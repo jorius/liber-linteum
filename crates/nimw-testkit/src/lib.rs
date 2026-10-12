@@ -20,6 +20,17 @@ pub fn copy_fixture(name: &str) -> TempDir {
     dir
 }
 
+/// Tests that move files to the real OS trash run only when `NIMW_TRASH_TESTS=1`
+/// (CI sets it). Locally they are skipped so test runs don't fill your Trash.
+/// Returns `false` (and prints why) when the test should skip itself.
+pub fn real_trash_tests_enabled() -> bool {
+    let enabled = std::env::var("NIMW_TRASH_TESTS").as_deref() == Ok("1");
+    if !enabled {
+        eprintln!("skipped: set NIMW_TRASH_TESTS=1 to run tests that use the real OS trash");
+    }
+    enabled
+}
+
 /// Like [`copy_fixture`], but inside the user's home folder so the OS trash
 /// works (on Linux the system temp dir is often a different filesystem than
 /// `~/.local/share/Trash`). Use only in tests that call `trash`.

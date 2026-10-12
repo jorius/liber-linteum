@@ -1,6 +1,6 @@
 use nimw_markdown::LinkKind;
 use nimw_session::{SessionError, SessionEvent, VaultSession};
-use nimw_testkit::{copy_fixture, snapshot, trashable_fixture};
+use nimw_testkit::{copy_fixture, real_trash_tests_enabled, snapshot, trashable_fixture};
 use nimw_vault::VaultPath;
 use std::sync::{Arc, Mutex};
 
@@ -247,6 +247,9 @@ fn exp_02_create_page_and_folder_resolve_waiting_links() {
 
 #[test]
 fn exp_03_trash_removes_from_index_and_unresolves_links() {
+    if !real_trash_tests_enabled() {
+        return;
+    }
     let vault = trashable_fixture("obsidian-basic");
     let cache = tempfile::tempdir().unwrap();
     let (s, ..) = open(vault.path(), cache.path());

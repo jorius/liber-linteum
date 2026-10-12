@@ -1,4 +1,4 @@
-use nimw_testkit::trashable_fixture;
+use nimw_testkit::{real_trash_tests_enabled, trashable_fixture};
 use nimw_vault::{Hash, Vault, VaultError, VaultPath};
 use proptest::prelude::*;
 
@@ -115,6 +115,9 @@ fn exp_02_case_only_rename() {
 
 #[test]
 fn exp_03_trash_moves_to_os_trash() {
+    if !real_trash_tests_enabled() {
+        return;
+    }
     let dir = trashable_fixture("ambiguous-names");
     let vault = Vault::open(dir.path()).unwrap();
     vault.trash(&vp("Archive")).unwrap();
