@@ -1,0 +1,21 @@
+{
+  "name": "notes-in-my-way",
+  "private": true,
+  "license": "GPL-3.0-or-later",
+  "packageManager": "pnpm@12.11.2",
+  "engines": { "node": ">=22.18" },
+  "scripts": {
+    "dev": "pnpm --filter @nimw/desktop tauri dev",
+    "build": "pnpm --filter @nimw/desktop tauri build",
+    "build:ui": "pnpm --filter @nimw/desktop build",
+    "lint": "pnpm --filter @nimw/desktop lint && prettier --check .",
+    "format": "prettier --write .",
+    "typecheck": "pnpm --filter @nimw/desktop typecheck",
+    "test": "pnpm --filter @nimw/desktop test",
+    "check:i18n": "pnpm --filter @nimw/desktop check:i18n",
+    "check": "pnpm lint && pnpm typecheck && pnpm test && pnpm check:i18n && pnpm build:ui && cargo fmt --all --check && cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace"
+  },
+  "devDependencies": {
+    "prettier": "^3.9.10"
+  }
+}
