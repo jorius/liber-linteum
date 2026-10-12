@@ -79,6 +79,11 @@
   cursor: pointer;
 }
 
+.segmented button:focus-visible {
+  /* The container clips overflow, so draw the global focus outline inside the button. */
+  outline-offset: -3px;
+}
+
 .segmented button + button {
   border-left: 1px solid var(--color-border);
 }
