@@ -2,7 +2,7 @@
 
 > **Status:** Approved in design review · **Date:** 2026-10-12
 > **Roles:** Jose — tech lead (decisions below are DECIDED) · PO — product owner
-> **Companion to:** `notes-in-my-way-spec.md` v0.2 (the *what*). This file is the *how*.
+> **Companion to:** `docs/product-spec.md` v0.2 (the *what*). This file is the *how*.
 > Requirement IDs (e.g. `GV-11`) refer to the product spec.
 
 ---
@@ -28,7 +28,7 @@
 | i18n | i18next, ICU JSON per locale |
 | License | **GPL-3.0-or-later** |
 | Platforms | macOS, Windows, Linux (`.deb`, `.AppImage`) shipped **simultaneously** |
-| Toolchain | Node 22 LTS, pnpm workspaces, Rust stable pinned via `rust-toolchain.toml`, Tauri 2.x |
+| Toolchain | Node ≥ 22.18 (CI: 24 LTS), pnpm workspaces, Rust stable pinned via `rust-toolchain.toml`, Tauri 2.x |
 
 ---
 
