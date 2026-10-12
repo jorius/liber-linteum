@@ -1,0 +1,23 @@
+[package]
+name = "nimw-session"
+description = "One open vault: indexing, watching and file operations over nimw-vault, nimw-markdown and nimw-index."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+nimw-index = { path = "../nimw-index" }
+nimw-markdown = { path = "../nimw-markdown" }
+nimw-vault = { path = "../nimw-vault" }
+percent-encoding.workspace = true
+rayon.workspace = true
+thiserror.workspace = true
+
+[dev-dependencies]
+nimw-testkit = { path = "../nimw-testkit" }
+proptest.workspace = true
+tempfile.workspace = true
+
+[lints]
+workspace = true
