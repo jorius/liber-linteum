@@ -1,0 +1,20 @@
+{
+  "app": {
+    "name": "Notes In My Way",
+    "tagline": "Private notes that live on your disk. No cloud, no accounts, no telemetry.",
+    "version": "v{version}"
+  },
+  "welcome": {
+    "language": "Language",
+    "create": "Create a new vault",
+    "open": "Open a folder as vault",
+    "openObsidian": "Open an Obsidian vault",
+    "importNotion": "Import a Notion export",
+    "recent": "Recent",
+    "noRecent": "No recent vaults yet.",
+    "comingSoon": "Vault actions arrive in the next milestone."
+  },
+  "languages": { "en": "English", "es": "Español" },
+  "screens": { "global": "Global view", "edit": "Edit" },
+  "privacy": { "localOnly": "Local only · zero network requests" }
+}
