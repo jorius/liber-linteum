@@ -40,20 +40,40 @@ export function Welcome({ version }: WelcomeProps) {
           </div>
         </div>
 
-        <div className={styles.actions} aria-describedby="welcome-coming-soon">
-          <button type="button" className={`${styles.button} ${styles.primary}`} disabled>
+        <div className={styles.actions}>
+          <button
+            type="button"
+            className={`${styles.button} ${styles.primary}`}
+            disabled
+            aria-describedby="welcome-coming-soon"
+          >
             <PlusIcon />
             {t('welcome.create')}
           </button>
-          <button type="button" className={styles.button} disabled>
+          <button
+            type="button"
+            className={styles.button}
+            disabled
+            aria-describedby="welcome-coming-soon"
+          >
             <FolderIcon />
             {t('welcome.open')}
           </button>
-          <button type="button" className={styles.button} disabled>
+          <button
+            type="button"
+            className={styles.button}
+            disabled
+            aria-describedby="welcome-coming-soon"
+          >
             <VaultIcon />
             {t('welcome.openObsidian')}
           </button>
-          <button type="button" className={styles.button} disabled>
+          <button
+            type="button"
+            className={styles.button}
+            disabled
+            aria-describedby="welcome-coming-soon"
+          >
             <ImportIcon />
             {t('welcome.importNotion')}
           </button>

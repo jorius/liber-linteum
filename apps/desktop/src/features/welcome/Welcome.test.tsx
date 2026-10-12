@@ -20,6 +20,20 @@ describe('Welcome screen', () => {
     expect(screen.getByText('v0.1.0')).toBeInTheDocument();
   });
 
+  it('describes each disabled vault action with the coming-soon note', () => {
+    render(<Welcome version={null} />);
+    for (const name of [
+      'Create a new vault',
+      'Open a folder as vault',
+      'Open an Obsidian vault',
+      'Import a Notion export',
+    ]) {
+      expect(screen.getByRole('button', { name })).toHaveAccessibleDescription(
+        'Vault actions arrive in the next milestone.',
+      );
+    }
+  });
+
   it('Q-I18N-1 language toggle switches the UI to Spanish', async () => {
     render(<Welcome version={null} />);
     const es = screen.getByRole('button', { name: 'Español' });
