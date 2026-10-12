@@ -1,8 +1,13 @@
 pub mod commands;
 
+/// Registers everything the app exposes to the webview. Shared by `run()` and the
+/// IPC integration tests so the tests exercise the real command registration.
+pub fn configure<R: tauri::Runtime>(builder: tauri::Builder<R>) -> tauri::Builder<R> {
+    builder.invoke_handler(tauri::generate_handler![commands::app_info])
+}
+
 pub fn run() {
-    tauri::Builder::default()
-        .invoke_handler(tauri::generate_handler![commands::app_info])
+    configure(tauri::Builder::default())
         .run(tauri::generate_context!())
         .expect("error while running Notes In My Way");
 }
