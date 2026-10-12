@@ -4,7 +4,7 @@ use nimw_index::{FileKind, FileRow, Index, Stat, cache_dir_name};
 use nimw_markdown::{PageMeta, link_key, parse_page};
 use nimw_vault::{Entry, EntryKind, Hash, Vault, VaultPath, is_hidden_name};
 use rayon::prelude::*;
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex, MutexGuard};
@@ -340,4 +340,17 @@ pub(crate) fn validate_name(name: &str) -> Result<&str> {
         return Err(SessionError::InvalidName(name.to_string()));
     }
     Ok(trimmed)
+}
+
+/// Paths of every file at or below `path` in `stats` (for folder moves).
+pub(crate) fn subtree_files(stats: &HashMap<String, Stat>, path: &VaultPath) -> Vec<String> {
+    let mut out: Vec<String> = stats
+        .iter()
+        .filter(|(p, s)| {
+            s.kind != FileKind::Folder && VaultPath::new(p).is_ok_and(|vp| vp.starts_with(path))
+        })
+        .map(|(p, _)| p.clone())
+        .collect();
+    out.sort();
+    out
 }

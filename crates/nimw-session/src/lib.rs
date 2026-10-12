@@ -3,6 +3,7 @@
 
 mod error;
 mod events;
+mod rename;
 mod session;
 
 pub use error::{Result, SessionError};
