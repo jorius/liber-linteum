@@ -1,0 +1,59 @@
+[graph]
+all-features = false
+# Scope checks to the desktop targets that ship. tauri pulls reqwest/hyper only
+# for mobile (android/iOS) targets, so this scopes the network-crate ban to
+# what is actually compiled into the app.
+targets = [
+  "x86_64-unknown-linux-gnu",
+  "aarch64-unknown-linux-gnu",
+  "x86_64-pc-windows-msvc",
+  "aarch64-pc-windows-msvc",
+  "x86_64-apple-darwin",
+  "aarch64-apple-darwin",
+]
+
+[advisories]
+# proc-macro-error is an unmaintained build-time proc-macro pulled in by the
+# gtk3-rs crates (glib-macros, gtk3-macros) that tauri/wry use on Linux. It is
+# not fixable here; revisit when tauri moves to gtk4 or updated gtk3-rs.
+ignore = [
+  { id = "RUSTSEC-2024-0370", reason = "unmaintained; transitive via tauri's gtk3 on Linux, no safe upgrade" },
+]
+
+[licenses]
+# Must stay compatible with GPL-3.0-or-later (NFR-09).
+allow = [
+  "MIT",
+  "MIT-0",
+  "Apache-2.0",
+  "Apache-2.0 WITH LLVM-exception",
+  "BSD-2-Clause",
+  "BSD-3-Clause",
+  "ISC",
+  "Zlib",
+  "Unicode-3.0",
+  "MPL-2.0",
+  "CC0-1.0",
+  "BSL-1.0",
+  "Unlicense",
+  "GPL-3.0-or-later",
+]
+confidence-threshold = 0.9
+
+[licenses.private]
+ignore = true
+
+[bans]
+multiple-versions = "allow"
+# P1 / NFR-04: the app contains no network client code.
+deny = [
+  { crate = "reqwest", reason = "P1/NFR-04: no network clients" },
+  { crate = "ureq", reason = "P1/NFR-04: no network clients" },
+  { crate = "isahc", reason = "P1/NFR-04: no network clients" },
+  { crate = "curl", reason = "P1/NFR-04: no network clients" },
+  { crate = "hyper", reason = "P1/NFR-04: no network clients" },
+]
+
+[sources]
+unknown-registry = "deny"
+unknown-git = "deny"
