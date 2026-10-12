@@ -51,6 +51,12 @@ export default defineConfig(
         ),
         { object: 'navigator', property: 'sendBeacon', message: NETWORK },
       ],
+      // sendBeacon is caught on any object chain (window.navigator.sendBeacon, ...).
+      'no-restricted-syntax': [
+        'error',
+        { selector: "MemberExpression[property.name='sendBeacon']", message: NETWORK },
+        { selector: "MemberExpression[property.value='sendBeacon']", message: NETWORK },
+      ],
       'no-restricted-imports': backendImportRule(false),
     },
   },

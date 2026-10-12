@@ -35,11 +35,16 @@ describe('NFR-04 network ban (lint layer)', () => {
     "globalThis['fetch']('x');",
     "window['WebSocket'];",
     "navigator['sendBeacon']('x', '');",
+    "window.navigator.sendBeacon('x', '');",
+    "globalThis.navigator.sendBeacon('x', '');",
+    "window['navigator']['sendBeacon']('x', '');",
     'const { fetch: f } = window;',
     'const { WebSocket: W } = globalThis;',
     'const { sendBeacon } = navigator;',
   ])('rejects indirect %s', async (code) => {
-    expect(await ruleIds(`export {}; ${code}`)).toContain('no-restricted-properties');
+    expect(await ruleIds(`export {}; ${code}`)).toEqual(
+      expect.arrayContaining([expect.stringMatching(/^no-restricted-(properties|syntax)$/)]),
+    );
   });
 
   it('rejects @tauri-apps/api/core outside src/ipc', async () => {
