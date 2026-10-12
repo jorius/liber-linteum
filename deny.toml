@@ -52,6 +52,15 @@ deny = [
   { crate = "isahc", reason = "P1/NFR-04: no network clients" },
   { crate = "curl", reason = "P1/NFR-04: no network clients" },
   { crate = "hyper", reason = "P1/NFR-04: no network clients" },
+  { crate = "tauri-plugin-http", reason = "P1/NFR-04: no network clients" },
+  { crate = "tauri-plugin-updater", reason = "P1/NFR-04: no network clients" },
+  { crate = "tauri-plugin-shell", reason = "P1/NFR-04: no network clients" },
+  { crate = "tauri-plugin-websocket", reason = "P1/NFR-04: no network clients" },
+  { crate = "tauri-plugin-upload", reason = "P1/NFR-04: no network clients" },
+  { crate = "tungstenite", reason = "P1/NFR-04: no network clients" },
+  { crate = "tokio-tungstenite", reason = "P1/NFR-04: no network clients" },
+  { crate = "h2", reason = "P1/NFR-04: no network clients" },
+  { crate = "attohttpc", reason = "P1/NFR-04: no network clients" },
 ]
 
 [sources]
