@@ -4,10 +4,12 @@
 mod body;
 mod frontmatter;
 mod page;
+mod resolve;
 mod title;
 mod types;
 mod wikilink;
 
 pub use page::parse_page;
+pub use resolve::{FileSet, link_key, name_key, normalize_join, resolve, shortest_unique_target};
 pub use title::extract_title;
 pub use types::{LinkKind, LinkRef, PageMeta, Tag};
