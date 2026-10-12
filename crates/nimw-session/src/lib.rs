@@ -5,6 +5,7 @@ mod error;
 mod events;
 mod rename;
 mod session;
+mod watching;
 
 pub use error::{Result, SessionError};
 pub use events::{IndexReport, RenameOutcome, SessionEvent};

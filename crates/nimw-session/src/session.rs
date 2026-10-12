@@ -2,7 +2,7 @@ use crate::error::{Result, SessionError};
 use crate::events::{IndexReport, SessionEvent};
 use nimw_index::{FileKind, FileRow, Index, Stat, cache_dir_name};
 use nimw_markdown::{PageMeta, link_key, parse_page};
-use nimw_vault::{Entry, EntryKind, Hash, Vault, VaultPath, is_hidden_name};
+use nimw_vault::{Entry, EntryKind, Hash, Vault, VaultPath, Watcher, is_hidden_name};
 use rayon::prelude::*;
 use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
@@ -20,6 +20,7 @@ pub struct VaultSession {
     pub(crate) vault: Vault,
     pub(crate) index: Mutex<Index>,
     pub(crate) sink: Sink,
+    pub(crate) watcher: Mutex<Option<Watcher>>,
 }
 
 impl std::fmt::Debug for VaultSession {
@@ -65,8 +66,9 @@ impl VaultSession {
             vault,
             index: Mutex::new(index),
             sink: Arc::new(sink),
+            watcher: Mutex::new(None),
         };
-        let report = session.reindex_all()?;
+        let (report, _) = session.reindex_all()?;
         Ok((session, report))
     }
 
@@ -82,8 +84,9 @@ impl VaultSession {
         (self.sink)(event);
     }
 
-    /// Full incremental pass (spec §6.2).
-    pub(crate) fn reindex_all(&self) -> Result<IndexReport> {
+    /// Full incremental pass (open and watcher overflow). Returns the report and
+    /// the created/modified/removed paths.
+    pub(crate) fn reindex_all(&self) -> Result<(IndexReport, Changes)> {
         let started = Instant::now();
         let scan = self.vault.scan()?;
         let mut report = IndexReport {
@@ -136,10 +139,26 @@ impl VaultSession {
             .collect();
         report.warnings.extend(warnings.into_inner().unwrap());
 
-        report.parsed = loaded
-            .iter()
-            .filter(|l| !matches!(l, Loaded::StatOnly(_)))
-            .count();
+        let mut changes = Changes {
+            removed: removed.clone(),
+            ..Changes::default()
+        };
+        for l in &loaded {
+            let (path, is_new) = match l {
+                Loaded::StatOnly(r) => (&r.path, false),
+                Loaded::Page(r, _) | Loaded::Attachment(r) => {
+                    (&r.path, !stored.contains_key(&r.path))
+                }
+            };
+            if !matches!(l, Loaded::StatOnly(_)) {
+                report.parsed += 1;
+                if is_new {
+                    changes.created.push(path.clone())
+                } else {
+                    changes.modified.push(path.clone())
+                }
+            }
+        }
         report.removed = removed.len();
 
         {
@@ -159,7 +178,7 @@ impl VaultSession {
         }
         report.duration = started.elapsed();
         self.emit(SessionEvent::Indexed(report.clone()));
-        Ok(report)
+        Ok((report, changes))
     }
 
     /// Reads, hashes and (for pages) parses one file. `None` if it vanished.
@@ -297,6 +316,14 @@ impl VaultSession {
         index.resolve_affected(&files, &keys)?;
         Ok(())
     }
+}
+
+/// Created/modified/removed paths of one pass.
+#[derive(Debug, Default)]
+pub(crate) struct Changes {
+    pub created: Vec<String>,
+    pub modified: Vec<String>,
+    pub removed: Vec<String>,
 }
 
 pub(crate) fn write_loaded(tx: &nimw_index::Tx<'_>, loaded: &Loaded) -> nimw_index::Result<()> {
