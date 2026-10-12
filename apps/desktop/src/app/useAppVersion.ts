@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { appInfo } from '../ipc';
+import { appInfo, isTauri } from '../ipc';
 
 export function useAppVersion(): string | null {
   const [version, setVersion] = useState<string | null>(null);
@@ -9,8 +9,10 @@ export function useAppVersion(): string | null {
       .then((info) => {
         if (!cancelled) setVersion(info.version);
       })
-      .catch(() => {
-        // Not running inside Tauri (e.g. plain `vite` in a browser): the version stays hidden.
+      .catch((error: unknown) => {
+        // Outside Tauri (plain `vite` in a browser) the version just stays hidden.
+        // Inside Tauri a failure means a broken command or capability: make it visible.
+        if (isTauri()) console.error('app_info IPC failed', error);
       });
     return () => {
       cancelled = true;
