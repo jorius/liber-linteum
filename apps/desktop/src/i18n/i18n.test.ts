@@ -28,4 +28,13 @@ describe('initI18n', () => {
     await i18n.changeLanguage('es');
     expect(i18n.t('welcome.create')).toBe('Crear una bóveda nueva');
   });
+
+  it('NFR-10 keeps <html lang> in sync with the UI language', async () => {
+    const i18n = await initI18n('es');
+    expect(document.documentElement.lang).toBe('es');
+    await i18n.changeLanguage('en');
+    expect(document.documentElement.lang).toBe('en');
+    await i18n.changeLanguage('es');
+    expect(document.documentElement.lang).toBe('es');
+  });
 });

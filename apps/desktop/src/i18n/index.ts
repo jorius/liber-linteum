@@ -20,6 +20,11 @@ export function detectLanguage(preferred: readonly string[]): Language {
   return 'en';
 }
 
+// NFR-10: assistive tech and hyphenation need <html lang> to match the UI language.
+function syncDocumentLang(language: string) {
+  if (typeof document !== 'undefined') document.documentElement.lang = language;
+}
+
 export async function initI18n(language: Language) {
   const resources = Object.fromEntries(
     Object.entries(LOCALES).map(([lng, translation]) => [lng, { translation }]),
@@ -28,5 +33,8 @@ export async function initI18n(language: Language) {
     .use(ICU)
     .use(initReactI18next)
     .init({ resources, lng: language, fallbackLng: 'en', interpolation: { escapeValue: false } });
+  syncDocumentLang(i18next.language);
+  i18next.off('languageChanged', syncDocumentLang);
+  i18next.on('languageChanged', syncDocumentLang);
   return i18next;
 }
