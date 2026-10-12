@@ -9,6 +9,26 @@ const NETWORK =
 const NETWORK_GLOBALS = ['fetch', 'XMLHttpRequest', 'WebSocket', 'EventSource'];
 const GLOBAL_OBJECTS = ['window', 'globalThis', 'self'];
 
+const BACKEND = 'Import backend calls from src/ipc/ only.';
+// Backend access is confined to src/ipc/. `@tauri-apps/api/mocks` is the one
+// exception, and only in test files (see the override below).
+const backendImportRule = (allowMocksInTests) => [
+  'error',
+  {
+    paths: [{ name: '@tauri-apps/api', message: BACKEND }],
+    patterns: [
+      {
+        group: [
+          '@tauri-apps/api/*',
+          ...(allowMocksInTests ? ['!@tauri-apps/api/mocks'] : []),
+          '@tauri-apps/plugin-*',
+        ],
+        message: BACKEND,
+      },
+    ],
+  },
+];
+
 export default defineConfig(
   { ignores: ['dist/**', 'src-tauri/**'] },
   js.configs.recommended,
@@ -31,15 +51,9 @@ export default defineConfig(
         ),
         { object: 'navigator', property: 'sendBeacon', message: NETWORK },
       ],
-      'no-restricted-imports': [
-        'error',
-        {
-          paths: [
-            { name: '@tauri-apps/api/core', message: 'Import backend calls from src/ipc/ only.' },
-          ],
-        },
-      ],
+      'no-restricted-imports': backendImportRule(false),
     },
   },
+  { files: ['**/*.test.{ts,tsx}'], rules: { 'no-restricted-imports': backendImportRule(true) } },
   { files: ['src/ipc/**'], rules: { 'no-restricted-imports': 'off' } },
 );
