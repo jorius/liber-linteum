@@ -82,3 +82,158 @@ pub fn wait_until(timeout: Duration, mut check: impl FnMut() -> bool) -> bool {
     }
     check()
 }
+
+/// Shape of a generated benchmark vault (spec §7.3).
+#[derive(Debug, Clone, Copy)]
+pub struct VaultShape {
+    pub notes: usize,
+    pub folders: usize,
+    pub max_depth: usize,
+    pub links_per_note: usize,
+    pub tags_per_note: usize,
+    pub attachments: usize,
+    /// Notes that link to `hub.md` (for the rename benchmark).
+    pub hub_backlinks: usize,
+}
+
+impl VaultShape {
+    /// The NFR-01 target: 10,000 notes.
+    pub const TEN_K: VaultShape = VaultShape {
+        notes: 10_000,
+        folders: 400,
+        max_depth: 6,
+        links_per_note: 8,
+        tags_per_note: 3,
+        attachments: 1_000,
+        hub_backlinks: 100,
+    };
+}
+
+/// Tiny deterministic PRNG (xorshift64*), so generated vaults are identical
+/// on every machine without extra dependencies.
+struct Rng(u64);
+
+impl Rng {
+    fn next(&mut self) -> u64 {
+        self.0 ^= self.0 >> 12;
+        self.0 ^= self.0 << 25;
+        self.0 ^= self.0 >> 27;
+        self.0.wrapping_mul(0x2545_F491_4F6C_DD1D)
+    }
+
+    fn below(&mut self, n: usize) -> usize {
+        (self.next() % n as u64) as usize
+    }
+}
+
+/// Writes a deterministic vault into `root`: nested folders, notes with
+/// frontmatter (half of them), wikilinks/embeds/Markdown links, tags,
+/// attachments, and a `hub.md` with `hub_backlinks` backlinks. Returns the
+/// vault-relative paths of the generated notes (index = note number).
+pub fn generate_vault(root: &Path, shape: VaultShape, seed: u64) -> Vec<String> {
+    let mut rng = Rng(seed.max(1));
+    let mut folders = vec![String::new()];
+    for i in 0..shape.folders {
+        let parent = folders[rng.below(folders.len())].clone();
+        let depth = if parent.is_empty() {
+            0
+        } else {
+            parent.matches('/').count() + 1
+        };
+        let parent = if depth >= shape.max_depth {
+            String::new()
+        } else {
+            parent
+        };
+        let name = if parent.is_empty() {
+            format!("Folder {i}")
+        } else {
+            format!("{parent}/Folder {i}")
+        };
+        std::fs::create_dir_all(root.join(&name)).expect("create folder");
+        folders.push(name);
+    }
+    let in_folder = |folder: &str, file: &str| {
+        if folder.is_empty() {
+            file.to_string()
+        } else {
+            format!("{folder}/{file}")
+        }
+    };
+    let notes: Vec<String> = (0..shape.notes)
+        .map(|i| in_folder(&folders[i % folders.len()], &format!("Note {i}.md")))
+        .collect();
+    let attachments: Vec<String> = (0..shape.attachments)
+        .map(|i| in_folder(&folders[(i * 7) % folders.len()], &format!("image-{i}.png")))
+        .collect();
+    for a in &attachments {
+        std::fs::write(root.join(a), b"PNG placeholder").expect("write attachment");
+    }
+    std::fs::write(
+        root.join("hub.md"),
+        "# Hub\n\nThe page everyone links to.\n",
+    )
+    .expect("write hub");
+    for (i, path) in notes.iter().enumerate() {
+        let mut text = String::new();
+        if i % 2 == 0 {
+            text.push_str(&format!(
+                "---\nsubtitle: Generated note {i}\ntags: [gen, batch{}]\n---\n",
+                i % 50
+            ));
+        }
+        text.push_str(&format!(
+            "# Note {i}\n\nGenerated paragraph with some words for the excerpt.\n\n"
+        ));
+        if i < shape.hub_backlinks {
+            text.push_str("Back to [[hub]].\n");
+        }
+        for _ in 0..shape.links_per_note {
+            let link = match rng.below(4) {
+                0 | 1 => format!("[[Note {}]]", rng.below(shape.notes)),
+                2 => format!("![[image-{}.png]]", rng.below(shape.attachments.max(1))),
+                _ => format!("[x](</{}>)", notes[rng.below(shape.notes)]),
+            };
+            text.push_str(&format!("- {link}\n"));
+        }
+        for t in 0..shape.tags_per_note {
+            text.push_str(&format!("#topic{} ", (i + t * 13) % 200));
+        }
+        text.push('\n');
+        std::fs::write(root.join(path), text).expect("write note");
+    }
+    notes
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn generator_is_deterministic_and_shaped() {
+        let shape = VaultShape {
+            notes: 50,
+            folders: 10,
+            max_depth: 3,
+            links_per_note: 4,
+            tags_per_note: 2,
+            attachments: 5,
+            hub_backlinks: 3,
+        };
+        let a = tempfile::tempdir().unwrap();
+        let b = tempfile::tempdir().unwrap();
+        let notes = generate_vault(a.path(), shape, 7);
+        assert_eq!(notes.len(), 50);
+        assert!(a.path().join(&notes[49]).is_file());
+        generate_vault(b.path(), shape, 7);
+        let strip = |s: BTreeMap<PathBuf, (Vec<u8>, SystemTime)>| {
+            s.into_iter().map(|(k, (v, _))| (k, v)).collect::<Vec<_>>()
+        };
+        assert_eq!(strip(snapshot(a.path())), strip(snapshot(b.path())));
+        let files = strip(snapshot(a.path()))
+            .into_iter()
+            .filter(|(k, _)| k.extension().is_some_and(|e| e == "md"))
+            .count();
+        assert_eq!(files, 51, "50 notes + hub");
+    }
+}

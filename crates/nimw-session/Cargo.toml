@@ -15,9 +15,14 @@ rayon.workspace = true
 thiserror.workspace = true
 
 [dev-dependencies]
+criterion.workspace = true
 nimw-testkit = { path = "../nimw-testkit" }
 proptest.workspace = true
 tempfile.workspace = true
+
+[[bench]]
+name = "vault"
+harness = false
 
 [lints]
 workspace = true
