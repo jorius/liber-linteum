@@ -37,7 +37,7 @@
 | Architecture | Approved plan doc (`docs/superpowers/specs/2026-10-12-architecture-design.md`) |
 | M0 scaffold | **Implemented, reviewed, fixed, merged into `main`** (`b7532b4`) |
 | Automated checks | `pnpm check` green (57 Vitest tests + 25 Rust tests incl. 3 real-IPC tests), `cargo deny check` ok |
-| Real app window | Builds and launches; **visual check in the real Tauri window still needs a human** (see §14) |
+| Real app window | **Verified on macOS** with screenshots: fonts, V0.1.0 via real IPC, live dark/light, Spanish OS locale (bundled app). Open: keyboard Tab reachability in WKWebView (see §14) |
 | CI on GitHub | Workflow written; **never run on real runners** (no remote yet) |
 | Merge | **Merged locally into `main`**; full `pnpm check` + `cargo deny check` re-run green on the merged result. Not pushed (see §17.1) |
 
@@ -449,33 +449,31 @@ Earlier, during brainstorming, you also chose (not rulings — your answers): Ta
 
 ---
 
-## 14. What is NOT verified
+## 14. Verification status of the real app
 
-Please do these by hand — none can be automated from the agent sandbox (it lacks macOS Screen Recording / Accessibility permissions).
+Update 2026-10-12 (after Ghostty got Screen Recording permission): the agent launched the real app and checked it with screenshots. Results:
 
-### 14.1 Real window, production CSP (5 minutes)
+### 14.1 Real window, production CSP — ✅ verified on macOS
 
 ```bash
 pnpm --filter @nimw/desktop tauri build --debug --no-bundle
 ./target/debug/nimw-desktop
 ```
 
-Check:
-- [ ] The welcome card renders with **Bricolage Grotesque** (title) and **Plus Jakarta Sans** (body), not system fonts.
-- [ ] The label next to the logo reads **V0.1.0** → proves `app_info` passed the capability allowlist in the real webview. If it is missing, open devtools (debug build: right-click → Inspect) and look for `app_info IPC failed`.
-- [ ] The English/Español toggle is styled; clicking Español switches all text.
-- [ ] Pressing **Tab** moves focus to the toggle buttons with a visible ring.
-- [ ] Devtools console: no CSP violation messages.
+- [x] Welcome card renders with **Bricolage Grotesque** (title) and **Plus Jakarta Sans** (body) — bundled fonts load under the production CSP.
+- [x] The label next to the logo reads **V0.1.0** → `app_info` passed the capability allowlist in the real WKWebView.
+- [x] The English/Español toggle is styled (inline styles allowed by the CSP).
+- [ ] **Keyboard focus — not verified, and a likely gap.** In WKWebView (like Safari), **Tab skips buttons unless macOS "Keyboard navigation" is enabled** (System Settings → Keyboard → Keyboard navigation; on this Mac `AppleKeyboardUIMode` is unset = off). The welcome screen has only buttons, so with the default macOS setting Tab may reach nothing. The focus-ring CSS fix is verified in Chromium; the reachability question is tracked for M1 (§15). The agent did not complete this check because synthetic Option+Tab is bound to a window switcher on this machine.
+- [ ] Devtools console check for CSP violations: not done in the real window (verified 0 violations in the browser run instead).
 
-What *was* verified by the agent instead: the built `dist` served in Chromium with the **exact production CSP header** and a mocked IPC → 0 CSP violations, local fonts loaded, `V0.1.0` rendered, Spanish toggle worked, dark tokens followed `prefers-color-scheme`. Plus `tests/ipc.rs` exercises the real ACL in Tauri's mock runtime. So the remaining risk is WKWebView-specific rendering.
+Note: the unbundled binary shows "nimw-desktop" in the macOS menu bar; the bundled `.app` shows "Notes In My Way" with its own Dock icon (expected).
 
-### 14.2 Dark mode
-- [ ] With the app open, switch System Settings → Appearance between Light and Dark: the background and card switch live, no restart.
+### 14.2 Dark mode — ✅ verified
+- [x] Real window follows the OS appearance live: switching macOS Light ↔ Dark repainted the background and card without restart (your Dark setting was restored afterwards).
 
-### 14.3 Spanish OS locale (Q-I18N-1) — the open question
-WKWebView derives `navigator.languages` from the app bundle's localizations. `Info.plist` now declares en/es, but that only applies to the **bundled** `.app`.
-- [ ] `pnpm build` (or `tauri build --debug` without `--no-bundle`), then launch the `.app` with `open target/debug/bundle/macos/Notes\ In\ My\ Way.app --args -AppleLanguages '(es)'` (or set macOS language to Español). Expected: UI starts in Spanish.
-- If it starts in English → implement the M1 fallback: a Rust command returning the OS locale via the `sys-locale` crate (MIT/Apache, no network), passed first into `detectLanguage`.
+### 14.3 Spanish OS locale (Q-I18N-1) — ✅ verified (bundled app)
+- [x] `pnpm --filter @nimw/desktop tauri build --debug --bundles app`, then `open -n "target/debug/bundle/macos/Notes In My Way.app" --args -AppleLanguages '(es)'` → the UI starts in **Spanish** ("Notas privadas…", Español pressed, "Idioma"). The bundle's `Info.plist` contains `CFBundleLocalizations = [en, es]`.
+- The Rust `sys-locale` fallback is therefore **not needed** for macOS. Still to check on Windows (WebView2) and Linux (WebKitGTK, follows `LANG`).
 
 ### 14.4 CI on real runners
 - [ ] After adding a GitHub remote and opening a PR, confirm all 5 jobs (frontend, rust ×3, deny) pass. Most likely first-run failures: Linux apt packages, pnpm 12 with `pnpm/action-setup@v4`.
@@ -490,7 +488,8 @@ WKWebView derives `navigator.languages` from the app bundle's localizations. `In
 | Item | Detail | Target |
 |---|---|---|
 | Language choice not persisted | Toggle resets on restart | Settings/persistence milestone (M1 settings store) |
-| OS-locale fallback in Rust | Only if §14.3 shows English on a Spanish Mac | M1 |
+| OS-locale detection on Windows/Linux | macOS verified (§14.3); confirm WebView2 / WebKitGTK report the OS language, else add a `sys-locale` Rust command | M1 |
+| Keyboard reachability on macOS | WKWebView skips buttons on Tab when macOS Keyboard navigation is off (default). Decide: rely on the OS setting (Safari behaviour), or handle Tab/arrow navigation in-app for the welcome actions and the Global View (NFR-10, GV-18). Verify the focus ring in the real window | M1 |
 | `initI18n` hardening | Re-running re-adds plugins (harmless now); no `.catch` in `main.tsx` (init failure = blank window) | M1 |
 | Locale check scans folder, not registry | A JSON file missing from `LOCALES` (or vice versa) isn't caught | When adding a 3rd language |
 | `cache_dir_name` on Windows | Canonical paths carry `\\?\` prefix; normalize before hashing | M1 |
