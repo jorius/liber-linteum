@@ -3,6 +3,7 @@
 
 mod config;
 mod error;
+mod fsops;
 mod hash;
 mod path;
 mod scan;
@@ -10,6 +11,7 @@ mod vault;
 
 pub use config::AttachmentPolicy;
 pub use error::{Result, VaultError};
+pub use fsops::TMP_MARKER;
 pub use hash::Hash;
 pub use path::VaultPath;
 pub use scan::{Entry, EntryKind, Scan};

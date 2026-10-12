@@ -13,9 +13,11 @@ globset.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 thiserror.workspace = true
+trash.workspace = true
 
 [dev-dependencies]
 nimw-testkit = { path = "../nimw-testkit" }
+proptest.workspace = true
 tempfile.workspace = true
 
 [lints]
