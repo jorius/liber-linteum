@@ -1,4 +1,13 @@
-//! Vault filesystem model: scanning, watching, atomic writes, trash, link rewrites.
+//! Vault filesystem model: scanning, watching, atomic writes, trash.
+//! Every path crossing this crate's boundary is vault-relative ([`VaultPath`]).
+
+mod error;
+mod hash;
+mod path;
+
+pub use error::{Result, VaultError};
+pub use hash::Hash;
+pub use path::VaultPath;
 
 /// VLT-05: dot-entries (`.obsidian`, `.git`, `.nimw`, …) are ignored everywhere.
 pub fn is_hidden_name(name: &str) -> bool {
