@@ -1,0 +1,360 @@
+use crate::types::{LinkKind, LinkRef, Tag};
+use crate::wikilink;
+use percent_encoding::percent_decode_str;
+use pulldown_cmark::{Event, HeadingLevel, LinkType, Options, Parser, Tag as MdTag, TagEnd};
+use std::ops::Range;
+
+const EXCERPT_CHARS: usize = 200;
+
+#[derive(Debug, Default)]
+pub(crate) struct Body {
+    pub links: Vec<LinkRef>,
+    pub tags: Vec<Tag>,
+    pub excerpt: String,
+}
+
+/// Extracts links, tags and the excerpt from the Markdown body. Code (fenced,
+/// indented, inline), HTML blocks/inline HTML and comments are ignored.
+pub(crate) fn extract(src: &str) -> Body {
+    let options = Options::ENABLE_YAML_STYLE_METADATA_BLOCKS
+        | Options::ENABLE_TABLES
+        | Options::ENABLE_TASKLISTS
+        | Options::ENABLE_STRIKETHROUGH;
+    let mut body = Body::default();
+    let mut regions: Vec<Range<usize>> = Vec::new();
+    let mut excerpt_regions: Vec<Range<usize>> = Vec::new();
+    let mut in_code = 0usize;
+    let mut in_meta = false;
+    let mut in_heading = false;
+    for (event, range) in Parser::new_ext(src, options).into_offset_iter() {
+        match event {
+            Event::Start(MdTag::MetadataBlock(_)) => in_meta = true,
+            Event::End(TagEnd::MetadataBlock(_)) => in_meta = false,
+            Event::Start(MdTag::CodeBlock(_)) => in_code += 1,
+            Event::End(TagEnd::CodeBlock) => in_code = in_code.saturating_sub(1),
+            Event::Start(MdTag::Heading { level, .. }) => {
+                in_heading = true;
+                if level == HeadingLevel::H1 {
+                    excerpt_regions.clear();
+                }
+            }
+            Event::End(TagEnd::Heading(_)) => in_heading = false,
+            Event::Start(MdTag::Link {
+                link_type,
+                dest_url,
+                ..
+            }) => {
+                if let Some(link) =
+                    markdown_link(src, &range, link_type, &dest_url, LinkKind::Markdown)
+                {
+                    body.links.push(link);
+                }
+            }
+            Event::Start(MdTag::Image {
+                link_type,
+                dest_url,
+                ..
+            }) => {
+                if let Some(link) =
+                    markdown_link(src, &range, link_type, &dest_url, LinkKind::MarkdownImage)
+                {
+                    body.links.push(link);
+                }
+            }
+            Event::Text(_) if in_code == 0 && !in_meta => {
+                push_merged(&mut regions, range.clone());
+                if !in_heading {
+                    push_merged(&mut excerpt_regions, range);
+                }
+            }
+            Event::SoftBreak | Event::HardBreak if !in_heading => {
+                push_merged(&mut excerpt_regions, range);
+            }
+            _ => {}
+        }
+    }
+    for region in &regions {
+        let text = &src[region.clone()];
+        for occ in wikilink::find_all(text) {
+            // An escaped `[[` has its backslash just before the text region.
+            let open = region.start + occ.inner.start - 2;
+            if !occ.embed && open > 0 && src.as_bytes()[open - 1] == b'\\' {
+                continue;
+            }
+            let Some(parts) = wikilink::parse_inner(&text[occ.inner.clone()]) else {
+                continue;
+            };
+            let start = region.start + occ.inner.start + parts.target_range.start;
+            let kind = if occ.embed {
+                LinkKind::Embed
+            } else {
+                LinkKind::Wiki
+            };
+            let mut link = LinkRef::new(kind, parts.target, start..start + parts.target.len());
+            link.heading = parts.heading.map(str::to_string);
+            link.alias = parts.alias.map(str::to_string);
+            body.links.push(link);
+        }
+        tags_in(text, &mut body.tags);
+    }
+    body.links.sort_by_key(|l| l.range.start);
+    body.excerpt = excerpt(src, &excerpt_regions);
+    body
+}
+
+/// Appends `r`, merging it with the previous range when they touch.
+/// (pulldown-cmark splits text at `[`, so `[[x]]` arrives in pieces.)
+fn push_merged(regions: &mut Vec<Range<usize>>, r: Range<usize>) {
+    match regions.last_mut() {
+        Some(last) if last.end == r.start => last.end = r.end,
+        _ => regions.push(r),
+    }
+}
+
+fn has_scheme(dest: &str) -> bool {
+    let Some(colon) = dest.find(':') else {
+        return false;
+    };
+    let scheme = &dest[..colon];
+    !scheme.is_empty()
+        && scheme.as_bytes()[0].is_ascii_alphabetic()
+        && scheme
+            .bytes()
+            .all(|b| b.is_ascii_alphanumeric() || b == b'+' || b == b'-' || b == b'.')
+}
+
+fn markdown_link(
+    src: &str,
+    range: &Range<usize>,
+    link_type: LinkType,
+    dest_url: &str,
+    kind: LinkKind,
+) -> Option<LinkRef> {
+    if link_type != LinkType::Inline
+        || dest_url.is_empty()
+        || dest_url.starts_with('#')
+        || has_scheme(dest_url)
+    {
+        return None;
+    }
+    let slice = &src[range.clone()];
+    let mut search = 0;
+    let (dest_start, angle) = loop {
+        let pos = search + slice[search..].find("](")?;
+        let after = pos + 2;
+        if slice[after..].starts_with(dest_url) {
+            break (after, false);
+        }
+        if slice[after..].starts_with('<') && slice[after + 1..].starts_with(dest_url) {
+            break (after + 1, true);
+        }
+        search = after;
+    };
+    let (path_part, heading) = match dest_url.find('#') {
+        Some(i) => (&dest_url[..i], Some(&dest_url[i + 1..])),
+        None => (dest_url, None),
+    };
+    if path_part.is_empty() {
+        return None;
+    }
+    let target = percent_decode_str(path_part)
+        .decode_utf8()
+        .ok()?
+        .to_string();
+    let abs = range.start + dest_start;
+    let mut link = LinkRef::new(kind, &target, abs..abs + path_part.len());
+    link.heading = heading.filter(|h| !h.is_empty()).map(str::to_string);
+    link.encoded = path_part.contains('%');
+    link.angle = angle;
+    Some(link)
+}
+
+fn is_tag_char(c: char) -> bool {
+    c.is_alphanumeric() || c == '_' || c == '-' || c == '/'
+}
+
+/// Obsidian tag rules: `#` at the start or after whitespace, then tag
+/// characters with at least one non-digit; trailing `/` dropped.
+fn tags_in(text: &str, out: &mut Vec<Tag>) {
+    let mut prev: Option<char> = None;
+    for (i, c) in text.char_indices() {
+        if c == '#' && prev.is_none_or(char::is_whitespace) {
+            let rest = &text[i + 1..];
+            let len: usize = rest
+                .chars()
+                .take_while(|&c| is_tag_char(c))
+                .map(char::len_utf8)
+                .sum();
+            let tag = rest[..len].trim_end_matches('/');
+            if !tag.is_empty()
+                && tag.chars().any(|c| !c.is_ascii_digit())
+                && !tag.starts_with('/')
+                && !out.iter().any(|t| t.key == tag.to_lowercase())
+            {
+                out.push(Tag::new(tag));
+            }
+        }
+        prev = Some(c);
+    }
+}
+
+/// Plain text of non-heading paragraphs after the first H1, with wikilinks
+/// shown as their alias or target and embeds dropped; ≤ 200 chars.
+fn excerpt(src: &str, regions: &[Range<usize>]) -> String {
+    let mut words = String::new();
+    for region in regions {
+        let text = &src[region.clone()];
+        let mut rendered = String::new();
+        let mut last = 0;
+        for occ in wikilink::find_all(text) {
+            rendered.push_str(&text[last..occ.whole.start]);
+            if !occ.embed
+                && let Some(p) = wikilink::parse_inner(&text[occ.inner.clone()])
+            {
+                rendered.push_str(p.alias.unwrap_or(p.target));
+            }
+            last = occ.whole.end;
+        }
+        rendered.push_str(&text[last..]);
+        words.push(' ');
+        words.push_str(&rendered.replace('\\', ""));
+    }
+    let collapsed = words.split_whitespace().collect::<Vec<_>>().join(" ");
+    if collapsed.chars().count() <= EXCERPT_CHARS {
+        collapsed
+    } else {
+        let cut: String = collapsed.chars().take(EXCERPT_CHARS).collect();
+        format!("{}…", cut.trim_end())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn targets(src: &str) -> Vec<(LinkKind, String, String)> {
+        extract(src)
+            .links
+            .into_iter()
+            .map(|l| (l.kind, l.target, src[l.range].to_string()))
+            .collect()
+    }
+
+    #[test]
+    fn pg_05_wikilinks_and_embeds_with_target_ranges() {
+        let src = "See [[Sparda#Coat|the knight]], ![[img.png]] and [[ spaced ]].";
+        assert_eq!(
+            targets(src),
+            vec![
+                (LinkKind::Wiki, "Sparda".into(), "Sparda".into()),
+                (LinkKind::Embed, "img.png".into(), "img.png".into()),
+                (LinkKind::Wiki, "spaced".into(), "spaced".into()),
+            ]
+        );
+        let l = &extract(src).links[0];
+        assert_eq!(
+            (l.heading.as_deref(), l.alias.as_deref()),
+            (Some("Coat"), Some("the knight"))
+        );
+    }
+
+    #[test]
+    fn pg_05_ignored_regions_yield_no_links_or_tags() {
+        let src = "`[[a]]` `#t`\n\n```\n[[b]] #b\n```\n\n    [[c]] #c\n\n<div>\n[[d]] #d\n</div>\n\n<!-- [[e]] #e -->\n\n\\[[f]] [[ok]] #ok";
+        let b = extract(src);
+        assert_eq!(
+            b.links
+                .iter()
+                .map(|l| l.target.as_str())
+                .collect::<Vec<_>>(),
+            vec!["ok"]
+        );
+        assert_eq!(
+            b.tags.iter().map(|t| t.text.as_str()).collect::<Vec<_>>(),
+            vec!["ok"]
+        );
+    }
+
+    #[test]
+    fn pg_05_markdown_links_encoded_angle_rooted_and_skipped() {
+        let src = "[a](DMC/Sparda.md#Palette) [b](</Game Design/Game 1.md>) [c](../Game%20Design/Game%201.md) \
+                   ![i](img/x.png) [w](https://e.com) [m](mailto:a@b.c) [f](#local) [r][ref]\n\n[ref]: other.md\n";
+        let links = extract(src).links;
+        let got: Vec<_> = links
+            .iter()
+            .map(|l| {
+                (
+                    l.kind,
+                    l.target.as_str(),
+                    &src[l.range.clone()],
+                    l.encoded,
+                    l.angle,
+                )
+            })
+            .collect();
+        assert_eq!(
+            got,
+            vec![
+                (
+                    LinkKind::Markdown,
+                    "DMC/Sparda.md",
+                    "DMC/Sparda.md",
+                    false,
+                    false
+                ),
+                (
+                    LinkKind::Markdown,
+                    "/Game Design/Game 1.md",
+                    "/Game Design/Game 1.md",
+                    false,
+                    true
+                ),
+                (
+                    LinkKind::Markdown,
+                    "../Game Design/Game 1.md",
+                    "../Game%20Design/Game%201.md",
+                    true,
+                    false
+                ),
+                (
+                    LinkKind::MarkdownImage,
+                    "img/x.png",
+                    "img/x.png",
+                    false,
+                    false
+                ),
+            ]
+        );
+        assert_eq!(links[0].heading.as_deref(), Some("Palette"));
+    }
+
+    #[test]
+    fn pg_04_tag_rules() {
+        let tags = |s: &str| {
+            extract(s)
+                .tags
+                .into_iter()
+                .map(|t| t.text)
+                .collect::<Vec<_>>()
+        };
+        assert_eq!(
+            tags("#art/sketch #2024 #y2024 #trailing/ a#b (#paren) #ñandú"),
+            vec!["art/sketch", "y2024", "trailing", "ñandú"]
+        );
+        assert_eq!(tags("# Heading\n\n#Tag and #tag"), vec!["Tag"]);
+        assert_eq!(tags("## Section #inheading"), vec!["inheading"]);
+        assert_eq!(tags("https://x.com/#anchor"), Vec::<String>::new());
+    }
+
+    #[test]
+    fn excerpt_skips_title_renders_links_and_truncates() {
+        let b = extract(
+            "---\nsubtitle: s\n---\n# Title\n\nHello [[rex-draft|Rex]] and ![[x.png]] world.\n\n## Sub\n\nMore.",
+        );
+        assert_eq!(b.excerpt, "Hello Rex and world. More.");
+        let long = format!("# T\n\n{}", "word ".repeat(100));
+        let e = extract(&long).excerpt;
+        assert!(e.ends_with('…') && e.chars().count() <= 201);
+        assert_eq!(extract("Intro\n\n# Title\n\nAfter").excerpt, "After");
+    }
+}

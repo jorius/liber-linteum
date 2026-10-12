@@ -1,6 +1,7 @@
 //! Metadata extraction from Markdown pages (title, frontmatter, tags, links).
 //! Pure functions, no I/O.
 
+mod body;
 mod frontmatter;
 mod page;
 mod title;

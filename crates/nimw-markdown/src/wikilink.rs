@@ -33,6 +33,47 @@ pub(crate) fn parse_inner(inner: &str) -> Option<WikiParts<'_>> {
     })
 }
 
+/// A `[[…]]` occurrence found in a text slice: byte range of the inner text
+/// (between the brackets) and whether it is an embed (`![[…]]`).
+pub(crate) struct Occurrence {
+    pub inner: Range<usize>,
+    pub embed: bool,
+    pub whole: Range<usize>,
+}
+
+/// Finds `[[…]]` in `text` (single line, no nested `[[`, not escaped `\[[`).
+pub(crate) fn find_all(text: &str) -> Vec<Occurrence> {
+    let bytes = text.as_bytes();
+    let mut out = Vec::new();
+    let mut i = 0;
+    while let Some(off) = text[i..].find("[[") {
+        let start = i + off;
+        if start > 0 && bytes[start - 1] == b'\\' {
+            i = start + 2;
+            continue;
+        }
+        let inner_start = start + 2;
+        let Some(close) = text[inner_start..].find("]]") else {
+            break;
+        };
+        let inner_end = inner_start + close;
+        let inner = &text[inner_start..inner_end];
+        if inner.contains('\n') || inner.contains("[[") {
+            i = start + 2;
+            continue;
+        }
+        let embed = start > 0 && bytes[start - 1] == b'!';
+        let whole_start = if embed { start - 1 } else { start };
+        out.push(Occurrence {
+            inner: inner_start..inner_end,
+            embed,
+            whole: whole_start..inner_end + 2,
+        });
+        i = inner_end + 2;
+    }
+    out
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -52,5 +93,15 @@ mod tests {
         assert!(parse_inner("").is_none());
         let p = parse_inner("a|").unwrap();
         assert_eq!(p.alias, None);
+    }
+
+    #[test]
+    fn pg_05_find_all_handles_embeds_escapes_and_newlines() {
+        let t = "a [[x]] ![[img.png]] \\[[no]] [[multi\nline]] [[y|z]]";
+        let found: Vec<_> = find_all(t)
+            .iter()
+            .map(|o| (&t[o.inner.clone()], o.embed))
+            .collect();
+        assert_eq!(found, vec![("x", false), ("img.png", true), ("y|z", false)]);
     }
 }
