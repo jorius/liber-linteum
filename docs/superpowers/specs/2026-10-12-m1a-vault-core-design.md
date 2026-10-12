@@ -297,3 +297,17 @@ impl VaultSession {
 - Every success criterion in §1 maps to tests in §7.2/§7.3.
 - Section dependencies are acyclic (§2). The rename planner depends only on `nimw-markdown::resolve` + index reads, so it is unit-testable without a filesystem.
 - Ambiguities resolved explicitly: Unicode/case handling (paths stored as on disk, NFC+lowercase only for matching — §3.1, §4.4.1), tie-break order (§4.4.3), crash ordering (§6.4), own-write window (§6.5, 2 s), batch size (§6.2, 500), progress cadence (§6.2, 200).
+
+---
+
+## 10. Amendments (2026-10-12, from compile-checking the M1a plan)
+
+These supersede the sections they name; the M1a plan (`docs/superpowers/plans/2026-10-12-m1a-vault-core.md`, "Plan notes") records the evidence.
+
+1. **Watcher (§3.3, §6.5):** `notify-debouncer-full` never reported deletes on macOS (FSEvents merges create/remove flags and the debouncer cancels them). Use **`notify-debouncer-mini` 0.7** (notify 8.2) with events `WatchEvent::{Changed(path), Removed(path), Overflow}`, classified by what exists on disk now. The session decides created vs. modified from the index, reconciles the **parent folder** of each reported path (a rename may arrive as only the new name), and pairs removed + new files with equal content hash as external renames.
+2. **Own-write suppression (§6.5):** no 2-second table. Every session operation updates the index synchronously; `apply` skips any path whose disk stat (mtime, size) or content hash already equals the index. External edits made right after an own write are never missed.
+3. **Resolution (§4.4):** rules (a) exact path and (b) path relative to the source apply only to targets that contain `/`; bare names go straight to the name search so the same-folder tie-break works (Obsidian behaviour). `resolve` takes `(kind, target, source, files)`. `shortest_unique_target` takes `rooted: bool` and, for wiki-style links, falls back to a vault-rooted `[[/Name]]` only when no path suffix is unique.
+4. **Markdown destinations (§6.4):** a plain destination that needs a space is %-encoded instead of `<…>`-wrapped (wrapping would break a `#heading` suffix); encoded stays encoded, angle stays angle.
+5. **Session events (§6.1/§6.3):** `create_page`, `create_folder`, `rename`, `trash` return results and do not emit `Changed`; `Changed` is only for external changes.
+6. **Fixtures (§7.1):** `.trash/` replaces the `.git/` stub (git cannot commit a nested `.git`); NFD names are created at test runtime (git on macOS re-normalizes names); `.gitattributes` keeps fixture bytes exact.
+7. **Test kit:** a test-only crate `nimw-testkit` (fixture copies, snapshots, polling helpers, 10k-note generator).
