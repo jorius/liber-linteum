@@ -1,6 +1,6 @@
 # Hand-off: M0 Scaffold — Notes In My Way
 
-> **Date:** 2026-10-12 · **Branch:** `feat/m0-scaffold` (20 commits on top of `main` @ `9c47e19` including this hand-off, not pushed, no remote configured)
+> **Date:** 2026-10-12 · **Branch:** merged into `main` (merge commit `b7532b4`; the 20 M0 commits sat on `feat/m0-scaffold` on top of `9c47e19`; branch deleted). Not pushed; no remote configured.
 > **Audience:** Jose (tech lead), or anyone continuing this work by hand without an AI agent.
 > **Goal of this file:** everything you need to understand, run, verify, change and continue the M0 scaffold: what exists, why it is that way, every decision made on your behalf, what is *not* verified, and where M1 starts.
 
@@ -35,11 +35,11 @@
 |---|---|
 | Product spec | v0.2, **all 22 open questions + 2 gaps closed** (`docs/product-spec.md`) |
 | Architecture | Approved plan doc (`docs/superpowers/specs/2026-10-12-architecture-design.md`) |
-| M0 scaffold | **Implemented, reviewed, fixed** on `feat/m0-scaffold` |
+| M0 scaffold | **Implemented, reviewed, fixed, merged into `main`** (`b7532b4`) |
 | Automated checks | `pnpm check` green (57 Vitest tests + 25 Rust tests incl. 3 real-IPC tests), `cargo deny check` ok |
 | Real app window | Builds and launches; **visual check in the real Tauri window still needs a human** (see §14) |
 | CI on GitHub | Workflow written; **never run on real runners** (no remote yet) |
-| Merge | **Not merged.** `main` only holds the docs commits. You decide merge/PR (see §17) |
+| Merge | **Merged locally into `main`**; full `pnpm check` + `cargo deny check` re-run green on the merged result. Not pushed (see §17.1) |
 
 What M0 deliberately does **not** contain: any vault, file, editor, Global View, search, audio or import functionality. Those are M1–M7. The welcome screen's four vault buttons are disabled with the note "Vault actions arrive in the next milestone."
 
@@ -134,7 +134,6 @@ Requirement IDs are referenced in commit messages, test names and code comments 
 
 ```bash
 git clone <repo> notes-in-my-way && cd notes-in-my-way
-git checkout feat/m0-scaffold          # until merged
 pnpm install                           # JS deps for the whole workspace
 pnpm build:ui                          # REQUIRED before any cargo build/test (see 16.1)
 cargo test --workspace                 # Rust: 25 tests
@@ -401,7 +400,7 @@ Known limits (documented, accepted): dynamic computed keys (`const k='fetch'; wi
 
 ## 12. Commit history
 
-`git log --oneline main..feat/m0-scaffold` (oldest at bottom):
+`git log --oneline 9c47e19..b7532b4^2` (the merged branch's commits, oldest at bottom; the merge commit itself is `b7532b4`):
 
 | Commit | Subject | Plan task |
 |---|---|---|
@@ -543,15 +542,13 @@ Run `pnpm format` and commit.
 
 ## 17. Where M1 starts
 
-### 17.1 Merging M0
-Nothing is pushed. Suggested:
+### 17.1 Publishing M0
+M0 is merged locally into `main` (`b7532b4`). Nothing is pushed. To publish and get CI running:
 ```bash
 git remote add origin <your GitHub repo URL>
 git push -u origin main
-git push -u origin feat/m0-scaffold
-gh pr create --base main --head feat/m0-scaffold --title "M0 scaffold"
 ```
-Then do §14 and watch CI (§14.4). Merge when green.
+The push to `main` triggers CI (§11). Then do §14 and watch the first run (§14.4). Start M1 on a new branch (e.g. `git checkout -b feat/m1-vault`).
 
 ### 17.2 M1 scope (arch §10): vault, explorer, index, watcher, CAS writes, trash, link rewrite — VLT-*, EXP-*, PG-01/04/05
 
