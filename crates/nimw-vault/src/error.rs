@@ -26,3 +26,12 @@ pub enum VaultError {
 }
 
 pub type Result<T> = std::result::Result<T, VaultError>;
+
+pub(crate) fn io_err(path: impl Into<String>, source: std::io::Error) -> VaultError {
+    let path = path.into();
+    match source.kind() {
+        std::io::ErrorKind::NotFound => VaultError::NotFound(path),
+        std::io::ErrorKind::AlreadyExists => VaultError::AlreadyExists(path),
+        _ => VaultError::Io { path, source },
+    }
+}

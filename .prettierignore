@@ -3,6 +3,7 @@ target
 node_modules
 pnpm-lock.yaml
 design
+fixtures
 docs
 *.md
 apps/desktop/src-tauri/gen
