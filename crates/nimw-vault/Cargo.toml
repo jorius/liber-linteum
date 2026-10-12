@@ -1,0 +1,12 @@
+[package]
+name = "nimw-vault"
+description = "Vault filesystem model: scanning, watching, atomic writes, trash, link rewrites."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+
+[lints]
+workspace = true

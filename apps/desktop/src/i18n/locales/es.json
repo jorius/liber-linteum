@@ -1,0 +1,20 @@
+{
+  "app": {
+    "name": "Notes In My Way",
+    "tagline": "Notas privadas que viven en tu disco. Sin nube, sin cuentas, sin telemetría.",
+    "version": "v{version}"
+  },
+  "welcome": {
+    "language": "Idioma",
+    "create": "Crear una bóveda nueva",
+    "open": "Abrir una carpeta como bóveda",
+    "openObsidian": "Abrir una bóveda de Obsidian",
+    "importNotion": "Importar una exportación de Notion",
+    "recent": "Recientes",
+    "noRecent": "Aún no hay bóvedas recientes.",
+    "comingSoon": "Las acciones de bóveda llegan en el próximo hito."
+  },
+  "languages": { "en": "English", "es": "Español" },
+  "screens": { "global": "Vista global", "edit": "Editar" },
+  "privacy": { "localOnly": "Solo local · cero peticiones de red" }
+}

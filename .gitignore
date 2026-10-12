@@ -1,0 +1,15 @@
+# deps / builds
+node_modules/
+dist/
+target/
+apps/desktop/src-tauri/gen/schemas/
+*.tsbuildinfo
+# OS / editors
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/*
+!.vscode/extensions.json
+# logs / tools
+*.log
+.playwright-mcp/

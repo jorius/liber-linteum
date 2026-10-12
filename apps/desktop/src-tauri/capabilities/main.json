@@ -1,0 +1,7 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "main",
+  "description": "Main window. Only explicitly listed commands are callable; each milestone adds its own.",
+  "windows": ["main"],
+  "permissions": ["allow-app-info"]
+}
