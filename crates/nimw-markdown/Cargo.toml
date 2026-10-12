@@ -1,0 +1,13 @@
+[package]
+name = "nimw-markdown"
+description = "Metadata extraction from Markdown pages (title, frontmatter, tags, links)."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+pulldown-cmark.workspace = true
+
+[lints]
+workspace = true

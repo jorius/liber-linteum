@@ -1,0 +1,12 @@
+[package]
+name = "nimw-import"
+description = "Notion export importer."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+
+[lints]
+workspace = true
