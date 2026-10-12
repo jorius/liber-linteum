@@ -1,5 +1,7 @@
 packages:
   - apps/*
+# Exact-version exclusions added 2026-10-12: the pinned versions were newer than
+# pnpm's release-age gate. Remove each entry once its version ages past the gate.
 minimumReleaseAgeExclude:
   - '@vitest/mocker@5.0.4'
   - '@vitest/spy@5.0.4'
