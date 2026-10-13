@@ -1,0 +1,2 @@
+# Fixture vaults are byte-exact test data (CRLF and invalid UTF-8 on purpose).
+fixtures/** -text

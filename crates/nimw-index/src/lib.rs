@@ -1,4 +1,13 @@
-//! SQLite + FTS5 index cache and Global View / search queries.
+//! SQLite cache of one vault (spec §5): files, pages, tags, links.
+//! Never reads or writes vault files; `nimw-session` feeds it.
+
+mod index;
+mod rows;
+mod schema;
+
+pub use index::{Index, IndexError, Result, Tx};
+pub use rows::{FileKind, FileRow, LinkRow, PageRow, Stat, TreeNode};
+pub use schema::SCHEMA_VERSION;
 
 use sha2::{Digest, Sha256};
 use std::path::Path;

@@ -29,6 +29,9 @@ jobs:
       - run: pnpm check:i18n
 
   rust:
+    env:
+      # Runner home dirs are throwaway, so tests that use the real OS trash run here.
+      NIMW_TRASH_TESTS: '1'
     strategy:
       fail-fast: false
       matrix:
