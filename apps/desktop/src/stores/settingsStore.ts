@@ -1,0 +1,56 @@
+import i18next from 'i18next';
+import { create } from 'zustand';
+import { detectLanguage } from '../i18n';
+import {
+  settingsGet,
+  settingsSet,
+  type IpcResult,
+  type Settings,
+  type SettingsPatch,
+} from '../ipc';
+import { applyTheme } from '../theme/theme';
+
+export const DEFAULT_SETTINGS: Settings = {
+  version: 1,
+  language: null,
+  theme: 'system',
+  rewriteLinks: true,
+  confirmDelete: true,
+};
+
+interface SettingsState {
+  settings: Settings;
+  warning: string | null;
+  loaded: boolean;
+  /** Called before the first render (main.tsx). */
+  load: () => Promise<void>;
+  update: (patch: SettingsPatch) => Promise<IpcResult<Settings>>;
+}
+
+async function apply(s: Settings) {
+  applyTheme(s.theme);
+  const lang = s.language ?? detectLanguage(navigator.languages);
+  if (i18next.language !== lang) await i18next.changeLanguage(lang);
+}
+
+export const useSettingsStore = create<SettingsState>((set) => ({
+  settings: DEFAULT_SETTINGS,
+  warning: null,
+  loaded: false,
+  load: async () => {
+    const res = await settingsGet();
+    // Outside Tauri (plain browser) or on error: defaults.
+    const settings = res.ok ? { ...DEFAULT_SETTINGS, ...res.value.settings } : DEFAULT_SETTINGS;
+    await apply(settings);
+    set({ settings, warning: res.ok ? (res.value.warning ?? null) : null, loaded: true });
+  },
+  update: async (patch) => {
+    const res = await settingsSet(patch);
+    if (res.ok) {
+      const settings = { ...DEFAULT_SETTINGS, ...res.value };
+      await apply(settings);
+      set({ settings });
+    }
+    return res;
+  },
+}));

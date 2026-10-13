@@ -14,7 +14,38 @@
     "noRecent": "No recent vaults yet.",
     "comingSoon": "Vault actions arrive in the next milestone."
   },
-  "languages": { "en": "English", "es": "Español" },
-  "screens": { "global": "Global view", "edit": "Edit" },
-  "privacy": { "localOnly": "Local only · zero network requests" }
+  "languages": {
+    "en": "English",
+    "es": "Español"
+  },
+  "screens": {
+    "global": "Global view",
+    "edit": "Edit"
+  },
+  "privacy": {
+    "localOnly": "Local only · zero network requests"
+  },
+  "errors": {
+    "noVault": "No vault is open.",
+    "notFound": "Not found.",
+    "alreadyExists": "Something with that name already exists.",
+    "notEmpty": "Pick an empty or new folder.",
+    "invalidName": "That name can't be used.",
+    "conflict": "The file changed on disk. Try again.",
+    "outsideVault": "That path is outside the vault.",
+    "unsafeRewrite": "Some links couldn't be updated safely.",
+    "watch": "Watching the vault for changes failed.",
+    "io": "Something went wrong: {message}"
+  },
+  "toasts": {
+    "linksUpdated": "{count, plural, one {Updated links in # file} other {Updated links in # files}}",
+    "renameFailed": "{count, plural, one {Renamed. # file couldn't be updated} other {Renamed. # files couldn't be updated}}",
+    "trashed": "Moved to Trash",
+    "openedWithWarnings": "{count, plural, one {Opened with # warning} other {Opened with # warnings}}",
+    "dismiss": "Dismiss",
+    "details": "Details"
+  },
+  "explorer": {
+    "untitled": "Untitled"
+  }
 }

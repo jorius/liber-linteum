@@ -14,7 +14,38 @@
     "noRecent": "Aún no hay bóvedas recientes.",
     "comingSoon": "Las acciones de bóveda llegan en el próximo hito."
   },
-  "languages": { "en": "English", "es": "Español" },
-  "screens": { "global": "Vista global", "edit": "Editar" },
-  "privacy": { "localOnly": "Solo local · cero peticiones de red" }
+  "languages": {
+    "en": "English",
+    "es": "Español"
+  },
+  "screens": {
+    "global": "Vista global",
+    "edit": "Editar"
+  },
+  "privacy": {
+    "localOnly": "Solo local · cero peticiones de red"
+  },
+  "errors": {
+    "noVault": "No hay ninguna bóveda abierta.",
+    "notFound": "No se encontró.",
+    "alreadyExists": "Ya existe algo con ese nombre.",
+    "notEmpty": "Elige una carpeta vacía o nueva.",
+    "invalidName": "Ese nombre no se puede usar.",
+    "conflict": "El archivo cambió en el disco. Inténtalo de nuevo.",
+    "outsideVault": "Esa ruta está fuera de la bóveda.",
+    "unsafeRewrite": "Algunos enlaces no se pudieron actualizar de forma segura.",
+    "watch": "Falló la vigilancia de cambios en la bóveda.",
+    "io": "Algo salió mal: {message}"
+  },
+  "toasts": {
+    "linksUpdated": "{count, plural, one {Enlaces actualizados en # archivo} other {Enlaces actualizados en # archivos}}",
+    "renameFailed": "{count, plural, one {Renombrado. No se pudo actualizar # archivo} other {Renombrado. No se pudieron actualizar # archivos}}",
+    "trashed": "Movido a la papelera",
+    "openedWithWarnings": "{count, plural, one {Abierta con # advertencia} other {Abierta con # advertencias}}",
+    "dismiss": "Cerrar",
+    "details": "Detalles"
+  },
+  "explorer": {
+    "untitled": "Sin título"
+  }
 }
