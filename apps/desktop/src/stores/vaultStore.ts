@@ -123,10 +123,12 @@ export const useVaultStore = create<VaultState>((set, get) => {
       expanded = new Set([...expanded].map((p) => remap(p, from, to) ?? p));
       trail.renamed(from, to);
     }
-    for (const path of change.removed) trail.removed(path);
     set({ selected, expanded });
     await get().refreshTree();
     const present = new Set(get().nodes.map((n) => n.path));
+    // Only what is gone after the whole batch: an atomic save (delete +
+    // re-create) keeps its place on the trail (final review m2).
+    for (const path of change.removed) trail.removed(path, (p) => present.has(p));
     await usePageStore.getState().onExternalChange(change, (p) => present.has(p));
   }
 

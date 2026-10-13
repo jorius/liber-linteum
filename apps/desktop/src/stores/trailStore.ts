@@ -20,14 +20,17 @@ interface TrailState {
   /** A direct navigation (explorer, ⌘O, …) starts a fresh trail. */
   reset: () => void;
   renamed: (from: string, to: string) => void;
-  removed: (path: string) => void;
+  /** `path` (a page or folder) was deleted. `exists` reports paths that are
+   *  in the vault again (an atomic save deletes and re-creates): those stay
+   *  (final review m2). */
+  removed: (path: string, exists?: (path: string) => boolean) => void;
 }
 
 const same = (a: TrailEntry | undefined, b: TrailEntry) => a?.path === b.path;
 
 /** Drops deleted pages and then repeated neighbours. */
-function prune(list: TrailEntry[], gone: string): TrailEntry[] {
-  const kept = list.filter((x) => remap(x.path, gone, gone) === null);
+function prune(list: TrailEntry[], gone: string, exists?: (path: string) => boolean): TrailEntry[] {
+  const kept = list.filter((x) => remap(x.path, gone, gone) === null || exists?.(x.path));
   return kept.filter((x, i) => !same(kept[i - 1], x));
 }
 
@@ -57,5 +60,6 @@ export const useTrailStore = create<TrailState>((set, get) => ({
       const move = (x: TrailEntry) => ({ ...x, path: remap(x.path, from, to) ?? x.path });
       return { back: s.back.map(move), forward: s.forward.map(move) };
     }),
-  removed: (path) => set((s) => ({ back: prune(s.back, path), forward: prune(s.forward, path) })),
+  removed: (path, exists) =>
+    set((s) => ({ back: prune(s.back, path, exists), forward: prune(s.forward, path, exists) })),
 }));

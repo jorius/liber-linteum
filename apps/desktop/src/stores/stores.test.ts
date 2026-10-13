@@ -153,6 +153,34 @@ describe('vaultStore', () => {
     expect(useToastStore.getState().toasts).toEqual([]);
   });
 
+  it('final review m2: a page removed and re-created in one coalesced change stays on the trail', async () => {
+    vi.useFakeTimers();
+    let current: TreeNode[] = [
+      { path: 'A.md', kind: 'page' },
+      { path: 'B.md', kind: 'page' },
+      { path: 'C.md', kind: 'page' },
+    ];
+    backend({ vault_open: () => info, vault_tree: () => current });
+    await useVaultStore.getState().open('/v');
+    const trail = useTrailStore.getState();
+    trail.followed({ path: 'A.md', heading: null });
+    trail.followed({ path: 'B.md', heading: null });
+    // Another editor saves A.md atomically (delete + re-create); B.md is deleted.
+    current = [
+      { path: 'A.md', kind: 'page' },
+      { path: 'C.md', kind: 'page' },
+    ];
+    await emit('vault:changed', {
+      created: [],
+      modified: [],
+      removed: ['A.md', 'B.md'],
+      renamed: [],
+    });
+    await emit('vault:changed', { created: ['A.md'], modified: [], removed: [], renamed: [] });
+    await vi.advanceTimersByTimeAsync(150);
+    expect(useTrailStore.getState().back.map((x) => x.path)).toEqual(['A.md']);
+  });
+
   it('VLT-01 open: closed → opening → open, with tree loaded', async () => {
     const gate = deferred<typeof info>();
     backend({ vault_open: () => gate.promise, vault_tree: () => tree });
