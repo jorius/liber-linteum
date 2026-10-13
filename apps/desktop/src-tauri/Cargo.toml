@@ -15,11 +15,14 @@ tauri-build.workspace = true
 [dependencies]
 tauri.workspace = true
 tauri-plugin-dialog.workspace = true
+tauri-plugin-opener.workspace = true
+percent-encoding.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 thiserror.workspace = true
 nimw-session = { path = "../../../crates/nimw-session" }
 nimw-vault = { path = "../../../crates/nimw-vault" }
+nimw-markdown = { path = "../../../crates/nimw-markdown" }
 
 [dev-dependencies]
 tauri = { workspace = true, features = ["test"] }

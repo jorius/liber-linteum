@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-page-create-conflict-copy"
+description = "Enables the page_create_conflict_copy command without any pre-configured scope."
+commands.allow = ["page_create_conflict_copy"]
+
+[[permission]]
+identifier = "deny-page-create-conflict-copy"
+description = "Denies the page_create_conflict_copy command without any pre-configured scope."
+commands.deny = ["page_create_conflict_copy"]

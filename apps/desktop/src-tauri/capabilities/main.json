@@ -19,6 +19,12 @@
     "allow-settings-set",
     "allow-vaults-recent",
     "allow-vaults-forget",
+    "allow-page-read",
+    "allow-page-write",
+    "allow-page-create-conflict-copy",
+    "allow-links-resolve",
+    "allow-url-open",
+    "allow-file-open-external",
     "core:event:allow-listen",
     "core:event:allow-unlisten",
     "dialog:allow-open"

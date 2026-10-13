@@ -37,6 +37,7 @@ fn patch_merges_saves_atomically_and_round_trips() {
             theme: Some(Theme::Dark),
             rewrite_links: Some(false),
             confirm_delete: None,
+            editor_mode: None,
         })
         .unwrap();
     assert_eq!(saved.language.as_deref(), Some("es"));
@@ -180,4 +181,32 @@ fn review_focus_unknown_value_from_newer_version_resets_only_that_field() {
     assert_eq!(saved["version"], 3);
     assert_eq!(saved["language"], "es");
     assert_eq!(saved["recentVaults"].as_array().unwrap().len(), 1);
+}
+
+/// M2a §3.2: the last-used editor mode is a global setting.
+#[test]
+fn ed_01_editor_mode_defaults_to_live_preview_and_persists() {
+    use nimw_desktop::settings::EditorMode;
+    let dir = tempfile::tempdir().unwrap();
+    let s = store(dir.path());
+    assert_eq!(s.get().0.editor_mode, EditorMode::LivePreview);
+    s.update(SettingsPatch {
+        editor_mode: Some(EditorMode::Split),
+        ..Default::default()
+    })
+    .unwrap();
+    let saved: serde_json::Value =
+        serde_json::from_str(&std::fs::read_to_string(dir.path().join("settings.json")).unwrap())
+            .unwrap();
+    assert_eq!(saved["editorMode"], "split");
+    assert_eq!(store(dir.path()).get().0.editor_mode, EditorMode::Split);
+    std::fs::write(
+        dir.path().join("settings.json"),
+        r#"{"editorMode":"zen","theme":"dark"}"#,
+    )
+    .unwrap();
+    let (s, warning) = store(dir.path()).get();
+    assert_eq!(s.editor_mode, EditorMode::LivePreview);
+    assert_eq!(s.theme, Theme::Dark);
+    assert!(warning.unwrap().contains("editorMode"));
 }

@@ -18,12 +18,27 @@ pub enum ErrorKind {
     UnsafeRewrite,
     Watch,
     Io,
+    /// The file is not valid UTF-8 text.
+    Binary,
+    /// A URL or link kind the app refuses to open.
+    InvalidUrl,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct CommandError {
     pub kind: ErrorKind,
     pub message: String,
+    /// Present on `conflict` from `page_write`: what is on disk now.
+    #[serde(flatten)]
+    pub conflict: Option<ConflictInfo>,
+}
+
+/// The file's current content when a compare-and-swap write was refused (M2a §3.1).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ConflictInfo {
+    pub current_text: String,
+    pub current_hash: String,
 }
 
 impl CommandError {
@@ -31,6 +46,7 @@ impl CommandError {
         CommandError {
             kind,
             message: message.into(),
+            conflict: None,
         }
     }
 

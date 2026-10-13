@@ -1,5 +1,7 @@
+pub mod asset;
 pub mod commands;
 pub mod dto;
+pub mod editor_commands;
 pub mod error;
 pub mod settings;
 pub mod settings_commands;
@@ -25,7 +27,33 @@ pub fn configure<R: tauri::Runtime>(
     builder: tauri::Builder<R>,
     dirs: Option<AppDirs>,
 ) -> tauri::Builder<R> {
-    let builder = builder.plugin(tauri_plugin_dialog::init());
+    let builder = builder
+        .plugin(tauri_plugin_dialog::init())
+        // Used only from our own commands (url_open, file_open_external); the
+        // webview gets no opener permission.
+        .plugin(tauri_plugin_opener::init())
+        .register_asynchronous_uri_scheme_protocol(asset::SCHEME, |ctx, request, responder| {
+            let app = ctx.app_handle().clone();
+            std::thread::spawn(move || {
+                let response = match app.try_state::<AppState>() {
+                    Some(state) => {
+                        let range = request
+                            .headers()
+                            .get("range")
+                            .and_then(|v| v.to_str().ok())
+                            .map(str::to_owned);
+                        asset::serve(&state, request.uri().path(), range.as_deref())
+                    }
+                    None => asset::AssetResponse {
+                        status: 404,
+                        mime: "text/plain",
+                        body: Vec::new(),
+                        headers: Vec::new(),
+                    },
+                };
+                responder.respond(response.into_response());
+            });
+        });
     // Known dirs (tests): manage the state up front. Otherwise resolve the OS
     // dirs once the app exists.
     let builder = match dirs {
@@ -53,6 +81,12 @@ pub fn configure<R: tauri::Runtime>(
         settings_commands::settings_set,
         settings_commands::vaults_recent,
         settings_commands::vaults_forget,
+        editor_commands::page_read,
+        editor_commands::page_write,
+        editor_commands::page_create_conflict_copy,
+        editor_commands::links_resolve,
+        editor_commands::url_open,
+        editor_commands::file_open_external,
     ])
 }
 

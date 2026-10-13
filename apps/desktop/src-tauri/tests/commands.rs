@@ -29,6 +29,12 @@ const COMMANDS: &[&str] = &[
     "settings_set",
     "vaults_recent",
     "vaults_forget",
+    "page_read",
+    "page_write",
+    "page_create_conflict_copy",
+    "links_resolve",
+    "url_open",
+    "file_open_external",
 ];
 
 struct Harness {
@@ -379,6 +385,7 @@ fn nfr_ui_thread_never_runs_disk_or_index_commands() {
     let sources = [
         include_str!("../src/vault_commands.rs"),
         include_str!("../src/settings_commands.rs"),
+        include_str!("../src/editor_commands.rs"),
     ];
     let mut offenders = Vec::new();
     for src in sources {
@@ -399,4 +406,145 @@ fn nfr_ui_thread_never_runs_disk_or_index_commands() {
         }
     }
     assert!(offenders.is_empty(), "must be async: {offenders:?}");
+}
+
+/// M2a §3.1: full-text read and compare-and-swap write; a stale hash returns
+/// a `conflict` error carrying the current text and hash, and writes nothing.
+#[test]
+fn ed_08_page_read_and_write_with_conflict_payload() {
+    let h = harness();
+    let vault = copy_fixture("obsidian-basic");
+    call(&h.main, "vault_open", json!({ "path": vault.path() })).unwrap();
+    let read = call(&h.main, "page_read", json!({ "path": "Welcome.md" })).unwrap();
+    let text = read["text"].as_str().unwrap().to_string();
+    let hash = read["hash"].as_str().unwrap().to_string();
+    let new_text = format!("{text}\nEdited [[Sparda]]\n");
+    let written = call(
+        &h.main,
+        "page_write",
+        json!({ "path": "Welcome.md", "text": new_text, "expectedHash": hash }),
+    )
+    .unwrap();
+    assert_ne!(written["hash"], read["hash"]);
+    assert_eq!(
+        std::fs::read_to_string(vault.path().join("Welcome.md")).unwrap(),
+        new_text
+    );
+    let err = call(
+        &h.main,
+        "page_write",
+        json!({ "path": "Welcome.md", "text": "lost", "expectedHash": hash }),
+    )
+    .unwrap_err();
+    assert_eq!(kind(err.clone()), "conflict");
+    assert_eq!(err["currentText"], new_text.as_str());
+    assert_eq!(err["currentHash"], written["hash"]);
+    assert_eq!(
+        std::fs::read_to_string(vault.path().join("Welcome.md")).unwrap(),
+        new_text
+    );
+    let bad = call(
+        &h.main,
+        "page_write",
+        json!({ "path": "Welcome.md", "text": "x", "expectedHash": "zz" }),
+    )
+    .unwrap_err();
+    assert_eq!(kind(bad), "io");
+}
+
+#[test]
+fn ed_08_page_read_refuses_binary_and_traversal() {
+    let h = harness();
+    let vault = copy_fixture("edge-cases");
+    call(&h.main, "vault_open", json!({ "path": vault.path() })).unwrap();
+    let err = call(&h.main, "page_read", json!({ "path": "latin1.md" })).unwrap_err();
+    assert_eq!(kind(err), "binary");
+    let err = call(&h.main, "page_read", json!({ "path": "../outside.md" })).unwrap_err();
+    assert_eq!(kind(err), "outsideVault");
+}
+
+#[test]
+fn ed_08_conflict_copy_through_ipc() {
+    let h = harness();
+    let vault = copy_fixture("obsidian-basic");
+    call(&h.main, "vault_open", json!({ "path": vault.path() })).unwrap();
+    let path = call(
+        &h.main,
+        "page_create_conflict_copy",
+        json!({ "path": "Game Design/Game 1.md", "text": "theirs" }),
+    )
+    .unwrap();
+    assert_eq!(path, "Game Design/Game 1 (conflict).md");
+    assert_eq!(
+        std::fs::read_to_string(vault.path().join("Game Design/Game 1 (conflict).md")).unwrap(),
+        "theirs"
+    );
+}
+
+#[test]
+fn pg_05_links_resolve_through_ipc() {
+    let h = harness();
+    let vault = copy_fixture("obsidian-basic");
+    call(&h.main, "vault_open", json!({ "path": vault.path() })).unwrap();
+    let got = call(
+        &h.main,
+        "links_resolve",
+        json!({
+            "source": "Character Design/rex-draft.md",
+            "targets": [
+                { "kind": "wiki", "target": "Sparda" },
+                { "kind": "embed", "target": "rex-turnaround.png" },
+                { "kind": "markdown", "target": "DMC/Sparda.md" },
+                { "kind": "wiki", "target": "Nowhere" }
+            ]
+        }),
+    )
+    .unwrap();
+    assert_eq!(
+        got,
+        json!([
+            "Character Design/DMC/Sparda.md",
+            "Character Design/assets/rex-turnaround.png",
+            "Character Design/DMC/Sparda.md",
+            null
+        ])
+    );
+    let err = call(
+        &h.main,
+        "links_resolve",
+        json!({ "source": "Welcome.md", "targets": [{ "kind": "bogus", "target": "x" }] }),
+    )
+    .unwrap_err();
+    assert_eq!(kind(err), "invalidUrl");
+}
+
+/// Opening in the OS browser / default app goes through our own commands
+/// (no opener permission is granted to the webview); unsafe targets are refused
+/// before anything is opened.
+#[test]
+fn external_open_commands_refuse_unsafe_targets() {
+    let h = harness();
+    let vault = copy_fixture("obsidian-basic");
+    call(&h.main, "vault_open", json!({ "path": vault.path() })).unwrap();
+    for url in [
+        "javascript:alert(1)",
+        "file:///etc/passwd",
+        "data:text/html,x",
+        "nimw-asset://x",
+        "relative.md",
+    ] {
+        let err = call(&h.main, "url_open", json!({ "url": url })).unwrap_err();
+        assert_eq!(kind(err), "invalidUrl", "{url}");
+    }
+    let err = call(&h.main, "file_open_external", json!({ "path": "../x.png" })).unwrap_err();
+    assert_eq!(kind(err), "outsideVault");
+    let err = call(&h.main, "file_open_external", json!({ "path": "nope.pdf" })).unwrap_err();
+    assert_eq!(kind(err), "notFound");
+    let err = call(
+        &h.main,
+        "plugin:opener|open_url",
+        json!({ "url": "https://example.com" }),
+    )
+    .unwrap_err();
+    assert!(err.to_string().contains("not allowed"), "{err}");
 }
