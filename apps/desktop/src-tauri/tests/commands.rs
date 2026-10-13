@@ -540,6 +540,16 @@ fn external_open_commands_refuse_unsafe_targets() {
     assert_eq!(kind(err), "outsideVault");
     let err = call(&h.main, "file_open_external", json!({ "path": "nope.pdf" })).unwrap_err();
     assert_eq!(kind(err), "notFound");
+    // m3: folders (an .app bundle is one), programs and scripts never reach
+    // the OS opener. (Opening a real document isn't exercised here: it would
+    // launch the default app; `check_openable` is unit-tested instead.)
+    std::fs::create_dir_all(vault.path().join("Bundle.app/Contents/MacOS")).unwrap();
+    std::fs::write(vault.path().join("run.sh"), "echo hi\n").unwrap();
+    std::fs::write(vault.path().join("Setup.exe"), "MZ").unwrap();
+    for path in ["Bundle.app", "Character Design", "run.sh", "Setup.exe"] {
+        let err = call(&h.main, "file_open_external", json!({ "path": path })).unwrap_err();
+        assert_eq!(kind(err), "invalidUrl", "{path}");
+    }
     let err = call(
         &h.main,
         "plugin:opener|open_url",

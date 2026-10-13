@@ -9,6 +9,7 @@ use nimw_markdown::LinkKind;
 use nimw_session::SessionError;
 use nimw_vault::{Hash, VaultError, VaultPath};
 use serde::{Deserialize, Serialize};
+use std::path::Path;
 use tauri::{AppHandle, Manager, Runtime};
 use tauri_plugin_opener::OpenerExt;
 
@@ -128,6 +129,112 @@ pub(crate) fn url_open_impl<R: Runtime>(app: &AppHandle<R>, url: String) -> CmdR
         .map_err(|e| CommandError::new(ErrorKind::Io, e.to_string()))
 }
 
+/// Extensions the OS would run (or install, or follow somewhere else) instead
+/// of showing: programs, installers, scripts, shortcuts, launchers. Matched
+/// case-insensitively against the file and, for a symlink, its target.
+const EXECUTABLE_EXTENSIONS: &[&str] = &[
+    // macOS
+    "app",
+    "command",
+    "tool",
+    "terminal",
+    "pkg",
+    "mpkg",
+    "dmg",
+    "scpt",
+    "scptd",
+    "applescript",
+    "workflow",
+    "action",
+    "prefpane",
+    "kext",
+    "webloc",
+    "inetloc",
+    "fileloc",
+    // Windows
+    "exe",
+    "msi",
+    "msix",
+    "msp",
+    "appx",
+    "appxbundle",
+    "bat",
+    "cmd",
+    "com",
+    "scr",
+    "pif",
+    "cpl",
+    "lnk",
+    "url",
+    "reg",
+    "hta",
+    "ps1",
+    "psm1",
+    "vbs",
+    "vbe",
+    "js",
+    "jse",
+    "wsf",
+    "wsh",
+    "gadget",
+    "application",
+    // Unix, cross-platform
+    "sh",
+    "bash",
+    "zsh",
+    "csh",
+    "ksh",
+    "fish",
+    "desktop",
+    "appimage",
+    "run",
+    "deb",
+    "rpm",
+    "jar",
+    "py",
+    "pyw",
+    "pl",
+    "rb",
+];
+
+fn refuse(full: &Path, why: &str) -> CommandError {
+    CommandError::new(
+        ErrorKind::InvalidUrl,
+        format!("refusing to open {}: {why}", full.display()),
+    )
+}
+
+fn executable_name(path: &Path) -> bool {
+    path.extension()
+        .and_then(|e| e.to_str())
+        .is_some_and(|e| EXECUTABLE_EXTENSIONS.contains(&e.to_ascii_lowercase().as_str()))
+}
+
+/// Checks that `full` may be handed to the OS's default app (review m3): a
+/// regular file (a folder may be an .app bundle) that is no program, script or
+/// installer by name, and on Unix has no exec bit. Symlinks are judged by
+/// their target.
+pub(crate) fn check_openable(full: &Path) -> CmdResult<()> {
+    let real = std::fs::canonicalize(full)
+        .map_err(|e| CommandError::new(ErrorKind::NotFound, e.to_string()))?;
+    let meta = std::fs::metadata(&real)
+        .map_err(|e| CommandError::new(ErrorKind::NotFound, e.to_string()))?;
+    if !meta.is_file() {
+        return Err(refuse(full, "not a regular file"));
+    }
+    if executable_name(full) || executable_name(&real) {
+        return Err(refuse(full, "a program or script"));
+    }
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        if meta.permissions().mode() & 0o111 != 0 {
+            return Err(refuse(full, "marked executable"));
+        }
+    }
+    Ok(())
+}
+
 pub(crate) fn file_open_external_impl<R: Runtime>(
     app: &AppHandle<R>,
     path: String,
@@ -142,6 +249,7 @@ pub(crate) fn file_open_external_impl<R: Runtime>(
         ));
     }
     let full = session.vault().fs_path(&vp)?;
+    check_openable(&full)?;
     app.opener()
         .open_path(full.to_string_lossy(), None::<&str>)
         .map_err(|e| CommandError::new(ErrorKind::Io, e.to_string()))
@@ -202,4 +310,68 @@ pub async fn url_open<R: Runtime>(app: AppHandle<R>, url: String) -> CmdResult<(
 #[tauri::command]
 pub async fn file_open_external<R: Runtime>(app: AppHandle<R>, path: String) -> CmdResult<()> {
     blocking(app, move |app| file_open_external_impl(&app, path)).await
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn refused(full: &Path) -> bool {
+        matches!(check_openable(full), Err(e) if e.kind == ErrorKind::InvalidUrl)
+    }
+
+    #[test]
+    fn m3_only_plain_documents_open_in_the_default_app() {
+        let dir = tempfile::tempdir().unwrap();
+        let p = |name: &str| dir.path().join(name);
+        std::fs::write(p("brief.pdf"), b"%PDF").unwrap();
+        std::fs::write(p("Notes.MD"), b"# x").unwrap();
+        std::fs::create_dir(p("Folder")).unwrap();
+        std::fs::create_dir_all(p("Evil.app/Contents/MacOS")).unwrap();
+        for name in [
+            "run.sh",
+            "Setup.EXE",
+            "x.command",
+            "y.app",
+            "z.ps1",
+            "w.jar",
+            "s.scpt",
+        ] {
+            std::fs::write(p(name), b"x").unwrap();
+        }
+        assert!(check_openable(&p("brief.pdf")).is_ok());
+        assert!(check_openable(&p("Notes.MD")).is_ok());
+        assert!(refused(&p("Folder")), "a folder");
+        assert!(refused(&p("Evil.app")), "an app bundle");
+        for name in [
+            "run.sh",
+            "Setup.EXE",
+            "x.command",
+            "y.app",
+            "z.ps1",
+            "w.jar",
+            "s.scpt",
+        ] {
+            assert!(refused(&p(name)), "{name}");
+        }
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn m3_files_with_an_exec_bit_are_refused() {
+        use std::os::unix::fs::PermissionsExt;
+        let dir = tempfile::tempdir().unwrap();
+        let tool = dir.path().join("tool");
+        std::fs::write(&tool, b"#!/bin/sh\n").unwrap();
+        std::fs::set_permissions(&tool, std::fs::Permissions::from_mode(0o744)).unwrap();
+        assert!(refused(&tool));
+        let pdf = dir.path().join("doc.pdf");
+        std::fs::write(&pdf, b"%PDF").unwrap();
+        std::fs::set_permissions(&pdf, std::fs::Permissions::from_mode(0o644)).unwrap();
+        assert!(check_openable(&pdf).is_ok());
+        // A symlink is judged by what it points to.
+        let link = dir.path().join("innocent.pdf");
+        std::os::unix::fs::symlink(&tool, &link).unwrap();
+        assert!(refused(&link));
+    }
 }
