@@ -1,0 +1,184 @@
+/* Layout values from the prototype (.shell, .side, .topbar, .toggle, .tg). */
+.shell {
+  display: flex;
+  height: 100%;
+  min-height: 0;
+}
+
+.side {
+  flex: 0 0 270px;
+  background: var(--color-sidebar-bg);
+  color: var(--color-sidebar-text);
+  padding: 16px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-height: 0;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 4px 8px 12px;
+  font: 700 16px var(--font-display);
+  color: #fff;
+}
+
+.sideHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  padding: 6px 8px;
+}
+
+.sideLabel {
+  font: 600 11px var(--font-body);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-text-faint);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+.sideActions {
+  display: flex;
+  gap: 2px;
+  flex: none;
+}
+
+.iconButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: none;
+  color: var(--color-sidebar-text);
+  cursor: pointer;
+}
+
+.iconButton:hover {
+  background: color-mix(in srgb, var(--color-sidebar-text) 12%, transparent);
+}
+
+.treeScroll {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+}
+
+.sideFoot {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--color-text-faint);
+  padding: 12px 8px 4px;
+  margin: 0;
+  border-top: 1px solid color-mix(in srgb, var(--color-sidebar-text) 15%, transparent);
+}
+
+.main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--color-bg);
+}
+
+.topbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 20px;
+  flex-wrap: wrap;
+  background: var(--color-surface-subtle);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.vaultName {
+  font: 600 14px var(--font-body);
+  color: var(--color-text-body);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 30%;
+}
+
+.toggle {
+  display: flex;
+  gap: 4px;
+  padding: 4px;
+  border: 1.5px solid var(--color-text-strong);
+  border-radius: var(--radius-pill);
+  background: var(--color-surface);
+  margin: 0 auto;
+}
+
+.tg {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 20px;
+  border-radius: var(--radius-pill);
+  border: 0;
+  background: transparent;
+  font: 600 15px var(--font-body);
+  color: var(--color-text-body);
+  cursor: pointer;
+  min-height: 44px;
+}
+
+.tg[aria-disabled='true'] {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.on {
+  background: var(--color-accent-soft);
+  color: var(--color-text-strong);
+}
+
+.tright {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.iconButtonLight {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  color: var(--color-text);
+  cursor: pointer;
+}
+
+.iconButtonLight:hover {
+  border-color: var(--color-accent);
+}
+
+.content {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+}
+
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}

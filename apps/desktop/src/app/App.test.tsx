@@ -28,12 +28,20 @@ describe('App routing', () => {
     expect(screen.getByRole('progressbar')).toHaveAttribute('value', '1240');
   });
 
-  it('leaves the welcome screen once the vault is open', () => {
+  it('shows the app shell once the vault is open', () => {
     render(<App />);
     act(() => useVaultStore.setState({ status: 'open' }));
     expect(
       screen.queryByRole('heading', { level: 1, name: 'Notes In My Way' }),
     ).not.toBeInTheDocument();
+    expect(screen.getByRole('tree', { name: 'Files' })).toBeInTheDocument();
+  });
+
+  it('still renders when not running inside Tauri (IPC unavailable)', async () => {
+    render(<App />);
+    expect(screen.getByRole('heading', { level: 1, name: 'Notes In My Way' })).toBeInTheDocument();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(screen.queryByText(/^v\d/)).not.toBeInTheDocument();
   });
 
   it('shows toasts with expandable details and lets you dismiss them', async () => {

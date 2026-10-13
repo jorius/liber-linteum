@@ -37,3 +37,12 @@ export function remap(path: string, from: string, to: string): string | null {
   if (path.startsWith(`${from}/`)) return to + path.slice(from.length);
   return null;
 }
+
+/** Folder where "New page/folder" creates things: the selected folder, the
+ * selected file's folder, or the vault root. */
+export function dirFor(nodes: TreeNode[], selected: string | null): string {
+  if (!selected) return '';
+  const node = nodes.find((n) => n.path === selected);
+  if (!node) return '';
+  return node.kind === 'folder' ? node.path : parentOf(node.path);
+}

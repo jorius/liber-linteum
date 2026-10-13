@@ -20,10 +20,6 @@
     "en": "English",
     "es": "Español"
   },
-  "screens": {
-    "global": "Global view",
-    "edit": "Edit"
-  },
   "privacy": {
     "localOnly": "Local only · zero network requests"
   },
@@ -61,5 +57,26 @@
     "title": "Opening vault…",
     "preparing": "Reading the folder…",
     "progress": "Indexing {done, number} / {total, number}"
+  },
+  "shell": {
+    "files": "Files · {name}",
+    "newPage": "New page",
+    "newFolder": "New folder",
+    "view": "View",
+    "edit": "Edit",
+    "globalView": "Global view",
+    "globalLater": "Global view arrives in a later milestone.",
+    "settings": "Settings",
+    "closeVault": "Close vault"
+  },
+  "page": {
+    "region": "Page",
+    "empty": "Pick a page in the explorer",
+    "loading": "Loading…",
+    "deleted": "This page was deleted outside the app.",
+    "binary": "This file isn't valid UTF-8 text, so it can't be shown.",
+    "truncated": "Showing the first 1 MB of this page.",
+    "tags": "Tags",
+    "meta": "{links, plural, one {# link} other {# links}} · {backlinks, plural, one {# backlink} other {# backlinks}}"
   }
 }

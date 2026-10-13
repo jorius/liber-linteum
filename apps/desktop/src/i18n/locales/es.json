@@ -20,10 +20,6 @@
     "en": "English",
     "es": "Español"
   },
-  "screens": {
-    "global": "Vista global",
-    "edit": "Editar"
-  },
   "privacy": {
     "localOnly": "Solo local · cero peticiones de red"
   },
@@ -61,5 +57,26 @@
     "title": "Abriendo bóveda…",
     "preparing": "Leyendo la carpeta…",
     "progress": "Indexando {done, number} / {total, number}"
+  },
+  "shell": {
+    "files": "Archivos · {name}",
+    "newPage": "Nueva página",
+    "newFolder": "Nueva carpeta",
+    "view": "Vista",
+    "edit": "Editar",
+    "globalView": "Vista global",
+    "globalLater": "La vista global llega en un hito posterior.",
+    "settings": "Ajustes",
+    "closeVault": "Cerrar bóveda"
+  },
+  "page": {
+    "region": "Página",
+    "empty": "Elige una página en el explorador",
+    "loading": "Cargando…",
+    "deleted": "Esta página se eliminó fuera de la app.",
+    "binary": "Este archivo no es texto UTF-8 válido, así que no se puede mostrar.",
+    "truncated": "Se muestra el primer 1 MB de esta página.",
+    "tags": "Etiquetas",
+    "meta": "{links, plural, one {# enlace} other {# enlaces}} · {backlinks, plural, one {# retroenlace} other {# retroenlaces}}"
   }
 }
