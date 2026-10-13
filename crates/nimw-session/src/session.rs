@@ -270,6 +270,18 @@ impl VaultSession {
         Ok(self.index().backlinks(path.as_str())?)
     }
 
+    /// Links from outside `path` into it: the file itself, or anything inside
+    /// the folder (delete confirmation, M1b).
+    pub fn backlinks_into(&self, path: &VaultPath) -> Result<Vec<nimw_index::LinkRow>> {
+        let prefix = format!("{}/", path.as_str());
+        Ok(self
+            .index()
+            .links_into(path.as_str())?
+            .into_iter()
+            .filter(|l| l.src != path.as_str() && !l.src.starts_with(&prefix))
+            .collect())
+    }
+
     // ---- operations ----
 
     /// Creates an empty page `name` (`.md` appended if missing) in `dir`.

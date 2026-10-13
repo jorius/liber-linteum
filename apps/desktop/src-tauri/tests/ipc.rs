@@ -11,7 +11,12 @@ use tauri::{
 };
 
 fn build_app() -> App<MockRuntime> {
-    nimw_desktop::configure(mock_builder())
+    // Temp config/cache dirs so tests never read or write the user's settings.
+    let dirs = nimw_desktop::AppDirs {
+        config: std::env::temp_dir().join(format!("nimw-ipc-cfg-{}", std::process::id())),
+        cache: std::env::temp_dir().join(format!("nimw-ipc-cache-{}", std::process::id())),
+    };
+    nimw_desktop::configure(mock_builder(), Some(dirs))
         .build(tauri::generate_context!())
         .expect("failed to build app with the real context")
 }

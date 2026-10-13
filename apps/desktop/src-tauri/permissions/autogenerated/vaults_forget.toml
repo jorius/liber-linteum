@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-vaults-forget"
+description = "Enables the vaults_forget command without any pre-configured scope."
+commands.allow = ["vaults_forget"]
+
+[[permission]]
+identifier = "deny-vaults-forget"
+description = "Denies the vaults_forget command without any pre-configured scope."
+commands.deny = ["vaults_forget"]

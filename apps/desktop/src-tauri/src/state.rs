@@ -3,18 +3,22 @@
 use crate::error::CommandError;
 use crate::settings::SettingsStore;
 use nimw_session::VaultSession;
+use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 
 pub struct AppState {
     session: Mutex<Option<Arc<VaultSession>>>,
     pub settings: SettingsStore,
+    /// OS cache dir; index databases live under `<cache_dir>/nimw/…`.
+    pub cache_dir: PathBuf,
 }
 
 impl AppState {
-    pub fn new(settings: SettingsStore) -> AppState {
+    pub fn new(settings: SettingsStore, cache_dir: PathBuf) -> AppState {
         AppState {
             session: Mutex::new(None),
             settings,
+            cache_dir,
         }
     }
 

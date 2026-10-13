@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-vaults-recent"
+description = "Enables the vaults_recent command without any pre-configured scope."
+commands.allow = ["vaults_recent"]
+
+[[permission]]
+identifier = "deny-vaults-recent"
+description = "Denies the vaults_recent command without any pre-configured scope."
+commands.deny = ["vaults_recent"]
