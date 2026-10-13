@@ -1,6 +1,6 @@
 # Hand-off: M1b App Integration — Notes In My Way
 
-> **Date:** 2026-10-12 · **Branch:** `feat/m1b-app-integration` (from `main` @ `323740e`) · not pushed, no remote configured
+> **Date:** 2026-10-12 · **Merged into `main`** (branch `feat/m1b-app-integration` from `323740e`, deleted) · not pushed, no remote configured
 > **Audience:** Jose, or anyone continuing by hand.
 > **Read first if new:** `docs/handoff/2026-10-12-m0-scaffold-handoff.md` (setup, commands, privacy layers) and `docs/handoff/2026-10-12-m1a-vault-core-handoff.md` (the engine). This document covers what M1b adds: the app you can actually use.
 
@@ -162,7 +162,7 @@ Global (⌘ on macOS, Ctrl elsewhere): ⇧E explorer, O open vault (picker), `,`
 
 ## 9. Bugs found after implementation, and fixes
 1. **Real window, by you: stuck on "Opening vault".** Cause: capability lacked `core:event:allow-listen`; the progress subscription was refused before `vault_open` ran. Fix `76f43d0`: grant listen/unlisten; open without live updates if refused. Tests: `vlt_04_main_window_may_listen_to_vault_events` (Rust, real ACL), two store tests.
-2. **Real window, by you: no visual cue while dragging in the explorer.** Cause: the only cue was a 2 px ring in the accent colour (`#4b2f86` on the `#1f1d24` sidebar — invisible in light theme) and no drag ghost. Fix `6b5a746`: ghost following the pointer, dimmed source row, tinted + ringed drop target, greyed ghost and not-allowed cursor for forbidden drops, spring-loaded folders (700 ms), translated keyboard-drag announcements. Tests: `dragFeedback.test.ts` (6). Visuals: rebuilt app handed to you for a check (result recorded in §1 when confirmed).
+2. **Real window, by you: no visual cue while dragging in the explorer.** Cause: the only cue was a 2 px ring in the accent colour (`#4b2f86` on the `#1f1d24` sidebar — invisible in light theme) and no drag ghost. Fix `6b5a746`: ghost following the pointer, dimmed source row, tinted + ringed drop target, greyed ghost and not-allowed cursor for forbidden drops, spring-loaded folders (700 ms), translated keyboard-drag announcements. Tests: `dragFeedback.test.ts` (6). Visuals: rebuilt app handed to you; you replied "Continue" (no explicit visual confirmation).
 3. **Final review (most capable model):** 1 Critical (= #1), 3 Important + 2 upgraded, 11 Minor deferred:
    - I1 explorer lost its only Tab stop after delete/move into collapsed folders → `974e6ed`.
    - I2 sync commands froze the window (trash prompt, big renames) → `505fc25`.
