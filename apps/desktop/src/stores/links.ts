@@ -38,7 +38,7 @@ export function followLink(action: LinkAction): void {
       if (action.resolved === null) {
         ui.openDialog({ type: 'createPage', source: action.source, target: action.target });
       } else if (isPage(action.resolved)) {
-        void openPage(action.resolved, action.heading);
+        void openPage(action.resolved, action.heading, 'link');
       } else {
         ui.openDialog({ type: 'openFile', path: action.resolved });
       }

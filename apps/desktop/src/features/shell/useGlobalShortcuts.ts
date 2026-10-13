@@ -1,11 +1,13 @@
 import { useEffect } from 'react';
 import { pickFolder } from '../../ipc';
+import { goBack, goForward } from '../../stores/navigate';
 import { dirFor } from '../../stores/tree';
 import { useUiStore } from '../../stores/uiStore';
 import { useVaultStore } from '../../stores/vaultStore';
 
 /** ⌘ (macOS) / Ctrl shortcuts (spec §3.5): ⇧E explorer, O open vault,
- * , settings, N new page, ⇧N new folder. Ignored while a dialog is open. */
+ * , settings, N new page, ⇧N new folder, [ / ] back and forward along the
+ * link trail (M2b §3). Ignored while a dialog is open. */
 export function useGlobalShortcuts(menuOpen: boolean) {
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
@@ -22,6 +24,10 @@ export function useGlobalShortcuts(menuOpen: boolean) {
       } else if (key === 'n') {
         const dir = dirFor(vault.nodes, vault.selected);
         void (e.shiftKey ? vault.createFolder(dir) : vault.createPage(dir));
+      } else if (key === '[' && !e.shiftKey) {
+        void goBack();
+      } else if (key === ']' && !e.shiftKey) {
+        void goForward();
       } else if (key === 'e' && e.shiftKey) {
         document
           .querySelector<HTMLElement>('[role="tree"] [role="treeitem"][tabindex="0"]')

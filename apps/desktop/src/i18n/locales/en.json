@@ -217,5 +217,8 @@
     "quote": "Quote",
     "divider": "Divider",
     "toggle": "Formatting toolbar"
+  },
+  "trail": {
+    "back": "Back to {name}"
   }
 }

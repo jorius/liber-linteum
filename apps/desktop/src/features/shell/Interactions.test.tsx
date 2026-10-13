@@ -8,6 +8,7 @@ import { usePageStore } from '../../stores/pageStore';
 import { DEFAULT_SETTINGS, useSettingsStore } from '../../stores/settingsStore';
 import { useToastStore } from '../../stores/toastStore';
 import { childrenByParent } from '../../stores/tree';
+import { openPage } from '../../stores/navigate';
 import { useUiStore } from '../../stores/uiStore';
 import { resetVaultStore, useVaultStore } from '../../stores/vaultStore';
 import { dropEntry } from '../explorer/drop';
@@ -255,6 +256,66 @@ describe('global shortcuts (spec §3.5)', () => {
     document.body.focus();
     await userEvent.keyboard('{Meta>}{Shift>}e{/Shift}{/Meta}');
     expect(document.activeElement).toHaveAttribute('role', 'treeitem');
+  });
+});
+
+describe('link trail keys (M2b §3)', () => {
+  it('⌘[ goes back and ⌘] forward along followed links', async () => {
+    backend({
+      page_get: (a) => ({
+        path: a.path,
+        title: String(a.path).replace(/\.md$/, ''),
+        subtitle: null,
+        cover: null,
+        tags: [],
+        links: 0,
+        backlinks: 0,
+        text: '',
+        truncated: false,
+        binary: false,
+      }),
+      page_read: () => ({ text: '', hash: 'h' }),
+    });
+    seed();
+    render(<AppShell />);
+    await act(() => openPage('Welcome.md'));
+    await act(() => openPage('Art/rex.md', null, 'link'));
+    document.body.focus();
+    await userEvent.keyboard('{Meta>}[[{/Meta}');
+    await waitFor(() => expect(usePageStore.getState().path).toBe('Welcome.md'));
+    await userEvent.keyboard('{Control>}]{/Control}');
+    await waitFor(() => expect(usePageStore.getState().path).toBe('Art/rex.md'));
+  });
+
+  it('review focus: ⌘[ typed in the editor goes back instead of indenting', async () => {
+    backend({
+      page_get: (a) => ({
+        path: a.path,
+        title: String(a.path).replace(/\.md$/, ''),
+        subtitle: null,
+        cover: null,
+        tags: [],
+        links: 0,
+        backlinks: 0,
+        text: '- item\n',
+        truncated: false,
+        binary: false,
+      }),
+      page_read: () => ({ text: '- item\n', hash: 'h' }),
+    });
+    seed();
+    render(<AppShell />);
+    await act(() => openPage('Welcome.md'));
+    await act(() => openPage('Art/rex.md', null, 'link'));
+    const content = await waitFor(() => {
+      const el = document.querySelector<HTMLElement>('.cm-content');
+      expect(el).not.toBeNull();
+      return el!;
+    });
+    content.focus();
+    await userEvent.keyboard('{Meta>}[[{/Meta}');
+    await waitFor(() => expect(usePageStore.getState().path).toBe('Welcome.md'));
+    expect(content.textContent).toBe('- item');
   });
 });
 

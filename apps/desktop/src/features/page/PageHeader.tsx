@@ -2,7 +2,10 @@ import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { assetUrl, linksResolve, type EditorMode, type Page } from '../../ipc';
 import { useEditorStore } from '../../stores/editorStore';
+import { goBack } from '../../stores/navigate';
 import { useSettingsStore } from '../../stores/settingsStore';
+import { useTrailStore } from '../../stores/trailStore';
+import { nameOf } from '../../stores/tree';
 import { Breadcrumb } from './Breadcrumb';
 import { ModeToggle } from './ModeToggle';
 import styles from './PageView.module.css';
@@ -32,11 +35,25 @@ export function PageHeader({ page, mode }: { page: Page; mode: EditorMode }) {
   const hasDoc = useEditorStore((s) => s.doc !== null);
   const large = useEditorStore((s) => s.large);
   const toolbar = useSettingsStore((s) => s.settings.toolbar);
+  const previous = useTrailStore((s) => s.back.at(-1) ?? null);
   const cover = useCover(page);
   return (
     <header className={styles.header}>
       <div className={styles.bar}>
-        <Breadcrumb path={page.path} />
+        <div className={styles.where}>
+          {previous && (
+            <button
+              type="button"
+              className={styles.back}
+              aria-label={t('trail.back', { name: nameOf(previous.path).replace(/\.md$/i, '') })}
+              title={t('trail.back', { name: nameOf(previous.path).replace(/\.md$/i, '') })}
+              onClick={() => void goBack()}
+            >
+              <span aria-hidden="true">←</span>
+            </button>
+          )}
+          <Breadcrumb path={page.path} />
+        </div>
         <div className={styles.controls}>
           {hasDoc && (
             <span role="status" aria-label={t('editor.saveStatus')} className={styles.status}>

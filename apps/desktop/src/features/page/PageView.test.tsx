@@ -11,6 +11,7 @@ import { resetVaultStore, useVaultStore } from '../../stores/vaultStore';
 import { fakeDisk } from '../../test/fakeDisk';
 import { AUTOSAVE_MS } from '../editor/pageDoc';
 import { LARGE_NOTE_CHARS } from '../editor/livePreview';
+import { openPage } from '../../stores/navigate';
 import { PageView } from './PageView';
 
 const open = (path: string) => act(() => usePageStore.getState().load(path));
@@ -83,6 +84,18 @@ describe('PageView (M2a §5)', () => {
     expect(view().dom).toHaveClass('cm-nimw-source');
     await userEvent.click(screen.getByRole('radio', { name: 'Split' }));
     expect(screen.getByRole('region', { name: 'Preview' })).toHaveTextContent('body');
+  });
+
+  it('M2b §3: the back arrow appears after following a link and goes back', async () => {
+    fakeDisk({ 'A.md': '# A\n\n[[B]]\n', 'B.md': '# B\n' });
+    render(<PageView />);
+    await open('A.md');
+    expect(screen.queryByRole('button', { name: /^Back to/ })).not.toBeInTheDocument();
+    await act(() => openPage('B.md', null, 'link'));
+    const back = await screen.findByRole('button', { name: 'Back to A' });
+    await userEvent.click(back);
+    await waitFor(() => expect(usePageStore.getState().path).toBe('A.md'));
+    expect(screen.queryByRole('button', { name: /^Back to/ })).not.toBeInTheDocument();
   });
 
   it('M2b §6: the header button shows and hides the formatting toolbar', async () => {

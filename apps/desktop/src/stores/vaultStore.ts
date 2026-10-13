@@ -24,6 +24,7 @@ import { useEditorStore, warnUnsaved } from './editorStore';
 import { errorMessage } from './messages';
 import { usePageStore } from './pageStore';
 import { useToastStore } from './toastStore';
+import { useTrailStore } from './trailStore';
 import { childrenByParent, joinPath, nextFreeName, parentOf, remap } from './tree';
 
 /** External changes arriving within this window trigger one tree refresh. */
@@ -110,10 +111,13 @@ export const useVaultStore = create<VaultState>((set, get) => {
     pending = null;
     if (!change) return;
     let { selected, expanded } = get();
+    const trail = useTrailStore.getState();
     for (const [from, to] of change.renamed) {
       selected = selected ? (remap(selected, from, to) ?? selected) : selected;
       expanded = new Set([...expanded].map((p) => remap(p, from, to) ?? p));
+      trail.renamed(from, to);
     }
+    for (const path of change.removed) trail.removed(path);
     set({ selected, expanded });
     await get().refreshTree();
     const present = new Set(get().nodes.map((n) => n.path));
@@ -169,6 +173,7 @@ export const useVaultStore = create<VaultState>((set, get) => {
       return res;
     }
     set({ info: res.value, selected: null, expanded: new Set(), renaming: null });
+    useTrailStore.getState().reset();
     usePageStore.getState().clear();
     useEditorStore.getState().reset();
     await get().refreshTree();
@@ -220,6 +225,7 @@ export const useVaultStore = create<VaultState>((set, get) => {
       useEditorStore.getState().reset();
       stopListening();
       await vaultClose();
+      useTrailStore.getState().reset();
       usePageStore.getState().clear();
       treeSeq++;
       set({ ...EMPTY, children: new Map(), expanded: new Set() });
@@ -301,6 +307,7 @@ export const useVaultStore = create<VaultState>((set, get) => {
         expanded: new Set([...expanded].map((p) => remap(p, from, to) ?? p)),
         renaming: null,
       });
+      useTrailStore.getState().renamed(from, to);
       get().expand(parentOf(to));
       await get().refreshTree();
       await usePageStore.getState().follow(from, to);
@@ -330,6 +337,7 @@ export const useVaultStore = create<VaultState>((set, get) => {
         toast().push({ message: errorMessage(res.error), tone: 'error' });
         return res;
       }
+      useTrailStore.getState().removed(path);
       const page = usePageStore.getState();
       if (page.path && remap(page.path, path, path)) page.clear();
       const selected = get().selected;

@@ -265,6 +265,9 @@ export const onVaultProgress = (cb: (p: ProgressPayload) => void): Promise<Unlis
   listen<ProgressPayload>('vault:progress', (e) => cb(e.payload));
 export const onVaultChanged = (cb: (p: ChangedPayload) => void): Promise<UnlistenFn> =>
   listen<ChangedPayload>('vault:changed', (e) => cb(e.payload));
+/** View → Back / Forward in the app menu (M2b §3). */
+export const onMenuNavigate = (cb: (direction: 'back' | 'forward') => void): Promise<UnlistenFn> =>
+  listen<'back' | 'forward'>('menu:navigate', (e) => cb(e.payload));
 export const onVaultWarning = (cb: (p: WarningPayload) => void): Promise<UnlistenFn> =>
   listen<WarningPayload>('vault:warning', (e) => cb(e.payload));
 

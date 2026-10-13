@@ -4,6 +4,7 @@ import type { TreeNode } from '../ipc';
 import { clearMocks, emit, mockIPC } from '../ipc/testing';
 import { usePageStore } from './pageStore';
 import { DEFAULT_SETTINGS, useSettingsStore } from './settingsStore';
+import { useTrailStore } from './trailStore';
 import { useToastStore } from './toastStore';
 import { resetVaultStore, useVaultStore } from './vaultStore';
 
@@ -117,6 +118,24 @@ describe('settingsStore', () => {
 });
 
 describe('vaultStore', () => {
+  it('M2b §3: renames and trashing in the app update the link trail; a new vault clears it', async () => {
+    backend({
+      entry_rename: () => ({ moved: [], updatedFiles: [], updatedLinks: 0, failed: [] }),
+      entry_trash: () => null,
+      vault_tree: () => [],
+      vault_open: () => ({ name: 'V', root: '/v', report: { warnings: [] } }),
+    });
+    const trail = useTrailStore.getState();
+    trail.followed({ path: 'Notes/A.md', heading: null });
+    trail.followed({ path: 'B.md', heading: null });
+    await useVaultStore.getState().rename('Notes', 'Archive');
+    expect(useTrailStore.getState().back.map((x) => x.path)).toEqual(['Archive/A.md', 'B.md']);
+    await useVaultStore.getState().trash('B.md');
+    expect(useTrailStore.getState().back.map((x) => x.path)).toEqual(['Archive/A.md']);
+    await useVaultStore.getState().open('/v');
+    expect(useTrailStore.getState().back).toEqual([]);
+  });
+
   it('VLT-01 open: closed → opening → open, with tree loaded', async () => {
     const gate = deferred<typeof info>();
     backend({ vault_open: () => gate.promise, vault_tree: () => tree });

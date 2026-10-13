@@ -149,7 +149,7 @@ function NoteEmbed({
         <button
           type="button"
           className={styles.cardButton}
-          onClick={() => void openPage(path, heading)}
+          onClick={() => void openPage(path, heading, 'link')}
         >
           {t('preview.open')}
         </button>

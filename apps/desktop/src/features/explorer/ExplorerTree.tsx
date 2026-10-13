@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react'
 import { useTranslation } from 'react-i18next';
 import type { TreeNode } from '../../ipc';
 import { usePageStore } from '../../stores/pageStore';
+import { useTrailStore } from '../../stores/trailStore';
 import { joinPath, parentOf, remap } from '../../stores/tree';
 import { useVaultStore } from '../../stores/vaultStore';
 import styles from './Explorer.module.css';
@@ -96,7 +97,11 @@ export function ExplorerTree({
     vault.select(node.path);
     setFocused(node.path);
     if (node.kind === 'folder') vault.toggle(node.path);
-    else if (node.kind === 'page') void usePageStore.getState().load(node.path);
+    else if (node.kind === 'page') {
+      // Opening from the explorer starts a fresh link trail (M2b §3).
+      useTrailStore.getState().reset();
+      void usePageStore.getState().load(node.path);
+    }
   };
 
   const commitRename = (node: TreeNode, name: string) => {
