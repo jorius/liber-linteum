@@ -22,11 +22,13 @@ Plan: `docs/superpowers/plans/2026-10-12-m2a-editor.md`
 | Page header: breadcrumb, cover (read-only), mode toggle, save status | done, tested (+ axe) |
 | M1b polish a–f, j | done, tested |
 | Zero-network e2e (Playwright, production CSP, frozen prototypes) | done, mutation-checked |
+| Final review (opus) + fix pass: 2 Critical, 7 Important, 3 Minors re-graded up — all fixed with RED→GREEN tests (§13) | done |
 | Real-window checks (§9) | **need you** |
 
-Totals at the end: 253 vitest tests (38 files), 4 Playwright tests, 176 cargo
-tests; eslint, prettier, tsc, i18n parity, clippy `-D warnings`, rustfmt and
-`cargo deny` all clean.
+Totals at the end (after the fix pass): 293 vitest tests (40 files), 4
+Playwright tests, 186 cargo tests (184 + 2 main-thread menu tests); eslint,
+prettier, tsc, i18n parity, clippy `-D warnings`, rustfmt and `cargo deny` all
+clean.
 
 ## 2. How to run
 
@@ -45,9 +47,11 @@ first). `NIMW_TRASH_TESTS=1` stays for CI only (it uses the real OS Trash).
 
 | File | What it does |
 |---|---|
-| `editor_commands.rs` | The six M2a commands. Each is `*_impl(&AppState, …)` plus an `async` wrapper through `vault_commands::blocking` (never on the UI thread). |
-| `asset.rs` | `nimw-asset:` — `serve(&AppState, uri_path, range)` resolves through the current session's `VaultPath` (no `..`, no absolute paths, no symlink escapes), refuses hidden files and the root (403), 404 without a vault, `Range` → 206/416. |
-| `lib.rs` | Registers the opener plugin (Rust API only), the protocol (on a thread) and the commands. |
+| `menu.rs` | Our own macOS app menu (About, Services, Hide/Hide Others/Show All, **our** Quit ⌘Q; Edit: Undo/Redo/Cut/Copy/Paste/Select All; View: Full Screen; Window: Minimize/Zoom/Close). Quit closes every window through its close request, so the UI's save-before-close runs (review I1). Tests: `tests/menu.rs` (custom harness: menus must be built on the main thread). |
+| `navigation.rs` | Navigation guard plugin: the webview may only show `tauri://localhost`, `http(s)://tauri.localhost`, `about:blank` and (debug builds) the Vite dev server `http://localhost:1420`. A vault file (`nimw-asset:`) or web page can never become the top-level document. |
+| `editor_commands.rs` | The six M2a commands. `file_open_external` only opens a regular file (no folders, so no `.app` bundles), refuses program/script/installer extensions (denylist `EXECUTABLE_EXTENSIONS`) and, on Unix, extensionless files with an exec bit (`check_openable`). Each is `*_impl(&AppState, …)` plus an `async` wrapper through `vault_commands::blocking` (never on the UI thread). |
+| `asset.rs` | `nimw-asset:` — `serve(&AppState, uri_path, range)` resolves through the current session's `VaultPath` (no `..`, no absolute paths, no symlink escapes), refuses hidden files and the root (403), 404 without a vault or for symlink escapes, `Range` → 206/416. Every response carries `Content-Security-Policy: default-src 'none'; sandbox` and `X-Content-Type-Options: nosniff`. |
+| `lib.rs` | Registers the opener plugin (Rust API only), the navigation guard, the menu-event handler, the protocol (on a thread) and the commands; `run()` installs the app menu (`menu::with_app_menu`). |
 | `error.rs` | `ErrorKind::{Binary, InvalidUrl}`; `CommandError.conflict` flattens `{currentText, currentHash}` into a `conflict` error. |
 | `settings.rs` | `editorMode: livePreview \| source \| split` (unknown value → default + warning). |
 | `vault_commands.rs` | `vault_open` no longer fails when recents can't be saved: the failure becomes an index warning. |
@@ -87,7 +91,9 @@ CSP: `img-src`/`media-src` allow `nimw-asset: http://nimw-asset.localhost`
 - **External change:** watcher → `vault:changed` → `vaultStore` (100 ms coalesce) → `pageStore.onExternalChange` → `editorStore.onExternalChange` → `PageDoc.sync()` → reload (clean) / merge / conflict copy → `doc.sink` applies the text to CodeMirror synchronously, outside the undo history.
 - **Write conflict:** `page_write` → `conflict {currentText, currentHash}` → same merge path, no extra read.
 - **Vault switch / close:** `editorStore.saveAll()` first; if a page still can't be written, the switch is refused with a toast (text never dropped).
-- **Quit:** `tauri://close-requested` → `flushAll(2000)` → `window.destroy()`.
+- **Quit / close:** close button, ⌘W or **⌘Q** (our menu item closes each window through its close request) → `tauri://close-requested` → `mayClose()` → `flushAll(2000)` → `window.destroy()`. If a page still can't be written (orphaned, read-only, disk gone), the window stays open with a toast whose "Open" shows that page; closing a **second** time while that warning is up quits anyway (so an unsaveable page never forces Force Quit). **Not covered:** Dock → Quit, logout and shutdown use the system terminate path (tao 0.37 `applicationWillTerminate`) and skip the flush — keep typing-to-quit gaps under 500 ms in mind.
+- **Missing file on save:** a `NotFound` from `page_write` is provisional (retry with backoff); the page is orphaned only when the watcher reports the removal or a read finds it missing. A rename event or a successful read clears `orphaned` and schedules a save. The orphan banner ("Save as new page") shows whenever the page is orphaned.
+- **External text into the editor:** `diffText` (line diff via node-diff3 `diffIndices`) → one non-overlapping change per changed hunk, trimmed to the differing characters, one transaction outside the undo history → ⌘Z undoes only your edits and the cursor stays in its word.
 - **Links:** pane/widget click or ⌘-click/Mod-Enter → `followLink` → open page (+ heading) · create-page dialog · external-link dialog → `url_open` · file dialog → `file_open_external`.
 
 ## 6. Recipes
@@ -121,6 +127,9 @@ CSP: `img-src`/`media-src` allow `nimw-asset: http://nimw-asset.localhost`
 7. **`core:window:allow-destroy`** added for the save-before-quit flow (Tauri's `onCloseRequested` destroys the window itself).
 8. **No regex lookbehind** (lint rule): the build targets Safari 15 (WKWebView, macOS 12).
 9. Versions: `@codemirror/language` 6.13.1, `@codemirror/view` 6.43.14 (pnpm's release-age gate resolved them); `@playwright/test` 1.64.0.
+10. **Links and tags inside `%% %%` comments are not indexed** (final-review ruling, as Obsidian): they don't show as backlinks and a rename does not rewrite them. Callout titles keep their links/formatting; `**#tag**` is a tag. Parity fixtures: `fixtures/markdown/{comments,callout-titles,formatted-tags,html-blocks}.md`.
+11. **Second close quits anyway** when a page can't be saved and you were already warned (see §5). To make it strict, remove the `warned` branch in `editorStore.mayClose`.
+12. **`file_open_external` exec bit:** only extensionless exec files are refused — exFAT/SMB volumes mark every file executable, and the OS opens a typed file in its app rather than running it.
 
 ## 9. Needs the real window (you)
 
@@ -135,17 +144,29 @@ Agent screenshots must be launch-only (no synthetic keystrokes). Please check:
 7. A page with remote images: "Remote image blocked (privacy)" placeholder.
 8. Images and audio from the vault (`nimw-asset:`) play/show; audio seeking (ranges).
 9. Quit with unsaved text (⌘Q right after typing): the text is on disk.
+10. Make a page unsaveable (e.g. `chmod a-w` the file, or delete it in Finder while it has unsaved text), press ⌘Q: the window stays open with the warning + "Open"; a second ⌘Q quits.
+11. The menu: ⌘Z / ⌘⇧Z / ⌘X / ⌘C / ⌘V / ⌘A in the editor, ⌘H, ⌥⌘H, ⌘W, ⌘M, About shows the app name.
+12. Rename the open page in Finder while typing: typing continues, the text lands in the renamed file, no endless "Saving…".
+13. "Open in default app" on a vault PDF/image works; on a `.sh`/`.app` it is refused.
 
 ## 10. Known gaps / deferred
 
 | # | Gap | Target |
 |---|---|---|
 | a | Raw HTML blocks show as source in Live Preview (rendered in Split) | M2b |
-| b | Large notes (> 200 KB) also re-parse fully if they contain fences/HTML/comments | later perf |
+| b | Incremental re-parse falls back to a full parse when the edited slice touches frontmatter, overlaps a `%%` comment, fences/HTML/directives, adjoining lists, or contains `[` on a page with definitions (frontmatter and comments elsewhere no longer force it — review I2) | later perf |
 | c | Mixed line endings in one file are normalised to the first one on save | later |
 | d | Cover editing, attachments, `[[` autocomplete | M2b |
 | e | Header title updates after each save, not per keystroke | later |
 | f | One giant paragraph (no blank lines) is slow to parse: a 200 KB single paragraph takes ~1.4 s to parse and ~2.1 s to open in Live Preview (jsdom), against ~0.35 s for 200 KB of normal paragraphs | later perf |
+| h | Dock → Quit, logout and shutdown skip the save-before-quit (tao 0.37 terminate path) | later (tao upgrade / `applicationShouldTerminate`) |
+| i | `%%` comment masking can change Markdown meaning (`%%x%% text` after a blank line → indented code; `foo %%x%%\nbar` → hard break) | later |
+| j | `page_write` conflict payload decodes with `from_utf8_lossy` (a non-UTF-8 external rewrite is merged with U+FFFD) | later |
+| k | "Create page" from an unresolved link ignores folders in the target | M2b |
+| l | `nimw-asset`: one thread per request; `Range` reads the whole file | later perf (M6 audio) |
+| m | Perf test takes the min of 5 runs; Live Preview decoration rebuild on cross-line cursor moves is unmeasured | later perf |
+| n | Rust indexes tags/wikilinks inside Markdown link text (`[#t](u)`), TS does not | later parity |
+| o | Pages with reference definitions re-parse fully when the edited block contains `[` (correct, slower on huge pages) | later perf |
 | g | On a busy machine the default vitest worker count can hit worker-start timeouts (CPU time stays ~40 s while wall time grew to 270 s); `pnpm exec vitest run --maxWorkers=2` is a workaround | watch in CI |
 
 ## 11. Troubleshooting
@@ -154,6 +175,8 @@ Agent screenshots must be launch-only (no synthetic keystrokes). Please check:
 |---|---|
 | Images don't show | `tauri.conf.json` CSP must list `nimw-asset: http://nimw-asset.localhost` in `img-src`/`media-src` |
 | "not allowed" on a new command | `build.rs` list + `capabilities/main.json` + ACL test |
+| ⌘Z/⌘C/⌘V stop working | the Edit menu in `menu.rs` must keep its predefined items (WKWebView routes the shortcuts through the menu) |
+| A link/embed opens nothing | the navigation guard blocks top-level navigation by design; links go through `followLink` → `url_open`/`file_open_external` |
 | `pnpm test:e2e` can't find a browser | `pnpm --filter @nimw/desktop exec playwright install chromium` |
 | e2e fails with `csp:`/violations | something reached the DOM with a remote URL: the sanitizer, not the CSP, must stop it |
 
@@ -162,3 +185,29 @@ Agent screenshots must be launch-only (no synthetic keystrokes). Please check:
 1. Your real-window pass (§9); note anything odd in a new hand-off section.
 2. **M2b:** covers/subtitle editing, paste/drop attachments, `[[` autocomplete.
 3. M3 Global View (reuse `Breadcrumb`).
+
+## 13. Final review and fix pass
+
+Reviewer (opus, fresh context) on `49625e6..3e3a8e6`; full text in
+`.superpowers/sdd/2026-10-12-m2a-editor/final-review.md` (git-ignored; removed
+after merge — the summary below is the record). Fixed in two parallel
+worktrees (A: editor/save; B: model/preview/backend safety), cherry-picked,
+every fix with a test that failed first:
+
+| # | Finding | Fix | Test(s) |
+|---|---|---|---|
+| C1 | Undo/cursor broken when a reload/merge changed text on both sides of the edit (⌘Z put my text into their line) | per-hunk external changes (`Editor.tsx` `diffText`) | `Editor.test.tsx` "C1: …" ×3 |
+| C2 | Page silently stopped saving forever after rename/recreate racing an autosave | NotFound provisional; un-orphan on rename/restore; banner whenever orphaned | `pageDoc.test.ts`, `editorStore.test.tsx`, `PageView.test.tsx` |
+| I1 | ⌘Q skipped the save-before-quit | own app menu (`menu.rs`) | `tests/menu.rs` ×2 |
+| I2 | Any page with frontmatter/`%%` re-parsed fully (~220 ms per keystroke at 5k lines) | frontmatter fixed block; comments only block when overlapping | `incremental.test.ts` (timing + fuzz with frontmatter) |
+| I3 | Reference links/footnotes vanished from Split after typing | full parse when definitions exist and slice has `[`; fuzz pieces | `incremental.test.ts` |
+| I4 | `<a href="#100%">` blanked the whole app | `markdown/decode.ts` `safeDecode` everywhere + `RenderBoundary` around the pane | sanitize/livePreview/Preview/`RenderBoundary` tests |
+| I5 | Cached editor state could write into another page; Split stopped following | PageDoc bound inside each `EditorState` | `Editor.test.tsx` "I5: …" ×2 |
+| I6 | `> ` leaked into quotes/callouts after a link/tag/highlight | plain runs from the node value (`inline.ts`) | `parse.test.ts` ×7 |
+| I7 | TS/Rust disagreed on comments, callout titles, `**#tag**` | rulings §8.10; Rust skips comments; TS `calloutTitle` node; tags after markup | 4 new parity fixtures; `parity.rs` lists all mismatches |
+| m5↑ | Orphaned text dropped on window close | `mayClose` keeps the window open + toast "Open" | `editorStore.test.tsx`, `ipc/editor.test.ts` |
+| m2↑ | Vault files served without CSP; webview could navigate to them | CSP sandbox + nosniff; `navigation.rs` guard | `tests/asset.rs`, `navigation.rs` tests |
+| m3↑ | "Open in default app" accepted folders (`.app`) and executables | `check_openable` | `editor_commands.rs` tests + IPC test |
+| m9 | No protocol-level symlink-escape test | added | `tests/asset.rs` `symlinks_escaping_the_vault_are_not_served` |
+
+Deferred minors are §10 h–o.
