@@ -92,6 +92,46 @@ describe('Editor (M2a §3.2–3.3)', () => {
     expect(view.state.doc.toString()).toBe('one\ntwo\nthree\nFOUR\n');
   });
 
+  it('C1: undo after a merge whose disk changes surround my edit reverts only my edit', async () => {
+    disk = fakeDisk({ 'A.md': 'one\nx\ntwo foo bar\ny\nthree\n' });
+    const doc = await load('A.md');
+    render(<Editor doc={doc} mode="source" label="A" />);
+    act(() => {
+      viewOf().dispatch({ changes: { from: 10, to: 14 }, userEvent: 'delete' }); // "foo "
+    });
+    disk.files.set('A.md', 'ONE more\nx\ntwo foo bar\ny\nTHREE!\n');
+    await act(() => doc.sync());
+    const view = viewOf();
+    expect(view.state.doc.toString()).toBe('ONE more\nx\ntwo bar\ny\nTHREE!\n');
+    act(() => void undo(view));
+    expect(view.state.doc.toString()).toBe('ONE more\nx\ntwo foo bar\ny\nTHREE!\n');
+    expect(doc.text).toBe('ONE more\nx\ntwo foo bar\ny\nTHREE!\n');
+  });
+
+  it('C1: a clean reload changing text above and below keeps the cursor in its word', async () => {
+    disk = fakeDisk({ 'A.md': 'one\nx\ntwo\ny\nthree\n' });
+    const doc = await load('A.md');
+    render(<Editor doc={doc} mode="source" label="A" />);
+    act(() => viewOf().dispatch({ selection: { anchor: 8 } })); // "tw|o"
+    disk.files.set('A.md', 'zero one\nx\ntwo\ny\nTHREE and more\n');
+    await act(() => doc.sync());
+    const view = viewOf();
+    const head = view.state.selection.main.head;
+    expect(view.state.doc.sliceString(head - 2, head + 1)).toBe('two');
+    expect(head).toBe(13);
+  });
+
+  it('C1: during a merge the next keystroke lands where I was typing', async () => {
+    disk = fakeDisk({ 'A.md': 'one\nx\ntwo\ny\nthree\n' });
+    const doc = await load('A.md');
+    render(<Editor doc={doc} mode="source" label="A" />);
+    await type('!', 9); // "two!"
+    disk.files.set('A.md', 'ONE 1\nx\ntwo\ny\nTHREE 3\n');
+    await act(() => doc.sync());
+    await type('?');
+    expect(viewOf().state.doc.toString()).toBe('ONE 1\nx\ntwo!?\ny\nTHREE 3\n');
+  });
+
   it('an external reload keeps the cursor on the same text', async () => {
     disk = fakeDisk({ 'A.md': 'one\ntwo\n' });
     const doc = await load('A.md');

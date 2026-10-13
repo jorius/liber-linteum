@@ -4,6 +4,7 @@ import { HighlightStyle, syntaxHighlighting } from '@codemirror/language';
 import { Compartment, EditorState, Transaction, type Extension } from '@codemirror/state';
 import { drawSelection, EditorView, keymap } from '@codemirror/view';
 import { tags } from '@lezer/highlight';
+import { diffIndices } from 'node-diff3';
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { EditorMode } from '../../ipc';
@@ -60,27 +61,86 @@ function modeExtensions(mode: EditorMode): Extension {
 
 const labelled = (label: string) => EditorView.contentAttributes.of({ 'aria-label': label });
 
-/** The smallest change turning `from` into `to`. */
-export function diffText(from: string, to: string) {
-  if (from === to) return null;
-  let start = 0;
-  const max = Math.min(from.length, to.length);
-  while (start < max && from.charCodeAt(start) === to.charCodeAt(start)) start++;
-  let a = from.length;
-  let b = to.length;
-  while (a > start && b > start && from.charCodeAt(a - 1) === to.charCodeAt(b - 1)) {
-    a--;
-    b--;
-  }
-  return { from: start, to: a, insert: to.slice(start, b) };
+export interface TextChange {
+  from: number;
+  to: number;
+  insert: string;
 }
 
-/** Text that changed outside the editor (reload, merge): applied as a minimal
- *  change outside the undo history, so the selection maps through it and undo
+/** Lines with their `\n` kept. */
+function splitLines(text: string): string[] {
+  const out: string[] = [];
+  let start = 0;
+  for (let i = text.indexOf('\n'); i >= 0; i = text.indexOf('\n', start)) {
+    out.push(text.slice(start, i + 1));
+    start = i + 1;
+  }
+  if (start < text.length) out.push(text.slice(start));
+  return out;
+}
+
+/** `from.slice(a, b)` → `insert`, trimmed to the characters that differ. */
+function trimmed(from: string, a: number, b: number, insert: string): TextChange | null {
+  let head = 0;
+  const max = Math.min(b - a, insert.length);
+  while (head < max && from.charCodeAt(a + head) === insert.charCodeAt(head)) head++;
+  let tail = 0;
+  while (
+    tail < max - head &&
+    from.charCodeAt(b - 1 - tail) === insert.charCodeAt(insert.length - 1 - tail)
+  ) {
+    tail++;
+  }
+  if (a + head === b - tail && head === insert.length - tail) return null;
+  return { from: a + head, to: b - tail, insert: insert.slice(head, insert.length - tail) };
+}
+
+/** The changes turning `from` into `to`: one per changed run of lines (each
+ *  trimmed to the characters that differ), never touching the unchanged text
+ *  between them, so selections and undo history map through it (M2a §3.3).
+ *  Offsets are in `from`; the changes don't overlap and are sorted. */
+export function diffText(from: string, to: string): TextChange[] {
+  if (from === to) return [];
+  const a = splitLines(from);
+  const b = splitLines(to);
+  // Skip the common head and tail lines (cheap; keeps the LCS small).
+  let head = 0;
+  while (head < a.length && head < b.length && a[head] === b[head]) head++;
+  let tail = 0;
+  while (
+    tail < a.length - head &&
+    tail < b.length - head &&
+    a[a.length - 1 - tail] === b[b.length - 1 - tail]
+  ) {
+    tail++;
+  }
+  const midA = a.slice(head, a.length - tail);
+  const midB = b.slice(head, b.length - tail);
+  // Offsets of each line of `from` (relative to the first differing line).
+  let base = 0;
+  for (let i = 0; i < head; i++) base += a[i].length;
+  const offsets = [base];
+  for (const line of midA) offsets.push(offsets[offsets.length - 1] + line.length);
+  const out: TextChange[] = [];
+  for (const hunk of diffIndices(midA, midB)) {
+    const [startA, lenA] = hunk.buffer1;
+    const change = trimmed(
+      from,
+      offsets[startA],
+      offsets[startA + lenA],
+      hunk.buffer2Content.join(''),
+    );
+    if (change) out.push(change);
+  }
+  return out;
+}
+
+/** Text that changed outside the editor (reload, merge): applied as minimal
+ *  changes outside the undo history, so the selection maps through it and undo
  *  only ever reverts the user's own edits. */
 function applyExternal(view: EditorView, text: string) {
   const changes = diffText(view.state.doc.toString(), text);
-  if (!changes) return;
+  if (!changes.length) return;
   view.dispatch({
     changes,
     annotations: [Transaction.addToHistory.of(false), Transaction.remote.of(true)],
