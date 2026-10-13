@@ -53,6 +53,14 @@
       "empty": "Enter a name.",
       "hidden": "Names can't start with a dot.",
       "forbidden": "Names can't contain \"{char}\"."
+    },
+    "drag": {
+      "pickedUp": "Picked up {name}.",
+      "over": "{name} is over {target}.",
+      "notOver": "{name} is not over a folder.",
+      "moved": "Moved {name} to {target}.",
+      "notAllowed": "{name} can't be moved there.",
+      "cancelled": "Move of {name} cancelled."
     }
   },
   "opening": {

@@ -32,7 +32,7 @@ interface TreeRowProps {
   onCancelRename: () => void;
 }
 
-function Icon({ node, expanded }: { node: TreeNode; expanded: boolean }) {
+export function Icon({ node, expanded }: { node: TreeNode; expanded: boolean }) {
   const common = {
     width: 14,
     height: 14,
@@ -164,7 +164,12 @@ export const TreeRow = forwardRef<HTMLLIElement, TreeRowProps>(function TreeRow(
     if (typeof ref === 'function') ref(el);
     else if (ref) ref.current = el;
   };
-  const classes = [styles.row, selected ? styles.selected : '', dropTarget ? styles.drop : '']
+  const classes = [
+    styles.row,
+    selected ? styles.selected : '',
+    dropTarget ? styles.drop : '',
+    drag.isDragging ? styles.dragSource : '',
+  ]
     .filter(Boolean)
     .join(' ');
   return (

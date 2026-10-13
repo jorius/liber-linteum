@@ -37,7 +37,35 @@
 }
 
 .drop {
-  box-shadow: inset 0 0 0 2px var(--color-accent);
+  background: var(--color-drop-bg);
+  box-shadow: inset 0 0 0 2px var(--color-drop-ring);
+}
+
+/* The row being dragged stays in place, dimmed (the ghost follows the pointer). */
+.dragSource {
+  opacity: 0.4;
+}
+
+/* Drag ghost (dnd-kit DragOverlay). */
+.ghost {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font: 600 13px var(--font-body);
+  box-shadow: var(--shadow-card);
+  border: 1px solid var(--color-border-strong);
+  cursor: grabbing;
+  white-space: nowrap;
+}
+
+.ghostForbidden {
+  opacity: 0.6;
+  cursor: not-allowed;
+  border-style: dashed;
 }
 
 .label {

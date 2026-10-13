@@ -53,6 +53,14 @@
       "empty": "Escribe un nombre.",
       "hidden": "Los nombres no pueden empezar con un punto.",
       "forbidden": "Los nombres no pueden contener «{char}»."
+    },
+    "drag": {
+      "pickedUp": "Has tomado {name}.",
+      "over": "{name} está sobre {target}.",
+      "notOver": "{name} no está sobre ninguna carpeta.",
+      "moved": "{name} se movió a {target}.",
+      "notAllowed": "{name} no se puede mover ahí.",
+      "cancelled": "Se canceló mover {name}."
     }
   },
   "opening": {
