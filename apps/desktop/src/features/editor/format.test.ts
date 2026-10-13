@@ -3,6 +3,8 @@ import { ensureSyntaxTree } from '@codemirror/language';
 import { history, undo } from '@codemirror/commands';
 import { EditorSelection, EditorState, type StateCommand } from '@codemirror/state';
 import { describe, expect, it } from 'vitest';
+import type { List, ListItem } from 'mdast';
+import { parsePage } from '../../markdown/parse';
 import {
   activeFormats,
   editorKeymap,
@@ -152,6 +154,48 @@ describe('keys', () => {
     expect(apply(listIndent(-1), '- a\n  - b¦')).toBe('- a\n- b¦');
     const plain = stateOf('text¦');
     expect(listIndent(1)({ state: plain, dispatch: () => undefined })).toBe(false);
+  });
+
+  it('Tab nests an item under the one above per CommonMark; ⇧Tab un-nests it', () => {
+    /** Item counts of the top-level list and of the list nested in its first item. */
+    const shape = (text: string) => {
+      const list = parsePage(text).tree.children[0] as List;
+      const first = list.children[0] as ListItem;
+      const nested = first.children.find((c) => c.type === 'list') as List | undefined;
+      return [list.children.length, nested?.children.length ?? 0];
+    };
+    // An ordered list only interrupts a paragraph when it starts at 1, so a
+    // newly nested numbered item restarts at 1 (or follows its new sibling).
+    const cases: [string, string][] = [
+      ['1. one\n2. two¦', '1. one\n   1. two¦'],
+      ['10. ten\n11. eleven¦', '10. ten\n    1. eleven¦'],
+      ['1) one\n2) two¦', '1) one\n   1) two¦'],
+      ['- a\n- b¦', '- a\n  - b¦'],
+      ['- [ ] a\n- [ ] b¦', '- [ ] a\n  - [ ] b¦'],
+      ['1. a\n\n2. b¦', '1. a\n\n   1. b¦'],
+    ];
+    for (const [flat, nested] of cases) {
+      expect(apply(listIndent(1), flat), flat).toBe(nested);
+      expect(apply(listIndent(-1), nested), nested).toBe(flat);
+      expect(shape(flat.replace('¦', '')), flat).toEqual([2, 0]);
+      expect(shape(nested.replace('¦', '')), nested).toEqual([1, 1]);
+    }
+    expect(apply(listIndent(1), '1. a\n   1. b\n2. c¦')).toBe('1. a\n   1. b\n   2. c¦');
+    expect(apply(listIndent(1), '1. a\n   1. b\n   2. c¦')).toBe('1. a\n   1. b\n      1. c¦');
+    expect(apply(listIndent(-1), '1. a\n   1. b\n      1. c¦')).toBe('1. a\n   1. b\n   2. c¦');
+    // Several selected items nest under the same parent.
+    expect(apply(listIndent(1), '1. a\n‹2. b\n3. c›')).toBe('1. a\n   ‹1. b\n   2. c›');
+    expect(apply(listIndent(-1), '1. a\n   ‹1. b\n   2. c›')).toBe('1. a\n‹2. b\n3. c›');
+  });
+
+  it('Tab with nothing to nest under (first item) is not handled', () => {
+    for (const input of ['- one¦', '1. one¦', '1. a\n   1. b¦']) {
+      const state = stateOf(input);
+      let dispatched = false;
+      const handled = listIndent(1)({ state, dispatch: () => (dispatched = true) });
+      expect(handled, input).toBe(false);
+      expect(dispatched, input).toBe(false);
+    }
   });
 
   it('⇧Tab with nothing to outdent is not handled, so focus can move backwards', () => {

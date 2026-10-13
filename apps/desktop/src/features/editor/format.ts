@@ -1,7 +1,7 @@
 // Formatting commands (M2b §6): pure CodeMirror commands over the Markdown
 // text — one transaction (one undo step) for every selection — plus the keys
 // that run them with or without the toolbar.
-import { defaultKeymap, indentLess, indentMore } from '@codemirror/commands';
+import { defaultKeymap } from '@codemirror/commands';
 import { syntaxTree } from '@codemirror/language';
 import {
   EditorSelection,
@@ -9,7 +9,6 @@ import {
   type EditorState,
   type SelectionRange,
   type StateCommand,
-  type Transaction,
 } from '@codemirror/state';
 import type { KeyBinding } from '@codemirror/view';
 
@@ -257,19 +256,95 @@ export const insertLink: StateCommand = ({ state, dispatch }) => {
   return true;
 };
 
-/** Tab / Shift-Tab: indent or outdent list items only; elsewhere — and when
- *  nothing would change, e.g. ⇧Tab on a top-level item — the key is left to
- *  the browser, so Tab / ⇧Tab keep moving focus out of the editor. */
+/** Leading whitespace, list marker (number + delimiter) and the gap after it. */
+const ITEM = /^([ \t]*)([-*+]|(\d{1,9})([.)]))([ \t]+|$)/;
+const columns = (ws: string) => {
+  let c = 0;
+  for (const ch of ws) c = ch === '\t' ? c + 4 - (c % 4) : c + 1;
+  return c;
+};
+const indentOf = (text: string) => columns(/^[ \t]*/.exec(text)![0]);
+
+/** The column an item's content starts at — where a child item must start to
+ *  nest under it (CommonMark): `- ` → 2, `1. ` → 3, `10. ` → 4; five or more
+ *  spaces after the marker count as one. */
+function contentColumn(m: RegExpExecArray): number {
+  const gap = m[5].length;
+  return columns(m[1]) + m[2].length + (gap >= 1 && gap <= 4 ? gap : 1);
+}
+
+/** The indent line `n` (a list item) gets from Tab — the content column of
+ *  the item above at its level — or ⇧Tab — the indent of its parent; null
+ *  when there is nothing to nest under / nothing to outdent. */
+function nestedIndent(textOf: (n: number) => string, n: number, dir: 1 | -1): number | null {
+  const own = indentOf(textOf(n));
+  if (dir === -1 && own === 0) return null;
+  for (let k = n - 1; k >= 1; k--) {
+    const text = textOf(k);
+    if (text.trim() === '') continue;
+    const indent = indentOf(text);
+    if (dir === 1) {
+      if (indent > own) continue;
+      const item = ITEM.exec(text);
+      return indent === own && item ? contentColumn(item) : null;
+    }
+    if (indent < own) return indent;
+  }
+  return dir === 1 ? null : 0;
+}
+
+/** The number of the ordered item just above line `n` in the same list at
+ *  `indent`, if there is one. */
+function previousNumber(textOf: (n: number) => string, n: number, indent: number): number | null {
+  for (let k = n - 1; k >= 1; k--) {
+    const text = textOf(k);
+    if (text.trim() === '') continue;
+    const at = indentOf(text);
+    if (at > indent) continue;
+    const item = ITEM.exec(text);
+    return at === indent && item?.[3] ? Number(item[3]) : null;
+  }
+  return null;
+}
+
+/** Tab / Shift-Tab: nest list items under the item above, or un-nest them,
+ *  by that item's marker width (spaces; `1. ` needs three), so the result is
+ *  a nested list in CommonMark. A numbered item continues the numbering of
+ *  its new list, and a newly nested one starts at 1 — an ordered list starting
+ *  at any other number cannot interrupt the paragraph above, and the item
+ *  would stay a line of its parent's text. Outside lists — and when nothing
+ *  would change, e.g. ⇧Tab on a top-level item or Tab on a first item — the
+ *  key is left to the browser, so Tab / ⇧Tab keep moving focus. */
 export function listIndent(dir: 1 | -1): StateCommand {
   return ({ state, dispatch }) => {
-    const inList = selectedLines(state).every((n) =>
-      /^\s*([-*+]|\d+[.)])[ \t]/.test(state.doc.line(n).text),
-    );
-    if (!inList) return false;
-    let tr: Transaction | null = null;
-    (dir === 1 ? indentMore : indentLess)({ state, dispatch: (t) => (tr = t) });
-    if (!tr || !(tr as Transaction).docChanged) return false;
-    dispatch(tr);
+    const numbers = selectedLines(state);
+    if (!numbers.every((n) => ITEM.test(state.doc.line(n).text))) return false;
+    // Lines already moved, so later selected items follow them.
+    const moved = new Map<number, string>();
+    const textOf = (n: number) => moved.get(n) ?? state.doc.line(n).text;
+    const changes: ChangeSpec[] = [];
+    for (const n of numbers) {
+      const target = nestedIndent(textOf, n, dir);
+      if (target === null) continue;
+      const line = state.doc.line(n);
+      const m = ITEM.exec(line.text)!;
+      const indent = ' '.repeat(target);
+      let marker = m[2];
+      if (m[3]) {
+        const previous = previousNumber(textOf, n, target);
+        if (previous !== null) marker = `${previous + 1}${m[4]}`;
+        else if (dir === 1) marker = `1${m[4]}`;
+      }
+      if (indent === m[1] && marker === m[2]) continue;
+      moved.set(n, indent + marker + line.text.slice(m[1].length + m[2].length));
+      if (indent !== m[1]) changes.push(...lineChange(line.from, m[1], indent));
+      if (marker !== m[2]) {
+        const at = line.from + m[1].length;
+        changes.push({ from: at, to: at + m[2].length, insert: marker });
+      }
+    }
+    if (!changes.length) return false;
+    dispatch(state.update({ changes, scrollIntoView: true, userEvent: 'input.indent' }));
     return true;
   };
 }
