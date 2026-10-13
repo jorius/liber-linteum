@@ -3,6 +3,7 @@
 import { invoke, isTauri } from '@tauri-apps/api/core';
 import { listen, type UnlistenFn } from '@tauri-apps/api/event';
 import { open } from '@tauri-apps/plugin-dialog';
+import { getCurrentWindow } from '@tauri-apps/api/window';
 
 export interface AppInfo {
   name: string;
@@ -28,11 +29,16 @@ export type ErrorKind =
   | 'outsideVault'
   | 'unsafeRewrite'
   | 'watch'
+  | 'binary'
+  | 'invalidUrl'
   | 'io';
 
 export interface CommandError {
   kind: ErrorKind;
   message: string;
+  /** `page_write` conflicts carry the file as it is now (M2a §3.1). */
+  currentText?: string;
+  currentHash?: string;
 }
 
 export type IpcResult<T> = { ok: true; value: T } | { ok: false; error: CommandError };
@@ -45,7 +51,10 @@ export function toCommandError(e: unknown): CommandError {
     typeof (e as CommandError).kind === 'string' &&
     typeof (e as CommandError).message === 'string'
   ) {
-    return { kind: (e as CommandError).kind, message: (e as CommandError).message };
+    const { kind, message, currentText, currentHash } = e as CommandError;
+    return typeof currentText === 'string' && typeof currentHash === 'string'
+      ? { kind, message, currentText, currentHash }
+      : { kind, message };
   }
   if (typeof e === 'string') return { kind: 'io', message: e };
   if (e instanceof Error) return { kind: 'io', message: e.message };
@@ -115,6 +124,8 @@ export interface RecentVault {
   missing: boolean;
 }
 
+export type EditorMode = 'livePreview' | 'source' | 'split';
+
 export interface Settings {
   version: number;
   /** `null` = follow the OS. */
@@ -122,6 +133,7 @@ export interface Settings {
   theme: Theme;
   rewriteLinks: boolean;
   confirmDelete: boolean;
+  editorMode: EditorMode;
 }
 
 /** `language: 'system'` means follow the OS again. */
@@ -130,11 +142,29 @@ export interface SettingsPatch {
   theme?: Theme;
   rewriteLinks?: boolean;
   confirmDelete?: boolean;
+  editorMode?: EditorMode;
 }
 
 export interface SettingsResponse {
   settings: Settings;
   warning?: string;
+}
+
+export interface PageText {
+  text: string;
+  hash: string;
+}
+
+export interface WriteResult {
+  hash: string;
+}
+
+/** Mirrors `nimw_markdown::LinkKind::as_str`. */
+export type LinkKind = 'wiki' | 'embed' | 'markdown' | 'markdown_image' | 'related' | 'cover';
+
+export interface LinkTarget {
+  kind: LinkKind;
+  target: string;
 }
 
 export interface ProgressPayload {
@@ -175,6 +205,15 @@ export const settingsGet = () => call<SettingsResponse>('settings_get');
 export const settingsSet = (patch: SettingsPatch) => call<Settings>('settings_set', { patch });
 export const vaultsRecent = () => call<RecentVault[]>('vaults_recent');
 export const vaultsForget = (path: string) => call<void>('vaults_forget', { path });
+export const pageRead = (path: string) => call<PageText>('page_read', { path });
+export const pageWrite = (path: string, text: string, expectedHash: string) =>
+  call<WriteResult>('page_write', { path, text, expectedHash });
+export const pageCreateConflictCopy = (path: string, text: string) =>
+  call<string>('page_create_conflict_copy', { path, text });
+export const linksResolve = (source: string, targets: LinkTarget[]) =>
+  call<(string | null)[]>('links_resolve', { source, targets });
+export const urlOpen = (url: string) => call<void>('url_open', { url });
+export const fileOpenExternal = (path: string) => call<void>('file_open_external', { path });
 
 // ---- events ----
 
@@ -184,6 +223,11 @@ export const onVaultChanged = (cb: (p: ChangedPayload) => void): Promise<Unliste
   listen<ChangedPayload>('vault:changed', (e) => cb(e.payload));
 export const onVaultWarning = (cb: (p: WarningPayload) => void): Promise<UnlistenFn> =>
   listen<WarningPayload>('vault:warning', (e) => cb(e.payload));
+
+/** Runs `handler` (e.g. flushing unsaved pages) before the main window closes;
+ *  the window is destroyed once it settles. */
+export const onCloseRequested = (handler: () => Promise<void>): Promise<UnlistenFn> =>
+  getCurrentWindow().onCloseRequested(() => handler());
 
 // ---- native folder picker (dialog plugin, folder selection only) ----
 

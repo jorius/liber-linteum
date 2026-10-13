@@ -28,6 +28,18 @@ export function Toaster() {
               </details>
             )}
           </div>
+          {toast.action && (
+            <button
+              type="button"
+              className={styles.action}
+              onClick={() => {
+                toast.action?.run();
+                dismiss(toast.id);
+              }}
+            >
+              {toast.action.label}
+            </button>
+          )}
           <button
             type="button"
             className={styles.dismiss}

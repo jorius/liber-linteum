@@ -548,3 +548,31 @@ fn external_open_commands_refuse_unsafe_targets() {
     .unwrap_err();
     assert!(err.to_string().contains("not allowed"), "{err}");
 }
+
+/// M2a §3.3: closing the window first flushes unsaved pages. The UI listens for
+/// `tauri://close-requested` and then destroys the window itself, so `main`
+/// needs `core:window:allow-destroy` — and another window must not get it.
+#[test]
+fn ed_08_main_window_may_flush_then_close_itself() {
+    let h = harness();
+    let other = WebviewWindowBuilder::new(&h.app, "other", Default::default())
+        .build()
+        .unwrap();
+    let listen = json!({
+        "event": "tauri://close-requested",
+        "target": { "kind": "Window", "label": "main" },
+        "handler": 9
+    });
+    if let Err(e) = call(&h.main, "plugin:event|listen", listen) {
+        panic!("main must be allowed to listen for close requests: {e}");
+    }
+    let destroy = json!({ "label": "other" });
+    let err = call(&other, "plugin:window|destroy", destroy.clone()).expect_err("other");
+    assert!(err.to_string().contains("not allowed"), "{err}");
+    if let Err(e) = call(&h.main, "plugin:window|destroy", json!({ "label": "main" })) {
+        assert!(
+            !e.to_string().contains("not allowed"),
+            "main must be allowed to destroy itself: {e}"
+        );
+    }
+}

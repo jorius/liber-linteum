@@ -31,6 +31,7 @@
     "mdast-util-to-hast": "^13.2.1",
     "micromark-extension-directive": "^4.0.0",
     "micromark-util-decode-string": "^2.0.1",
+    "node-diff3": "^3.2.1",
     "react": "^19.3.0",
     "react-dom": "^19.3.0",
     "react-i18next": "^17.0.16",

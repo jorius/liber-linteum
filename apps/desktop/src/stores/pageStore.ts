@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { pageGet, type ChangedPayload, type Page } from '../ipc';
+import { useEditorStore } from './editorStore';
 import { errorMessage } from './messages';
 import { useToastStore } from './toastStore';
 import { remap } from './tree';
@@ -10,7 +11,10 @@ interface PageState {
   path: string | null;
   page: Page | null;
   state: PageViewState;
+  /** Opens `path` (header data + editor). */
   load: (path: string) => Promise<void>;
+  /** Re-reads the header data (title, tags, counts) of the open page. */
+  refresh: () => Promise<void>;
   clear: () => void;
   /** Follows renames of the open page (own or external). */
   follow: (from: string, to: string) => Promise<void>;
@@ -29,7 +33,9 @@ export const usePageStore = create<PageState>((set, get) => ({
   load: async (path) => {
     const mine = ++seq;
     set({ path, state: get().path === path && get().page ? get().state : 'loading' });
+    const editing = useEditorStore.getState().open(path);
     const res = await pageGet(path);
+    await editing;
     if (mine !== seq) return; // a newer load won
     if (res.ok) set({ page: res.value, state: 'ready' });
     else if (res.error.kind === 'notFound') set({ page: null, state: 'deleted' });
@@ -38,16 +44,26 @@ export const usePageStore = create<PageState>((set, get) => ({
       useToastStore.getState().push({ message: errorMessage(res.error), tone: 'error' });
     }
   },
+  refresh: async () => {
+    const path = get().path;
+    if (!path || get().state !== 'ready') return;
+    const mine = seq;
+    const res = await pageGet(path);
+    if (mine === seq && res.ok) set({ page: res.value });
+  },
   clear: () => {
     seq++;
     set({ path: null, page: null, state: 'empty' });
+    void useEditorStore.getState().close();
   },
   follow: async (from, to) => {
+    useEditorStore.getState().follow(from, to);
     const path = get().path;
     const next = path ? remap(path, from, to) : null;
     if (next) await get().load(next);
   },
   onExternalChange: async (c, exists) => {
+    await useEditorStore.getState().onExternalChange(c, exists);
     const path = get().path;
     if (!path) return;
     for (const [from, to] of c.renamed) {
@@ -64,3 +80,11 @@ export const usePageStore = create<PageState>((set, get) => ({
     if (touched || (get().state === 'deleted' && stillThere)) await get().load(path);
   },
 }));
+
+// Our own saves aren't reported by the watcher: refresh the header data
+// (title, tags, link counts) after each one.
+useEditorStore.subscribe((s, prev) => {
+  if (s.path && s.path === prev.path && prev.hash && s.hash !== prev.hash) {
+    void usePageStore.getState().refresh();
+  }
+});

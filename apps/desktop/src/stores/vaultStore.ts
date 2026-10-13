@@ -20,6 +20,7 @@ import {
   type TreeNode,
   type VaultInfo,
 } from '../ipc';
+import { useEditorStore } from './editorStore';
 import { errorMessage } from './messages';
 import { usePageStore } from './pageStore';
 import { useToastStore } from './toastStore';
@@ -189,6 +190,8 @@ export const useVaultStore = create<VaultState>((set, get) => {
     open: (path) => withProgress(() => vaultOpen(path)),
     create: (path) => withProgress(() => vaultCreate(path)),
     close: async () => {
+      // Unsaved text is written before the vault goes away (M2a §3.3).
+      await useEditorStore.getState().flushAll();
       stopListening();
       await vaultClose();
       usePageStore.getState().clear();
@@ -251,6 +254,7 @@ export const useVaultStore = create<VaultState>((set, get) => {
       return res;
     },
     rename: async (from, to) => {
+      await useEditorStore.getState().flushAll(); // the move takes the latest text
       const res = await entryRename(from, to);
       if (!res.ok) {
         toast().push({ message: errorMessage(res.error), tone: 'error' });
@@ -266,6 +270,8 @@ export const useVaultStore = create<VaultState>((set, get) => {
       await get().refreshTree();
       await usePageStore.getState().follow(from, to);
       const out = res.value;
+      // Our link rewrites aren't reported by the watcher: re-read open pages.
+      await useEditorStore.getState().syncPaths(out.updatedFiles);
       if (out.failed.length) {
         toast().push({
           message: i18next.t('toasts.renameFailed', { count: out.failed.length }),
@@ -283,6 +289,7 @@ export const useVaultStore = create<VaultState>((set, get) => {
       const siblings = get().children.get(parentOf(path)) ?? [];
       const i = siblings.findIndex((n) => n.path === path);
       const next = siblings[i + 1]?.path ?? (parentOf(path) || null);
+      await useEditorStore.getState().flushAll(); // the Trash gets the latest text
       const res = await entryTrash(path);
       if (!res.ok) {
         toast().push({ message: errorMessage(res.error), tone: 'error' });
