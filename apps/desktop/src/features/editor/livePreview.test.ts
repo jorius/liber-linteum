@@ -135,6 +135,52 @@ describe('Live Preview (M2a §3.2)', () => {
     expect(followLinkAtCursor(v)).toBe(false);
   });
 
+  describe('a plain click on a link (as in Obsidian)', () => {
+    const resolveTo = () =>
+      mockIPC((cmd) => {
+        if (cmd === 'links_resolve') return ['Notes/Sparda.md'];
+        if (cmd === 'page_get') throw { kind: 'notFound', message: 'x' };
+        if (cmd === 'page_read') return { text: '', hash: 'h' };
+        return null;
+      });
+    const click = (v: EditorView, init: MouseEventInit = {}) => {
+      const link = v.contentDOM.querySelector('.cm-nimw-link')!;
+      act(() => {
+        link.dispatchEvent(
+          new MouseEvent('mousedown', { bubbles: true, cancelable: true, button: 0, ...init }),
+        );
+      });
+    };
+    const settle = () => act(() => new Promise((r) => setTimeout(r, 20)));
+
+    it('follows a rendered link', async () => {
+      resolveTo();
+      usePageStore.setState({ path: null });
+      const v = editor('x\n\nSee [[Sparda|the twins]] now\n', 0);
+      click(v);
+      await vi.waitFor(() => expect(usePageStore.getState().path).toBe('Notes/Sparda.md'));
+    });
+
+    it('edits a link on the cursor line (it shows its source)', async () => {
+      resolveTo();
+      usePageStore.setState({ path: null });
+      const v = editor('x\n\nSee [[Sparda|the twins]] now\n', 0);
+      await moveTo(v, v.state.doc.line(3).from);
+      click(v);
+      await settle();
+      expect(usePageStore.getState().path).toBeNull();
+    });
+
+    it('shift-click extends the selection instead', async () => {
+      resolveTo();
+      usePageStore.setState({ path: null });
+      const v = editor('x\n\nSee [[Sparda]] now\n', 0);
+      click(v, { shiftKey: true });
+      await settle();
+      expect(usePageStore.getState().path).toBeNull();
+    });
+  });
+
   it('a link target with a bare % is followed as written, never throws (I4)', async () => {
     const asked: unknown[] = [];
     mockIPC((cmd, args) => {

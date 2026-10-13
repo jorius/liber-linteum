@@ -60,6 +60,13 @@ test('following a link shows the back arrow; ← and ⌘] walk the trail', async
   await expect(page.getByRole('textbox', { name: 'Page title' })).toHaveValue('A');
 });
 
+test('a plain click on a link in Live Preview opens the page (as in Obsidian)', async ({ page }) => {
+  await open(page, 'A');
+  await page.locator('.cm-nimw-link', { hasText: 'B' }).click();
+  await expect(page.getByRole('textbox', { name: 'Page title' })).toHaveValue('B');
+  await expect(page.getByRole('button', { name: 'Back to A' })).toBeVisible();
+});
+
 test('a palette from Settings applies at once', async ({ page }) => {
   await open(page, 'A');
   await page.getByRole('button', { name: 'Settings' }).click();
