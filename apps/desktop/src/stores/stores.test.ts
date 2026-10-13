@@ -103,6 +103,17 @@ describe('settingsStore', () => {
     expect(useSettingsStore.getState().settings.theme).toBe('light');
     expect(document.documentElement.dataset.theme).toBe('light');
   });
+
+  it('M2b §4: the palette applies on load and on update', async () => {
+    backend({
+      settings_get: () => ({ settings: { ...DEFAULT_SETTINGS, palette: 'sepia' } }),
+      settings_set: (a) => ({ ...DEFAULT_SETTINGS, ...(a.patch as object) }),
+    });
+    await useSettingsStore.getState().load();
+    expect(document.documentElement.dataset.palette).toBe('sepia');
+    await useSettingsStore.getState().update({ palette: 'ink' });
+    expect(document.documentElement.dataset.palette).toBe('ink');
+  });
 });
 
 describe('vaultStore', () => {

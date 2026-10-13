@@ -361,11 +361,11 @@ const theme = EditorView.baseTheme({
   '.cm-nimw-em': { fontStyle: 'italic' },
   '.cm-nimw-strong': { fontWeight: '700' },
   '.cm-nimw-strike': { textDecoration: 'line-through' },
-  '.cm-nimw-highlight': { background: 'var(--palette-yellow-bg)', borderRadius: '3px' },
+  '.cm-nimw-highlight': { background: 'var(--color-highlight-bg)', borderRadius: '3px' },
   '.cm-nimw-code': {
     fontFamily: 'var(--font-mono)',
     fontSize: '0.9em',
-    background: 'var(--color-surface-subtle)',
+    background: 'var(--color-code-bg)',
     borderRadius: '4px',
   },
   '.cm-nimw-link': { color: 'var(--color-accent)', textDecoration: 'underline' },

@@ -20,6 +20,10 @@
   /* Drag-and-drop on the (always dark) sidebar: visible in both themes. */
   --color-drop-bg: rgba(185, 162, 230, 0.22);
   --color-drop-ring: #b9a2e6;
+  /* M2b §4: per-palette tokens (palettes.css overrides them). */
+  --color-sidebar-selected: rgba(185, 162, 230, 0.22);
+  --color-highlight-bg: #fbf1c7;
+  --color-code-bg: #efe9f6;
   --color-warn-bg: #fff1e3;
   --color-warn-border: #efc49c;
   --color-warn-text: #7a330b;
@@ -75,6 +79,8 @@
     --color-warn-border: #7a4a26;
     --color-warn-text: #f3c79f;
     --color-focus: #cbb8ef;
+    --color-highlight-bg: #4a3f12;
+    --color-code-bg: #2a2533;
     --palette-red: #ff9d92;
     --palette-red-bg: #4a1f1c;
     --palette-orange: #ffb877;
@@ -117,6 +123,8 @@
   --color-warn-border: #7a4a26;
   --color-warn-text: #f3c79f;
   --color-focus: #cbb8ef;
+  --color-highlight-bg: #4a3f12;
+  --color-code-bg: #2a2533;
   --palette-red: #ff9d92;
   --palette-red-bg: #4a1f1c;
   --palette-orange: #ffb877;

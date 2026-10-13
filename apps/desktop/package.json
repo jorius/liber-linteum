@@ -12,7 +12,8 @@
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "check:i18n": "node scripts/check-i18n.ts",
-    "test:e2e": "vite build && playwright test"
+    "test:e2e": "vite build && playwright test",
+    "gen:palettes": "node scripts/gen-palettes.ts"
   },
   "dependencies": {
     "@codemirror/commands": "^6.11.1",

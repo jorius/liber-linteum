@@ -44,7 +44,7 @@
 
 .content :not(pre) > code,
 .nested :not(pre) > code {
-  background: var(--color-surface-subtle);
+  background: var(--color-code-bg);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-sm);
   padding: 0 4px;
@@ -80,7 +80,7 @@
 
 .content mark,
 .nested mark {
-  background: var(--palette-yellow-bg);
+  background: var(--color-highlight-bg);
   color: var(--color-text);
   border-radius: 3px;
   padding: 0 2px;

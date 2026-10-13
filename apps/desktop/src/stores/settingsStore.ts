@@ -8,6 +8,7 @@ import {
   type Settings,
   type SettingsPatch,
 } from '../ipc';
+import { applyAppearance } from '../theme/appearance';
 import { applyTheme } from '../theme/theme';
 import { useToastStore } from './toastStore';
 
@@ -37,6 +38,7 @@ interface SettingsState {
 
 async function apply(s: Settings) {
   applyTheme(s.theme);
+  applyAppearance(s);
   const lang = s.language ?? detectLanguage(navigator.languages);
   if (i18next.language !== lang) await i18next.changeLanguage(lang);
 }
