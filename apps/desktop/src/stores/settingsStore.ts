@@ -25,6 +25,7 @@ export const DEFAULT_SETTINGS: Settings = {
   fontSource: 'jetbrains-mono',
   fontSize: 15,
   toolbar: true,
+  lineNumbers: false,
 };
 
 interface SettingsState {

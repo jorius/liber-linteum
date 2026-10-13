@@ -225,6 +225,7 @@ fn m2b_appearance_and_editor_settings_default_and_persist() {
     assert_eq!(d.font_source.as_str(), "jetbrains-mono");
     assert_eq!(d.font_size, FontSize::new(15));
     assert!(d.toolbar);
+    assert!(!d.line_numbers, "line numbers are off by default");
     s.update(SettingsPatch {
         palette: Some(Palette::Custom),
         accent_color: Some(HexColor::parse("#2AA198").unwrap()),
@@ -232,6 +233,7 @@ fn m2b_appearance_and_editor_settings_default_and_persist() {
         font_source: Some(FontChoice::parse("ibm-plex-mono").unwrap()),
         font_size: Some(FontSize::new(18)),
         toolbar: Some(false),
+        line_numbers: Some(true),
         ..Default::default()
     })
     .unwrap();
@@ -244,6 +246,7 @@ fn m2b_appearance_and_editor_settings_default_and_persist() {
     assert_eq!(saved["fontSource"], "ibm-plex-mono");
     assert_eq!(saved["fontSize"], 18);
     assert_eq!(saved["toolbar"], false);
+    assert_eq!(saved["lineNumbers"], true);
     assert_eq!(store(dir.path()).get().0, s.get().0, "round-trips");
 }
 
@@ -254,7 +257,7 @@ fn m2b_each_new_setting_is_reset_on_its_own() {
     std::fs::write(
         dir.path().join("settings.json"),
         r#"{"palette":"neon","accentColor":"red","fontLivePreview":"comic-sans",
-            "fontSource":"system:","fontSize":"big","toolbar":"yes","theme":"dark"}"#,
+            "fontSource":"system:","fontSize":"big","toolbar":"yes","lineNumbers":1,"theme":"dark"}"#,
     )
     .unwrap();
     let (s, warning) = store(dir.path()).get();
@@ -264,6 +267,7 @@ fn m2b_each_new_setting_is_reset_on_its_own() {
     assert_eq!(s.font_source.as_str(), "jetbrains-mono");
     assert_eq!(s.font_size, FontSize::new(15));
     assert!(s.toolbar);
+    assert!(!s.line_numbers);
     assert_eq!(s.theme, Theme::Dark, "valid neighbours survive");
     let warning = warning.unwrap();
     for key in [
@@ -273,6 +277,7 @@ fn m2b_each_new_setting_is_reset_on_its_own() {
         "fontSource",
         "fontSize",
         "toolbar",
+        "lineNumbers",
     ] {
         assert!(warning.contains(key), "{key} in {warning}");
     }

@@ -160,6 +160,8 @@ export interface Settings {
   fontSize: number;
   /** Formatting toolbar shown. */
   toolbar: boolean;
+  /** Line numbers in the editor gutter. */
+  lineNumbers: boolean;
 }
 
 /** `language: 'system'` means follow the OS again. */
@@ -175,6 +177,7 @@ export interface SettingsPatch {
   fontSource?: FontChoice;
   fontSize?: number;
   toolbar?: boolean;
+  lineNumbers?: boolean;
 }
 
 export interface SettingsResponse {

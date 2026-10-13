@@ -624,7 +624,8 @@ fn m2b_settings_round_trip_over_ipc() {
             "fontLivePreview": "system:Avenir Next",
             "fontSource": "source-code-pro",
             "fontSize": 17,
-            "toolbar": false
+            "toolbar": false,
+            "lineNumbers": true
         }}),
     )
     .unwrap();
@@ -634,6 +635,7 @@ fn m2b_settings_round_trip_over_ipc() {
     assert_eq!(saved["fontSource"], "source-code-pro");
     assert_eq!(saved["fontSize"], 17);
     assert_eq!(saved["toolbar"], false);
+    assert_eq!(saved["lineNumbers"], true);
     let got = call(&h.main, "settings_get", json!({})).unwrap();
     assert_eq!(got["settings"]["palette"], "graphite");
     assert!(

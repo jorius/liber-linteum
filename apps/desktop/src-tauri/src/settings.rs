@@ -204,6 +204,8 @@ pub struct Settings {
     pub font_size: FontSize,
     /// Formatting toolbar shown (M2b §6).
     pub toolbar: bool,
+    /// Line numbers in the editor gutter (M2b §11, feedback round).
+    pub line_numbers: bool,
     pub recent_vaults: Vec<RecentVault>,
     /// Keys this build does not know (written by a newer version); kept on save.
     #[serde(flatten)]
@@ -225,6 +227,7 @@ impl Default for Settings {
             font_source: FontChoice::bundled("jetbrains-mono"),
             font_size: FontSize::default(),
             toolbar: true,
+            line_numbers: false,
             recent_vaults: Vec::new(),
             extra: serde_json::Map::new(),
         }
@@ -246,6 +249,7 @@ pub struct SettingsPatch {
     pub font_source: Option<FontChoice>,
     pub font_size: Option<FontSize>,
     pub toolbar: Option<bool>,
+    pub line_numbers: Option<bool>,
 }
 
 /// A recent vault as shown on the welcome screen.
@@ -300,6 +304,7 @@ fn parse_lenient(text: &str) -> Result<(Settings, Vec<String>), serde_json::Erro
     field!("fontSource", font_source);
     field!("fontSize", font_size);
     field!("toolbar", toolbar);
+    field!("lineNumbers", line_numbers);
     match map.remove("recentVaults") {
         None => {}
         Some(Value::Array(items)) => {
@@ -418,6 +423,9 @@ impl SettingsStore {
         }
         if let Some(v) = patch.toolbar {
             next.toolbar = v;
+        }
+        if let Some(v) = patch.line_numbers {
+            next.line_numbers = v;
         }
         self.save(&next)?;
         *s = next.clone();

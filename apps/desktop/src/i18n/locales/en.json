@@ -201,7 +201,8 @@
     "fontSystemDefault": "System default",
     "fontSize": "Text size",
     "fontSizePx": "{px} px",
-    "toolbar": "Show the formatting toolbar"
+    "toolbar": "Show the formatting toolbar",
+    "lineNumbers": "Show line numbers"
   },
   "toolbar": {
     "label": "Formatting",

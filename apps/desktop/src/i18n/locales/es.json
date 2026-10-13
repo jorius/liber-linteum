@@ -201,7 +201,8 @@
     "fontSystemDefault": "Predeterminada del sistema",
     "fontSize": "Tamaño del texto",
     "fontSizePx": "{px} px",
-    "toolbar": "Mostrar la barra de formato"
+    "toolbar": "Mostrar la barra de formato",
+    "lineNumbers": "Mostrar los números de línea"
   },
   "toolbar": {
     "label": "Formato",

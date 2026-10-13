@@ -127,6 +127,14 @@ export function SettingsDialog({ onClose }: { onClose: () => void }) {
           />
           {t('settings.toolbar')}
         </label>
+        <label className={styles.check}>
+          <input
+            type="checkbox"
+            checked={settings.lineNumbers}
+            onChange={(e) => void update({ lineNumbers: e.target.checked })}
+          />
+          {t('settings.lineNumbers')}
+        </label>
       </section>
 
       <section className={styles.section} aria-labelledby={ids.files}>

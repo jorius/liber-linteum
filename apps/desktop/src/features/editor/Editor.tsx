@@ -2,7 +2,7 @@ import { history, historyKeymap } from '@codemirror/commands';
 import { markdown, markdownLanguage } from '@codemirror/lang-markdown';
 import { HighlightStyle, syntaxHighlighting, syntaxTree } from '@codemirror/language';
 import { Compartment, EditorState, Facet, Transaction, type Extension } from '@codemirror/state';
-import { drawSelection, EditorView, keymap } from '@codemirror/view';
+import { drawSelection, EditorView, keymap, lineNumbers } from '@codemirror/view';
 import { tags } from '@lezer/highlight';
 import { diffIndices } from 'node-diff3';
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
@@ -32,6 +32,9 @@ const paneOf = new WeakMap<EditorView, (text: string) => void>();
 const toolbarOf = new WeakMap<EditorView, (state: EditorState) => void>();
 const modeSlot = new Compartment();
 const labelSlot = new Compartment();
+/** Line numbers in the gutter (Settings → Editor). */
+const gutterSlot = new Compartment();
+const gutter = (on: boolean): Extension => (on ? lineNumbers() : []);
 
 const sourceHighlight = HighlightStyle.define([
   { tag: tags.heading, fontWeight: '700', color: 'var(--color-text-strong)' },
@@ -65,6 +68,14 @@ const theme = EditorView.theme({
   '.cm-selectionBackground, &.cm-focused .cm-selectionBackground': {
     backgroundColor: 'var(--color-accent-soft)',
   },
+  '.cm-gutters': {
+    backgroundColor: 'transparent',
+    border: 'none',
+    color: 'var(--color-text-muted)',
+    fontFamily: 'var(--font-source)',
+    fontSize: '0.8em',
+  },
+  '.cm-lineNumbers .cm-gutterElement': { padding: '0 4px 0 12px' },
 });
 
 function modeExtensions(mode: EditorMode): Extension {
@@ -166,7 +177,7 @@ function applyExternal(view: EditorView, text: string) {
 
 /** A page's editor state. Its listeners find the page through `pageDocOf`
  *  and the Split pane through the view they run in (I5). */
-function createState(d: PageDoc, mode: EditorMode, label: string): EditorState {
+function createState(d: PageDoc, mode: EditorMode, label: string, numbers: boolean): EditorState {
   return EditorState.create({
     doc: d.text,
     extensions: [
@@ -181,6 +192,7 @@ function createState(d: PageDoc, mode: EditorMode, label: string): EditorState {
       theme,
       labelSlot.of(labelled(label)),
       modeSlot.of(modeExtensions(mode)),
+      gutterSlot.of(gutter(numbers)),
       // Autosave also when the editor loses focus (M2a §3.3).
       EditorView.domEventHandlers({
         blur: (_e, v) => {
@@ -218,6 +230,7 @@ export function Editor({ doc, mode, label }: EditorProps) {
   // The text for the Split pane (cheap to track: the pane renders only in Split).
   const [text, setText] = useState(doc.text);
   const showToolbar = useSettingsStore((s) => s.settings.toolbar);
+  const showNumbers = useSettingsStore((s) => s.settings.lineNumbers);
   const [toolbarView, setToolbarView] = useState<EditorView | null>(null);
   const [active, setActive] = useState<Set<ActiveFormat>>(() => new Set());
   const showFormats = useCallback((state: EditorState) => {
@@ -225,7 +238,8 @@ export function Editor({ doc, mode, label }: EditorProps) {
     setActive((prev) => ([...prev].sort().join() === [...next].sort().join() ? prev : next));
   }, []);
 
-  const stateFor = (d: PageDoc): EditorState => states.get(d) ?? createState(d, mode, label);
+  const stateFor = (d: PageDoc): EditorState =>
+    states.get(d) ?? createState(d, mode, label, showNumbers);
 
   // One view for the component's lifetime; page states are swapped into it.
   useLayoutEffect(() => {
@@ -259,7 +273,11 @@ export function Editor({ doc, mode, label }: EditorProps) {
     // Changed while it was in the background (reload or merge without a view).
     applyExternal(v, doc.text);
     v.dispatch({
-      effects: [modeSlot.reconfigure(modeExtensions(mode)), labelSlot.reconfigure(labelled(label))],
+      effects: [
+        modeSlot.reconfigure(modeExtensions(mode)),
+        labelSlot.reconfigure(labelled(label)),
+        gutterSlot.reconfigure(gutter(showNumbers)),
+      ],
     });
     setText(doc.text);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -270,6 +288,10 @@ export function Editor({ doc, mode, label }: EditorProps) {
       effects: [modeSlot.reconfigure(modeExtensions(mode)), labelSlot.reconfigure(labelled(label))],
     });
   }, [mode, label]);
+
+  useLayoutEffect(() => {
+    view.current?.dispatch({ effects: gutterSlot.reconfigure(gutter(showNumbers)) });
+  }, [showNumbers]);
 
   // Split: the editor and the rendered pane follow each other's scrolling.
   useEffect(() => {

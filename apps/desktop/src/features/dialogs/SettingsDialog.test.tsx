@@ -126,7 +126,7 @@ describe('Settings dialog (M2b §4, §5, §7)', () => {
     expect(patches.length).toBeLessThanOrEqual(6);
   });
 
-  it('fonts: bundled and installed families per mode, text size and the toolbar', async () => {
+  it('fonts: bundled and installed families per mode, text size, toolbar and line numbers', async () => {
     open();
     const live = screen.getByRole('combobox', { name: 'Live Preview font' });
     const source = screen.getByRole('combobox', { name: 'Source font' });
@@ -136,12 +136,14 @@ describe('Settings dialog (M2b §4, §5, §7)', () => {
     await userEvent.selectOptions(source, 'system:Menlo');
     await userEvent.selectOptions(screen.getByRole('combobox', { name: 'Text size' }), '18');
     await userEvent.click(screen.getByRole('checkbox', { name: 'Show the formatting toolbar' }));
+    await userEvent.click(screen.getByRole('checkbox', { name: 'Show line numbers' }));
     await waitFor(() =>
       expect(patches).toEqual([
         { fontLivePreview: 'literata' },
         { fontSource: 'system:Menlo' },
         { fontSize: 18 },
         { toolbar: false },
+        { lineNumbers: true },
       ]),
     );
     expect(document.documentElement.style.getPropertyValue('--font-source')).toContain('"Menlo"');
