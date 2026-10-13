@@ -12,5 +12,8 @@ pulldown-cmark.workspace = true
 unicode-normalization.workspace = true
 yaml-rust2.workspace = true
 
+[dev-dependencies]
+serde_json.workspace = true
+
 [lints]
 workspace = true

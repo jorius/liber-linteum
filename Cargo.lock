@@ -2348,6 +2348,7 @@ version = "0.1.0"
 dependencies = [
  "percent-encoding",
  "pulldown-cmark",
+ "serde_json",
  "unicode-normalization",
  "yaml-rust2",
 ]

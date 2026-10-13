@@ -5,13 +5,18 @@ import remarkFrontmatter from 'remark-frontmatter';
 import remarkGfm from 'remark-gfm';
 import remarkParse from 'remark-parse';
 import { unified } from 'unified';
+import { findComments, maskComments, remarkContainerDirectives, transformBlocks } from './blocks';
 import { frontmatterLinks, frontmatterTags, readFrontmatter } from './frontmatter';
 import { scanText } from './inline';
 import { locator } from './locate';
 import type { Embed, LinkRef, ParsedPage, Tag, WikiLink } from './types';
 import { findAll, rangeOf } from './walk';
 
-const processor = unified().use(remarkParse).use(remarkGfm).use(remarkFrontmatter, ['yaml']);
+const processor = unified()
+  .use(remarkParse)
+  .use(remarkGfm)
+  .use(remarkFrontmatter, ['yaml'])
+  .use(remarkContainerDirectives);
 
 /** Parents whose text is never scanned for extensions. */
 const OPAQUE = new Set(['link', 'linkReference', 'image', 'imageReference']);
@@ -119,14 +124,20 @@ function collectTags(tree: Root, fmTags: string[]): string[] {
 /** Parses one page. Pure and synchronous; positions are UTF-16 offsets into `text`. */
 export function parsePage(text: string): ParsedPage {
   const loc = locator(text);
-  const tree = processor.parse(text) as Root;
-  transformInline(tree, text, loc);
+  let tree = processor.parse(text) as Root;
+  // Comments are blanked (same length) and the page re-parsed, so positions
+  // still index `text` but nothing inside a comment renders or links.
+  const comments = findComments(text, tree);
+  const source = maskComments(text, comments);
+  if (comments.length) tree = processor.parse(source) as Root;
+  transformBlocks(tree, source, loc);
+  transformInline(tree, source, loc);
   const frontmatter = readFrontmatter(tree);
   return {
     tree,
     frontmatter,
     links: collectLinks(tree, frontmatterLinks(frontmatter)),
     tags: collectTags(tree, frontmatterTags(frontmatter)),
-    comments: [],
+    comments,
   };
 }
