@@ -9,6 +9,7 @@ import {
   type SettingsPatch,
 } from '../ipc';
 import { applyTheme } from '../theme/theme';
+import { useToastStore } from './toastStore';
 
 export const DEFAULT_SETTINGS: Settings = {
   version: 1,
@@ -42,7 +43,15 @@ export const useSettingsStore = create<SettingsState>((set) => ({
     // Outside Tauri (plain browser) or on error: defaults.
     const settings = res.ok ? { ...DEFAULT_SETTINGS, ...res.value.settings } : DEFAULT_SETTINGS;
     await apply(settings);
-    set({ settings, warning: res.ok ? (res.value.warning ?? null) : null, loaded: true });
+    const warning = res.ok ? (res.value.warning ?? null) : null;
+    set({ settings, warning, loaded: true });
+    if (warning) {
+      useToastStore.getState().push({
+        message: i18next.t('toasts.settingsWarning'),
+        detail: [warning],
+        tone: 'error',
+      });
+    }
   },
   update: async (patch) => {
     const res = await settingsSet(patch);

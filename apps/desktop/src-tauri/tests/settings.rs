@@ -143,3 +143,41 @@ fn rfc3339_formats_utc_seconds() {
     assert_eq!(rfc3339_utc(951_782_400), "2000-02-29T00:00:00Z");
     assert_eq!(rfc3339_utc(1_791_820_800), "2026-10-12T16:00:00Z");
 }
+
+/// Final review I3: a newer app may write a value this build doesn't know
+/// (`"theme": "sepia"`) — only that field falls back to its default; recent
+/// vaults, other preferences and unknown keys survive, and the next save keeps them.
+#[test]
+fn review_focus_unknown_value_from_newer_version_resets_only_that_field() {
+    let dir = tempfile::tempdir().unwrap();
+    let vault = tempfile::tempdir().unwrap();
+    std::fs::write(
+        dir.path().join("settings.json"),
+        format!(
+            r#"{{"version":3,"theme":"sepia","language":"es","confirmDelete":false,
+               "recentVaults":[{{"path":{p:?},"name":"Old","openedAt":"2026-01-01T00:00:00Z"}},
+                               {{"path":7}}],
+               "futureThing":1}}"#,
+            p = vault.path().to_string_lossy()
+        ),
+    )
+    .unwrap();
+    let s = store(dir.path());
+    let (settings, warning) = s.get();
+    assert_eq!(settings.theme, Theme::System, "unknown theme → default");
+    assert_eq!(settings.language.as_deref(), Some("es"));
+    assert!(!settings.confirm_delete);
+    assert_eq!(settings.recent_vaults.len(), 1, "valid recent entries kept");
+    assert_eq!(settings.version, 3);
+    let w = warning.expect("a warning names what was reset");
+    assert!(w.contains("theme"), "{w}");
+
+    s.push_recent(vault.path(), "Old").unwrap();
+    let saved: serde_json::Value =
+        serde_json::from_str(&std::fs::read_to_string(dir.path().join("settings.json")).unwrap())
+            .unwrap();
+    assert_eq!(saved["futureThing"], 1);
+    assert_eq!(saved["version"], 3);
+    assert_eq!(saved["language"], "es");
+    assert_eq!(saved["recentVaults"].as_array().unwrap().len(), 1);
+}

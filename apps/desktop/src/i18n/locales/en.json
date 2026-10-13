@@ -42,7 +42,8 @@
     "openedWithWarnings": "{count, plural, one {Opened with # warning} other {Opened with # warnings}}",
     "dismiss": "Dismiss",
     "details": "Details",
-    "liveUpdatesUnavailable": "Live updates are unavailable: changes made outside the app appear after reopening the vault."
+    "liveUpdatesUnavailable": "Live updates are unavailable: changes made outside the app appear after reopening the vault.",
+    "settingsWarning": "Some settings couldn't be read and were reset to defaults"
   },
   "explorer": {
     "untitled": "Untitled",

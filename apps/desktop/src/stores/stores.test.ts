@@ -51,6 +51,18 @@ afterEach(async () => {
 });
 
 describe('settingsStore', () => {
+  it('review focus: a settings warning (reset values, unreadable file) is shown as a toast', async () => {
+    backend({
+      settings_get: () => ({
+        settings: DEFAULT_SETTINGS,
+        warning: 'settings.json: unrecognised values reset to defaults: theme',
+      }),
+    });
+    await useSettingsStore.getState().load();
+    const toasts = useToastStore.getState().toasts;
+    expect(toasts.some((t) => t.detail?.some((d) => d.includes('theme')))).toBe(true);
+  });
+
   it('loads before first render and applies theme and language', async () => {
     backend({
       settings_get: () => ({

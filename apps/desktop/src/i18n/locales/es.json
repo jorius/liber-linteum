@@ -42,7 +42,8 @@
     "openedWithWarnings": "{count, plural, one {Abierta con # advertencia} other {Abierta con # advertencias}}",
     "dismiss": "Cerrar",
     "details": "Detalles",
-    "liveUpdatesUnavailable": "Las actualizaciones en vivo no están disponibles: los cambios hechos fuera de la app aparecen al reabrir la bóveda."
+    "liveUpdatesUnavailable": "Las actualizaciones en vivo no están disponibles: los cambios hechos fuera de la app aparecen al reabrir la bóveda.",
+    "settingsWarning": "Algunos ajustes no se pudieron leer y se restablecieron"
   },
   "explorer": {
     "untitled": "Sin título",

@@ -85,6 +85,52 @@ pub struct SettingsDto {
     pub warning: Option<String>,
 }
 
+/// Parses settings field by field (final review I3): a value this build does
+/// not understand — e.g. a theme added by a newer version — resets only that
+/// field; everything else, including unknown keys, survives. Returns the
+/// settings and the names of the fields that were reset. Fails only when the
+/// text is not a JSON object.
+fn parse_lenient(text: &str) -> Result<(Settings, Vec<String>), serde_json::Error> {
+    use serde::de::Error as _;
+    use serde_json::Value;
+    let Value::Object(mut map) = serde_json::from_str::<Value>(text)? else {
+        return Err(serde_json::Error::custom("settings must be a JSON object"));
+    };
+    let mut settings = Settings::default();
+    let mut reset = Vec::new();
+    macro_rules! field {
+        ($key:literal, $field:ident) => {
+            if let Some(v) = map.remove($key) {
+                match serde_json::from_value(v) {
+                    Ok(x) => settings.$field = x,
+                    Err(_) => reset.push($key.to_string()),
+                }
+            }
+        };
+    }
+    field!("version", version);
+    field!("language", language);
+    field!("theme", theme);
+    field!("rewriteLinks", rewrite_links);
+    field!("confirmDelete", confirm_delete);
+    match map.remove("recentVaults") {
+        None => {}
+        Some(Value::Array(items)) => {
+            let total = items.len();
+            settings.recent_vaults = items
+                .into_iter()
+                .filter_map(|v| serde_json::from_value::<RecentVault>(v).ok())
+                .collect();
+            if settings.recent_vaults.len() < total {
+                reset.push("recentVaults (some entries)".to_string());
+            }
+        }
+        Some(_) => reset.push("recentVaults".to_string()),
+    }
+    settings.extra = map;
+    Ok((settings, reset))
+}
+
 pub struct SettingsStore {
     path: PathBuf,
     inner: Mutex<Settings>,
@@ -98,8 +144,15 @@ impl SettingsStore {
     pub fn load(dir: &Path) -> SettingsStore {
         let path = dir.join(FILE_NAME);
         let (settings, warning) = match std::fs::read_to_string(&path) {
-            Ok(text) => match serde_json::from_str::<Settings>(&text) {
-                Ok(s) => (s, None),
+            Ok(text) => match parse_lenient(&text) {
+                Ok((s, reset)) if reset.is_empty() => (s, None),
+                Ok((s, reset)) => (
+                    s,
+                    Some(format!(
+                        "{FILE_NAME}: unrecognised values reset to defaults: {}",
+                        reset.join(", ")
+                    )),
+                ),
                 Err(e) => {
                     let bad = dir.join(format!("{FILE_NAME}.bad"));
                     if !bad.exists() {
