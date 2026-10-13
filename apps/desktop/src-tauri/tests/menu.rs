@@ -113,7 +113,12 @@ fn macos_menu_quit_is_ours_and_the_standard_items_stay() {
     // M2b §3: Back / Forward along the link trail (⌘[ / ⌘] are handled by the
     // page itself, so the items carry no accelerator).
     let view = texts("View");
-    for want in ["Back", "Forward"] {
+    for want in [
+        "Back",
+        "Forward",
+        "Toggle Formatting Toolbar",
+        "Toggle Line Numbers",
+    ] {
         assert!(view.iter().any(|t| t == want), "{want}: {view:?}");
     }
     let window = texts("Window");
@@ -196,6 +201,40 @@ fn back_and_forward_items_emit_menu_navigate() {
     );
 }
 
+/// M2b feedback round: View → Toggle Formatting Toolbar / Toggle Line Numbers
+/// tell the page which setting to flip.
+fn toggle_items_emit_menu_toggle() {
+    use tauri::Listener;
+    let got: Arc<std::sync::Mutex<Vec<String>>> = Arc::default();
+    let log = got.clone();
+    build_app("toggle").run_return(move |handle, event| {
+        if let RunEvent::Ready = event {
+            let log = log.clone();
+            handle.listen("menu:toggle", move |e| {
+                log.lock().unwrap().push(e.payload().to_string());
+            });
+            for id in [
+                nimw_desktop::menu::TOOLBAR_ID,
+                nimw_desktop::menu::LINE_NUMBERS_ID,
+            ] {
+                nimw_desktop::menu::on_menu_event(
+                    handle,
+                    MenuEvent {
+                        id: MenuId::new(id),
+                    },
+                );
+            }
+            for window in handle.webview_windows().into_values() {
+                window.close().unwrap();
+            }
+        }
+    });
+    assert_eq!(
+        *got.lock().unwrap(),
+        ["\"toolbar\"".to_string(), "\"lineNumbers\"".into()]
+    );
+}
+
 fn main() {
     #[cfg(target_os = "macos")]
     {
@@ -206,4 +245,6 @@ fn main() {
     println!("test quit_menu_item_requests_the_window_close_like_the_close_button ... ok");
     back_and_forward_items_emit_menu_navigate();
     println!("test back_and_forward_items_emit_menu_navigate ... ok");
+    toggle_items_emit_menu_toggle();
+    println!("test toggle_items_emit_menu_toggle ... ok");
 }

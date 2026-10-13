@@ -212,21 +212,26 @@
 
 /* Shows/hides the formatting toolbar (M2b §6). */
 .toolbarToggle {
-  height: 28px;
-  min-width: 34px;
-  padding: 0 8px;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-sm);
-  background: var(--color-surface);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 30px;
+  padding: 0 10px;
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-subtle);
   color: var(--color-text-muted);
-  font: 600 13px var(--font-body);
+  font: 600 12.5px var(--font-body);
   cursor: pointer;
 }
 
+.toolbarToggle:hover {
+  border-color: var(--color-accent);
+}
+
 .toolbarToggle[aria-pressed='true'] {
-  background: var(--color-accent-soft);
-  color: var(--color-accent);
-  border-color: transparent;
+  background: var(--color-surface);
+  color: var(--color-text-strong);
 }
 
 .toolbarToggle:focus-visible {

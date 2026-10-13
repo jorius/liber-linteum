@@ -7,6 +7,7 @@ import { createRoot } from 'react-dom/client';
 import { App } from './app/App';
 import { detectLanguage, initI18n } from './i18n';
 import { installQuitGuardIfTauri } from './stores/editorStore';
+import { installMenuTogglesIfTauri } from './stores/menuToggles';
 import { installMenuNavigationIfTauri } from './stores/navigate';
 import { useSettingsStore } from './stores/settingsStore';
 import { applyTheme } from './theme/theme';
@@ -19,6 +20,7 @@ void initI18n(detectLanguage(navigator.languages))
   .then(() => {
     installQuitGuardIfTauri();
     installMenuNavigationIfTauri();
+    installMenuTogglesIfTauri();
     createRoot(document.getElementById('root')!).render(
       <StrictMode>
         <App />

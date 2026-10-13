@@ -271,6 +271,10 @@ export const onVaultChanged = (cb: (p: ChangedPayload) => void): Promise<Unliste
 /** View → Back / Forward in the app menu (M2b §3). */
 export const onMenuNavigate = (cb: (direction: 'back' | 'forward') => void): Promise<UnlistenFn> =>
   listen<'back' | 'forward'>('menu:navigate', (e) => cb(e.payload));
+/** View → Toggle Formatting Toolbar / Toggle Line Numbers in the app menu:
+ *  the settings key to flip. */
+export const onMenuToggle = (cb: (key: string) => void): Promise<UnlistenFn> =>
+  listen<string>('menu:toggle', (e) => cb(e.payload));
 export const onVaultWarning = (cb: (p: WarningPayload) => void): Promise<UnlistenFn> =>
   listen<WarningPayload>('vault:warning', (e) => cb(e.payload));
 

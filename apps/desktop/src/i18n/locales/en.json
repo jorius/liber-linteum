@@ -220,7 +220,10 @@
     "task": "Task list",
     "quote": "Quote",
     "divider": "Divider",
-    "toggle": "Formatting toolbar"
+    "toggle": "Formatting toolbar",
+    "short": "Format",
+    "show": "Show the formatting toolbar",
+    "hide": "Hide the formatting toolbar"
   },
   "trail": {
     "back": "Back to {name}"

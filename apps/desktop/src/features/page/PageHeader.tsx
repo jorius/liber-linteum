@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { FormatIcon } from '../../app/icons';
 import { assetUrl, linksResolve, type EditorMode, type Page } from '../../ipc';
 import { useEditorStore } from '../../stores/editorStore';
 import { goBack } from '../../stores/navigate';
@@ -66,11 +67,12 @@ export function PageHeader({ page, mode }: { page: Page; mode: EditorMode }) {
               type="button"
               className={styles.toolbarToggle}
               aria-pressed={toolbar}
-              title={t('toolbar.toggle')}
+              aria-label={t('toolbar.toggle')}
+              title={t(toolbar ? 'toolbar.hide' : 'toolbar.show')}
               onClick={() => void useSettingsStore.getState().update({ toolbar: !toolbar })}
             >
-              <span aria-hidden="true">Aa</span>
-              <span className={styles.srOnly}>{t('toolbar.toggle')}</span>
+              <FormatIcon />
+              <span aria-hidden="true">{t('toolbar.short')}</span>
             </button>
           )}
           <ModeToggle mode={mode} />

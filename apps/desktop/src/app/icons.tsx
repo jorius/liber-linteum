@@ -99,6 +99,15 @@ export function GraphIcon() {
   );
 }
 
+/** The formatting toolbar (a "T" over a rule). */
+export function FormatIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true" {...stroke}>
+      <path d="M5 6V4h14v2M12 4v12M9 16h6M4 20h16" />
+    </svg>
+  );
+}
+
 export function CloseIcon() {
   return (
     <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true" {...stroke}>

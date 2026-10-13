@@ -220,7 +220,10 @@
     "task": "Lista de tareas",
     "quote": "Cita",
     "divider": "Separador",
-    "toggle": "Barra de formato"
+    "toggle": "Barra de formato",
+    "short": "Formato",
+    "show": "Mostrar la barra de formato",
+    "hide": "Ocultar la barra de formato"
   },
   "trail": {
     "back": "Volver a {name}"

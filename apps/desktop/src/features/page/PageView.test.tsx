@@ -106,11 +106,15 @@ describe('PageView (M2a §5)', () => {
     await open('A.md');
     const toggle = screen.getByRole('button', { name: 'Formatting toolbar' });
     expect(toggle).toHaveAttribute('aria-pressed', 'true');
+    // Feedback round: a labelled button whose tooltip says what a click does.
+    expect(toggle).toHaveTextContent('Format');
+    expect(toggle).toHaveAttribute('title', 'Hide the formatting toolbar');
     expect(screen.getByRole('toolbar', { name: 'Formatting' })).toBeInTheDocument();
     await userEvent.click(toggle);
     expect(disk.calls).toContainEqual(['settings_set', { patch: { toolbar: false } }]);
     await waitFor(() => expect(screen.queryByRole('toolbar')).not.toBeInTheDocument());
     expect(toggle).toHaveAttribute('aria-pressed', 'false');
+    expect(toggle).toHaveAttribute('title', 'Show the formatting toolbar');
   });
 
   it('save status: Saved → Saving… → Saved; failures say "Unsaved — retrying"', async () => {
