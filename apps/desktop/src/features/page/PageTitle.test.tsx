@@ -2,7 +2,7 @@ import { EditorView } from '@codemirror/view';
 import { act, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import axe from 'axe-core';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { clearMocks } from '../../ipc/testing';
 import { resetEditorStore } from '../../stores/editorStore';
 import { usePageStore } from '../../stores/pageStore';
@@ -71,6 +71,26 @@ describe('editable title (M2b §2)', () => {
     expect(renames(disk.calls)).toEqual([]);
     await userEvent.type(title(), 'B');
     await userEvent.tab();
+    await waitFor(() => expect(renames(disk.calls)).toEqual([{ from: 'A.md', to: 'AB.md' }]));
+  });
+
+  it('final review m6: a blur because the window lost focus keeps the edit uncommitted', async () => {
+    const disk = fakeDisk({ 'A.md': 'x\n' });
+    render(<PageView />);
+    await open('A.md');
+    await userEvent.type(title(), 'B');
+    const hasFocus = vi.spyOn(document, 'hasFocus').mockReturnValue(false);
+    try {
+      act(() => title().blur()); // switching to another app mid-edit
+      await act(async () => {});
+      expect(renames(disk.calls)).toEqual([]);
+      expect(title()).toHaveValue('AB');
+    } finally {
+      hasFocus.mockRestore();
+    }
+    // Back in the window: Enter (or a real in-app blur) still commits.
+    title().focus();
+    await userEvent.type(title(), '{Enter}');
     await waitFor(() => expect(renames(disk.calls)).toEqual([{ from: 'A.md', to: 'AB.md' }]));
   });
 

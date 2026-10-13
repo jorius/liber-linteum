@@ -24,3 +24,14 @@ if (typeof Range !== 'undefined' && !Range.prototype.getClientRects) {
     }) as unknown as DOMRectList;
   Range.prototype.getBoundingClientRect = () => new DOMRect();
 }
+
+// jsdom answers document.hasFocus() from "is some element focused", so it is
+// false in the middle of an in-app blur. A real window answers "does this
+// window have focus" — true while the user moves around inside the app. Tests
+// that need a window that lost focus spy on `document.hasFocus`.
+if (typeof Document !== 'undefined') {
+  Object.defineProperty(Document.prototype, 'hasFocus', {
+    configurable: true,
+    value: () => true,
+  });
+}

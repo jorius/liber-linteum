@@ -91,7 +91,11 @@ export function PageTitle({ page }: { page: Page }) {
             setError(null);
           }}
           onKeyDown={onKeyDown}
-          onBlur={() => void commit()}
+          onBlur={() => {
+            // The window lost focus (switching apps mid-edit): keep the edit;
+            // Enter or a real blur inside the app commits it (final review m6).
+            if (document.hasFocus()) void commit();
+          }}
         />
       </h1>
       {error && (
