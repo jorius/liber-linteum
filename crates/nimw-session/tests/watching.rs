@@ -184,3 +184,79 @@ fn review_focus_git_checkout_like_burst_converges() {
     assert!(s.page(&vp("Archive/Old/Ideas.md")).unwrap().is_none());
     assert_eq!(s.backlinks(&vp("Ideas.md")).unwrap().len(), 300 + 1 + 1);
 }
+
+/// A session over a fresh vault, NOT watching: tests drive `apply` directly so
+/// they don't depend on watcher timing.
+fn unwatched(files: &[(&str, &str)]) -> (tempfile::TempDir, tempfile::TempDir, VaultSession) {
+    let vault = tempfile::tempdir().unwrap();
+    for (p, c) in files {
+        let full = vault.path().join(p);
+        std::fs::create_dir_all(full.parent().unwrap()).unwrap();
+        std::fs::write(full, c).unwrap();
+    }
+    let cache = tempfile::tempdir().unwrap();
+    let (s, _) = VaultSession::open(vault.path(), cache.path(), |_: SessionEvent| {}).unwrap();
+    (vault, cache, s)
+}
+
+fn target_of(s: &VaultSession, page: &str) -> Option<String> {
+    s.page(&vp(page)).unwrap().unwrap().links[0]
+        .target_path
+        .clone()
+}
+
+/// Final review I4: a change reported only on an already-indexed folder (how
+/// FSEvents asks for a folder rescan) reconciles that folder's subtree.
+#[test]
+fn vlt_04_change_on_indexed_folder_reconciles_its_subtree() {
+    let (dir, _c, s) = unwatched(&[("F/a.md", "# a"), ("F/Sub/old.md", "# old")]);
+    std::fs::write(dir.path().join("F/b.md"), "# b").unwrap();
+    std::fs::remove_file(dir.path().join("F/Sub/old.md")).unwrap();
+    std::fs::write(dir.path().join("F/Sub/new.md"), "# new").unwrap();
+    s.apply(vec![WatchEvent::Changed(vp("F"))]).unwrap();
+    assert!(s.page(&vp("F/b.md")).unwrap().is_some());
+    assert!(s.page(&vp("F/Sub/new.md")).unwrap().is_some());
+    assert!(s.page(&vp("F/Sub/old.md")).unwrap().is_none());
+}
+
+/// Final review I5: removing a whole folder in one event re-resolves links to
+/// every file that was inside it, so they can move to another candidate.
+#[test]
+fn vlt_04_removed_folder_re_resolves_links_to_its_contents() {
+    let (dir, _c, s) = unwatched(&[
+        ("Projects/Note.md", "[[Plan]]"),
+        ("Archive/Plan.md", "# archived plan"),
+        ("Projects/Sub/Plan.md", "# current plan"),
+    ]);
+    assert_eq!(
+        target_of(&s, "Projects/Note.md").as_deref(),
+        Some("Archive/Plan.md")
+    );
+    let outside = tempfile::tempdir().unwrap();
+    std::fs::rename(dir.path().join("Archive"), outside.path().join("Archive")).unwrap();
+    s.apply(vec![WatchEvent::Removed(vp("Archive"))]).unwrap();
+    assert_eq!(
+        target_of(&s, "Projects/Note.md").as_deref(),
+        Some("Projects/Sub/Plan.md")
+    );
+}
+
+/// Final review I3: an unreadable new folder doesn't drop the rest of the batch.
+#[cfg(unix)]
+#[test]
+fn vlt_04_unreadable_new_folder_does_not_drop_the_batch() {
+    use std::os::unix::fs::PermissionsExt;
+    let (dir, _c, s) = unwatched(&[("a.md", "# a")]);
+    let locked = dir.path().join("locked");
+    std::fs::create_dir(&locked).unwrap();
+    std::fs::write(locked.join("x.md"), "# x").unwrap();
+    std::fs::set_permissions(&locked, std::fs::Permissions::from_mode(0o000)).unwrap();
+    std::fs::write(dir.path().join("b.md"), "# b").unwrap();
+    let result = s.apply(vec![
+        WatchEvent::Changed(vp("b.md")),
+        WatchEvent::Changed(vp("locked")),
+    ]);
+    std::fs::set_permissions(&locked, std::fs::Permissions::from_mode(0o755)).unwrap();
+    result.unwrap();
+    assert!(s.page(&vp("b.md")).unwrap().is_some());
+}

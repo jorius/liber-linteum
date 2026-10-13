@@ -4,7 +4,7 @@ use crate::session::{Loaded, VaultSession, folder_row, unchanged, write_loaded};
 use nimw_index::FileKind;
 use nimw_markdown::link_key;
 use nimw_vault::{EntryKind, VaultPath, WatchEvent};
-use std::collections::{BTreeSet, HashMap};
+use std::collections::{BTreeSet, HashMap, HashSet};
 use std::sync::Arc;
 
 impl VaultSession {
@@ -86,11 +86,48 @@ impl VaultSession {
             }
         }
 
+        // A change reported on an already-indexed folder (FSEvents' way of
+        // asking for a folder rescan) reconciles that folder's whole subtree
+        // (final review I4).
+        for ev in &events {
+            if let WatchEvent::Changed(dir) = ev
+                && stats
+                    .get(dir.as_str())
+                    .is_some_and(|s| s.kind == FileKind::Folder)
+                && let Ok(scan) = self.vault.scan_from(dir)
+            {
+                let on_disk: BTreeSet<String> =
+                    scan.entries.iter().map(|e| e.path.to_string()).collect();
+                for e in scan.entries {
+                    let changed = stats
+                        .get(e.path.as_str())
+                        .is_none_or(|s| e.kind != EntryKind::Dir && !unchanged(s, &e));
+                    if changed {
+                        dirty.insert(e.path);
+                    }
+                }
+                let prefix = format!("{}/", dir.as_str());
+                for indexed in stats.keys() {
+                    if indexed.starts_with(&prefix)
+                        && !on_disk.contains(indexed)
+                        && let Ok(p) = VaultPath::new(indexed)
+                    {
+                        dirty.insert(p);
+                    }
+                }
+            }
+        }
+
         let mut removed: Vec<String> = Vec::new();
         let mut folders = Vec::new();
         let mut loaded: Vec<(Loaded, bool)> = Vec::new();
         let mut warnings = Vec::new();
+        // Paths already handled as part of a new folder's subtree.
+        let mut seen: HashSet<String> = HashSet::new();
         for path in dirty {
+            if seen.contains(path.as_str()) {
+                continue;
+            }
             let old = stats.get(path.as_str());
             match (self.vault.stat(&path)?, old) {
                 (None, Some(_)) => removed.push(path.to_string()),
@@ -98,7 +135,18 @@ impl VaultSession {
                 (Some(entry), old) if entry.kind == EntryKind::Dir => {
                     if old.is_none_or(|s| s.kind != FileKind::Folder) {
                         folders.push(folder_row(&entry));
-                        for child in self.vault.scan_from(&path)?.entries {
+                        // An unreadable new folder is a warning, not a lost
+                        // batch (final review I3).
+                        let scan = match self.vault.scan_from(&path) {
+                            Ok(scan) => scan,
+                            Err(e) => {
+                                warnings.push(format!("{path}: {e}"));
+                                continue;
+                            }
+                        };
+                        warnings.extend(scan.skipped);
+                        for child in scan.entries {
+                            seen.insert(child.path.to_string());
                             if child.kind == EntryKind::Dir {
                                 folders.push(folder_row(&child));
                             } else if let Some(l) = self.load(&child, None, &mut warnings) {
@@ -169,9 +217,17 @@ impl VaultSession {
             Ok(())
         })?;
         let files = index.file_set()?;
+        // A removed folder takes every file inside it with it: re-resolve links
+        // to all of them, not just to the folder's own name (final review I5).
+        let removed_subtree = removed.iter().flat_map(|p| {
+            let prefix = format!("{p}/");
+            stats
+                .keys()
+                .filter(move |k| *k == p || k.starts_with(&prefix))
+        });
         let keys: Vec<String> = created
             .iter()
-            .chain(&removed)
+            .chain(removed_subtree)
             .chain(renamed.iter().flat_map(|(a, b)| [a, b]))
             .map(|p| link_key(p))
             .collect();
