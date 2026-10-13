@@ -325,6 +325,47 @@ describe('pageStore', () => {
   });
 });
 
+describe('pageStore — atomic saves (final review, upgraded M7)', () => {
+  it('EXP-05 a page removed and recreated in one batch reloads instead of showing "deleted"', async () => {
+    let title = 'One';
+    backend({
+      page_get: (a) => ({ path: a.path, title, tags: [], text: 'x', links: 0, backlinks: 0 }),
+    });
+    await usePageStore.getState().load('a.md');
+    title = 'Saved by another editor';
+    await usePageStore
+      .getState()
+      .onExternalChange(
+        { created: ['a.md'], modified: [], removed: ['a.md'], renamed: [] },
+        (p) => p === 'a.md',
+      );
+    expect(usePageStore.getState().state).toBe('ready');
+    expect(usePageStore.getState().page?.title).toBe('Saved by another editor');
+  });
+
+  it('EXP-05 a deleted page recovers when it is recreated later', async () => {
+    backend({
+      page_get: (a) => ({
+        path: a.path,
+        title: 'Back',
+        tags: [],
+        text: 'x',
+        links: 0,
+        backlinks: 0,
+      }),
+    });
+    await usePageStore.getState().load('a.md');
+    await usePageStore
+      .getState()
+      .onExternalChange({ created: [], modified: [], removed: ['a.md'], renamed: [] }, () => false);
+    expect(usePageStore.getState().state).toBe('deleted');
+    await usePageStore
+      .getState()
+      .onExternalChange({ created: ['a.md'], modified: [], removed: [], renamed: [] }, () => true);
+    expect(usePageStore.getState().state).toBe('ready');
+  });
+});
+
 describe('toastStore', () => {
   it('auto-dismisses after 5 s unless the toast has details', async () => {
     vi.useFakeTimers();

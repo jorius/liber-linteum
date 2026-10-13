@@ -108,7 +108,8 @@ export const useVaultStore = create<VaultState>((set, get) => {
     }
     set({ selected, expanded });
     await get().refreshTree();
-    await usePageStore.getState().onExternalChange(change);
+    const present = new Set(get().nodes.map((n) => n.path));
+    await usePageStore.getState().onExternalChange(change, (p) => present.has(p));
   }
 
   /** Subscribes to external-change and warning events. A refused

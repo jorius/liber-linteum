@@ -31,6 +31,12 @@ export function ContextMenu({ menu, onClose }: { menu: MenuState; onClose: () =>
     return () => document.removeEventListener('mousedown', onDown);
   }, [onClose]);
 
+  // Its item vanished (deleted or renamed outside the app): close instead of
+  // lingering invisibly with global shortcuts disabled (final review, upgraded M3).
+  useEffect(() => {
+    if (!node) onClose();
+  }, [node, onClose]);
+
   if (!node) return null;
   const dir = node.kind === 'folder' ? node.path : parentOf(node.path);
   const vault = useVaultStore.getState;

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useVaultStore } from '../../stores/vaultStore';
 import { dropEntry, planDrop } from '../explorer/drop';
@@ -15,6 +15,12 @@ export function MoveToDialog({ path, onClose }: { path: string; onClose: () => v
     (target) => planDrop(path, target) !== null,
   );
   const [target, setTarget] = useState(targets[0] ?? '');
+
+  // Its item vanished (deleted or renamed outside the app): close instead of
+  // lingering invisibly with global shortcuts disabled (final review, upgraded M3).
+  useEffect(() => {
+    if (!node) onClose();
+  }, [node, onClose]);
 
   if (!node) return null;
   const move = async () => {

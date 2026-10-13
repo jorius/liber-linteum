@@ -19,6 +19,12 @@ export function ConfirmDeleteDialog({ path, onClose }: { path: string; onClose: 
     void backlinkCount(path).then((res) => setLinks(res.ok ? res.value : 0));
   }, [path]);
 
+  // Its item vanished (deleted or renamed outside the app): close instead of
+  // lingering invisibly with global shortcuts disabled (final review, upgraded M3).
+  useEffect(() => {
+    if (!node) onClose();
+  }, [node, onClose]);
+
   if (!node) return null;
   const confirm = async () => {
     if (dontAsk) await useSettingsStore.getState().update({ confirmDelete: false });

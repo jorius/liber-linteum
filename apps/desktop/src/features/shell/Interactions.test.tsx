@@ -314,3 +314,30 @@ describe('keyboard focus is never lost (final review I1, NFR-10)', () => {
     expect(await screen.findByRole('textbox', { name: 'Rename' })).toBeInTheDocument();
   });
 });
+
+describe('stale menus and dialogs (final review, upgraded M3)', () => {
+  it('a dialog whose item vanished closes itself, so shortcuts keep working', async () => {
+    backend({ backlink_count: () => 0 });
+    seed();
+    render(<AppShell />);
+    act(() => useUiStore.getState().openDialog({ type: 'move', path: 'Welcome.md' }));
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
+    const rest = nodes.filter((n) => n.path !== 'Welcome.md');
+    act(() => useVaultStore.setState({ nodes: rest, children: childrenByParent(rest) }));
+    await waitFor(() => expect(useUiStore.getState().dialog).toBeNull());
+  });
+
+  it('a context menu whose item vanished closes itself', async () => {
+    backend({});
+    seed();
+    render(<AppShell />);
+    screen.getByRole('treeitem', { name: 'Welcome' }).focus();
+    await userEvent.keyboard('{Shift>}{F10}{/Shift}');
+    expect(screen.getByRole('menu')).toBeInTheDocument();
+    const rest = nodes.filter((n) => n.path !== 'Welcome.md');
+    act(() => useVaultStore.setState({ nodes: rest, children: childrenByParent(rest) }));
+    await waitFor(() => expect(screen.queryByRole('menu')).not.toBeInTheDocument());
+    await userEvent.keyboard('{Meta>},{/Meta}');
+    expect(useUiStore.getState().dialog).toEqual({ type: 'settings' });
+  });
+});

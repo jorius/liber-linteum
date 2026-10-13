@@ -14,7 +14,10 @@ interface PageState {
   clear: () => void;
   /** Follows renames of the open page (own or external). */
   follow: (from: string, to: string) => Promise<void>;
-  onExternalChange: (c: ChangedPayload) => Promise<void>;
+  /** `exists` reports whether a path is in the freshly refreshed tree, so a
+   *  file an editor saved by delete + rewrite reloads instead of reading as
+   *  deleted (final review, upgraded M7). */
+  onExternalChange: (c: ChangedPayload, exists?: (path: string) => boolean) => Promise<void>;
 }
 
 let seq = 0;
@@ -44,17 +47,20 @@ export const usePageStore = create<PageState>((set, get) => ({
     const next = path ? remap(path, from, to) : null;
     if (next) await get().load(next);
   },
-  onExternalChange: async (c) => {
+  onExternalChange: async (c, exists) => {
     const path = get().path;
     if (!path) return;
     for (const [from, to] of c.renamed) {
       if (remap(path, from, to)) return get().follow(from, to);
     }
-    if (c.removed.some((r) => remap(path, r, r) !== null)) {
+    const stillThere = exists?.(path) ?? false;
+    if (c.removed.some((r) => remap(path, r, r) !== null) && !stillThere) {
       seq++;
       set({ state: 'deleted' });
       return;
     }
-    if (c.modified.includes(path)) await get().load(path);
+    const touched =
+      c.modified.includes(path) || c.created.includes(path) || c.removed.includes(path);
+    if (touched || (get().state === 'deleted' && stillThere)) await get().load(path);
   },
 }));
