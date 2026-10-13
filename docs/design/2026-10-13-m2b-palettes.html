@@ -1,0 +1,310 @@
+<title>NIMW Palette Studio</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&family=Literata:ital,opsz,wght@0,7..72,400;0,7..72,600;1,7..72,400&family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;1,8..60,400&family=IBM+Plex+Sans:ital,wght@0,400;0,600;1,400&family=Plus+Jakarta+Sans:wght@400;600;700&family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&family=JetBrains+Mono:wght@400&family=IBM+Plex+Mono:wght@400&family=Source+Code+Pro:wght@400&display=swap">
+<style>
+/* Layout: a review sheet — intro, global controls, then one row per palette with its light and dark app mock side by side. */
+:root {
+  --bg: #f5f4f2;
+  --fg: #1d1c20;
+  --muted: #5d5a66;
+  --line: #dddad5;
+  --card: #ffffff;
+  --accent: #4b2f86;
+  --chip: #ebe7f3;
+  --f-display: 'Bricolage Grotesque', 'Plus Jakarta Sans', system-ui, sans-serif;
+  --f-body: 'Plus Jakarta Sans', system-ui, sans-serif;
+  --f-mono: 'JetBrains Mono', ui-monospace, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #141317; --fg: #ecebf0; --muted: #a7a3b2; --line: #2e2c35; --card: #1c1b21; --accent: #c3b0ee; --chip: #2a2534;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #141317; --fg: #ecebf0; --muted: #a7a3b2; --line: #2e2c35; --card: #1c1b21; --accent: #c3b0ee; --chip: #2a2534;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--fg); font: 15px/1.55 var(--f-body); }
+.wrap { max-width: 1240px; margin: 0 auto; padding-inline: 20px; padding-block: 32px 64px; display: grid; gap: 28px; }
+h1 { font: 700 clamp(28px, 4vw, 40px)/1.1 var(--f-display); margin: 0; text-wrap: balance; letter-spacing: -0.01em; }
+h2 { font: 700 22px/1.2 var(--f-display); margin: 0; text-wrap: balance; }
+p { margin: 0; max-width: 68ch; color: var(--muted); }
+.eyebrow { font: 600 12px/1 var(--f-body); letter-spacing: .08em; text-transform: uppercase; color: var(--accent); }
+.intro { display: grid; gap: 10px; }
+
+.controls { display: flex; flex-wrap: wrap; gap: 16px 24px; padding: 16px 18px; border: 1px solid var(--line); border-radius: 12px; background: var(--card); position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; }
+.controls label { display: grid; gap: 4px; font-size: 12px; font-weight: 600; color: var(--muted); letter-spacing: .02em; }
+.controls select { font: 14px var(--f-body); padding: 6px 8px; border-radius: 8px; border: 1px solid var(--line); background: var(--bg); color: var(--fg); min-width: 0; max-width: 100%; }
+.controls .toggle { display: flex; gap: 8px; align-items: center; font-size: 14px; font-weight: 500; color: var(--fg); }
+
+.palette { display: grid; gap: 14px; padding-block: 20px; border-top: 1px solid var(--line); }
+.palette-head { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: baseline; justify-content: space-between; }
+.palette-head .tag { font-size: 12px; font-weight: 600; padding: 3px 10px; border-radius: 999px; background: var(--chip); color: var(--accent); }
+.swatches { display: flex; flex-wrap: wrap; gap: 6px; }
+.sw { width: 22px; height: 22px; border-radius: 6px; border: 1px solid rgba(0,0,0,.12); }
+.pair { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 520px), 1fr)); gap: 16px; }
+.mode-label { font: 600 11px var(--f-body); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); margin-bottom: 6px; }
+
+/* ---- App mock: every color comes from the mock's own --m-* tokens. ---- */
+.app { display: grid; grid-template-columns: 150px 1fr; min-height: 430px; border-radius: 12px; overflow: hidden; border: 1px solid var(--m-border); background: var(--m-bg); color: var(--m-text); font-family: var(--f-ui); box-shadow: 0 8px 24px rgba(20,10,40,.08); }
+.side { background: var(--m-side); color: var(--m-side-text); padding: 12px 10px; font-size: 12px; display: grid; align-content: start; gap: 4px; }
+.side .vault { font-weight: 700; font-size: 13px; padding: 2px 6px 8px; }
+.side .row { padding: 4px 6px; border-radius: 6px; opacity: .85; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.side .row.on { background: var(--m-side-sel); opacity: 1; }
+.main { display: grid; grid-template-rows: auto auto 1fr; min-width: 0; }
+.header { padding: 10px 16px 8px; border-bottom: 1px solid var(--m-border); background: var(--m-surface); display: grid; gap: 6px; }
+.crumbs { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--m-muted); min-width: 0; flex-wrap: wrap; }
+.back { display: inline-grid; place-items: center; width: 22px; height: 22px; border-radius: 6px; border: 1px solid var(--m-border); color: var(--m-accent); font-size: 13px; line-height: 1; }
+.crumbs b { color: var(--m-text); font-weight: 600; }
+.title { font: 700 20px/1.2 var(--f-title); color: var(--m-text-strong); padding: 2px 6px; margin-left: -6px; border-radius: 6px; outline: 1px dashed transparent; }
+.title:hover, .title:focus { outline-color: var(--m-accent); background: var(--m-accent-soft); }
+.toolbar { display: flex; flex-wrap: wrap; gap: 2px; padding: 6px 12px; border-bottom: 1px solid var(--m-border); background: var(--m-surface); }
+.toolbar span { min-width: 26px; height: 26px; display: inline-grid; place-items: center; padding: 0 6px; border-radius: 6px; font-size: 13px; color: var(--m-text-body); }
+.toolbar span.on { background: var(--m-accent-soft); color: var(--m-accent); }
+.toolbar i.sep { width: 1px; background: var(--m-border); margin: 4px 4px; }
+.doc { padding: 14px 18px 18px; font-family: var(--f-live); font-size: 15px; line-height: 1.6; color: var(--m-text-body); display: grid; gap: 8px; align-content: start; min-width: 0; }
+.doc h3 { font: 700 18px/1.3 var(--f-live); color: var(--m-text-strong); margin: 4px 0 0; }
+.doc p { color: inherit; margin: 0; max-width: none; }
+.doc a { color: var(--m-accent); text-decoration: underline; text-decoration-color: color-mix(in srgb, var(--m-accent) 40%, transparent); text-underline-offset: 2px; }
+.doc .tagx { color: var(--m-accent); background: var(--m-accent-soft); padding: 0 5px; border-radius: 4px; font-size: .9em; }
+.doc mark { background: var(--m-mark); color: inherit; padding: 0 2px; border-radius: 3px; }
+.doc .task { display: flex; gap: 8px; align-items: center; }
+.doc .box { width: 14px; height: 14px; border-radius: 4px; border: 1.5px solid var(--m-accent); display: inline-grid; place-items: center; font-size: 10px; color: var(--m-accent-contrast); flex: none; }
+.doc .box.on { background: var(--m-accent); }
+.doc .done { text-decoration: line-through; color: var(--m-muted); }
+.doc .callout { border-left: 3px solid var(--m-accent); background: var(--m-accent-soft); padding: 8px 10px; border-radius: 0 8px 8px 0; }
+.doc .callout b { color: var(--m-accent); }
+.doc code { font-family: var(--f-src); font-size: .86em; background: var(--m-code); padding: 1px 5px; border-radius: 4px; color: var(--m-text-strong); }
+.doc .src { font-family: var(--f-src); font-size: 13px; color: var(--m-muted); }
+.doc .src .mk { color: var(--m-accent); }
+@media (max-width: 560px) { .app { grid-template-columns: 1fr; } .side { display: none; } }
+
+.custom { display: grid; gap: 14px; padding: 20px; border: 1px solid var(--line); border-radius: 14px; background: var(--card); }
+.custom-controls { display: flex; flex-wrap: wrap; gap: 12px 20px; align-items: center; }
+.custom-controls label { display: flex; gap: 10px; align-items: center; font-weight: 600; font-size: 14px; }
+.custom-controls input[type=color] { width: 44px; height: 32px; border: 1px solid var(--line); border-radius: 8px; background: none; padding: 2px; }
+.presets { display: flex; gap: 6px; }
+.presets button { width: 26px; height: 26px; border-radius: 50%; border: 2px solid var(--card); outline: 1px solid var(--line); background: var(--c); cursor: pointer; }
+.contrast { font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.ideas { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr)); gap: 14px; }
+.idea { border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; background: var(--card); display: grid; gap: 6px; align-content: start; }
+.idea h3 { margin: 0; font: 700 15px var(--f-body); }
+.idea p { font-size: 14px; }
+button:focus-visible, select:focus-visible, input:focus-visible, .title:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+</style>
+
+<div class="wrap">
+  <header class="intro">
+    <span class="eyebrow">Notes In My Way · M2b proposals · round 2</span>
+    <h1>Palette and reading-font proposals</h1>
+    <p>Round 2: Graphite and Rosewood are in; six new proposals follow, plus a custom accent picker. Each palette is shown inside the same page mock, in light and dark: the header with the proposed back arrow, the breadcrumb and an editable title (hover it), the optional formatting toolbar, and a Live Preview sample. Use the pickers to try the reading font for Live Preview and the font for Source text; every mock updates at once. Tell me which palettes to ship and which fonts you like as defaults.</p>
+  </header>
+
+  <section class="controls" aria-label="Preview controls">
+    <label for="f-live">Live Preview font
+      <select id="f-live">
+        <option value="'Atkinson Hyperlegible', system-ui, sans-serif">Atkinson Hyperlegible (proposed default)</option>
+        <option value="'Literata', Georgia, serif">Literata (serif, book-like)</option>
+        <option value="'Source Serif 4', Georgia, serif">Source Serif 4 (serif)</option>
+        <option value="'IBM Plex Sans', system-ui, sans-serif">IBM Plex Sans</option>
+        <option value="'Plus Jakarta Sans', system-ui, sans-serif">Plus Jakarta Sans (today)</option>
+        <option value="system-ui, -apple-system, 'Segoe UI', sans-serif">System font (San Francisco / Segoe)</option>
+      </select>
+    </label>
+    <label for="f-src">Source font
+      <select id="f-src">
+        <option value="'JetBrains Mono', ui-monospace, monospace">JetBrains Mono (today)</option>
+        <option value="'IBM Plex Mono', ui-monospace, monospace">IBM Plex Mono</option>
+        <option value="'Source Code Pro', ui-monospace, monospace">Source Code Pro</option>
+        <option value="ui-monospace, 'SF Mono', Menlo, Consolas, monospace">System mono (SF Mono / Consolas)</option>
+      </select>
+    </label>
+    <label for="f-size">Text size
+      <select id="f-size">
+        <option value="14">14 px</option>
+        <option value="15" selected>15 px</option>
+        <option value="16">16 px</option>
+        <option value="17">17 px</option>
+      </select>
+    </label>
+    <label class="toggle" for="tb"><input type="checkbox" id="tb" checked> Show formatting toolbar</label>
+  </section>
+
+  <section class="custom" aria-labelledby="h-custom">
+    <div class="palette-head"><h2 id="h-custom">Your own accent</h2><span class="tag">Proposed Settings feature</span></div>
+    <p>Pick any colour. The app builds the whole palette from it: the accent is darkened for light mode and lightened for dark mode until text in that colour stays readable (WCAG AA, 4.5:1), and the backgrounds and greys take a faint tint of the same hue. Try a very light yellow or a near-black: the contrast numbers below stay above the line.</p>
+    <div class="custom-controls">
+      <label for="accent">Accent colour <input type="color" id="accent" value="#d1477a"></label>
+      <div class="presets" role="group" aria-label="Example accents">
+        <button type="button" data-c="#d1477a" style="--c:#d1477a" aria-label="Raspberry"></button>
+        <button type="button" data-c="#f5d000" style="--c:#f5d000" aria-label="Lemon"></button>
+        <button type="button" data-c="#2aa198" style="--c:#2aa198" aria-label="Teal"></button>
+        <button type="button" data-c="#ff6a00" style="--c:#ff6a00" aria-label="Orange"></button>
+        <button type="button" data-c="#6d28d9" style="--c:#6d28d9" aria-label="Violet"></button>
+        <button type="button" data-c="#222222" style="--c:#222222" aria-label="Charcoal"></button>
+      </div>
+      <output id="contrast" class="contrast"></output>
+    </div>
+    <div class="pair" id="custom-pair"></div>
+  </section>
+
+  <main id="palettes"></main>
+
+  <section class="intro">
+    <span class="eyebrow">How the other feedback items look in the mock</span>
+    <div class="ideas">
+      <article class="idea"><h3>← Back arrow</h3><p>Appears left of the breadcrumb only after you followed an internal link, and goes back along the links you followed (⌘[ also works; ⌘] goes forward). Opening a page from the explorer starts a fresh trail, so the arrow disappears.</p></article>
+      <article class="idea"><h3>Editable title</h3><p>Click the title under the breadcrumb to edit it. Enter or clicking away renames the file and updates every link to it; Escape cancels. Names that can't be file names are explained inline.</p></article>
+      <article class="idea"><h3>Formatting toolbar</h3><p>Bold, italic, strikethrough, highlight, code, link · heading level · bullet, numbered and task list, quote, divider. Shows the active styles at the cursor. Hidden or shown from the page header or Settings (remembered); ⌘B, ⌘I, ⌘⇧X and the rest work either way.</p></article>
+      <article class="idea"><h3>Fonts in Settings</h3><p>Separate pickers for Live Preview and for Source, plus text size. Bundled fonts work offline; any font installed on your computer can be picked too. Nothing is downloaded.</p></article>
+    </div>
+  </section>
+</div>
+
+<script>
+const PALETTES = [
+  { id: 'lavender', name: 'Lavender', note: 'Current default · kept',
+    light: { bg:'#f4eff8', surface:'#ffffff', border:'#e6ddef', text:'#1d1a22', strong:'#2c1f4a', body:'#4a4058', muted:'#6b5f80', accent:'#4b2f86', soft:'#e9e1f4', contrast:'#ffffff', side:'#1f1d24', sideText:'#d9d4e2', sideSel:'rgba(185,162,230,.22)', mark:'#fbf1c7', code:'#efe9f6' },
+    dark:  { bg:'#17151c', surface:'#1f1d26', border:'#322d3d', text:'#ece8f2', strong:'#f3eefb', body:'#cfc8db', muted:'#a59cb5', accent:'#b9a2e6', soft:'#2f2742', contrast:'#1b1426', side:'#121016', sideText:'#d9d4e2', sideSel:'rgba(185,162,230,.22)', mark:'#4a3f12', code:'#2a2533' } },
+  { id: 'graphite', name: 'Graphite', note: 'Chosen · near-neutral greys with a cobalt accent',
+    light: { bg:'#f2f3f5', surface:'#ffffff', border:'#dfe1e6', text:'#17181c', strong:'#111827', body:'#3d4250', muted:'#606676', accent:'#2448c4', soft:'#e2e8fb', contrast:'#ffffff', side:'#17181c', sideText:'#d5d8df', sideSel:'rgba(138,164,255,.2)', mark:'#fdf0a8', code:'#eceef2' },
+    dark:  { bg:'#111216', surface:'#18191e', border:'#2a2c33', text:'#e7e9ee', strong:'#f4f5f8', body:'#c6cad3', muted:'#949aa8', accent:'#8ea7ff', soft:'#1f2846', contrast:'#0d1124', side:'#0b0c0f', sideText:'#d2d5dc', sideSel:'rgba(138,164,255,.18)', mark:'#4b4417', code:'#20222a' } },
+  { id: 'rosewood', name: 'Rosewood', note: 'Chosen · blush paper with a deep wine accent',
+    light: { bg:'#f7f0f1', surface:'#ffffff', border:'#ecdcdf', text:'#221a1c', strong:'#3d1424', body:'#52404a', muted:'#76616a', accent:'#8c2a4c', soft:'#f4e1e7', contrast:'#ffffff', side:'#221a1d', sideText:'#e6d6db', sideSel:'rgba(240,163,187,.2)', mark:'#fbeaa9', code:'#f2e7ea' },
+    dark:  { bg:'#191315', surface:'#211a1d', border:'#3a2b31', text:'#f1e8eb', strong:'#fbf2f5', body:'#d8c8ce', muted:'#ab97a0', accent:'#f2a5bd', soft:'#43222f', contrast:'#2a0f19', side:'#120d0f', sideText:'#e1d2d7', sideSel:'rgba(240,163,187,.18)', mark:'#4d4219', code:'#2c2227' } },
+  { id: 'saffron', name: 'Saffron', note: 'New · warm ochre on a light neutral; sunny without being beige',
+    light: { bg:'#f6f4ee', surface:'#fffefb', border:'#e7e2d4', text:'#1f1b12', strong:'#2f2410', body:'#4b4334', muted:'#6e6552', accent:'#8a5800', soft:'#f6e9cc', contrast:'#ffffff', side:'#1f1c16', sideText:'#e2dccd', sideSel:'rgba(242,192,99,.2)', mark:'#dfeaf7', code:'#f0ece1' },
+    dark:  { bg:'#16140f', surface:'#1e1b14', border:'#332e22', text:'#efe9dc', strong:'#f8f3e8', body:'#d6ceba', muted:'#a99f88', accent:'#f2c063', soft:'#3a2f17', contrast:'#231a05', side:'#100e0a', sideText:'#e0d8c6', sideSel:'rgba(242,192,99,.18)', mark:'#1f3550', code:'#29251b' } },
+  { id: 'persimmon', name: 'Persimmon', note: 'New · cool grey paper with a persimmon-orange accent; energetic',
+    light: { bg:'#f4f3f4', surface:'#ffffff', border:'#e4e1e4', text:'#1d191a', strong:'#2e1810', body:'#463f40', muted:'#6a6163', accent:'#b03f17', soft:'#fbe4da', contrast:'#ffffff', side:'#1d1a1b', sideText:'#e1dadb', sideSel:'rgba(255,154,118,.2)', mark:'#fcefa6', code:'#efecee' },
+    dark:  { bg:'#151213', surface:'#1d191a', border:'#33292a', text:'#f0e9e7', strong:'#faf3f1', body:'#d5cac8', muted:'#a8999a', accent:'#ff9a76', soft:'#43241a', contrast:'#2a0e04', side:'#0f0c0d', sideText:'#e0d6d4', sideSel:'rgba(255,154,118,.18)', mark:'#4b4317', code:'#282223' } },
+  { id: 'jade', name: 'Jade', note: 'New · fresh jade green on a misty white; clean and bright',
+    light: { bg:'#eff4f2', surface:'#ffffff', border:'#d8e4df', text:'#142019', strong:'#0c3326', body:'#36483f', muted:'#586b62', accent:'#0b7553', soft:'#d9efe6', contrast:'#ffffff', side:'#13201b', sideText:'#cfe2da', sideSel:'rgba(110,214,170,.2)', mark:'#f7eba8', code:'#e6efeb' },
+    dark:  { bg:'#0f1714', surface:'#15201b', border:'#24352d', text:'#e3efe9', strong:'#f0f9f4', body:'#c3d6cc', muted:'#8fa79b', accent:'#6ed6aa', soft:'#163a2c', contrast:'#04190f', side:'#0a110e', sideText:'#c9ddd3', sideSel:'rgba(110,214,170,.18)', mark:'#4a4316', code:'#1c2b24' } },
+  { id: 'midnight', name: 'Midnight', note: 'New · indigo; its dark mode is the star, deep blue instead of black',
+    light: { bg:'#eef0f8', surface:'#ffffff', border:'#dadff0', text:'#151a2e', strong:'#1b1f4a', body:'#3a4060', muted:'#5d6384', accent:'#3b3fbf', soft:'#e1e3fa', contrast:'#ffffff', side:'#141733', sideText:'#d2d6f0', sideSel:'rgba(150,156,255,.22)', mark:'#f8eda6', code:'#e8eaf5' },
+    dark:  { bg:'#0d0f22', surface:'#141731', border:'#252a4d', text:'#e4e6f7', strong:'#f1f2fc', body:'#c3c7e6', muted:'#8d92b8', accent:'#a3a8ff', soft:'#262b5e', contrast:'#0b0d26', side:'#080918', sideText:'#cdd1ee', sideSel:'rgba(163,168,255,.2)', mark:'#4a4318', code:'#1c2042' } },
+  { id: 'sepia', name: 'Sepia', note: 'New · e-reader paper and brown ink; easiest on the eyes at night in light mode',
+    light: { bg:'#f3ead8', surface:'#fbf5e9', border:'#e3d6bb', text:'#2b2116', strong:'#3b2a17', body:'#4f3f2c', muted:'#75634c', accent:'#8b4513', soft:'#f0dcc2', contrast:'#ffffff', side:'#2b241b', sideText:'#e7dcc8', sideSel:'rgba(214,160,110,.22)', mark:'#f5dd8a', code:'#efe3cc' },
+    dark:  { bg:'#1c1814', surface:'#241f19', border:'#3a3127', text:'#ece2d0', strong:'#f5ecdc', body:'#d3c6b0', muted:'#a8987f', accent:'#e3a774', soft:'#44301f', contrast:'#24140a', side:'#14110d', sideText:'#ddd1bc', sideSel:'rgba(227,167,116,.2)', mark:'#4d4119', code:'#2c261f' } },
+  { id: 'ink', name: 'Ink', note: 'New · pure black and white, maximum contrast; for low vision or e-ink habits',
+    light: { bg:'#ffffff', surface:'#ffffff', border:'#d4d4d4', text:'#000000', strong:'#000000', body:'#1a1a1a', muted:'#4d4d4d', accent:'#000000', soft:'#ececec', contrast:'#ffffff', side:'#000000', sideText:'#f2f2f2', sideSel:'rgba(255,255,255,.18)', mark:'#ffe94d', code:'#f0f0f0' },
+    dark:  { bg:'#000000', surface:'#0a0a0a', border:'#3a3a3a', text:'#ffffff', strong:'#ffffff', body:'#e6e6e6', muted:'#b3b3b3', accent:'#ffffff', soft:'#262626', contrast:'#000000', side:'#000000', sideText:'#f2f2f2', sideSel:'rgba(255,255,255,.16)', mark:'#6b5d00', code:'#1a1a1a' } },
+];
+
+const SAMPLE = `
+  <h3>Field notes — Trondheim</h3>
+  <p>Left the harbour at <b>06:40</b>. Fog lifted by the second buoy; see <a href="#">[[Route planning]]</a> for the full leg list. <span class="tagx">#sailing</span></p>
+  <div class="callout"><b>Tide</b> — high water 08:12, 2.9 m. Wait for slack before the narrows.</div>
+  <div class="task"><span class="box on">✓</span><span class="done">Check rigging and reef points</span></div>
+  <div class="task"><span class="box"></span><span>Log fuel at <mark>Munkholmen</mark> mooring</span></div>
+  <p>Wind backed to <i>south-west</i>, 14 kn; reefed at <code>63.45°N</code>.</p>
+  <p class="src"><span class="mk">## </span>Source text uses the <span class="mk">**</span>source font<span class="mk">**</span></p>`;
+
+function mock(p, mode) {
+  const c = p[mode];
+  const style = Object.entries({ bg:c.bg, surface:c.surface, border:c.border, text:c.text, 'text-strong':c.strong, 'text-body':c.body, muted:c.muted, accent:c.accent, 'accent-soft':c.soft, 'accent-contrast':c.contrast, side:c.side, 'side-text':c.sideText, 'side-sel':c.sideSel, mark:c.mark, code:c.code })
+    .map(([k, v]) => `--m-${k}:${v}`).join(';');
+  return `<div><div class="mode-label">${mode === 'light' ? 'Light' : 'Dark'}</div>
+  <div class="app" style="${style}">
+    <nav class="side" aria-label="Explorer (mock)"><div class="vault">Logbook</div>
+      <div class="row">▾ Trips</div><div class="row on">　Trondheim</div><div class="row">　Route planning</div><div class="row">▸ Boat</div><div class="row">Ideas</div></nav>
+    <div class="main">
+      <div class="header">
+        <div class="crumbs"><span class="back" title="Back to Route planning">←</span><span>Logbook</span>›<span>Trips</span>›<b>Trondheim</b></div>
+        <div class="title" contenteditable="true" spellcheck="false" role="textbox" aria-label="Page title (mock)">Trondheim</div>
+      </div>
+      <div class="toolbar" aria-label="Formatting toolbar (mock)">
+        <span class="on" title="Bold"><b>B</b></span><span title="Italic"><i>I</i></span><span title="Strikethrough"><s>S</s></span><span title="Highlight">H̲</span><span title="Code">&lt;/&gt;</span><span title="Link">🔗︎</span><i class="sep"></i>
+        <span title="Heading">H2 ▾</span><i class="sep"></i><span title="Bullet list">•</span><span title="Numbered list">1.</span><span title="Task list">☑︎</span><span title="Quote">❝</span><span title="Divider">—</span>
+      </div>
+      <div class="doc">${SAMPLE}</div>
+    </div>
+  </div></div>`;
+}
+
+function render() {
+  const root = document.getElementById('palettes');
+  root.innerHTML = PALETTES.map((p) => `
+    <section class="palette" aria-labelledby="h-${p.id}">
+      <div class="palette-head"><h2 id="h-${p.id}">${p.name}</h2><span class="tag">${p.note}</span></div>
+      <div class="swatches" aria-hidden="true">${['bg','surface','accent','soft','side','mark'].flatMap((k) => [p.light[k], p.dark[k]]).map((c) => `<span class="sw" style="background:${c}"></span>`).join('')}</div>
+      <div class="pair">${mock(p, 'light')}${mock(p, 'dark')}</div>
+    </section>`).join('');
+}
+
+function apply() {
+  const s = document.documentElement.style;
+  s.setProperty('--f-live', document.getElementById('f-live').value);
+  s.setProperty('--f-title', document.getElementById('f-live').value);
+  s.setProperty('--f-src', document.getElementById('f-src').value);
+  s.setProperty('--f-ui', "'Plus Jakarta Sans', system-ui, sans-serif");
+  document.querySelectorAll('.doc').forEach((d) => { d.style.fontSize = document.getElementById('f-size').value + 'px'; });
+  const show = document.getElementById('tb').checked;
+  document.querySelectorAll('.toolbar').forEach((t) => { t.hidden = !show; });
+}
+
+// ---- Custom accent → full palette (OKLCH), the way the app would derive it.
+const toLin = (c) => (c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4);
+const toSrgb = (c) => (c <= 0.0031308 ? 12.92 * c : 1.055 * c ** (1 / 2.4) - 0.055);
+function hexToRgb(h) { const n = parseInt(h.slice(1), 16); return [(n >> 16) & 255, (n >> 8) & 255, n & 255].map((v) => v / 255); }
+function rgbToHex(rgb) { return '#' + rgb.map((v) => Math.round(Math.min(1, Math.max(0, v)) * 255).toString(16).padStart(2, '0')).join(''); }
+function rgbToOklch([r, g, b]) {
+  [r, g, b] = [r, g, b].map(toLin);
+  const l = Math.cbrt(0.4122214708 * r + 0.5363325363 * g + 0.0514459929 * b);
+  const m = Math.cbrt(0.2119034982 * r + 0.6806995451 * g + 0.1073969566 * b);
+  const s = Math.cbrt(0.0883024619 * r + 0.2817188376 * g + 0.6299787005 * b);
+  const L = 0.2104542553 * l + 0.793617785 * m - 0.0040720468 * s;
+  const A = 1.9779984951 * l - 2.428592205 * m + 0.4505937099 * s;
+  const B = 0.0259040371 * l + 0.7827717662 * m - 0.808675766 * s;
+  return [L, Math.hypot(A, B), (Math.atan2(B, A) * 180) / Math.PI];
+}
+function oklch(L, C, H) {
+  const h = (H * Math.PI) / 180;
+  let c = C, rgb;
+  for (let i = 0; i < 30; i++) { // reduce chroma until the colour fits in sRGB
+    const A = c * Math.cos(h), B = c * Math.sin(h);
+    const l = (L + 0.3963377774 * A + 0.2158037573 * B) ** 3;
+    const m = (L - 0.1055613458 * A - 0.0638541728 * B) ** 3;
+    const s = (L - 0.0894841775 * A - 1.291485548 * B) ** 3;
+    rgb = [4.0767416621 * l - 3.3077115913 * m + 0.2309699292 * s, -1.2684380046 * l + 2.6097574011 * m - 0.3413193965 * s, -0.0041960863 * l - 0.7034186147 * m + 1.707614701 * s];
+    if (rgb.every((v) => v >= -0.0005 && v <= 1.0005)) break;
+    c *= 0.9;
+  }
+  return rgbToHex(rgb.map(toSrgb));
+}
+const lum = (hex) => { const [r, g, b] = hexToRgb(hex).map(toLin); return 0.2126 * r + 0.7152 * g + 0.0722 * b; };
+const ratio = (a, b) => { const [x, y] = [lum(a), lum(b)].sort((p, q) => q - p); return (x + 0.05) / (y + 0.05); };
+function derive(hex) {
+  const [, c0, h] = rgbToOklch(hexToRgb(hex));
+  const neutral = c0 < 0.03; // greys stay grey
+  const tint = (c) => (neutral ? 0 : c);
+  const lightSurface = '#ffffff', darkSurface = oklch(0.205, tint(0.014), h);
+  let L = rgbToOklch(hexToRgb(hex))[0], la, da;
+  for (let x = Math.min(Math.max(L, 0.15), 0.62); x > 0.1; x -= 0.01) { la = oklch(x, Math.min(c0, 0.17), h); if (ratio(la, lightSurface) >= 4.8) break; }
+  for (let x = Math.min(Math.max(L, 0.7), 0.97); x < 0.99; x += 0.01) { da = oklch(x, Math.min(c0, 0.13), h); if (ratio(da, darkSurface) >= 6) break; }
+  const on = (bg) => (ratio('#ffffff', bg) >= ratio('#111111', bg) ? '#ffffff' : '#111111');
+  return {
+    light: { bg: oklch(0.965, tint(0.012), h), surface: lightSurface, border: oklch(0.9, tint(0.02), h), text: oklch(0.2, tint(0.02), h), strong: oklch(0.24, tint(0.05), h), body: oklch(0.38, tint(0.025), h), muted: oklch(0.52, tint(0.03), h), accent: la, soft: oklch(0.94, tint(0.035), h), contrast: on(la), side: oklch(0.2, tint(0.015), h), sideText: oklch(0.88, tint(0.02), h), sideSel: 'rgba(255,255,255,.12)', mark: '#fbf1c7', code: oklch(0.945, tint(0.012), h) },
+    dark: { bg: oklch(0.17, tint(0.012), h), surface: darkSurface, border: oklch(0.3, tint(0.02), h), text: oklch(0.94, tint(0.01), h), strong: oklch(0.97, tint(0.01), h), body: oklch(0.84, tint(0.015), h), muted: oklch(0.7, tint(0.02), h), accent: da, soft: oklch(0.3, tint(0.05), h), contrast: on(da), side: oklch(0.14, tint(0.01), h), sideText: oklch(0.88, tint(0.02), h), sideSel: 'rgba(255,255,255,.12)', mark: '#4a3f12', code: oklch(0.25, tint(0.014), h) },
+  };
+}
+function renderCustom() {
+  const hex = document.getElementById('accent').value;
+  const p = derive(hex);
+  document.getElementById('custom-pair').innerHTML = mock(p, 'light') + mock(p, 'dark');
+  document.getElementById('contrast').textContent =
+    `Light accent ${p.light.accent} · ${ratio(p.light.accent, p.light.surface).toFixed(1)}:1 on white   ·   Dark accent ${p.dark.accent} · ${ratio(p.dark.accent, p.dark.surface).toFixed(1)}:1 on dark`;
+  apply();
+}
+document.getElementById('accent').addEventListener('input', renderCustom);
+document.querySelectorAll('.presets button').forEach((b) => b.addEventListener('click', () => { document.getElementById('accent').value = b.dataset.c; renderCustom(); }));
+
+render();
+renderCustom();
+apply();
+['f-live', 'f-src', 'f-size', 'tb'].forEach((id) => document.getElementById(id).addEventListener('change', apply));
+</script>
