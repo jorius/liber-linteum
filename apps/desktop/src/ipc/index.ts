@@ -215,6 +215,15 @@ export const linksResolve = (source: string, targets: LinkTarget[]) =>
 export const urlOpen = (url: string) => call<void>('url_open', { url });
 export const fileOpenExternal = (path: string) => call<void>('file_open_external', { path });
 
+/** URL of a vault file for <img>/<audio> through the `nimw-asset:` protocol
+ *  (M2a §2.5); WebView2 on Windows reaches custom protocols over http. */
+export function assetUrl(path: string): string {
+  const encoded = path.split('/').map(encodeURIComponent).join('/');
+  return /Windows/i.test(navigator.userAgent)
+    ? `http://nimw-asset.localhost/${encoded}`
+    : `nimw-asset://localhost/${encoded}`;
+}
+
 // ---- events ----
 
 export const onVaultProgress = (cb: (p: ProgressPayload) => void): Promise<UnlistenFn> =>

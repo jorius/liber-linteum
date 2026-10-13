@@ -1,5 +1,6 @@
 import { useUiStore } from '../../stores/uiStore';
 import { ConfirmDeleteDialog } from './ConfirmDeleteDialog';
+import { CreatePageDialog, OpenExternalDialog, OpenFileDialog } from './LinkDialogs';
 import { MoveToDialog } from './MoveToDialog';
 import { SettingsDialog } from './SettingsDialog';
 
@@ -15,5 +16,11 @@ export function DialogHost() {
       return <MoveToDialog path={dialog.path} onClose={close} />;
     case 'settings':
       return <SettingsDialog onClose={close} />;
+    case 'createPage':
+      return <CreatePageDialog source={dialog.source} target={dialog.target} onClose={close} />;
+    case 'openExternal':
+      return <OpenExternalDialog url={dialog.url} onClose={close} />;
+    case 'openFile':
+      return <OpenFileDialog path={dialog.path} onClose={close} />;
   }
 }

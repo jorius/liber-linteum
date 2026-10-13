@@ -101,6 +101,15 @@
     "saveAsNew": "Save as new page",
     "largeNote": "Simplified preview for large notes"
   },
+  "preview": {
+    "remoteBlocked": "Remote image blocked (privacy)",
+    "notFound": "Not found: {target}",
+    "createPage": "Create page",
+    "openInApp": "Open in default app",
+    "open": "Open",
+    "cycle": "Embedded note refers back to this page",
+    "loading": "Loading…"
+  },
   "menu": {
     "label": "Actions for {name}",
     "newPage": "New page",
@@ -124,6 +133,19 @@
       "to": "Destination folder",
       "root": "Vault root",
       "confirm": "Move"
+    },
+    "external": {
+      "title": "Open this link in your browser?",
+      "confirm": "Open in browser"
+    },
+    "openFile": {
+      "title": "Open “{name}” in its default app?",
+      "confirm": "Open"
+    },
+    "createPage": {
+      "title": "Create page “{name}”?",
+      "where": "It will be created in {folder}.",
+      "confirm": "Create page"
     }
   },
   "settings": {

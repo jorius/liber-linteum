@@ -7,10 +7,19 @@ import { remap } from './tree';
 
 export type PageViewState = 'empty' | 'loading' | 'ready' | 'deleted';
 
+/** A heading to scroll to (link with `#Heading`); `nonce` re-triggers the same one. */
+export interface Anchor {
+  heading: string;
+  nonce: number;
+}
+
 interface PageState {
   path: string | null;
   page: Page | null;
   state: PageViewState;
+  anchor: Anchor | null;
+  /** Scrolls the open page to `heading`. */
+  reveal: (heading: string | null) => void;
   /** Opens `path` (header data + editor). */
   load: (path: string) => Promise<void>;
   /** Re-reads the header data (title, tags, counts) of the open page. */
@@ -30,9 +39,17 @@ export const usePageStore = create<PageState>((set, get) => ({
   path: null,
   page: null,
   state: 'empty',
+  anchor: null,
+  reveal: (heading) =>
+    set({ anchor: heading ? { heading, nonce: (get().anchor?.nonce ?? 0) + 1 } : null }),
   load: async (path) => {
     const mine = ++seq;
-    set({ path, state: get().path === path && get().page ? get().state : 'loading' });
+    const same = get().path === path;
+    set({
+      path,
+      state: same && get().page ? get().state : 'loading',
+      anchor: same ? get().anchor : null,
+    });
     const editing = useEditorStore.getState().open(path);
     const res = await pageGet(path);
     await editing;
@@ -53,7 +70,7 @@ export const usePageStore = create<PageState>((set, get) => ({
   },
   clear: () => {
     seq++;
-    set({ path: null, page: null, state: 'empty' });
+    set({ path: null, page: null, state: 'empty', anchor: null });
     void useEditorStore.getState().close();
   },
   follow: async (from, to) => {

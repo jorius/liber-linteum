@@ -1,0 +1,293 @@
+/* Rendered pane (M2a §4). */
+.content,
+.nested {
+  font: 400 15px/1.65 var(--font-body);
+  color: var(--color-text-body);
+  overflow-wrap: anywhere;
+}
+
+.content > :first-child,
+.nested > :first-child {
+  margin-top: 0;
+}
+
+.content h1,
+.content h2,
+.content h3,
+.content h4,
+.nested h1,
+.nested h2,
+.nested h3,
+.nested h4 {
+  font-family: var(--font-display);
+  color: var(--color-text-strong);
+  line-height: 1.2;
+  margin: 1.4em 0 0.5em;
+}
+
+.content pre,
+.nested pre {
+  font: 400 13px/1.6 var(--font-mono);
+  background: var(--color-surface-subtle);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: 12px 14px;
+  overflow-x: auto;
+  white-space: pre;
+}
+
+.content code,
+.nested code {
+  font-family: var(--font-mono);
+  font-size: 0.9em;
+}
+
+.content :not(pre) > code,
+.nested :not(pre) > code {
+  background: var(--color-surface-subtle);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  padding: 0 4px;
+}
+
+.content blockquote,
+.nested blockquote {
+  margin: 0;
+  padding: 2px 14px;
+  border-left: 3px solid var(--color-border-strong);
+  color: var(--color-text-muted);
+}
+
+.content table,
+.nested table {
+  border-collapse: collapse;
+}
+
+.content th,
+.content td,
+.nested th,
+.nested td {
+  border: 1px solid var(--color-border);
+  padding: 4px 10px;
+}
+
+.content hr,
+.nested hr {
+  border: none;
+  border-top: 1px solid var(--color-border-strong);
+  margin: 20px 0;
+}
+
+.content mark,
+.nested mark {
+  background: var(--palette-yellow-bg);
+  color: var(--color-text);
+  border-radius: 3px;
+  padding: 0 2px;
+}
+
+.content :global(.contains-task-list),
+.nested :global(.contains-task-list) {
+  list-style: none;
+  padding-left: 4px;
+}
+
+/* Colored spans: palette tokens only (sanitizer allowlist). */
+.content [data-color],
+.nested [data-color] {
+  color: var(--tone);
+}
+
+.content [data-bg],
+.nested [data-bg] {
+  background: var(--tone-bg);
+  border-radius: 3px;
+  padding: 0 2px;
+}
+
+[data-color='red'],
+[data-bg='red'],
+[data-tone='red'] {
+  --tone: var(--palette-red);
+  --tone-bg: var(--palette-red-bg);
+}
+[data-color='orange'],
+[data-bg='orange'],
+[data-tone='orange'] {
+  --tone: var(--palette-orange);
+  --tone-bg: var(--palette-orange-bg);
+}
+[data-color='yellow'],
+[data-bg='yellow'],
+[data-tone='yellow'] {
+  --tone: var(--palette-yellow);
+  --tone-bg: var(--palette-yellow-bg);
+}
+[data-color='green'],
+[data-bg='green'],
+[data-tone='green'] {
+  --tone: var(--palette-green);
+  --tone-bg: var(--palette-green-bg);
+}
+[data-color='blue'],
+[data-bg='blue'],
+[data-tone='blue'] {
+  --tone: var(--palette-blue);
+  --tone-bg: var(--palette-blue-bg);
+}
+[data-color='purple'],
+[data-bg='purple'],
+[data-tone='purple'] {
+  --tone: var(--palette-purple);
+  --tone-bg: var(--palette-purple-bg);
+}
+[data-color='gray'],
+[data-bg='gray'],
+[data-tone='gray'] {
+  --tone: var(--palette-gray);
+  --tone-bg: var(--palette-gray-bg);
+}
+
+.link {
+  color: var(--color-accent);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+
+.unresolved {
+  color: var(--color-text-muted);
+  text-decoration: underline dashed;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+
+.externalIcon {
+  font-size: 0.8em;
+  margin-left: 2px;
+}
+
+.tag {
+  font: 600 12px var(--font-body);
+  color: var(--color-accent);
+  background: var(--color-accent-soft);
+  border-radius: var(--radius-pill);
+  padding: 2px 8px;
+}
+
+.callout {
+  margin: 12px 0;
+  padding: 10px 14px;
+  border-left: 4px solid var(--tone);
+  background: var(--tone-bg);
+  border-radius: var(--radius-md);
+  color: var(--color-text);
+}
+
+.calloutTitle {
+  margin: 0 0 4px;
+  font-weight: 700;
+  color: var(--tone);
+}
+
+summary.calloutTitle {
+  cursor: pointer;
+}
+
+/* Columns: a grid that stacks when its container is narrower than 600 px. */
+.columns {
+  container-type: inline-size;
+  margin: 12px 0;
+}
+
+.columnsGrid {
+  display: grid;
+  grid-template-columns: repeat(var(--columns, 2), minmax(0, 1fr));
+  gap: 20px;
+}
+
+@container (max-width: 600px) {
+  .columnsGrid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.column > :first-child {
+  margin-top: 0;
+}
+
+.block {
+  margin: 12px 0;
+}
+
+.embedImage {
+  max-width: 100%;
+  height: auto;
+  border-radius: var(--radius-md);
+}
+
+.embedAudio {
+  width: min(100%, 420px);
+}
+
+.noteEmbed {
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-md);
+  padding: 10px 14px 12px;
+  background: var(--color-surface-subtle);
+}
+
+.noteHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 6px;
+}
+
+.noteTitle {
+  font: 700 13px var(--font-body);
+  color: var(--color-text-muted);
+}
+
+.card,
+.linkCard,
+.remote {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  border: 1px dashed var(--color-border-strong);
+  border-radius: var(--radius-md);
+  padding: 6px 10px;
+  color: var(--color-text-muted);
+  font-size: 13.5px;
+}
+
+.linkCard {
+  border-style: solid;
+  color: var(--color-accent);
+  text-decoration: none;
+}
+
+.remote::before {
+  content: '⊘';
+}
+
+.fileName {
+  font-family: var(--font-mono);
+}
+
+.cardButton {
+  font: 600 12.5px var(--font-body);
+  color: var(--color-accent);
+  background: var(--color-accent-soft);
+  border: none;
+  border-radius: var(--radius-sm);
+  padding: 4px 10px;
+  cursor: pointer;
+}
+
+.pending {
+  color: var(--color-text-faint);
+  font-size: 13px;
+}

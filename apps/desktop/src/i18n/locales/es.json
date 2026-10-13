@@ -101,6 +101,15 @@
     "saveAsNew": "Guardar como página nueva",
     "largeNote": "Vista previa simplificada para notas grandes"
   },
+  "preview": {
+    "remoteBlocked": "Imagen remota bloqueada (privacidad)",
+    "notFound": "No encontrado: {target}",
+    "createPage": "Crear página",
+    "openInApp": "Abrir en la app predeterminada",
+    "open": "Abrir",
+    "cycle": "La nota incrustada vuelve a esta página",
+    "loading": "Cargando…"
+  },
   "menu": {
     "label": "Acciones para {name}",
     "newPage": "Nueva página",
@@ -124,6 +133,19 @@
       "to": "Carpeta de destino",
       "root": "Raíz de la bóveda",
       "confirm": "Mover"
+    },
+    "external": {
+      "title": "¿Abrir este enlace en tu navegador?",
+      "confirm": "Abrir en el navegador"
+    },
+    "openFile": {
+      "title": "¿Abrir «{name}» en su app predeterminada?",
+      "confirm": "Abrir"
+    },
+    "createPage": {
+      "title": "¿Crear la página «{name}»?",
+      "where": "Se creará en {folder}.",
+      "confirm": "Crear página"
     }
   },
   "settings": {
