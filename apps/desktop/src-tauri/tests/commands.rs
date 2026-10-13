@@ -35,6 +35,7 @@ const COMMANDS: &[&str] = &[
     "links_resolve",
     "url_open",
     "file_open_external",
+    "fonts_list",
 ];
 
 struct Harness {
@@ -386,6 +387,7 @@ fn nfr_ui_thread_never_runs_disk_or_index_commands() {
         include_str!("../src/vault_commands.rs"),
         include_str!("../src/settings_commands.rs"),
         include_str!("../src/editor_commands.rs"),
+        include_str!("../src/fonts.rs"),
     ];
     let mut offenders = Vec::new();
     for src in sources {
@@ -642,4 +644,30 @@ fn m2b_settings_round_trip_over_ipc() {
         )
         .is_err()
     );
+}
+
+/// M2b §5: the fonts installed on this computer, read locally (no network):
+/// unique family names, sorted, without hidden (dot) families.
+#[test]
+fn m2b_fonts_list_returns_installed_families() {
+    let h = harness();
+    let list = call(&h.main, "fonts_list", json!({})).unwrap();
+    let families: Vec<String> = list
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|v| v.as_str().unwrap().to_string())
+        .collect();
+    assert!(!families.is_empty(), "every desktop OS has fonts");
+    assert!(
+        families
+            .iter()
+            .all(|f| !f.starts_with('.') && !f.trim().is_empty())
+    );
+    let mut sorted = families.clone();
+    sorted.sort_by_key(|f| f.to_lowercase());
+    sorted.dedup_by_key(|f| f.to_lowercase());
+    assert_eq!(families, sorted, "sorted case-insensitively, no duplicates");
+    // Cached: a second call returns the same list.
+    assert_eq!(call(&h.main, "fonts_list", json!({})).unwrap(), list);
 }

@@ -22,6 +22,7 @@ const COMMANDS: &[&str] = &[
     "links_resolve",
     "url_open",
     "file_open_external",
+    "fonts_list",
 ];
 
 fn main() {

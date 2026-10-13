@@ -25,6 +25,7 @@
     "allow-links-resolve",
     "allow-url-open",
     "allow-file-open-external",
+    "allow-fonts-list",
     "core:event:allow-listen",
     "core:event:allow-unlisten",
     "core:window:allow-destroy",

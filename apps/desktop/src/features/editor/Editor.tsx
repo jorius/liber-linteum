@@ -45,10 +45,14 @@ const sourceHighlight = HighlightStyle.define([
 const theme = EditorView.theme({
   '&': { height: '100%', color: 'var(--color-text)', backgroundColor: 'transparent' },
   '&.cm-focused': { outline: 'none' },
-  '.cm-scroller': { fontFamily: 'var(--font-body)', fontSize: '15.5px', lineHeight: '1.7' },
+  '.cm-scroller': {
+    fontFamily: 'var(--font-live)',
+    fontSize: 'var(--font-size-editor)',
+    lineHeight: '1.7',
+  },
   '&.cm-nimw-source .cm-scroller': {
-    fontFamily: 'var(--font-mono)',
-    fontSize: '13.5px',
+    fontFamily: 'var(--font-source)',
+    fontSize: 'calc(var(--font-size-editor) * 0.9)',
     lineHeight: '1.6',
   },
   '.cm-content': { padding: '20px 0 40vh', caretColor: 'var(--color-text)' },

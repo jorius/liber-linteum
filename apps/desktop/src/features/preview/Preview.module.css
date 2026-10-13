@@ -1,7 +1,7 @@
 /* Rendered pane (M2a §4). */
 .content,
 .nested {
-  font: 400 15px/1.65 var(--font-body);
+  font: 400 var(--font-size-editor)/1.65 var(--font-live);
   color: var(--color-text-body);
   overflow-wrap: anywhere;
 }
@@ -38,7 +38,7 @@
 
 .content code,
 .nested code {
-  font-family: var(--font-mono);
+  font-family: var(--font-source);
   font-size: 0.9em;
 }
 

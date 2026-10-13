@@ -53,6 +53,10 @@
   --font-display: 'Bricolage Grotesque', system-ui, sans-serif;
   --font-body: 'Plus Jakarta Sans', system-ui, sans-serif;
   --font-mono: 'JetBrains Mono', ui-monospace, monospace;
+  /* M2b §5: editor fonts (appearance.ts sets them from the settings). */
+  --font-live: 'Atkinson Hyperlegible', system-ui, sans-serif;
+  --font-source: 'JetBrains Mono', ui-monospace, Menlo, Consolas, monospace;
+  --font-size-editor: 15px;
 }
 
 @media (prefers-color-scheme: dark) {

@@ -3,6 +3,7 @@ pub mod commands;
 pub mod dto;
 pub mod editor_commands;
 pub mod error;
+pub mod fonts;
 pub mod menu;
 pub mod navigation;
 pub mod settings;
@@ -94,6 +95,7 @@ pub fn configure<R: tauri::Runtime>(
         editor_commands::links_resolve,
         editor_commands::url_open,
         editor_commands::file_open_external,
+        fonts::fonts_list,
     ])
 }
 

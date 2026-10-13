@@ -4,6 +4,7 @@ import { applyAppearance, CUSTOM_STYLE_ID } from './appearance';
 
 afterEach(() => {
   document.documentElement.removeAttribute('data-palette');
+  document.documentElement.removeAttribute('style');
   document.getElementById(CUSTOM_STYLE_ID)?.remove();
 });
 
@@ -26,5 +27,18 @@ describe('applyAppearance (M2b §4)', () => {
     expect(document.getElementById(CUSTOM_STYLE_ID)!.textContent).not.toBe(first);
     applyAppearance({ ...DEFAULT_SETTINGS, palette: 'sepia' });
     expect(document.getElementById(CUSTOM_STYLE_ID)).toBeNull();
+  });
+
+  it('M2b §5: fonts and text size become CSS variables on <html>', () => {
+    applyAppearance({
+      ...DEFAULT_SETTINGS,
+      fontLivePreview: 'literata',
+      fontSource: 'system:Menlo',
+      fontSize: 18,
+    });
+    const style = document.documentElement.style;
+    expect(style.getPropertyValue('--font-live')).toBe("'Literata', Georgia, serif");
+    expect(style.getPropertyValue('--font-source')).toContain('"Menlo"');
+    expect(style.getPropertyValue('--font-size-editor')).toBe('18px');
   });
 });

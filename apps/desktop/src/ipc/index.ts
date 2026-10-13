@@ -247,6 +247,9 @@ export const linksResolve = (source: string, targets: LinkTarget[]) =>
 export const urlOpen = (url: string) => call<void>('url_open', { url });
 export const fileOpenExternal = (path: string) => call<void>('file_open_external', { path });
 
+/** Font families installed on this computer (M2b §5). */
+export const fontsList = () => call<string[]>('fonts_list');
+
 /** URL of a vault file for <img>/<audio> through the `nimw-asset:` protocol
  *  (M2a §2.5); WebView2 on Windows reaches custom protocols over http. */
 export function assetUrl(path: string): string {
