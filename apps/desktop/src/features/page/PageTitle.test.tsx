@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { clearMocks } from '../../ipc/testing';
 import { resetEditorStore } from '../../stores/editorStore';
 import { usePageStore } from '../../stores/pageStore';
+import { useToastStore } from '../../stores/toastStore';
 import { DEFAULT_SETTINGS, useSettingsStore } from '../../stores/settingsStore';
 import { resetVaultStore, useVaultStore } from '../../stores/vaultStore';
 import { fakeDisk } from '../../test/fakeDisk';
@@ -22,6 +23,7 @@ beforeEach(() => {
 });
 afterEach(async () => {
   usePageStore.getState().clear();
+  useToastStore.getState().clear();
   resetEditorStore();
   await resetVaultStore();
   clearMocks();
@@ -146,6 +148,29 @@ describe('editable title (M2b §2)', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent('disk is read-only');
     expect(title()).toHaveValue('B');
     expect(usePageStore.getState().path).toBe('A.md');
+  });
+
+  it('final review m4: a failed title rename is reported once, under the title (no toast)', async () => {
+    fakeDisk(
+      { 'A.md': 'x\n', 'B.md': 'y\n' },
+      {
+        entry_rename: (a) =>
+          a.to === 'C.md'
+            ? Promise.reject({ kind: 'io', message: 'disk is read-only' })
+            : Promise.reject({ kind: 'alreadyExists', message: String(a.to) }),
+      },
+    );
+    render(<PageView />);
+    await open('A.md');
+    await userEvent.clear(title());
+    await userEvent.type(title(), 'B{Enter}'); // taken, though the tree didn't know
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'A page named “B” is already in this folder.',
+    );
+    await userEvent.clear(title());
+    await userEvent.type(title(), 'C{Enter}');
+    expect(await screen.findByRole('alert')).toHaveTextContent('disk is read-only');
+    expect(useToastStore.getState().toasts).toEqual([]);
   });
 
   it('has no axe violations', async () => {

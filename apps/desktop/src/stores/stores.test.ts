@@ -136,6 +136,23 @@ describe('vaultStore', () => {
     expect(useTrailStore.getState().back).toEqual([]);
   });
 
+  it('final review m4: a failed rename toasts by default (explorer), not when asked to stay quiet (title)', async () => {
+    backend({
+      entry_rename: () => {
+        throw { kind: 'io', message: 'disk is read-only' };
+      },
+    });
+    const loud = await useVaultStore.getState().rename('a.md', 'b.md');
+    expect(loud.ok).toBe(false);
+    expect(useToastStore.getState().toasts.map((t) => t.message)).toEqual([
+      'Something went wrong: disk is read-only',
+    ]);
+    useToastStore.getState().clear();
+    const quiet = await useVaultStore.getState().rename('a.md', 'b.md', { quiet: true });
+    expect(quiet.ok).toBe(false);
+    expect(useToastStore.getState().toasts).toEqual([]);
+  });
+
   it('VLT-01 open: closed → opening → open, with tree loaded', async () => {
     const gate = deferred<typeof info>();
     backend({ vault_open: () => gate.promise, vault_tree: () => tree });

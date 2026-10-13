@@ -59,7 +59,8 @@ export function PageTitle({ page }: { page: Page }) {
       return;
     }
     setBusy(true);
-    const res = await useVaultStore.getState().rename(page.path, to);
+    // Reported inline under the title, so no toast as well (final review m4).
+    const res = await useVaultStore.getState().rename(page.path, to, { quiet: true });
     setBusy(false);
     if (!res.ok) setError(res.error.kind === 'alreadyExists' ? taken() : errorMessage(res.error));
     else setError(null);

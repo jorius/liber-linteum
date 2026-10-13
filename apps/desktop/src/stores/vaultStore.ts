@@ -57,7 +57,13 @@ interface VaultState {
   startRename: (path: string | null) => void;
   createPage: (dir: string) => Promise<IpcResult<string>>;
   createFolder: (dir: string) => Promise<IpcResult<string>>;
-  rename: (from: string, to: string) => Promise<IpcResult<RenameOutcome>>;
+  /** `quiet`: a refused rename isn't toasted (the caller shows it inline,
+   *  like the page title — final review m4). */
+  rename: (
+    from: string,
+    to: string,
+    opts?: { quiet?: boolean },
+  ) => Promise<IpcResult<RenameOutcome>>;
   trash: (path: string) => Promise<IpcResult<void>>;
 }
 
@@ -294,11 +300,11 @@ export const useVaultStore = create<VaultState>((set, get) => {
       set({ selected: res.value, renaming: res.value });
       return res;
     },
-    rename: async (from, to) => {
+    rename: async (from, to, opts) => {
       await useEditorStore.getState().flushAll(); // the move takes the latest text
       const res = await entryRename(from, to);
       if (!res.ok) {
-        toast().push({ message: errorMessage(res.error), tone: 'error' });
+        if (!opts?.quiet) toast().push({ message: errorMessage(res.error), tone: 'error' });
         return res;
       }
       const { selected, expanded } = get();
