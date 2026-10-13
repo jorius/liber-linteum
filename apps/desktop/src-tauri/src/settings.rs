@@ -21,6 +21,16 @@ pub enum Theme {
     Dark,
 }
 
+/// Editor mode remembered globally (M2a §3.2); Live Preview by default.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum EditorMode {
+    #[default]
+    LivePreview,
+    Source,
+    Split,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct RecentVault {
@@ -38,6 +48,7 @@ pub struct Settings {
     pub theme: Theme,
     pub rewrite_links: bool,
     pub confirm_delete: bool,
+    pub editor_mode: EditorMode,
     pub recent_vaults: Vec<RecentVault>,
     /// Keys this build does not know (written by a newer version); kept on save.
     #[serde(flatten)]
@@ -52,6 +63,7 @@ impl Default for Settings {
             theme: Theme::System,
             rewrite_links: true,
             confirm_delete: true,
+            editor_mode: EditorMode::LivePreview,
             recent_vaults: Vec::new(),
             extra: serde_json::Map::new(),
         }
@@ -66,6 +78,7 @@ pub struct SettingsPatch {
     pub theme: Option<Theme>,
     pub rewrite_links: Option<bool>,
     pub confirm_delete: Option<bool>,
+    pub editor_mode: Option<EditorMode>,
 }
 
 /// A recent vault as shown on the welcome screen.
@@ -113,6 +126,7 @@ fn parse_lenient(text: &str) -> Result<(Settings, Vec<String>), serde_json::Erro
     field!("theme", theme);
     field!("rewriteLinks", rewrite_links);
     field!("confirmDelete", confirm_delete);
+    field!("editorMode", editor_mode);
     match map.remove("recentVaults") {
         None => {}
         Some(Value::Array(items)) => {
@@ -210,6 +224,9 @@ impl SettingsStore {
         }
         if let Some(v) = patch.confirm_delete {
             next.confirm_delete = v;
+        }
+        if let Some(v) = patch.editor_mode {
+            next.editor_mode = v;
         }
         self.save(&next)?;
         *s = next.clone();

@@ -1,16 +1,29 @@
 import { create } from 'zustand';
 import { pageGet, type ChangedPayload, type Page } from '../ipc';
+import { useEditorStore } from './editorStore';
 import { errorMessage } from './messages';
 import { useToastStore } from './toastStore';
 import { remap } from './tree';
 
 export type PageViewState = 'empty' | 'loading' | 'ready' | 'deleted';
 
+/** A heading to scroll to (link with `#Heading`); `nonce` re-triggers the same one. */
+export interface Anchor {
+  heading: string;
+  nonce: number;
+}
+
 interface PageState {
   path: string | null;
   page: Page | null;
   state: PageViewState;
+  anchor: Anchor | null;
+  /** Scrolls the open page to `heading`. */
+  reveal: (heading: string | null) => void;
+  /** Opens `path` (header data + editor). */
   load: (path: string) => Promise<void>;
+  /** Re-reads the header data (title, tags, counts) of the open page. */
+  refresh: () => Promise<void>;
   clear: () => void;
   /** Follows renames of the open page (own or external). */
   follow: (from: string, to: string) => Promise<void>;
@@ -21,15 +34,40 @@ interface PageState {
 }
 
 let seq = 0;
+let watchingSaves = false;
+
+/** Our own saves aren't reported by the watcher: refresh the header data
+ *  (title, tags, link counts) after each one. Subscribed on first use, not at
+ *  module load, because the stores import each other. */
+function watchSaves() {
+  if (watchingSaves) return;
+  watchingSaves = true;
+  useEditorStore.subscribe((s, prev) => {
+    if (s.path && s.path === prev.path && prev.hash && s.hash !== prev.hash) {
+      void usePageStore.getState().refresh();
+    }
+  });
+}
 
 export const usePageStore = create<PageState>((set, get) => ({
   path: null,
   page: null,
   state: 'empty',
+  anchor: null,
+  reveal: (heading) =>
+    set({ anchor: heading ? { heading, nonce: (get().anchor?.nonce ?? 0) + 1 } : null }),
   load: async (path) => {
+    watchSaves();
     const mine = ++seq;
-    set({ path, state: get().path === path && get().page ? get().state : 'loading' });
+    const same = get().path === path;
+    set({
+      path,
+      state: same && get().page ? get().state : 'loading',
+      anchor: same ? get().anchor : null,
+    });
+    const editing = useEditorStore.getState().open(path);
     const res = await pageGet(path);
+    await editing;
     if (mine !== seq) return; // a newer load won
     if (res.ok) set({ page: res.value, state: 'ready' });
     else if (res.error.kind === 'notFound') set({ page: null, state: 'deleted' });
@@ -38,16 +76,26 @@ export const usePageStore = create<PageState>((set, get) => ({
       useToastStore.getState().push({ message: errorMessage(res.error), tone: 'error' });
     }
   },
+  refresh: async () => {
+    const path = get().path;
+    if (!path || get().state !== 'ready') return;
+    const mine = seq;
+    const res = await pageGet(path);
+    if (mine === seq && res.ok) set({ page: res.value });
+  },
   clear: () => {
     seq++;
-    set({ path: null, page: null, state: 'empty' });
+    set({ path: null, page: null, state: 'empty', anchor: null });
+    void useEditorStore.getState().close();
   },
   follow: async (from, to) => {
+    useEditorStore.getState().follow(from, to);
     const path = get().path;
     const next = path ? remap(path, from, to) : null;
     if (next) await get().load(next);
   },
   onExternalChange: async (c, exists) => {
+    await useEditorStore.getState().onExternalChange(c, exists);
     const path = get().path;
     if (!path) return;
     for (const [from, to] of c.renamed) {

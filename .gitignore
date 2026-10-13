@@ -13,3 +13,7 @@ Thumbs.db
 # logs / tools
 *.log
 .playwright-mcp/
+
+# Playwright (zero-network test)
+test-results/
+playwright-report/

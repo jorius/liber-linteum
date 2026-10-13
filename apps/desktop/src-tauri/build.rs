@@ -16,6 +16,12 @@ const COMMANDS: &[&str] = &[
     "settings_set",
     "vaults_recent",
     "vaults_forget",
+    "page_read",
+    "page_write",
+    "page_create_conflict_copy",
+    "links_resolve",
+    "url_open",
+    "file_open_external",
 ];
 
 fn main() {

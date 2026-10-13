@@ -20,6 +20,7 @@ import {
   type TreeNode,
   type VaultInfo,
 } from '../ipc';
+import { useEditorStore, warnUnsaved } from './editorStore';
 import { errorMessage } from './messages';
 import { usePageStore } from './pageStore';
 import { useToastStore } from './toastStore';
@@ -40,6 +41,11 @@ interface VaultState {
   selected: string | null;
   /** Path currently in inline-rename mode. */
   renaming: string | null;
+  /** Asks the explorer to focus a row (`''` = the first row); `nonce` repeats it. */
+  focusRequest: { path: string; nonce: number } | null;
+  /** Breadcrumb (M2a §5): a folder is expanded with its ancestors and focused;
+   *  `''` (the vault) collapses the tree and focuses its first row. */
+  revealFolder: (path: string) => void;
   open: (path: string) => Promise<IpcResult<VaultInfo>>;
   create: (path: string) => Promise<IpcResult<VaultInfo>>;
   close: () => Promise<void>;
@@ -55,6 +61,7 @@ interface VaultState {
 }
 
 const toast = () => useToastStore.getState();
+const BUSY: CommandError = { kind: 'io', message: 'the vault is busy' };
 let treeSeq = 0;
 let unlisten: (() => void)[] = [];
 let pending: ChangedPayload | null = null;
@@ -69,6 +76,7 @@ const EMPTY = {
   expanded: new Set<string>(),
   selected: null,
   renaming: null,
+  focusRequest: null as { path: string; nonce: number } | null,
 };
 
 /** Unsubscribes without ever throwing (the event runtime may already be gone). */
@@ -141,14 +149,28 @@ export const useVaultStore = create<VaultState>((set, get) => {
     ]);
   }
 
-  async function opened(res: IpcResult<VaultInfo>): Promise<IpcResult<VaultInfo>> {
+  /** Saves open pages before the vault changes (M2a §3.3); if one can't be
+   *  written, says so and returns false: its text must not be dropped. */
+  async function savedEverything(): Promise<boolean> {
+    const unsaved = await useEditorStore.getState().saveAll();
+    if (!unsaved.length) return true;
+    warnUnsaved(unsaved[0], 'editor.unsavedBlocks');
+    return false;
+  }
+
+  async function opened(
+    res: IpcResult<VaultInfo>,
+    before: VaultStatus,
+  ): Promise<IpcResult<VaultInfo>> {
     if (!res.ok) {
-      set({ status: 'closed', progress: null });
+      // The backend keeps the vault it had (M1b §10 a).
+      set({ status: before === 'open' ? 'open' : 'closed', progress: null });
       toast().push({ message: errorMessage(res.error), tone: 'error' });
       return res;
     }
     set({ info: res.value, selected: null, expanded: new Set(), renaming: null });
     usePageStore.getState().clear();
+    useEditorStore.getState().reset();
     await get().refreshTree();
     await startListening();
     set({ status: 'open', progress: null });
@@ -165,14 +187,18 @@ export const useVaultStore = create<VaultState>((set, get) => {
   async function withProgress(
     run: () => Promise<IpcResult<VaultInfo>>,
   ): Promise<IpcResult<VaultInfo>> {
+    const before = get().status;
+    // One open at a time (M1b §10 b).
+    if (before === 'opening') return { ok: false, error: BUSY };
+    if (before === 'open' && !(await savedEverything())) return { ok: false, error: BUSY };
     set({ status: 'opening', progress: null });
     // Progress is a nicety: if it can't be subscribed, open without it.
     const stop = await onVaultProgress((p) => set({ progress: p })).catch(() => null);
     try {
-      return await opened(await run());
+      return await opened(await run(), before);
     } catch (e) {
       // Never leave the opening overlay up without a way out.
-      set({ status: 'closed', progress: null });
+      set({ status: before === 'open' ? 'open' : 'closed', progress: null });
       const error: CommandError = {
         kind: 'io',
         message: e instanceof Error ? e.message : String(e),
@@ -189,6 +215,9 @@ export const useVaultStore = create<VaultState>((set, get) => {
     open: (path) => withProgress(() => vaultOpen(path)),
     create: (path) => withProgress(() => vaultCreate(path)),
     close: async () => {
+      // Unsaved text is written before the vault goes away (M2a §3.3).
+      if (!(await savedEverything())) return;
+      useEditorStore.getState().reset();
       stopListening();
       await vaultClose();
       usePageStore.getState().clear();
@@ -226,6 +255,15 @@ export const useVaultStore = create<VaultState>((set, get) => {
       if (expanded.size !== before) set({ expanded });
     },
     startRename: (renaming) => set({ renaming }),
+    revealFolder: (path) => {
+      const nonce = (get().focusRequest?.nonce ?? 0) + 1;
+      if (!path) {
+        set({ expanded: new Set(), focusRequest: { path: '', nonce } });
+        return;
+      }
+      get().expand(path);
+      set({ focusRequest: { path, nonce } });
+    },
     createPage: async (dir) => {
       const name = nextFreeName(get().nodes, dir, i18next.t('explorer.untitled'), '.md');
       const res = await entryCreatePage(dir, name);
@@ -251,6 +289,7 @@ export const useVaultStore = create<VaultState>((set, get) => {
       return res;
     },
     rename: async (from, to) => {
+      await useEditorStore.getState().flushAll(); // the move takes the latest text
       const res = await entryRename(from, to);
       if (!res.ok) {
         toast().push({ message: errorMessage(res.error), tone: 'error' });
@@ -266,6 +305,8 @@ export const useVaultStore = create<VaultState>((set, get) => {
       await get().refreshTree();
       await usePageStore.getState().follow(from, to);
       const out = res.value;
+      // Our link rewrites aren't reported by the watcher: re-read open pages.
+      await useEditorStore.getState().syncPaths(out.updatedFiles);
       if (out.failed.length) {
         toast().push({
           message: i18next.t('toasts.renameFailed', { count: out.failed.length }),
@@ -283,6 +324,7 @@ export const useVaultStore = create<VaultState>((set, get) => {
       const siblings = get().children.get(parentOf(path)) ?? [];
       const i = siblings.findIndex((n) => n.path === path);
       const next = siblings[i + 1]?.path ?? (parentOf(path) || null);
+      await useEditorStore.getState().flushAll(); // the Trash gets the latest text
       const res = await entryTrash(path);
       if (!res.ok) {
         toast().push({ message: errorMessage(res.error), tone: 'error' });

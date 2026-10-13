@@ -39,7 +39,10 @@ export function RecentList() {
                 type="button"
                 className={styles.recentOpen}
                 disabled={item.missing}
-                onClick={() => void open(item.path)}
+                onClick={() =>
+                  // A failed open may mean the folder is gone: refresh "missing".
+                  void open(item.path).then((res) => (res.ok ? undefined : reload()))
+                }
               >
                 <FolderIcon />
                 <span className={styles.recentText}>

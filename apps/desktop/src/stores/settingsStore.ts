@@ -17,6 +17,7 @@ export const DEFAULT_SETTINGS: Settings = {
   theme: 'system',
   rewriteLinks: true,
   confirmDelete: true,
+  editorMode: 'livePreview',
 };
 
 interface SettingsState {

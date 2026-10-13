@@ -1,0 +1,7 @@
+{
+  "links": [
+    { "kind": "wiki", "target": "Inline Html", "heading": null, "alias": null },
+    { "kind": "wiki", "target": "Inside Div Paragraph", "heading": null, "alias": null }
+  ],
+  "tags": ["inlinehtml", "insidediv"]
+}

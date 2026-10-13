@@ -46,6 +46,7 @@ export function ExplorerTree({
   const expanded = useVaultStore((s) => s.expanded);
   const selected = useVaultStore((s) => s.selected);
   const renaming = useVaultStore((s) => s.renaming);
+  const focusRequest = useVaultStore((s) => s.focusRequest);
   const rows = useMemo(() => visibleRows(children, expanded), [children, expanded]);
   const [focused, setFocused] = useState<string | null>(null);
   const refs = useRef(new Map<string, HTMLLIElement>());
@@ -76,6 +77,14 @@ export function ExplorerTree({
     setFocused(path);
     refs.current.get(path)?.focus();
   };
+
+  // Breadcrumb requests: focus that row (or the first one).
+  useEffect(() => {
+    if (!focusRequest) return;
+    moveFocus(focusRequest.path || rows[0]?.node.path);
+    // Only a new request moves focus, not later row changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [focusRequest]);
 
   // Keep focus on the renamed item after an inline rename.
   useEffect(() => {
@@ -214,6 +223,14 @@ export function ExplorerTree({
           onFocusRow={setFocused}
           onCommitRename={commitRename}
           onCancelRename={cancelRename}
+          onMenu={
+            onRequestMenu
+              ? (path, anchor) => {
+                  setFocused(path);
+                  onRequestMenu(path, anchor);
+                }
+              : undefined
+          }
         />
       ))}
     </ul>

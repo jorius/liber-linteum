@@ -64,12 +64,18 @@ fn open_session<R: Runtime>(app: &AppHandle<R>, root: &Path) -> CmdResult<VaultI
         .file_name()
         .map(|n| n.to_string_lossy().into_owned())
         .unwrap_or_else(|| root.to_string_lossy().into_owned());
-    state.settings.push_recent(&root, &name)?;
+    let mut report: crate::dto::IndexReportDto = (&report).into();
+    // A read-only config dir must not stop the vault from opening (M1b §10 j).
+    if let Err(e) = state.settings.push_recent(&root, &name) {
+        report
+            .warnings
+            .push(format!("recent vaults could not be saved: {e}"));
+    }
     state.set_session(Some(session));
     Ok(VaultInfo {
         name,
         root: root.to_string_lossy().into_owned(),
-        report: (&report).into(),
+        report,
     })
 }
 

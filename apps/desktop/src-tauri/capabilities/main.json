@@ -1,7 +1,7 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "main",
-  "description": "Main window. Only explicitly listed commands are callable; each milestone adds its own. The dialog plugin is limited to the folder picker; the event plugin only to listen/unlisten (the UI subscribes to vault:* events).",
+  "description": "Main window. Only explicitly listed commands are callable; each milestone adds its own. The dialog plugin is limited to the folder picker; the event plugin only to listen/unlisten (the UI subscribes to vault:* events); the window plugin only to destroy (the UI closes the window itself after saving unsaved pages).",
   "windows": ["main"],
   "permissions": [
     "allow-app-info",
@@ -19,8 +19,15 @@
     "allow-settings-set",
     "allow-vaults-recent",
     "allow-vaults-forget",
+    "allow-page-read",
+    "allow-page-write",
+    "allow-page-create-conflict-copy",
+    "allow-links-resolve",
+    "allow-url-open",
+    "allow-file-open-external",
     "core:event:allow-listen",
     "core:event:allow-unlisten",
+    "core:window:allow-destroy",
     "dialog:allow-open"
   ]
 }

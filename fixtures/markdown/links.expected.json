@@ -1,0 +1,20 @@
+{
+  "links": [
+    { "kind": "cover", "target": "assets/rex-cover.png", "heading": null, "alias": null },
+    { "kind": "related", "target": "Sparda", "heading": null, "alias": null },
+    { "kind": "related", "target": "Game 1", "heading": null, "alias": null },
+    { "kind": "wiki", "target": "Sparda", "heading": null, "alias": null },
+    { "kind": "wiki", "target": "Game 1", "heading": "Plot", "alias": null },
+    { "kind": "wiki", "target": "rex-draft", "heading": null, "alias": "Rex" },
+    { "kind": "wiki", "target": "A", "heading": "B", "alias": "C" },
+    { "kind": "embed", "target": "rex-turnaround.png", "heading": null, "alias": null },
+    { "kind": "embed", "target": "rex-turnaround.png", "heading": null, "alias": "300" },
+    { "kind": "embed", "target": "Sparda", "heading": "Palette", "alias": null },
+    { "kind": "markdown", "target": "DMC/Sparda.md", "heading": "Palette", "alias": null },
+    { "kind": "markdown", "target": "/Game Design/Game 1.md", "heading": null, "alias": null },
+    { "kind": "markdown", "target": "../Game Design/Game 1.md", "heading": null, "alias": null },
+    { "kind": "markdown_image", "target": "assets/a.png", "heading": null, "alias": null },
+    { "kind": "wiki", "target": "Table Link", "heading": null, "alias": "shown" }
+  ],
+  "tags": ["character", "Redesign"]
+}

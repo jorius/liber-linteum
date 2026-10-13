@@ -33,6 +33,8 @@
     "outsideVault": "Esa ruta está fuera de la bóveda.",
     "unsafeRewrite": "Algunos enlaces no se pudieron actualizar de forma segura.",
     "watch": "Falló la vigilancia de cambios en la bóveda.",
+    "binary": "Este archivo no es texto UTF-8 válido.",
+    "invalidUrl": "Ese enlace no se puede abrir.",
     "io": "Algo salió mal: {message}"
   },
   "toasts": {
@@ -85,9 +87,40 @@
     "loading": "Cargando…",
     "deleted": "Esta página se eliminó fuera de la app.",
     "binary": "Este archivo no es texto UTF-8 válido, así que no se puede mostrar.",
-    "truncated": "Se muestra el primer 1 MB de esta página.",
     "tags": "Etiquetas",
-    "meta": "{links, plural, one {# enlace} other {# enlaces}} · {backlinks, plural, one {# retroenlace} other {# retroenlaces}}"
+    "meta": "{links, plural, one {# enlace} other {# enlaces}} · {backlinks, plural, one {# retroenlace} other {# retroenlaces}}",
+    "breadcrumb": "Ruta"
+  },
+  "editor": {
+    "conflictCopy": "Alguien más cambió esta página — su versión se guardó como «{name}»",
+    "openCopy": "Abrir",
+    "openUnsaved": "Abrir",
+    "saved": "Guardado",
+    "saving": "Guardando…",
+    "retrying": "Sin guardar — reintentando",
+    "orphaned": "Esta página se borró fuera de la app. Tu texto sigue aquí.",
+    "saveAsNew": "Guardar como página nueva",
+    "largeNote": "Vista previa simplificada para notas grandes",
+    "preview": "Vista previa",
+    "mode": "Modo del editor",
+    "modes": {
+      "livePreview": "Vista en vivo",
+      "source": "Código",
+      "split": "Dividido"
+    },
+    "saveStatus": "Estado de guardado",
+    "unsavedBlocks": "Los cambios sin guardar en «{name}» no se pudieron escribir, así que la bóveda sigue abierta.",
+    "unsavedKeepsWindow": "Los cambios sin guardar en «{name}» no se pudieron escribir, así que la ventana sigue abierta. Ciérrala otra vez para salir sin ellos."
+  },
+  "preview": {
+    "remoteBlocked": "Imagen remota bloqueada (privacidad)",
+    "notFound": "No encontrado: {target}",
+    "createPage": "Crear página",
+    "openInApp": "Abrir en la app predeterminada",
+    "open": "Abrir",
+    "cycle": "La nota incrustada vuelve a esta página",
+    "loading": "Cargando…",
+    "renderFailed": "No se pudo mostrar esta página. El texto está a salvo en el editor."
   },
   "menu": {
     "label": "Acciones para {name}",
@@ -112,6 +145,19 @@
       "to": "Carpeta de destino",
       "root": "Raíz de la bóveda",
       "confirm": "Mover"
+    },
+    "external": {
+      "title": "¿Abrir este enlace en tu navegador?",
+      "confirm": "Abrir en el navegador"
+    },
+    "openFile": {
+      "title": "¿Abrir «{name}» en su app predeterminada?",
+      "confirm": "Abrir"
+    },
+    "createPage": {
+      "title": "¿Crear la página «{name}»?",
+      "where": "Se creará en {folder}.",
+      "confirm": "Crear página"
     }
   },
   "settings": {

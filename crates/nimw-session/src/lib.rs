@@ -1,6 +1,7 @@
 //! One open vault: indexing, watching and file operations, composed from
 //! `nimw-vault` (filesystem), `nimw-markdown` (parsing) and `nimw-index` (cache).
 
+mod editing;
 mod error;
 mod events;
 mod rename;

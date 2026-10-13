@@ -19,6 +19,8 @@ export default defineConfig({
     // Never inline assets as data: URIs (fonts must match CSP font-src 'self').
     assetsInlineLimit: 0,
     sourcemap: !!process.env.TAURI_ENV_DEBUG,
+    // One local bundle loaded from disk by the webview: size costs no download.
+    chunkSizeWarningLimit: 2000,
   },
   test: {
     environment: 'jsdom',

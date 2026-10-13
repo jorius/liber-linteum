@@ -33,6 +33,8 @@
     "outsideVault": "That path is outside the vault.",
     "unsafeRewrite": "Some links couldn't be updated safely.",
     "watch": "Watching the vault for changes failed.",
+    "binary": "This file isn't valid UTF-8 text.",
+    "invalidUrl": "That link can't be opened.",
     "io": "Something went wrong: {message}"
   },
   "toasts": {
@@ -85,9 +87,40 @@
     "loading": "Loading…",
     "deleted": "This page was deleted outside the app.",
     "binary": "This file isn't valid UTF-8 text, so it can't be shown.",
-    "truncated": "Showing the first 1 MB of this page.",
     "tags": "Tags",
-    "meta": "{links, plural, one {# link} other {# links}} · {backlinks, plural, one {# backlink} other {# backlinks}}"
+    "meta": "{links, plural, one {# link} other {# links}} · {backlinks, plural, one {# backlink} other {# backlinks}}",
+    "breadcrumb": "Breadcrumb"
+  },
+  "editor": {
+    "conflictCopy": "Someone else changed this page — their version was saved as “{name}”",
+    "openCopy": "Open",
+    "openUnsaved": "Open",
+    "saved": "Saved",
+    "saving": "Saving…",
+    "retrying": "Unsaved — retrying",
+    "orphaned": "This page was deleted outside the app. Your text is still here.",
+    "saveAsNew": "Save as new page",
+    "largeNote": "Simplified preview for large notes",
+    "preview": "Preview",
+    "mode": "Editor mode",
+    "modes": {
+      "livePreview": "Live Preview",
+      "source": "Source",
+      "split": "Split"
+    },
+    "saveStatus": "Save status",
+    "unsavedBlocks": "Unsaved changes in “{name}” couldn’t be written, so the vault stays open.",
+    "unsavedKeepsWindow": "Unsaved changes in “{name}” couldn’t be written, so the window stays open. Close it again to quit without them."
+  },
+  "preview": {
+    "remoteBlocked": "Remote image blocked (privacy)",
+    "notFound": "Not found: {target}",
+    "createPage": "Create page",
+    "openInApp": "Open in default app",
+    "open": "Open",
+    "cycle": "Embedded note refers back to this page",
+    "loading": "Loading…",
+    "renderFailed": "This page couldn’t be shown. The text is safe in the editor."
   },
   "menu": {
     "label": "Actions for {name}",
@@ -112,6 +145,19 @@
       "to": "Destination folder",
       "root": "Vault root",
       "confirm": "Move"
+    },
+    "external": {
+      "title": "Open this link in your browser?",
+      "confirm": "Open in browser"
+    },
+    "openFile": {
+      "title": "Open “{name}” in its default app?",
+      "confirm": "Open"
+    },
+    "createPage": {
+      "title": "Create page “{name}”?",
+      "where": "It will be created in {folder}.",
+      "confirm": "Create page"
     }
   },
   "settings": {

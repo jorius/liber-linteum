@@ -10,6 +10,8 @@ const NETWORK_GLOBALS = ['fetch', 'XMLHttpRequest', 'WebSocket', 'EventSource'];
 const GLOBAL_OBJECTS = ['window', 'globalThis', 'self'];
 
 const BACKEND = 'Import backend calls from src/ipc/ only.';
+const LOOKBEHIND =
+  'Regex lookbehind needs Safari 16.4; the build targets Safari 15 (WKWebView on macOS 12).';
 // Backend access is confined to src/ipc/. `@tauri-apps/api/mocks` is the one
 // exception, and only in test files (see the override below).
 const backendImportRule = (allowMocksInTests) => [
@@ -56,6 +58,7 @@ export default defineConfig(
         'error',
         { selector: "MemberExpression[property.name='sendBeacon']", message: NETWORK },
         { selector: "MemberExpression[property.value='sendBeacon']", message: NETWORK },
+        { selector: 'Literal[regex.pattern=/\\(\\?<[=!]/]', message: LOOKBEHIND },
       ],
       'no-restricted-imports': backendImportRule(false),
     },
