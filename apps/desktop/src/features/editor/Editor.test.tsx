@@ -161,4 +161,28 @@ describe('Editor (M2a §3.2–3.3)', () => {
     expect(view.state.doc.toString()).toBe('aaa\nmore\n');
     expect(b.text).toBe('2bbb\n');
   });
+
+  it('I5: a cached page state writes only to its own page, whichever editor shows it', async () => {
+    disk = fakeDisk({ 'A.md': 'aaa\n', 'B.md': 'bbb\n' });
+    const a = await load('A.md');
+    const b = await load('B.md');
+    const first = render(<Editor doc={a} mode="source" label="A" />);
+    first.rerender(<Editor doc={b} mode="source" label="B" />); // same instance swaps to B
+    first.unmount();
+    render(<Editor doc={a} mode="source" label="A" />); // A again, in a new instance
+    await type('X', 0);
+    expect(a.text).toBe('Xaaa\n');
+    expect(b.text).toBe('bbb\n');
+  });
+
+  it('I5: the Split pane follows typing after the editor is remounted', async () => {
+    disk = fakeDisk({ 'A.md': 'first\n' });
+    const a = await load('A.md');
+    render(<Editor doc={a} mode="split" label="A" />).unmount();
+    render(<Editor doc={a} mode="split" label="A" />); // cached state, new component
+    await type('typed ', 0);
+    await vi.waitFor(() =>
+      expect(screen.getByRole('region', { name: 'Preview' })).toHaveTextContent('typed first'),
+    );
+  });
 });

@@ -1,7 +1,7 @@
 import { defaultKeymap, history, historyKeymap } from '@codemirror/commands';
 import { markdown } from '@codemirror/lang-markdown';
 import { HighlightStyle, syntaxHighlighting } from '@codemirror/language';
-import { Compartment, EditorState, Transaction, type Extension } from '@codemirror/state';
+import { Compartment, EditorState, Facet, Transaction, type Extension } from '@codemirror/state';
 import { drawSelection, EditorView, keymap } from '@codemirror/view';
 import { tags } from '@lezer/highlight';
 import { diffIndices } from 'node-diff3';
@@ -17,6 +17,13 @@ import { blockForOffset, offsetAtTop, topIn } from './scrollSync';
 /** Each page keeps its CodeMirror state (text, selection, undo) while the app
  *  runs, so switching pages or modes never loses history (ED-07). */
 const states = new WeakMap<PageDoc, EditorState>();
+/** The page a state belongs to: a cached state is reused by whichever editor
+ *  shows the page next, so nothing in it may close over a component. */
+const pageDocOf = Facet.define<PageDoc, PageDoc | null>({
+  combine: (values) => values[0] ?? null,
+});
+/** The Split pane of the component currently showing each view. */
+const paneOf = new WeakMap<EditorView, (text: string) => void>();
 const modeSlot = new Compartment();
 const labelSlot = new Compartment();
 
@@ -147,6 +154,42 @@ function applyExternal(view: EditorView, text: string) {
   });
 }
 
+/** A page's editor state. Its listeners find the page through `pageDocOf`
+ *  and the Split pane through the view they run in (I5). */
+function createState(d: PageDoc, mode: EditorMode, label: string): EditorState {
+  return EditorState.create({
+    doc: d.text,
+    extensions: [
+      pageDocOf.of(d),
+      history(),
+      drawSelection(),
+      EditorView.lineWrapping,
+      markdown(),
+      keymap.of([
+        { key: 'Mod-Enter', run: followLinkAtCursor },
+        ...defaultKeymap,
+        ...historyKeymap,
+      ]),
+      pagePath.of(() => d.path),
+      theme,
+      labelSlot.of(labelled(label)),
+      modeSlot.of(modeExtensions(mode)),
+      // Autosave also when the editor loses focus (M2a §3.3).
+      EditorView.domEventHandlers({
+        blur: (_e, v) => {
+          void v.state.facet(pageDocOf)?.flush();
+        },
+      }),
+      EditorView.updateListener.of((u) => {
+        if (!u.docChanged) return;
+        const next = u.state.doc.toString();
+        u.state.facet(pageDocOf)?.edit(next);
+        paneOf.get(u.view)?.(next);
+      }),
+    ],
+  });
+}
+
 export interface EditorProps {
   doc: PageDoc;
   mode: EditorMode;
@@ -165,46 +208,17 @@ export function Editor({ doc, mode, label }: EditorProps) {
   // The text for the Split pane (cheap to track: the pane renders only in Split).
   const [text, setText] = useState(doc.text);
 
-  const stateFor = (d: PageDoc): EditorState =>
-    states.get(d) ??
-    EditorState.create({
-      doc: d.text,
-      extensions: [
-        history(),
-        drawSelection(),
-        EditorView.lineWrapping,
-        markdown(),
-        keymap.of([
-          { key: 'Mod-Enter', run: followLinkAtCursor },
-          ...defaultKeymap,
-          ...historyKeymap,
-        ]),
-        pagePath.of(() => current.current.path),
-        theme,
-        labelSlot.of(labelled(label)),
-        modeSlot.of(modeExtensions(mode)),
-        // Autosave also when the editor loses focus (M2a §3.3).
-        EditorView.domEventHandlers({
-          blur: () => {
-            void current.current.flush();
-          },
-        }),
-        EditorView.updateListener.of((u) => {
-          if (!u.docChanged) return;
-          const next = u.state.doc.toString();
-          current.current.edit(next);
-          setText(next);
-        }),
-      ],
-    });
+  const stateFor = (d: PageDoc): EditorState => states.get(d) ?? createState(d, mode, label);
 
   // One view for the component's lifetime; page states are swapped into it.
   useLayoutEffect(() => {
     const v = new EditorView({ parent: host.current!, state: stateFor(current.current) });
     view.current = v;
+    paneOf.set(v, setText);
     return () => {
       states.set(current.current, v.state);
       current.current.sink = null;
+      paneOf.delete(v);
       v.destroy();
       view.current = null;
     };
