@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { PALETTE_IDS } from '../ipc';
 import { contrast } from './color';
-import { derive } from './derive';
+import { DARK_ACCENT_FLOOR, derive, LIGHT_ACCENT_FLOOR } from './derive';
 import { paletteCss, paletteVars } from './paletteCss';
 import { PALETTES } from './palettes';
 
@@ -31,6 +31,7 @@ describe('built-in palettes (M2b §4, §10)', () => {
       expect(contrast(t.muted, t.surface), 'muted on surface').toBeGreaterThanOrEqual(4.5);
       expect(contrast(t.accent, t.surface), 'accent on surface').toBeGreaterThanOrEqual(4.5);
       expect(contrast(t.contrast, t.accent), 'text on accent').toBeGreaterThanOrEqual(4.5);
+      expect(contrast(t.accent, t.soft), 'accent on accent-soft').toBeGreaterThanOrEqual(4.5);
       expect(contrast(t.sideText, t.side), 'sidebar text').toBeGreaterThanOrEqual(7);
       for (const c of sharedText[mode]) {
         expect(contrast(c, t.surface), `${c} on surface`).toBeGreaterThanOrEqual(4.5);
@@ -109,12 +110,19 @@ describe('custom accent → palette (M2b §4, derive.ts)', () => {
 
   it.each(hexes)('%s: the accent is readable in light and dark mode', (hex) => {
     const p = derive(hex);
-    expect(contrast(p.light.accent, p.light.surface)).toBeGreaterThanOrEqual(4.5);
-    expect(contrast(p.dark.accent, p.dark.surface)).toBeGreaterThanOrEqual(6);
-    expect(contrast(p.light.contrast, p.light.accent)).toBeGreaterThanOrEqual(4.5);
-    expect(contrast(p.dark.contrast, p.dark.accent)).toBeGreaterThanOrEqual(4.5);
-    expect(contrast(p.light.text, p.light.bg)).toBeGreaterThanOrEqual(7);
-    expect(contrast(p.dark.text, p.dark.bg)).toBeGreaterThanOrEqual(7);
+    const floors = { light: LIGHT_ACCENT_FLOOR, dark: DARK_ACCENT_FLOOR };
+    for (const mode of ['light', 'dark'] as const) {
+      const t = p[mode];
+      const at = `${mode}:`;
+      expect(contrast(t.accent, t.surface), `${at} accent on surface`).toBeGreaterThanOrEqual(
+        floors[mode],
+      );
+      // Tags, pressed toolbar buttons and the "Aa" toggle put accent text on
+      // the accent-soft tint.
+      expect(contrast(t.accent, t.soft), `${at} accent on accent-soft`).toBeGreaterThanOrEqual(4.5);
+      expect(contrast(t.contrast, t.accent), `${at} text on accent`).toBeGreaterThanOrEqual(4.5);
+      expect(contrast(t.text, t.bg), `${at} text on background`).toBeGreaterThanOrEqual(7);
+    }
     for (const v of Object.values(p.light).concat(Object.values(p.dark))) {
       expect(v).toMatch(/^(#[0-9a-f]{6}|rgba\(.*\))$/);
     }

@@ -4,10 +4,13 @@ import type { PaletteTokens } from './palettes';
 /** Accent contrast floors (M2b §4): text-sized accent on the surface. */
 export const LIGHT_ACCENT_FLOOR = 4.8;
 export const DARK_ACCENT_FLOOR = 6;
+/** Accent text on the accent-soft tint (tags, pressed toolbar buttons, the
+ *  "Aa" toggle) must stay readable too, in both modes. */
+export const SOFT_ACCENT_FLOOR = 4.5;
 
 /** A complete light/dark palette from one accent colour (M2b §4): the accent
  *  is darkened (light mode) or lightened (dark mode) until it reads as text
- *  on the surface, chroma is capped, and neutrals take a faint tint of the
+ *  on the surface and on the accent-soft tint, chroma is capped, and neutrals take a faint tint of the
  *  accent's hue (none for greys). Ported from the reference page. */
 export function derive(hex: string): { light: PaletteTokens; dark: PaletteTokens } {
   const [L0, c0, h] = hexToOklch(hex.toLowerCase());
@@ -15,16 +18,26 @@ export function derive(hex: string): { light: PaletteTokens; dark: PaletteTokens
   const at = (L: number, C: number) => oklchToHex(L, C, h);
   const lightSurface = '#ffffff';
   const darkSurface = at(0.205, tint(0.014));
+  const lightSoft = at(0.94, tint(0.035));
+  const darkSoft = at(0.3, tint(0.05));
 
   let lightAccent = hex;
   for (let x = Math.min(Math.max(L0, 0.15), 0.62); x > 0.1; x -= 0.01) {
     lightAccent = at(x, Math.min(c0, 0.17));
-    if (contrast(lightAccent, lightSurface) >= LIGHT_ACCENT_FLOOR) break;
+    if (
+      contrast(lightAccent, lightSurface) >= LIGHT_ACCENT_FLOOR &&
+      contrast(lightAccent, lightSoft) >= SOFT_ACCENT_FLOOR
+    )
+      break;
   }
   let darkAccent = hex;
   for (let x = Math.min(Math.max(L0, 0.7), 0.97); x < 0.99; x += 0.01) {
     darkAccent = at(x, Math.min(c0, 0.13));
-    if (contrast(darkAccent, darkSurface) >= DARK_ACCENT_FLOOR) break;
+    if (
+      contrast(darkAccent, darkSurface) >= DARK_ACCENT_FLOOR &&
+      contrast(darkAccent, darkSoft) >= SOFT_ACCENT_FLOOR
+    )
+      break;
   }
   const on = (bg: string) =>
     contrast('#ffffff', bg) >= contrast('#111111', bg) ? '#ffffff' : '#111111';
@@ -39,7 +52,7 @@ export function derive(hex: string): { light: PaletteTokens; dark: PaletteTokens
       body: at(0.38, tint(0.025)),
       muted: at(0.52, tint(0.03)),
       accent: lightAccent,
-      soft: at(0.94, tint(0.035)),
+      soft: lightSoft,
       contrast: on(lightAccent),
       side: at(0.2, tint(0.015)),
       sideText: at(0.88, tint(0.02)),
@@ -56,7 +69,7 @@ export function derive(hex: string): { light: PaletteTokens; dark: PaletteTokens
       body: at(0.84, tint(0.015)),
       muted: at(0.7, tint(0.02)),
       accent: darkAccent,
-      soft: at(0.3, tint(0.05)),
+      soft: darkSoft,
       contrast: on(darkAccent),
       side: at(0.14, tint(0.01)),
       sideText: at(0.88, tint(0.02)),
