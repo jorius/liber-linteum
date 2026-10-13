@@ -29,5 +29,10 @@ tauri = { workspace = true, features = ["test"] }
 tempfile.workspace = true
 nimw-testkit = { path = "../../../crates/nimw-testkit" }
 
+# Runs on the process main thread (muda menus can only be created there).
+[[test]]
+name = "menu"
+harness = false
+
 [lints.clippy]
 all = { level = "warn", priority = -1 }

@@ -3,6 +3,7 @@ pub mod commands;
 pub mod dto;
 pub mod editor_commands;
 pub mod error;
+pub mod menu;
 pub mod settings;
 pub mod settings_commands;
 pub mod state;
@@ -32,6 +33,9 @@ pub fn configure<R: tauri::Runtime>(
         // Used only from our own commands (url_open, file_open_external); the
         // webview gets no opener permission.
         .plugin(tauri_plugin_opener::init())
+        // Our Quit item (macOS app menu) closes the windows through their close
+        // request, so the UI saves pending pages first (see `menu`).
+        .on_menu_event(menu::on_menu_event)
         .register_asynchronous_uri_scheme_protocol(asset::SCHEME, |ctx, request, responder| {
             let app = ctx.app_handle().clone();
             std::thread::spawn(move || {
@@ -91,7 +95,7 @@ pub fn configure<R: tauri::Runtime>(
 }
 
 pub fn run() {
-    configure(tauri::Builder::default(), None)
+    menu::with_app_menu(configure(tauri::Builder::default(), None))
         .run(tauri::generate_context!())
         .expect("error while running Notes In My Way");
 }
