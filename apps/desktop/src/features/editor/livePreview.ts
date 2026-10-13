@@ -27,6 +27,7 @@ import { followLink } from '../../stores/links';
 import { CheckboxWidget, PreviewWidget } from './widgets';
 
 import { LARGE_NOTE_CHARS } from './limits';
+import { safeDecode } from '../../markdown/decode';
 
 export { LARGE_NOTE_CHARS };
 /** Re-parse delay after typing; positions are mapped until then. */
@@ -319,14 +320,14 @@ export function followLinkAt(view: EditorView, pos: number): boolean {
     return true;
   }
   if (url.startsWith('#')) {
-    followLink({ type: 'anchor', heading: decodeURIComponent(url.slice(1)) });
+    followLink({ type: 'anchor', heading: safeDecode(url.slice(1)) });
     return true;
   }
   if (/^[a-z][a-z0-9+.-]*:/i.test(url)) return false;
   const hash = url.indexOf('#');
   const joined = vaultJoin(source, hash >= 0 ? url.slice(0, hash) : url);
   if (!joined) return false;
-  const heading = hash >= 0 ? decodeURIComponent(url.slice(hash + 1)) || null : null;
+  const heading = hash >= 0 ? safeDecode(url.slice(hash + 1)) || null : null;
   void resolveAndFollow('markdown', `/${joined}`, joined, heading, source);
   return true;
 }

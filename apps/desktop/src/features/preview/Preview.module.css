@@ -291,3 +291,13 @@ summary.calloutTitle {
   color: var(--color-text-faint);
   font-size: 13px;
 }
+
+/* A render bug in the pane (I4): a quiet message instead of a blank app. */
+.renderFailed {
+  margin: 0;
+  padding: 10px 14px;
+  border: 1px dashed var(--color-border-strong);
+  border-radius: var(--radius-md);
+  color: var(--color-text-muted);
+  font: 400 14px/1.5 var(--font-body);
+}

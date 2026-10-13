@@ -117,7 +117,8 @@
     "openInApp": "Open in default app",
     "open": "Open",
     "cycle": "Embedded note refers back to this page",
-    "loading": "Loading…"
+    "loading": "Loading…",
+    "renderFailed": "This page couldn’t be shown. The text is safe in the editor."
   },
   "menu": {
     "label": "Actions for {name}",

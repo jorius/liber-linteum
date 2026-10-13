@@ -117,7 +117,8 @@
     "openInApp": "Abrir en la app predeterminada",
     "open": "Abrir",
     "cycle": "La nota incrustada vuelve a esta página",
-    "loading": "Cargando…"
+    "loading": "Cargando…",
+    "renderFailed": "No se pudo mostrar esta página. El texto está a salvo en el editor."
   },
   "menu": {
     "label": "Acciones para {name}",

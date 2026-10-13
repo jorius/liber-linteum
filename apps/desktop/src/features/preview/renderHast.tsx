@@ -7,6 +7,7 @@ import { Callout } from './Callout';
 import { Embed } from './Embed';
 import styles from './Preview.module.css';
 import type { Resolve } from './useResolved';
+import { safeDecode } from '../../markdown/decode';
 
 export interface RenderCtx {
   /** Page being rendered. */
@@ -110,7 +111,7 @@ function renderElement(e: Element, key: number, ctx: RenderCtx): ReactNode {
       );
     }
     case 'anchor': {
-      const heading = decodeURIComponent(String(p.href ?? '').slice(1));
+      const heading = safeDecode(String(p.href ?? '').slice(1));
       return (
         <a
           key={key}

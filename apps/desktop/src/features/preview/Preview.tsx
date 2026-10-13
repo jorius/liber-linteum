@@ -9,6 +9,7 @@ import { openPage } from '../../stores/navigate';
 import { usePageStore } from '../../stores/pageStore';
 import { nameOf } from '../../stores/tree';
 import styles from './Preview.module.css';
+import { RenderBoundary } from './RenderBoundary';
 import { renderChildren, type RenderCtx } from './renderHast';
 import { useDebounced } from './useDebounced';
 import { useParsed } from './useParsed';
@@ -29,8 +30,17 @@ export interface PreviewProps {
   embedded?: boolean;
 }
 
-/** The rendered pane (M2a §4): sanitized Markdown with resolved links and embeds. */
-export function Preview({
+/** The rendered pane (M2a §4): sanitized Markdown with resolved links and
+ *  embeds. A render bug shows a message in the pane, never a blank app (I4). */
+export function Preview(props: PreviewProps) {
+  return (
+    <RenderBoundary resetKey={`${props.path}\u0000${props.heading ?? ''}\u0000${props.text}`}>
+      <PreviewBody {...props} />
+    </RenderBoundary>
+  );
+}
+
+function PreviewBody({
   text,
   path,
   heading = null,

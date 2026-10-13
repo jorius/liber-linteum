@@ -126,4 +126,19 @@ describe('Live Preview (M2a §3.2)', () => {
     await moveTo(v, 1);
     expect(followLinkAtCursor(v)).toBe(false);
   });
+
+  it('a link target with a bare % is followed as written, never throws (I4)', async () => {
+    const asked: unknown[] = [];
+    mockIPC((cmd, args) => {
+      if (cmd !== 'links_resolve') return null;
+      asked.push(args);
+      return ['Notes/B.md'];
+    });
+    const v = editor('[a](#100%) and [b](B.md#50%)\n', 2);
+    expect(followLinkAtCursor(v)).toBe(true);
+    expect(usePageStore.getState().anchor?.heading).toBe('100%');
+    act(() => v.dispatch({ selection: { anchor: 18 } }));
+    expect(() => followLinkAtCursor(v)).not.toThrow();
+    await vi.waitFor(() => expect(asked).toHaveLength(1));
+  });
 });

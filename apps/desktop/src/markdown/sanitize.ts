@@ -19,6 +19,7 @@ import type {
   Tag,
   WikiLink,
 } from './types';
+import { safeDecode } from './decode';
 
 /** Colors allowed in `data-color` / `data-bg` (theme-aware tokens). */
 export const PALETTE = ['red', 'orange', 'yellow', 'green', 'blue', 'purple', 'gray'] as const;
@@ -31,12 +32,7 @@ export interface RenderContext {
 /** Vault-relative join of a Markdown/HTML path from a page; `null` if it would
  * leave the vault or is empty. A leading `/` means the vault root. */
 export function vaultJoin(sourcePath: string, target: string): string | null {
-  let decoded = target;
-  try {
-    decoded = decodeURIComponent(target);
-  } catch {
-    // keep as written
-  }
+  const decoded = safeDecode(target);
   const fromRoot = decoded.startsWith('/');
   const base = fromRoot ? [] : sourcePath.split('/').slice(0, -1);
   const parts = [...base];
@@ -266,8 +262,7 @@ function applyUrlPolicy(parent: Root | Element, ctx: RenderContext) {
         const target = path ? vaultJoin(ctx.sourcePath, path) : null;
         p.dataNimw = 'link';
         if (target) p.dataTarget = target;
-        if (hash >= 0 && href.slice(hash + 1))
-          p.dataHeading = decodeURIComponent(href.slice(hash + 1));
+        if (hash >= 0 && href.slice(hash + 1)) p.dataHeading = safeDecode(href.slice(hash + 1));
         delete p.href;
       }
     }

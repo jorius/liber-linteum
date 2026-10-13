@@ -238,3 +238,11 @@ describe('Preview: embeds (M2a §4, §1.1)', () => {
     expect(document.querySelector('img')).toBeNull();
   });
 });
+
+describe('malformed percent-encoding and render errors (I4)', () => {
+  it('raw-HTML links with a bare % render instead of blanking the app', () => {
+    show('<a href="#100%">hundred</a> and <a href="B.md#50%">half</a>\n');
+    expect(screen.getByText('hundred')).toBeTruthy();
+    expect(screen.getByText('half')).toBeTruthy();
+  });
+});

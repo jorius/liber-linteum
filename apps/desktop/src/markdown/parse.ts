@@ -11,6 +11,7 @@ import { scanText } from './inline';
 import { locator } from './locate';
 import type { Embed, LinkRef, ParsedPage, Tag, WikiLink } from './types';
 import { findAll, rangeOf } from './walk';
+import { safeDecode } from './decode';
 
 const processor = unified()
   .use(remarkParse)
@@ -52,12 +53,7 @@ function markdownTarget(url: string): { target: string; heading: string | null }
   const hash = url.indexOf('#');
   const path = hash >= 0 ? url.slice(0, hash) : url;
   if (!path) return null;
-  let target = path;
-  try {
-    target = decodeURIComponent(path);
-  } catch {
-    // keep the raw path when it isn't valid percent-encoding
-  }
+  const target = safeDecode(path);
   const heading = hash >= 0 ? url.slice(hash + 1) || null : null;
   return { target, heading };
 }

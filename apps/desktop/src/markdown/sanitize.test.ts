@@ -135,3 +135,13 @@ describe('extension nodes become marked elements', () => {
     expect(html('---\nsubtitle: S\n---\nBody\n')).not.toContain('subtitle');
   });
 });
+
+describe('malformed percent-encoding (I4)', () => {
+  it('raw-HTML links with a bare % keep the text as written instead of throwing', () => {
+    const tree = render('<a href="#100%">a</a> <a href="B.md#50%">b</a> <a href="C%.md">c</a>');
+    const links = elements(tree).filter((e) => e.tagName === 'a');
+    expect(links.map((e) => e.properties.dataNimw)).toEqual(['anchor', 'link', 'link']);
+    expect(links[1].properties.dataHeading).toBe('50%');
+    expect(links[2].properties.dataTarget).toBe('Notes/C%.md');
+  });
+});
