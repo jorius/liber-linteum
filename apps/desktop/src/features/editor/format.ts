@@ -25,11 +25,38 @@ export const MARKERS: Record<InlineFormat, string> = {
   code: '`',
 };
 
-/** How many `ch` end `text` / start `text`. */
-const runBefore = (text: string, ch: string) =>
-  text.length - text.replace(new RegExp(`\\${ch}+$`), '').length;
-const runAfter = (text: string, ch: string) =>
-  text.length - text.replace(new RegExp(`^\\${ch}+`), '').length;
+/** Marker characters each format accepts: Obsidian (CommonMark) also takes
+ *  `_x_` / `__x__` for italic / bold. */
+const CHARS: Record<InlineFormat, string> = {
+  bold: '*_',
+  italic: '*_',
+  strike: '~',
+  highlight: '=',
+  code: '`',
+};
+/** Characters of the markers that can nest around a text (`**_x_**`). */
+const NESTING = '*_~=';
+
+/** Runs of one marker character that wrap a text on both sides, from the
+ *  inside out (`before` ends at the text, `after` starts at it): character,
+ *  run lengths and their distance from the text on each side. */
+function markerPairs(before: string, after: string) {
+  const out: { ch: string; a: number; b: number; da: number; db: number }[] = [];
+  let i = before.length;
+  let j = 0;
+  while (i > 0 && j < after.length) {
+    const ch = before[i - 1];
+    if (!NESTING.includes(ch) || after[j] !== ch) break;
+    let a = 0;
+    while (a < i && before[i - 1 - a] === ch) a++;
+    let b = 0;
+    while (j + b < after.length && after[j + b] === ch) b++;
+    out.push({ ch, a, b, da: before.length - i, db: j });
+    i -= a;
+    j += b;
+  }
+  return out;
+}
 
 /** Whether runs of `before`/`after` marker characters wrap the text in this
  *  format: italic is an odd run (`*x*`, `***x***`), the others need their
@@ -40,12 +67,15 @@ function wrapped(kind: InlineFormat, before: number, after: number): boolean {
   return before >= len && after >= len;
 }
 
+/** The pair of marker runs that makes `before`·text·`after` this format. */
+const wrapping = (kind: InlineFormat, before: string, after: string) =>
+  markerPairs(before, after).find((p) => CHARS[kind].includes(p.ch) && wrapped(kind, p.a, p.b));
+
 /** Wraps each selection (or the word at an empty cursor) in the format's
  *  markers, or unwraps it when it is already formatted. */
 export function toggleInline(kind: InlineFormat): StateCommand {
   const m = MARKERS[kind];
   const k = m.length;
-  const ch = m[0];
   return ({ state, dispatch }) => {
     const tr = state.changeByRange((range) => {
       let { from, to } = range;
@@ -58,31 +88,44 @@ export function toggleInline(kind: InlineFormat): StateCommand {
           };
         }
         ({ from, to } = word);
+        // `_` is a word character: underscore markers are not part of the word.
+        const text = state.sliceDoc(from, to);
+        const lead = text.length - text.replace(/^_+/, '').length;
+        const trail = text.length - text.replace(/_+$/, '').length;
+        if (lead + trail < text.length) {
+          from += lead;
+          to -= trail;
+        }
       }
       const text = state.sliceDoc(from, to);
-      const before = runBefore(state.sliceDoc(Math.max(0, from - 6), from), ch);
-      const after = runAfter(state.sliceDoc(to, to + 6), ch);
       const keep = (a: number, b: number) =>
         range.empty ? EditorSelection.cursor(range.head + a) : EditorSelection.range(from + a, b);
-      if (wrapped(kind, before, after)) {
+      const outside = wrapping(
+        kind,
+        state.sliceDoc(Math.max(0, from - 12), from),
+        state.sliceDoc(to, to + 12),
+      );
+      if (outside) {
         return {
           changes: [
-            { from: from - k, to: from },
-            { from: to, to: to + k },
+            { from: from - outside.da - k, to: from - outside.da },
+            { from: to + outside.db, to: to + outside.db + k },
           ],
           range: keep(-k, to - k),
         };
       }
+      const lead = text.length - text.replace(new RegExp(`^[${NESTING}]+`), '').length;
+      const trail = text.length - text.replace(new RegExp(`[${NESTING}]+$`), '').length;
       const inside =
-        text.length >= 2 * k &&
-        wrapped(kind, runAfter(text, ch), runBefore(text, ch)) &&
-        text.startsWith(m) &&
-        text.endsWith(m);
+        lead + trail < text.length &&
+        wrapping(kind, text.slice(0, lead), text.slice(-trail || text.length));
       if (inside) {
+        const start = from + lead - inside.da - k;
+        const end = to - trail + inside.db;
         return {
           changes: [
-            { from, to: from + k },
-            { from: to - k, to },
+            { from: start, to: start + k },
+            { from: end, to: end + k },
           ],
           range: EditorSelection.range(from, to - 2 * k),
         };
@@ -179,7 +222,7 @@ export function setHeading(level: 0 | 1 | 2 | 3 | 4 | 5 | 6): StateCommand {
 }
 
 /** indent, list marker (`- `, `1. `, `- [ ] `), rest. */
-const LIST = /^(\s*)((?:[-*+][ \t]+\[[ xX]\][ \t]+)|(?:[-*+][ \t]+)|(?:\d+[.)][ \t]+))?(.*)$/;
+const LIST = /^(\s*)((?:[-*+][ \t]+\[[ xX]\](?:[ \t]+|$))|(?:[-*+][ \t]+)|(?:\d+[.)][ \t]+))?(.*)$/;
 const kindOf = (marker: string | undefined): BlockFormat | null =>
   !marker ? null : /\[[ xX]\]/.test(marker) ? 'task' : /^\d/.test(marker) ? 'numbered' : 'bullet';
 

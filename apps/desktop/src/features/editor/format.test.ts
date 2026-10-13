@@ -82,6 +82,19 @@ describe('inline formats (M2b §6)', () => {
     expect(apply(toggleInline('italic'), '***wo¦rd***')).toBe('**wo¦rd**');
   });
 
+  it('underscore markers count as italic / bold, so toggling removes them', () => {
+    expect(apply(toggleInline('italic'), '_wo¦rd_')).toBe('wo¦rd');
+    expect(apply(toggleInline('bold'), '__wo¦rd__')).toBe('wo¦rd');
+    expect(apply(toggleInline('italic'), '___wo¦rd___')).toBe('__wo¦rd__');
+    expect(apply(toggleInline('bold'), '___wo¦rd___')).toBe('_wo¦rd_');
+    expect(apply(toggleInline('italic'), 'a ‹_word_›')).toBe('a ‹word›');
+    expect(apply(toggleInline('bold'), 'a _‹word›_')).toBe('a _**‹word›**_');
+    expect(apply(toggleInline('bold'), 'a __‹word›__')).toBe('a ‹word›');
+    expect(apply(toggleInline('bold'), '**_wo¦rd_**')).toBe('_wo¦rd_');
+    // Underscores inside a word stay part of it.
+    expect(apply(toggleInline('bold'), 'snake_ca¦se')).toBe('**snake_ca¦se**');
+  });
+
   it('every selection at once, in one undo step', () => {
     const s = run(toggleInline('bold'), '‹one› and ‹two›');
     expect(marked(s)).toBe('**‹one›** and **‹two›**');
@@ -106,6 +119,13 @@ describe('block formats', () => {
     expect(apply(toggleBlock('task'), '- a¦')).toBe('- [ ] a¦');
     expect(apply(toggleBlock('numbered'), '  - a¦')).toBe('  1. a¦');
     expect(apply(toggleBlock('bullet'), '¦')).toBe('- ¦');
+  });
+
+  it('a bare task marker is a task: toggling it off never doubles the box', () => {
+    expect(apply(toggleBlock('task'), '- [ ]¦')).toBe('¦');
+    expect(apply(toggleBlock('task'), '- [x]¦')).toBe('¦');
+    expect(apply(toggleBlock('task'), '  - [ ]¦')).toBe('  ¦');
+    expect(apply(toggleBlock('bullet'), '- [ ]¦')).toBe('- ¦');
   });
 
   it('a selection ending at a line start (triple-click) leaves the next line alone', () => {
