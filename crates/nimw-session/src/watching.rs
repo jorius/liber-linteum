@@ -31,10 +31,7 @@ impl VaultSession {
     }
 
     fn emit_warning(&self, message: String) {
-        self.emit(SessionEvent::Indexed(crate::events::IndexReport {
-            warnings: vec![message],
-            ..Default::default()
-        }));
+        self.emit(SessionEvent::Warning(message));
     }
 
     /// Applies one watcher batch (spec §6.5). Paths are re-checked on disk and

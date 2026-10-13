@@ -30,6 +30,9 @@ pub enum SessionEvent {
         removed: Vec<String>,
         renamed: Vec<(String, String)>,
     },
+    /// A non-fatal problem found while applying external changes (unreadable
+    /// folder, invalid UTF-8 page, watcher error).
+    Warning(String),
 }
 
 /// Result of [`crate::VaultSession::rename`] (EXP-02, EXP-04).

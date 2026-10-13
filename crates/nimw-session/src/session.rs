@@ -303,14 +303,27 @@ impl VaultSession {
 
     /// Moves a file or folder to the OS trash (EXP-03). Links to it become unresolved.
     pub fn trash(&self, path: &VaultPath) -> Result<()> {
-        let mut index = self.index();
-        let keys: Vec<String> = index
+        self.trash_with_hook(path, &|| {})
+    }
+
+    /// `trash` with a hook that runs just before the OS call. The index lock is
+    /// released during that call: the OS may block on a permission prompt and
+    /// reads/the watcher must not stall meanwhile.
+    pub(crate) fn trash_with_hook(
+        &self,
+        path: &VaultPath,
+        before_os_call: &dyn Fn(),
+    ) -> Result<()> {
+        let keys: Vec<String> = self
+            .index()
             .file_set()?
             .iter()
             .filter(|p| VaultPath::new(p).is_ok_and(|vp| vp.starts_with(path)))
             .map(|p| link_key(p))
             .collect();
+        before_os_call();
         self.vault.trash(path)?;
+        let mut index = self.index();
         index.transaction(|tx| tx.remove(path.as_str()))?;
         let files = index.file_set()?;
         index.resolve_affected(&files, &keys)?;
@@ -388,4 +401,30 @@ pub(crate) fn subtree_files(stats: &HashMap<String, Stat>, path: &VaultPath) -> 
         .collect();
     out.sort();
     out
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::sync::atomic::AtomicBool;
+
+    /// M1b (M1a hand-off §11 n): the OS trash call may block on a permission
+    /// prompt, so the index must not be locked while it runs.
+    #[test]
+    fn exp_03_trash_does_not_hold_the_index_lock_during_the_os_call() {
+        let vault = tempfile::tempdir().unwrap();
+        std::fs::write(vault.path().join("a.md"), "# a").unwrap();
+        let cache = tempfile::tempdir().unwrap();
+        let (s, _) = VaultSession::open(vault.path(), cache.path(), |_| {}).unwrap();
+        // Removing the file first makes the OS call fail (NotFound) after the
+        // hook ran, so this test never touches the real trash.
+        std::fs::remove_file(vault.path().join("a.md")).unwrap();
+        let hook_ran = AtomicBool::new(false);
+        let result = s.trash_with_hook(&VaultPath::new("a.md").unwrap(), &|| {
+            assert!(s.index.try_lock().is_ok(), "index locked during OS trash");
+            hook_ran.store(true, Ordering::SeqCst);
+        });
+        assert!(hook_ran.load(Ordering::SeqCst));
+        assert!(result.is_err());
+    }
 }
