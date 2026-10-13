@@ -44,6 +44,21 @@ describe('editable title (M2b §2)', () => {
     expect(disk.files.has('Notes/New name.md')).toBe(true);
   });
 
+  it('final review I3: focus stays on the title after renaming with Enter (NFR-10)', async () => {
+    fakeDisk({ 'A.md': 'x\n' });
+    render(<PageView />);
+    await open('A.md');
+    await userEvent.clear(title());
+    await userEvent.type(title(), 'B{Enter}');
+    await waitFor(() => expect(usePageStore.getState().path).toBe('B.md'));
+    await waitFor(() => expect(usePageStore.getState().state).toBe('ready'));
+    expect(title()).toHaveValue('B');
+    expect(title()).toHaveFocus();
+    await userEvent.type(title(), 'x{Escape}');
+    expect(title()).toHaveValue('B');
+    expect(title()).toHaveFocus();
+  });
+
   it('Escape puts the name back; blur renames; an unchanged name does nothing', async () => {
     const disk = fakeDisk({ 'A.md': 'x\n' });
     render(<PageView />);
