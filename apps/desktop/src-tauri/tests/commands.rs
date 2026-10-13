@@ -368,3 +368,35 @@ fn vlt_04_main_window_may_listen_to_vault_events() {
         );
     }
 }
+
+/// Final review I2: Tauri runs non-`async` commands on the macOS main (UI)
+/// thread, so any command that touches the disk, the index or the OS trash
+/// must be `async` (it then runs on the async runtime / a blocking thread).
+/// Only `settings_get` (in-memory) may stay synchronous.
+#[test]
+fn nfr_ui_thread_never_runs_disk_or_index_commands() {
+    const SYNC_ALLOWED: &[&str] = &["settings_get"];
+    let sources = [
+        include_str!("../src/vault_commands.rs"),
+        include_str!("../src/settings_commands.rs"),
+    ];
+    let mut offenders = Vec::new();
+    for src in sources {
+        let lines: Vec<&str> = src.lines().collect();
+        for (i, line) in lines.iter().enumerate() {
+            if line.trim() != "#[tauri::command]" {
+                continue;
+            }
+            let sig = lines[i + 1].trim();
+            let name = sig
+                .split("fn ")
+                .nth(1)
+                .and_then(|s| s.split(['(', '<']).next())
+                .unwrap_or(sig);
+            if !sig.contains("async fn") && !SYNC_ALLOWED.contains(&name) {
+                offenders.push(name.to_string());
+            }
+        }
+    }
+    assert!(offenders.is_empty(), "must be async: {offenders:?}");
+}

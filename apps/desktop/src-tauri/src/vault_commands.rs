@@ -11,7 +11,7 @@ use nimw_session::{SessionEvent, VaultSession};
 use nimw_vault::VaultPath;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
-use tauri::{AppHandle, Emitter, Manager, Runtime, State};
+use tauri::{AppHandle, Emitter, Manager, Runtime};
 
 /// Largest page text sent to the read-only view.
 pub const MAX_PAGE_BYTES: usize = 1024 * 1024;
@@ -73,7 +73,7 @@ fn open_session<R: Runtime>(app: &AppHandle<R>, root: &Path) -> CmdResult<VaultI
     })
 }
 
-async fn blocking<R: Runtime, T: Send + 'static>(
+pub(crate) async fn blocking<R: Runtime, T: Send + 'static>(
     app: AppHandle<R>,
     f: impl FnOnce(AppHandle<R>) -> CmdResult<T> + Send + 'static,
 ) -> CmdResult<T> {
@@ -108,13 +108,11 @@ pub async fn vault_create<R: Runtime>(app: AppHandle<R>, path: PathBuf) -> CmdRe
     .await
 }
 
-#[tauri::command]
-pub fn vault_close(state: State<'_, AppState>) {
+pub(crate) fn vault_close_impl(state: &AppState) {
     state.set_session(None);
 }
 
-#[tauri::command]
-pub fn vault_tree(state: State<'_, AppState>) -> CmdResult<Vec<TreeNodeDto>> {
+pub(crate) fn vault_tree_impl(state: &AppState) -> CmdResult<Vec<TreeNodeDto>> {
     Ok(state
         .session()?
         .tree()?
@@ -126,8 +124,7 @@ pub fn vault_tree(state: State<'_, AppState>) -> CmdResult<Vec<TreeNodeDto>> {
         .collect())
 }
 
-#[tauri::command]
-pub fn page_get(state: State<'_, AppState>, path: String) -> CmdResult<PageDto> {
+pub(crate) fn page_get_impl(state: &AppState, path: String) -> CmdResult<PageDto> {
     let session = state.session()?;
     let vp = VaultPath::new(&path)?;
     let (bytes, _) = session.vault().read(&vp)?;
@@ -175,17 +172,15 @@ pub fn page_get(state: State<'_, AppState>, path: String) -> CmdResult<PageDto> 
     }
 }
 
-#[tauri::command]
-pub fn backlink_count(state: State<'_, AppState>, path: String) -> CmdResult<usize> {
+pub(crate) fn backlink_count_impl(state: &AppState, path: String) -> CmdResult<usize> {
     Ok(state
         .session()?
         .backlinks_into(&VaultPath::new(&path)?)?
         .len())
 }
 
-#[tauri::command]
-pub fn entry_create_page(
-    state: State<'_, AppState>,
+pub(crate) fn entry_create_page_impl(
+    state: &AppState,
     dir: String,
     name: String,
 ) -> CmdResult<String> {
@@ -195,9 +190,8 @@ pub fn entry_create_page(
         .to_string())
 }
 
-#[tauri::command]
-pub fn entry_create_folder(
-    state: State<'_, AppState>,
+pub(crate) fn entry_create_folder_impl(
+    state: &AppState,
     parent: String,
     name: String,
 ) -> CmdResult<String> {
@@ -207,9 +201,8 @@ pub fn entry_create_folder(
         .to_string())
 }
 
-#[tauri::command]
-pub fn entry_rename(
-    state: State<'_, AppState>,
+pub(crate) fn entry_rename_impl(
+    state: &AppState,
     from: String,
     to: String,
 ) -> CmdResult<RenameOutcomeDto> {
@@ -220,7 +213,82 @@ pub fn entry_rename(
         .into())
 }
 
-#[tauri::command]
-pub fn entry_trash(state: State<'_, AppState>, path: String) -> CmdResult<()> {
+pub(crate) fn entry_trash_impl(state: &AppState, path: String) -> CmdResult<()> {
     Ok(state.session()?.trash(&VaultPath::new(&path)?)?)
+}
+
+// ---- command wrappers: run off the UI thread (final review I2) ----
+
+#[tauri::command]
+pub async fn vault_close<R: Runtime>(app: AppHandle<R>) -> CmdResult<()> {
+    blocking(app, move |app| {
+        vault_close_impl(&app.state::<AppState>());
+        Ok(())
+    })
+    .await
+}
+
+#[tauri::command]
+pub async fn vault_tree<R: Runtime>(app: AppHandle<R>) -> CmdResult<Vec<TreeNodeDto>> {
+    blocking(app, move |app| vault_tree_impl(&app.state::<AppState>())).await
+}
+
+#[tauri::command]
+pub async fn page_get<R: Runtime>(app: AppHandle<R>, path: String) -> CmdResult<PageDto> {
+    blocking(app, move |app| {
+        page_get_impl(&app.state::<AppState>(), path)
+    })
+    .await
+}
+
+#[tauri::command]
+pub async fn backlink_count<R: Runtime>(app: AppHandle<R>, path: String) -> CmdResult<usize> {
+    blocking(app, move |app| {
+        backlink_count_impl(&app.state::<AppState>(), path)
+    })
+    .await
+}
+
+#[tauri::command]
+pub async fn entry_create_page<R: Runtime>(
+    app: AppHandle<R>,
+    dir: String,
+    name: String,
+) -> CmdResult<String> {
+    blocking(app, move |app| {
+        entry_create_page_impl(&app.state::<AppState>(), dir, name)
+    })
+    .await
+}
+
+#[tauri::command]
+pub async fn entry_create_folder<R: Runtime>(
+    app: AppHandle<R>,
+    parent: String,
+    name: String,
+) -> CmdResult<String> {
+    blocking(app, move |app| {
+        entry_create_folder_impl(&app.state::<AppState>(), parent, name)
+    })
+    .await
+}
+
+#[tauri::command]
+pub async fn entry_rename<R: Runtime>(
+    app: AppHandle<R>,
+    from: String,
+    to: String,
+) -> CmdResult<RenameOutcomeDto> {
+    blocking(app, move |app| {
+        entry_rename_impl(&app.state::<AppState>(), from, to)
+    })
+    .await
+}
+
+#[tauri::command]
+pub async fn entry_trash<R: Runtime>(app: AppHandle<R>, path: String) -> CmdResult<()> {
+    blocking(app, move |app| {
+        entry_trash_impl(&app.state::<AppState>(), path)
+    })
+    .await
 }
