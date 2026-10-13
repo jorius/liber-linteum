@@ -186,3 +186,24 @@ describe('Editor (M2a §3.2–3.3)', () => {
     );
   });
 });
+
+describe('task checkboxes outside the source text (feedback 2026-10-13)', () => {
+  it('a click in the Split pane toggles the task in the page', async () => {
+    disk = fakeDisk({ 'T.md': '# T\n\n- [ ] a\n' });
+    const doc = await load('T.md');
+    render(<Editor doc={doc} mode="split" label="T" />);
+    const box = await screen.findByRole('checkbox', { name: 'a' });
+    await act(() => box.click());
+    expect(viewOf().state.doc.toString()).toBe('# T\n\n- [x] a\n');
+  });
+
+  it('a click on a task inside a callout widget (Live Preview) toggles it', async () => {
+    disk = fakeDisk({ 'C.md': '> [!todo] List\n> - [ ] a\n\nend\n' });
+    const doc = await load('C.md');
+    render(<Editor doc={doc} mode="livePreview" label="C" />);
+    act(() => viewOf().dispatch({ selection: { anchor: viewOf().state.doc.length } }));
+    const box = await screen.findByRole('checkbox', { name: 'a' });
+    await act(() => box.click());
+    expect(viewOf().state.doc.toString()).toBe('> [!todo] List\n> - [x] a\n\nend\n');
+  });
+});

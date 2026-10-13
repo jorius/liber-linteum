@@ -81,6 +81,14 @@ describe('Live Preview (M2a §3.2)', () => {
     expect(v.state.doc.line(1).text).toBe('- [x] todo');
   });
 
+  it('the checkbox stays on its line while the cursor is there (feedback 2026-10-13)', async () => {
+    const v = editor('- [ ] todo\n\nother\n', 8);
+    const box = v.contentDOM.querySelector<HTMLInputElement>('input[type="checkbox"]');
+    expect(box).not.toBeNull();
+    await act(() => box!.dispatchEvent(new MouseEvent('mousedown', { bubbles: true })));
+    expect(v.state.doc.line(1).text).toBe('- [x] todo');
+  });
+
   it('tables, callouts and rules become rendered widgets until the cursor enters them', async () => {
     const doc = 'x\n\n| a | b |\n|---|---|\n| 1 | 2 |\n\n> [!tip] Hint\n> body\n\n---\n';
     const v = editor(doc);

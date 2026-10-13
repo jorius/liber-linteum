@@ -36,7 +36,7 @@ clean.
 |---|---|
 | Everything (the CI gate) | `pnpm check` |
 | UI unit tests | `pnpm test` |
-| Zero-network test | `pnpm --filter @nimw/desktop exec playwright install chromium` once, then `pnpm test:e2e` |
+| Zero-network test | `pnpm --filter @nimw/desktop exec playwright install chromium webkit` once, then `pnpm test:e2e` |
 | Rust | `pnpm build:ui && cargo test --workspace` |
 | App (dev) | `pnpm dev` |
 
@@ -177,7 +177,7 @@ Agent screenshots must be launch-only (no synthetic keystrokes). Please check:
 | "not allowed" on a new command | `build.rs` list + `capabilities/main.json` + ACL test |
 | ⌘Z/⌘C/⌘V stop working | the Edit menu in `menu.rs` must keep its predefined items (WKWebView routes the shortcuts through the menu) |
 | A link/embed opens nothing | the navigation guard blocks top-level navigation by design; links go through `followLink` → `url_open`/`file_open_external` |
-| `pnpm test:e2e` can't find a browser | `pnpm --filter @nimw/desktop exec playwright install chromium` |
+| `pnpm test:e2e` can't find a browser | `pnpm --filter @nimw/desktop exec playwright install chromium webkit` |
 | e2e fails with `csp:`/violations | something reached the DOM with a remote URL: the sanitizer, not the CSP, must stop it |
 
 ## 12. Next steps
@@ -211,3 +211,10 @@ every fix with a test that failed first:
 | m9 | No protocol-level symlink-escape test | added | `tests/asset.rs` `symlinks_escaping_the_vault_are_not_served` |
 
 Deferred minors are §10 h–o.
+
+## 14. Your real-window feedback (2026-10-13)
+
+| Feedback | Outcome |
+|---|---|
+| Checklists only toggled by typing `[x]` | **Fixed in M2a.** Two causes: Live Preview hid the checkbox while the cursor was on its line, and rendered checkboxes (Split pane; callouts/tables shown as widgets in Live Preview) were always `disabled`. Now the Live Preview checkbox is always shown (Backspace removes the marker, as in Obsidian), and rendered checkboxes toggle the page through `markdown/tasks.ts` `toggleTask(text, listItemOffset)` (a stale offset is a no-op). Checkboxes inside note embeds stay read-only (another page). Tests: `tasks.test.ts`, `livePreview.test.ts`, `Preview.test.tsx`, `Editor.test.tsx`, and `e2e/checklist.spec.ts` — run in **Chromium and WebKit** (WebKit ≈ WKWebView; `playwright install chromium webkit`). |
+| Edit the title below the breadcrumb; back arrow for link navigation; 3+ colour palettes; legible Live Preview fonts + per-mode font settings; optional formatting toolbar | New features → next iteration (see the M2a.1 design). |

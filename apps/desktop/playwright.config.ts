@@ -6,8 +6,16 @@ const PORT = 4317;
 export default defineConfig({
   testDir: './e2e',
   timeout: 30_000,
-  use: { baseURL: `http://127.0.0.1:${PORT}`, ...devices['Desktop Chrome'] },
-  projects: [{ name: 'chromium', use: { browserName: 'chromium' } }],
+  use: { baseURL: `http://127.0.0.1:${PORT}` },
+  projects: [
+    { name: 'chromium', use: { ...devices['Desktop Chrome'], browserName: 'chromium' } },
+    // WKWebView (macOS) is WebKit: editor interactions are checked there too.
+    {
+      name: 'webkit',
+      use: { ...devices['Desktop Safari'], browserName: 'webkit' },
+      testMatch: /checklist/,
+    },
+  ],
   webServer: {
     command: `node e2e/serve.ts ${PORT}`,
     url: `http://127.0.0.1:${PORT}`,

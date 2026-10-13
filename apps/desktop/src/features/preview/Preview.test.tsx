@@ -239,6 +239,43 @@ describe('Preview: embeds (M2a §4, §1.1)', () => {
   });
 });
 
+describe('Preview: task checkboxes (feedback 2026-10-13)', () => {
+  it('are clickable when the pane can edit the page, and report the list item offset', async () => {
+    const toggled: number[] = [];
+    render(
+      <Preview
+        text={'- [ ] a\n- [x] b\n'}
+        path="Notes/Page.md"
+        onToggleTask={(at) => toggled.push(at)}
+      />,
+    );
+    const b = await screen.findByRole('checkbox', { name: 'b' });
+    expect(b).toBeEnabled();
+    expect(b).toBeChecked();
+    await userEvent.click(b);
+    expect(toggled).toEqual([8]);
+  });
+
+  it('stay read-only without an editor, and inside note embeds', async () => {
+    FILES['Notes/Tasks.md'] = '# Tasks\n\n- [ ] inner\n';
+    try {
+      render(
+        <Preview
+          text={'- [ ] mine\n\n![[Tasks]]\n'}
+          path="Notes/Page.md"
+          onToggleTask={() => undefined}
+        />,
+      );
+      expect(await screen.findByRole('checkbox', { name: 'inner' })).toBeDisabled();
+      expect(screen.getByRole('checkbox', { name: 'mine' })).toBeEnabled();
+      show('- [ ] alone\n');
+      expect(await screen.findByRole('checkbox', { name: 'alone' })).toBeDisabled();
+    } finally {
+      delete FILES['Notes/Tasks.md'];
+    }
+  });
+});
+
 describe('malformed percent-encoding and render errors (I4)', () => {
   it('raw-HTML links with a bare % render instead of blanking the app', () => {
     show('<a href="#100%">hundred</a> and <a href="B.md#50%">half</a>\n');

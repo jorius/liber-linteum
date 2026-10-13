@@ -22,6 +22,11 @@ export interface RenderCtx {
   renderNote: (path: string, heading: string | null) => ReactNode;
   /** Accessible name for a task checkbox (the list item's text). */
   taskLabel?: string;
+  /** Source offset of the task list item being rendered. */
+  taskAt?: number;
+  /** Toggles the task whose list item starts at the offset (the page's own
+   *  editor); without it checkboxes are read-only. */
+  toggleTask?: (at: number) => void;
 }
 
 const VOID = new Set(['br', 'hr', 'img', 'input', 'source']);
@@ -209,13 +214,16 @@ function renderElement(e: Element, key: number, ctx: RenderCtx): ReactNode {
     });
   }
   if (e.tagName === 'input') {
+    const { toggleTask, taskAt } = ctx;
+    const editable = toggleTask && ctx.depth === 0 && taskAt !== undefined;
     return (
       <input
         key={key}
         type="checkbox"
         checked={Boolean(p.checked)}
-        disabled
-        readOnly
+        disabled={!editable}
+        readOnly={!editable}
+        onChange={editable ? () => toggleTask(taskAt) : undefined}
         aria-label={ctx.taskLabel}
       />
     );
@@ -225,7 +233,12 @@ function renderElement(e: Element, key: number, ctx: RenderCtx): ReactNode {
     return createElement(
       'li',
       { key, ...reactProps(p) },
-      renderChildren(e, { ...ctx, taskLabel: label }),
+      renderChildren(e, {
+        ...ctx,
+        taskLabel: label,
+        // Sanitized data attributes are strings.
+        taskAt: p.dataSourceStart === undefined ? undefined : Number(p.dataSourceStart),
+      }),
     );
   }
   return createElement(

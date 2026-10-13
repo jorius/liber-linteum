@@ -28,6 +28,9 @@ export interface PreviewProps {
   chain?: string[];
   /** A fragment inside the editor (Live Preview widget): no heading scrolling. */
   embedded?: boolean;
+  /** Makes task checkboxes clickable: toggles the task whose list item starts
+   *  at the source offset (relative to `text`). */
+  onToggleTask?: (at: number) => void;
 }
 
 /** The rendered pane (M2a §4): sanitized Markdown with resolved links and
@@ -47,6 +50,7 @@ function PreviewBody({
   depth = 0,
   chain = [],
   embedded = false,
+  onToggleTask,
 }: PreviewProps) {
   const { t } = useTranslation();
   const shown = useDebounced(text, RENDER_DEBOUNCE_MS);
@@ -82,11 +86,12 @@ function PreviewBody({
       resolve,
       t,
       renderNote: (note, h) => <NoteEmbed key={`${note}#${h}`} path={note} heading={h} ctx={ctx} />,
+      toggleTask: onToggleTask,
     };
     return renderChildren(tree, ctx);
     // `chainKey` stands for `chain`.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tree, resolve, path, depth, chainKey, t]);
+  }, [tree, resolve, path, depth, chainKey, t, onToggleTask]);
   return (
     <div ref={box} className={depth || embedded ? styles.nested : styles.content}>
       {body}

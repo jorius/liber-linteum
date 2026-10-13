@@ -198,7 +198,9 @@ function build(state: EditorState, page: ParsedPage, active: Set<number>): Decor
         if (reduced || typeof item.checked !== 'boolean') break;
         const line = doc.lineAt(from);
         const m = TASK.exec(line.text);
-        if (m && !touched(from, from)) {
+        // Shown on the cursor line too, so a task can always be ticked with a
+        // click (as Obsidian does); Backspace removes the whole marker.
+        if (m) {
           const at = line.from + m[1].length;
           const label = line.text.slice(m[0].length).trim();
           out.push(

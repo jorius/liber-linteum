@@ -59,7 +59,11 @@ export function installIpcMock({
     vault_tree: () => Object.keys(pages).map((path) => ({ path, kind: 'page' })),
     page_get: (a) => page(a.path as string),
     page_read: (a) => ({ text: pages[a.path as string], hash: 'h' }),
-    page_write: () => ({ hash: 'h2' }),
+    page_write: (a) => {
+      // Recorded so tests can assert what an edit saved.
+      ((w.__nimwWrites ??= []) as unknown[]).push(a);
+      return { hash: 'h2' };
+    },
     backlink_count: () => 0,
     links_resolve: (a) =>
       (a.targets as { kind: string; target: string }[]).map(({ target }) => {

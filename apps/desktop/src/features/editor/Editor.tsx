@@ -5,7 +5,7 @@ import { Compartment, EditorState, Facet, Transaction, type Extension } from '@c
 import { drawSelection, EditorView, keymap } from '@codemirror/view';
 import { tags } from '@lezer/highlight';
 import { diffIndices } from 'node-diff3';
-import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { EditorMode } from '../../ipc';
 import { Preview } from '../preview/Preview';
@@ -13,6 +13,7 @@ import styles from './Editor.module.css';
 import { followLinkAtCursor, livePreview, pagePath } from './livePreview';
 import type { PageDoc } from './pageDoc';
 import { blockForOffset, offsetAtTop, topIn } from './scrollSync';
+import { toggleTaskIn } from './widgets';
 
 /** Each page keeps its CodeMirror state (text, selection, undo) while the app
  *  runs, so switching pages or modes never loses history (ED-07). */
@@ -284,12 +285,16 @@ export function Editor({ doc, mode, label }: EditorProps) {
     };
   }, [split]);
 
+  const toggleTask = useCallback((at: number) => {
+    if (view.current) toggleTaskIn(view.current, at);
+  }, []);
+
   return (
     <div className={split ? styles.split : styles.single}>
       <div ref={host} className={mode === 'livePreview' ? styles.live : styles.source} />
       {split && (
         <div ref={pane} className={styles.pane} role="region" aria-label={t('editor.preview')}>
-          <Preview text={text} path={doc.path} />
+          <Preview text={text} path={doc.path} onToggleTask={toggleTask} />
         </div>
       )}
     </div>

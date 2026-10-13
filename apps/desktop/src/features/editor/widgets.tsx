@@ -1,6 +1,14 @@
 import { WidgetType, type EditorView } from '@codemirror/view';
 import { createRoot, type Root } from 'react-dom/client';
+import { toggleTask } from '../../markdown/tasks';
 import { Preview } from '../preview/Preview';
+
+/** Toggles the task whose list item starts at `at` in the editor's text (a
+ *  rendered checkbox was clicked); a stale offset does nothing. */
+export function toggleTaskIn(view: EditorView, at: number): void {
+  const change = toggleTask(view.state.doc.toString(), at);
+  if (change) view.dispatch({ changes: change, userEvent: 'input.toggle' });
+}
 
 /** A block (table, callout, columns, embed, rule) rendered with the preview
  *  components (M2a §3.2). A click outside its links moves the cursor into
@@ -29,7 +37,10 @@ export class PreviewWidget extends WidgetType {
       view.focus();
     });
     this.root = createRoot(dom);
-    this.root.render(<Preview text={this.text} path={this.path} embedded />);
+    // The widget's text starts where the widget does, so a task offset inside
+    // it maps to the page by adding the widget's position.
+    const toggle = (at: number) => toggleTaskIn(view, view.posAtDOM(dom) + at);
+    this.root.render(<Preview text={this.text} path={this.path} embedded onToggleTask={toggle} />);
     return dom;
   }
 
