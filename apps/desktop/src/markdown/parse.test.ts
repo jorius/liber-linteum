@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { Embed, Tag, WikiLink } from './types';
 import { parsePage } from './parse';
+import { toSafeHast } from './sanitize';
 import { findAll } from './walk';
 
 const slice = (
@@ -114,5 +115,30 @@ describe('review focus: offsets', () => {
     const src = '# Title\r\n\r\nText [[A]]\r\nmore [[B|b]]\r\n';
     const links = findAll<WikiLink>(parsePage(src).tree, 'wikiLink');
     expect(links.map((l) => slice(src, l))).toEqual(['[[A]]', '[[B|b]]']);
+  });
+});
+
+describe('inline extensions keep mdast text values (I6)', () => {
+  /** All text a reader sees, as rendered (hast text nodes, in order). */
+  const shown = (md: string) => {
+    const out: string[] = [];
+    const walk = (n: { type: string; value?: string; children?: unknown[] }) => {
+      if (n.type === 'text') out.push(n.value!);
+      (n.children as (typeof n)[] | undefined)?.forEach(walk);
+    };
+    walk(toSafeHast(parsePage(md), { sourcePath: 'A.md' }));
+    return out.join('');
+  };
+
+  it.each([
+    ['a link in a quote', '> see [[x]] and\n> more\n', 'see x and\nmore'],
+    ['a link in a callout', '> [!note] T\n> see [[x]] and\n> more\n', 'see x and\nmore'],
+    ['a tag in a quote', '> see #t and\n> more\n', 'see #t and\nmore'],
+    ['a highlight in a quote', '> see ==hi== and\n> more\n', 'see hi and\nmore'],
+    ['a highlight across lines', '> see ==a\n> b== and\n> more\n', 'see a\nb and\nmore'],
+    ['a nested quote in a list', '- > a [[x]] b\n  > c\n', 'a x b\nc'],
+    ['trailing space and escapes', 'a [[x]] \\*b\\* &amp; \nc\n', 'a x *b* &\nc'],
+  ])('%s: no quote markers or escapes leak', (_, md, text) => {
+    expect(shown(md).trim()).toBe(text);
   });
 });
