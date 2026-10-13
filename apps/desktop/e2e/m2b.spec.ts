@@ -60,7 +60,9 @@ test('following a link shows the back arrow; ← and ⌘] walk the trail', async
   await expect(page.getByRole('textbox', { name: 'Page title' })).toHaveValue('A');
 });
 
-test('a plain click on a link in Live Preview opens the page (as in Obsidian)', async ({ page }) => {
+test('a plain click on a link in Live Preview opens the page (as in Obsidian)', async ({
+  page,
+}) => {
   await open(page, 'A');
   await page.locator('.cm-nimw-link', { hasText: 'B' }).click();
   await expect(page.getByRole('textbox', { name: 'Page title' })).toHaveValue('B');
@@ -88,6 +90,22 @@ test('a table or callout in Live Preview has no blank lines above it', async ({ 
     });
     expect(gap).toBeLessThan(20);
   }
+});
+
+test('the Edit · Global view group matches the settings and close buttons', async ({ page }) => {
+  await open(page, 'A');
+  const look = (el: Element) => {
+    const c = getComputedStyle(el);
+    return {
+      height: Math.round(el.getBoundingClientRect().height),
+      border: `${c.borderTopWidth} ${c.borderTopStyle} ${c.borderTopColor}`,
+      radius: c.borderTopLeftRadius,
+      background: c.backgroundColor,
+    };
+  };
+  const group = await page.getByRole('group', { name: 'View' }).evaluate(look);
+  const settings = await page.getByRole('button', { name: 'Settings' }).evaluate(look);
+  expect(group).toEqual(settings);
 });
 
 test('a palette from Settings applies at once', async ({ page }) => {

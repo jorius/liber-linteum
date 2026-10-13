@@ -111,12 +111,17 @@
   max-width: 30%;
 }
 
+/* Same box as the settings / close buttons (.iconButtonLight): 40 px high,
+   thin strong border, medium radius, surface background. */
 .toggle {
+  box-sizing: border-box;
   display: flex;
-  gap: 4px;
-  padding: 4px;
-  border: 1.5px solid var(--color-text-strong);
-  border-radius: var(--radius-pill);
+  align-items: center;
+  gap: 2px;
+  height: 40px;
+  padding: 3px;
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-md);
   background: var(--color-surface);
   margin: 0 auto;
 }
@@ -125,14 +130,18 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 8px 20px;
-  border-radius: var(--radius-pill);
+  height: 32px;
+  padding: 0 14px;
+  border-radius: var(--radius-sm);
   border: 0;
   background: transparent;
-  font: 600 15px var(--font-body);
+  font: 600 14px var(--font-body);
   color: var(--color-text-body);
   cursor: pointer;
-  min-height: 44px;
+}
+
+.tg:not(.on):not([aria-disabled='true']):hover {
+  background: var(--color-surface-subtle);
 }
 
 .tg[aria-disabled='true'] {
