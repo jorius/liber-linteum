@@ -26,13 +26,13 @@
 
 | Crate | Tests |
 |---|---|
-| nimw-vault | 36 (13 unit + 9 open_scan + 2 path_hash + 4 watch + 8 write_ops) |
-| nimw-markdown | 34 (30 unit + 2 fixture_pages + 1 frontmatter_api + 1 resolve_api) |
+| nimw-vault | 40 (16 unit + 10 open_scan + 2 path_hash + 4 watch + 8 write_ops) |
+| nimw-markdown | 37 (33 unit + 2 fixture_pages + 1 frontmatter_api + 1 resolve_api) |
 | nimw-index | 11 (2 unit + 9 index) |
-| nimw-session | 26 (3 unit + 8 open + 8 rename + 2 rename_props + 5 watching) |
+| nimw-session | 35 (4 unit + 8 open + 13 rename + 2 rename_props + 8 watching) |
 | nimw-testkit | 1 |
 | (M0 crates + desktop shell, unchanged) | 13 (audio 3, import 5, desktop 2 + 3 IPC) |
-| **Total Rust** | **121** |
+| **Total Rust** | **137** (121 before the final-review fixes) |
 | Frontend (Vitest, unchanged) | 57 |
 
 ### 1.2 Benchmarks (NFR-03) — 10,000 generated notes
@@ -45,6 +45,8 @@ Machine: Apple M5 Pro, macOS 27.0.1, `cargo bench -p nimw-session --bench vault`
 | Reopen, nothing changed | **156.6 ms** | — |
 | Re-index one modified file | **11.7 ms** | < 100 ms ✅ |
 | Rename a page with 100 backlinks (rewrites 100 files) | **958 ms** | — (no budget; see §11 g) |
+
+After the final-review fixes (quick run, same machine): first index 1.056 s, reopen 150 ms, re-index one file 11.3 ms, rename with 100 backlinks 1.01 s (+5 % from the new after-write verification).
 
 Generated vault shape (`VaultShape::TEN_K`): 10,000 notes, ~400 folders up to 6 levels, ~8 links/note of mixed kinds, 3 tags/note, frontmatter on half, 1,000 attachments, one hub page with 100 backlinks. Deterministic (`seed`).
 
@@ -88,12 +90,12 @@ Files: `src/{lib,error,hash,path,config,vault,scan,fsops,watch}.rs`.
 | `Hash` | BLAKE3, 32 bytes: `of(&[u8])`, `to_hex()`, `from_hex(&str)` |
 | `Vault::open(root: &Path) -> Result<Vault>` | Canonicalizes (strips Windows `\\?\` via `dunce`); reads `.obsidian/app.json` (`attachmentFolderPath`) and `.nimw/vault.json` (`exclude`, `attachments`); **writes nothing**; bad config → defaults + `warnings()` |
 | `root()`, `attachment_policy() -> &AttachmentPolicy`, `warnings() -> &[String]`, `is_excluded(rel)` | |
-| `scan() -> Result<Scan>` | `Scan { entries: Vec<Entry>, skipped }`; `Entry { path, kind: EntryKind::{File, Dir}, mtime_ns, size }`; skips hidden names, exclude globs, `.nimw-tmp-` temp files; **never follows symlinked folders**; symlinks/non-UTF-8 names reported in `skipped` |
+| `scan() -> Result<Scan>` | `Scan { entries: Vec<Entry>, skipped }`; `Entry { path, kind: EntryKind::{File, Dir}, mtime_ns, size }`; skips hidden names, exclude globs, `.nimw-tmp-` temp files; **never follows symlinked folders**; symlinked folders, symlinks pointing outside, non-UTF-8 names and **unreadable subfolders** are reported in `skipped` (only an unreadable vault root is an error). Symlinked **files** inside the vault are indexed (but never written through, §6) |
 | `scan_from(dir)`, `list_dir(dir)`, `stat(path) -> Result<Option<Entry>>`, `fs_path(path)` | |
 | `read(path) -> Result<(Vec<u8>, Hash)>`, `read_to_string(path) -> Result<(String, Hash)>` (`NotUtf8` error) | |
 | `write_cas(path, content, expected: Option<Hash>) -> Result<Hash>` | Atomic compare-and-swap (NFR-08): temp file `.<name>.nimw-tmp-<random>` in the same folder → fsync → rename → fsync dir; `Some(h)` = must still be `h` else `Conflict { current }`; `None` = create-only else `AlreadyExists`; keeps permissions; refuses paths escaping through symlinks |
 | `create_dir(path)`, `rename(from, to)` (fails if target exists; case-only renames via a temp hop), `trash(path)` (OS trash) | |
-| `watch(callback) -> Result<Watcher>` | `notify` 8.2 via `notify-debouncer-mini` 0.7, `DEBOUNCE` = 200 ms; callback gets `Vec<WatchEvent>` batches; `WatchEvent::{Changed(VaultPath), Removed(VaultPath), Overflow}`; hidden/excluded/outside paths dropped; drop the `Watcher` to stop |
+| `watch(callback) -> Result<Watcher>` | `notify` 8.2 with an **in-crate debouncer** (`DEBOUNCE` = 200 ms of quiet, batches capped at 2 s); callback gets `Vec<WatchEvent>` batches; `WatchEvent::{Changed(VaultPath), Removed(VaultPath), Overflow}`; hidden/excluded/outside paths dropped; backend errors, "rescan needed" signals and events on the vault root become `Overflow`; drop the `Watcher` to stop |
 | `VaultError` | `NotFound`, `AlreadyExists`, `Conflict { path, current }`, `OutsideVault`, `NotUtf8`, `InvalidConfig { file, reason }`, `Io { path, source }`, `Watch` |
 | `is_hidden_name(name)` | M0, unchanged |
 
@@ -124,7 +126,7 @@ Files: `src/{lib,schema,rows,index}.rs`. Schema v1 (`SCHEMA_VERSION = 1`): table
 |---|---|
 | `Index::open(db_path) -> Result<Index>` | WAL + foreign keys; wrong schema version, foreign or corrupt file → deleted and recreated (it is only a cache) |
 | `open_in_memory()` | tests |
-| `transaction(|tx: &Tx| …)` | batched writes; `Tx` has `upsert_file(&FileRow)`, `upsert_page(path, &PageMeta)`, `remove(path)` (subtree for folders), `rename(from, to)` (subtree) — also available directly on `Index` |
+| `transaction(|tx: &Tx| …)` | the only way to write: `Tx` has `upsert_file(&FileRow)`, `upsert_page(path, &PageMeta)`, `remove(path)` (subtree for folders), `rename(from, to)` (subtree) |
 | `stats() -> HashMap<String, Stat>`, `stat(path)`, `counts() -> (files, pages)` | incremental indexing |
 | `file_set() -> FileSet`, `tree() -> Vec<TreeNode>` (folders first, then case-insensitive name), `page(path) -> Option<PageRow>`, `links_from(src)`, `backlinks(path)`, `links_into(prefix)`, `links_by_key(keys)` | reads |
 | `resolve_all(&FileSet)`, `resolve_affected(&FileSet, keys)`, `resolve_from(&FileSet, src)` | link resolution maintenance |
@@ -141,15 +143,15 @@ Files: `src/{lib,error,events,session,rename,watching}.rs`.
 | `VaultSession::open(root: &Path, cache_root: &Path, sink: impl Fn(SessionEvent) + Send + Sync + 'static) -> Result<(VaultSession, IndexReport)>` | Opens vault + index, incremental re-index; emits `Progress` and `Indexed` |
 | `index_db_path(cache_root, vault_root) -> PathBuf` | `<cache_root>/nimw/<cache_dir_name(vault)>/index.sqlite` |
 | `vault()`, `tree()`, `page(path)`, `backlinks(path)` | reads |
-| `create_page(dir, name) -> Result<VaultPath>` | appends `.md`; empty file; `InvalidName` for empty/whitespace/`/`/hidden names; `AlreadyExists` on collision |
+| `create_page(dir, name) -> Result<VaultPath>` | appends `.md`; empty file; `InvalidName` for empty/whitespace/hidden names, control characters and any of `/ \ # \| ^ [ ] : * " < > ?` (Obsidian's rule set — such names can't be linked to); `AlreadyExists` on collision |
 | `create_folder(parent, name) -> Result<VaultPath>` | |
-| `rename(from, to, rewrite_links: bool) -> Result<RenameOutcome>` | §6 |
+| `rename(from, to, rewrite_links: bool) -> Result<RenameOutcome>` | §6; the new name obeys the same name rules as `create_page` |
 | `trash(path) -> Result<()>` | OS trash + index removal; links become unresolved |
 | `start_watching(self: &Arc<Self>) -> Result<()>`, `stop_watching()`, `apply(events: Vec<WatchEvent>)` | §7 |
 | `IndexReport` | `files, pages, parsed, skipped_unchanged, removed, warnings, duration` |
 | `SessionEvent` | `Progress { done, total }`, `Indexed(IndexReport)`, `Changed { created, modified, removed, renamed }` (only for **external** changes) |
 | `RenameOutcome` | `moved: Vec<(old, new)>` (one per file), `updated_files`, `updated_links`, `failed: Vec<(path, reason)>` |
-| `SessionError` | `Vault(..)`, `Index(..)`, `NotIndexed(path)`, `InvalidName(String)` |
+| `SessionError` | `Vault(..)`, `Index(..)`, `NotIndexed(path)`, `InvalidName(String)`, `UnsafeRewrite(String)` (a link rewrite refused — file left unchanged, reported in `RenameOutcome.failed`) |
 
 ### 3.5 `nimw-testkit` — test-only (dev-dependency)
 `fixture_path(name)`, `copy_fixture(name) -> TempDir`, `trashable_fixture(name)` (temp copy inside `$HOME`), `real_trash_tests_enabled()` (§9.4), `snapshot(root) -> BTreeMap<path, (bytes, mtime)>`, `wait_until(timeout, check)`, `VaultShape { … }` / `VaultShape::TEN_K`, `generate_vault(root, shape, seed) -> Vec<String>`.
@@ -164,7 +166,7 @@ Files: `src/{lib,error,events,session,rename,watching}.rs`.
 4. `reindex_all()`:
    1. `vault.scan()` → current entries.
    2. Compare with `index.stats()` by `(mtime_ns, size)`. Unchanged → skipped without reading (**this is why reopening a 10k vault takes ~0.16 s**).
-   3. New/changed: read + BLAKE3; same hash as stored → stat-only update; `.md` → `parse_page` in parallel (`rayon`); non-UTF-8 `.md` → stored as attachment + warning; other files → attachment rows; folders → folder rows.
+   3. New/changed: read + BLAKE3; same hash as stored → stat-only update; `.md` → `parse_page` in a `rayon` pass (currently serialized by a held warnings lock — deferred minor, §11 q); non-UTF-8 `.md` → stored as attachment + warning; other files → attachment rows; folders → folder rows.
    4. Index rows not on disk → removed.
    5. One writer applies everything in transactions of ≤ 500 rows; `Progress` every 200 files.
    6. `resolve_all` once; `Indexed(IndexReport)` emitted and returned.
@@ -212,7 +214,12 @@ Pinned by `pg_05_ambiguous_names_follow_tie_breaks`.
    - For each candidate: resolve before (old file set) and after (new file set, source moved if inside the folder). If the target would change, compute `shortest_unique_target` for the moved-through target, keeping `#heading`/`|alias`, `%`-encoding and `<…>` style. A plain Markdown destination that would need a space is %-encoded (wrapping in `<…>` would break a `#heading`).
    - Per source file: list of `(byte range, replacement)` edits (`edits_for`).
 3. **Move on disk** (`vault.rename`), then `index.rename` (subtree).
-4. **Rewrite** each source file (at its post-move path): read, check hash against the index, apply edits from the highest offset to the lowest (`apply_edits`), `write_cas(expected)`. On `Conflict`: re-read, re-plan that file, retry — **max 3**. Persistent failure → `failed.push((path, reason))`, continue.
+4. **Rewrite** each source file (at its post-move path):
+   - a **symlinked note** is never written (it would become a plain file); it is reported in `failed` unless it needs no edits — its target file is rewritten instead;
+   - read it (text + hash), plan edits, then **`checked_edits`**: sort, merge identical duplicates, **refuse overlapping edits**;
+   - apply edits from the highest offset to the lowest (`apply_edits`);
+   - **`verify`**: re-parse the new text — same number and kinds of links in the same order, and every link that resolved before resolves to the moved-through target after. Otherwise the file is left unchanged and reported (`UnsafeRewrite`), e.g. when no link text can point at a file inside a folder named with `#`;
+   - `write_cas(expected = the hash just read)`. On `Conflict` (someone wrote in between): re-read, re-plan, retry — **max 3**. Persistent failure → `failed.push((path, reason))`, continue.
 5. Re-parse rewritten files, `upsert_page`, `resolve_affected`.
 6. Return `RenameOutcome`. M1b shows "Updated links in N files" from `updated_files.len()` and lists `failed`.
 
@@ -220,7 +227,7 @@ Pinned by `pg_05_ambiguous_names_follow_tie_breaks`.
 
 **Why no undo:** reverting writes across many files safely is its own feature; renaming back rewrites the links back.
 
-**Guarantees, property-tested** (`rename_props.rs`): random renames/moves in random vaults never change bytes outside link target ranges, and every link still resolves to the same file (mapped through the rename).
+**Guarantees:** property tests (`rename_props.rs`) check that random renames/moves never change bytes outside link target ranges and keep every link on its file. The final review found two inputs the generator didn't produce (linked images `[![a](x)](x)` and frontmatter with a blank first line) that corrupted notes — both are fixed and pinned by tests, and `checked_edits` + `verify` now refuse any rewrite that would overlap or move a link, whatever the input.
 
 ---
 
@@ -229,16 +236,18 @@ Pinned by `pg_05_ambiguous_names_follow_tie_breaks`.
 `src/watching.rs` (spec §6.5 + amendments 1–2):
 
 1. `start_watching(&Arc<Self>)` starts `vault.watch`; the watcher holds a weak reference to the session (no cycle); `stop_watching()` drops it.
-2. **Classification:** each debounced batch is a list of paths; each is classified by what exists **now**: exists → `Changed`, gone → `Removed`; backend errors → `Overflow`. (notify-debouncer-full was dropped because on macOS it never reported deletes.)
+2. **Classification:** each debounced batch is a list of paths; each is classified by what exists **now**: exists → `Changed`, gone → `Removed`; backend errors, "rescan needed" flags (lost events, e.g. an inotify queue overflow) and events on the vault root → `Overflow`. (notify-debouncer-full was dropped because on macOS it never reported deletes; notify-debouncer-mini was then replaced by an in-crate debouncer because it silently drops path-less rescan signals.)
 3. `apply(events)`:
    - For every reported path, **reconcile its parent folder** (`list_dir` vs index rows) — a rename can arrive as only the new name.
+   - A `Changed` on an **already-indexed folder** (FSEvents' "rescan this folder") **reconciles that folder's whole subtree** (new, changed and vanished files).
    - `Changed` → compare stat, then hash, with the index; **identical → skip** (this is the own-write suppression: every session operation updates the index synchronously, so the watcher's echo of our own write matches and is dropped — no 2-second timer, so an external edit right after ours is never missed). Otherwise re-parse + `resolve_affected`.
-   - `Removed` → `index.remove` + `resolve_affected`.
+   - `Removed` → `index.remove` (subtree) + `resolve_affected` with the keys of **every file that was inside** a removed folder, so links can move to another candidate.
+   - An unreadable new folder becomes a warning; the rest of the batch is still applied.
    - A removed file and a new file with the **same content hash** in one batch → external rename: rows move, **links are not rewritten** (the other program owns that, like Obsidian).
    - `Overflow` → full incremental `reindex_all`.
 4. Each batch with external effects emits one `SessionEvent::Changed { created, modified, removed, renamed }`.
 
-Tests: `vlt_04_external_create_modify_delete_update_the_index`, `vlt_04_external_rename_moves_rows_without_rewriting_links`, `vlt_04_own_writes_are_not_reported_as_external_changes`, `vlt_04_overflow_triggers_full_rescan`, `review_focus_git_checkout_like_burst_converges`.
+Tests: `vlt_04_external_create_modify_delete_update_the_index`, `vlt_04_external_rename_moves_rows_without_rewriting_links`, `vlt_04_own_writes_are_not_reported_as_external_changes`, `vlt_04_overflow_triggers_full_rescan`, `review_focus_git_checkout_like_burst_converges`, `vlt_04_change_on_indexed_folder_reconciles_its_subtree`, `vlt_04_removed_folder_re_resolves_links_to_its_contents`, `vlt_04_unreadable_new_folder_does_not_drop_the_batch`; vault-level `vlt_04_rescan_flag_becomes_overflow`, `vlt_04_root_event_becomes_overflow`, `vlt_04_file_events_are_classified_by_disk_state`.
 
 ---
 
@@ -285,7 +294,7 @@ Follow the M0 recipe (M0 hand-off §8.1) with these specifics:
 ### 9.2 Fixture vaults (`fixtures/vaults/`, byte-exact via `.gitattributes: fixtures/** -text`)
 - **`obsidian-basic/`**: `.obsidian/app.json` (attachment folder), `.trash/old.md` (hidden-folder stand-in for `.git/`), `Welcome.md`, `Character Design/{rex-draft.md, My characters.md, DMC/Sparda.md, assets/{rex-cover.png, rex-turnaround.png, voice-reference.mp3}}`, `Game Design/{Game 1.md, notes.txt}` — frontmatter (`subtitle`, `cover`, `tags`, `related` both forms), wikilinks with heading/alias, embeds, Markdown links (relative, rooted, %-encoded, angle), nested tags. Content mirrors the prototype's sample data.
 - **`ambiguous-names/`**: §5 example.
-- **`edge-cases/`**: `code.md` (links/tags inside code and HTML → ignored), `bad-yaml.md`, `empty.md`, `crlf.md`, `latin1.md` (invalid UTF-8 → attachment + warning), `target.md`, `unicode/Café ñandú 🎨.md`. NFD-named files are created at runtime in tests (git on macOS re-normalizes committed names).
+- **`edge-cases/`**: `code.md` (links/tags inside code and HTML → ignored), `bad-yaml.md`, `empty.md`, `crlf.md`, `latin1.md` (invalid UTF-8 → attachment + warning), `target.md`, `unicode/Café ñandú 🎨.md`. NFD-named files are **not** committed (git on macOS re-normalizes names) and on-disk NFD behaviour has **no automated test yet** — NFC/NFD matching is unit-tested in `resolve`, and the final reviewer verified by hand on macOS that an NFD file links and renames correctly (§11).
 - Mutating tests always work on a `TempDir` copy (`copy_fixture`); committed fixtures are never written.
 
 ### 9.3 Running focused tests
@@ -305,18 +314,20 @@ cargo bench -p nimw-session --bench vault -- --quick      # fast benchmark look 
 
 | # | Ruling | Why | Cost if wrong |
 |---|---|---|---|
-| 1 | **Watcher backend:** notify-debouncer-mini 0.7 instead of debouncer-full; events `Changed/Removed/Overflow` classified by disk state; parent-folder reconciliation; hash-based external rename detection (spec amendment 1) | debouncer-full never reported deletes on macOS | One extra `read_dir` per touched folder per batch |
+| 1 | **Watcher backend:** notify-debouncer-mini 0.7 instead of debouncer-full (itself replaced later, ruling 12); events `Changed/Removed/Overflow` classified by disk state; parent-folder reconciliation; hash-based external rename detection (spec amendment 1) | debouncer-full never reported deletes on macOS | One extra `read_dir` per touched folder per batch |
 | 2 | **Own-write suppression** by comparing stat/hash with the synchronously updated index instead of a 2-s table (amendment 2) | Same effect; never misses an external edit right after ours | None observed |
 | 3 | **Resolution:** exact/relative rules only for targets with `/`; `resolve(kind, target, source, files)`; rooted `[[/Name]]` fallback (amendment 3) | Otherwise same-folder tie-break could never apply; Obsidian behaves this way | Rooted form only in rare shadowing cases; it is an extension Obsidian may render as a different link |
 | 4 | **Markdown destinations needing spaces are %-encoded**, not `<…>`-wrapped (amendment 4) | Wrapping breaks `#heading` suffixes | Slightly less readable link text in that case |
 | 5 | **API additions** (`Scan.skipped`, `scan_from`, `list_dir`, `stat`, `fs_path`, `VaultError::Watch`, `TMP_MARKER`, `Index::open_in_memory/stats/links_from/resolve_from/counts`, `Tx`, `index_db_path`, `vault()`, `stop_watching`, `start_watching(&Arc<Self>)`) | Needed by later tasks | More public surface to maintain |
 | 6 | **`Changed` events only for external changes**; own operations return results (amendment 5) | Avoids double UI refresh | M1b must refresh after its own calls |
 | 7 | **Test kit crate** `nimw-testkit`; trash tests copy into `$HOME` (Linux temp dir is often another filesystem than the trash) | Shared helpers; real trash works | — |
-| 8 | **Fixtures:** `.trash/` instead of `.git/`; NFD names created at runtime; `.gitattributes` keeps bytes exact (amendment 6) | git limitations | — |
+| 8 | **Fixtures:** `.trash/` instead of `.git/`; NFD names not committed; `.gitattributes` keeps bytes exact (amendment 6) | git limitations | On-disk NFD only verified by hand (§11) |
 | 9 | **Executor:** Tasks 1–12 were applied by cherry-picking the planning agent's verified replay commits (built on `e294f87`) instead of re-typing ~7.2k lines; each task was re-verified here on its own commit (fmt, clippy `-D warnings`, the crate's tests — all green) | Same code, already replayed RED→GREEN step by step | RED evidence comes from the planning replay, not this executor; the final fresh review covers the gap |
 | 10 | **Real-trash tests gated** behind `NIMW_TRASH_TESTS=1` (CI sets it) — approved by you | Local runs no longer fill your Trash | Local runs don't exercise the real trash |
 
-(Any rulings from the final review are appended in §14.)
+| 11 | **Final review:** re-graded M1 (rewrites replaced symlinked notes with plain files) from Minor to Important and fixed it | A symlink silently stopping to point at the shared original is data damage | Symlinked notes' links are reported, not auto-edited (their target file is) |
+| 12 | **Final review:** replaced notify-debouncer-mini with an in-crate debouncer on notify 8.2 (200 ms quiet, 2 s cap) | debouncer-mini drops path-less rescan signals (I4) | Simpler than a library debouncer (no per-path timers); covered by real watcher tests |
+| 13 | **Final review:** declined-to-judge items stand as set aside (other link-typed frontmatter keys, `%% %%` comment links, 958 ms rename, Linux/Windows watcher, hard links/xattrs, crash between disk and index rename, multi-instance) | Outside the spec's scope or harmless | Listed in §11 |
 
 ---
 
@@ -326,12 +337,22 @@ cargo bench -p nimw-session --bench vault -- --quick      # fast benchmark look 
 |---|---|---|---|
 | a | External **folder** renames are seen as remove + create | Pages are re-parsed and links re-resolve correctly, but rows are not moved (slower for big folders) | later (perf) |
 | b | Incremental indexing is stat-based: a file rewritten within the same mtime tick with the same size looks unchanged | Picked up at the next real change or when the watcher reports it (watcher compares hashes) | accept |
-| c | Frontmatter values written with YAML escape sequences (e.g. `"\u00e9"`) are read, but the rewrite only edits the literal bytes (per the plan author; not separately tested) | Such a `related:`/`cover:` value may not be updated on rename | when needed |
+| c | Frontmatter values written with YAML escape sequences (e.g. `"\u00e9"`) are **not indexed** as links | Such a `related:`/`cover:` link is invisible to backlinks and not updated on rename | when needed |
 | d | `[[/Name]]` rooted form is an extension | Only emitted when no suffix is unique | accept |
 | e | No FTS | Search is M5 | M5 |
 | f | No undo for renames | Rename back manually | later |
 | g | Rename with 100 backlinks takes ~0.96 s | Acceptable for M1, noticeable for very linked pages; UI should show progress/spinner | profile in M8 if needed |
-| h | Watcher only verified on macOS | Linux (inotify) and Windows (ReadDirectoryChangesW) behave differently | first CI run / manual check |
+| h | Watcher only verified on macOS | Linux (inotify) and Windows (ReadDirectoryChangesW) behave differently; lost-event signals now force a rescan, but a real overflow was only simulated | first CI run / manual check |
+| j | Small race windows (final review M2): `write_cas` checks the hash before writing the temp file; create-only and `rename` check existence, then rename | A file written in that sub-millisecond window could be overwritten | use `renameat2(RENAME_NOREPLACE)` / `renamex_np(RENAME_EXCL)` |
+| k | Reference-style Markdown links (`[x][ref]` / `[ref]: a.md`) and destinations with backslash escapes or HTML entities are not indexed or rewritten (M3) | Such links break silently on rename (Obsidian never creates them) | later |
+| l | Frontmatter edge cases (M4): a closing `--- ` with trailing spaces drops the frontmatter; YAML aliases (`*x`) shift key/value pairs | Lost `related`/`subtitle` in those files | later |
+| m | Case-colliding names on case-sensitive filesystems (M5): exact-match fallback depends on insertion order, so two file sets can disagree; the case-sensitive test only runs on Linux | Rare rename edge on Linux | later |
+| n | `trash()` holds the index lock during the OS trash call (M6) | A macOS permission prompt would stall reads and the watcher | M1b (release the lock first) |
+| o | Watcher warnings are delivered as `Indexed(IndexReport { files: 0, … })` (M7) | M1b could misread it as "0 files" | M1b: add `SessionEvent::Warning` |
+| p | Excerpt resets on every H1, not only the first (M8) | Excerpt may start later than expected | later |
+| q | Parallel parse serialized by a held warnings lock (M9) | First index slower than it could be (still ~30× under budget) | perf pass |
+| r | `Index::open` deletes the DB on any error, incl. "database busy" (M10) | An unneeded re-index | later |
+| s | Other link-typed frontmatter keys (`up: "[[X]]"`) are not indexed; links inside `%% %%` comments are indexed and rewritten | Spec scope (only `related`/`cover`) | if requested |
 | i | `.nimw/vault.json` read, never written | Exclude globs editable only by hand | Settings milestone |
 
 ---
@@ -352,7 +373,7 @@ cargo bench -p nimw-session --bench vault -- --quick      # fast benchmark look 
 
 ## 13. Next steps
 
-1. Merge `feat/m1a-vault-core` (after the final review in §14).
+1. Merge `feat/m1a-vault-core` (final review done, fixes in — §14).
 2. **M1b design + plan:** Tauri commands over `VaultSession` (§8.1), settings store (OS config dir: language, theme, recent vaults, rewrite-links toggle), welcome actions with the dialog plugin, explorer tree UI, read-only page view, toasts, keyboard reachability decision (M0 hand-off §15).
 3. Push to GitHub to get the first CI run on Linux/Windows (watcher + trash behaviour).
 
@@ -360,4 +381,17 @@ cargo bench -p nimw-session --bench vault -- --quick      # fast benchmark look 
 
 ## 14. Final review
 
-Pending — a fresh whole-branch review (most capable model) runs before merge; its findings, fixes and any rulings will be recorded here.
+A fresh whole-branch review (most capable model, read-only, reproducing each finding with throwaway tests) returned **With fixes**: 1 Critical, 5 Important, 10 Minor, plus 8 hand-off inaccuracies. All Critical/Important findings were fixed test-first (each new test watched failing, then passing), in commits `0f25c85`, `366cad1`, `551eaed`, `bf2b1c4`:
+
+| Finding | Fix | Pinned by |
+|---|---|---|
+| **C1** rename corrupted notes through overlapping edits (linked images; frontmatter pulldown-cmark doesn't recognise) | Destination found from the link's *last* `](`; body parsing skips the frontmatter range; `checked_edits` refuses overlaps; `verify` refuses any rewrite that changes link count, kinds or targets | `exp_04_linked_image_has_distinct_ranges`, `exp_04_frontmatter_links_are_not_duplicated_as_body_links`, `exp_04_linked_image_and_unrecognised_frontmatter_rewrite_cleanly`, `exp_04_overlapping_edits_are_refused_and_duplicates_merged` |
+| **I1** names with `#`, `\|`, `^`, `[`, `]`… produced unlinkable files and broken rewrites | Name validation on create and rename; `#`/`?` %-encoded in Markdown destinations; `verify` reports instead of writing a link that can't resolve | `exp_02_names_that_would_break_links_are_rejected`, `exp_04_markdown_destination_into_hash_folder_is_encoded`, `exp_04_unlinkable_rewrite_is_reported_not_written` |
+| **I2** table alias `[[A\|alias]]` not extracted | Text regions merge across the escaped pipe; `\|` is the alias separator | `pg_05_table_alias_with_escaped_pipe_is_a_link` |
+| **I3** one unreadable subfolder made the vault fail to open; the watcher dropped a whole batch | Unreadable subfolders/entries go to `skipped` / warnings | `vlt_01_unreadable_subfolder_is_skipped_not_fatal`, `vlt_04_unreadable_new_folder_does_not_drop_the_batch` |
+| **I4** lost-event and folder-level rescan signals were dropped | In-crate debouncer keeps rescan flags → `Overflow`; root events → `Overflow`; `Changed` on an indexed folder reconciles its subtree | `vlt_04_rescan_flag_becomes_overflow`, `vlt_04_root_event_becomes_overflow`, `vlt_04_change_on_indexed_folder_reconciles_its_subtree` |
+| **I5** a folder removed in one event left links unresolved instead of moving them to another candidate | Re-resolve with the keys of every file that was inside | `vlt_04_removed_folder_re_resolves_links_to_its_contents` |
+| **M1 → Important** rewrites replaced symlinked notes with plain files | Rewrites never write a symlink | `exp_04_symlinked_notes_stay_symlinks` |
+| Hand-off inaccuracies (M11) | Corrected in this document (§3.1, §3.3, §4, §6, §9.2, §10, §11) | — |
+
+After the fixes: `pnpm check` green (57 Vitest + **137** Rust tests), `cargo deny check` ok, benchmarks within budget (§1.2). The remaining Minor findings are deferred in §11 (j–s). The reviewer's Review Focus check flagged #2 (case/Unicode on disk) and #4 (bursts) as under-pinned: #4 now has three more tests; #2 still lacks an on-disk NFD test and a Linux run of the case-sensitive test (§11 m).
