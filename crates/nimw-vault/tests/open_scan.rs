@@ -182,3 +182,31 @@ fn scan_from_list_dir_and_stat() {
             .is_none()
     );
 }
+
+/// Final review I3: one unreadable subfolder is a warning, not a failed open.
+#[cfg(unix)]
+#[test]
+fn vlt_01_unreadable_subfolder_is_skipped_not_fatal() {
+    use std::os::unix::fs::PermissionsExt;
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::write(dir.path().join("a.md"), "# a").unwrap();
+    let locked = dir.path().join("locked");
+    std::fs::create_dir(&locked).unwrap();
+    std::fs::write(locked.join("secret.md"), "# s").unwrap();
+    std::fs::set_permissions(&locked, std::fs::Permissions::from_mode(0o000)).unwrap();
+    let readable = std::fs::read_dir(&locked).is_ok(); // running as root
+    let vault = Vault::open(dir.path()).unwrap();
+    let scan = vault.scan();
+    std::fs::set_permissions(&locked, std::fs::Permissions::from_mode(0o755)).unwrap();
+    if readable {
+        return;
+    }
+    let scan = scan.expect("scan must not fail on one unreadable folder");
+    let names: Vec<_> = scan.entries.iter().map(|e| e.path.to_string()).collect();
+    assert_eq!(names, vec!["a.md", "locked"]);
+    assert!(
+        scan.skipped.iter().any(|s| s.contains("locked")),
+        "{:?}",
+        scan.skipped
+    );
+}

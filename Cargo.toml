@@ -17,7 +17,7 @@ sha2 = "0.11.1"
 blake3 = "1.8.7"
 dunce = "1.0.5"
 globset = "0.4.20"
-notify-debouncer-mini = "0.7.0"
+notify = "8.2.0"
 percent-encoding = "2.3.2"
 rayon = "1.12.0"
 rusqlite = { version = "0.40.2", features = ["bundled"] }

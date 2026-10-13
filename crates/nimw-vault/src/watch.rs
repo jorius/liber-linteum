@@ -2,13 +2,16 @@ use crate::error::{Result, VaultError};
 use crate::is_hidden_name;
 use crate::path::VaultPath;
 use crate::vault::Vault;
-use notify_debouncer_mini::notify::{RecommendedWatcher, RecursiveMode};
-use notify_debouncer_mini::{DebounceEventResult, Debouncer, new_debouncer};
+use notify::{Event, RecommendedWatcher, RecursiveMode, Watcher as _};
 use std::path::{Path, PathBuf};
-use std::time::Duration;
+use std::sync::mpsc::{self, RecvTimeoutError};
+use std::time::{Duration, Instant};
 
 /// Debounce window for file-system events (arch §4.1).
 pub const DEBOUNCE: Duration = Duration::from_millis(200);
+
+/// Longest a batch may keep growing under a continuous stream of events.
+const MAX_BATCH_WAIT: Duration = Duration::from_secs(2);
 
 /// A change observed on disk (VLT-04), classified by what exists on disk *now*.
 /// Backends disagree on event kinds (macOS FSEvents merges created/removed
@@ -24,9 +27,10 @@ pub enum WatchEvent {
     Overflow,
 }
 
-/// Active watch; dropping it stops watching.
+/// Active watch; dropping it stops watching (the batching thread ends when
+/// the backend watcher, and with it the event sender, is dropped).
 pub struct Watcher {
-    _debouncer: Debouncer<RecommendedWatcher>,
+    _watcher: RecommendedWatcher,
 }
 
 impl std::fmt::Debug for Watcher {
@@ -37,7 +41,13 @@ impl std::fmt::Debug for Watcher {
 
 impl Vault {
     /// Watches the vault recursively. `callback` receives one batch per debounce
-    /// tick (sorted, de-duplicated); hidden, excluded and outside paths are dropped.
+    /// tick (sorted, de-duplicated); hidden, excluded and outside paths are
+    /// dropped. Backend errors, "rescan needed" signals (lost events, e.g. an
+    /// inotify queue overflow) and events on the vault root become `Overflow`.
+    ///
+    /// The debouncing is done here rather than with a debouncer crate because
+    /// `notify-debouncer-full` cancels macOS deletes and `notify-debouncer-mini`
+    /// drops path-less rescan signals (final review I4).
     pub fn watch<F>(&self, callback: F) -> Result<Watcher>
     where
         F: Fn(Vec<WatchEvent>) + Send + 'static,
@@ -46,20 +56,50 @@ impl Vault {
             root: self.root.clone(),
             excludes: self.excludes.clone(),
         };
-        let mut debouncer = new_debouncer(DEBOUNCE, move |result: DebounceEventResult| {
-            let batch = filter.translate(result);
-            if !batch.is_empty() {
-                callback(batch);
-            }
+        let (tx, rx) = mpsc::channel::<notify::Result<Event>>();
+        let mut watcher = notify::recommended_watcher(move |res| {
+            let _ = tx.send(res);
         })
         .map_err(|e| VaultError::Watch(e.to_string()))?;
-        debouncer
-            .watcher()
+        watcher
             .watch(&self.root, RecursiveMode::Recursive)
             .map_err(|e| VaultError::Watch(e.to_string()))?;
-        Ok(Watcher {
-            _debouncer: debouncer,
-        })
+        std::thread::Builder::new()
+            .name("nimw-watch".into())
+            .spawn(move || {
+                while let Ok(first) = rx.recv() {
+                    let started = Instant::now();
+                    let mut last = started;
+                    let mut raw = vec![first];
+                    let mut closed = false;
+                    loop {
+                        let wait = (last + DEBOUNCE).saturating_duration_since(Instant::now());
+                        match rx.recv_timeout(wait) {
+                            Ok(ev) => {
+                                raw.push(ev);
+                                last = Instant::now();
+                                if last - started >= MAX_BATCH_WAIT {
+                                    break;
+                                }
+                            }
+                            Err(RecvTimeoutError::Timeout) => break,
+                            Err(RecvTimeoutError::Disconnected) => {
+                                closed = true;
+                                break;
+                            }
+                        }
+                    }
+                    let batch = filter.translate(raw);
+                    if !batch.is_empty() {
+                        callback(batch);
+                    }
+                    if closed {
+                        return;
+                    }
+                }
+            })
+            .map_err(|e| VaultError::Watch(e.to_string()))?;
+        Ok(Watcher { _watcher: watcher })
     }
 }
 
@@ -69,25 +109,36 @@ struct PathFilter {
 }
 
 impl PathFilter {
-    fn translate(&self, result: DebounceEventResult) -> Vec<WatchEvent> {
-        let events = match result {
-            Ok(events) => events,
-            Err(_) => return vec![WatchEvent::Overflow],
-        };
-        let mut out: Vec<WatchEvent> = events
-            .iter()
-            .filter_map(|ev| {
-                let path = self.visible(&ev.path)?;
-                Some(if ev.path.exists() {
-                    WatchEvent::Changed(path)
-                } else {
-                    WatchEvent::Removed(path)
-                })
-            })
-            .collect();
+    fn translate(&self, raw: Vec<notify::Result<Event>>) -> Vec<WatchEvent> {
+        let mut out: Vec<WatchEvent> = Vec::new();
+        for res in raw {
+            let event = match res {
+                Ok(event) => event,
+                Err(_) => return vec![WatchEvent::Overflow],
+            };
+            if event.need_rescan() {
+                return vec![WatchEvent::Overflow];
+            }
+            for p in &event.paths {
+                if self.is_root(p) {
+                    return vec![WatchEvent::Overflow];
+                }
+                if let Some(path) = self.visible(p) {
+                    out.push(if p.exists() {
+                        WatchEvent::Changed(path)
+                    } else {
+                        WatchEvent::Removed(path)
+                    });
+                }
+            }
+        }
         out.sort_by(|a, b| format!("{a:?}").cmp(&format!("{b:?}")));
         out.dedup();
         out
+    }
+
+    fn is_root(&self, p: &Path) -> bool {
+        dunce::canonicalize(p).is_ok_and(|c| c == self.root)
     }
 
     /// Vault path for `p` unless it is outside, the root, hidden or excluded.
@@ -105,5 +156,64 @@ impl PathFilter {
             return None;
         }
         Some(vp)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use notify::event::{CreateKind, Flag};
+    use notify::{Event, EventKind};
+
+    fn filter(root: &Path) -> PathFilter {
+        PathFilter {
+            root: dunce::canonicalize(root).unwrap(),
+            excludes: globset::GlobSet::empty(),
+        }
+    }
+
+    /// Final review I4: a backend "rescan needed" signal (events were lost, no
+    /// paths) must become `Overflow`, never be dropped.
+    #[test]
+    fn vlt_04_rescan_flag_becomes_overflow() {
+        let dir = tempfile::tempdir().unwrap();
+        let f = filter(dir.path());
+        let rescan = Event::new(EventKind::Other).set_flag(Flag::Rescan);
+        assert_eq!(f.translate(vec![Ok(rescan)]), vec![WatchEvent::Overflow]);
+        assert_eq!(
+            f.translate(vec![Err(notify::Error::generic("queue overflow"))]),
+            vec![WatchEvent::Overflow]
+        );
+    }
+
+    /// An event on the vault root itself means "something in here changed"
+    /// (e.g. FSEvents must-scan-subdirs): rescan.
+    #[test]
+    fn vlt_04_root_event_becomes_overflow() {
+        let dir = tempfile::tempdir().unwrap();
+        let f = filter(dir.path());
+        let root_ev = Event::new(EventKind::Create(CreateKind::Any)).add_path(f.root.clone());
+        assert_eq!(f.translate(vec![Ok(root_ev)]), vec![WatchEvent::Overflow]);
+    }
+
+    #[test]
+    fn vlt_04_file_events_are_classified_by_disk_state() {
+        let dir = tempfile::tempdir().unwrap();
+        let f = filter(dir.path());
+        std::fs::write(f.root.join("a.md"), "x").unwrap();
+        let ev =
+            |p: &str| Ok(Event::new(EventKind::Create(CreateKind::File)).add_path(f.root.join(p)));
+        assert_eq!(
+            f.translate(vec![
+                ev("a.md"),
+                ev("gone.md"),
+                ev("a.md"),
+                ev(".hidden/x.md")
+            ]),
+            vec![
+                WatchEvent::Changed(VaultPath::new("a.md").unwrap()),
+                WatchEvent::Removed(VaultPath::new("gone.md").unwrap()),
+            ]
+        );
     }
 }

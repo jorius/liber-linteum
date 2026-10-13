@@ -74,10 +74,23 @@ impl Vault {
             let read = match std::fs::read_dir(&fs_dir) {
                 Ok(read) => read,
                 Err(e) if e.kind() == std::io::ErrorKind::NotFound && dir != *start => continue,
+                // One unreadable subfolder must not make the vault unopenable
+                // (final review I3): report it and keep scanning.
+                Err(e) if dir != *start => {
+                    out.skipped
+                        .push(format!("{dir}: folder not readable ({e})"));
+                    continue;
+                }
                 Err(e) => return Err(io_err(dir.as_str(), e)),
             };
             for item in read {
-                let item = item.map_err(|e| io_err(dir.as_str(), e))?;
+                let item = match item {
+                    Ok(item) => item,
+                    Err(e) => {
+                        out.skipped.push(format!("{dir}: entry not readable ({e})"));
+                        continue;
+                    }
+                };
                 let os_name = item.file_name();
                 let Some(name) = os_name.to_str() else {
                     out.skipped
