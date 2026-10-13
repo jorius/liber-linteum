@@ -342,3 +342,29 @@ fn vlt_04_opening_emits_progress_events() {
     let last: Value = serde_json::from_str(got.last().unwrap()).unwrap();
     assert_eq!(last["done"], last["total"]);
 }
+
+/// Regression (real window: stuck on "Opening vault"): the UI subscribes to
+/// `vault:*` events through Tauri's event plugin, so `main` must be allowed to
+/// listen and unlisten — and another window must not be.
+#[test]
+fn vlt_04_main_window_may_listen_to_vault_events() {
+    let h = harness();
+    let other = WebviewWindowBuilder::new(&h.app, "other", Default::default())
+        .build()
+        .unwrap();
+    for event in ["vault:progress", "vault:changed", "vault:warning"] {
+        let body = json!({ "event": event, "target": { "kind": "Any" }, "handler": 7 });
+        if let Err(e) = call(&h.main, "plugin:event|listen", body.clone()) {
+            panic!("main must be allowed to listen to {event}: {e}");
+        }
+        let err = call(&other, "plugin:event|listen", body).expect_err(event);
+        assert!(err.to_string().contains("not allowed"), "{event}: {err}");
+    }
+    let unlisten = json!({ "event": "vault:progress", "eventId": 7 });
+    if let Err(e) = call(&h.main, "plugin:event|unlisten", unlisten) {
+        assert!(
+            !e.to_string().contains("not allowed"),
+            "main must be allowed to unlisten: {e}"
+        );
+    }
+}

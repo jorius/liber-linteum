@@ -1,7 +1,7 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "main",
-  "description": "Main window. Only explicitly listed commands are callable; each milestone adds its own. The dialog plugin is limited to the folder picker.",
+  "description": "Main window. Only explicitly listed commands are callable; each milestone adds its own. The dialog plugin is limited to the folder picker; the event plugin only to listen/unlisten (the UI subscribes to vault:* events).",
   "windows": ["main"],
   "permissions": [
     "allow-app-info",
@@ -19,6 +19,8 @@
     "allow-settings-set",
     "allow-vaults-recent",
     "allow-vaults-forget",
+    "core:event:allow-listen",
+    "core:event:allow-unlisten",
     "dialog:allow-open"
   ]
 }

@@ -41,7 +41,8 @@
     "trashed": "Moved to Trash",
     "openedWithWarnings": "{count, plural, one {Opened with # warning} other {Opened with # warnings}}",
     "dismiss": "Dismiss",
-    "details": "Details"
+    "details": "Details",
+    "liveUpdatesUnavailable": "Live updates are unavailable: changes made outside the app appear after reopening the vault."
   },
   "explorer": {
     "untitled": "Untitled",

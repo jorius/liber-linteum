@@ -322,3 +322,37 @@ describe('toastStore', () => {
     expect(useToastStore.getState().toasts.map((t) => t.message)).toEqual(['long']);
   });
 });
+
+describe('vaultStore — event subscriptions refused (real-window regression)', () => {
+  /** Backend where every event subscription is refused, as when the
+   *  capability lacked core:event:allow-listen. */
+  function refusingEvents(handlers: Record<string, Handler>) {
+    mockIPC((cmd, args) => {
+      if (cmd.startsWith('plugin:event|')) {
+        throw new Error('event.listen not allowed');
+      }
+      const h = handlers[cmd];
+      return h ? h((args ?? {}) as Record<string, unknown>) : undefined;
+    });
+  }
+
+  it('VLT-01 opening never gets stuck when progress/change events cannot be subscribed', async () => {
+    refusingEvents({ vault_open: () => info, vault_tree: () => tree });
+    const res = await useVaultStore.getState().open('/v');
+    expect(res.ok).toBe(true);
+    expect(useVaultStore.getState().status).toBe('open');
+    expect(useVaultStore.getState().nodes.map((n) => n.path)).toContain('b.md');
+    expect(useToastStore.getState().toasts.some((t) => t.tone === 'error')).toBe(true);
+  });
+
+  it('VLT-01 a failing open after refused subscriptions returns to the welcome screen', async () => {
+    refusingEvents({
+      vault_open: () => {
+        throw { kind: 'notFound', message: 'gone' };
+      },
+    });
+    const res = await useVaultStore.getState().open('/v');
+    expect(res.ok).toBe(false);
+    expect(useVaultStore.getState().status).toBe('closed');
+  });
+});

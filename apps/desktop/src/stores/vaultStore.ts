@@ -13,6 +13,7 @@ import {
   vaultOpen,
   vaultTree,
   type ChangedPayload,
+  type CommandError,
   type IpcResult,
   type ProgressPayload,
   type RenameOutcome,
@@ -110,9 +111,20 @@ export const useVaultStore = create<VaultState>((set, get) => {
     await usePageStore.getState().onExternalChange(change);
   }
 
+  /** Subscribes to external-change and warning events. A refused
+   *  subscription must not block the vault: it opens without live updates and
+   *  says so (real-window regression: missing event permission). */
   async function startListening() {
     stopListening();
-    unlisten = await Promise.all([
+    try {
+      unlisten = await subscribeAll();
+    } catch {
+      toast().push({ message: i18next.t('toasts.liveUpdatesUnavailable'), tone: 'error' });
+    }
+  }
+
+  function subscribeAll() {
+    return Promise.all([
       onVaultChanged((c) => {
         pending = pending
           ? {
@@ -149,13 +161,25 @@ export const useVaultStore = create<VaultState>((set, get) => {
     return res;
   }
 
-  async function withProgress(run: () => Promise<IpcResult<VaultInfo>>) {
+  async function withProgress(
+    run: () => Promise<IpcResult<VaultInfo>>,
+  ): Promise<IpcResult<VaultInfo>> {
     set({ status: 'opening', progress: null });
-    const stop = await onVaultProgress((p) => set({ progress: p }));
+    // Progress is a nicety: if it can't be subscribed, open without it.
+    const stop = await onVaultProgress((p) => set({ progress: p })).catch(() => null);
     try {
       return await opened(await run());
+    } catch (e) {
+      // Never leave the opening overlay up without a way out.
+      set({ status: 'closed', progress: null });
+      const error: CommandError = {
+        kind: 'io',
+        message: e instanceof Error ? e.message : String(e),
+      };
+      toast().push({ message: errorMessage(error), tone: 'error' });
+      return { ok: false, error };
     } finally {
-      safeUnlisten(stop);
+      if (stop) safeUnlisten(stop);
     }
   }
 

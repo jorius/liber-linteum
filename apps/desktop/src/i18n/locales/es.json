@@ -41,7 +41,8 @@
     "trashed": "Movido a la papelera",
     "openedWithWarnings": "{count, plural, one {Abierta con # advertencia} other {Abierta con # advertencias}}",
     "dismiss": "Cerrar",
-    "details": "Detalles"
+    "details": "Detalles",
+    "liveUpdatesUnavailable": "Las actualizaciones en vivo no están disponibles: los cambios hechos fuera de la app aparecen al reabrir la bóveda."
   },
   "explorer": {
     "untitled": "Sin título",
