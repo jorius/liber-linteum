@@ -94,6 +94,7 @@
   "editor": {
     "conflictCopy": "Someone else changed this page — their version was saved as “{name}”",
     "openCopy": "Open",
+    "openUnsaved": "Open",
     "saved": "Saved",
     "saving": "Saving…",
     "retrying": "Unsaved — retrying",
@@ -108,7 +109,8 @@
       "split": "Split"
     },
     "saveStatus": "Save status",
-    "unsavedBlocks": "Unsaved changes in “{name}” couldn’t be written, so the vault stays open."
+    "unsavedBlocks": "Unsaved changes in “{name}” couldn’t be written, so the vault stays open.",
+    "unsavedKeepsWindow": "Unsaved changes in “{name}” couldn’t be written, so the window stays open. Close it again to quit without them."
   },
   "preview": {
     "remoteBlocked": "Remote image blocked (privacy)",

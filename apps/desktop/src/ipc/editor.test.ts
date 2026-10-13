@@ -78,10 +78,26 @@ describe('M2a ipc commands', () => {
     await onCloseRequested(async () => {
       await Promise.resolve();
       flushed = true;
+      return true;
     });
     await emit('tauri://close-requested');
     await new Promise((r) => setTimeout(r, 0));
     expect(flushed).toBe(true);
     expect(calls).toContain('plugin:window|destroy');
+  });
+
+  it('keeps the window open when the close handler says no', async () => {
+    mockWindows('main');
+    const calls: string[] = [];
+    mockIPC((cmd) => void calls.push(cmd), { shouldMockEvents: true });
+    let asked = false;
+    await onCloseRequested(async () => {
+      asked = true;
+      return false;
+    });
+    await emit('tauri://close-requested');
+    await new Promise((r) => setTimeout(r, 0));
+    expect(asked).toBe(true);
+    expect(calls).not.toContain('plugin:window|destroy');
   });
 });

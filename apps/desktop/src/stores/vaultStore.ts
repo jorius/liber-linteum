@@ -20,11 +20,11 @@ import {
   type TreeNode,
   type VaultInfo,
 } from '../ipc';
-import { useEditorStore } from './editorStore';
+import { useEditorStore, warnUnsaved } from './editorStore';
 import { errorMessage } from './messages';
 import { usePageStore } from './pageStore';
 import { useToastStore } from './toastStore';
-import { childrenByParent, joinPath, nameOf, nextFreeName, parentOf, remap } from './tree';
+import { childrenByParent, joinPath, nextFreeName, parentOf, remap } from './tree';
 
 /** External changes arriving within this window trigger one tree refresh. */
 export const COALESCE_MS = 100;
@@ -154,12 +154,7 @@ export const useVaultStore = create<VaultState>((set, get) => {
   async function savedEverything(): Promise<boolean> {
     const unsaved = await useEditorStore.getState().saveAll();
     if (!unsaved.length) return true;
-    toast().push({
-      message: i18next.t('editor.unsavedBlocks', {
-        name: nameOf(unsaved[0]).replace(/\.md$/i, ''),
-      }),
-      tone: 'error',
-    });
+    warnUnsaved(unsaved[0], 'editor.unsavedBlocks');
     return false;
   }
 

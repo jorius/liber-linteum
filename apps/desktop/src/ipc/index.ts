@@ -234,9 +234,11 @@ export const onVaultWarning = (cb: (p: WarningPayload) => void): Promise<Unliste
   listen<WarningPayload>('vault:warning', (e) => cb(e.payload));
 
 /** Runs `handler` (e.g. flushing unsaved pages) before the main window closes;
- *  the window is destroyed once it settles. */
-export const onCloseRequested = (handler: () => Promise<void>): Promise<UnlistenFn> =>
-  getCurrentWindow().onCloseRequested(() => handler());
+ *  the window is destroyed once it resolves `true` and stays open on `false`. */
+export const onCloseRequested = (handler: () => Promise<boolean>): Promise<UnlistenFn> =>
+  getCurrentWindow().onCloseRequested(async (event) => {
+    if (!(await handler())) event.preventDefault();
+  });
 
 // ---- native folder picker (dialog plugin, folder selection only) ----
 

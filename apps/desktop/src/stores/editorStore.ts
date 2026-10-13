@@ -34,8 +34,9 @@ interface EditorState {
   syncPaths: (paths: string[]) => Promise<void>;
   /** Writes an orphaned page (deleted outside while dirty) to a new page. */
   saveAsNew: () => Promise<void>;
-  /** Saves every page; returns the paths that still have unsaved text. */
-  saveAll: () => Promise<string[]>;
+  /** Saves every page (capped at `timeoutMs`); returns the paths that still
+   *  have unsaved text (failing or orphaned pages). */
+  saveAll: (timeoutMs?: number) => Promise<string[]>;
   /** Drops every page (after `saveAll` left nothing unsaved). */
   reset: () => void;
 }
@@ -81,10 +82,12 @@ const hooks: PageDocHooks = {
   },
 };
 
-/** A background page is dropped once it's saved (or orphaned: nothing to retry). */
+/** A background page is dropped once it's saved. An orphaned one (deleted
+ *  outside with unsaved text) is kept: its text must not be dropped silently,
+ *  so it still blocks closing the vault or the window (M2a §3.3). */
 function dropIfDone(doc: PageDoc) {
   if (doc === useEditorStore.getState().doc) return;
-  if (doc.status === 'saved' || doc.orphaned) {
+  if (doc.status === 'saved') {
     doc.dispose();
     if (docs.get(doc.path) === doc) docs.delete(doc.path);
   }
@@ -163,8 +166,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   syncPaths: async (paths) => {
     await Promise.all(paths.flatMap((p) => docs.get(p)?.sync() ?? []));
   },
-  saveAll: async () => {
-    await get().flushAll();
+  saveAll: async (timeoutMs) => {
+    await get().flushAll(timeoutMs);
     return [...docs.values()].filter((d) => d.dirty).map((d) => d.path);
   },
   reset: () => resetEditorStore(),
@@ -184,9 +187,38 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   },
 }));
 
-/** Closing the window first saves every unsaved page (max 2 s). */
+/** Says that `path` has text that couldn't be written, with a button that
+ *  shows it (its save status, or the orphan banner with "Save as new page").
+ *  Returns the toast id. */
+export function warnUnsaved(
+  path: string,
+  key: 'editor.unsavedBlocks' | 'editor.unsavedKeepsWindow',
+) {
+  return useToastStore.getState().push({
+    message: i18next.t(key, { name: nameOf(path).replace(/\.md$/i, '') }),
+    tone: 'error',
+    action: { label: i18next.t('editor.openUnsaved'), run: () => void openPage(path) },
+  });
+}
+
+/** The warning shown by the last refused close, while it is on screen. */
+let closeWarning: number | null = null;
+
+/** Whether the window may close: saves every page first (max 2 s). Text that
+ *  still can't be written (failing or orphaned page) keeps the window open
+ *  with a warning; closing again while it shows quits anyway (M2a §3.3). */
+export async function mayClose(): Promise<boolean> {
+  const unsaved = await useEditorStore.getState().saveAll(QUIT_FLUSH_MS);
+  if (!unsaved.length) return true;
+  const warned = useToastStore.getState().toasts.some((t) => t.id === closeWarning);
+  if (warned) return true;
+  closeWarning = warnUnsaved(unsaved[0], 'editor.unsavedKeepsWindow');
+  return false;
+}
+
+/** Closing the window (or quitting) first saves every unsaved page. */
 export async function installQuitGuard(): Promise<void> {
-  await onCloseRequested(() => useEditorStore.getState().flushAll(QUIT_FLUSH_MS));
+  await onCloseRequested(mayClose);
 }
 
 /** Installs the quit guard when running inside Tauri. */

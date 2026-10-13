@@ -188,4 +188,51 @@ describe('editorStore (M2a §3.3)', () => {
     expect(disk.files.get('A.md')).toBe('typed just before quitting\n');
     expect(calls().indexOf('page_write')).toBeLessThan(calls().indexOf('plugin:window|destroy'));
   });
+
+  it('m5: an orphaned page keeps the window open, says so, and a second close quits', async () => {
+    mockWindows('main');
+    const disk = fakeDisk({ 'A.md': 'a\n' });
+    const calls = () => disk.calls.map(([c]) => c);
+    render(<Toaster />);
+    await act(() => editor().open('A.md'));
+    editor().doc!.edit('keep me\n');
+    disk.files.delete('A.md');
+    await act(() =>
+      editor().onExternalChange({ created: [], modified: [], removed: ['A.md'], renamed: [] }),
+    );
+    expect(editor().orphaned).toBe(true);
+    await installQuitGuard();
+    await act(() => emit('tauri://close-requested'));
+    await screen.findByText(
+      'Unsaved changes in “A” couldn’t be written, so the window stays open. Close it again to quit without them.',
+    );
+    expect(calls()).not.toContain('plugin:window|destroy');
+    expect(editor().doc!.text).toBe('keep me\n');
+    // Asked twice: the person chose to quit.
+    await act(() => emit('tauri://close-requested'));
+    await vi.waitFor(() => expect(calls()).toContain('plugin:window|destroy'));
+  });
+
+  it('m5: a page orphaned in the background is kept, blocks the close, and can be opened', async () => {
+    mockWindows('main');
+    const disk = fakeDisk({ 'A.md': 'a\n', 'B.md': 'b\n' });
+    const calls = () => disk.calls.map(([c]) => c);
+    render(<Toaster />);
+    await act(() => editor().open('A.md'));
+    editor().doc!.edit('keep me\n');
+    disk.failWrites(1);
+    await act(() => editor().open('B.md')); // A keeps retrying in the background
+    disk.files.delete('A.md');
+    await act(() =>
+      editor().onExternalChange({ created: [], modified: [], removed: ['A.md'], renamed: [] }),
+    );
+    await installQuitGuard();
+    await act(() => emit('tauri://close-requested'));
+    await screen.findByText(/Unsaved changes in “A” couldn’t be written/);
+    expect(calls()).not.toContain('plugin:window|destroy');
+    await userEvent.click(screen.getByRole('button', { name: 'Open' }));
+    await vi.waitFor(() => expect(editor().path).toBe('A.md'));
+    expect(editor().orphaned).toBe(true);
+    expect(editor().doc!.text).toBe('keep me\n');
+  });
 });

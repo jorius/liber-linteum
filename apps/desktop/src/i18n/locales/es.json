@@ -94,6 +94,7 @@
   "editor": {
     "conflictCopy": "Alguien más cambió esta página — su versión se guardó como «{name}»",
     "openCopy": "Abrir",
+    "openUnsaved": "Abrir",
     "saved": "Guardado",
     "saving": "Guardando…",
     "retrying": "Sin guardar — reintentando",
@@ -108,7 +109,8 @@
       "split": "Dividido"
     },
     "saveStatus": "Estado de guardado",
-    "unsavedBlocks": "Los cambios sin guardar en «{name}» no se pudieron escribir, así que la bóveda sigue abierta."
+    "unsavedBlocks": "Los cambios sin guardar en «{name}» no se pudieron escribir, así que la bóveda sigue abierta.",
+    "unsavedKeepsWindow": "Los cambios sin guardar en «{name}» no se pudieron escribir, así que la ventana sigue abierta. Ciérrala otra vez para salir sin ellos."
   },
   "preview": {
     "remoteBlocked": "Imagen remota bloqueada (privacidad)",
