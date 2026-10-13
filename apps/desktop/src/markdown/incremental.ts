@@ -10,6 +10,25 @@ import type { ParsedPage } from './types';
  *  block: fences, HTML, comments, definitions/footnotes, directives, math. */
 const NONLOCAL = /`{3}|~{3}|%%|\]:|<|^[ \t]*:{3}|\$\$/m;
 
+/** Nodes whose children are blocks (where a definition can stand). */
+const FLOW = new Set([
+  'root',
+  'blockquote',
+  'list',
+  'listItem',
+  'callout',
+  'columns',
+  'column',
+  'footnoteDefinition',
+]);
+
+/** Whether the tree holds a link/image definition or a footnote definition. */
+function hasDefinitions(node: Node): boolean {
+  if (node.type === 'definition' || node.type === 'footnoteDefinition') return true;
+  if (!FLOW.has(node.type)) return false;
+  return ((node as Parent).children as Node[]).some(hasDefinitions);
+}
+
 const begin = (n: Node) => n.position!.start.offset!;
 const end = (n: Node) => n.position!.end.offset!;
 
@@ -99,7 +118,9 @@ export function reparse(prev: ParsedPage, prevText: string, text: string): Parse
     (!afterFrontmatter && !blankBefore(text, sliceStart)) ||
     !blankAfter(text, newEnd) ||
     NONLOCAL.test(slice) ||
-    NONLOCAL.test(prevText.slice(sliceStart, oldEnd))
+    NONLOCAL.test(prevText.slice(sliceStart, oldEnd)) ||
+    // `[ref]` / `[^1]` resolve against definitions elsewhere on the page.
+    (slice.includes('[') && hasDefinitions(prev.tree))
   ) {
     return parsePage(text);
   }

@@ -50,6 +50,16 @@ const LOCAL_PIECES = [
   '  - ',
   '[!tip]',
 ];
+/** References resolve against definitions anywhere on the page (I3). */
+const REFERENCE_PIECES = [
+  '[ref]',
+  '[^1]',
+  '[Ref][]',
+  '[x][ref]',
+  '[ref]: https://e.x',
+  '[^1]: Note.',
+];
+const DEFS = 'See [ref] and a note[^1].\n\n[ref]: https://e.x\n\n[^1]: A footnote.\n\n';
 const NONLOCAL_PIECES = ['`', '```', '%%', '<b>', '[x]: y', ':::'];
 
 /** Applies `steps` seeded random edits; after each, the incremental model must
@@ -91,6 +101,21 @@ describe('incremental re-parse (M2a §7: typing in a 5,000-line note)', () => {
     // Same order as the plain fuzz (seed 42: 139 plain, 122 here; the rest are
     // edits that legitimately need a full parse).
     expect(fuzz(42, LOCAL_PIECES, 200, HEAD, true)).toBeGreaterThan(110);
+  }, 60_000);
+
+  it('reference links and footnotes resolve as in the full parse', () => {
+    const text = 'Intro.\n\nType here.\n\nMiddle.\n\nEnd.\n\n[ref]: https://e.x\n\n[^1]: Note.\n';
+    const typed = text.replace('Type here.', 'Type [ref] and[^1] here.');
+    const page = reparse(parsePage(text), text, typed);
+    expect(page).toEqual(parsePage(typed));
+    // …and definitions added or removed in another block.
+    const noDefs = typed.replace('[ref]: https://e.x\n\n', '');
+    expect(reparse(parsePage(typed), typed, noDefs)).toEqual(parsePage(noDefs));
+  });
+
+  it('edits adding references and definitions still equal the full parse', () => {
+    fuzz(21, [...LOCAL_PIECES, ...REFERENCE_PIECES], 200);
+    fuzz(22, [...LOCAL_PIECES, ...REFERENCE_PIECES], 200, DEFS);
   }, 60_000);
 
   it.each([
