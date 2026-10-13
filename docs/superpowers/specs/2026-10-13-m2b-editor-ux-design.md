@@ -135,3 +135,21 @@ Token meanings: `bg` page background · `surface` cards/header/editor · `border
 | `sideSel` | `rgba(255,154,118,.2)` | `rgba(255,154,118,.18)` | `rgba(150,156,255,.22)` | `rgba(163,168,255,.2)` | `rgba(214,160,110,.22)` | `rgba(227,167,116,.2)` | `rgba(255,255,255,.18)` | `rgba(255,255,255,.16)` |
 | `mark` | `#fcefa6` | `#4b4317` | `#f8eda6` | `#4a4318` | `#f5dd8a` | `#4d4119` | `#ffe94d` | `#6b5d00` |
 | `code` | `#efecee` | `#282223` | `#e8eaf5` | `#1c2042` | `#efe3cc` | `#2c261f` | `#f0f0f0` | `#1a1a1a` |
+
+---
+
+## 11. Amendments from planning (plan `docs/superpowers/plans/2026-10-13-m2b-editor-ux.md`, replayed end-to-end)
+These override the sections above where they conflict.
+
+1. **Custom palette** is applied as a generated `<style id="nimw-custom-palette">` element (light + dark blocks), not inline custom properties on `<html>` — a palette needs both light and dark values, which inline properties cannot express.
+2. **Derived tokens** (`bg-dots`, `surface-subtle`, `border-strong`, `text-faint`, `accent-hover`) are computed to hex when `palettes.css` is generated (and in `derive.ts` for the custom accent), not with runtime `color-mix()` — Safari 15 lacks it.
+3. **View → Back / Forward** menu items carry no keyboard accelerators: the page handles ⌘[ / ⌘] itself, and a menu accelerator could fire the navigation twice. The menu items still work by click and emit `menu:navigate`.
+4. **Toolbar active state** comes from CodeMirror's Lezer syntax tree (available in every mode), not the remark model (absent in Source mode); `==highlight==` is detected by scanning the cursor line.
+5. **⌘K / Link** always writes `[text](url)`; turning a selected page name into `[[Page]]` moves to M2c with `[[` autocomplete.
+6. **Title field** shows the file name; when the note's frontmatter `title:` or first H1 differs, it is shown underneath as "Title in the note: …".
+7. **Duplicate names** are checked against the loaded tree and again via the backend's "already exists" error; both show the same message.
+8. **Code** (inline and fenced) in Live Preview and the rendered pane uses the Source font.
+9. **Bundled weights:** 400, 400 italic and 600 (Atkinson Hyperlegible also 700); bold in Literata, Source Serif 4 and IBM Plex Sans renders at 600.
+10. **Text size** outside 13–20 is clamped (not reset to 15).
+11. **Explorer selection** uses each palette's `sideSel`.
+12. **Versions:** `fontdb` 0.24.0; @fontsource atkinson-hyperlegible 5.3.0, literata 5.3.0, source-serif-4 5.3.1, ibm-plex-sans 5.3.0, ibm-plex-mono 5.3.0, source-code-pro 5.3.1. CI installs Playwright `chromium webkit`.
