@@ -1,6 +1,6 @@
 # Hand-off: M1a Vault Core — Notes In My Way
 
-> **Date:** 2026-10-12 · **Branch:** `feat/m1a-vault-core` (from `main` @ `cc07e13`) · not pushed, no remote configured
+> **Date:** 2026-10-12 · **Merged into `main`** (merge `1c3e30c`; branch `feat/m1a-vault-core` from `cc07e13`, deleted) · not pushed, no remote configured
 > **Audience:** Jose (tech lead), or anyone continuing by hand without an AI agent.
 > **Goal of this file:** everything needed to understand, run, change and build on the M1a vault engine — what exists, why, every decision taken on your behalf, what is not verified, and how M1b plugs in.
 > **Read first if new:** `docs/handoff/2026-10-12-m0-scaffold-handoff.md` (setup, commands, privacy layers). This document only covers what M1a adds.
@@ -20,7 +20,7 @@
 | Tests | see table §1.1 — all green |
 | `cargo deny check` | ok (advisories, bans, licenses, sources) |
 | Platforms verified | macOS (Apple M5 Pro, macOS 27.0.1). Linux/Windows: CI will be the first run (watcher behaviour differs per OS) |
-| Merge | Not merged (see §13) |
+| Merge | Merged locally into `main` (`1c3e30c`); full check re-run green on the merged result |
 
 ### 1.1 Test counts per crate (`cargo test --workspace`, final branch)
 
