@@ -201,3 +201,20 @@ Top bar "Close vault" → `vault_close` → Welcome (the closed vault first in R
 ## 7. Spec self-review notes
 - Each success criterion in §1 maps to tests in §5.
 - Ambiguities settled: recent-vault cap (10), truncation (1 MiB), coalescing (100 ms), toast lifetime (5 s; detail toasts persist), `vault_create` emptiness (any entry except OS metadata files), default names (`Untitled`, `Untitled 1`, …), shortcut set (§3.5), ⌘O vs Close vault (§4.4).
+
+---
+
+## 8. Amendments (2026-10-12, from compile-checking the M1b plan)
+
+Recorded with evidence in the plan's notes (`docs/superpowers/plans/2026-10-12-m1b-app-integration.md`); they supersede the sections named.
+
+1. **Task order:** the explorer tree (part 1) is built before the app shell so the shell renders the real tree.
+2. **`configure(builder, Option<AppDirs>)`** (§2.2): the mock IPC runtime does not run `setup`, and tests must never touch the user's real settings, so directories are injected; `AppState` also holds `cache_dir`.
+3. **`VaultSession::backlinks_into(path)`** is added so a folder's backlink count only counts links from outside the folder (§2.4 `backlink_count`).
+4. **`page_get`** returns `binary: true` for `.md` files that are not valid UTF-8 (§2.4).
+5. **Settings (§2.3):** in a patch, `language: "system"` means follow the OS (stored as `null`); unknown keys and the file `version` are preserved when saving (a newer app's file is not clobbered).
+6. **Stores (§3.3):** the inline-rename state lives in `vaultStore` (not `uiStore`); stores guard against stale responses with sequence numbers and unsubscribe safely.
+7. **IPC tests:** a `src/ipc/testing.ts` helper keeps the ESLint `@tauri-apps/*` ban strict in test files.
+8. **Drag-and-drop (§3.5):** Space picks up and drops; only dnd-kit listeners are attached to tree rows.
+9. **Welcome language toggle** switches immediately and then saves the setting.
+10. **M0 stub screens** (`GlobalViewScreen`, `EditorScreen`) and their unused strings are removed (replaced by the shell).
