@@ -53,4 +53,14 @@ describe('link trail (M2b §3)', () => {
     trail().removed('C.md');
     expect(trail().forward).toEqual([]);
   });
+
+  it('final review m3: pruning never leaves the current page next on either side', () => {
+    trail().followed(e('A.md'));
+    trail().followed(e('B.md'));
+    trail().removed('B.md', { current: 'A.md' });
+    expect(trail().back).toEqual([]);
+    useTrailStore.setState({ forward: [e('C.md'), e('A.md'), e('B.md')] });
+    trail().removed('B.md', { current: 'A.md' });
+    expect(trail().forward).toEqual([e('C.md')]);
+  });
 });

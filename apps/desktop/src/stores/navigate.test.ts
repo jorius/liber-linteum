@@ -4,7 +4,7 @@ import { followLink } from './links';
 import { goBack, goForward, installMenuNavigation, openPage } from './navigate';
 import { usePageStore } from './pageStore';
 import { useTrailStore } from './trailStore';
-import { resetVaultStore } from './vaultStore';
+import { resetVaultStore, useVaultStore } from './vaultStore';
 
 const page = (path: string) => ({
   path,
@@ -55,6 +55,64 @@ describe('navigation and the link trail (M2b §3)', () => {
     expect(at()).toBe('C.md');
     expect(usePageStore.getState().anchor?.heading).toBe('Part');
     await openPage('D.md');
+    expect(useTrailStore.getState().back).toEqual([]);
+  });
+
+  /** A→B→A→C, back to A, then B goes: the trail collapses to [A] while A is
+   *  shown — it must not offer "Back to A" (final review m3). */
+  function trailBackOnA() {
+    const calls: string[] = [];
+    mockIPC(
+      (cmd, raw) => {
+        const args = (raw ?? {}) as Record<string, unknown>;
+        calls.push(cmd === 'page_get' ? `page_get ${String(args.path)}` : cmd);
+        if (cmd === 'page_get') return page(args.path as string);
+        if (cmd === 'page_read') return { text: '', hash: 'h' };
+        if (cmd === 'vault_open') return { name: 'V', root: '/v', report: { warnings: [] } };
+        if (cmd === 'vault_tree')
+          return [
+            { path: 'A.md', kind: 'page' },
+            { path: 'C.md', kind: 'page' },
+          ];
+        return null;
+      },
+      { shouldMockEvents: true },
+    );
+    return calls;
+  }
+  async function walkToA() {
+    await openPage('A.md');
+    await openPage('B.md', null, 'link');
+    await openPage('A.md', null, 'link');
+    await openPage('C.md', null, 'link');
+    await goBack();
+    expect(at()).toBe('A.md');
+    expect(useTrailStore.getState().back.map((x) => x.path)).toEqual(['A.md', 'B.md']);
+  }
+
+  it('final review m3: trashing a page never leaves "Back to" the page on screen', async () => {
+    const calls = trailBackOnA();
+    await walkToA();
+    await useVaultStore.getState().trash('B.md');
+    expect(useTrailStore.getState().back).toEqual([]);
+    expect(useTrailStore.getState().forward.map((x) => x.path)).toEqual(['C.md']);
+    calls.length = 0;
+    expect(await goBack()).toBe(false);
+    expect(calls.filter((c) => c.startsWith('page_get'))).toEqual([]);
+  });
+
+  it('final review m3: an external delete never leaves "Back to" the page on screen', async () => {
+    trailBackOnA();
+    await useVaultStore.getState().open('/v');
+    await walkToA();
+    vi.useFakeTimers();
+    try {
+      await emit('vault:changed', { created: [], modified: [], removed: ['B.md'], renamed: [] });
+      await vi.advanceTimersByTimeAsync(150);
+    } finally {
+      vi.useRealTimers();
+    }
+    expect(at()).toBe('A.md');
     expect(useTrailStore.getState().back).toEqual([]);
   });
 

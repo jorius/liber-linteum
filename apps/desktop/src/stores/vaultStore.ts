@@ -126,10 +126,13 @@ export const useVaultStore = create<VaultState>((set, get) => {
     set({ selected, expanded });
     await get().refreshTree();
     const present = new Set(get().nodes.map((n) => n.path));
+    const exists = (p: string) => present.has(p);
+    await usePageStore.getState().onExternalChange(change, exists);
     // Only what is gone after the whole batch: an atomic save (delete +
-    // re-create) keeps its place on the trail (final review m2).
-    for (const path of change.removed) trail.removed(path, (p) => present.has(p));
-    await usePageStore.getState().onExternalChange(change, (p) => present.has(p));
+    // re-create) keeps its place on the trail (final review m2). Pruned after
+    // the page followed any rename, so it knows the page on screen (m3).
+    const current = usePageStore.getState().path;
+    for (const path of change.removed) trail.removed(path, { exists, current });
   }
 
   /** Subscribes to external-change and warning events. A refused
@@ -345,8 +348,8 @@ export const useVaultStore = create<VaultState>((set, get) => {
         toast().push({ message: errorMessage(res.error), tone: 'error' });
         return res;
       }
-      useTrailStore.getState().removed(path);
       const page = usePageStore.getState();
+      useTrailStore.getState().removed(path, { current: page.path });
       if (page.path && remap(page.path, path, path)) page.clear();
       const selected = get().selected;
       if (selected && remap(selected, path, path)) set({ selected: next });

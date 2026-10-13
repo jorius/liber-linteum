@@ -22,16 +22,25 @@ interface TrailState {
   renamed: (from: string, to: string) => void;
   /** `path` (a page or folder) was deleted. `exists` reports paths that are
    *  in the vault again (an atomic save deletes and re-creates): those stay
-   *  (final review m2). */
-  removed: (path: string, exists?: (path: string) => boolean) => void;
+   *  (final review m2). `current` is the page on screen: the trail never
+   *  offers it as the next step back or forward (final review m3). */
+  removed: (path: string, opts?: PruneOptions) => void;
 }
 
 const same = (a: TrailEntry | undefined, b: TrailEntry) => a?.path === b.path;
 
-/** Drops deleted pages and then repeated neighbours. */
-function prune(list: TrailEntry[], gone: string, exists?: (path: string) => boolean): TrailEntry[] {
+export interface PruneOptions {
+  exists?: (path: string) => boolean;
+  current?: string | null;
+}
+
+/** Drops deleted pages, then repeated neighbours, then the current page
+ *  where it would be the next step (`list` ends nearest the current page). */
+function prune(list: TrailEntry[], gone: string, { exists, current }: PruneOptions): TrailEntry[] {
   const kept = list.filter((x) => remap(x.path, gone, gone) === null || exists?.(x.path));
-  return kept.filter((x, i) => !same(kept[i - 1], x));
+  const out = kept.filter((x, i) => !same(kept[i - 1], x));
+  while (current && out.at(-1)?.path === current) out.pop();
+  return out;
 }
 
 /** The link trail (M2b §3): only followed internal links add to it; it lives
@@ -60,6 +69,6 @@ export const useTrailStore = create<TrailState>((set, get) => ({
       const move = (x: TrailEntry) => ({ ...x, path: remap(x.path, from, to) ?? x.path });
       return { back: s.back.map(move), forward: s.forward.map(move) };
     }),
-  removed: (path, exists) =>
-    set((s) => ({ back: prune(s.back, path, exists), forward: prune(s.forward, path, exists) })),
+  removed: (path, opts = {}) =>
+    set((s) => ({ back: prune(s.back, path, opts), forward: prune(s.forward, path, opts) })),
 }));
