@@ -48,7 +48,14 @@
     "details": "Detalles"
   },
   "explorer": {
-    "untitled": "Sin título"
+    "untitled": "Sin título",
+    "tree": "Archivos",
+    "rename": "Renombrar",
+    "nameErrors": {
+      "empty": "Escribe un nombre.",
+      "hidden": "Los nombres no pueden empezar con un punto.",
+      "forbidden": "Los nombres no pueden contener «{char}»."
+    }
   },
   "opening": {
     "title": "Abriendo bóveda…",

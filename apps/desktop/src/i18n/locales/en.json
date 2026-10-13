@@ -48,7 +48,14 @@
     "details": "Details"
   },
   "explorer": {
-    "untitled": "Untitled"
+    "untitled": "Untitled",
+    "tree": "Files",
+    "rename": "Rename",
+    "nameErrors": {
+      "empty": "Enter a name.",
+      "hidden": "Names can't start with a dot.",
+      "forbidden": "Names can't contain \"{char}\"."
+    }
   },
   "opening": {
     "title": "Opening vault…",
