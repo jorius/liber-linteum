@@ -2,7 +2,8 @@ import { useTranslation } from 'react-i18next';
 import { BrandMark, LockIcon, NewFolderIcon, NewPageIcon } from '../../app/icons';
 import { dirFor } from '../../stores/tree';
 import { useVaultStore } from '../../stores/vaultStore';
-import { ExplorerTree, type ExplorerTreeProps } from '../explorer/ExplorerTree';
+import { ExplorerDnd } from '../explorer/ExplorerDnd';
+import type { ExplorerTreeProps } from '../explorer/ExplorerTree';
 import styles from './Shell.module.css';
 
 /** Left column: brand, explorer actions, the tree and the privacy footer. */
@@ -44,7 +45,7 @@ export function Sidebar(treeProps: ExplorerTreeProps) {
         </span>
       </div>
       <nav className={styles.treeScroll}>
-        <ExplorerTree {...treeProps} />
+        <ExplorerDnd {...treeProps} />
       </nav>
       <p className={styles.sideFoot}>
         <LockIcon />

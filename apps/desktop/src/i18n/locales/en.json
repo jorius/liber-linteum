@@ -78,5 +78,41 @@
     "truncated": "Showing the first 1 MB of this page.",
     "tags": "Tags",
     "meta": "{links, plural, one {# link} other {# links}} · {backlinks, plural, one {# backlink} other {# backlinks}}"
+  },
+  "menu": {
+    "label": "Actions for {name}",
+    "newPage": "New page",
+    "newFolder": "New folder",
+    "rename": "Rename",
+    "move": "Move to…",
+    "delete": "Delete"
+  },
+  "dialogs": {
+    "cancel": "Cancel",
+    "close": "Close",
+    "delete": {
+      "title": "Move “{name}” to Trash?",
+      "links": "{count, plural, =0 {Nothing links to it.} one {# link points to it and will break.} other {# links point to it and will break.}}",
+      "items": "{count, plural, one {It contains # item.} other {It contains # items.}}",
+      "dontAsk": "Don't ask again",
+      "confirm": "Move to Trash"
+    },
+    "move": {
+      "title": "Move “{name}”",
+      "to": "Destination folder",
+      "root": "Vault root",
+      "confirm": "Move"
+    }
+  },
+  "settings": {
+    "title": "Settings",
+    "language": "Language",
+    "languageSystem": "Same as the system",
+    "theme": "Theme",
+    "themeSystem": "Same as the system",
+    "themeLight": "Light",
+    "themeDark": "Dark",
+    "rewriteLinks": "Update links when renaming or moving",
+    "confirmDelete": "Ask before moving to Trash"
   }
 }

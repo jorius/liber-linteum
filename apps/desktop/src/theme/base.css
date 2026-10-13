@@ -31,3 +31,32 @@ body {
   outline: 2px solid var(--color-focus);
   outline-offset: 2px;
 }
+
+/* Explorer context menu (rendered at the pointer / focused row). */
+.nimw-menu {
+  z-index: 35;
+  min-width: 180px;
+  display: flex;
+  flex-direction: column;
+  padding: 6px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-panel);
+}
+
+.nimw-menu [role='menuitem'] {
+  text-align: left;
+  border: 0;
+  background: none;
+  color: var(--color-text);
+  font: 500 14px var(--font-body);
+  padding: 8px 10px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+
+.nimw-menu [role='menuitem']:hover,
+.nimw-menu [role='menuitem']:focus-visible {
+  background: var(--color-accent-soft);
+}

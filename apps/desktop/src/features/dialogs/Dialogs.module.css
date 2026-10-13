@@ -1,0 +1,112 @@
+.backdrop {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: color-mix(in srgb, var(--color-bg) 60%, transparent);
+  z-index: 40;
+}
+
+.dialog {
+  width: min(480px, calc(100% - 32px));
+  max-height: calc(100% - 64px);
+  overflow: auto;
+  background: var(--color-surface);
+  color: var(--color-text);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-panel);
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.title {
+  font: 700 20px var(--font-display);
+  color: var(--color-text-strong);
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.text {
+  margin: 0;
+  color: var(--color-text-body);
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font: 600 13px var(--font-body);
+  color: var(--color-text-body);
+}
+
+.select {
+  font: 400 14px var(--font-body);
+  color: var(--color-text);
+  background: var(--color-surface-subtle);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-md);
+  padding: 6px 8px;
+}
+
+.fieldset {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: 8px 12px 12px;
+  margin: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+}
+
+.fieldset legend {
+  font: 600 13px var(--font-body);
+  color: var(--color-text-body);
+  padding: 0 4px;
+}
+
+.check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  color: var(--color-text-body);
+}
+
+.buttons {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 6px;
+}
+
+.button {
+  border: 1px solid var(--color-border-strong);
+  background: var(--color-surface);
+  color: var(--color-text);
+  border-radius: var(--radius-md);
+  padding: 9px 16px;
+  font: 600 14px var(--font-body);
+  min-height: 40px;
+  cursor: pointer;
+}
+
+.button:hover:not(:disabled) {
+  border-color: var(--color-accent);
+}
+
+.primary {
+  background: var(--color-accent);
+  border-color: var(--color-accent);
+  color: var(--color-accent-contrast);
+}
+
+.danger {
+  background: var(--color-warn-text);
+  border-color: var(--color-warn-text);
+  color: var(--color-surface);
+}

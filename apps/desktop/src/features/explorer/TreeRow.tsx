@@ -1,3 +1,4 @@
+import { useDraggable, useDroppable } from '@dnd-kit/core';
 import { forwardRef, useEffect, useRef, useState, type KeyboardEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { TreeNode } from '../../ipc';
@@ -153,12 +154,23 @@ export const TreeRow = forwardRef<HTMLLIElement, TreeRowProps>(function TreeRow(
   ref,
 ) {
   const name = displayName(node);
+  // Drag source (any item) and drop target (folders). Only the listeners are
+  // spread: dnd-kit's attributes would replace the treeitem role and tabindex.
+  const drag = useDraggable({ id: node.path, disabled: renaming });
+  const drop = useDroppable({ id: node.path, disabled: node.kind !== 'folder' });
+  const setRefs = (el: HTMLLIElement | null) => {
+    drag.setNodeRef(el);
+    drop.setNodeRef(el);
+    if (typeof ref === 'function') ref(el);
+    else if (ref) ref.current = el;
+  };
   const classes = [styles.row, selected ? styles.selected : '', dropTarget ? styles.drop : '']
     .filter(Boolean)
     .join(' ');
   return (
     <li
-      ref={ref}
+      ref={setRefs}
+      {...drag.listeners}
       role="treeitem"
       aria-label={name}
       aria-level={level}

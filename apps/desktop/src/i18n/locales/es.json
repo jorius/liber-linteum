@@ -78,5 +78,41 @@
     "truncated": "Se muestra el primer 1 MB de esta página.",
     "tags": "Etiquetas",
     "meta": "{links, plural, one {# enlace} other {# enlaces}} · {backlinks, plural, one {# retroenlace} other {# retroenlaces}}"
+  },
+  "menu": {
+    "label": "Acciones para {name}",
+    "newPage": "Nueva página",
+    "newFolder": "Nueva carpeta",
+    "rename": "Renombrar",
+    "move": "Mover a…",
+    "delete": "Eliminar"
+  },
+  "dialogs": {
+    "cancel": "Cancelar",
+    "close": "Cerrar",
+    "delete": {
+      "title": "¿Mover «{name}» a la papelera?",
+      "links": "{count, plural, =0 {Nada enlaza a este elemento.} one {# enlace apunta aquí y se romperá.} other {# enlaces apuntan aquí y se romperán.}}",
+      "items": "{count, plural, one {Contiene # elemento.} other {Contiene # elementos.}}",
+      "dontAsk": "No volver a preguntar",
+      "confirm": "Mover a la papelera"
+    },
+    "move": {
+      "title": "Mover «{name}»",
+      "to": "Carpeta de destino",
+      "root": "Raíz de la bóveda",
+      "confirm": "Mover"
+    }
+  },
+  "settings": {
+    "title": "Ajustes",
+    "language": "Idioma",
+    "languageSystem": "Igual que el sistema",
+    "theme": "Tema",
+    "themeSystem": "Igual que el sistema",
+    "themeLight": "Claro",
+    "themeDark": "Oscuro",
+    "rewriteLinks": "Actualizar enlaces al renombrar o mover",
+    "confirmDelete": "Preguntar antes de mover a la papelera"
   }
 }

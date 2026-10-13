@@ -28,12 +28,19 @@ export function visibleRows(children: Map<string, TreeNode[]>, expanded: Set<str
 export interface ExplorerTreeProps {
   onRequestDelete?: (path: string) => void;
   onRequestMenu?: (path: string, anchor: { x: number; y: number }) => void;
-  /** Highlighted drop target while dragging (Task 9). */
+  /** Highlighted drop target while dragging. */
   dropTarget?: string | null;
+  /** A drag is in progress: arrow keys belong to the drag, not the tree. */
+  dragging?: boolean;
 }
 
 /** ARIA tree (one Tab stop, roving focus, arrow keys, type-ahead, inline rename). */
-export function ExplorerTree({ onRequestDelete, onRequestMenu, dropTarget }: ExplorerTreeProps) {
+export function ExplorerTree({
+  onRequestDelete,
+  onRequestMenu,
+  dropTarget,
+  dragging,
+}: ExplorerTreeProps) {
   const { t } = useTranslation();
   const children = useVaultStore((s) => s.children);
   const expanded = useVaultStore((s) => s.expanded);
@@ -86,7 +93,7 @@ export function ExplorerTree({ onRequestDelete, onRequestMenu, dropTarget }: Exp
   };
 
   const onKeyDown = (e: KeyboardEvent<HTMLUListElement>) => {
-    if (index < 0) return;
+    if (index < 0 || dragging) return;
     const row = rows[index];
     const vault = useVaultStore.getState();
     const isFolder = row.node.kind === 'folder';
