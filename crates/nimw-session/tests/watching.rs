@@ -260,3 +260,31 @@ fn vlt_04_unreadable_new_folder_does_not_drop_the_batch() {
     result.unwrap();
     assert!(s.page(&vp("b.md")).unwrap().is_some());
 }
+
+/// M1b (M1a hand-off §11 o): warnings found while applying watcher events are
+/// their own event, not an `Indexed` report with zero files.
+#[test]
+fn vlt_04_watcher_warnings_are_warning_events() {
+    let vault = tempfile::tempdir().unwrap();
+    std::fs::write(vault.path().join("a.md"), "# a").unwrap();
+    let cache = tempfile::tempdir().unwrap();
+    let events: Events = Arc::new(Mutex::new(Vec::new()));
+    let sink = events.clone();
+    let (s, _) = VaultSession::open(vault.path(), cache.path(), move |e| {
+        sink.lock().unwrap().push(e)
+    })
+    .unwrap();
+    events.lock().unwrap().clear();
+    std::fs::write(vault.path().join("bad.md"), [0xff, 0xfe, b'x']).unwrap();
+    s.apply(vec![WatchEvent::Changed(vp("bad.md"))]).unwrap();
+    let got = events.lock().unwrap().clone();
+    assert!(
+        got.iter()
+            .any(|e| matches!(e, SessionEvent::Warning(m) if m.contains("bad.md"))),
+        "{got:?}"
+    );
+    assert!(
+        !got.iter().any(|e| matches!(e, SessionEvent::Indexed(_))),
+        "{got:?}"
+    );
+}

@@ -218,3 +218,6 @@ Recorded with evidence in the plan's notes (`docs/superpowers/plans/2026-10-12-m
 8. **Drag-and-drop (§3.5):** Space picks up and drops; only dnd-kit listeners are attached to tree rows.
 9. **Welcome language toggle** switches immediately and then saves the setting.
 10. **M0 stub screens** (`GlobalViewScreen`, `EditorScreen`) and their unused strings are removed (replaced by the shell).
+11. **Event permissions (§2.7, found in the real window):** the UI subscribes to `vault:*` events through Tauri's event plugin, so `capabilities/main.json` also grants `core:event:allow-listen` and `core:event:allow-unlisten` (not `core:event:default`, which would allow emitting). If a subscription is ever refused, the vault opens without live updates and says so.
+12. **Command threading (final review):** every command that touches the disk, the index, the OS trash or the network-free settings file is `async` and runs on a blocking thread (Tauri runs sync commands on the macOS UI thread); only the in-memory `settings_get` stays synchronous. A guard test enforces it.
+13. **Settings leniency (final review, §2.3):** settings are parsed field by field; an unrecognised value (e.g. a theme added by a newer version) resets only that field, invalid recent-vault entries are dropped individually, and the resulting warning is shown as a toast.

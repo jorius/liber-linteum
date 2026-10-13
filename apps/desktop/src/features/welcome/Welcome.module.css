@@ -161,3 +161,83 @@
   color: var(--color-text-muted);
   margin: 0;
 }
+
+.recentList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.recentItem {
+  display: flex;
+  align-items: stretch;
+  gap: 6px;
+}
+
+.recentOpen {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  border: 1px solid var(--color-border);
+  background: var(--color-surface-subtle);
+  color: var(--color-text);
+  border-radius: var(--radius-lg);
+  padding: 12px 14px;
+  text-align: left;
+  font: inherit;
+  min-height: 56px;
+  cursor: pointer;
+}
+
+.recentOpen:hover:not(:disabled) {
+  border-color: var(--color-accent);
+}
+
+.recentOpen:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+
+.recentText {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.recentName {
+  font-weight: 700;
+}
+
+.recentPath {
+  font: 400 12px var(--font-mono);
+  color: var(--color-text-faint);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.missing {
+  font: 600 12px var(--font-body);
+  color: var(--color-warn-text);
+}
+
+.forget {
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-text-muted);
+  border-radius: var(--radius-lg);
+  width: 44px;
+  font: 600 18px var(--font-body);
+  cursor: pointer;
+}
+
+.forget:hover {
+  color: var(--color-text);
+  border-color: var(--color-accent);
+}

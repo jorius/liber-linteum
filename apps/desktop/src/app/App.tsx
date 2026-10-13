@@ -1,10 +1,19 @@
-import { useState } from 'react';
-import { ScreenRouter, type Screen } from './ScreenRouter';
+import { OpeningOverlay } from '../features/opening/OpeningOverlay';
+import { AppShell } from '../features/shell/AppShell';
+import { Toaster } from '../features/toasts/Toaster';
+import { Welcome } from '../features/welcome/Welcome';
+import { useVaultStore } from '../stores/vaultStore';
 import { useAppVersion } from './useAppVersion';
 
+/** Routes on the vault status (spec §3.4): welcome, opening overlay, app shell. */
 export function App() {
-  // M1 drives this from the open-vault state.
-  const [screen] = useState<Screen>('welcome');
   const version = useAppVersion();
-  return <ScreenRouter screen={screen} version={version} />;
+  const status = useVaultStore((s) => s.status);
+  return (
+    <>
+      {status === 'open' ? <AppShell /> : <Welcome version={version} />}
+      {status === 'opening' && <OpeningOverlay />}
+      <Toaster />
+    </>
+  );
 }

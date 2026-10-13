@@ -1,0 +1,123 @@
+/* Values from the prototype's sidebar (.trow) on the shared tokens. */
+.tree {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  color: var(--color-sidebar-text);
+  font: 500 13.5px var(--font-body);
+  padding: 6px 8px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  min-height: 32px;
+  user-select: none;
+}
+
+.row:hover {
+  background: color-mix(in srgb, var(--color-sidebar-text) 10%, transparent);
+}
+
+.row:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: -2px;
+}
+
+.selected {
+  background: color-mix(in srgb, var(--color-accent) 35%, var(--color-sidebar-bg));
+  color: #fff;
+}
+
+.drop {
+  background: var(--color-drop-bg);
+  box-shadow: inset 0 0 0 2px var(--color-drop-ring);
+}
+
+/* The row being dragged stays in place, dimmed (the ghost follows the pointer). */
+.dragSource {
+  opacity: 0.4;
+}
+
+/* Drag ghost (dnd-kit DragOverlay). */
+.ghost {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font: 600 13px var(--font-body);
+  box-shadow: var(--shadow-card);
+  border: 1px solid var(--color-border-strong);
+  cursor: grabbing;
+  white-space: nowrap;
+}
+
+.ghostForbidden {
+  opacity: 0.6;
+  cursor: not-allowed;
+  border-style: dashed;
+}
+
+.label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+.folder {
+  font-weight: 600;
+}
+
+.chevron {
+  flex: none;
+  transition: transform 0.12s;
+}
+
+.open {
+  flex: none;
+  transform: rotate(90deg);
+  transition: transform 0.12s;
+}
+
+.renameBox {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+}
+
+.renameInput {
+  font: inherit;
+  color: var(--color-text);
+  background: var(--color-surface);
+  border: 1px solid var(--color-accent);
+  border-radius: var(--radius-sm);
+  padding: 2px 6px;
+  min-width: 0;
+}
+
+.renameInput[aria-invalid='true'] {
+  border-color: var(--color-warn-border);
+}
+
+.renameError {
+  font-size: 12px;
+  color: var(--color-warn-border);
+}
+
+.rootDrop {
+  min-height: 100%;
+  border-radius: var(--radius-sm);
+}

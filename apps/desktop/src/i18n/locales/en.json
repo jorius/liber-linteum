@@ -12,9 +12,117 @@
     "importNotion": "Import a Notion export",
     "recent": "Recent",
     "noRecent": "No recent vaults yet.",
-    "comingSoon": "Vault actions arrive in the next milestone."
+    "notionLater": "Notion import arrives in a later milestone.",
+    "forget": "Remove {name} from recent",
+    "missing": "Folder not found"
   },
-  "languages": { "en": "English", "es": "Español" },
-  "screens": { "global": "Global view", "edit": "Edit" },
-  "privacy": { "localOnly": "Local only · zero network requests" }
+  "languages": {
+    "en": "English",
+    "es": "Español"
+  },
+  "privacy": {
+    "localOnly": "Local only · zero network requests"
+  },
+  "errors": {
+    "noVault": "No vault is open.",
+    "notFound": "Not found.",
+    "alreadyExists": "Something with that name already exists.",
+    "notEmpty": "Pick an empty or new folder.",
+    "invalidName": "That name can't be used.",
+    "conflict": "The file changed on disk. Try again.",
+    "outsideVault": "That path is outside the vault.",
+    "unsafeRewrite": "Some links couldn't be updated safely.",
+    "watch": "Watching the vault for changes failed.",
+    "io": "Something went wrong: {message}"
+  },
+  "toasts": {
+    "linksUpdated": "{count, plural, one {Updated links in # file} other {Updated links in # files}}",
+    "renameFailed": "{count, plural, one {Renamed. # file couldn't be updated} other {Renamed. # files couldn't be updated}}",
+    "trashed": "Moved to Trash",
+    "openedWithWarnings": "{count, plural, one {Opened with # warning} other {Opened with # warnings}}",
+    "dismiss": "Dismiss",
+    "details": "Details",
+    "liveUpdatesUnavailable": "Live updates are unavailable: changes made outside the app appear after reopening the vault.",
+    "settingsWarning": "Some settings couldn't be read and were reset to defaults"
+  },
+  "explorer": {
+    "untitled": "Untitled",
+    "tree": "Files",
+    "rename": "Rename",
+    "nameErrors": {
+      "empty": "Enter a name.",
+      "hidden": "Names can't start with a dot.",
+      "forbidden": "Names can't contain \"{char}\"."
+    },
+    "drag": {
+      "pickedUp": "Picked up {name}.",
+      "over": "{name} is over {target}.",
+      "notOver": "{name} is not over a folder.",
+      "moved": "Moved {name} to {target}.",
+      "notAllowed": "{name} can't be moved there.",
+      "cancelled": "Move of {name} cancelled."
+    }
+  },
+  "opening": {
+    "title": "Opening vault…",
+    "preparing": "Reading the folder…",
+    "progress": "Indexing {done, number} / {total, number}"
+  },
+  "shell": {
+    "files": "Files · {name}",
+    "newPage": "New page",
+    "newFolder": "New folder",
+    "view": "View",
+    "edit": "Edit",
+    "globalView": "Global view",
+    "globalLater": "Global view arrives in a later milestone.",
+    "settings": "Settings",
+    "closeVault": "Close vault"
+  },
+  "page": {
+    "region": "Page",
+    "empty": "Pick a page in the explorer",
+    "loading": "Loading…",
+    "deleted": "This page was deleted outside the app.",
+    "binary": "This file isn't valid UTF-8 text, so it can't be shown.",
+    "truncated": "Showing the first 1 MB of this page.",
+    "tags": "Tags",
+    "meta": "{links, plural, one {# link} other {# links}} · {backlinks, plural, one {# backlink} other {# backlinks}}"
+  },
+  "menu": {
+    "label": "Actions for {name}",
+    "newPage": "New page",
+    "newFolder": "New folder",
+    "rename": "Rename",
+    "move": "Move to…",
+    "delete": "Delete"
+  },
+  "dialogs": {
+    "cancel": "Cancel",
+    "close": "Close",
+    "delete": {
+      "title": "Move “{name}” to Trash?",
+      "links": "{count, plural, =0 {Nothing links to it.} one {# link points to it and will break.} other {# links point to it and will break.}}",
+      "items": "{count, plural, one {It contains # item.} other {It contains # items.}}",
+      "dontAsk": "Don't ask again",
+      "confirm": "Move to Trash"
+    },
+    "move": {
+      "title": "Move “{name}”",
+      "to": "Destination folder",
+      "root": "Vault root",
+      "confirm": "Move"
+    }
+  },
+  "settings": {
+    "title": "Settings",
+    "language": "Language",
+    "languageSystem": "Same as the system",
+    "theme": "Theme",
+    "themeSystem": "Same as the system",
+    "themeLight": "Light",
+    "themeDark": "Dark",
+    "rewriteLinks": "Update links when renaming or moving",
+    "confirmDelete": "Ask before moving to Trash"
+  }
 }

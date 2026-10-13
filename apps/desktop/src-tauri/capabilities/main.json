@@ -1,7 +1,26 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "main",
-  "description": "Main window. Only explicitly listed commands are callable; each milestone adds its own.",
+  "description": "Main window. Only explicitly listed commands are callable; each milestone adds its own. The dialog plugin is limited to the folder picker; the event plugin only to listen/unlisten (the UI subscribes to vault:* events).",
   "windows": ["main"],
-  "permissions": ["allow-app-info"]
+  "permissions": [
+    "allow-app-info",
+    "allow-vault-open",
+    "allow-vault-create",
+    "allow-vault-close",
+    "allow-vault-tree",
+    "allow-page-get",
+    "allow-backlink-count",
+    "allow-entry-create-page",
+    "allow-entry-create-folder",
+    "allow-entry-rename",
+    "allow-entry-trash",
+    "allow-settings-get",
+    "allow-settings-set",
+    "allow-vaults-recent",
+    "allow-vaults-forget",
+    "core:event:allow-listen",
+    "core:event:allow-unlisten",
+    "dialog:allow-open"
+  ]
 }

@@ -17,6 +17,9 @@
   --color-accent-soft: #e9e1f4;
   --color-sidebar-bg: #1f1d24;
   --color-sidebar-text: #d9d4e2;
+  /* Drag-and-drop on the (always dark) sidebar: visible in both themes. */
+  --color-drop-bg: rgba(185, 162, 230, 0.22);
+  --color-drop-ring: #b9a2e6;
   --color-warn-bg: #fff1e3;
   --color-warn-border: #efc49c;
   --color-warn-text: #7a330b;
