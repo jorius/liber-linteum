@@ -11,6 +11,7 @@ import { nameOf } from '../../stores/tree';
 import styles from './Preview.module.css';
 import { renderChildren, type RenderCtx } from './renderHast';
 import { useDebounced } from './useDebounced';
+import { useParsed } from './useParsed';
 import { useResolved } from './useResolved';
 
 /** Re-render delay after typing (M2a §4). */
@@ -24,19 +25,30 @@ export interface PreviewProps {
   heading?: string | null;
   depth?: number;
   chain?: string[];
+  /** A fragment inside the editor (Live Preview widget): no heading scrolling. */
+  embedded?: boolean;
 }
 
 /** The rendered pane (M2a §4): sanitized Markdown with resolved links and embeds. */
-export function Preview({ text, path, heading = null, depth = 0, chain = [] }: PreviewProps) {
+export function Preview({
+  text,
+  path,
+  heading = null,
+  depth = 0,
+  chain = [],
+  embedded = false,
+}: PreviewProps) {
   const { t } = useTranslation();
   const shown = useDebounced(text, RENDER_DEBOUNCE_MS);
+  const page = useParsed(shown);
   const tree = useMemo(() => {
-    const page = parsePage(shown);
-    if (heading) page.tree = sectionOf(page.tree, heading) ?? { type: 'root', children: [] };
-    return toSafeHast(page, { sourcePath: path });
-  }, [shown, path, heading]);
+    const part = heading
+      ? { ...page, tree: sectionOf(page.tree, heading) ?? { type: 'root' as const, children: [] } }
+      : page;
+    return toSafeHast(part, { sourcePath: path });
+  }, [page, path, heading]);
   const resolve = useResolved(path, tree);
-  const anchor = usePageStore((s) => (depth === 0 ? s.anchor : null));
+  const anchor = usePageStore((s) => (depth === 0 && !embedded ? s.anchor : null));
   const box = useRef<HTMLDivElement>(null);
 
   // Scroll to the heading a link asked for (by slug or by exact id).
@@ -49,17 +61,25 @@ export function Preview({ text, path, heading = null, depth = 0, chain = [] }: P
     target?.scrollIntoView?.({ block: 'start' });
   }, [anchor, tree]);
 
-  const ctx: RenderCtx = {
-    path,
-    depth,
-    chain: [...chain, path],
-    resolve,
-    t,
-    renderNote: (note, h) => <NoteEmbed key={`${note}#${h}`} path={note} heading={h} ctx={ctx} />,
-  };
+  // Re-rendering the body only when its inputs change keeps typing in Split
+  // cheap: the pane re-renders on its debounce, not on every keystroke.
+  const chainKey = chain.join('\u0000');
+  const body = useMemo(() => {
+    const ctx: RenderCtx = {
+      path,
+      depth,
+      chain: [...chain, path],
+      resolve,
+      t,
+      renderNote: (note, h) => <NoteEmbed key={`${note}#${h}`} path={note} heading={h} ctx={ctx} />,
+    };
+    return renderChildren(tree, ctx);
+    // `chainKey` stands for `chain`.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tree, resolve, path, depth, chainKey, t]);
   return (
-    <div ref={box} className={depth ? styles.nested : styles.content}>
-      {renderChildren(tree, ctx)}
+    <div ref={box} className={depth || embedded ? styles.nested : styles.content}>
+      {body}
     </div>
   );
 }

@@ -2,6 +2,7 @@ import i18next from 'i18next';
 import { create } from 'zustand';
 import { PageDoc, type PageDocHooks, type SaveStatus } from '../features/editor/pageDoc';
 import { isTauri, onCloseRequested, type ChangedPayload, type CommandError } from '../ipc';
+import { openPage } from './navigate';
 import { useToastStore } from './toastStore';
 import { nameOf, remap } from './tree';
 
@@ -63,11 +64,7 @@ const hooks: PageDocHooks = {
   onConflictCopy: (_doc, copy) => {
     useToastStore.getState().push({
       message: i18next.t('editor.conflictCopy', { name: nameOf(copy).replace(/\.md$/i, '') }),
-      // Lazy: navigate → vaultStore → pageStore → editorStore would be a load cycle.
-      action: {
-        label: i18next.t('editor.openCopy'),
-        run: () => void import('./navigate').then((m) => m.openPage(copy)),
-      },
+      action: { label: i18next.t('editor.openCopy'), run: () => void openPage(copy) },
     });
   },
 };

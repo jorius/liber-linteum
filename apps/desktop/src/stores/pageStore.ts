@@ -34,6 +34,20 @@ interface PageState {
 }
 
 let seq = 0;
+let watchingSaves = false;
+
+/** Our own saves aren't reported by the watcher: refresh the header data
+ *  (title, tags, link counts) after each one. Subscribed on first use, not at
+ *  module load, because the stores import each other. */
+function watchSaves() {
+  if (watchingSaves) return;
+  watchingSaves = true;
+  useEditorStore.subscribe((s, prev) => {
+    if (s.path && s.path === prev.path && prev.hash && s.hash !== prev.hash) {
+      void usePageStore.getState().refresh();
+    }
+  });
+}
 
 export const usePageStore = create<PageState>((set, get) => ({
   path: null,
@@ -43,6 +57,7 @@ export const usePageStore = create<PageState>((set, get) => ({
   reveal: (heading) =>
     set({ anchor: heading ? { heading, nonce: (get().anchor?.nonce ?? 0) + 1 } : null }),
   load: async (path) => {
+    watchSaves();
     const mine = ++seq;
     const same = get().path === path;
     set({
@@ -97,11 +112,3 @@ export const usePageStore = create<PageState>((set, get) => ({
     if (touched || (get().state === 'deleted' && stillThere)) await get().load(path);
   },
 }));
-
-// Our own saves aren't reported by the watcher: refresh the header data
-// (title, tags, link counts) after each one.
-useEditorStore.subscribe((s, prev) => {
-  if (s.path && s.path === prev.path && prev.hash && s.hash !== prev.hash) {
-    void usePageStore.getState().refresh();
-  }
-});

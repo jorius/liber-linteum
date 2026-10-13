@@ -121,17 +121,16 @@ function collectTags(tree: Root, fmTags: string[]): string[] {
   return out;
 }
 
-/** Parses one page. Pure and synchronous; positions are UTF-16 offsets into `text`. */
-export function parsePage(text: string): ParsedPage {
-  const loc = locator(text);
-  let tree = processor.parse(text) as Root;
-  // Comments are blanked (same length) and the page re-parsed, so positions
-  // still index `text` but nothing inside a comment renders or links.
-  const comments = findComments(text, tree);
-  const source = maskComments(text, comments);
-  if (comments.length) tree = processor.parse(source) as Root;
-  transformBlocks(tree, source, loc);
-  transformInline(tree, source, loc);
+/** remark + our block and inline transforms, without comment masking. */
+export function parseTree(src: string, loc = locator(src)): Root {
+  const tree = processor.parse(src) as Root;
+  transformBlocks(tree, src, loc);
+  transformInline(tree, src, loc);
+  return tree;
+}
+
+/** Page-level data derived from a finished tree. */
+export function finishPage(tree: Root, comments: [number, number][]): ParsedPage {
   const frontmatter = readFrontmatter(tree);
   return {
     tree,
@@ -140,4 +139,14 @@ export function parsePage(text: string): ParsedPage {
     tags: collectTags(tree, frontmatterTags(frontmatter)),
     comments,
   };
+}
+
+/** Parses one page. Pure and synchronous; positions are UTF-16 offsets into `text`. */
+export function parsePage(text: string): ParsedPage {
+  const loc = locator(text);
+  // Comments are blanked (same length) and the page re-parsed, so positions
+  // still index `text` but nothing inside a comment renders or links.
+  const comments = findComments(text, processor.parse(text) as Root);
+  const source = maskComments(text, comments);
+  return finishPage(parseTree(source, loc), comments);
 }

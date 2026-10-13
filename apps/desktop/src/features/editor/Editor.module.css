@@ -1,0 +1,46 @@
+.single,
+.split {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+}
+
+.single {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.split {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 1px;
+  background: var(--color-border);
+}
+
+.live,
+.source,
+.pane {
+  min-height: 0;
+  background: var(--color-surface);
+}
+
+/* Live Preview reads like a page: a centred measure. */
+.live :global(.cm-content) {
+  max-width: 760px;
+  margin: 0 auto;
+  padding-left: 40px;
+  padding-right: 40px;
+}
+
+.source :global(.cm-content) {
+  padding-left: 24px;
+  padding-right: 24px;
+}
+
+.live:focus-within,
+.source:focus-within {
+  box-shadow: inset 0 0 0 2px var(--color-focus);
+}
+
+.pane {
+  overflow: auto;
+  padding: 20px 28px;
+}

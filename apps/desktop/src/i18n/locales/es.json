@@ -99,7 +99,8 @@
     "retrying": "Sin guardar — reintentando",
     "orphaned": "Esta página se borró fuera de la app. Tu texto sigue aquí.",
     "saveAsNew": "Guardar como página nueva",
-    "largeNote": "Vista previa simplificada para notas grandes"
+    "largeNote": "Vista previa simplificada para notas grandes",
+    "preview": "Vista previa"
   },
   "preview": {
     "remoteBlocked": "Imagen remota bloqueada (privacidad)",

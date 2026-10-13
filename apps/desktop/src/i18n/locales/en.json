@@ -99,7 +99,8 @@
     "retrying": "Unsaved — retrying",
     "orphaned": "This page was deleted outside the app. Your text is still here.",
     "saveAsNew": "Save as new page",
-    "largeNote": "Simplified preview for large notes"
+    "largeNote": "Simplified preview for large notes",
+    "preview": "Preview"
   },
   "preview": {
     "remoteBlocked": "Remote image blocked (privacy)",

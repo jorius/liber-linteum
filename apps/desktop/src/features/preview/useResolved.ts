@@ -1,5 +1,5 @@
 import type { Element, Root } from 'hast';
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { linksResolve, type LinkKind, type LinkTarget } from '../../ipc';
 import { useVaultStore } from '../../stores/vaultStore';
 
@@ -57,8 +57,11 @@ export function useResolved(source: string, tree: Root): Resolve {
     // `key` stands for `targets`; `nodes` re-resolves after file changes.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [source, key, nodes]);
-  return (kind, target) => {
-    const k = keyOf({ kind, target: kind === 'markdown' ? `/${target}` : target });
-    return result.map.has(k) ? result.map.get(k) : undefined;
-  };
+  return useCallback(
+    (kind, target) => {
+      const k = keyOf({ kind, target: kind === 'markdown' ? `/${target}` : target });
+      return result.map.has(k) ? result.map.get(k) : undefined;
+    },
+    [result],
+  );
 }
