@@ -274,3 +274,129 @@ fn rename_rejects_invalid_requests() {
         Err(SessionError::InvalidName(_))
     ));
 }
+
+/// A fresh vault from `(path, content)` pairs, opened in a session.
+fn vault_with(files: &[(&str, &[u8])]) -> (tempfile::TempDir, tempfile::TempDir, VaultSession) {
+    let vault = tempfile::tempdir().unwrap();
+    for (p, c) in files {
+        let full = vault.path().join(p);
+        std::fs::create_dir_all(full.parent().unwrap()).unwrap();
+        std::fs::write(full, c).unwrap();
+    }
+    let cache = tempfile::tempdir().unwrap();
+    let (s, _) = VaultSession::open(vault.path(), cache.path(), |_: SessionEvent| {}).unwrap();
+    (vault, cache, s)
+}
+
+/// Final review C1: a linked image and frontmatter that pulldown-cmark does not
+/// recognise used to produce overlapping edits that corrupted the note.
+#[test]
+fn exp_04_linked_image_and_unrecognised_frontmatter_rewrite_cleanly() {
+    let (dir, _c, s) = vault_with(&[
+        ("x.png", b"png"),
+        ("A.md", b"# A\n"),
+        ("p.md", b"[![alt](x.png)](x.png)\n"),
+        ("q.md", b"---\n\nrelated:\n  - \"[[A]]\"\n---\n# Q\n"),
+    ]);
+    let out = s.rename(&vp("x.png"), &vp("new name.png"), true).unwrap();
+    assert!(out.failed.is_empty(), "{:?}", out.failed);
+    assert_eq!(
+        read(&dir, "p.md"),
+        "[![alt](new%20name.png)](new%20name.png)\n"
+    );
+    let out = s.rename(&vp("A.md"), &vp("Longer Name.md"), true).unwrap();
+    assert!(out.failed.is_empty(), "{:?}", out.failed);
+    assert_eq!(
+        read(&dir, "q.md"),
+        "---\n\nrelated:\n  - \"[[Longer Name]]\"\n---\n# Q\n"
+    );
+}
+
+/// Final review I1: names that cannot be linked to are refused up front.
+#[test]
+fn exp_02_names_that_would_break_links_are_rejected() {
+    let (dir, _c, s) = vault_with(&[("A.md", b"# A\n"), ("p.md", b"[[A]]\n")]);
+    for bad in [
+        "C# basics.md",
+        "a|b.md",
+        "x^y.md",
+        "[x].md",
+        "q?.md",
+        "note: draft.md",
+        ".hidden.md",
+    ] {
+        assert!(
+            matches!(
+                s.rename(&vp("A.md"), &vp(bad), true),
+                Err(SessionError::InvalidName(_))
+            ),
+            "{bad}"
+        );
+    }
+    assert!(matches!(
+        s.create_page(&VaultPath::root(), "C#"),
+        Err(SessionError::InvalidName(_))
+    ));
+    assert!(matches!(
+        s.create_folder(&VaultPath::root(), "a|b"),
+        Err(SessionError::InvalidName(_))
+    ));
+    assert_eq!(read(&dir, "p.md"), "[[A]]\n");
+}
+
+/// Final review I1: an existing folder whose name needs escaping in a Markdown
+/// destination gets %-encoded, so the link keeps pointing at the file.
+#[test]
+fn exp_04_markdown_destination_into_hash_folder_is_encoded() {
+    let (dir, _c, s) = vault_with(&[
+        ("A.md", b"# A\n"),
+        ("C#/keep.md", b"x\n"),
+        ("p.md", b"[a](A.md)\n"),
+    ]);
+    let out = s.rename(&vp("A.md"), &vp("C#/A.md"), true).unwrap();
+    assert!(out.failed.is_empty(), "{:?}", out.failed);
+    assert_eq!(read(&dir, "p.md"), "[a](C%23/A.md)\n");
+    assert_eq!(
+        s.page(&vp("p.md")).unwrap().unwrap().links[0]
+            .target_path
+            .as_deref(),
+        Some("C#/A.md")
+    );
+}
+
+/// Final review I1: when no link text can point at the moved file (a wikilink
+/// path through a folder named with `#`), the file is left unchanged and
+/// reported instead of being rewritten to a link that resolves elsewhere.
+#[test]
+fn exp_04_unlinkable_rewrite_is_reported_not_written() {
+    let (dir, _c, s) = vault_with(&[
+        ("A.md", b"# A\n"),
+        ("B/A.md", b"# other A\n"),
+        ("C#/keep.md", b"x\n"),
+        ("Q/p.md", b"[[A]]\n"),
+    ]);
+    let out = s.rename(&vp("A.md"), &vp("C#/A.md"), true).unwrap();
+    assert_eq!(read(&dir, "Q/p.md"), "[[A]]\n");
+    assert_eq!(out.failed.len(), 1, "{out:?}");
+    assert_eq!(out.failed[0].0, "Q/p.md");
+}
+
+/// Final review (M1, re-graded Important): a symlinked note is never replaced
+/// by a plain file; its link edits happen through the real file.
+#[cfg(unix)]
+#[test]
+fn exp_04_symlinked_notes_stay_symlinks() {
+    let (dir, _c, s) = vault_with(&[("A.md", b"# A\n"), ("real.md", b"[[A]]\n")]);
+    std::os::unix::fs::symlink(dir.path().join("real.md"), dir.path().join("alias.md")).unwrap();
+    drop(s);
+    let cache = tempfile::tempdir().unwrap();
+    let (s, _) = VaultSession::open(dir.path(), cache.path(), |_: SessionEvent| {}).unwrap();
+    s.rename(&vp("A.md"), &vp("B.md"), true).unwrap();
+    let meta = std::fs::symlink_metadata(dir.path().join("alias.md")).unwrap();
+    assert!(
+        meta.file_type().is_symlink(),
+        "alias.md must stay a symlink"
+    );
+    assert_eq!(read(&dir, "real.md"), "[[B]]\n");
+    assert_eq!(read(&dir, "alias.md"), "[[B]]\n");
+}

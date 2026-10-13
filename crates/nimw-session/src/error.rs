@@ -11,6 +11,10 @@ pub enum SessionError {
     NotIndexed(String),
     #[error("invalid name: {0}")]
     InvalidName(String),
+    /// A link rewrite was refused because it would corrupt the file or change
+    /// where a link points; the file was left unchanged.
+    #[error("not rewritten: {0}")]
+    UnsafeRewrite(String),
 }
 
 pub type Result<T> = std::result::Result<T, SessionError>;

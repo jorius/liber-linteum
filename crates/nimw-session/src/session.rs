@@ -356,12 +356,20 @@ pub(crate) fn clamp_ns(ns: i128) -> i64 {
     ns.clamp(i64::MIN as i128, i64::MAX as i128) as i64
 }
 
-/// A single file or folder name: non-empty, no `/`, not hidden.
+/// Characters that cannot appear in a file or folder name created by the app:
+/// path separators, characters that break `[[wikilinks]]` (`#`, `|`, `^`, `[`,
+/// `]`) and characters Windows/macOS forbid or mangle (Obsidian's rule set).
+const FORBIDDEN_NAME_CHARS: &[char] = &[
+    '/', '\\', '#', '|', '^', '[', ']', ':', '*', '"', '<', '>', '?',
+];
+
+/// A single file or folder name: non-empty, not hidden, no forbidden or
+/// control characters (final review I1: such names produce unlinkable files).
 pub(crate) fn validate_name(name: &str) -> Result<&str> {
     let trimmed = name.trim();
     if trimmed.is_empty()
-        || trimmed.contains('/')
-        || trimmed.contains('\\')
+        || trimmed.contains(FORBIDDEN_NAME_CHARS)
+        || trimmed.chars().any(char::is_control)
         || is_hidden_name(trimmed)
     {
         return Err(SessionError::InvalidName(name.to_string()));

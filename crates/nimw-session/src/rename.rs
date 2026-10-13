@@ -1,6 +1,6 @@
 use crate::error::{Result, SessionError};
 use crate::events::RenameOutcome;
-use crate::session::{VaultSession, is_page_path, subtree_files};
+use crate::session::{VaultSession, is_page_path, subtree_files, validate_name};
 use nimw_markdown::{FileSet, LinkKind, link_key, parse_page, resolve, shortest_unique_target};
 use nimw_vault::{VaultError, VaultPath};
 use percent_encoding::{AsciiSet, CONTROLS, utf8_percent_encode};
@@ -70,8 +70,10 @@ impl RenamePlan {
             // Markdown destinations keep their style: %-encoded stays encoded;
             // a plain destination that now needs a space is %-encoded too
             // (wrapping in `<…>` would break a `#heading` suffix).
+            // `#` and `?` in a plain destination would start a heading/query.
             let path_style = matches!(link.kind, LinkKind::Markdown | LinkKind::MarkdownImage);
-            if link.encoded || (path_style && !link.angle && new_text.contains(' ')) {
+            let needs_encoding = new_text.contains([' ', '#', '?']);
+            if link.encoded || (path_style && !link.angle && needs_encoding) {
                 new_text = utf8_percent_encode(&new_text, PATH_ENCODE).to_string();
             }
             if text[link.range.clone()] != new_text {
@@ -80,6 +82,55 @@ impl RenamePlan {
         }
         edits
     }
+
+    /// Final check before writing (final review C1/I1): the rewritten text must
+    /// contain the same links in the same order, and every link that resolved
+    /// before the move must resolve to the moved-through target afterwards.
+    pub(crate) fn verify(
+        &self,
+        path_now: &str,
+        old_text: &str,
+        new_text: &str,
+    ) -> std::result::Result<(), String> {
+        let old_src = self.unmap(path_now);
+        let before = parse_page(old_text, "").links;
+        let after = parse_page(new_text, "").links;
+        if before.len() != after.len() {
+            return Err(format!(
+                "rewrite would change the number of links ({} → {})",
+                before.len(),
+                after.len()
+            ));
+        }
+        for (b, a) in before.iter().zip(&after) {
+            if b.kind != a.kind {
+                return Err("rewrite would change a link's kind".to_string());
+            }
+            let Some(target) = resolve(b.kind, &b.target, old_src, &self.old_files) else {
+                continue;
+            };
+            let want = self.map(&target);
+            if resolve(a.kind, &a.target, path_now, &self.new_files).as_deref() != Some(want) {
+                return Err(format!(
+                    "no link text can point at {want} from here; links left unchanged"
+                ));
+            }
+        }
+        Ok(())
+    }
+}
+
+/// Sorts and de-duplicates edits; overlapping edits are refused (they would
+/// corrupt the text — final review C1).
+pub(crate) fn checked_edits(
+    mut edits: Vec<(Range<usize>, String)>,
+) -> std::result::Result<Vec<(Range<usize>, String)>, String> {
+    edits.sort_by_key(|e| (e.0.start, e.0.end));
+    edits.dedup();
+    if edits.windows(2).any(|w| w[0].0.end > w[1].0.start) {
+        return Err("overlapping link edits; file left unchanged".to_string());
+    }
+    Ok(edits)
 }
 
 /// Applies non-overlapping edits from the end of the text to the start.
@@ -123,6 +174,9 @@ impl VaultSession {
             return Err(SessionError::InvalidName(format!(
                 "cannot move {from} into itself"
             )));
+        }
+        if validate_name(to.file_name())? != to.file_name() {
+            return Err(SessionError::InvalidName(to.to_string()));
         }
         let (plan, sources) = {
             let index = self.index();
@@ -221,14 +275,29 @@ impl VaultSession {
         path: &VaultPath,
         before_write: &dyn Fn(&VaultPath),
     ) -> Result<usize> {
+        // Never replace a symlinked note with a plain file: its links are
+        // updated through the real file instead (final review M1).
+        let full = self.vault.fs_path(path)?;
+        if std::fs::symlink_metadata(&full).is_ok_and(|m| m.file_type().is_symlink()) {
+            let (text, _) = self.vault.read_to_string(path)?;
+            if plan.edits_for(path.as_str(), &text).is_empty() {
+                return Ok(0);
+            }
+            return Err(SessionError::UnsafeRewrite(
+                "symlinked note; edit the file it points to".to_string(),
+            ));
+        }
         let mut last = None;
         for _ in 0..MAX_ATTEMPTS {
             let (text, hash) = self.vault.read_to_string(path)?;
-            let edits = plan.edits_for(path.as_str(), &text);
+            let edits = checked_edits(plan.edits_for(path.as_str(), &text))
+                .map_err(SessionError::UnsafeRewrite)?;
             if edits.is_empty() {
                 return Ok(0);
             }
             let new_text = apply_edits(&text, &edits);
+            plan.verify(path.as_str(), &text, &new_text)
+                .map_err(SessionError::UnsafeRewrite)?;
             before_write(path);
             match self.vault.write_cas(path, new_text.as_bytes(), Some(hash)) {
                 Ok(new_hash) => {
@@ -246,6 +315,16 @@ impl VaultSession {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn exp_04_overlapping_edits_are_refused_and_duplicates_merged() {
+        let dup = vec![(8..13, "y".to_string()), (8..13, "y".to_string())];
+        assert_eq!(checked_edits(dup).unwrap(), vec![(8..13, "y".to_string())]);
+        let overlap = vec![(8..13, "y".to_string()), (10..20, "z".to_string())];
+        assert!(checked_edits(overlap).is_err());
+        let conflicting_same_range = vec![(8..13, "y".to_string()), (8..13, "z".to_string())];
+        assert!(checked_edits(conflicting_same_range).is_err());
+    }
     use crate::events::SessionEvent;
     use std::sync::atomic::{AtomicUsize, Ordering};
 
