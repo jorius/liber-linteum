@@ -9,6 +9,7 @@ import { LIVE_FONTS, SOURCE_FONTS, systemChoice, type FontOption } from '../../t
 import { PALETTES } from '../../theme/palettes';
 import { Dialog } from './Dialog';
 import styles from './Dialogs.module.css';
+import { useLatestSave } from './useLatestSave';
 
 const THEMES: Theme[] = ['system', 'light', 'dark'];
 const themeKey = { system: 'themeSystem', light: 'themeLight', dark: 'themeDark' } as const;
@@ -81,7 +82,7 @@ export function SettingsDialog({ onClose }: { onClose: () => void }) {
         {settings.palette === 'custom' && (
           <AccentEditor
             value={settings.accentColor}
-            onSave={(accentColor) => void update({ accentColor })}
+            onSave={(accentColor) => update({ accentColor })}
           />
         )}
       </section>
@@ -187,14 +188,26 @@ function Swatch({ id, accent }: { id: PaletteChoice; accent: string }) {
 }
 
 /** Colour picker + hex field for the custom accent, with the contrast the
- *  derived palette reaches in each mode. */
-function AccentEditor({ value, onSave }: { value: string; onSave: (hex: string) => void }) {
+ *  derived palette reaches in each mode. The picker previews locally while
+ *  dragging and saves the settled colour; the last colour always wins. */
+function AccentEditor({
+  value,
+  onSave,
+}: {
+  value: string;
+  onSave: (hex: string) => Promise<unknown>;
+}) {
   const { t } = useTranslation();
   const [draft, setDraft] = useState(value);
   const [invalid, setInvalid] = useState(false);
   const errorId = useId();
-  useEffect(() => setDraft(value), [value]);
-  const p = derive(value);
+  const saver = useLatestSave(onSave);
+  // Follow the saved value, but not while a newer colour is on its way.
+  useEffect(() => {
+    if (!saver.pending()) setDraft(value);
+  }, [value, saver]);
+  const shown = HEX.test(draft) ? draft.toLowerCase() : value;
+  const p = derive(shown);
 
   const commit = () => {
     if (!HEX.test(draft)) {
@@ -202,7 +215,8 @@ function AccentEditor({ value, onSave }: { value: string; onSave: (hex: string) 
       return;
     }
     setInvalid(false);
-    if (draft.toLowerCase() !== value) onSave(draft.toLowerCase());
+    const hex = draft.toLowerCase();
+    if (hex !== value || saver.pending()) saver.now(hex);
   };
   const onKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter') {
@@ -218,8 +232,13 @@ function AccentEditor({ value, onSave }: { value: string; onSave: (hex: string) 
           type="color"
           className={styles.colorInput}
           aria-label={t('settings.accentColor')}
-          value={value}
-          onChange={(e) => onSave(e.target.value.toLowerCase())}
+          value={shown}
+          onChange={(e) => {
+            const hex = e.target.value.toLowerCase();
+            setDraft(hex);
+            setInvalid(false);
+            saver.schedule(hex);
+          }}
         />
         <input
           type="text"
@@ -229,7 +248,11 @@ function AccentEditor({ value, onSave }: { value: string; onSave: (hex: string) 
           aria-describedby={invalid ? errorId : undefined}
           spellCheck={false}
           value={draft}
-          onChange={(e) => setDraft(e.target.value.trim())}
+          onChange={(e) => {
+            const next = e.target.value.trim();
+            setDraft(next);
+            if (HEX.test(next)) setInvalid(false);
+          }}
           onKeyDown={onKeyDown}
           onBlur={commit}
         />

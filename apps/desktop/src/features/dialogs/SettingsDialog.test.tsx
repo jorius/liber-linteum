@@ -73,6 +73,59 @@ describe('Settings dialog (M2b §4, §5, §7)', () => {
     await waitFor(() => expect(patches).toEqual([{ accentColor: '#6d28d9' }]));
   });
 
+  it('the hex error clears once the value is valid again, typed or picked', async () => {
+    useSettingsStore.setState({ settings: { ...DEFAULT_SETTINGS, palette: 'custom' } });
+    open();
+    const hex = screen.getByRole('textbox', { name: 'Accent colour (hex)' });
+    await userEvent.clear(hex);
+    await userEvent.type(hex, 'pink{Enter}');
+    expect(screen.getByRole('alert')).toBeInTheDocument();
+    await userEvent.clear(hex);
+    await userEvent.type(hex, '#2aa198');
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    expect(hex).not.toHaveAttribute('aria-invalid', 'true');
+
+    await userEvent.clear(hex);
+    await userEvent.type(hex, 'nope{Enter}');
+    expect(screen.getByRole('alert')).toBeInTheDocument();
+    fireEvent.input(screen.getByLabelText('Accent colour'), { target: { value: '#6d28d9' } });
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    expect(hex).toHaveValue('#6d28d9');
+  });
+
+  it('dragging the colour picker saves a bounded number of times, and the last colour wins', async () => {
+    useSettingsStore.setState({ settings: { ...DEFAULT_SETTINGS, palette: 'custom' } });
+    // Earlier saves answer later, as a busy blocking pool might.
+    let calls = 0;
+    mockIPC(async (cmd, raw) => {
+      if (cmd !== 'settings_set') return cmd === 'fonts_list' ? [] : null;
+      const patch = (raw as { patch: Record<string, unknown> }).patch;
+      patches.push(patch);
+      await new Promise((r) => setTimeout(r, Math.max(10, 80 - 20 * calls++)));
+      return { ...useSettingsStore.getState().settings, ...patch };
+    });
+    open();
+    const picker = screen.getByLabelText('Accent colour');
+    const colours = Array.from(
+      { length: 20 },
+      (_, i) => `#${(0x203040 + i * 0x050301).toString(16).padStart(6, '0')}`,
+    );
+    // Mostly quick moves, with a pause now and then long enough to save.
+    for (const [i, value] of colours.entries()) {
+      fireEvent.input(picker, { target: { value } });
+      await new Promise((r) => setTimeout(r, i % 5 === 4 ? 200 : 15));
+    }
+    const last = colours[colours.length - 1];
+    expect(screen.getByRole('textbox', { name: 'Accent colour (hex)' })).toHaveValue(last);
+    await waitFor(() => expect(useSettingsStore.getState().settings.accentColor).toBe(last), {
+      timeout: 2000,
+    });
+    await new Promise((r) => setTimeout(r, 300));
+    expect(useSettingsStore.getState().settings.accentColor).toBe(last);
+    expect(patches.at(-1)).toEqual({ accentColor: last });
+    expect(patches.length).toBeLessThanOrEqual(6);
+  });
+
   it('fonts: bundled and installed families per mode, text size and the toolbar', async () => {
     open();
     const live = screen.getByRole('combobox', { name: 'Live Preview font' });
