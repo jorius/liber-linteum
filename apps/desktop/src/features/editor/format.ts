@@ -100,11 +100,14 @@ export function toggleInline(kind: InlineFormat): StateCommand {
   };
 }
 
-/** Line numbers touched by the selections, in order, once each. */
+/** Line numbers touched by the selections, in order, once each. A selection
+ *  that ends at a line start (triple-click, ⇧↓) does not touch that line —
+ *  as CodeMirror's own `selectedLineBlocks`. */
 function selectedLines(state: EditorState): number[] {
   const lines = new Set<number>();
   for (const r of state.selection.ranges) {
-    const last = state.doc.lineAt(r.to).number;
+    const endsAtLineStart = !r.empty && state.doc.lineAt(r.to).from === r.to;
+    const last = state.doc.lineAt(endsAtLineStart ? r.to - 1 : r.to).number;
     for (let n = state.doc.lineAt(r.from).number; n <= last; n++) lines.add(n);
   }
   return [...lines].sort((a, b) => a - b);

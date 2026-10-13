@@ -106,6 +106,16 @@ describe('block formats', () => {
     expect(apply(toggleBlock('bullet'), '¦')).toBe('- ¦');
   });
 
+  it('a selection ending at a line start (triple-click) leaves the next line alone', () => {
+    expect(apply(toggleBlock('bullet'), '‹first\n›second')).toBe('‹- first\n›second');
+    expect(apply(setHeading(1), '‹first\n›second')).toBe('‹# first\n›second');
+    expect(apply(toggleBlock('quote'), '‹first\n›second')).toBe('‹> first\n›second');
+    expect(apply(toggleBlock('task'), '‹first\n›second')).toBe('‹- [ ] first\n›second');
+    expect(apply(toggleBlock('numbered'), '‹first\n›second')).toBe('‹1. first\n›second');
+    // Toggling off counts only the selected line too.
+    expect(apply(toggleBlock('bullet'), '‹- first\n›second')).toBe('‹first\n›second');
+  });
+
   it('quote adds and removes "> " in front of every line', () => {
     expect(apply(toggleBlock('quote'), '‹a\n- b›')).toBe('‹> a\n> - b›');
     expect(apply(toggleBlock('quote'), '‹> a\n> - b›')).toBe('‹a\n- b›');
