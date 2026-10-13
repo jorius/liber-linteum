@@ -20,7 +20,7 @@ This milestone is Jose's real-window feedback on M2a: rename from the title, a b
 | E2E in Chromium **and WebKit**: toolbar, rename, trail, palettes; zero-network across all palettes with installed fonts | done (27 tests) |
 | Real-window checks (§9) | **need you** |
 
-Totals at the end of the replay: **421 vitest tests (50 files)**, **27 Playwright tests**, **192 cargo tests** (189 + 3 main-thread menu checks); eslint, prettier, tsc, i18n parity, clippy `-D warnings`, rustfmt and `cargo deny` all clean.
+Totals after the final-review fix pass (§13): **439 vitest tests (50 files)**, **27 Playwright tests** (Chromium + WebKit), **192 cargo tests** (189 + 3 main-thread menu checks); eslint, prettier, tsc, i18n parity, clippy `-D warnings`, rustfmt and `cargo deny` all clean.
 
 ## 2. How to run
 
@@ -36,7 +36,7 @@ Totals at the end of the replay: **421 vitest tests (50 files)**, **27 Playwrigh
 
 | File | What changed |
 |---|---|
-| `settings.rs` | New types: `Palette` (lowercase ids + `custom`), `HexColor` (`#rrggbb`, stored lower-case), `FontChoice` (a `BUNDLED_FONTS` id or `system:<Family>`, ≤ 200 chars, no control characters), `FontSize` (13–20, out-of-range numbers are **clamped**, non-numbers reset). New `Settings`/`SettingsPatch` fields with defaults `lavender`, `#d1477a`, `atkinson-hyperlegible`, `jetbrains-mono`, `15`, `true`. `parse_lenient` resets each field on its own (warning names the key). |
+| `settings.rs` | New types: `Palette` (lowercase ids + `custom`), `HexColor` (`#rrggbb`, stored lower-case), `FontChoice` (a `BUNDLED_FONTS` id or `system:<Family>`, ≤ 200 chars, no control characters), `FontSize` (13–20; out-of-range whole numbers ≥ 0 are **clamped**; negative numbers, fractions like `15.5` and non-numbers **reset to 15** — the type is `u32`). New `Settings`/`SettingsPatch` fields with defaults `lavender`, `#d1477a`, `atkinson-hyperlegible`, `jetbrains-mono`, `15`, `true`. `parse_lenient` resets each field on its own (warning names the key). |
 | `fonts.rs` (new) | `system_families()` with `fontdb` (local files only): English family name when a font has several, hidden `.`-families dropped, unique + sorted ignoring case; cached in a `OnceLock` per app session. Command `fonts_list` is async via `blocking()`. |
 | `menu.rs` | View menu gains **Back** (`nimw-back`) and **Forward** (`nimw-forward`) before Full Screen, **without accelerators** (the page handles ⌘[ / ⌘] itself — see §8.3). `on_menu_event` emits `menu:navigate` with `"back"` / `"forward"`. |
 | `lib.rs` | Registers `fonts::fonts_list`. |
@@ -122,6 +122,11 @@ Tests: `tests/settings.rs` (3 new), `tests/commands.rs` (`m2b_settings_round_tri
 5. Rename a page from its title; with backlinks (they update); try a name with `/` and an existing name.
 6. Follow 3–4 links, then ←, ⌘[, ⌘], and View → Back / Forward in the menu; open a page from the explorer (the arrow disappears).
 7. IME / dead keys in the title field.
+8. **Your Spanish layout:** ⌘[ / ⌘] (with or without ⌥) go back/forward. The tests use the `e.key`/`e.code` values WKWebView *should* report; please confirm on the real keyboard.
+9. Rename from the title, then Cmd-Tab to another app mid-edit and back: the rename must **not** have happened (it commits on Enter or a click elsewhere in the app). Focus stays in the title after Enter/Escape.
+10. Triple-click a line and press Bullet/H1: only that line changes. Tab in a numbered list nests the item (renumbered to `1.`); ⇧Tab un-nests; ⇧Tab on a top-level item moves focus backwards.
+11. Pick a custom accent by dragging the colour picker: the final colour sticks after closing Settings; tags and pressed toolbar buttons stay readable.
+12. Whether installed fonts render in the WKWebView (Safari restricts user-installed fonts for fingerprinting; the reviewer could not verify WKWebView's behaviour).
 
 ## 10. Known gaps / deferred
 
@@ -133,6 +138,11 @@ Tests: `tests/settings.rs` (3 new), `tests/commands.rs` (`m2b_settings_round_tri
 | d | `fonts_list` is read once per app session (install a font → restart) | later |
 | e | Forward has no header button (shortcut + menu only, per spec) | — |
 | f | The trail is per window and not persisted | — |
+| g | Nested numbered items keep the outer count when the list buttons renumber; outer numbers after a Tab-nest are not renumbered | later |
+| h | Two cursors in one word double-wrap (`****hello****`); `_**x**_` + Italic wraps again | later |
+| i | View → Back / Forward are always enabled (spec: disabled when empty) | later |
+| j | A valid bundled font id from the other list (e.g. `fontLivePreview: "jetbrains-mono"` in settings.json) applies, but the picker shows the default | later |
+| k | Title rename flush has no 2 s cap (one write attempt, same as the explorer rename) | — |
 
 ## 11. Troubleshooting
 
@@ -149,3 +159,25 @@ Tests: `tests/settings.rs` (3 new), `tests/commands.rs` (`m2b_settings_round_tri
 1. Your real-window pass (§9).
 2. **M2c:** covers/subtitle editing, paste/drop attachments, `[[` autocomplete (incl. ⌘K → `[[…]]`), Create-page folders.
 3. M3 Global View.
+
+## 13. Final review and fix pass
+
+Reviewer (opus, fresh context) on `2fa7ab1..7473d1f`: **0 Critical, 3 Important, 12 Minor**, no data-loss path; CSS injection through settings ruled out (Rust validates `HexColor`/`FontChoice`; fonts set via `setProperty`; the custom `<style>` contains only derived hex). Re-graded by effect, 9 minors joined the fix pass. Fixed in three parallel worktrees (A: format commands; B: title, trail, shortcuts; C: theme, settings), cherry-picked; every fix has a test that failed first.
+
+| # | Finding | Fix | Test(s) |
+|---|---|---|---|
+| I1 | Triple-click / Shift+↓ selections also formatted the next line | `selectedLines` stops before a line the selection merely touches at its start | `format.test.ts` "a selection ending at a line start…" |
+| I2 | Tab in a numbered list didn't nest (2 spaces under `1. `; and a nested list must start at 1 to interrupt a paragraph) | indent to the parent's text column (`- ` 2, `1. ` 3, `10. ` 4) and renumber the moved item; ⇧Tab mirrors | `format.test.ts` "Tab nests an item…", verified with `parsePage` |
+| I3 | Focus lost after renaming from the title (header unmounted during reload) | `pageStore.follow` remaps the shown page first, so the header stays mounted | `PageTitle.test.tsx` "final review I3…" |
+| m1↑ | Custom accent on the soft tint < 4.5:1 (tags, pressed buttons) | accent loops also require ≥ 4.5 on the soft tint (light accent slightly darker); reference page mirrors it | `palettes.test.ts` sweep + built-ins |
+| m2↑ | Atomic external save (delete + re-create) dropped the page from the trail | prune after `refreshTree`, keep entries present again | `stores.test.ts` "final review m2…" |
+| m3↑ | "Back to <current page>" after pruning | `removed(path, {exists, current})` drops the current page from the near end of both stacks | `navigate.test.ts`, `trailStore.test.ts` |
+| m4↑ | Failed title rename shown inline **and** as a toast | `vaultStore.rename(from, to, { quiet })`; title passes `quiet` | `PageTitle.test.tsx`, `stores.test.ts` |
+| m5↑ | ⌘[ / ⌘] unusable where brackets need ⌥ (Spanish, German, French Mac) | accept bracket `key` with/without ⌥ and physical `BracketLeft/Right` when it isn't an ordinary shortcut character | `Interactions.test.tsx` "final review m5…" |
+| m6↑ | Switching apps mid-edit committed a half-typed title (vault-wide link rewrite) | blur commits only when `document.hasFocus()` | `PageTitle.test.tsx` "final review m6…" |
+| m7↑ | ⇧Tab on a top-level item swallowed (focus trap) | list Tab/⇧Tab return false when nothing changes | `format.test.ts` |
+| m8↑ | `_x_` / `__x__` didn't toggle off; bare `- [ ]` → `- [ ] [ ]` | `_` counts as a marker; empty task recognised | `format.test.ts` |
+| m10↑ | Hex error stuck; colour drag fired concurrent saves (last colour could lose) | error clears when valid; `useLatestSave` (150 ms settle, one save in flight, last value wins, flushed on close) | `SettingsDialog.test.tsx` |
+| m11 | ⌘[ review-focus test couldn't fail; duplicate check untested with a tree | indented-list test pressing Ctrl (jsdom's Mod) for ⌘[ and ⌘]; tree-loaded duplicate + case-only test | `Interactions.test.tsx`, `PageTitle.test.tsx` |
+
+`src/test/setup.ts` stubs `document.hasFocus()` → true (jsdom returns false mid-blur). Deferred minors: §10 g–k.
