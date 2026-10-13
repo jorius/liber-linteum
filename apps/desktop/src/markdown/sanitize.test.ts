@@ -109,7 +109,15 @@ describe('extension nodes become marked elements', () => {
     const marks = elements(tree)
       .map((e) => e.properties.dataNimw)
       .filter(Boolean);
-    expect(marks).toEqual(['wikilink', 'embed', 'tag', 'callout', 'columns', 'column']);
+    expect(marks).toEqual([
+      'wikilink',
+      'embed',
+      'tag',
+      'callout',
+      'callout-title',
+      'columns',
+      'column',
+    ]);
     const wl = elements(tree).find((e) => e.properties.dataNimw === 'wikilink')!;
     expect([wl.properties.dataTarget, wl.properties.dataHeading]).toEqual(['Game 1', 'Plot']);
     expect(elements(tree).some((e) => e.tagName === 'mark')).toBe(true);

@@ -1,0 +1,9 @@
+{
+  "links": [
+    { "kind": "wiki", "target": "Title Link", "heading": null, "alias": null },
+    { "kind": "wiki", "target": "Body Link", "heading": null, "alias": null },
+    { "kind": "wiki", "target": "Fold Link", "heading": null, "alias": "alias" },
+    { "kind": "wiki", "target": "Untitled Body", "heading": null, "alias": null }
+  ],
+  "tags": ["titletag", "foldtag"]
+}

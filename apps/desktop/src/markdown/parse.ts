@@ -22,14 +22,27 @@ const processor = unified()
 /** Parents whose text is never scanned for extensions. */
 const OPAQUE = new Set(['link', 'linkReference', 'image', 'imageReference']);
 
+/** A GFM literal autolink (`www.x.com`, `a@b.c`): neither `[…](…)` nor `<…>`.
+ *  (Some are added after parsing, without a position.) */
+const isLiteralAutolink = (n: RootContent, src: string) =>
+  n.type === 'link' &&
+  (n.position?.start.offset === undefined || !'[<'.includes(src[n.position.start.offset]));
+
 function transformInline(tree: Root, src: string, loc: ReturnType<typeof locator>) {
   const walk = (parent: Parent) => {
     if (OPAQUE.has(parent.type)) return;
     const next: RootContent[] = [];
     let changed = false;
+    let prev: RootContent | undefined;
     for (const child of parent.children as RootContent[]) {
+      const after = prev;
+      prev = child;
       if (child.type === 'text') {
-        const parts = scanText(src, child as Text, loc);
+        // Text right after markup (`**#tag**`, a table cell, inline HTML)
+        // starts a run, as in nimw-markdown: a `#` there can open a tag. A GFM
+        // literal autolink (`a@b.c#x`) is plain text to nimw-markdown.
+        const runStart = after?.type !== 'text' && !(after && isLiteralAutolink(after, src));
+        const parts = scanText(src, child as Text, loc, runStart);
         if (parts) {
           next.push(...parts);
           changed = true;

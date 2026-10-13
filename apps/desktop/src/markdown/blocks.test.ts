@@ -1,3 +1,4 @@
+import type { Node, Parent } from 'mdast';
 import { describe, expect, it } from 'vitest';
 import type { Callout, Columns, WikiLink } from './types';
 import { parsePage } from './parse';
@@ -25,6 +26,38 @@ describe('callouts (M2a §2.1, Tier B toggles)', () => {
       ['warning', 'Open', true, false],
     ]);
     expect(findAll(p.tree, 'blockquote')).toHaveLength(1);
+  });
+});
+
+describe('callout titles keep inline content (I7, parity with nimw-markdown)', () => {
+  const callout = (src: string) => findAll<Callout>(parsePage(src).tree, 'callout')[0];
+
+  it('a link in the title is a link', () => {
+    const c = callout('> [!note] Title [[x]]\n> body\n');
+    const [title, body] = c.children;
+    expect(title.type).toBe('calloutTitle');
+    expect(findAll<WikiLink>(title, 'wikiLink').map((l) => l.target)).toEqual(['x']);
+    expect(c.title).toBe('Title [[x]]');
+    expect(findAll(body, 'wikiLink')).toEqual([]);
+  });
+
+  it('bold in the title stays in the title; the body starts on the next line', () => {
+    const src = '> [!note] Title **bold** end\n> body **b2**\n';
+    const c = callout(src);
+    const [title, body] = c.children as Parent[];
+    expect(title.children.map((n) => n.type)).toEqual(['text', 'strong', 'text']);
+    expect(body.type).toBe('paragraph');
+    expect(body.children.map((n) => n.type)).toEqual(['text', 'strong']);
+    const at = (n: Node) => src.slice(n.position!.start.offset!, n.position!.end.offset!);
+    expect(at(title)).toBe('Title **bold** end');
+    expect(at(body.children[0])).toBe('> body ');
+  });
+
+  it('an empty title has no title node, and the body keeps its first line', () => {
+    const c = callout('> [!TIP]- \n> hidden\n');
+    expect(c.children.map((n) => n.type)).toEqual(['paragraph']);
+    expect(c.title).toBe('Tip');
+    expect(JSON.stringify(c.children)).toContain('"value":"hidden"');
   });
 });
 

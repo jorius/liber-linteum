@@ -13,22 +13,94 @@ pub(crate) struct Body {
     pub excerpt: String,
 }
 
+const OPTIONS: Options = Options::ENABLE_YAML_STYLE_METADATA_BLOCKS
+    .union(Options::ENABLE_TABLES)
+    .union(Options::ENABLE_TASKLISTS)
+    .union(Options::ENABLE_STRIKETHROUGH);
+
+/// Byte ranges of code (fenced, indented, inline), HTML and the frontmatter,
+/// where `%%` stays literal.
+fn code_ranges(src: &str, body_start: usize) -> Vec<Range<usize>> {
+    let mut out = Vec::new();
+    out.push(0..body_start);
+    for (event, range) in Parser::new_ext(src, OPTIONS).into_offset_iter() {
+        match event {
+            Event::Start(MdTag::CodeBlock(_))
+            | Event::Start(MdTag::HtmlBlock)
+            | Event::Start(MdTag::MetadataBlock(_))
+            | Event::Code(_)
+            | Event::InlineHtml(_)
+            | Event::Html(_) => out.push(range),
+            _ => {}
+        }
+    }
+    out
+}
+
+/// Obsidian `%% … %%` comment ranges outside code; an unclosed `%%` is not a
+/// comment. Same rules as the editor's model (apps/desktop/src/markdown/blocks.ts).
+pub(crate) fn find_comments(src: &str, body_start: usize) -> Vec<Range<usize>> {
+    if !src.contains("%%") {
+        return Vec::new();
+    }
+    let code = code_ranges(src, body_start);
+    let in_code = |i: usize| code.iter().any(|r| r.contains(&i));
+    let next = |from: usize| src.get(from..)?.find("%%").map(|p| p + from);
+    let mut out = Vec::new();
+    let mut i = next(0);
+    while let Some(open) = i {
+        if in_code(open) {
+            i = next(open + 2);
+            continue;
+        }
+        let mut close = next(open + 2);
+        while let Some(c) = close.filter(|&c| in_code(c)) {
+            close = next(c + 2);
+        }
+        let Some(close) = close else { break };
+        out.push(open..close + 2);
+        i = next(close + 2);
+    }
+    out
+}
+
+/// `src` with comments blanked byte for byte (line endings kept), so every
+/// offset into the result is also an offset into `src`.
+fn mask_comments(src: &str, comments: &[Range<usize>]) -> String {
+    let mut bytes = src.as_bytes().to_vec();
+    for r in comments {
+        for b in &mut bytes[r.clone()] {
+            if *b != b'\n' && *b != b'\r' {
+                *b = b' ';
+            }
+        }
+    }
+    // Comments start and end at ASCII `%`, so whole characters were replaced.
+    String::from_utf8(bytes).unwrap_or_else(|_| src.to_string())
+}
+
 /// Extracts links, tags and the excerpt from the Markdown body. Code (fenced,
-/// indented, inline), HTML blocks/inline HTML and comments are ignored, and so
-/// is everything before `body_start` (the frontmatter, even when pulldown-cmark
-/// does not recognise it as a metadata block — its links come from the YAML).
+/// indented, inline), HTML blocks/inline HTML, HTML comments and Obsidian
+/// `%% %%` comments are ignored, and so is everything before `body_start` (the
+/// frontmatter, even when pulldown-cmark does not recognise it as a metadata
+/// block — its links come from the YAML).
 pub(crate) fn extract(src: &str, body_start: usize) -> Body {
-    let options = Options::ENABLE_YAML_STYLE_METADATA_BLOCKS
-        | Options::ENABLE_TABLES
-        | Options::ENABLE_TASKLISTS
-        | Options::ENABLE_STRIKETHROUGH;
+    let comments = find_comments(src, body_start);
+    if comments.is_empty() {
+        extract_unmasked(src, body_start)
+    } else {
+        extract_unmasked(&mask_comments(src, &comments), body_start)
+    }
+}
+
+fn extract_unmasked(src: &str, body_start: usize) -> Body {
     let mut body = Body::default();
     let mut regions: Vec<Range<usize>> = Vec::new();
     let mut excerpt_regions: Vec<Range<usize>> = Vec::new();
     let mut in_code = 0usize;
     let mut in_meta = false;
     let mut in_heading = false;
-    for (event, range) in Parser::new_ext(src, options).into_offset_iter() {
+    for (event, range) in Parser::new_ext(src, OPTIONS).into_offset_iter() {
         if range.start < body_start {
             continue;
         }
@@ -339,6 +411,23 @@ mod tests {
             ]
         );
         assert_eq!(links[0].heading.as_deref(), Some("Palette"));
+    }
+
+    #[test]
+    fn obsidian_comments_hide_links_and_tags_but_not_in_code() {
+        let src = "a [[x]] %% [[hidden]] #h %% b #t\n\n%%\n[[block]] ![[e.png]]\n%%\n\n`%%` [[kept]] %% open [[open]]";
+        let b = extract(src, 0);
+        let got: Vec<_> = b
+            .links
+            .iter()
+            .map(|l| (l.target.as_str(), &src[l.range.clone()]))
+            .collect();
+        assert_eq!(got, vec![("x", "x"), ("kept", "kept"), ("open", "open")]);
+        assert_eq!(
+            b.tags.iter().map(|t| t.text.as_str()).collect::<Vec<_>>(),
+            vec!["t"]
+        );
+        assert_eq!(find_comments("ü %% é %% `%%`", 0), vec![3..11]);
     }
 
     #[test]

@@ -11,6 +11,7 @@ import type { Nodes as MdastNodes } from 'mdast';
 import { toHast, type Handler, type State } from 'mdast-util-to-hast';
 import type {
   Callout,
+  CalloutTitle,
   Column,
   Columns,
   Embed,
@@ -101,6 +102,11 @@ const handlers: Record<string, Handler> = {
       },
       state.wrap(state.all(node as unknown as MdastNodes), true),
     );
+    state.patch(node, out);
+    return out;
+  },
+  calloutTitle(state: State, node: CalloutTitle) {
+    const out = el('div', { dataNimw: 'callout-title' }, state.all(node as unknown as MdastNodes));
     state.patch(node, out);
     return out;
   },

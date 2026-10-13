@@ -138,12 +138,22 @@ function renderElement(e: Element, key: number, ctx: RenderCtx): ReactNode {
           {t('preview.notFound', { target: String(p.alt ?? p.src ?? '') })}
         </span>
       );
-    case 'callout':
+    case 'callout': {
+      const head = e.children.find((c) => c.type === 'element');
+      const title =
+        head?.type === 'element' && head.properties.dataNimw === 'callout-title' ? head : null;
+      const body = title ? { ...e, children: e.children.filter((c) => c !== title) } : e;
       return (
-        <Callout key={key} e={e} props={reactProps(p)}>
-          {renderChildren(e, ctx)}
+        <Callout
+          key={key}
+          e={e}
+          props={reactProps(p)}
+          title={title ? renderChildren(title, ctx) : null}
+        >
+          {renderChildren(body, ctx)}
         </Callout>
       );
+    }
     case 'columns': {
       const count = e.children.filter((c) => c.type === 'element').length;
       return (

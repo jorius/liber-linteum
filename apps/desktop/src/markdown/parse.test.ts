@@ -132,7 +132,7 @@ describe('inline extensions keep mdast text values (I6)', () => {
 
   it.each([
     ['a link in a quote', '> see [[x]] and\n> more\n', 'see x and\nmore'],
-    ['a link in a callout', '> [!note] T\n> see [[x]] and\n> more\n', 'see x and\nmore'],
+    ['a link in a callout', '> [!note] T\n> see [[x]] and\n> more\n', 'T\nsee x and\nmore'],
     ['a tag in a quote', '> see #t and\n> more\n', 'see #t and\nmore'],
     ['a highlight in a quote', '> see ==hi== and\n> more\n', 'see hi and\nmore'],
     ['a highlight across lines', '> see ==a\n> b== and\n> more\n', 'see a\nb and\nmore'],

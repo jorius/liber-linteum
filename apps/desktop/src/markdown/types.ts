@@ -33,14 +33,22 @@ export interface Tag extends Node {
   name: string;
 }
 
-/** `> [!type]- Title` */
+/** `> [!type]- Title`. A title with text comes first in `children` as a
+ *  `calloutTitle` (inline content: links, tags and formatting stay). */
 export interface Callout extends Parent {
   type: 'callout';
   calloutType: string;
+  /** Plain text of the title, or the type name when it has none. */
   title: string;
   foldable: boolean;
   folded: boolean;
-  children: BlockContent[];
+  children: (CalloutTitle | BlockContent)[];
+}
+
+/** The text after `[!type]` on a callout's first line. */
+export interface CalloutTitle extends Parent {
+  type: 'calloutTitle';
+  children: PhrasingContent[];
 }
 
 /** `::::columns` container holding `:::column` children. */
@@ -76,6 +84,7 @@ declare module 'mdast' {
     highlight: Highlight;
     tag: Tag;
     callout: Callout;
+    calloutTitle: CalloutTitle;
     columns: Columns;
     column: Column;
   }

@@ -36,15 +36,19 @@ const TONE: Record<string, string> = {
 export function Callout({
   e,
   props,
+  title: heading,
   children,
 }: {
   e: Element;
   props: Record<string, unknown>;
+  /** The rendered title line (links and formatting kept), if it has text. */
+  title: ReactNode;
   children: ReactNode;
 }) {
   const type = String(e.properties.dataCallout ?? 'note');
   const title =
-    String(e.properties.dataTitle ?? '') || type.charAt(0).toUpperCase() + type.slice(1);
+    heading ??
+    (String(e.properties.dataTitle ?? '') || type.charAt(0).toUpperCase() + type.slice(1));
   const tone = TONE[type] ?? 'gray';
   if (e.properties.dataFoldable === 'true') {
     return (

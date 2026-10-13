@@ -246,3 +246,16 @@ describe('malformed percent-encoding and render errors (I4)', () => {
     expect(screen.getByText('half')).toBeTruthy();
   });
 });
+
+describe('callout titles (I7)', () => {
+  it('render their links and formatting in the title', async () => {
+    show('> [!tip]- **Bold** [[Sparda|knight]]\n> body\n');
+    const summary = screen.getByText('Bold').closest('summary')!;
+    expect(screen.getByText('Bold').tagName).toBe('STRONG');
+    expect(within(summary as HTMLElement).getByText('knight')).toHaveAttribute(
+      'data-nimw',
+      'wikilink',
+    );
+    expect(screen.getByText('body').closest('summary')).toBeNull();
+  });
+});

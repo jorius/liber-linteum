@@ -12,6 +12,7 @@ fn fixtures() -> PathBuf {
 #[test]
 fn pg_05_parity_fixtures_match_the_typescript_model() {
     let mut seen = 0;
+    let mut failures = Vec::new();
     for entry in std::fs::read_dir(fixtures()).unwrap() {
         let path = entry.unwrap().path();
         if path.extension().and_then(|e| e.to_str()) != Some("md") {
@@ -38,8 +39,15 @@ fn pg_05_parity_fixtures_match_the_typescript_model() {
             })
             .collect();
         let tags: Vec<&str> = meta.tags.iter().map(|t| t.text.as_str()).collect();
-        assert_eq!(Value::Array(links), expected["links"], "{}", path.display());
-        assert_eq!(json!(tags), expected["tags"], "{}", path.display());
+        if Value::Array(links.clone()) != expected["links"] || json!(tags) != expected["tags"] {
+            failures.push(format!(
+                "{}\n  links: {}\n  tags: {}",
+                path.display(),
+                Value::Array(links),
+                json!(tags)
+            ));
+        }
     }
     assert!(seen > 0, "no fixtures found");
+    assert!(failures.is_empty(), "{}", failures.join("\n"));
 }

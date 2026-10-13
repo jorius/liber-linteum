@@ -89,9 +89,15 @@ function align(s: string, value: string, atLineStart: boolean): Int32Array | nul
 
 /**
  * Splits one text node into text + extension nodes. `src` is the whole
- * document. Returns `null` when the node contains no extension.
+ * document; `runStart` says the node follows markup rather than text (so a
+ * `#` at its start may open a tag). Returns `null` when it has no extension.
  */
-export function scanText(src: string, node: Text, loc: Locator): PhrasingContent[] | null {
+export function scanText(
+  src: string,
+  node: Text,
+  loc: Locator,
+  runStart = false,
+): PhrasingContent[] | null {
   const start = node.position?.start.offset;
   const end = node.position?.end.offset;
   if (start === undefined || end === undefined) return null;
@@ -104,7 +110,7 @@ export function scanText(src: string, node: Text, loc: Locator): PhrasingContent
   const plain = map
     ? (from: number, to: number) => node.value.slice(map[from], map[to])
     : (from: number, to: number) => plainValue(s.slice(from, to));
-  const out = scan(s, 0, s.length, start, src[start - 1] ?? '', loc, plain);
+  const out = scan(s, 0, s.length, start, runStart ? '' : (src[start - 1] ?? ''), loc, plain);
   return out.length === 1 && out[0].type === 'text' ? null : out;
 }
 
