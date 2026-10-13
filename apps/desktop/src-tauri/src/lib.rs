@@ -4,6 +4,7 @@ pub mod dto;
 pub mod editor_commands;
 pub mod error;
 pub mod menu;
+pub mod navigation;
 pub mod settings;
 pub mod settings_commands;
 pub mod state;
@@ -33,6 +34,8 @@ pub fn configure<R: tauri::Runtime>(
         // Used only from our own commands (url_open, file_open_external); the
         // webview gets no opener permission.
         .plugin(tauri_plugin_opener::init())
+        // The webview only ever shows the app itself (no vault file, no web page).
+        .plugin(navigation::guard())
         // Our Quit item (macOS app menu) closes the windows through their close
         // request, so the UI saves pending pages first (see `menu`).
         .on_menu_event(menu::on_menu_event)
