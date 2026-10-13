@@ -153,6 +153,16 @@ describe('keys', () => {
     const plain = stateOf('text¦');
     expect(listIndent(1)({ state: plain, dispatch: () => undefined })).toBe(false);
   });
+
+  it('⇧Tab with nothing to outdent is not handled, so focus can move backwards', () => {
+    for (const input of ['- one¦', '1. one¦', '- [ ] one¦', '‹- a\n- b›']) {
+      const state = stateOf(input);
+      let dispatched = false;
+      const handled = listIndent(-1)({ state, dispatch: () => (dispatched = true) });
+      expect(handled, input).toBe(false);
+      expect(dispatched, input).toBe(false);
+    }
+  });
 });
 
 describe('activeFormats (toolbar pressed state)', () => {

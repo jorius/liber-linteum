@@ -9,6 +9,7 @@ import {
   type EditorState,
   type SelectionRange,
   type StateCommand,
+  type Transaction,
 } from '@codemirror/state';
 import type { KeyBinding } from '@codemirror/view';
 
@@ -256,15 +257,20 @@ export const insertLink: StateCommand = ({ state, dispatch }) => {
   return true;
 };
 
-/** Tab / Shift-Tab: indent or outdent list items only; elsewhere the key is
- *  left to the browser, so Tab keeps moving focus out of the editor. */
+/** Tab / Shift-Tab: indent or outdent list items only; elsewhere — and when
+ *  nothing would change, e.g. ⇧Tab on a top-level item — the key is left to
+ *  the browser, so Tab / ⇧Tab keep moving focus out of the editor. */
 export function listIndent(dir: 1 | -1): StateCommand {
-  return (target) => {
-    const inList = selectedLines(target.state).every((n) =>
-      /^\s*([-*+]|\d+[.)])[ \t]/.test(target.state.doc.line(n).text),
+  return ({ state, dispatch }) => {
+    const inList = selectedLines(state).every((n) =>
+      /^\s*([-*+]|\d+[.)])[ \t]/.test(state.doc.line(n).text),
     );
     if (!inList) return false;
-    return dir === 1 ? indentMore(target) : indentLess(target);
+    let tr: Transaction | null = null;
+    (dir === 1 ? indentMore : indentLess)({ state, dispatch: (t) => (tr = t) });
+    if (!tr || !(tr as Transaction).docChanged) return false;
+    dispatch(tr);
+    return true;
   };
 }
 
