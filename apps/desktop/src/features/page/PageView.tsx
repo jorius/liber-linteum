@@ -34,21 +34,24 @@ export function PageView() {
       </section>
     );
   }
+  // Deleted outside while it had unsaved edits: the text is kept (M2a §3.3).
+  const orphanBanner = orphaned && doc && (
+    <div className={styles.orphan}>
+      <p className={styles.notice}>{t('editor.orphaned')}</p>
+      <button
+        type="button"
+        className={styles.button}
+        onClick={() => void useEditorStore.getState().saveAsNew()}
+      >
+        {t('editor.saveAsNew')}
+      </button>
+    </div>
+  );
   if (state === 'deleted' || !page) {
-    // Deleted outside while it had unsaved edits: the text is kept (M2a §3.3).
     if (orphaned && doc) {
       return (
         <section className={styles.page} aria-label={t('page.region')}>
-          <div className={styles.orphan}>
-            <p className={styles.notice}>{t('editor.orphaned')}</p>
-            <button
-              type="button"
-              className={styles.button}
-              onClick={() => void useEditorStore.getState().saveAsNew()}
-            >
-              {t('editor.saveAsNew')}
-            </button>
-          </div>
+          {orphanBanner}
           <Editor doc={doc} mode={mode} label={nameOf(doc.path)} />
         </section>
       );
@@ -63,6 +66,7 @@ export function PageView() {
   return (
     <section className={styles.page} aria-label={t('page.region')}>
       <PageHeader page={page} mode={mode} />
+      {orphanBanner}
       {binary ? (
         <p className={`${styles.notice} ${styles.inset}`}>{t('page.binary')}</p>
       ) : editorError ? (

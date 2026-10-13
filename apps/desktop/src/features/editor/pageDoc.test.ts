@@ -168,4 +168,50 @@ describe('PageDoc external changes (M2a §3.3)', () => {
     await doc.flush();
     expect(disk.files.get('B.md')).toBe('two\n');
   });
+
+  it('C2: a write that finds the file missing retries; it is not orphaned yet', async () => {
+    const disk = fakeDisk({ 'A.md': 'one\n' });
+    const doc = await load('A.md');
+    doc.edit('two\n');
+    disk.files.set('B.md', disk.files.get('A.md')!);
+    disk.files.delete('A.md'); // renamed outside; the watcher event is still on its way
+    await doc.flush();
+    expect(doc.orphaned).toBe(false);
+    expect(doc.status).toBe('retrying');
+    doc.moveTo('B.md'); // the rename event
+    await vi.advanceTimersByTimeAsync(0);
+    expect(disk.files.get('B.md')).toBe('two\n');
+    expect(doc.status).toBe('saved');
+  });
+
+  it('C2: following a rename clears orphaned and saves at the new path', async () => {
+    const disk = fakeDisk({ 'A.md': 'one\n' });
+    const doc = await load('A.md');
+    doc.edit('two\n');
+    disk.files.set('B.md', disk.files.get('A.md')!);
+    disk.files.delete('A.md');
+    expect(doc.markDeleted()).toBe(true);
+    doc.moveTo('B.md');
+    expect(doc.orphaned).toBe(false);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(disk.files.get('B.md')).toBe('two\n');
+    doc.edit('three\n');
+    await vi.advanceTimersByTimeAsync(AUTOSAVE_MS);
+    expect(disk.files.get('B.md')).toBe('three\n');
+  });
+
+  it('C2: restored after being orphaned: the read clears orphaned and the text saves', async () => {
+    const disk = fakeDisk({ 'A.md': 'one\n' });
+    const doc = await load('A.md');
+    doc.edit('two\n');
+    disk.files.delete('A.md');
+    await doc.sync(); // the read confirms it is gone
+    expect(doc.orphaned).toBe(true);
+    disk.files.set('A.md', 'one\n'); // restored from the Trash
+    await doc.sync();
+    expect(doc.orphaned).toBe(false);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(disk.files.get('A.md')).toBe('two\n');
+    expect(doc.status).toBe('saved');
+  });
 });

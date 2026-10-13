@@ -33,7 +33,9 @@ export class PageDoc {
   base: string;
   hash: string;
   eol: Eol;
-  /** Deleted on disk while it had unsaved edits: kept, never written back. */
+  /** Deleted on disk while it had unsaved edits (confirmed by the watcher or
+   *  a read): kept, not written back until the file is back (rename followed,
+   *  restored) or it is saved as a new page. */
   orphaned = false;
   /** Bumped whenever the text changes from outside the editor. */
   revision = 0;
@@ -98,15 +100,20 @@ export class PageDoc {
   sync(): Promise<void> {
     return this.enqueue(async () => {
       const res = await pageRead(this.path);
-      if (res.ok) await this.reconcile(res.value.text, res.value.hash);
-      else if (res.error.kind === 'notFound') this.markDeleted();
+      if (res.ok) {
+        const wasOrphaned = this.orphaned;
+        this.orphaned = false; // it is back (restored, recreated)
+        await this.reconcile(res.value.text, res.value.hash);
+        if (wasOrphaned) this.resume();
+      } else if (res.error.kind === 'notFound') this.markDeleted();
     });
   }
 
   /** The file was renamed or moved; keeps the text and history. */
   moveTo(path: string): void {
     this.path = path;
-    this.hooks.onChange(this);
+    this.orphaned = false; // a write that hit the old path may have orphaned it
+    this.resume();
   }
 
   /** The file is gone. Returns whether there are unsaved edits worth keeping. */
@@ -158,6 +165,13 @@ export class PageDoc {
     this.timer = setTimeout(() => void this.flush(), ms);
   }
 
+  /** Saves soon if there is anything unsaved (a new path, the file is back). */
+  private resume(): void {
+    this.retryDelay = 0;
+    if (this.dirty) this.schedule(0);
+    this.hooks.onChange(this);
+  }
+
   private async save(): Promise<void> {
     if (!this.dirty || this.orphaned) return;
     const text = this.text;
@@ -173,9 +187,10 @@ export class PageDoc {
       if (this.dirty) this.schedule(AUTOSAVE_MS); // typed while saving
     } else if (res.error.kind === 'conflict' && res.error.currentText !== undefined) {
       await this.reconcile(res.error.currentText, res.error.currentHash ?? '');
-    } else if (res.error.kind === 'notFound') {
-      this.markDeleted();
     } else {
+      // NotFound too: the file may only have been renamed or atomically
+      // replaced, and the watcher event is still on its way. Only the watcher
+      // or a read confirms a deletion (`markDeleted`); until then, retry.
       this.retry();
     }
     this.hooks.onChange(this);

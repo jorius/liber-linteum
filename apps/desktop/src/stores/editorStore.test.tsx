@@ -82,6 +82,63 @@ describe('editorStore (M2a §3.3)', () => {
     expect(editor().doc).toBeNull();
   });
 
+  it('C2: renamed in Finder while an autosave runs: the text is saved at the new path', async () => {
+    const disk = fakeDisk({ 'A.md': 'a\n' });
+    await editor().open('A.md');
+    editor().doc!.edit('typed\n');
+    disk.files.set('B.md', disk.files.get('A.md')!);
+    disk.files.delete('A.md'); // the watcher event is still being debounced...
+    await editor().doc!.flush(); // ...when the autosave fires: NotFound
+    await editor().onExternalChange({
+      created: [],
+      modified: [],
+      removed: [],
+      renamed: [['A.md', 'B.md']],
+    });
+    expect(editor().path).toBe('B.md');
+    editor().doc!.edit('typed more\n');
+    const unsaved = await editor().saveAll();
+    expect({
+      orphaned: editor().orphaned,
+      onDisk: disk.files.get('B.md'),
+      unsaved,
+      status: editor().status,
+    }).toEqual({ orphaned: false, onDisk: 'typed more\n', unsaved: [], status: 'saved' });
+  });
+
+  it('C2: deleted and recreated (sync tool) around an autosave: saving resumes', async () => {
+    const disk = fakeDisk({ 'A.md': 'a\n' });
+    await editor().open('A.md');
+    editor().doc!.edit('typed\n');
+    disk.files.delete('A.md');
+    await editor().doc!.flush();
+    disk.files.set('A.md', 'a\n');
+    await editor().onExternalChange(
+      { created: ['A.md'], modified: [], removed: ['A.md'], renamed: [] },
+      () => true,
+    );
+    editor().doc!.edit('typed more\n');
+    await editor().flushAll();
+    expect({ orphaned: editor().orphaned, onDisk: disk.files.get('A.md') }).toEqual({
+      orphaned: false,
+      onDisk: 'typed more\n',
+    });
+  });
+
+  it('C2: an orphaned page restored on disk is no longer orphaned and saves', async () => {
+    const disk = fakeDisk({ 'A.md': 'a\n' });
+    await editor().open('A.md');
+    editor().doc!.edit('keep me\n');
+    disk.files.delete('A.md');
+    await editor().onExternalChange({ created: [], modified: [], removed: ['A.md'], renamed: [] });
+    expect(editor().orphaned).toBe(true);
+    disk.files.set('A.md', 'a\n'); // put back from the Trash
+    await editor().onExternalChange({ created: ['A.md'], modified: [], removed: [], renamed: [] });
+    expect(editor().orphaned).toBe(false);
+    expect(await editor().saveAll()).toEqual([]);
+    expect(disk.files.get('A.md')).toBe('keep me\n');
+  });
+
   it('modified on disk reloads; a delete + recreate (atomic save) is a modify', async () => {
     const disk = fakeDisk({ 'A.md': 'a\n' });
     await editor().open('A.md');

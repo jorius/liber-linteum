@@ -135,6 +135,19 @@ describe('PageView (M2a §5)', () => {
     await waitFor(() => expect(usePageStore.getState().state).toBe('ready'));
   });
 
+  it('C2: the orphan banner shows whenever the page is orphaned, even while it is loaded', async () => {
+    fakeDisk({ 'A.md': '# A\n' });
+    render(<PageView />);
+    await open('A.md');
+    await type('kept ', 4);
+    expect(usePageStore.getState().state).toBe('ready');
+    act(() => void useEditorStore.getState().doc!.markDeleted());
+    expect(
+      screen.getByText('This page was deleted outside the app. Your text is still here.'),
+    ).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Save as new page' })).toBeInTheDocument();
+  });
+
   it('binary pages and the loading state', async () => {
     mockIPC((cmd) => {
       if (cmd === 'page_get')
