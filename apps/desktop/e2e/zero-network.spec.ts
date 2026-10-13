@@ -41,9 +41,9 @@ async function scrollThrough(page: Page, selector: string) {
   }
 }
 
-async function openRemotePage(page: Page, mode: string) {
+async function openRemotePage(page: Page, mode: string, settings: Record<string, unknown> = {}) {
   const seen = await watchNetwork(page);
-  await page.addInitScript(installIpcMock, { pages: PAGES, editorMode: mode });
+  await page.addInitScript(installIpcMock, { pages: PAGES, editorMode: mode, settings });
   await page.goto('/');
   await page.getByRole('button', { name: /^vault/ }).click();
   await page.getByRole('treeitem', { name: 'remote' }).click();
@@ -82,6 +82,46 @@ for (const mode of ['livePreview', 'source', 'split']) {
     );
     expect(problems).toEqual([]);
     expect(csp).toEqual([]); // nothing even reached the CSP
+    expect(outside).toEqual([]);
+  });
+}
+
+// M2b: every palette (and a custom accent) with installed fonts picked by
+// name: still nothing leaves the machine, and the palette really applies.
+for (const palette of [
+  'lavender',
+  'graphite',
+  'rosewood',
+  'saffron',
+  'persimmon',
+  'midnight',
+  'sepia',
+  'ink',
+  'custom',
+]) {
+  test(`zero network requests: ${palette} palette with installed fonts`, async ({ page }) => {
+    const { outside, problems } = await openRemotePage(page, 'split', {
+      palette,
+      accentColor: '#2aa198',
+      fontLivePreview: 'system:Menlo',
+      fontSource: 'system:Courier New',
+    });
+    await expect(page.locator('html')).toHaveAttribute('data-palette', palette);
+    await expect
+      .poll(() =>
+        page.evaluate(() =>
+          getComputedStyle(document.documentElement).getPropertyValue('--font-live'),
+        ),
+      )
+      .toContain('"Menlo"');
+    await scrollThrough(page, '[role="region"][aria-label="Preview"]');
+    await page.waitForLoadState('networkidle');
+    await page.waitForTimeout(300);
+    const csp = await page.evaluate(
+      () => (window as unknown as { __nimwCspViolations: string[] }).__nimwCspViolations,
+    );
+    expect(problems).toEqual([]);
+    expect(csp).toEqual([]);
     expect(outside).toEqual([]);
   });
 }
