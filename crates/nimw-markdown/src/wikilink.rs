@@ -12,7 +12,11 @@ pub(crate) struct WikiParts<'a> {
 /// Splits `target#heading|alias`. Returns `None` for an empty target
 /// (e.g. `[[#Heading]]`, a link to the same page).
 pub(crate) fn parse_inner(inner: &str) -> Option<WikiParts<'_>> {
+    // Obsidian writes `[[target\|alias]]` inside tables: the `\` escapes the pipe.
     let (target_part, alias) = match inner.find('|') {
+        Some(i) if i > 0 && inner.as_bytes()[i - 1] == b'\\' => {
+            (&inner[..i - 1], Some(&inner[i + 1..]))
+        }
         Some(i) => (&inner[..i], Some(&inner[i + 1..])),
         None => (inner, None),
     };

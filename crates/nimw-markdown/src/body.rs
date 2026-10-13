@@ -14,8 +14,10 @@ pub(crate) struct Body {
 }
 
 /// Extracts links, tags and the excerpt from the Markdown body. Code (fenced,
-/// indented, inline), HTML blocks/inline HTML and comments are ignored.
-pub(crate) fn extract(src: &str) -> Body {
+/// indented, inline), HTML blocks/inline HTML and comments are ignored, and so
+/// is everything before `body_start` (the frontmatter, even when pulldown-cmark
+/// does not recognise it as a metadata block — its links come from the YAML).
+pub(crate) fn extract(src: &str, body_start: usize) -> Body {
     let options = Options::ENABLE_YAML_STYLE_METADATA_BLOCKS
         | Options::ENABLE_TABLES
         | Options::ENABLE_TASKLISTS
@@ -27,6 +29,9 @@ pub(crate) fn extract(src: &str) -> Body {
     let mut in_meta = false;
     let mut in_heading = false;
     for (event, range) in Parser::new_ext(src, options).into_offset_iter() {
+        if range.start < body_start {
+            continue;
+        }
         match event {
             Event::Start(MdTag::MetadataBlock(_)) => in_meta = true,
             Event::End(TagEnd::MetadataBlock(_)) => in_meta = false,
@@ -62,13 +67,13 @@ pub(crate) fn extract(src: &str) -> Body {
                 }
             }
             Event::Text(_) if in_code == 0 && !in_meta => {
-                push_merged(&mut regions, range.clone());
+                push_merged(src, &mut regions, range.clone());
                 if !in_heading {
-                    push_merged(&mut excerpt_regions, range);
+                    push_merged(src, &mut excerpt_regions, range);
                 }
             }
             Event::SoftBreak | Event::HardBreak if !in_heading => {
-                push_merged(&mut excerpt_regions, range);
+                push_merged(src, &mut excerpt_regions, range);
             }
             _ => {}
         }
@@ -102,11 +107,17 @@ pub(crate) fn extract(src: &str) -> Body {
     body
 }
 
-/// Appends `r`, merging it with the previous range when they touch.
-/// (pulldown-cmark splits text at `[`, so `[[x]]` arrives in pieces.)
-fn push_merged(regions: &mut Vec<Range<usize>>, r: Range<usize>) {
+/// Appends `r`, merging it with the previous range when they touch or are
+/// separated only by a backslash escape. (pulldown-cmark splits text at `[`,
+/// so `[[x]]` arrives in pieces, and drops the `\` of an escaped table pipe in
+/// Obsidian's `[[target\|alias]]`.)
+fn push_merged(src: &str, regions: &mut Vec<Range<usize>>, r: Range<usize>) {
     match regions.last_mut() {
-        Some(last) if last.end == r.start => last.end = r.end,
+        Some(last)
+            if last.end == r.start || (last.end < r.start && &src[last.end..r.start] == "\\") =>
+        {
+            last.end = r.end
+        }
         _ => regions.push(r),
     }
 }
@@ -137,10 +148,12 @@ fn markdown_link(
     {
         return None;
     }
+    // The destination is the link's *last* `](`: searching from the start
+    // would find a nested image's destination inside the link text.
     let slice = &src[range.clone()];
-    let mut search = 0;
+    let mut end = slice.len();
     let (dest_start, angle) = loop {
-        let pos = search + slice[search..].find("](")?;
+        let pos = slice[..end].rfind("](")?;
         let after = pos + 2;
         if slice[after..].starts_with(dest_url) {
             break (after, false);
@@ -148,7 +161,7 @@ fn markdown_link(
         if slice[after..].starts_with('<') && slice[after + 1..].starts_with(dest_url) {
             break (after + 1, true);
         }
-        search = after;
+        end = pos;
     };
     let (path_part, heading) = match dest_url.find('#') {
         Some(i) => (&dest_url[..i], Some(&dest_url[i + 1..])),
@@ -233,7 +246,7 @@ mod tests {
     use super::*;
 
     fn targets(src: &str) -> Vec<(LinkKind, String, String)> {
-        extract(src)
+        extract(src, 0)
             .links
             .into_iter()
             .map(|l| (l.kind, l.target, src[l.range].to_string()))
@@ -251,7 +264,7 @@ mod tests {
                 (LinkKind::Wiki, "spaced".into(), "spaced".into()),
             ]
         );
-        let l = &extract(src).links[0];
+        let l = &extract(src, 0).links[0];
         assert_eq!(
             (l.heading.as_deref(), l.alias.as_deref()),
             (Some("Coat"), Some("the knight"))
@@ -261,7 +274,7 @@ mod tests {
     #[test]
     fn pg_05_ignored_regions_yield_no_links_or_tags() {
         let src = "`[[a]]` `#t`\n\n```\n[[b]] #b\n```\n\n    [[c]] #c\n\n<div>\n[[d]] #d\n</div>\n\n<!-- [[e]] #e -->\n\n\\[[f]] [[ok]] #ok";
-        let b = extract(src);
+        let b = extract(src, 0);
         assert_eq!(
             b.links
                 .iter()
@@ -279,7 +292,7 @@ mod tests {
     fn pg_05_markdown_links_encoded_angle_rooted_and_skipped() {
         let src = "[a](DMC/Sparda.md#Palette) [b](</Game Design/Game 1.md>) [c](../Game%20Design/Game%201.md) \
                    ![i](img/x.png) [w](https://e.com) [m](mailto:a@b.c) [f](#local) [r][ref]\n\n[ref]: other.md\n";
-        let links = extract(src).links;
+        let links = extract(src, 0).links;
         let got: Vec<_> = links
             .iter()
             .map(|l| {
@@ -331,7 +344,7 @@ mod tests {
     #[test]
     fn pg_04_tag_rules() {
         let tags = |s: &str| {
-            extract(s)
+            extract(s, 0)
                 .tags
                 .into_iter()
                 .map(|t| t.text)
@@ -350,11 +363,12 @@ mod tests {
     fn excerpt_skips_title_renders_links_and_truncates() {
         let b = extract(
             "---\nsubtitle: s\n---\n# Title\n\nHello [[rex-draft|Rex]] and ![[x.png]] world.\n\n## Sub\n\nMore.",
+            0,
         );
         assert_eq!(b.excerpt, "Hello Rex and world. More.");
         let long = format!("# T\n\n{}", "word ".repeat(100));
-        let e = extract(&long).excerpt;
+        let e = extract(&long, 0).excerpt;
         assert!(e.ends_with('…') && e.chars().count() <= 201);
-        assert_eq!(extract("Intro\n\n# Title\n\nAfter").excerpt, "After");
+        assert_eq!(extract("Intro\n\n# Title\n\nAfter", 0).excerpt, "After");
     }
 }

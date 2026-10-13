@@ -10,7 +10,9 @@ pub fn parse_page(source: &str, file_stem: &str) -> PageMeta {
         title: title::extract_title(source, file_stem),
         ..PageMeta::default()
     };
-    if let Some((yaml, _)) = frontmatter::split(source) {
+    let mut body_start = 0;
+    if let Some((yaml, start)) = frontmatter::split(source) {
+        body_start = start;
         let fm = frontmatter::parse(source, yaml);
         meta.subtitle = fm.subtitle;
         meta.cover = fm.cover;
@@ -19,7 +21,7 @@ pub fn parse_page(source: &str, file_stem: &str) -> PageMeta {
         meta.links = fm.links;
         meta.frontmatter_error = fm.error;
     }
-    let body = body::extract(source);
+    let body = body::extract(source, body_start);
     for tag in body.tags {
         if !meta.tags.iter().any(|t| t.key == tag.key) {
             meta.tags.push(tag);
@@ -95,6 +97,61 @@ mod tests {
         assert!(m.frontmatter_error.is_some());
         assert_eq!(m.links[0].target, "target");
         assert_eq!(m.tags[0].text, "ok");
+    }
+
+    /// Final review C1(a): the outer link of a linked image must point at its
+    /// own destination, not the inner image's (overlapping ranges corrupt rewrites).
+    #[test]
+    fn exp_04_linked_image_has_distinct_ranges() {
+        let src = "[![alt](x.png)](y.png)\n";
+        let m = parse_page(src, "p");
+        let mut got: Vec<_> = m
+            .links
+            .iter()
+            .map(|l| (l.kind, &src[l.range.clone()], l.range.start))
+            .collect();
+        got.sort_by_key(|g| g.2);
+        assert_eq!(
+            got,
+            vec![
+                (LinkKind::MarkdownImage, "x.png", 8),
+                (LinkKind::Markdown, "y.png", 16)
+            ]
+        );
+        let same = "[![alt](x.png)](x.png)\n";
+        let m = parse_page(same, "p");
+        let ranges: Vec<_> = m.links.iter().map(|l| l.range.clone()).collect();
+        assert_eq!(ranges, vec![8..13, 16..21]);
+    }
+
+    /// Final review C1(b): frontmatter that pulldown-cmark does not recognise
+    /// (blank first line) must not also be parsed as body text.
+    #[test]
+    fn exp_04_frontmatter_links_are_not_duplicated_as_body_links() {
+        let src = "---\n\nrelated:\n  - \"[[A]]\"\n---\n# T\n\n[[B]]\n";
+        let m = parse_page(src, "p");
+        let got: Vec<_> = m
+            .links
+            .iter()
+            .map(|l| (l.kind, l.target.as_str()))
+            .collect();
+        assert_eq!(
+            got,
+            vec![(LinkKind::FrontmatterRelated, "A"), (LinkKind::Wiki, "B")]
+        );
+    }
+
+    /// Final review I2: Obsidian's escaped alias pipe inside tables.
+    #[test]
+    fn pg_05_table_alias_with_escaped_pipe_is_a_link() {
+        let src = "| a | b |\n|---|---|\n| x | [[A\\|shown]] |\n";
+        let m = parse_page(src, "p");
+        assert_eq!(m.links.len(), 1, "{:?}", m.links);
+        let l = &m.links[0];
+        assert_eq!(l.kind, LinkKind::Wiki);
+        assert_eq!(l.target, "A");
+        assert_eq!(l.alias.as_deref(), Some("shown"));
+        assert_eq!(&src[l.range.clone()], "A");
     }
 
     #[test]
