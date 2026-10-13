@@ -153,3 +153,21 @@ a. A failed ⌘O switch keeps the current vault (`status` restored to `open`). b
 
 ## 9. Out of scope (→ later)
 Covers/subtitle editing, paste/drop attachments, `[[` autocomplete (**M2b**); Global View (M3); block drag-and-drop (M4); search (M5); custom audio player and recording (M6); syntax highlighting inside code blocks; math; Mermaid; PDF rendering; multiple panes/tabs.
+
+---
+
+## 10. Amendments from planning (plan `docs/superpowers/plans/2026-10-12-m2a-editor.md`, replayed end-to-end)
+These override the sections above where they conflict.
+
+1. **Vault files are served by our own `nimw-asset:` URI scheme protocol** (§2.4, §2.5, §7). Tauri's asset protocol scope cannot be reliably revoked, so a previously opened vault would stay readable. The custom protocol resolves each request against the *currently open* vault root (`VaultPath` validation: no `..`, no absolute paths, no symlink escapes) and returns 404 once the vault is closed. Tauri's `assetProtocol` stays disabled; the CSP lists `nimw-asset:` (not `asset:`) in `img-src`/`media-src`. The sanitizer rewrites vault paths to `nimw-asset:` URLs. Test: a closed vault's files are no longer served.
+2. **External opening goes through our own commands** (§3.4, §4): `url_open` (http/https/mailto only, validated in Rust) and `file_open_external` (vault files only), both after the in-app confirmation. `tauri-plugin-opener` is used from Rust only; the webview gets **no** `opener:*` permission and `@tauri-apps/plugin-opener` is not a dependency. ACL tests cover the new commands.
+3. **Sanitizer is `hast-util-sanitize`** (+ `hast-util-raw`) instead of DOMPurify (§2.4, §8): it works on the hast tree, so source positions survive for Split scroll sync, and needs no DOM. Same allowlist. `dompurify` is not a dependency.
+4. **Only the container directive form** (`:::name` / `::::columns`) is recognised (§2.1). Inline/leaf directive syntax is disabled because it would turn ordinary text such as `3:2` into a directive.
+5. **Incremental re-parse** (§3.2, §7): a full parse of 5,000 lines takes ~110 ms, so per-keystroke parsing re-parses only the changed top-level block range and reuses the rest; a seeded fuzz test asserts it always equals a full parse.
+6. **Switching or closing the vault is refused while a page cannot be saved** (§3.3), with the save-error banner, so text is never silently dropped.
+7. **The UI gets `core:window:allow-destroy`** (§3.3 quit flush): the close request is intercepted, pending saves are flushed, then the window is destroyed.
+8. **Lint rule bans regex lookbehind** in `src/` — the WKWebView floor (Safari 15) lacks it.
+9. **Versions** (§8): `@codemirror/language` 6.13.1, `@codemirror/view` 6.43.14 (picked by pnpm's release-age gate), `@playwright/test` 1.64.0; plus `mdast-util-directive` 3, `micromark-extension-directive` 4, `mdast-util-to-hast` 13, `hast-util-raw` 9, `hast-util-sanitize` 5.
+10. **Parity fixtures are guards, not RED steps** (§2.6): the Rust side already exists, so they pass as soon as they are written.
+11. **Autosave on blur** (§3.3) is explicitly tested in Task 7 (was missing in the first plan draft).
+12. **Known performance limit:** a single 200 KB *paragraph* parses slowly in remark (~1.4 s; normal 200 KB notes ~0.35 s). The large-note fallback (§3.2) still applies; recorded in the M2a hand-off. Vitest may stall on a loaded machine — run with `--maxWorkers=2` if workers time out.
