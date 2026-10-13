@@ -216,9 +216,13 @@ export const useVaultStore = create<VaultState>((set, get) => {
       else expanded.add(path);
       set({ expanded });
     },
+    // Expands `path` and every ancestor, so whatever lives in it is visible
+    // (final review I1: moves/creates into collapsed folders stayed hidden).
     expand: (path) => {
-      if (!path || get().expanded.has(path)) return;
-      set({ expanded: new Set(get().expanded).add(path) });
+      const expanded = new Set(get().expanded);
+      const before = expanded.size;
+      for (let p = path; p; p = parentOf(p)) expanded.add(p);
+      if (expanded.size !== before) set({ expanded });
     },
     startRename: (renaming) => set({ renaming }),
     createPage: async (dir) => {

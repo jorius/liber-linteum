@@ -50,8 +50,26 @@ export function ExplorerTree({
   const [focused, setFocused] = useState<string | null>(null);
   const refs = useRef(new Map<string, HTMLLIElement>());
 
-  const focusPath = focused ?? selected ?? rows[0]?.node.path ?? null;
+  // The single Tab stop must always be a visible row (final review I1): the
+  // focused row, else the selection, else the nearest visible ancestor of
+  // either, else the first row.
+  const visible = useMemo(() => new Set(rows.map((r) => r.node.path)), [rows]);
+  const focusPath = useMemo(() => {
+    for (const start of [focused, selected]) {
+      for (let p = start; p; p = parentOf(p)) if (visible.has(p)) return p;
+    }
+    return rows[0]?.node.path ?? null;
+  }, [focused, selected, visible, rows]);
   const index = rows.findIndex((r) => r.node.path === focusPath);
+
+  // When the focused row disappears (trash, rename, move), the browser drops
+  // focus to <body>; put it back on the tree's Tab stop.
+  const hadFocus = useRef(false);
+  useEffect(() => {
+    if (!hadFocus.current || !focusPath) return;
+    const active = document.activeElement;
+    if (!active || active === document.body) refs.current.get(focusPath)?.focus();
+  }, [focusPath, rows]);
 
   const moveFocus = (path: string | undefined) => {
     if (!path) return;
@@ -154,6 +172,16 @@ export function ExplorerTree({
 
   return (
     <ul
+      onFocus={() => {
+        hadFocus.current = true;
+      }}
+      onBlur={(e) => {
+        // Focus moving to another element outside the tree ends "tree has focus";
+        // a removed row blurs with no related target, which keeps it.
+        if (e.relatedTarget && !e.currentTarget.contains(e.relatedTarget as Node)) {
+          hadFocus.current = false;
+        }
+      }}
       role="tree"
       aria-label={t('explorer.tree')}
       className={styles.tree}

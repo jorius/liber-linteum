@@ -257,3 +257,60 @@ describe('global shortcuts (spec §3.5)', () => {
     expect(document.activeElement).toHaveAttribute('role', 'treeitem');
   });
 });
+
+describe('keyboard focus is never lost (final review I1, NFR-10)', () => {
+  const tabStops = () => screen.getAllByRole('treeitem').filter((el) => el.tabIndex === 0);
+
+  it('after trashing the focused row, a visible row keeps the Tab stop and focus', async () => {
+    let current = nodes;
+    backend({
+      entry_trash: (a) => {
+        current = current.filter((n) => n.path !== a.path);
+      },
+      vault_tree: () => current,
+    });
+    useSettingsStore.setState({ settings: { ...DEFAULT_SETTINGS, confirmDelete: false } });
+    seed();
+    render(<AppShell />);
+    screen.getByRole('treeitem', { name: 'Art' }).focus();
+    await userEvent.keyboard('{ArrowDown}{ArrowDown}');
+    expect(screen.getByRole('treeitem', { name: 'Welcome' })).toHaveFocus();
+    await userEvent.keyboard('{Delete}');
+    await waitFor(() =>
+      expect(screen.queryByRole('treeitem', { name: 'Welcome' })).not.toBeInTheDocument(),
+    );
+    expect(tabStops()).toHaveLength(1);
+    expect(document.activeElement?.getAttribute('role')).toBe('treeitem');
+  });
+
+  it('moving into a collapsed folder reveals the moved item and keeps it the Tab stop', async () => {
+    const moved = nodes
+      .filter((n) => n.path !== 'Welcome.md')
+      .concat({ path: 'Art/DMC/Welcome.md', kind: 'page' });
+    backend({
+      entry_rename: () => ({ ...outcome, moved: [['Welcome.md', 'Art/DMC/Welcome.md']] }),
+      vault_tree: () => moved,
+    });
+    seed('Welcome.md');
+    render(<AppShell />);
+    await act(() => useVaultStore.getState().rename('Welcome.md', 'Art/DMC/Welcome.md'));
+    const row = await screen.findByRole('treeitem', { name: 'Welcome' });
+    expect(row).toHaveAttribute('aria-level', '3');
+    expect(tabStops()).toEqual([row]);
+  });
+
+  it('a new page inside a collapsed folder is revealed for inline rename', async () => {
+    let current = nodes;
+    backend({
+      entry_create_page: (a) => {
+        current = current.concat({ path: `${a.dir}/${a.name}.md`, kind: 'page' });
+        return `${a.dir}/${a.name}.md`;
+      },
+      vault_tree: () => current,
+    });
+    seed('Art/DMC/Sparda.md');
+    render(<AppShell />);
+    await act(() => useVaultStore.getState().createPage('Art/DMC'));
+    expect(await screen.findByRole('textbox', { name: 'Rename' })).toBeInTheDocument();
+  });
+});
