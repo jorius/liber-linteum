@@ -264,3 +264,42 @@
   outline: 2px solid var(--color-focus);
   outline-offset: 2px;
 }
+
+/* Editable title (M2b §2): looks like the heading until hovered or focused. */
+.titleInput {
+  font: inherit;
+  color: inherit;
+  width: 100%;
+  margin: 0 0 0 -6px;
+  padding: 2px 6px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  outline: 1px dashed transparent;
+  text-overflow: ellipsis;
+}
+
+.titleInput:hover {
+  outline-color: var(--color-border-strong);
+}
+
+.titleInput:focus {
+  outline: 1px dashed var(--color-accent);
+  background: var(--color-accent-soft);
+}
+
+.titleInput[aria-invalid='true'] {
+  outline: 1px solid var(--color-warn-border);
+}
+
+.titleError {
+  margin: 0;
+  font-size: 13px;
+  color: var(--color-warn-text);
+}
+
+.noteTitle {
+  margin: 0;
+  font-size: 13px;
+  color: var(--color-text-muted);
+}

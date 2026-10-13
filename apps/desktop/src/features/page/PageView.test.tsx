@@ -61,7 +61,9 @@ describe('PageView (M2a §5)', () => {
     expect(screen.getByRole('navigation', { name: 'Breadcrumb' })).toHaveTextContent(
       'VaultCharacter Designrex',
     );
-    expect(screen.getByRole('heading', { level: 1, name: 'Generator Rex' })).toBeInTheDocument();
+    // M2b §2: the title is the file name; the note's own title is shown under it.
+    expect(screen.getByRole('heading', { level: 1, name: 'rex' })).toBeInTheDocument();
+    expect(screen.getByText('Title in the note: Generator Rex')).toBeInTheDocument();
     expect(screen.getByText('Hero redesign · v3')).toBeInTheDocument();
     expect(screen.getByRole('list', { name: 'Tags' })).toHaveTextContent('#character#redesign');
     expect(screen.getByText('8 links · 1 backlink')).toBeInTheDocument();
@@ -134,12 +136,12 @@ describe('PageView (M2a §5)', () => {
     fakeDisk({ 'A.md': '# Old\n' });
     render(<PageView />);
     await open('A.md');
-    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Old');
+    expect(screen.getByText('Title in the note: Old')).toBeInTheDocument();
     await act(async () => {
       view().dispatch({ changes: { from: 2, to: 5, insert: 'New' } });
       await useEditorStore.getState().flushAll();
     });
-    await waitFor(() => expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('New'));
+    await waitFor(() => expect(screen.getByText('Title in the note: New')).toBeInTheDocument());
   });
 
   it('deleted outside while dirty: the text stays and can be saved as a new page', async () => {

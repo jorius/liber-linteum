@@ -89,7 +89,10 @@
     "binary": "This file isn't valid UTF-8 text, so it can't be shown.",
     "tags": "Tags",
     "meta": "{links, plural, one {# link} other {# links}} · {backlinks, plural, one {# backlink} other {# backlinks}}",
-    "breadcrumb": "Breadcrumb"
+    "breadcrumb": "Breadcrumb",
+    "titleLabel": "Page title",
+    "titleTaken": "A page named “{name}” is already in this folder.",
+    "titleInNote": "Title in the note: {title}"
   },
   "editor": {
     "conflictCopy": "Someone else changed this page — their version was saved as “{name}”",

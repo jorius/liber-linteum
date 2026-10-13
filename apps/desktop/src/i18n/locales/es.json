@@ -89,7 +89,10 @@
     "binary": "Este archivo no es texto UTF-8 válido, así que no se puede mostrar.",
     "tags": "Etiquetas",
     "meta": "{links, plural, one {# enlace} other {# enlaces}} · {backlinks, plural, one {# retroenlace} other {# retroenlaces}}",
-    "breadcrumb": "Ruta"
+    "breadcrumb": "Ruta",
+    "titleLabel": "Título de la página",
+    "titleTaken": "Ya hay una página llamada «{name}» en esta carpeta.",
+    "titleInNote": "Título en la nota: {title}"
   },
   "editor": {
     "conflictCopy": "Alguien más cambió esta página — su versión se guardó como «{name}»",

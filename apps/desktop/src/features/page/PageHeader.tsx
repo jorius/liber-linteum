@@ -8,6 +8,7 @@ import { useTrailStore } from '../../stores/trailStore';
 import { nameOf } from '../../stores/tree';
 import { Breadcrumb } from './Breadcrumb';
 import { ModeToggle } from './ModeToggle';
+import { PageTitle } from './PageTitle';
 import styles from './PageView.module.css';
 
 /** The cover's vault path (`null`: none, remote or missing). */
@@ -78,7 +79,7 @@ export function PageHeader({ page, mode }: { page: Page; mode: EditorMode }) {
       {cover && (
         <img data-cover className={styles.cover} src={assetUrl(cover)} alt="" loading="lazy" />
       )}
-      <h1 className={styles.title}>{page.title}</h1>
+      <PageTitle page={page} />
       {page.subtitle && <p className={styles.subtitle}>{page.subtitle}</p>}
       {page.tags.length > 0 && (
         <ul className={styles.tags} aria-label={t('page.tags')}>
