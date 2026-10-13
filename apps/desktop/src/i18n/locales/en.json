@@ -199,5 +199,23 @@
     "fontSize": "Text size",
     "fontSizePx": "{px} px",
     "toolbar": "Show the formatting toolbar"
+  },
+  "toolbar": {
+    "label": "Formatting",
+    "bold": "Bold",
+    "italic": "Italic",
+    "strike": "Strikethrough",
+    "highlight": "Highlight",
+    "code": "Inline code",
+    "link": "Link",
+    "heading": "Text style",
+    "paragraph": "Paragraph",
+    "headingN": "Heading {n}",
+    "bullet": "Bulleted list",
+    "numbered": "Numbered list",
+    "task": "Task list",
+    "quote": "Quote",
+    "divider": "Divider",
+    "toggle": "Formatting toolbar"
   }
 }

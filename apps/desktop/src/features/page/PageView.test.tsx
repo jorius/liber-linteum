@@ -85,6 +85,19 @@ describe('PageView (M2a §5)', () => {
     expect(screen.getByRole('region', { name: 'Preview' })).toHaveTextContent('body');
   });
 
+  it('M2b §6: the header button shows and hides the formatting toolbar', async () => {
+    const disk = fakeDisk({ 'A.md': '# A\n\nbody\n' });
+    render(<PageView />);
+    await open('A.md');
+    const toggle = screen.getByRole('button', { name: 'Formatting toolbar' });
+    expect(toggle).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByRole('toolbar', { name: 'Formatting' })).toBeInTheDocument();
+    await userEvent.click(toggle);
+    expect(disk.calls).toContainEqual(['settings_set', { patch: { toolbar: false } }]);
+    await waitFor(() => expect(screen.queryByRole('toolbar')).not.toBeInTheDocument());
+    expect(toggle).toHaveAttribute('aria-pressed', 'false');
+  });
+
   it('save status: Saved → Saving… → Saved; failures say "Unsaved — retrying"', async () => {
     const disk = fakeDisk({ 'A.md': '# A\n' });
     render(<PageView />);

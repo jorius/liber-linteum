@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { assetUrl, linksResolve, type EditorMode, type Page } from '../../ipc';
 import { useEditorStore } from '../../stores/editorStore';
+import { useSettingsStore } from '../../stores/settingsStore';
 import { Breadcrumb } from './Breadcrumb';
 import { ModeToggle } from './ModeToggle';
 import styles from './PageView.module.css';
@@ -30,6 +31,7 @@ export function PageHeader({ page, mode }: { page: Page; mode: EditorMode }) {
   const status = useEditorStore((s) => s.status);
   const hasDoc = useEditorStore((s) => s.doc !== null);
   const large = useEditorStore((s) => s.large);
+  const toolbar = useSettingsStore((s) => s.settings.toolbar);
   const cover = useCover(page);
   return (
     <header className={styles.header}>
@@ -40,6 +42,18 @@ export function PageHeader({ page, mode }: { page: Page; mode: EditorMode }) {
             <span role="status" aria-label={t('editor.saveStatus')} className={styles.status}>
               {t(`editor.${status}`)}
             </span>
+          )}
+          {hasDoc && (
+            <button
+              type="button"
+              className={styles.toolbarToggle}
+              aria-pressed={toolbar}
+              title={t('toolbar.toggle')}
+              onClick={() => void useSettingsStore.getState().update({ toolbar: !toolbar })}
+            >
+              <span aria-hidden="true">Aa</span>
+              <span className={styles.srOnly}>{t('toolbar.toggle')}</span>
+            </button>
           )}
           <ModeToggle mode={mode} />
         </div>

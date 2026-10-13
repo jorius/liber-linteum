@@ -199,5 +199,23 @@
     "fontSize": "Tamaño del texto",
     "fontSizePx": "{px} px",
     "toolbar": "Mostrar la barra de formato"
+  },
+  "toolbar": {
+    "label": "Formato",
+    "bold": "Negrita",
+    "italic": "Cursiva",
+    "strike": "Tachado",
+    "highlight": "Resaltado",
+    "code": "Código en línea",
+    "link": "Enlace",
+    "heading": "Estilo de texto",
+    "paragraph": "Párrafo",
+    "headingN": "Título {n}",
+    "bullet": "Lista con viñetas",
+    "numbered": "Lista numerada",
+    "task": "Lista de tareas",
+    "quote": "Cita",
+    "divider": "Separador",
+    "toggle": "Barra de formato"
   }
 }

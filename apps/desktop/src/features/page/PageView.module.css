@@ -209,3 +209,27 @@
   padding: 8px 14px;
   cursor: pointer;
 }
+
+/* Shows/hides the formatting toolbar (M2b §6). */
+.toolbarToggle {
+  height: 28px;
+  min-width: 34px;
+  padding: 0 8px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  color: var(--color-text-muted);
+  font: 600 13px var(--font-body);
+  cursor: pointer;
+}
+
+.toolbarToggle[aria-pressed='true'] {
+  background: var(--color-accent-soft);
+  color: var(--color-accent);
+  border-color: transparent;
+}
+
+.toolbarToggle:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 2px;
+}
