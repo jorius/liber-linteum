@@ -1,5 +1,5 @@
-import { defaultKeymap, history, historyKeymap } from '@codemirror/commands';
-import { markdown } from '@codemirror/lang-markdown';
+import { history, historyKeymap } from '@codemirror/commands';
+import { markdown, markdownLanguage } from '@codemirror/lang-markdown';
 import { HighlightStyle, syntaxHighlighting } from '@codemirror/language';
 import { Compartment, EditorState, Facet, Transaction, type Extension } from '@codemirror/state';
 import { drawSelection, EditorView, keymap } from '@codemirror/view';
@@ -11,6 +11,7 @@ import type { EditorMode } from '../../ipc';
 import { Preview } from '../preview/Preview';
 import styles from './Editor.module.css';
 import { followLinkAtCursor, livePreview, pagePath } from './livePreview';
+import { editorKeymap } from './format';
 import type { PageDoc } from './pageDoc';
 import { blockForOffset, offsetAtTop, topIn } from './scrollSync';
 import { toggleTaskIn } from './widgets';
@@ -169,12 +170,9 @@ function createState(d: PageDoc, mode: EditorMode, label: string): EditorState {
       history(),
       drawSelection(),
       EditorView.lineWrapping,
-      markdown(),
-      keymap.of([
-        { key: 'Mod-Enter', run: followLinkAtCursor },
-        ...defaultKeymap,
-        ...historyKeymap,
-      ]),
+      // GFM syntax tree: Source highlighting and the toolbar's pressed state.
+      markdown({ base: markdownLanguage }),
+      keymap.of([{ key: 'Mod-Enter', run: followLinkAtCursor }, ...editorKeymap, ...historyKeymap]),
       pagePath.of(() => d.path),
       theme,
       labelSlot.of(labelled(label)),

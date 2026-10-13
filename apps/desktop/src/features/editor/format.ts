@@ -1,0 +1,333 @@
+// Formatting commands (M2b §6): pure CodeMirror commands over the Markdown
+// text — one transaction (one undo step) for every selection — plus the keys
+// that run them with or without the toolbar.
+import { defaultKeymap, indentLess, indentMore } from '@codemirror/commands';
+import { syntaxTree } from '@codemirror/language';
+import {
+  EditorSelection,
+  type ChangeSpec,
+  type EditorState,
+  type SelectionRange,
+  type StateCommand,
+} from '@codemirror/state';
+import type { KeyBinding } from '@codemirror/view';
+
+export type InlineFormat = 'bold' | 'italic' | 'strike' | 'highlight' | 'code';
+export type BlockFormat = 'bullet' | 'numbered' | 'task' | 'quote';
+/** What the toolbar can show as pressed. */
+export type ActiveFormat = InlineFormat | BlockFormat | `h${1 | 2 | 3 | 4 | 5 | 6}`;
+
+export const MARKERS: Record<InlineFormat, string> = {
+  bold: '**',
+  italic: '*',
+  strike: '~~',
+  highlight: '==',
+  code: '`',
+};
+
+/** How many `ch` end `text` / start `text`. */
+const runBefore = (text: string, ch: string) =>
+  text.length - text.replace(new RegExp(`\\${ch}+$`), '').length;
+const runAfter = (text: string, ch: string) =>
+  text.length - text.replace(new RegExp(`^\\${ch}+`), '').length;
+
+/** Whether runs of `before`/`after` marker characters wrap the text in this
+ *  format: italic is an odd run (`*x*`, `***x***`), the others need their
+ *  whole marker (`**x**` is bold, never italic). */
+function wrapped(kind: InlineFormat, before: number, after: number): boolean {
+  const len = MARKERS[kind].length;
+  if (kind === 'italic') return before % 2 === 1 && after % 2 === 1;
+  return before >= len && after >= len;
+}
+
+/** Wraps each selection (or the word at an empty cursor) in the format's
+ *  markers, or unwraps it when it is already formatted. */
+export function toggleInline(kind: InlineFormat): StateCommand {
+  const m = MARKERS[kind];
+  const k = m.length;
+  const ch = m[0];
+  return ({ state, dispatch }) => {
+    const tr = state.changeByRange((range) => {
+      let { from, to } = range;
+      if (range.empty) {
+        const word = state.wordAt(range.head);
+        if (!word) {
+          return {
+            changes: { from, insert: m + m },
+            range: EditorSelection.cursor(from + k),
+          };
+        }
+        ({ from, to } = word);
+      }
+      const text = state.sliceDoc(from, to);
+      const before = runBefore(state.sliceDoc(Math.max(0, from - 6), from), ch);
+      const after = runAfter(state.sliceDoc(to, to + 6), ch);
+      const keep = (a: number, b: number) =>
+        range.empty ? EditorSelection.cursor(range.head + a) : EditorSelection.range(from + a, b);
+      if (wrapped(kind, before, after)) {
+        return {
+          changes: [
+            { from: from - k, to: from },
+            { from: to, to: to + k },
+          ],
+          range: keep(-k, to - k),
+        };
+      }
+      const inside =
+        text.length >= 2 * k &&
+        wrapped(kind, runAfter(text, ch), runBefore(text, ch)) &&
+        text.startsWith(m) &&
+        text.endsWith(m);
+      if (inside) {
+        return {
+          changes: [
+            { from, to: from + k },
+            { from: to - k, to },
+          ],
+          range: EditorSelection.range(from, to - 2 * k),
+        };
+      }
+      return {
+        changes: [
+          { from, insert: m },
+          { from: to, insert: m },
+        ],
+        range: keep(k, to + k),
+      };
+    });
+    dispatch(state.update(tr, { scrollIntoView: true, userEvent: 'input.format' }));
+    return true;
+  };
+}
+
+/** Line numbers touched by the selections, in order, once each. */
+function selectedLines(state: EditorState): number[] {
+  const lines = new Set<number>();
+  for (const r of state.selection.ranges) {
+    const last = state.doc.lineAt(r.to).number;
+    for (let n = state.doc.lineAt(r.from).number; n <= last; n++) lines.add(n);
+  }
+  return [...lines].sort((a, b) => a - b);
+}
+
+/** Applies per-line edits as one transaction; selections map through them. */
+function editLines(
+  state: EditorState,
+  dispatch: (tr: ReturnType<EditorState['update']>) => void,
+  edit: (text: string, index: number, lines: string[]) => string,
+): boolean {
+  const numbers = selectedLines(state);
+  const texts = numbers.map((n) => state.doc.line(n).text);
+  const changes: ChangeSpec[] = [];
+  numbers.forEach((n, i) => {
+    const line = state.doc.line(n);
+    const next = edit(line.text, i, texts);
+    if (next !== line.text) changes.push(...lineChange(line.from, line.text, next));
+  });
+  const set = state.changes(changes);
+  // A selection that starts at a line start keeps covering the whole line
+  // (prefix included); cursors stay after the text they were on.
+  const selection = EditorSelection.create(
+    state.selection.ranges.map((r) => {
+      const atStart = !r.empty && state.doc.lineAt(r.from).from === r.from;
+      const from = set.mapPos(r.from, atStart ? -1 : 1);
+      const to = set.mapPos(r.to, 1);
+      return r.anchor <= r.head ? EditorSelection.range(from, to) : EditorSelection.range(to, from);
+    }),
+    state.selection.mainIndex,
+  );
+  dispatch(
+    state.update({ changes: set, selection, scrollIntoView: true, userEvent: 'input.format' }),
+  );
+  return true;
+}
+
+/** The smallest change turning `before` into `after` at `from` (only the
+ *  prefix differs in practice), so cursors after it keep their place. */
+function lineChange(from: number, before: string, after: string): ChangeSpec[] {
+  let head = 0;
+  while (head < before.length && head < after.length && before[head] === after[head]) head++;
+  let tail = 0;
+  while (
+    tail < before.length - head &&
+    tail < after.length - head &&
+    before[before.length - 1 - tail] === after[after.length - 1 - tail]
+  ) {
+    tail++;
+  }
+  return [
+    {
+      from: from + head,
+      to: from + before.length - tail,
+      insert: after.slice(head, after.length - tail),
+    },
+  ];
+}
+
+const HEADING = /^(#{1,6})[ \t]+/;
+
+/** Sets every selected line to heading `level` (0 = paragraph). */
+export function setHeading(level: 0 | 1 | 2 | 3 | 4 | 5 | 6): StateCommand {
+  return ({ state, dispatch }) =>
+    editLines(state, dispatch, (text) => {
+      const body = text.replace(HEADING, '');
+      return level === 0 ? body : `${'#'.repeat(level)} ${body}`;
+    });
+}
+
+/** indent, list marker (`- `, `1. `, `- [ ] `), rest. */
+const LIST = /^(\s*)((?:[-*+][ \t]+\[[ xX]\][ \t]+)|(?:[-*+][ \t]+)|(?:\d+[.)][ \t]+))?(.*)$/;
+const kindOf = (marker: string | undefined): BlockFormat | null =>
+  !marker ? null : /\[[ xX]\]/.test(marker) ? 'task' : /^\d/.test(marker) ? 'numbered' : 'bullet';
+
+/** Toggles a list kind or the quote on every selected line: removes it when
+ *  every (non-blank) line already has it, otherwise sets it — replacing
+ *  another list kind, renumbering numbered lists, keeping indentation. */
+export function toggleBlock(kind: BlockFormat): StateCommand {
+  return ({ state, dispatch }) => {
+    const lines = selectedLines(state).map((n) => state.doc.line(n).text);
+    const single = lines.length === 1;
+    const counted = lines.filter((l) => single || l.trim() !== '');
+    if (kind === 'quote') {
+      const all = counted.every((l) => /^>/.test(l));
+      return editLines(state, dispatch, (text) => {
+        if (!single && text.trim() === '') return text;
+        return all ? text.replace(/^> ?/, '') : `> ${text}`;
+      });
+    }
+    const all = counted.every((l) => kindOf(LIST.exec(l)?.[2]) === kind);
+    let number = 0;
+    return editLines(state, dispatch, (text) => {
+      if (!single && text.trim() === '') return text;
+      const [, indent, , rest] = LIST.exec(text)!;
+      if (all) return indent + rest;
+      number += 1;
+      const marker = kind === 'bullet' ? '- ' : kind === 'task' ? '- [ ] ' : `${number}. `;
+      return indent + marker + rest;
+    });
+  };
+}
+
+/** A thematic break on its own line, with a blank line above it so the
+ *  paragraph before never becomes a setext heading. */
+export const insertDivider: StateCommand = ({ state, dispatch }) => {
+  const line = state.doc.lineAt(state.selection.main.head);
+  let from: number;
+  let insert: string;
+  if (line.text.trim() !== '') {
+    from = line.to;
+    insert = '\n\n---\n';
+  } else {
+    const above = line.number > 1 ? state.doc.line(line.number - 1).text : '';
+    from = line.from;
+    insert = above.trim() !== '' ? '\n---\n' : '---\n';
+  }
+  dispatch(
+    state.update({
+      changes: { from, to: line.text.trim() === '' ? line.to : from, insert },
+      selection: { anchor: from + insert.length },
+      scrollIntoView: true,
+      userEvent: 'input.format',
+    }),
+  );
+  return true;
+};
+
+/** `[selection](url)` with "url" selected to type over; empty → `[]()`. */
+export const insertLink: StateCommand = ({ state, dispatch }) => {
+  const tr = state.changeByRange((range: SelectionRange) => {
+    if (range.empty) {
+      return {
+        changes: { from: range.from, insert: '[]()' },
+        range: EditorSelection.cursor(range.from + 1),
+      };
+    }
+    const text = state.sliceDoc(range.from, range.to);
+    const urlFrom = range.from + text.length + 3;
+    return {
+      changes: { from: range.from, to: range.to, insert: `[${text}](url)` },
+      range: EditorSelection.range(urlFrom, urlFrom + 3),
+    };
+  });
+  dispatch(state.update(tr, { scrollIntoView: true, userEvent: 'input.format' }));
+  return true;
+};
+
+/** Tab / Shift-Tab: indent or outdent list items only; elsewhere the key is
+ *  left to the browser, so Tab keeps moving focus out of the editor. */
+export function listIndent(dir: 1 | -1): StateCommand {
+  return (target) => {
+    const inList = selectedLines(target.state).every((n) =>
+      /^\s*([-*+]|\d+[.)])[ \t]/.test(target.state.doc.line(n).text),
+    );
+    if (!inList) return false;
+    return dir === 1 ? indentMore(target) : indentLess(target);
+  };
+}
+
+const HEADINGS = {
+  ATXHeading1: 'h1',
+  ATXHeading2: 'h2',
+  ATXHeading3: 'h3',
+  ATXHeading4: 'h4',
+  ATXHeading5: 'h5',
+  ATXHeading6: 'h6',
+  SetextHeading1: 'h1',
+  SetextHeading2: 'h2',
+} as const;
+const INLINE_NODES: Record<string, ActiveFormat> = {
+  StrongEmphasis: 'bold',
+  Emphasis: 'italic',
+  Strikethrough: 'strike',
+  InlineCode: 'code',
+  Blockquote: 'quote',
+};
+
+/** The formats at the main cursor, from the editor's (incremental) syntax
+ *  tree; `==highlight==` has no node there, so it is found on the line. */
+export function activeFormats(state: EditorState): Set<ActiveFormat> {
+  const out = new Set<ActiveFormat>();
+  const pos = state.selection.main.head;
+  for (let node = syntaxTree(state).resolveInner(pos, -1); node; node = node.parent!) {
+    const name = node.name;
+    if (name in INLINE_NODES) out.add(INLINE_NODES[name]);
+    else if (name in HEADINGS) out.add(HEADINGS[name as keyof typeof HEADINGS]);
+    else if (name === 'ListItem') {
+      const list = node.parent?.name;
+      const task = node.getChild('Task');
+      if (!out.has('bullet') && !out.has('numbered') && !out.has('task')) {
+        out.add(task ? 'task' : list === 'OrderedList' ? 'numbered' : 'bullet');
+      }
+    }
+    if (!node.parent) break;
+  }
+  const line = state.doc.lineAt(pos);
+  const before = line.text.slice(0, pos - line.from);
+  const after = line.text.slice(pos - line.from);
+  if ((before.split('==').length - 1) % 2 === 1 && after.includes('==')) out.add('highlight');
+  return out;
+}
+
+/** Formatting shortcuts (active with the toolbar hidden too). */
+export const formatKeymap: readonly KeyBinding[] = [
+  { key: 'Mod-b', run: toggleInline('bold') },
+  { key: 'Mod-i', run: toggleInline('italic') },
+  { key: 'Mod-Shift-x', run: toggleInline('strike') },
+  { key: 'Mod-Shift-h', run: toggleInline('highlight') },
+  { key: 'Mod-e', run: toggleInline('code') },
+  { key: 'Mod-k', run: insertLink },
+  ...([0, 1, 2, 3, 4, 5, 6] as const).map((n) => ({ key: `Mod-Alt-${n}`, run: setHeading(n) })),
+  { key: 'Mod-Shift-7', run: toggleBlock('numbered') },
+  { key: 'Mod-Shift-8', run: toggleBlock('bullet') },
+  { key: 'Mod-Shift-9', run: toggleBlock('task') },
+  { key: 'Mod-Shift-.', run: toggleBlock('quote') },
+  { key: 'Tab', run: listIndent(1) },
+  { key: 'Shift-Tab', run: listIndent(-1) },
+];
+
+/** The editor's keys: formatting first, then CodeMirror's defaults without
+ *  ⌘[ / ⌘] (they go back and forward along the link trail, M2b §3). */
+export const editorKeymap: readonly KeyBinding[] = [
+  ...formatKeymap,
+  ...defaultKeymap.filter((b) => b.key !== 'Mod-[' && b.key !== 'Mod-]'),
+];

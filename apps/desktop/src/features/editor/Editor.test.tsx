@@ -207,3 +207,24 @@ describe('task checkboxes outside the source text (feedback 2026-10-13)', () => 
     expect(viewOf().state.doc.toString()).toBe('> [!todo] List\n> - [x] a\n\nend\n');
   });
 });
+
+describe('formatting keys (M2b §6)', () => {
+  const mod = /Mac|iP(hone|ad)/.test(navigator.platform) ? { metaKey: true } : { ctrlKey: true };
+  const press = (key: string, extra: KeyboardEventInit = {}) =>
+    act(() => {
+      viewOf().contentDOM.dispatchEvent(
+        new KeyboardEvent('keydown', { key, bubbles: true, cancelable: true, ...mod, ...extra }),
+      );
+    });
+
+  it('⌘B bolds the word at the cursor; ⌘[ is not indentation any more', async () => {
+    disk = fakeDisk({ 'K.md': 'hello world\n' });
+    const doc = await load('K.md');
+    render(<Editor doc={doc} mode="source" label="K" />);
+    act(() => viewOf().dispatch({ selection: { anchor: 8 } }));
+    await press('b');
+    expect(viewOf().state.doc.toString()).toBe('hello **world**\n');
+    await press('[');
+    expect(viewOf().state.doc.toString()).toBe('hello **world**\n');
+  });
+});
