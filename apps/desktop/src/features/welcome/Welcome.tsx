@@ -1,7 +1,17 @@
 import { useTranslation } from 'react-i18next';
 import { BrandMark, FolderIcon, ImportIcon, LockIcon, PlusIcon, VaultIcon } from '../../app/icons';
-import { SUPPORTED_LANGUAGES } from '../../i18n';
+import { SUPPORTED_LANGUAGES, type Language } from '../../i18n';
+import { pickFolder } from '../../ipc';
+import { useSettingsStore } from '../../stores/settingsStore';
+import { useVaultStore } from '../../stores/vaultStore';
+import { RecentList } from './RecentList';
 import styles from './Welcome.module.css';
+
+/** Native folder picker → open or create (VLT-01). A cancelled picker does nothing. */
+async function pickThen(action: (path: string) => Promise<unknown>) {
+  const path = await pickFolder().catch(() => null);
+  if (path) await action(path);
+}
 
 export interface WelcomeProps {
   version: string | null;
@@ -10,6 +20,15 @@ export interface WelcomeProps {
 export function Welcome({ version }: WelcomeProps) {
   const { t, i18n } = useTranslation();
   const current = i18n.resolvedLanguage;
+  const open = useVaultStore((s) => s.open);
+  const create = useVaultStore((s) => s.create);
+  const updateSettings = useSettingsStore((s) => s.update);
+
+  const chooseLanguage = async (lng: Language) => {
+    // Switch immediately; persist when running inside the app.
+    await i18n.changeLanguage(lng);
+    void updateSettings({ language: lng });
+  };
 
   return (
     <main className={styles.page}>
@@ -32,7 +51,7 @@ export function Welcome({ version }: WelcomeProps) {
                 type="button"
                 lang={lng}
                 aria-pressed={current === lng}
-                onClick={() => void i18n.changeLanguage(lng)}
+                onClick={() => void chooseLanguage(lng)}
               >
                 {t(`languages.${lng}`)}
               </button>
@@ -44,27 +63,16 @@ export function Welcome({ version }: WelcomeProps) {
           <button
             type="button"
             className={`${styles.button} ${styles.primary}`}
-            disabled
-            aria-describedby="welcome-coming-soon"
+            onClick={() => void pickThen(create)}
           >
             <PlusIcon />
             {t('welcome.create')}
           </button>
-          <button
-            type="button"
-            className={styles.button}
-            disabled
-            aria-describedby="welcome-coming-soon"
-          >
+          <button type="button" className={styles.button} onClick={() => void pickThen(open)}>
             <FolderIcon />
             {t('welcome.open')}
           </button>
-          <button
-            type="button"
-            className={styles.button}
-            disabled
-            aria-describedby="welcome-coming-soon"
-          >
+          <button type="button" className={styles.button} onClick={() => void pickThen(open)}>
             <VaultIcon />
             {t('welcome.openObsidian')}
           </button>
@@ -72,22 +80,17 @@ export function Welcome({ version }: WelcomeProps) {
             type="button"
             className={styles.button}
             disabled
-            aria-describedby="welcome-coming-soon"
+            aria-describedby="welcome-notion-later"
           >
             <ImportIcon />
             {t('welcome.importNotion')}
           </button>
-          <p className={styles.note} id="welcome-coming-soon">
-            {t('welcome.comingSoon')}
+          <p className={styles.note} id="welcome-notion-later">
+            {t('welcome.notionLater')}
           </p>
         </div>
 
-        <section className={styles.recent} aria-labelledby="welcome-recent">
-          <h2 className={styles.label} id="welcome-recent">
-            {t('welcome.recent')}
-          </h2>
-          <p className={styles.empty}>{t('welcome.noRecent')}</p>
-        </section>
+        <RecentList />
 
         <p className={styles.footer}>
           <LockIcon />

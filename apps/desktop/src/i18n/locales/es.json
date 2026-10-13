@@ -12,7 +12,9 @@
     "importNotion": "Importar una exportación de Notion",
     "recent": "Recientes",
     "noRecent": "Aún no hay bóvedas recientes.",
-    "comingSoon": "Las acciones de bóveda llegan en el próximo hito."
+    "notionLater": "La importación de Notion llega en un hito posterior.",
+    "forget": "Quitar {name} de recientes",
+    "missing": "Carpeta no encontrada"
   },
   "languages": {
     "en": "English",
@@ -47,5 +49,10 @@
   },
   "explorer": {
     "untitled": "Sin título"
+  },
+  "opening": {
+    "title": "Abriendo bóveda…",
+    "preparing": "Leyendo la carpeta…",
+    "progress": "Indexando {done, number} / {total, number}"
   }
 }

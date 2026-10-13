@@ -12,7 +12,9 @@
     "importNotion": "Import a Notion export",
     "recent": "Recent",
     "noRecent": "No recent vaults yet.",
-    "comingSoon": "Vault actions arrive in the next milestone."
+    "notionLater": "Notion import arrives in a later milestone.",
+    "forget": "Remove {name} from recent",
+    "missing": "Folder not found"
   },
   "languages": {
     "en": "English",
@@ -47,5 +49,10 @@
   },
   "explorer": {
     "untitled": "Untitled"
+  },
+  "opening": {
+    "title": "Opening vault…",
+    "preparing": "Reading the folder…",
+    "progress": "Indexing {done, number} / {total, number}"
   }
 }
