@@ -1,5 +1,6 @@
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { EditorView } from '@codemirror/view';
 import axe from 'axe-core';
 import { afterEach, describe, expect, it } from 'vitest';
 import type { TreeNode } from '../../ipc';
@@ -287,7 +288,10 @@ describe('link trail keys (M2b §3)', () => {
     await waitFor(() => expect(usePageStore.getState().path).toBe('Art/rex.md'));
   });
 
-  it('review focus: ⌘[ typed in the editor goes back instead of indenting', async () => {
+  /** Pages with an indented list: CodeMirror's default Mod-[ / Mod-] would
+   *  outdent / indent them, so a changed text means the editor took the key. */
+  function trailPages() {
+    const text = '- a\n  - b\n';
     backend({
       page_get: (a) => ({
         path: a.path,
@@ -297,25 +301,78 @@ describe('link trail keys (M2b §3)', () => {
         tags: [],
         links: 0,
         backlinks: 0,
-        text: '- item\n',
+        text,
         truncated: false,
         binary: false,
       }),
-      page_read: () => ({ text: '- item\n', hash: 'h' }),
+      page_read: () => ({ text, hash: 'h' }),
+      page_write: () => ({ hash: 'h2' }),
     });
+    return text;
+  }
+  /** The editor on screen once `path` is shown, with the cursor at `pos`. */
+  async function editorAt(path: string, pos: number) {
+    await waitFor(() => expect(usePageStore.getState().path).toBe(path));
+    const view = await waitFor(() => {
+      const el = document.querySelector<HTMLElement>('.cm-editor');
+      const v = el && EditorView.findFromDOM(el);
+      expect(v?.state.doc.toString()).toBe('- a\n  - b\n');
+      return v!;
+    });
+    act(() => view.dispatch({ selection: { anchor: pos } }));
+    view.contentDOM.focus();
+    return view;
+  }
+
+  it('review focus: ⌘[ / ⌘] typed in an indented list go back / forward instead of (out)denting', async () => {
+    const text = trailPages();
     seed();
     render(<AppShell />);
     await act(() => openPage('Welcome.md'));
     await act(() => openPage('Art/rex.md', null, 'link'));
-    const content = await waitFor(() => {
-      const el = document.querySelector<HTMLElement>('.cm-content');
-      expect(el).not.toBeNull();
-      return el!;
-    });
-    content.focus();
-    await userEvent.keyboard('{Meta>}[[{/Meta}');
-    await waitFor(() => expect(usePageStore.getState().path).toBe('Welcome.md'));
-    expect(content.textContent).toBe('- item');
+    // Cursor in the nested item: Mod-[ (indentLess) would outdent it.
+    // jsdom isn't a Mac, so CodeMirror's Mod is Ctrl here: press Ctrl so a
+    // still-bound Mod-[ / Mod-] would fire (our handler takes ⌘ or Ctrl).
+    let view = await editorAt('Art/rex.md', text.indexOf('b'));
+    await userEvent.keyboard('{Control>}[[{/Control}');
+    expect(view.state.doc.toString()).toBe(text);
+    // Cursor in the top-level item: Mod-] (indentMore) would indent it.
+    view = await editorAt('Welcome.md', 1);
+    await userEvent.keyboard('{Control>}]{/Control}');
+    expect(view.state.doc.toString()).toBe(text);
+    await editorAt('Art/rex.md', 0);
+  });
+
+  it('final review m5: ⌘[ / ⌘] work where brackets need Option (Spanish, German, French Macs)', async () => {
+    trailPages();
+    seed();
+    render(<AppShell />);
+    await act(() => openPage('Welcome.md'));
+    await act(() => openPage('Art/rex.md', null, 'link'));
+    const at = () => usePageStore.getState().path;
+    const press = (init: KeyboardEventInit) =>
+      act(() => void fireEvent.keyDown(document.body, { metaKey: true, ...init }));
+    // Spanish: ⌘⌥ + the key right of P types "[".
+    press({ altKey: true, key: '[', code: 'BracketLeft' });
+    await waitFor(() => expect(at()).toBe('Welcome.md'));
+    press({ altKey: true, key: ']', code: 'BracketRight' });
+    await waitFor(() => expect(at()).toBe('Art/rex.md'));
+    // German: ⌘ü / ⌘+ (the keys where US has [ and ]).
+    press({ key: 'ü', code: 'BracketLeft' });
+    await waitFor(() => expect(at()).toBe('Welcome.md'));
+    press({ key: '+', code: 'BracketRight' });
+    await waitFor(() => expect(at()).toBe('Art/rex.md'));
+    // French: a dead key (^) at the same place.
+    press({ key: 'Dead', code: 'BracketLeft' });
+    await waitFor(() => expect(at()).toBe('Welcome.md'));
+    press({ key: 'Dead', code: 'BracketRight' });
+    await waitFor(() => expect(at()).toBe('Art/rex.md'));
+    // Not stolen: AltGr (Ctrl+Alt) typing "[" on Windows/Linux, and Dvorak's
+    // ⌘/ which sits on that physical key.
+    press({ metaKey: false, ctrlKey: true, altKey: true, key: '[', code: 'Digit8' });
+    press({ key: '/', code: 'BracketLeft' });
+    await act(async () => {});
+    expect(at()).toBe('Art/rex.md');
   });
 });
 
