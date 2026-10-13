@@ -1,8 +1,10 @@
 import i18next from 'i18next';
 import { create } from 'zustand';
+import { LARGE_NOTE_CHARS } from '../features/editor/limits';
 import { PageDoc, type PageDocHooks, type SaveStatus } from '../features/editor/pageDoc';
 import { isTauri, onCloseRequested, type ChangedPayload, type CommandError } from '../ipc';
-import { openPage } from './navigate';
+import { errorMessage } from './messages';
+import { openNewPage, openPage } from './navigate';
 import { useToastStore } from './toastStore';
 import { nameOf, remap } from './tree';
 
@@ -17,6 +19,8 @@ interface EditorState {
   dirty: boolean;
   orphaned: boolean;
   hash: string | null;
+  /** Over 200 KB: Live Preview uses the reduced decoration set. */
+  large: boolean;
   /** Why the requested page can't be edited (e.g. `binary`). */
   error: CommandError | null;
   open: (path: string) => Promise<void>;
@@ -28,6 +32,8 @@ interface EditorState {
   follow: (from: string, to: string) => void;
   /** Re-reads pages rewritten by our own link updates (rename/move). */
   syncPaths: (paths: string[]) => Promise<void>;
+  /** Writes an orphaned page (deleted outside while dirty) to a new page. */
+  saveAsNew: () => Promise<void>;
 }
 
 /** Every page with a live document: the current one plus pages switched away
@@ -42,6 +48,7 @@ const IDLE = {
   dirty: false,
   orphaned: false,
   hash: null,
+  large: false,
   error: null,
 };
 
@@ -52,6 +59,7 @@ const snapshot = (doc: PageDoc) => ({
   dirty: doc.dirty,
   orphaned: doc.orphaned,
   hash: doc.hash,
+  large: doc.text.length > LARGE_NOTE_CHARS,
   error: null,
 });
 
@@ -150,6 +158,20 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   },
   syncPaths: async (paths) => {
     await Promise.all(paths.flatMap((p) => docs.get(p)?.sync() ?? []));
+  },
+  saveAsNew: async () => {
+    const doc = get().doc;
+    if (!doc) return;
+    const old = doc.path;
+    const res = await doc.saveAsNew();
+    if (!res.ok) {
+      useToastStore.getState().push({ message: errorMessage(res.error), tone: 'error' });
+      return;
+    }
+    docs.delete(old);
+    docs.set(doc.path, doc);
+    set(snapshot(doc));
+    await openNewPage(doc.path);
   },
 }));
 

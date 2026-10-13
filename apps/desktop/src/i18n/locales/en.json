@@ -87,9 +87,9 @@
     "loading": "Loading…",
     "deleted": "This page was deleted outside the app.",
     "binary": "This file isn't valid UTF-8 text, so it can't be shown.",
-    "truncated": "Showing the first 1 MB of this page.",
     "tags": "Tags",
-    "meta": "{links, plural, one {# link} other {# links}} · {backlinks, plural, one {# backlink} other {# backlinks}}"
+    "meta": "{links, plural, one {# link} other {# links}} · {backlinks, plural, one {# backlink} other {# backlinks}}",
+    "breadcrumb": "Breadcrumb"
   },
   "editor": {
     "conflictCopy": "Someone else changed this page — their version was saved as “{name}”",
@@ -100,7 +100,14 @@
     "orphaned": "This page was deleted outside the app. Your text is still here.",
     "saveAsNew": "Save as new page",
     "largeNote": "Simplified preview for large notes",
-    "preview": "Preview"
+    "preview": "Preview",
+    "mode": "Editor mode",
+    "modes": {
+      "livePreview": "Live Preview",
+      "source": "Source",
+      "split": "Split"
+    },
+    "saveStatus": "Save status"
   },
   "preview": {
     "remoteBlocked": "Remote image blocked (privacy)",

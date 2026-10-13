@@ -41,6 +41,11 @@ interface VaultState {
   selected: string | null;
   /** Path currently in inline-rename mode. */
   renaming: string | null;
+  /** Asks the explorer to focus a row (`''` = the first row); `nonce` repeats it. */
+  focusRequest: { path: string; nonce: number } | null;
+  /** Breadcrumb (M2a §5): a folder is expanded with its ancestors and focused;
+   *  `''` (the vault) collapses the tree and focuses its first row. */
+  revealFolder: (path: string) => void;
   open: (path: string) => Promise<IpcResult<VaultInfo>>;
   create: (path: string) => Promise<IpcResult<VaultInfo>>;
   close: () => Promise<void>;
@@ -70,6 +75,7 @@ const EMPTY = {
   expanded: new Set<string>(),
   selected: null,
   renaming: null,
+  focusRequest: null as { path: string; nonce: number } | null,
 };
 
 /** Unsubscribes without ever throwing (the event runtime may already be gone). */
@@ -229,6 +235,15 @@ export const useVaultStore = create<VaultState>((set, get) => {
       if (expanded.size !== before) set({ expanded });
     },
     startRename: (renaming) => set({ renaming }),
+    revealFolder: (path) => {
+      const nonce = (get().focusRequest?.nonce ?? 0) + 1;
+      if (!path) {
+        set({ expanded: new Set(), focusRequest: { path: '', nonce } });
+        return;
+      }
+      get().expand(path);
+      set({ focusRequest: { path, nonce } });
+    },
     createPage: async (dir) => {
       const name = nextFreeName(get().nodes, dir, i18next.t('explorer.untitled'), '.md');
       const res = await entryCreatePage(dir, name);

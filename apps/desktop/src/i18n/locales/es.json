@@ -87,9 +87,9 @@
     "loading": "Cargando…",
     "deleted": "Esta página se eliminó fuera de la app.",
     "binary": "Este archivo no es texto UTF-8 válido, así que no se puede mostrar.",
-    "truncated": "Se muestra el primer 1 MB de esta página.",
     "tags": "Etiquetas",
-    "meta": "{links, plural, one {# enlace} other {# enlaces}} · {backlinks, plural, one {# retroenlace} other {# retroenlaces}}"
+    "meta": "{links, plural, one {# enlace} other {# enlaces}} · {backlinks, plural, one {# retroenlace} other {# retroenlaces}}",
+    "breadcrumb": "Ruta"
   },
   "editor": {
     "conflictCopy": "Alguien más cambió esta página — su versión se guardó como «{name}»",
@@ -100,7 +100,14 @@
     "orphaned": "Esta página se borró fuera de la app. Tu texto sigue aquí.",
     "saveAsNew": "Guardar como página nueva",
     "largeNote": "Vista previa simplificada para notas grandes",
-    "preview": "Vista previa"
+    "preview": "Vista previa",
+    "mode": "Modo del editor",
+    "modes": {
+      "livePreview": "Vista en vivo",
+      "source": "Código",
+      "split": "Dividido"
+    },
+    "saveStatus": "Estado de guardado"
   },
   "preview": {
     "remoteBlocked": "Imagen remota bloqueada (privacidad)",

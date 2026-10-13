@@ -1,7 +1,7 @@
 import { useTranslation } from 'react-i18next';
 import { entryCreatePage, fileOpenExternal, urlOpen, type IpcResult } from '../../ipc';
 import { errorMessage } from '../../stores/messages';
-import { openPage } from '../../stores/navigate';
+import { openNewPage } from '../../stores/navigate';
 import { useToastStore } from '../../stores/toastStore';
 import { nameOf, parentOf } from '../../stores/tree';
 import { useVaultStore } from '../../stores/vaultStore';
@@ -97,8 +97,7 @@ export function CreatePageDialog({
         const res = await entryCreatePage(dir, name);
         report(res);
         if (!res.ok) return;
-        await useVaultStore.getState().refreshTree();
-        await openPage(res.value);
+        await openNewPage(res.value);
       }}
       onClose={onClose}
     />

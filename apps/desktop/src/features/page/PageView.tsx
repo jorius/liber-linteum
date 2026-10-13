@@ -1,12 +1,22 @@
 import { useTranslation } from 'react-i18next';
+import { useEditorStore } from '../../stores/editorStore';
+import { errorMessage } from '../../stores/messages';
 import { usePageStore } from '../../stores/pageStore';
+import { useSettingsStore } from '../../stores/settingsStore';
+import { nameOf } from '../../stores/tree';
+import { Editor } from '../editor/Editor';
+import { PageHeader } from './PageHeader';
 import styles from './PageView.module.css';
 
-/** Read-only page view (EXP-05): header + raw Markdown. CodeMirror arrives in M2. */
+/** The open page: header and editor (M2a §3, §5). */
 export function PageView() {
   const { t } = useTranslation();
   const state = usePageStore((s) => s.state);
   const page = usePageStore((s) => s.page);
+  const doc = useEditorStore((s) => s.doc);
+  const editorError = useEditorStore((s) => s.error);
+  const orphaned = useEditorStore((s) => s.orphaned);
+  const mode = useSettingsStore((s) => s.settings.editorMode);
 
   if (state === 'empty') {
     return (
@@ -25,40 +35,40 @@ export function PageView() {
     );
   }
   if (state === 'deleted' || !page) {
+    // Deleted outside while it had unsaved edits: the text is kept (M2a §3.3).
+    if (orphaned && doc) {
+      return (
+        <section className={styles.page} aria-label={t('page.region')}>
+          <div className={styles.orphan}>
+            <p className={styles.notice}>{t('editor.orphaned')}</p>
+            <button
+              type="button"
+              className={styles.button}
+              onClick={() => void useEditorStore.getState().saveAsNew()}
+            >
+              {t('editor.saveAsNew')}
+            </button>
+          </div>
+          <Editor doc={doc} mode={mode} label={nameOf(doc.path)} />
+        </section>
+      );
+    }
     return (
       <section className={styles.center} aria-label={t('page.region')}>
         <p className={styles.notice}>{t('page.deleted')}</p>
       </section>
     );
   }
+  const binary = page.binary || editorError?.kind === 'binary';
   return (
     <section className={styles.page} aria-label={t('page.region')}>
-      <header className={styles.header}>
-        <h1 className={styles.title}>{page.title}</h1>
-        {page.subtitle && <p className={styles.subtitle}>{page.subtitle}</p>}
-        {page.tags.length > 0 && (
-          <ul className={styles.tags} aria-label={t('page.tags')}>
-            {page.tags.map((tag) => (
-              <li key={tag} className={styles.tag}>
-                #{tag}
-              </li>
-            ))}
-          </ul>
-        )}
-        <p className={styles.meta}>
-          <span className={styles.path}>{page.path}</span>
-          <span>{t('page.meta', { links: page.links, backlinks: page.backlinks })}</span>
-        </p>
-      </header>
-      {page.binary ? (
-        <p className={styles.notice}>{t('page.binary')}</p>
+      <PageHeader page={page} mode={mode} />
+      {binary ? (
+        <p className={`${styles.notice} ${styles.inset}`}>{t('page.binary')}</p>
+      ) : editorError ? (
+        <p className={`${styles.notice} ${styles.inset}`}>{errorMessage(editorError)}</p>
       ) : (
-        <>
-          {page.truncated && <p className={styles.notice}>{t('page.truncated')}</p>}
-          <pre className={styles.source} tabIndex={0} aria-label={page.title}>
-            {page.text}
-          </pre>
-        </>
+        doc && <Editor doc={doc} mode={mode} label={page.title} />
       )}
     </section>
   );

@@ -54,6 +54,11 @@ describe('Live Preview (M2a §3.2)', () => {
     expect(line(v, 3)).toBe('**bold** and [[Sparda|alias]] and [md](x.md) `code`');
   });
 
+  it('shows the alias of the table form [[a\\|b]] like the parser does', () => {
+    const v = editor('x\n\n[[Sparda\\|alias]] and [[A#H]]\n');
+    expect(line(v, 3)).toBe('alias and A#H');
+  });
+
   it('styles headings by level and inline formatting by kind', () => {
     const v = editor('x\n\n## Two\n\n*em* ==hi== ~~no~~ #tag\n');
     expect(v.contentDOM.querySelector('.cm-nimw-h2')).toHaveTextContent('Two');

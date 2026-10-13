@@ -26,8 +26,9 @@ import { rangeOf } from '../../markdown/walk';
 import { followLink } from '../../stores/links';
 import { CheckboxWidget, PreviewWidget } from './widgets';
 
-/** Notes above this size get the reduced decoration set (M2a §3.2). */
-export const LARGE_NOTE_CHARS = 200 * 1024;
+import { LARGE_NOTE_CHARS } from './limits';
+
+export { LARGE_NOTE_CHARS };
 /** Re-parse delay after typing; positions are mapped until then. */
 export const REPARSE_MS = 150;
 
@@ -159,7 +160,8 @@ function build(state: EditorState, page: ParsedPage, active: Set<number>): Decor
         break;
       case 'wikiLink': {
         const inner = text(from + 2, to - 2);
-        const bar = inner.search(/(?<!\\)\|/);
+        // First `|`, escaped or not (`[[a\|b]]` is the table form), as in parseWikiInner.
+        const bar = inner.indexOf('|');
         const show: [number, number] = bar >= 0 ? [from + 2 + bar + 1, to - 2] : [from + 2, to - 2];
         if (show[0] < show[1]) out.push(MARKS.link.range(show[0], show[1]));
         if (!touched(from, to)) {
