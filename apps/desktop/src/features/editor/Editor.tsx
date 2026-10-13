@@ -1,18 +1,21 @@
-import { defaultKeymap, history, historyKeymap } from '@codemirror/commands';
-import { markdown } from '@codemirror/lang-markdown';
-import { HighlightStyle, syntaxHighlighting } from '@codemirror/language';
+import { history, historyKeymap } from '@codemirror/commands';
+import { markdown, markdownLanguage } from '@codemirror/lang-markdown';
+import { HighlightStyle, syntaxHighlighting, syntaxTree } from '@codemirror/language';
 import { Compartment, EditorState, Facet, Transaction, type Extension } from '@codemirror/state';
-import { drawSelection, EditorView, keymap } from '@codemirror/view';
+import { drawSelection, EditorView, keymap, lineNumbers } from '@codemirror/view';
 import { tags } from '@lezer/highlight';
 import { diffIndices } from 'node-diff3';
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { EditorMode } from '../../ipc';
+import { useSettingsStore } from '../../stores/settingsStore';
 import { Preview } from '../preview/Preview';
 import styles from './Editor.module.css';
 import { followLinkAtCursor, livePreview, pagePath } from './livePreview';
+import { activeFormats, editorKeymap, type ActiveFormat } from './format';
 import type { PageDoc } from './pageDoc';
 import { blockForOffset, offsetAtTop, topIn } from './scrollSync';
+import { Toolbar } from './Toolbar';
 import { toggleTaskIn } from './widgets';
 
 /** Each page keeps its CodeMirror state (text, selection, undo) while the app
@@ -25,8 +28,13 @@ const pageDocOf = Facet.define<PageDoc, PageDoc | null>({
 });
 /** The Split pane of the component currently showing each view. */
 const paneOf = new WeakMap<EditorView, (text: string) => void>();
+/** The toolbar's pressed state of the component currently showing each view. */
+const toolbarOf = new WeakMap<EditorView, (state: EditorState) => void>();
 const modeSlot = new Compartment();
 const labelSlot = new Compartment();
+/** Line numbers in the gutter (Settings → Editor). */
+const gutterSlot = new Compartment();
+const gutter = (on: boolean): Extension => (on ? lineNumbers() : []);
 
 const sourceHighlight = HighlightStyle.define([
   { tag: tags.heading, fontWeight: '700', color: 'var(--color-text-strong)' },
@@ -45,10 +53,14 @@ const sourceHighlight = HighlightStyle.define([
 const theme = EditorView.theme({
   '&': { height: '100%', color: 'var(--color-text)', backgroundColor: 'transparent' },
   '&.cm-focused': { outline: 'none' },
-  '.cm-scroller': { fontFamily: 'var(--font-body)', fontSize: '15.5px', lineHeight: '1.7' },
+  '.cm-scroller': {
+    fontFamily: 'var(--font-live)',
+    fontSize: 'var(--font-size-editor)',
+    lineHeight: '1.7',
+  },
   '&.cm-nimw-source .cm-scroller': {
-    fontFamily: 'var(--font-mono)',
-    fontSize: '13.5px',
+    fontFamily: 'var(--font-source)',
+    fontSize: 'calc(var(--font-size-editor) * 0.9)',
     lineHeight: '1.6',
   },
   '.cm-content': { padding: '20px 0 40vh', caretColor: 'var(--color-text)' },
@@ -56,6 +68,14 @@ const theme = EditorView.theme({
   '.cm-selectionBackground, &.cm-focused .cm-selectionBackground': {
     backgroundColor: 'var(--color-accent-soft)',
   },
+  '.cm-gutters': {
+    backgroundColor: 'transparent',
+    border: 'none',
+    color: 'var(--color-text-muted)',
+    fontFamily: 'var(--font-source)',
+    fontSize: '0.8em',
+  },
+  '.cm-lineNumbers .cm-gutterElement': { padding: '0 4px 0 12px' },
 });
 
 function modeExtensions(mode: EditorMode): Extension {
@@ -157,7 +177,7 @@ function applyExternal(view: EditorView, text: string) {
 
 /** A page's editor state. Its listeners find the page through `pageDocOf`
  *  and the Split pane through the view they run in (I5). */
-function createState(d: PageDoc, mode: EditorMode, label: string): EditorState {
+function createState(d: PageDoc, mode: EditorMode, label: string, numbers: boolean): EditorState {
   return EditorState.create({
     doc: d.text,
     extensions: [
@@ -165,16 +185,14 @@ function createState(d: PageDoc, mode: EditorMode, label: string): EditorState {
       history(),
       drawSelection(),
       EditorView.lineWrapping,
-      markdown(),
-      keymap.of([
-        { key: 'Mod-Enter', run: followLinkAtCursor },
-        ...defaultKeymap,
-        ...historyKeymap,
-      ]),
+      // GFM syntax tree: Source highlighting and the toolbar's pressed state.
+      markdown({ base: markdownLanguage }),
+      keymap.of([{ key: 'Mod-Enter', run: followLinkAtCursor }, ...editorKeymap, ...historyKeymap]),
       pagePath.of(() => d.path),
       theme,
       labelSlot.of(labelled(label)),
       modeSlot.of(modeExtensions(mode)),
+      gutterSlot.of(gutter(numbers)),
       // Autosave also when the editor loses focus (M2a §3.3).
       EditorView.domEventHandlers({
         blur: (_e, v) => {
@@ -182,6 +200,9 @@ function createState(d: PageDoc, mode: EditorMode, label: string): EditorState {
         },
       }),
       EditorView.updateListener.of((u) => {
+        if (u.docChanged || u.selectionSet || syntaxTree(u.startState) !== syntaxTree(u.state)) {
+          toolbarOf.get(u.view)?.(u.state);
+        }
         if (!u.docChanged) return;
         const next = u.state.doc.toString();
         u.state.facet(pageDocOf)?.edit(next);
@@ -208,18 +229,31 @@ export function Editor({ doc, mode, label }: EditorProps) {
   const split = mode === 'split';
   // The text for the Split pane (cheap to track: the pane renders only in Split).
   const [text, setText] = useState(doc.text);
+  const showToolbar = useSettingsStore((s) => s.settings.toolbar);
+  const showNumbers = useSettingsStore((s) => s.settings.lineNumbers);
+  const [toolbarView, setToolbarView] = useState<EditorView | null>(null);
+  const [active, setActive] = useState<Set<ActiveFormat>>(() => new Set());
+  const showFormats = useCallback((state: EditorState) => {
+    const next = activeFormats(state);
+    setActive((prev) => ([...prev].sort().join() === [...next].sort().join() ? prev : next));
+  }, []);
 
-  const stateFor = (d: PageDoc): EditorState => states.get(d) ?? createState(d, mode, label);
+  const stateFor = (d: PageDoc): EditorState =>
+    states.get(d) ?? createState(d, mode, label, showNumbers);
 
   // One view for the component's lifetime; page states are swapped into it.
   useLayoutEffect(() => {
     const v = new EditorView({ parent: host.current!, state: stateFor(current.current) });
     view.current = v;
     paneOf.set(v, setText);
+    toolbarOf.set(v, showFormats);
+    setToolbarView(v);
+    showFormats(v.state);
     return () => {
       states.set(current.current, v.state);
       current.current.sink = null;
       paneOf.delete(v);
+      toolbarOf.delete(v);
       v.destroy();
       view.current = null;
     };
@@ -233,12 +267,17 @@ export function Editor({ doc, mode, label }: EditorProps) {
       current.current.sink = null;
       current.current = doc;
       v.setState(stateFor(doc));
+      showFormats(v.state);
     }
     doc.sink = (next) => applyExternal(v, next);
     // Changed while it was in the background (reload or merge without a view).
     applyExternal(v, doc.text);
     v.dispatch({
-      effects: [modeSlot.reconfigure(modeExtensions(mode)), labelSlot.reconfigure(labelled(label))],
+      effects: [
+        modeSlot.reconfigure(modeExtensions(mode)),
+        labelSlot.reconfigure(labelled(label)),
+        gutterSlot.reconfigure(gutter(showNumbers)),
+      ],
     });
     setText(doc.text);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -249,6 +288,10 @@ export function Editor({ doc, mode, label }: EditorProps) {
       effects: [modeSlot.reconfigure(modeExtensions(mode)), labelSlot.reconfigure(labelled(label))],
     });
   }, [mode, label]);
+
+  useLayoutEffect(() => {
+    view.current?.dispatch({ effects: gutterSlot.reconfigure(gutter(showNumbers)) });
+  }, [showNumbers]);
 
   // Split: the editor and the rendered pane follow each other's scrolling.
   useEffect(() => {
@@ -290,13 +333,16 @@ export function Editor({ doc, mode, label }: EditorProps) {
   }, []);
 
   return (
-    <div className={split ? styles.split : styles.single}>
-      <div ref={host} className={mode === 'livePreview' ? styles.live : styles.source} />
-      {split && (
-        <div ref={pane} className={styles.pane} role="region" aria-label={t('editor.preview')}>
-          <Preview text={text} path={doc.path} onToggleTask={toggleTask} />
-        </div>
-      )}
+    <div className={styles.frame}>
+      {showToolbar && toolbarView && <Toolbar view={toolbarView} active={active} />}
+      <div className={split ? styles.split : styles.single}>
+        <div ref={host} className={mode === 'livePreview' ? styles.live : styles.source} />
+        {split && (
+          <div ref={pane} className={styles.pane} role="region" aria-label={t('editor.preview')}>
+            <Preview text={text} path={doc.path} onToggleTask={toggleTask} />
+          </div>
+        )}
+      </div>
     </div>
   );
 }

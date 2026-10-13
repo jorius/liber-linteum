@@ -35,6 +35,7 @@ const COMMANDS: &[&str] = &[
     "links_resolve",
     "url_open",
     "file_open_external",
+    "fonts_list",
 ];
 
 struct Harness {
@@ -386,6 +387,7 @@ fn nfr_ui_thread_never_runs_disk_or_index_commands() {
         include_str!("../src/vault_commands.rs"),
         include_str!("../src/settings_commands.rs"),
         include_str!("../src/editor_commands.rs"),
+        include_str!("../src/fonts.rs"),
     ];
     let mut offenders = Vec::new();
     for src in sources {
@@ -606,4 +608,68 @@ fn vlt_01_open_survives_an_unwritable_config_dir() {
         "{warnings:?}"
     );
     call(&h.main, "vault_tree", json!({})).expect("the vault is open");
+}
+
+/// M2b §7: the new appearance/editor settings travel through `settings_set`
+/// and come back from `settings_get`; an invalid value is refused.
+#[test]
+fn m2b_settings_round_trip_over_ipc() {
+    let h = harness();
+    let saved = call(
+        &h.main,
+        "settings_set",
+        json!({ "patch": {
+            "palette": "graphite",
+            "accentColor": "#2AA198",
+            "fontLivePreview": "system:Avenir Next",
+            "fontSource": "source-code-pro",
+            "fontSize": 17,
+            "toolbar": false,
+            "lineNumbers": true
+        }}),
+    )
+    .unwrap();
+    assert_eq!(saved["palette"], "graphite");
+    assert_eq!(saved["accentColor"], "#2aa198");
+    assert_eq!(saved["fontLivePreview"], "system:Avenir Next");
+    assert_eq!(saved["fontSource"], "source-code-pro");
+    assert_eq!(saved["fontSize"], 17);
+    assert_eq!(saved["toolbar"], false);
+    assert_eq!(saved["lineNumbers"], true);
+    let got = call(&h.main, "settings_get", json!({})).unwrap();
+    assert_eq!(got["settings"]["palette"], "graphite");
+    assert!(
+        call(
+            &h.main,
+            "settings_set",
+            json!({ "patch": { "accentColor": "red" } })
+        )
+        .is_err()
+    );
+}
+
+/// M2b §5: the fonts installed on this computer, read locally (no network):
+/// unique family names, sorted, without hidden (dot) families.
+#[test]
+fn m2b_fonts_list_returns_installed_families() {
+    let h = harness();
+    let list = call(&h.main, "fonts_list", json!({})).unwrap();
+    let families: Vec<String> = list
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|v| v.as_str().unwrap().to_string())
+        .collect();
+    assert!(!families.is_empty(), "every desktop OS has fonts");
+    assert!(
+        families
+            .iter()
+            .all(|f| !f.starts_with('.') && !f.trim().is_empty())
+    );
+    let mut sorted = families.clone();
+    sorted.sort_by_key(|f| f.to_lowercase());
+    sorted.dedup_by_key(|f| f.to_lowercase());
+    assert_eq!(families, sorted, "sorted case-insensitively, no duplicates");
+    // Cached: a second call returns the same list.
+    assert_eq!(call(&h.main, "fonts_list", json!({})).unwrap(), list);
 }

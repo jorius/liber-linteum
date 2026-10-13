@@ -283,9 +283,10 @@ function derive(hex) {
   const neutral = c0 < 0.03; // greys stay grey
   const tint = (c) => (neutral ? 0 : c);
   const lightSurface = '#ffffff', darkSurface = oklch(0.205, tint(0.014), h);
+  const softL = oklch(0.94, tint(0.035), h), softD = oklch(0.3, tint(0.05), h);
   let L = rgbToOklch(hexToRgb(hex))[0], la, da;
-  for (let x = Math.min(Math.max(L, 0.15), 0.62); x > 0.1; x -= 0.01) { la = oklch(x, Math.min(c0, 0.17), h); if (ratio(la, lightSurface) >= 4.8) break; }
-  for (let x = Math.min(Math.max(L, 0.7), 0.97); x < 0.99; x += 0.01) { da = oklch(x, Math.min(c0, 0.13), h); if (ratio(da, darkSurface) >= 6) break; }
+  for (let x = Math.min(Math.max(L, 0.15), 0.62); x > 0.1; x -= 0.01) { la = oklch(x, Math.min(c0, 0.17), h); if (ratio(la, lightSurface) >= 4.8 && ratio(la, softL) >= 4.5) break; }
+  for (let x = Math.min(Math.max(L, 0.7), 0.97); x < 0.99; x += 0.01) { da = oklch(x, Math.min(c0, 0.13), h); if (ratio(da, darkSurface) >= 6 && ratio(da, softD) >= 4.5) break; }
   const on = (bg) => (ratio('#ffffff', bg) >= ratio('#111111', bg) ? '#ffffff' : '#111111');
   return {
     light: { bg: oklch(0.965, tint(0.012), h), surface: lightSurface, border: oklch(0.9, tint(0.02), h), text: oklch(0.2, tint(0.02), h), strong: oklch(0.24, tint(0.05), h), body: oklch(0.38, tint(0.025), h), muted: oklch(0.52, tint(0.03), h), accent: la, soft: oklch(0.94, tint(0.035), h), contrast: on(la), side: oklch(0.2, tint(0.015), h), sideText: oklch(0.88, tint(0.02), h), sideSel: 'rgba(255,255,255,.12)', mark: '#fbf1c7', code: oklch(0.945, tint(0.012), h) },

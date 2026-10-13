@@ -153,3 +153,12 @@ These override the sections above where they conflict.
 10. **Text size** outside 13–20 is clamped (not reset to 15).
 11. **Explorer selection** uses each palette's `sideSel`.
 12. **Versions:** `fontdb` 0.24.0; @fontsource atkinson-hyperlegible 5.3.0, literata 5.3.0, source-serif-4 5.3.1, ibm-plex-sans 5.3.0, ibm-plex-mono 5.3.0, source-code-pro 5.3.1. CI installs Playwright `chromium webkit`.
+
+## 12. Amendments from Jose's real-window check (2026-10-13)
+These override the sections above (and M2a §3.2 / ED-04) where they conflict.
+
+1. **Links in Live Preview follow on a plain click**, as in Obsidian: a click on a link shown rendered (its line is not touched by the selection) opens it — resolved page, `#heading`, "Create page" for an unresolved target, confirmation for a web link. On the cursor line the link shows its source and a click places the cursor (that is how a link is edited; arrow keys work too). Shift-click extends the selection; ⌘/Ctrl-click and ⌘↩ still follow any link.
+2. **Line numbers** (`lineNumbers`, default `false`; Settings → Editor "Show line numbers"; View → Toggle Line Numbers): a CodeMirror gutter in Live Preview and Source, and on the source side of Split (the rendered pane has no lines). In Live Preview the gutter sits beside the centred text. Lines inside a rendered block widget (table, callout, columns, rule, lone embed) carry no number, so the count jumps past them, as in Obsidian.
+3. **Formatting-toolbar toggle**: the header button is a bordered "Format" button with an icon (accessible name "Formatting toolbar", `aria-pressed`), styled like the mode switch, whose tooltip says what a click does ("Hide/Show the formatting toolbar"). View → Toggle Formatting Toolbar flips it too. The View items are plain (no checkmark): they emit `menu:toggle` with the settings key (`"toolbar"` / `"lineNumbers"`) and the page flips the setting.
+4. **Top bar**: the Edit · Global view group uses the same box as the settings / close buttons — 40 px high, 1 px `border-strong`, `radius-md`, surface background; the selected segment keeps the accent-soft fill.
+5. **Block widgets** in Live Preview render with `white-space: normal` (CodeMirror's pre-wrapped whitespace turned the renderer's newline text nodes into blank lines above tables and callouts).

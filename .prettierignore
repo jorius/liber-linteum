@@ -8,3 +8,4 @@ docs
 *.md
 apps/desktop/src-tauri/gen
 apps/desktop/src-tauri/icons
+apps/desktop/src/theme/palettes.css

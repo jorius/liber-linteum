@@ -305,7 +305,7 @@ async function resolveAndFollow(
     followLink({ type: 'page', kind, target, heading, resolved: res.value[0] ?? null, source });
 }
 
-/** Follows the link at `pos` (⌘-click, Mod-Enter); `false` if there is none. */
+/** Follows the link at `pos` (click, Mod-Enter); `false` if there is none. */
 export function followLinkAt(view: EditorView, pos: number): boolean {
   const node = linkAt(refresh(view).page, pos);
   if (!node) return false;
@@ -337,11 +337,32 @@ export function followLinkAt(view: EditorView, pos: number): boolean {
 export const followLinkAtCursor = (view: EditorView): boolean =>
   followLinkAt(view, view.state.selection.main.head);
 
-/** ⌘/Ctrl-click follows links (plain clicks place the cursor). */
-const modClick = EditorView.domEventHandlers({
+/** A rendered link's text (`.cm-nimw-link` on a line the selection does not
+ *  touch, so its markup is hidden): its position, else `null`. */
+function renderedLinkAt(view: EditorView, target: EventTarget | null): number | null {
+  const el = target instanceof Element ? target.closest('.cm-nimw-link') : null;
+  if (!el || !view.contentDOM.contains(el)) return null;
+  const pos = view.posAtDOM(el, 0);
+  const node = linkAt(refresh(view).page, pos);
+  if (!node) return null;
+  const [from, to] = rangeOf(node);
+  const doc = view.state.doc;
+  const active = activeLines(view.state);
+  const last = doc.lineAt(Math.min(to, doc.length)).number;
+  for (let n = doc.lineAt(from).number; n <= last; n++) if (active.has(n)) return null;
+  return pos;
+}
+
+/** A click on a rendered link follows it, as in Obsidian; on the cursor line
+ *  the link shows its source and a click places the cursor. ⌘/Ctrl-click
+ *  follows any link. */
+const linkClick = EditorView.domEventHandlers({
   mousedown(e, view) {
-    if (!(e.metaKey || e.ctrlKey) || e.button !== 0) return false;
-    const pos = view.posAtCoords({ x: e.clientX, y: e.clientY });
+    if (e.button !== 0 || e.altKey || e.shiftKey) return false;
+    const pos =
+      e.metaKey || e.ctrlKey
+        ? view.posAtCoords({ x: e.clientX, y: e.clientY })
+        : renderedLinkAt(view, e.target);
     if (pos === null || !followLinkAt(view, pos)) return false;
     e.preventDefault();
     return true;
@@ -361,22 +382,24 @@ const theme = EditorView.baseTheme({
   '.cm-nimw-em': { fontStyle: 'italic' },
   '.cm-nimw-strong': { fontWeight: '700' },
   '.cm-nimw-strike': { textDecoration: 'line-through' },
-  '.cm-nimw-highlight': { background: 'var(--palette-yellow-bg)', borderRadius: '3px' },
+  '.cm-nimw-highlight': { background: 'var(--color-highlight-bg)', borderRadius: '3px' },
   '.cm-nimw-code': {
-    fontFamily: 'var(--font-mono)',
+    fontFamily: 'var(--font-source)',
     fontSize: '0.9em',
-    background: 'var(--color-surface-subtle)',
+    background: 'var(--color-code-bg)',
     borderRadius: '4px',
   },
   '.cm-nimw-link': { color: 'var(--color-accent)', textDecoration: 'underline' },
   '.cm-nimw-tag': { color: 'var(--color-accent)', fontWeight: '600' },
-  '.cm-nimw-codeblock': { fontFamily: 'var(--font-mono)', fontSize: '0.9em' },
+  '.cm-nimw-codeblock': { fontFamily: 'var(--font-source)', fontSize: '0.9em' },
   '.cm-nimw-quote': { borderLeft: '3px solid var(--color-border-strong)', paddingLeft: '12px' },
-  '.cm-nimw-frontmatter': { color: 'var(--color-text-muted)', fontFamily: 'var(--font-mono)' },
-  '.cm-nimw-widget': { padding: '4px 0', cursor: 'default' },
+  '.cm-nimw-frontmatter': { color: 'var(--color-text-muted)', fontFamily: 'var(--font-source)' },
+  // Rendered HTML, not editor text: CodeMirror's pre-wrapped whitespace would
+  // turn the renderer's newlines into blank lines.
+  '.cm-nimw-widget': { padding: '4px 0', cursor: 'default', whiteSpace: 'normal' },
   '.cm-nimw-checkbox': { margin: '0 4px 0 0', verticalAlign: 'middle', cursor: 'pointer' },
 });
 
 export function livePreview(): Extension {
-  return [model, reparser, modClick, theme];
+  return [model, reparser, linkClick, theme];
 }

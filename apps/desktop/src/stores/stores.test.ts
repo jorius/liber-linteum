@@ -4,6 +4,7 @@ import type { TreeNode } from '../ipc';
 import { clearMocks, emit, mockIPC } from '../ipc/testing';
 import { usePageStore } from './pageStore';
 import { DEFAULT_SETTINGS, useSettingsStore } from './settingsStore';
+import { useTrailStore } from './trailStore';
 import { useToastStore } from './toastStore';
 import { resetVaultStore, useVaultStore } from './vaultStore';
 
@@ -51,6 +52,17 @@ afterEach(async () => {
 });
 
 describe('settingsStore', () => {
+  it('M2b §7: the defaults match the Rust defaults (settings.rs)', () => {
+    expect(DEFAULT_SETTINGS).toMatchObject({
+      palette: 'lavender',
+      accentColor: '#d1477a',
+      fontLivePreview: 'atkinson-hyperlegible',
+      fontSource: 'jetbrains-mono',
+      fontSize: 15,
+      toolbar: true,
+    });
+  });
+
   it('review focus: a settings warning (reset values, unreadable file) is shown as a toast', async () => {
     backend({
       settings_get: () => ({
@@ -92,9 +104,83 @@ describe('settingsStore', () => {
     expect(useSettingsStore.getState().settings.theme).toBe('light');
     expect(document.documentElement.dataset.theme).toBe('light');
   });
+
+  it('M2b §4: the palette applies on load and on update', async () => {
+    backend({
+      settings_get: () => ({ settings: { ...DEFAULT_SETTINGS, palette: 'sepia' } }),
+      settings_set: (a) => ({ ...DEFAULT_SETTINGS, ...(a.patch as object) }),
+    });
+    await useSettingsStore.getState().load();
+    expect(document.documentElement.dataset.palette).toBe('sepia');
+    await useSettingsStore.getState().update({ palette: 'ink' });
+    expect(document.documentElement.dataset.palette).toBe('ink');
+  });
 });
 
 describe('vaultStore', () => {
+  it('M2b §3: renames and trashing in the app update the link trail; a new vault clears it', async () => {
+    backend({
+      entry_rename: () => ({ moved: [], updatedFiles: [], updatedLinks: 0, failed: [] }),
+      entry_trash: () => null,
+      vault_tree: () => [],
+      vault_open: () => ({ name: 'V', root: '/v', report: { warnings: [] } }),
+    });
+    const trail = useTrailStore.getState();
+    trail.followed({ path: 'Notes/A.md', heading: null });
+    trail.followed({ path: 'B.md', heading: null });
+    await useVaultStore.getState().rename('Notes', 'Archive');
+    expect(useTrailStore.getState().back.map((x) => x.path)).toEqual(['Archive/A.md', 'B.md']);
+    await useVaultStore.getState().trash('B.md');
+    expect(useTrailStore.getState().back.map((x) => x.path)).toEqual(['Archive/A.md']);
+    await useVaultStore.getState().open('/v');
+    expect(useTrailStore.getState().back).toEqual([]);
+  });
+
+  it('final review m4: a failed rename toasts by default (explorer), not when asked to stay quiet (title)', async () => {
+    backend({
+      entry_rename: () => {
+        throw { kind: 'io', message: 'disk is read-only' };
+      },
+    });
+    const loud = await useVaultStore.getState().rename('a.md', 'b.md');
+    expect(loud.ok).toBe(false);
+    expect(useToastStore.getState().toasts.map((t) => t.message)).toEqual([
+      'Something went wrong: disk is read-only',
+    ]);
+    useToastStore.getState().clear();
+    const quiet = await useVaultStore.getState().rename('a.md', 'b.md', { quiet: true });
+    expect(quiet.ok).toBe(false);
+    expect(useToastStore.getState().toasts).toEqual([]);
+  });
+
+  it('final review m2: a page removed and re-created in one coalesced change stays on the trail', async () => {
+    vi.useFakeTimers();
+    let current: TreeNode[] = [
+      { path: 'A.md', kind: 'page' },
+      { path: 'B.md', kind: 'page' },
+      { path: 'C.md', kind: 'page' },
+    ];
+    backend({ vault_open: () => info, vault_tree: () => current });
+    await useVaultStore.getState().open('/v');
+    const trail = useTrailStore.getState();
+    trail.followed({ path: 'A.md', heading: null });
+    trail.followed({ path: 'B.md', heading: null });
+    // Another editor saves A.md atomically (delete + re-create); B.md is deleted.
+    current = [
+      { path: 'A.md', kind: 'page' },
+      { path: 'C.md', kind: 'page' },
+    ];
+    await emit('vault:changed', {
+      created: [],
+      modified: [],
+      removed: ['A.md', 'B.md'],
+      renamed: [],
+    });
+    await emit('vault:changed', { created: ['A.md'], modified: [], removed: [], renamed: [] });
+    await vi.advanceTimersByTimeAsync(150);
+    expect(useTrailStore.getState().back.map((x) => x.path)).toEqual(['A.md']);
+  });
+
   it('VLT-01 open: closed → opening → open, with tree loaded', async () => {
     const gate = deferred<typeof info>();
     backend({ vault_open: () => gate.promise, vault_tree: () => tree });

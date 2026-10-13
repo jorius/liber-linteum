@@ -97,7 +97,7 @@ export function CreatePageDialog({
         const res = await entryCreatePage(dir, name);
         report(res);
         if (!res.ok) return;
-        await openNewPage(res.value);
+        await openNewPage(res.value, 'link');
       }}
       onClose={onClose}
     />

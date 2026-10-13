@@ -31,6 +31,154 @@ pub enum EditorMode {
     Split,
 }
 
+/// Colour palette (M2b §4); `Custom` derives one from `accent_color`.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum Palette {
+    #[default]
+    Lavender,
+    Graphite,
+    Rosewood,
+    Saffron,
+    Persimmon,
+    Midnight,
+    Sepia,
+    Ink,
+    Custom,
+}
+
+/// A `#rrggbb` colour, stored lower-case.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(try_from = "String", into = "String")]
+pub struct HexColor(String);
+
+impl HexColor {
+    pub fn parse(s: &str) -> Option<HexColor> {
+        let ok =
+            s.len() == 7 && s.starts_with('#') && s[1..].chars().all(|c| c.is_ascii_hexdigit());
+        ok.then(|| HexColor(s.to_ascii_lowercase()))
+    }
+
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+}
+
+impl Default for HexColor {
+    fn default() -> HexColor {
+        HexColor("#d1477a".into())
+    }
+}
+
+impl TryFrom<String> for HexColor {
+    type Error = String;
+    fn try_from(s: String) -> Result<HexColor, String> {
+        HexColor::parse(&s).ok_or_else(|| format!("not a #rrggbb colour: {s}"))
+    }
+}
+
+impl From<HexColor> for String {
+    fn from(c: HexColor) -> String {
+        c.0
+    }
+}
+
+/// Fonts bundled with the app (M2b §5): Live Preview faces, then Source faces;
+/// `system-ui` / `system-mono` are the OS defaults.
+pub const BUNDLED_FONTS: &[&str] = &[
+    "atkinson-hyperlegible",
+    "literata",
+    "source-serif-4",
+    "ibm-plex-sans",
+    "plus-jakarta-sans",
+    "system-ui",
+    "jetbrains-mono",
+    "ibm-plex-mono",
+    "source-code-pro",
+    "system-mono",
+];
+
+/// Prefix of a font installed on the computer, e.g. `system:Avenir Next`.
+pub const SYSTEM_FONT_PREFIX: &str = "system:";
+const MAX_FONT_CHOICE: usize = 200;
+
+/// A bundled font id or `system:<Family Name>` (at most 200 characters, no
+/// control characters).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(try_from = "String", into = "String")]
+pub struct FontChoice(String);
+
+impl FontChoice {
+    pub fn parse(s: &str) -> Option<FontChoice> {
+        let ok = if let Some(family) = s.strip_prefix(SYSTEM_FONT_PREFIX) {
+            !family.trim().is_empty()
+                && s.chars().count() <= MAX_FONT_CHOICE
+                && !s.chars().any(char::is_control)
+        } else {
+            BUNDLED_FONTS.contains(&s)
+        };
+        ok.then(|| FontChoice(s.to_string()))
+    }
+
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+
+    fn bundled(id: &str) -> FontChoice {
+        FontChoice(id.to_string())
+    }
+}
+
+impl TryFrom<String> for FontChoice {
+    type Error = String;
+    fn try_from(s: String) -> Result<FontChoice, String> {
+        FontChoice::parse(&s).ok_or_else(|| format!("unknown font: {s}"))
+    }
+}
+
+impl From<FontChoice> for String {
+    fn from(c: FontChoice) -> String {
+        c.0
+    }
+}
+
+pub const MIN_FONT_SIZE: u8 = 13;
+pub const MAX_FONT_SIZE: u8 = 20;
+
+/// Editor text size in px, clamped to 13–20 (an out-of-range number is
+/// clamped, not reset).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(from = "u32", into = "u8")]
+pub struct FontSize(u8);
+
+impl FontSize {
+    pub fn new(px: u32) -> FontSize {
+        FontSize(px.clamp(u32::from(MIN_FONT_SIZE), u32::from(MAX_FONT_SIZE)) as u8)
+    }
+
+    pub fn get(self) -> u8 {
+        self.0
+    }
+}
+
+impl Default for FontSize {
+    fn default() -> FontSize {
+        FontSize(15)
+    }
+}
+
+impl From<u32> for FontSize {
+    fn from(px: u32) -> FontSize {
+        FontSize::new(px)
+    }
+}
+
+impl From<FontSize> for u8 {
+    fn from(s: FontSize) -> u8 {
+        s.0
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct RecentVault {
@@ -49,6 +197,15 @@ pub struct Settings {
     pub rewrite_links: bool,
     pub confirm_delete: bool,
     pub editor_mode: EditorMode,
+    pub palette: Palette,
+    pub accent_color: HexColor,
+    pub font_live_preview: FontChoice,
+    pub font_source: FontChoice,
+    pub font_size: FontSize,
+    /// Formatting toolbar shown (M2b §6).
+    pub toolbar: bool,
+    /// Line numbers in the editor gutter (M2b §11, feedback round).
+    pub line_numbers: bool,
     pub recent_vaults: Vec<RecentVault>,
     /// Keys this build does not know (written by a newer version); kept on save.
     #[serde(flatten)]
@@ -64,6 +221,13 @@ impl Default for Settings {
             rewrite_links: true,
             confirm_delete: true,
             editor_mode: EditorMode::LivePreview,
+            palette: Palette::Lavender,
+            accent_color: HexColor::default(),
+            font_live_preview: FontChoice::bundled("atkinson-hyperlegible"),
+            font_source: FontChoice::bundled("jetbrains-mono"),
+            font_size: FontSize::default(),
+            toolbar: true,
+            line_numbers: false,
             recent_vaults: Vec::new(),
             extra: serde_json::Map::new(),
         }
@@ -79,6 +243,13 @@ pub struct SettingsPatch {
     pub rewrite_links: Option<bool>,
     pub confirm_delete: Option<bool>,
     pub editor_mode: Option<EditorMode>,
+    pub palette: Option<Palette>,
+    pub accent_color: Option<HexColor>,
+    pub font_live_preview: Option<FontChoice>,
+    pub font_source: Option<FontChoice>,
+    pub font_size: Option<FontSize>,
+    pub toolbar: Option<bool>,
+    pub line_numbers: Option<bool>,
 }
 
 /// A recent vault as shown on the welcome screen.
@@ -127,6 +298,13 @@ fn parse_lenient(text: &str) -> Result<(Settings, Vec<String>), serde_json::Erro
     field!("rewriteLinks", rewrite_links);
     field!("confirmDelete", confirm_delete);
     field!("editorMode", editor_mode);
+    field!("palette", palette);
+    field!("accentColor", accent_color);
+    field!("fontLivePreview", font_live_preview);
+    field!("fontSource", font_source);
+    field!("fontSize", font_size);
+    field!("toolbar", toolbar);
+    field!("lineNumbers", line_numbers);
     match map.remove("recentVaults") {
         None => {}
         Some(Value::Array(items)) => {
@@ -227,6 +405,27 @@ impl SettingsStore {
         }
         if let Some(v) = patch.editor_mode {
             next.editor_mode = v;
+        }
+        if let Some(v) = patch.palette {
+            next.palette = v;
+        }
+        if let Some(v) = patch.accent_color {
+            next.accent_color = v;
+        }
+        if let Some(v) = patch.font_live_preview {
+            next.font_live_preview = v;
+        }
+        if let Some(v) = patch.font_source {
+            next.font_source = v;
+        }
+        if let Some(v) = patch.font_size {
+            next.font_size = v;
+        }
+        if let Some(v) = patch.toolbar {
+            next.toolbar = v;
+        }
+        if let Some(v) = patch.line_numbers {
+            next.line_numbers = v;
         }
         self.save(&next)?;
         *s = next.clone();

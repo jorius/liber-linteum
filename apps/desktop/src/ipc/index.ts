@@ -126,6 +126,23 @@ export interface RecentVault {
 
 export type EditorMode = 'livePreview' | 'source' | 'split';
 
+/** Built-in palettes (M2b §4); `custom` derives one from `accentColor`. */
+export const PALETTE_IDS = [
+  'lavender',
+  'graphite',
+  'rosewood',
+  'saffron',
+  'persimmon',
+  'midnight',
+  'sepia',
+  'ink',
+] as const;
+export type PaletteId = (typeof PALETTE_IDS)[number];
+export type PaletteChoice = PaletteId | 'custom';
+
+/** A bundled font id (theme/fonts.ts) or `system:<Family Name>`. */
+export type FontChoice = string;
+
 export interface Settings {
   version: number;
   /** `null` = follow the OS. */
@@ -134,6 +151,17 @@ export interface Settings {
   rewriteLinks: boolean;
   confirmDelete: boolean;
   editorMode: EditorMode;
+  palette: PaletteChoice;
+  /** `#rrggbb`, used when `palette` is `custom`. */
+  accentColor: string;
+  fontLivePreview: FontChoice;
+  fontSource: FontChoice;
+  /** Editor text size in px (13–20). */
+  fontSize: number;
+  /** Formatting toolbar shown. */
+  toolbar: boolean;
+  /** Line numbers in the editor gutter. */
+  lineNumbers: boolean;
 }
 
 /** `language: 'system'` means follow the OS again. */
@@ -143,6 +171,13 @@ export interface SettingsPatch {
   rewriteLinks?: boolean;
   confirmDelete?: boolean;
   editorMode?: EditorMode;
+  palette?: PaletteChoice;
+  accentColor?: string;
+  fontLivePreview?: FontChoice;
+  fontSource?: FontChoice;
+  fontSize?: number;
+  toolbar?: boolean;
+  lineNumbers?: boolean;
 }
 
 export interface SettingsResponse {
@@ -215,6 +250,9 @@ export const linksResolve = (source: string, targets: LinkTarget[]) =>
 export const urlOpen = (url: string) => call<void>('url_open', { url });
 export const fileOpenExternal = (path: string) => call<void>('file_open_external', { path });
 
+/** Font families installed on this computer (M2b §5). */
+export const fontsList = () => call<string[]>('fonts_list');
+
 /** URL of a vault file for <img>/<audio> through the `nimw-asset:` protocol
  *  (M2a §2.5); WebView2 on Windows reaches custom protocols over http. */
 export function assetUrl(path: string): string {
@@ -230,6 +268,13 @@ export const onVaultProgress = (cb: (p: ProgressPayload) => void): Promise<Unlis
   listen<ProgressPayload>('vault:progress', (e) => cb(e.payload));
 export const onVaultChanged = (cb: (p: ChangedPayload) => void): Promise<UnlistenFn> =>
   listen<ChangedPayload>('vault:changed', (e) => cb(e.payload));
+/** View → Back / Forward in the app menu (M2b §3). */
+export const onMenuNavigate = (cb: (direction: 'back' | 'forward') => void): Promise<UnlistenFn> =>
+  listen<'back' | 'forward'>('menu:navigate', (e) => cb(e.payload));
+/** View → Toggle Formatting Toolbar / Toggle Line Numbers in the app menu:
+ *  the settings key to flip. */
+export const onMenuToggle = (cb: (key: string) => void): Promise<UnlistenFn> =>
+  listen<string>('menu:toggle', (e) => cb(e.payload));
 export const onVaultWarning = (cb: (p: WarningPayload) => void): Promise<UnlistenFn> =>
   listen<WarningPayload>('vault:warning', (e) => cb(e.payload));
 

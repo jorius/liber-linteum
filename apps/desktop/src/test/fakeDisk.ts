@@ -86,6 +86,18 @@ export function fakeDisk(initial: Record<string, string>, extra: Extra = {}): Fa
             binary: false,
           };
         }
+        case 'entry_rename': {
+          const text = files.get(args.from);
+          if (text === undefined) throw err('notFound', args.from);
+          // Case-insensitive like macOS/Windows; a case-only rename is fine.
+          const lower = args.to.toLowerCase();
+          if ([...files.keys()].some((k) => k.toLowerCase() === lower && k !== args.from)) {
+            throw err('alreadyExists', args.to);
+          }
+          files.delete(args.from);
+          files.set(args.to, text);
+          return { moved: [[args.from, args.to]], updatedFiles: [], updatedLinks: 0, failed: [] };
+        }
         case 'vault_tree':
           return [...files.keys()].map((path) => ({ path, kind: 'page' }));
         case 'links_resolve':

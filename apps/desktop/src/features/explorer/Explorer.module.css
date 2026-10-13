@@ -32,7 +32,7 @@
 }
 
 .selected {
-  background: color-mix(in srgb, var(--color-accent) 35%, var(--color-sidebar-bg));
+  background: var(--color-sidebar-selected);
   color: #fff;
 }
 

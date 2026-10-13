@@ -4,6 +4,7 @@ import { act, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { clearMocks } from '../../ipc/testing';
 import { fakeDisk, type FakeDisk } from '../../test/fakeDisk';
+import { DEFAULT_SETTINGS, useSettingsStore } from '../../stores/settingsStore';
 import { Editor } from './Editor';
 import { AUTOSAVE_MS, PageDoc } from './pageDoc';
 
@@ -205,5 +206,62 @@ describe('task checkboxes outside the source text (feedback 2026-10-13)', () => 
     const box = await screen.findByRole('checkbox', { name: 'a' });
     await act(() => box.click());
     expect(viewOf().state.doc.toString()).toBe('> [!todo] List\n> - [x] a\n\nend\n');
+  });
+});
+
+describe('formatting keys (M2b §6)', () => {
+  const mod = /Mac|iP(hone|ad)/.test(navigator.platform) ? { metaKey: true } : { ctrlKey: true };
+  const press = (key: string, extra: KeyboardEventInit = {}) =>
+    act(() => {
+      viewOf().contentDOM.dispatchEvent(
+        new KeyboardEvent('keydown', { key, bubbles: true, cancelable: true, ...mod, ...extra }),
+      );
+    });
+
+  it('⌘B bolds the word at the cursor; ⌘[ is not indentation any more', async () => {
+    disk = fakeDisk({ 'K.md': 'hello world\n' });
+    const doc = await load('K.md');
+    render(<Editor doc={doc} mode="source" label="K" />);
+    act(() => viewOf().dispatch({ selection: { anchor: 8 } }));
+    await press('b');
+    expect(viewOf().state.doc.toString()).toBe('hello **world**\n');
+    await press('[');
+    expect(viewOf().state.doc.toString()).toBe('hello **world**\n');
+  });
+});
+
+describe('line numbers (M2b feedback round)', () => {
+  afterEach(() => useSettingsStore.setState({ settings: DEFAULT_SETTINGS }));
+  const numbers = () =>
+    [...document.querySelectorAll<HTMLElement>('.cm-lineNumbers .cm-gutterElement')]
+      // The hidden spacer only sizes the gutter.
+      .filter((e) => e.style.visibility !== 'hidden')
+      .map((e) => e.textContent)
+      .filter((t) => /^\d+$/.test(t ?? ''));
+
+  it('are off by default and follow the setting in every mode, live', async () => {
+    disk = fakeDisk({ 'N.md': 'one\ntwo\nthree\n' });
+    const doc = await load('N.md');
+    const { rerender } = render(<Editor doc={doc} mode="livePreview" label="N" />);
+    expect(document.querySelector('.cm-lineNumbers')).toBeNull();
+    act(() => useSettingsStore.setState({ settings: { ...DEFAULT_SETTINGS, lineNumbers: true } }));
+    expect(numbers()).toEqual(['1', '2', '3', '4']);
+    for (const mode of ['source', 'split'] as const) {
+      rerender(<Editor doc={doc} mode={mode} label="N" />);
+      expect(numbers()).toEqual(['1', '2', '3', '4']);
+    }
+    act(() => useSettingsStore.setState({ settings: { ...DEFAULT_SETTINGS, lineNumbers: false } }));
+    expect(document.querySelector('.cm-lineNumbers')).toBeNull();
+  });
+
+  it('a page swapped in from the cache follows the current setting', async () => {
+    disk = fakeDisk({ 'P.md': 'p\n', 'Q.md': 'q\n' });
+    const p = await load('P.md');
+    const q = await load('Q.md');
+    const { rerender } = render(<Editor doc={p} mode="source" label="P" />);
+    rerender(<Editor doc={q} mode="source" label="Q" />);
+    act(() => useSettingsStore.setState({ settings: { ...DEFAULT_SETTINGS, lineNumbers: true } }));
+    rerender(<Editor doc={p} mode="source" label="P" />);
+    expect(numbers()).toEqual(['1', '2']);
   });
 });

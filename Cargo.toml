@@ -33,6 +33,8 @@ tauri = "2.12.3"
 tauri-build = "2.7.2"
 tauri-plugin-dialog = "2.8.2"
 tauri-plugin-opener = "2.7.1"
+# M2b: installed font families (local files only)
+fontdb = "0.24.0"
 
 [workspace.lints.rust]
 unsafe_code = "forbid"

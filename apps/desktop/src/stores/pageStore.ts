@@ -92,7 +92,13 @@ export const usePageStore = create<PageState>((set, get) => ({
     useEditorStore.getState().follow(from, to);
     const path = get().path;
     const next = path ? remap(path, from, to) : null;
-    if (next) await get().load(next);
+    if (!next) return;
+    // Same document under a new name: keep the page shown (header mounted) while
+    // it reloads, so focus in the header (the title just renamed) isn't lost
+    // (final review I3, NFR-10).
+    const page = get().page;
+    if (page && get().state === 'ready') set({ path: next, page: { ...page, path: next } });
+    await get().load(next);
   },
   onExternalChange: async (c, exists) => {
     await useEditorStore.getState().onExternalChange(c, exists);

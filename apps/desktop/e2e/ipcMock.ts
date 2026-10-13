@@ -4,9 +4,12 @@
 export function installIpcMock({
   pages,
   editorMode,
+  settings: overrides = {},
 }: {
   pages: Record<string, string>;
   editorMode: string;
+  /** Extra settings (palette, fonts, toolbar…) for M2b tests. */
+  settings?: Record<string, unknown>;
 }) {
   type Args = Record<string, unknown>;
   const w = window as unknown as Record<string, unknown>;
@@ -23,25 +26,31 @@ export function installIpcMock({
     truncated: false,
     binary: false,
   });
+  let settings: Record<string, unknown> = {
+    version: 1,
+    language: 'en',
+    theme: 'light',
+    rewriteLinks: true,
+    confirmDelete: true,
+    editorMode,
+    ...overrides,
+  };
   const handlers: Record<string, (a: Args) => unknown> = {
     app_info: () => ({ name: 'Notes In My Way', version: '0.0.0-e2e' }),
-    settings_get: () => ({
-      settings: {
-        version: 1,
-        language: 'en',
-        theme: 'light',
-        rewriteLinks: true,
-        confirmDelete: true,
-        editorMode,
-      },
-    }),
-    settings_set: (a) => ({
-      version: 1,
-      language: 'en',
-      theme: 'light',
-      editorMode,
-      ...(a.patch as object),
-    }),
+    settings_get: () => ({ settings }),
+    settings_set: (a) => {
+      settings = { ...settings, ...(a.patch as object) };
+      return settings;
+    },
+    fonts_list: () => ['Courier New', 'Menlo'],
+    entry_rename: (a) => {
+      const from = a.from as string;
+      const to = a.to as string;
+      pages[to] = pages[from];
+      delete pages[from];
+      ((w.__nimwRenames ??= []) as unknown[]).push({ from, to });
+      return { moved: [[from, to]], updatedFiles: [], updatedLinks: 0, failed: [] };
+    },
     vaults_recent: () => [{ path: '/vault', name: 'vault', openedAt: '', missing: false }],
     vault_open: () => ({
       name: 'vault',

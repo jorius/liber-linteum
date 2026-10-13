@@ -15,15 +15,30 @@
 //! already granted (`core:window:allow-destroy`).
 
 use tauri::menu::{AboutMetadata, Menu, MenuEvent, MenuItem, PredefinedMenuItem, Submenu};
-use tauri::{AppHandle, Manager, Runtime};
+use tauri::{AppHandle, Emitter, Manager, Runtime};
 
 /// Id of our Quit item.
 pub const QUIT_ID: &str = "nimw-quit";
+/// Ids of View → Back / Forward (M2b §3 link trail).
+pub const BACK_ID: &str = "nimw-back";
+pub const FORWARD_ID: &str = "nimw-forward";
+/// Event telling the page to walk the link trail; payload `"back"` or
+/// `"forward"`.
+pub const NAVIGATE_EVENT: &str = "menu:navigate";
+/// Ids of View → Toggle Formatting Toolbar / Toggle Line Numbers.
+pub const TOOLBAR_ID: &str = "nimw-toggle-toolbar";
+pub const LINE_NUMBERS_ID: &str = "nimw-toggle-line-numbers";
+/// Event telling the page to flip a setting; payload `"toolbar"` or
+/// `"lineNumbers"` (the settings key).
+pub const TOGGLE_EVENT: &str = "menu:toggle";
 
 /// The app menu: About, Services, Hide, Hide Others, Show All, Quit (ours);
 /// Edit (Undo, Redo, Cut, Copy, Paste, Select All: macOS routes the text
-/// editing shortcuts through it); View (full screen); Window (Minimize, Zoom,
-/// Close Window).
+/// editing shortcuts through it); View (Back, Forward along the link trail —
+/// no accelerators: the page handles ⌘[ / ⌘] itself, which also works where
+/// there is no app menu; the formatting toolbar and line-number toggles —
+/// plain items, the page owns the settings; full screen); Window (Minimize,
+/// Zoom, Close Window).
 pub fn app_menu<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
     let pkg = app.package_info();
     let config = app.config();
@@ -72,11 +87,35 @@ pub fn app_menu<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
             &PredefinedMenuItem::select_all(app, None)?,
         ],
     )?;
+    let back = MenuItem::with_id(app, BACK_ID, "Back", true, None::<&str>)?;
+    let forward = MenuItem::with_id(app, FORWARD_ID, "Forward", true, None::<&str>)?;
+    let toolbar = MenuItem::with_id(
+        app,
+        TOOLBAR_ID,
+        "Toggle Formatting Toolbar",
+        true,
+        None::<&str>,
+    )?;
+    let line_numbers = MenuItem::with_id(
+        app,
+        LINE_NUMBERS_ID,
+        "Toggle Line Numbers",
+        true,
+        None::<&str>,
+    )?;
     let view = Submenu::with_items(
         app,
         "View",
         true,
-        &[&PredefinedMenuItem::fullscreen(app, None)?],
+        &[
+            &back,
+            &forward,
+            &PredefinedMenuItem::separator(app)?,
+            &toolbar,
+            &line_numbers,
+            &PredefinedMenuItem::separator(app)?,
+            &PredefinedMenuItem::fullscreen(app, None)?,
+        ],
     )?;
     let window = Submenu::with_items(
         app,
@@ -103,8 +142,16 @@ pub fn with_app_menu<R: Runtime>(builder: tauri::Builder<R>) -> tauri::Builder<R
 
 /// Menu events (registered by `configure`).
 pub fn on_menu_event<R: Runtime>(app: &AppHandle<R>, event: MenuEvent) {
-    if event.id() == QUIT_ID {
+    let id = event.id().0.as_str();
+    if id == QUIT_ID {
         request_quit(app);
+    } else if id == BACK_ID || id == FORWARD_ID {
+        let direction = if id == BACK_ID { "back" } else { "forward" };
+        let _ = app.emit(NAVIGATE_EVENT, direction);
+    } else if id == TOOLBAR_ID {
+        let _ = app.emit(TOGGLE_EVENT, "toolbar");
+    } else if id == LINE_NUMBERS_ID {
+        let _ = app.emit(TOGGLE_EVENT, "lineNumbers");
     }
 }
 

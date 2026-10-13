@@ -24,6 +24,7 @@ import { useEditorStore, warnUnsaved } from './editorStore';
 import { errorMessage } from './messages';
 import { usePageStore } from './pageStore';
 import { useToastStore } from './toastStore';
+import { useTrailStore } from './trailStore';
 import { childrenByParent, joinPath, nextFreeName, parentOf, remap } from './tree';
 
 /** External changes arriving within this window trigger one tree refresh. */
@@ -56,7 +57,13 @@ interface VaultState {
   startRename: (path: string | null) => void;
   createPage: (dir: string) => Promise<IpcResult<string>>;
   createFolder: (dir: string) => Promise<IpcResult<string>>;
-  rename: (from: string, to: string) => Promise<IpcResult<RenameOutcome>>;
+  /** `quiet`: a refused rename isn't toasted (the caller shows it inline,
+   *  like the page title — final review m4). */
+  rename: (
+    from: string,
+    to: string,
+    opts?: { quiet?: boolean },
+  ) => Promise<IpcResult<RenameOutcome>>;
   trash: (path: string) => Promise<IpcResult<void>>;
 }
 
@@ -110,14 +117,22 @@ export const useVaultStore = create<VaultState>((set, get) => {
     pending = null;
     if (!change) return;
     let { selected, expanded } = get();
+    const trail = useTrailStore.getState();
     for (const [from, to] of change.renamed) {
       selected = selected ? (remap(selected, from, to) ?? selected) : selected;
       expanded = new Set([...expanded].map((p) => remap(p, from, to) ?? p));
+      trail.renamed(from, to);
     }
     set({ selected, expanded });
     await get().refreshTree();
     const present = new Set(get().nodes.map((n) => n.path));
-    await usePageStore.getState().onExternalChange(change, (p) => present.has(p));
+    const exists = (p: string) => present.has(p);
+    await usePageStore.getState().onExternalChange(change, exists);
+    // Only what is gone after the whole batch: an atomic save (delete +
+    // re-create) keeps its place on the trail (final review m2). Pruned after
+    // the page followed any rename, so it knows the page on screen (m3).
+    const current = usePageStore.getState().path;
+    for (const path of change.removed) trail.removed(path, { exists, current });
   }
 
   /** Subscribes to external-change and warning events. A refused
@@ -169,6 +184,7 @@ export const useVaultStore = create<VaultState>((set, get) => {
       return res;
     }
     set({ info: res.value, selected: null, expanded: new Set(), renaming: null });
+    useTrailStore.getState().reset();
     usePageStore.getState().clear();
     useEditorStore.getState().reset();
     await get().refreshTree();
@@ -220,6 +236,7 @@ export const useVaultStore = create<VaultState>((set, get) => {
       useEditorStore.getState().reset();
       stopListening();
       await vaultClose();
+      useTrailStore.getState().reset();
       usePageStore.getState().clear();
       treeSeq++;
       set({ ...EMPTY, children: new Map(), expanded: new Set() });
@@ -288,11 +305,11 @@ export const useVaultStore = create<VaultState>((set, get) => {
       set({ selected: res.value, renaming: res.value });
       return res;
     },
-    rename: async (from, to) => {
+    rename: async (from, to, opts) => {
       await useEditorStore.getState().flushAll(); // the move takes the latest text
       const res = await entryRename(from, to);
       if (!res.ok) {
-        toast().push({ message: errorMessage(res.error), tone: 'error' });
+        if (!opts?.quiet) toast().push({ message: errorMessage(res.error), tone: 'error' });
         return res;
       }
       const { selected, expanded } = get();
@@ -301,6 +318,7 @@ export const useVaultStore = create<VaultState>((set, get) => {
         expanded: new Set([...expanded].map((p) => remap(p, from, to) ?? p)),
         renaming: null,
       });
+      useTrailStore.getState().renamed(from, to);
       get().expand(parentOf(to));
       await get().refreshTree();
       await usePageStore.getState().follow(from, to);
@@ -331,6 +349,7 @@ export const useVaultStore = create<VaultState>((set, get) => {
         return res;
       }
       const page = usePageStore.getState();
+      useTrailStore.getState().removed(path, { current: page.path });
       if (page.path && remap(page.path, path, path)) page.clear();
       const selected = get().selected;
       if (selected && remap(selected, path, path)) set({ selected: next });

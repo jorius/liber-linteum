@@ -11,6 +11,7 @@ import { resetVaultStore, useVaultStore } from '../../stores/vaultStore';
 import { fakeDisk } from '../../test/fakeDisk';
 import { AUTOSAVE_MS } from '../editor/pageDoc';
 import { LARGE_NOTE_CHARS } from '../editor/livePreview';
+import { openPage } from '../../stores/navigate';
 import { PageView } from './PageView';
 
 const open = (path: string) => act(() => usePageStore.getState().load(path));
@@ -60,7 +61,9 @@ describe('PageView (M2a §5)', () => {
     expect(screen.getByRole('navigation', { name: 'Breadcrumb' })).toHaveTextContent(
       'VaultCharacter Designrex',
     );
-    expect(screen.getByRole('heading', { level: 1, name: 'Generator Rex' })).toBeInTheDocument();
+    // M2b §2: the title is the file name; the note's own title is shown under it.
+    expect(screen.getByRole('heading', { level: 1, name: 'rex' })).toBeInTheDocument();
+    expect(screen.getByText('Title in the note: Generator Rex')).toBeInTheDocument();
     expect(screen.getByText('Hero redesign · v3')).toBeInTheDocument();
     expect(screen.getByRole('list', { name: 'Tags' })).toHaveTextContent('#character#redesign');
     expect(screen.getByText('8 links · 1 backlink')).toBeInTheDocument();
@@ -83,6 +86,35 @@ describe('PageView (M2a §5)', () => {
     expect(view().dom).toHaveClass('cm-nimw-source');
     await userEvent.click(screen.getByRole('radio', { name: 'Split' }));
     expect(screen.getByRole('region', { name: 'Preview' })).toHaveTextContent('body');
+  });
+
+  it('M2b §3: the back arrow appears after following a link and goes back', async () => {
+    fakeDisk({ 'A.md': '# A\n\n[[B]]\n', 'B.md': '# B\n' });
+    render(<PageView />);
+    await open('A.md');
+    expect(screen.queryByRole('button', { name: /^Back to/ })).not.toBeInTheDocument();
+    await act(() => openPage('B.md', null, 'link'));
+    const back = await screen.findByRole('button', { name: 'Back to A' });
+    await userEvent.click(back);
+    await waitFor(() => expect(usePageStore.getState().path).toBe('A.md'));
+    expect(screen.queryByRole('button', { name: /^Back to/ })).not.toBeInTheDocument();
+  });
+
+  it('M2b §6: the header button shows and hides the formatting toolbar', async () => {
+    const disk = fakeDisk({ 'A.md': '# A\n\nbody\n' });
+    render(<PageView />);
+    await open('A.md');
+    const toggle = screen.getByRole('button', { name: 'Formatting toolbar' });
+    expect(toggle).toHaveAttribute('aria-pressed', 'true');
+    // Feedback round: a labelled button whose tooltip says what a click does.
+    expect(toggle).toHaveTextContent('Format');
+    expect(toggle).toHaveAttribute('title', 'Hide the formatting toolbar');
+    expect(screen.getByRole('toolbar', { name: 'Formatting' })).toBeInTheDocument();
+    await userEvent.click(toggle);
+    expect(disk.calls).toContainEqual(['settings_set', { patch: { toolbar: false } }]);
+    await waitFor(() => expect(screen.queryByRole('toolbar')).not.toBeInTheDocument());
+    expect(toggle).toHaveAttribute('aria-pressed', 'false');
+    expect(toggle).toHaveAttribute('title', 'Show the formatting toolbar');
   });
 
   it('save status: Saved → Saving… → Saved; failures say "Unsaved — retrying"', async () => {
@@ -108,12 +140,12 @@ describe('PageView (M2a §5)', () => {
     fakeDisk({ 'A.md': '# Old\n' });
     render(<PageView />);
     await open('A.md');
-    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Old');
+    expect(screen.getByText('Title in the note: Old')).toBeInTheDocument();
     await act(async () => {
       view().dispatch({ changes: { from: 2, to: 5, insert: 'New' } });
       await useEditorStore.getState().flushAll();
     });
-    await waitFor(() => expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('New'));
+    await waitFor(() => expect(screen.getByText('Title in the note: New')).toBeInTheDocument());
   });
 
   it('deleted outside while dirty: the text stays and can be saved as a new page', async () => {
