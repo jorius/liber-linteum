@@ -169,6 +169,35 @@
     "themeLight": "Light",
     "themeDark": "Dark",
     "rewriteLinks": "Update links when renaming or moving",
-    "confirmDelete": "Ask before moving to Trash"
+    "confirmDelete": "Ask before moving to Trash",
+    "sections": {
+      "appearance": "Appearance",
+      "editor": "Editor",
+      "files": "Files"
+    },
+    "palette": "Palette",
+    "palettes": {
+      "lavender": "Lavender",
+      "graphite": "Graphite",
+      "rosewood": "Rosewood",
+      "saffron": "Saffron",
+      "persimmon": "Persimmon",
+      "midnight": "Midnight",
+      "sepia": "Sepia",
+      "ink": "Ink",
+      "custom": "Custom accent"
+    },
+    "accentColor": "Accent colour",
+    "accentHex": "Accent colour (hex)",
+    "accentInvalid": "Use a colour like #rrggbb (six hex digits).",
+    "accentContrast": "Accent contrast: {light}:1 in light mode, {dark}:1 in dark mode",
+    "fontLive": "Live Preview font",
+    "fontSource": "Source font",
+    "fontBundled": "Included with the app",
+    "fontInstalled": "Installed on this computer",
+    "fontSystemDefault": "System default",
+    "fontSize": "Text size",
+    "fontSizePx": "{px} px",
+    "toolbar": "Show the formatting toolbar"
   }
 }

@@ -1,18 +1,29 @@
+import { useEffect, useId, useState, type KeyboardEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { SUPPORTED_LANGUAGES } from '../../i18n';
-import type { Theme } from '../../ipc';
+import { fontsList, PALETTE_IDS, type PaletteChoice, type Theme } from '../../ipc';
 import { useSettingsStore } from '../../stores/settingsStore';
+import { contrast } from '../../theme/color';
+import { derive } from '../../theme/derive';
+import { LIVE_FONTS, SOURCE_FONTS, systemChoice, type FontOption } from '../../theme/fonts';
+import { PALETTES } from '../../theme/palettes';
 import { Dialog } from './Dialog';
 import styles from './Dialogs.module.css';
 
 const THEMES: Theme[] = ['system', 'light', 'dark'];
 const themeKey = { system: 'themeSystem', light: 'themeLight', dark: 'themeDark' } as const;
+const PALETTE_CHOICES: PaletteChoice[] = [...PALETTE_IDS, 'custom'];
+const SIZES = [13, 14, 15, 16, 17, 18, 19, 20];
+const HEX = /^#[0-9a-f]{6}$/i;
 
-/** Language, theme and file-operation settings; every change is saved at once. */
+/** Language, appearance (theme, palette, custom accent), editor (fonts, text
+ *  size, toolbar) and file settings; every change is saved at once (M2b §7). */
 export function SettingsDialog({ onClose }: { onClose: () => void }) {
   const { t } = useTranslation();
   const settings = useSettingsStore((s) => s.settings);
   const update = useSettingsStore((s) => s.update);
+  const installed = useInstalledFonts();
+  const ids = { appearance: useId(), editor: useId(), files: useId() };
 
   return (
     <Dialog title={t('settings.title')} onClose={onClose}>
@@ -31,42 +42,257 @@ export function SettingsDialog({ onClose }: { onClose: () => void }) {
           ))}
         </select>
       </label>
-      <fieldset className={styles.fieldset}>
-        <legend>{t('settings.theme')}</legend>
-        {THEMES.map((theme) => (
-          <label key={theme} className={styles.check}>
-            <input
-              type="radio"
-              name="theme"
-              value={theme}
-              checked={settings.theme === theme}
-              onChange={() => void update({ theme })}
-            />
-            {t(`settings.${themeKey[theme]}`)}
-          </label>
-        ))}
-      </fieldset>
-      <label className={styles.check}>
-        <input
-          type="checkbox"
-          checked={settings.rewriteLinks}
-          onChange={(e) => void update({ rewriteLinks: e.target.checked })}
+
+      <section className={styles.section} aria-labelledby={ids.appearance}>
+        <h3 id={ids.appearance} className={styles.sectionTitle}>
+          {t('settings.sections.appearance')}
+        </h3>
+        <fieldset className={styles.fieldset}>
+          <legend>{t('settings.theme')}</legend>
+          {THEMES.map((theme) => (
+            <label key={theme} className={styles.check}>
+              <input
+                type="radio"
+                name="theme"
+                value={theme}
+                checked={settings.theme === theme}
+                onChange={() => void update({ theme })}
+              />
+              {t(`settings.${themeKey[theme]}`)}
+            </label>
+          ))}
+        </fieldset>
+        <fieldset className={`${styles.fieldset} ${styles.palettes}`}>
+          <legend>{t('settings.palette')}</legend>
+          {PALETTE_CHOICES.map((id) => (
+            <label key={id} className={styles.palette}>
+              <input
+                type="radio"
+                name="palette"
+                value={id}
+                checked={settings.palette === id}
+                onChange={() => void update({ palette: id })}
+              />
+              <Swatch id={id} accent={settings.accentColor} />
+              <span>{t(`settings.palettes.${id}`)}</span>
+            </label>
+          ))}
+        </fieldset>
+        {settings.palette === 'custom' && (
+          <AccentEditor
+            value={settings.accentColor}
+            onSave={(accentColor) => void update({ accentColor })}
+          />
+        )}
+      </section>
+
+      <section className={styles.section} aria-labelledby={ids.editor}>
+        <h3 id={ids.editor} className={styles.sectionTitle}>
+          {t('settings.sections.editor')}
+        </h3>
+        <FontSelect
+          label={t('settings.fontLive')}
+          fonts={LIVE_FONTS}
+          installed={installed}
+          value={settings.fontLivePreview}
+          onChange={(fontLivePreview) => void update({ fontLivePreview })}
         />
-        {t('settings.rewriteLinks')}
-      </label>
-      <label className={styles.check}>
-        <input
-          type="checkbox"
-          checked={settings.confirmDelete}
-          onChange={(e) => void update({ confirmDelete: e.target.checked })}
+        <FontSelect
+          label={t('settings.fontSource')}
+          fonts={SOURCE_FONTS}
+          installed={installed}
+          value={settings.fontSource}
+          onChange={(fontSource) => void update({ fontSource })}
         />
-        {t('settings.confirmDelete')}
-      </label>
+        <label className={styles.field}>
+          <span>{t('settings.fontSize')}</span>
+          <select
+            className={styles.select}
+            value={settings.fontSize}
+            onChange={(e) => void update({ fontSize: Number(e.target.value) })}
+          >
+            {SIZES.map((px) => (
+              <option key={px} value={px}>
+                {t('settings.fontSizePx', { px })}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className={styles.check}>
+          <input
+            type="checkbox"
+            checked={settings.toolbar}
+            onChange={(e) => void update({ toolbar: e.target.checked })}
+          />
+          {t('settings.toolbar')}
+        </label>
+      </section>
+
+      <section className={styles.section} aria-labelledby={ids.files}>
+        <h3 id={ids.files} className={styles.sectionTitle}>
+          {t('settings.sections.files')}
+        </h3>
+        <label className={styles.check}>
+          <input
+            type="checkbox"
+            checked={settings.rewriteLinks}
+            onChange={(e) => void update({ rewriteLinks: e.target.checked })}
+          />
+          {t('settings.rewriteLinks')}
+        </label>
+        <label className={styles.check}>
+          <input
+            type="checkbox"
+            checked={settings.confirmDelete}
+            onChange={(e) => void update({ confirmDelete: e.target.checked })}
+          />
+          {t('settings.confirmDelete')}
+        </label>
+      </section>
+
       <div className={styles.buttons}>
         <button type="button" className={`${styles.button} ${styles.primary}`} onClick={onClose}>
           {t('dialogs.close')}
         </button>
       </div>
     </Dialog>
+  );
+}
+
+/** Installed font families (empty outside the app or on error). */
+function useInstalledFonts(): string[] {
+  const [families, setFamilies] = useState<string[]>([]);
+  useEffect(() => {
+    let live = true;
+    void fontsList().then((res) => {
+      if (live && res.ok && Array.isArray(res.value)) setFamilies(res.value);
+    });
+    return () => {
+      live = false;
+    };
+  }, []);
+  return families;
+}
+
+/** Light and dark background + accent of a palette, as four chips. */
+function Swatch({ id, accent }: { id: PaletteChoice; accent: string }) {
+  const p = id === 'custom' ? derive(accent) : PALETTES.find((x) => x.id === id)!;
+  return (
+    <span className={styles.chips} aria-hidden="true">
+      {[p.light.bg, p.light.accent, p.dark.bg, p.dark.accent].map((c, i) => (
+        <span key={i} className={styles.chip} style={{ background: c }} />
+      ))}
+    </span>
+  );
+}
+
+/** Colour picker + hex field for the custom accent, with the contrast the
+ *  derived palette reaches in each mode. */
+function AccentEditor({ value, onSave }: { value: string; onSave: (hex: string) => void }) {
+  const { t } = useTranslation();
+  const [draft, setDraft] = useState(value);
+  const [invalid, setInvalid] = useState(false);
+  const errorId = useId();
+  useEffect(() => setDraft(value), [value]);
+  const p = derive(value);
+
+  const commit = () => {
+    if (!HEX.test(draft)) {
+      setInvalid(true);
+      return;
+    }
+    setInvalid(false);
+    if (draft.toLowerCase() !== value) onSave(draft.toLowerCase());
+  };
+  const onKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      commit();
+    }
+  };
+
+  return (
+    <div className={styles.accent}>
+      <div className={styles.accentRow}>
+        <input
+          type="color"
+          className={styles.colorInput}
+          aria-label={t('settings.accentColor')}
+          value={value}
+          onChange={(e) => onSave(e.target.value.toLowerCase())}
+        />
+        <input
+          type="text"
+          className={styles.hexInput}
+          aria-label={t('settings.accentHex')}
+          aria-invalid={invalid}
+          aria-describedby={invalid ? errorId : undefined}
+          spellCheck={false}
+          value={draft}
+          onChange={(e) => setDraft(e.target.value.trim())}
+          onKeyDown={onKeyDown}
+          onBlur={commit}
+        />
+      </div>
+      {invalid && (
+        <p id={errorId} role="alert" className={styles.error}>
+          {t('settings.accentInvalid')}
+        </p>
+      )}
+      <p className={styles.hint}>
+        {t('settings.accentContrast', {
+          light: contrast(p.light.accent, p.light.surface).toFixed(1),
+          dark: contrast(p.dark.accent, p.dark.surface).toFixed(1),
+        })}
+      </p>
+    </div>
+  );
+}
+
+/** Bundled fonts, then the fonts installed on this computer. */
+function FontSelect({
+  label,
+  fonts,
+  installed,
+  value,
+  onChange,
+}: {
+  label: string;
+  fonts: readonly FontOption[];
+  installed: string[];
+  value: string;
+  onChange: (choice: string) => void;
+}) {
+  const { t } = useTranslation();
+  const known = new Set([...fonts.map((f) => f.id), ...installed.map(systemChoice)]);
+  return (
+    <label className={styles.field}>
+      <span>{label}</span>
+      <select className={styles.select} value={value} onChange={(e) => onChange(e.target.value)}>
+        <optgroup label={t('settings.fontBundled')}>
+          {fonts.map((f) => (
+            <option key={f.id} value={f.id} style={{ fontFamily: f.stack }}>
+              {f.label ?? t('settings.fontSystemDefault')}
+            </option>
+          ))}
+        </optgroup>
+        {(installed.length > 0 || !known.has(value)) && (
+          <optgroup label={t('settings.fontInstalled')}>
+            {!known.has(value) && value.startsWith('system:') && (
+              <option value={value}>{value.slice('system:'.length)}</option>
+            )}
+            {installed.map((family) => (
+              <option
+                key={family}
+                value={systemChoice(family)}
+                style={{ fontFamily: `"${family}"` }}
+              >
+                {family}
+              </option>
+            ))}
+          </optgroup>
+        )}
+      </select>
+    </label>
   );
 }

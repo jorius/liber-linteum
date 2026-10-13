@@ -169,6 +169,35 @@
     "themeLight": "Claro",
     "themeDark": "Oscuro",
     "rewriteLinks": "Actualizar enlaces al renombrar o mover",
-    "confirmDelete": "Preguntar antes de mover a la papelera"
+    "confirmDelete": "Preguntar antes de mover a la papelera",
+    "sections": {
+      "appearance": "Apariencia",
+      "editor": "Editor",
+      "files": "Archivos"
+    },
+    "palette": "Paleta",
+    "palettes": {
+      "lavender": "Lavanda",
+      "graphite": "Grafito",
+      "rosewood": "Palisandro",
+      "saffron": "Azafrán",
+      "persimmon": "Caqui",
+      "midnight": "Medianoche",
+      "sepia": "Sepia",
+      "ink": "Tinta",
+      "custom": "Color de acento propio"
+    },
+    "accentColor": "Color de acento",
+    "accentHex": "Color de acento (hex)",
+    "accentInvalid": "Usa un color como #rrggbb (seis dígitos hexadecimales).",
+    "accentContrast": "Contraste del acento: {light}:1 en modo claro, {dark}:1 en modo oscuro",
+    "fontLive": "Fuente de Vista en vivo",
+    "fontSource": "Fuente de Código",
+    "fontBundled": "Incluidas con la app",
+    "fontInstalled": "Instaladas en este equipo",
+    "fontSystemDefault": "Predeterminada del sistema",
+    "fontSize": "Tamaño del texto",
+    "fontSizePx": "{px} px",
+    "toolbar": "Mostrar la barra de formato"
   }
 }

@@ -116,3 +116,94 @@
   font-family: var(--font-mono);
   font-size: 13px;
 }
+
+/* Settings sections (M2b §7). */
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding-top: 12px;
+  border-top: 1px solid var(--color-border);
+}
+
+.sectionTitle {
+  margin: 0;
+  font: 700 14px var(--font-body);
+  letter-spacing: 0.02em;
+  color: var(--color-text-strong);
+}
+
+.palettes {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+}
+
+.palette {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--color-text-body);
+  cursor: pointer;
+}
+
+.chips {
+  display: inline-grid;
+  grid-template-columns: repeat(4, 10px);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  border: 1px solid var(--color-border-strong);
+  flex: none;
+}
+
+.chip {
+  width: 10px;
+  height: 18px;
+}
+
+.accent {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.accentRow {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.colorInput {
+  width: 44px;
+  height: 32px;
+  padding: 2px;
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-subtle);
+}
+
+.hexInput {
+  font: 400 14px var(--font-mono);
+  width: 10ch;
+  color: var(--color-text);
+  background: var(--color-surface-subtle);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-md);
+  padding: 6px 8px;
+}
+
+.hexInput[aria-invalid='true'] {
+  border-color: var(--color-warn-border);
+}
+
+.error {
+  margin: 0;
+  font-size: 13px;
+  color: var(--color-warn-text);
+}
+
+.hint {
+  margin: 0;
+  font-size: 12px;
+  color: var(--color-text-muted);
+}
