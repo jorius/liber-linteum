@@ -212,8 +212,10 @@ fn executable_name(path: &Path) -> bool {
 
 /// Checks that `full` may be handed to the OS's default app (review m3): a
 /// regular file (a folder may be an .app bundle) that is no program, script or
-/// installer by name, and on Unix has no exec bit. Symlinks are judged by
-/// their target.
+/// installer by name, and on Unix is not an extensionless file with an exec
+/// bit (a binary or script). Exec bits on files with an extension are ignored:
+/// exFAT/SMB volumes set them on everything, and the OS opens such a file by
+/// its type rather than running it. Symlinks are judged by their target.
 pub(crate) fn check_openable(full: &Path) -> CmdResult<()> {
     let real = std::fs::canonicalize(full)
         .map_err(|e| CommandError::new(ErrorKind::NotFound, e.to_string()))?;
@@ -228,7 +230,8 @@ pub(crate) fn check_openable(full: &Path) -> CmdResult<()> {
     #[cfg(unix)]
     {
         use std::os::unix::fs::PermissionsExt;
-        if meta.permissions().mode() & 0o111 != 0 {
+        let extensionless = full.extension().is_none() || real.extension().is_none();
+        if extensionless && meta.permissions().mode() & 0o111 != 0 {
             return Err(refuse(full, "marked executable"));
         }
     }
@@ -369,6 +372,13 @@ mod tests {
         std::fs::write(&pdf, b"%PDF").unwrap();
         std::fs::set_permissions(&pdf, std::fs::Permissions::from_mode(0o644)).unwrap();
         assert!(check_openable(&pdf).is_ok());
+        // exFAT/SMB volumes mark every file executable: a document with an
+        // extension still opens (the OS picks the app by type, it never runs it).
+        std::fs::set_permissions(&pdf, std::fs::Permissions::from_mode(0o755)).unwrap();
+        assert!(
+            check_openable(&pdf).is_ok(),
+            "an exec-bit document on exFAT/SMB"
+        );
         // A symlink is judged by what it points to.
         let link = dir.path().join("innocent.pdf");
         std::os::unix::fs::symlink(&tool, &link).unwrap();
