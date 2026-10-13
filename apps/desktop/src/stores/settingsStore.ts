@@ -18,6 +18,12 @@ export const DEFAULT_SETTINGS: Settings = {
   rewriteLinks: true,
   confirmDelete: true,
   editorMode: 'livePreview',
+  palette: 'lavender',
+  accentColor: '#d1477a',
+  fontLivePreview: 'atkinson-hyperlegible',
+  fontSource: 'jetbrains-mono',
+  fontSize: 15,
+  toolbar: true,
 };
 
 interface SettingsState {

@@ -126,6 +126,23 @@ export interface RecentVault {
 
 export type EditorMode = 'livePreview' | 'source' | 'split';
 
+/** Built-in palettes (M2b §4); `custom` derives one from `accentColor`. */
+export const PALETTE_IDS = [
+  'lavender',
+  'graphite',
+  'rosewood',
+  'saffron',
+  'persimmon',
+  'midnight',
+  'sepia',
+  'ink',
+] as const;
+export type PaletteId = (typeof PALETTE_IDS)[number];
+export type PaletteChoice = PaletteId | 'custom';
+
+/** A bundled font id (theme/fonts.ts) or `system:<Family Name>`. */
+export type FontChoice = string;
+
 export interface Settings {
   version: number;
   /** `null` = follow the OS. */
@@ -134,6 +151,15 @@ export interface Settings {
   rewriteLinks: boolean;
   confirmDelete: boolean;
   editorMode: EditorMode;
+  palette: PaletteChoice;
+  /** `#rrggbb`, used when `palette` is `custom`. */
+  accentColor: string;
+  fontLivePreview: FontChoice;
+  fontSource: FontChoice;
+  /** Editor text size in px (13–20). */
+  fontSize: number;
+  /** Formatting toolbar shown. */
+  toolbar: boolean;
 }
 
 /** `language: 'system'` means follow the OS again. */
@@ -143,6 +169,12 @@ export interface SettingsPatch {
   rewriteLinks?: boolean;
   confirmDelete?: boolean;
   editorMode?: EditorMode;
+  palette?: PaletteChoice;
+  accentColor?: string;
+  fontLivePreview?: FontChoice;
+  fontSource?: FontChoice;
+  fontSize?: number;
+  toolbar?: boolean;
 }
 
 export interface SettingsResponse {

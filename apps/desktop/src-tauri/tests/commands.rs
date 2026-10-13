@@ -607,3 +607,39 @@ fn vlt_01_open_survives_an_unwritable_config_dir() {
     );
     call(&h.main, "vault_tree", json!({})).expect("the vault is open");
 }
+
+/// M2b §7: the new appearance/editor settings travel through `settings_set`
+/// and come back from `settings_get`; an invalid value is refused.
+#[test]
+fn m2b_settings_round_trip_over_ipc() {
+    let h = harness();
+    let saved = call(
+        &h.main,
+        "settings_set",
+        json!({ "patch": {
+            "palette": "graphite",
+            "accentColor": "#2AA198",
+            "fontLivePreview": "system:Avenir Next",
+            "fontSource": "source-code-pro",
+            "fontSize": 17,
+            "toolbar": false
+        }}),
+    )
+    .unwrap();
+    assert_eq!(saved["palette"], "graphite");
+    assert_eq!(saved["accentColor"], "#2aa198");
+    assert_eq!(saved["fontLivePreview"], "system:Avenir Next");
+    assert_eq!(saved["fontSource"], "source-code-pro");
+    assert_eq!(saved["fontSize"], 17);
+    assert_eq!(saved["toolbar"], false);
+    let got = call(&h.main, "settings_get", json!({})).unwrap();
+    assert_eq!(got["settings"]["palette"], "graphite");
+    assert!(
+        call(
+            &h.main,
+            "settings_set",
+            json!({ "patch": { "accentColor": "red" } })
+        )
+        .is_err()
+    );
+}

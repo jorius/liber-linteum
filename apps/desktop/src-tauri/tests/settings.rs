@@ -37,7 +37,7 @@ fn patch_merges_saves_atomically_and_round_trips() {
             theme: Some(Theme::Dark),
             rewrite_links: Some(false),
             confirm_delete: None,
-            editor_mode: None,
+            ..Default::default()
         })
         .unwrap();
     assert_eq!(saved.language.as_deref(), Some("es"));
@@ -209,4 +209,98 @@ fn ed_01_editor_mode_defaults_to_live_preview_and_persists() {
     assert_eq!(s.editor_mode, EditorMode::LivePreview);
     assert_eq!(s.theme, Theme::Dark);
     assert!(warning.unwrap().contains("editorMode"));
+}
+
+/// M2b §7: appearance and editor settings, each with a default, persisted,
+/// and reset on its own when a value can't be understood.
+#[test]
+fn m2b_appearance_and_editor_settings_default_and_persist() {
+    use nimw_desktop::settings::{FontChoice, FontSize, HexColor, Palette};
+    let dir = tempfile::tempdir().unwrap();
+    let s = store(dir.path());
+    let d = s.get().0;
+    assert_eq!(d.palette, Palette::Lavender);
+    assert_eq!(d.accent_color, HexColor::parse("#d1477a").unwrap());
+    assert_eq!(d.font_live_preview.as_str(), "atkinson-hyperlegible");
+    assert_eq!(d.font_source.as_str(), "jetbrains-mono");
+    assert_eq!(d.font_size, FontSize::new(15));
+    assert!(d.toolbar);
+    s.update(SettingsPatch {
+        palette: Some(Palette::Custom),
+        accent_color: Some(HexColor::parse("#2AA198").unwrap()),
+        font_live_preview: Some(FontChoice::parse("system:Avenir Next").unwrap()),
+        font_source: Some(FontChoice::parse("ibm-plex-mono").unwrap()),
+        font_size: Some(FontSize::new(18)),
+        toolbar: Some(false),
+        ..Default::default()
+    })
+    .unwrap();
+    let saved: serde_json::Value =
+        serde_json::from_str(&std::fs::read_to_string(dir.path().join("settings.json")).unwrap())
+            .unwrap();
+    assert_eq!(saved["palette"], "custom");
+    assert_eq!(saved["accentColor"], "#2aa198", "stored lower-case");
+    assert_eq!(saved["fontLivePreview"], "system:Avenir Next");
+    assert_eq!(saved["fontSource"], "ibm-plex-mono");
+    assert_eq!(saved["fontSize"], 18);
+    assert_eq!(saved["toolbar"], false);
+    assert_eq!(store(dir.path()).get().0, s.get().0, "round-trips");
+}
+
+#[test]
+fn m2b_each_new_setting_is_reset_on_its_own() {
+    use nimw_desktop::settings::{FontSize, Palette};
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::write(
+        dir.path().join("settings.json"),
+        r#"{"palette":"neon","accentColor":"red","fontLivePreview":"comic-sans",
+            "fontSource":"system:","fontSize":"big","toolbar":"yes","theme":"dark"}"#,
+    )
+    .unwrap();
+    let (s, warning) = store(dir.path()).get();
+    assert_eq!(s.palette, Palette::Lavender);
+    assert_eq!(s.accent_color.as_str(), "#d1477a");
+    assert_eq!(s.font_live_preview.as_str(), "atkinson-hyperlegible");
+    assert_eq!(s.font_source.as_str(), "jetbrains-mono");
+    assert_eq!(s.font_size, FontSize::new(15));
+    assert!(s.toolbar);
+    assert_eq!(s.theme, Theme::Dark, "valid neighbours survive");
+    let warning = warning.unwrap();
+    for key in [
+        "palette",
+        "accentColor",
+        "fontLivePreview",
+        "fontSource",
+        "fontSize",
+        "toolbar",
+    ] {
+        assert!(warning.contains(key), "{key} in {warning}");
+    }
+}
+
+#[test]
+fn m2b_font_size_is_clamped_and_font_choices_are_bounded() {
+    use nimw_desktop::settings::{FontChoice, FontSize, HexColor};
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::write(dir.path().join("settings.json"), r#"{"fontSize":40}"#).unwrap();
+    assert_eq!(store(dir.path()).get().0.font_size, FontSize::new(20));
+    assert_eq!(FontSize::new(2).get(), 13);
+    assert!(FontChoice::parse("literata").is_some());
+    assert!(FontChoice::parse("system:Avenir Next").is_some());
+    assert!(FontChoice::parse("system:").is_none(), "empty family");
+    assert!(
+        FontChoice::parse("system:x\u{7}").is_none(),
+        "control characters"
+    );
+    assert!(
+        FontChoice::parse(&format!("system:{}", "a".repeat(200))).is_none(),
+        "at most 200 characters"
+    );
+    assert!(
+        FontChoice::parse("comic-sans").is_none(),
+        "unknown bundled id"
+    );
+    assert!(HexColor::parse("#ABCDEF").is_some());
+    assert!(HexColor::parse("#abc").is_none());
+    assert!(HexColor::parse("abcdef").is_none());
 }

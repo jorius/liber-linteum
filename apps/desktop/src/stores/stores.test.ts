@@ -51,6 +51,17 @@ afterEach(async () => {
 });
 
 describe('settingsStore', () => {
+  it('M2b §7: the defaults match the Rust defaults (settings.rs)', () => {
+    expect(DEFAULT_SETTINGS).toMatchObject({
+      palette: 'lavender',
+      accentColor: '#d1477a',
+      fontLivePreview: 'atkinson-hyperlegible',
+      fontSource: 'jetbrains-mono',
+      fontSize: 15,
+      toolbar: true,
+    });
+  });
+
   it('review focus: a settings warning (reset values, unreadable file) is shown as a toast', async () => {
     backend({
       settings_get: () => ({
