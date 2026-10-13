@@ -15,7 +15,8 @@
     "typecheck": "pnpm --filter @nimw/desktop typecheck",
     "test": "pnpm --filter @nimw/desktop test",
     "check:i18n": "pnpm --filter @nimw/desktop check:i18n",
-    "check": "pnpm lint && pnpm typecheck && pnpm test && pnpm check:i18n && pnpm build:ui && cargo fmt --all --check && cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace"
+    "check": "pnpm lint && pnpm typecheck && pnpm test && pnpm check:i18n && pnpm build:ui && pnpm test:e2e && cargo fmt --all --check && cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace",
+    "test:e2e": "pnpm --filter @nimw/desktop test:e2e"
   },
   "devDependencies": {
     "prettier": "^3.9.10"
