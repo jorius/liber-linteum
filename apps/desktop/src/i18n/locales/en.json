@@ -107,7 +107,8 @@
       "source": "Source",
       "split": "Split"
     },
-    "saveStatus": "Save status"
+    "saveStatus": "Save status",
+    "unsavedBlocks": "Unsaved changes in “{name}” couldn’t be written, so the vault stays open."
   },
   "preview": {
     "remoteBlocked": "Remote image blocked (privacy)",

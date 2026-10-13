@@ -33,7 +33,11 @@ export function ConfirmDeleteDialog({ path, onClose }: { path: string; onClose: 
   };
 
   return (
-    <Dialog title={t('dialogs.delete.title', { name: displayName(node) })} onClose={onClose}>
+    <Dialog
+      title={t('dialogs.delete.title', { name: displayName(node) })}
+      onClose={onClose}
+      onConfirm={() => void confirm()}
+    >
       {node.kind === 'folder' && (
         <p className={styles.text}>{t('dialogs.delete.items', { count: items })}</p>
       )}
@@ -51,6 +55,7 @@ export function ConfirmDeleteDialog({ path, onClose }: { path: string; onClose: 
         <button
           type="button"
           className={`${styles.button} ${styles.danger}`}
+          data-autofocus
           onClick={() => void confirm()}
         >
           {t('dialogs.delete.confirm')}

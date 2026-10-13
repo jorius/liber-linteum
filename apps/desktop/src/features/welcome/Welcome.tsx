@@ -22,6 +22,8 @@ export function Welcome({ version }: WelcomeProps) {
   const current = i18n.resolvedLanguage;
   const open = useVaultStore((s) => s.open);
   const create = useVaultStore((s) => s.create);
+  // Behind the opening overlay nothing is reachable (M1b §10 b).
+  const opening = useVaultStore((s) => s.status === 'opening');
   const updateSettings = useSettingsStore((s) => s.update);
 
   const chooseLanguage = async (lng: Language) => {
@@ -31,7 +33,7 @@ export function Welcome({ version }: WelcomeProps) {
   };
 
   return (
-    <main className={styles.page}>
+    <main className={styles.page} inert={opening}>
       <div className={styles.card}>
         <div className={styles.header}>
           <BrandMark />

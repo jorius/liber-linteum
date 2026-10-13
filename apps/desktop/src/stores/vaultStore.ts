@@ -24,7 +24,7 @@ import { useEditorStore } from './editorStore';
 import { errorMessage } from './messages';
 import { usePageStore } from './pageStore';
 import { useToastStore } from './toastStore';
-import { childrenByParent, joinPath, nextFreeName, parentOf, remap } from './tree';
+import { childrenByParent, joinPath, nameOf, nextFreeName, parentOf, remap } from './tree';
 
 /** External changes arriving within this window trigger one tree refresh. */
 export const COALESCE_MS = 100;
@@ -61,6 +61,7 @@ interface VaultState {
 }
 
 const toast = () => useToastStore.getState();
+const BUSY: CommandError = { kind: 'io', message: 'the vault is busy' };
 let treeSeq = 0;
 let unlisten: (() => void)[] = [];
 let pending: ChangedPayload | null = null;
@@ -148,14 +149,33 @@ export const useVaultStore = create<VaultState>((set, get) => {
     ]);
   }
 
-  async function opened(res: IpcResult<VaultInfo>): Promise<IpcResult<VaultInfo>> {
+  /** Saves open pages before the vault changes (M2a §3.3); if one can't be
+   *  written, says so and returns false: its text must not be dropped. */
+  async function savedEverything(): Promise<boolean> {
+    const unsaved = await useEditorStore.getState().saveAll();
+    if (!unsaved.length) return true;
+    toast().push({
+      message: i18next.t('editor.unsavedBlocks', {
+        name: nameOf(unsaved[0]).replace(/\.md$/i, ''),
+      }),
+      tone: 'error',
+    });
+    return false;
+  }
+
+  async function opened(
+    res: IpcResult<VaultInfo>,
+    before: VaultStatus,
+  ): Promise<IpcResult<VaultInfo>> {
     if (!res.ok) {
-      set({ status: 'closed', progress: null });
+      // The backend keeps the vault it had (M1b §10 a).
+      set({ status: before === 'open' ? 'open' : 'closed', progress: null });
       toast().push({ message: errorMessage(res.error), tone: 'error' });
       return res;
     }
     set({ info: res.value, selected: null, expanded: new Set(), renaming: null });
     usePageStore.getState().clear();
+    useEditorStore.getState().reset();
     await get().refreshTree();
     await startListening();
     set({ status: 'open', progress: null });
@@ -172,14 +192,18 @@ export const useVaultStore = create<VaultState>((set, get) => {
   async function withProgress(
     run: () => Promise<IpcResult<VaultInfo>>,
   ): Promise<IpcResult<VaultInfo>> {
+    const before = get().status;
+    // One open at a time (M1b §10 b).
+    if (before === 'opening') return { ok: false, error: BUSY };
+    if (before === 'open' && !(await savedEverything())) return { ok: false, error: BUSY };
     set({ status: 'opening', progress: null });
     // Progress is a nicety: if it can't be subscribed, open without it.
     const stop = await onVaultProgress((p) => set({ progress: p })).catch(() => null);
     try {
-      return await opened(await run());
+      return await opened(await run(), before);
     } catch (e) {
       // Never leave the opening overlay up without a way out.
-      set({ status: 'closed', progress: null });
+      set({ status: before === 'open' ? 'open' : 'closed', progress: null });
       const error: CommandError = {
         kind: 'io',
         message: e instanceof Error ? e.message : String(e),
@@ -197,7 +221,8 @@ export const useVaultStore = create<VaultState>((set, get) => {
     create: (path) => withProgress(() => vaultCreate(path)),
     close: async () => {
       // Unsaved text is written before the vault goes away (M2a §3.3).
-      await useEditorStore.getState().flushAll();
+      if (!(await savedEverything())) return;
+      useEditorStore.getState().reset();
       stopListening();
       await vaultClose();
       usePageStore.getState().clear();

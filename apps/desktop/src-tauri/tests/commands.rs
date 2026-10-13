@@ -576,3 +576,24 @@ fn ed_08_main_window_may_flush_then_close_itself() {
         );
     }
 }
+
+/// M1b hand-off §10 j: a read-only config dir must not stop a vault from
+/// opening; the failed recent-vaults update becomes an index warning.
+#[cfg(unix)]
+#[test]
+fn vlt_01_open_survives_an_unwritable_config_dir() {
+    use std::os::unix::fs::PermissionsExt;
+    let h = harness();
+    let config = h._config.path().to_path_buf();
+    std::fs::set_permissions(&config, std::fs::Permissions::from_mode(0o555)).unwrap();
+    let vault = copy_fixture("obsidian-basic");
+    let res = call(&h.main, "vault_open", json!({ "path": vault.path() }));
+    std::fs::set_permissions(&config, std::fs::Permissions::from_mode(0o755)).unwrap();
+    let info = res.expect("vault opens");
+    let warnings: Vec<String> = serde_json::from_value(info["report"]["warnings"].clone()).unwrap();
+    assert!(
+        warnings.iter().any(|w| w.contains("recent vaults")),
+        "{warnings:?}"
+    );
+    call(&h.main, "vault_tree", json!({})).expect("the vault is open");
+}

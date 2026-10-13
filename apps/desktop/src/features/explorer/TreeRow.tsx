@@ -1,5 +1,5 @@
 import { useDraggable, useDroppable } from '@dnd-kit/core';
-import { forwardRef, useEffect, useRef, useState, type KeyboardEvent } from 'react';
+import { forwardRef, useEffect, useId, useRef, useState, type KeyboardEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { TreeNode } from '../../ipc';
 import styles from './Explorer.module.css';
@@ -30,6 +30,8 @@ interface TreeRowProps {
   onFocusRow: (path: string) => void;
   onCommitRename: (node: TreeNode, name: string) => void;
   onCancelRename: () => void;
+  /** Opens the row's context menu (the "…" button). */
+  onMenu?: (path: string, anchor: { x: number; y: number }) => void;
 }
 
 export function Icon({ node, expanded }: { node: TreeNode; expanded: boolean }) {
@@ -84,7 +86,7 @@ function RenameInput({
   // Set once Enter/Escape decided; the blur that follows unmounting is ignored.
   const finished = useRef(false);
   const error = validateName(value);
-  const errorId = `rename-error-${node.path}`;
+  const errorId = useId();
 
   useEffect(() => {
     input.current?.focus();
@@ -150,9 +152,11 @@ export const TreeRow = forwardRef<HTMLLIElement, TreeRowProps>(function TreeRow(
     onFocusRow,
     onCommitRename,
     onCancelRename,
+    onMenu,
   },
   ref,
 ) {
+  const { t } = useTranslation();
   const name = displayName(node);
   // Drag source (any item) and drop target (folders). Only the listeners are
   // spread: dnd-kit's attributes would replace the treeitem role and tabindex.
@@ -202,6 +206,24 @@ export const TreeRow = forwardRef<HTMLLIElement, TreeRowProps>(function TreeRow(
         >
           {name}
         </span>
+      )}
+      {onMenu && !renaming && (
+        <button
+          type="button"
+          tabIndex={-1}
+          className={styles.more}
+          aria-label={t('menu.label', { name })}
+          aria-haspopup="menu"
+          // Pointer users' way to the menu (keyboard: Shift+F10 / ContextMenu key).
+          onPointerDown={(e) => e.stopPropagation()}
+          onClick={(e) => {
+            e.stopPropagation();
+            const rect = e.currentTarget.getBoundingClientRect();
+            onMenu(node.path, { x: rect.left, y: rect.bottom });
+          }}
+        >
+          …
+        </button>
       )}
     </li>
   );

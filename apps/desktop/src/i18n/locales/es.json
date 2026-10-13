@@ -107,7 +107,8 @@
       "source": "Código",
       "split": "Dividido"
     },
-    "saveStatus": "Estado de guardado"
+    "saveStatus": "Estado de guardado",
+    "unsavedBlocks": "Los cambios sin guardar en «{name}» no se pudieron escribir, así que la bóveda sigue abierta."
   },
   "preview": {
     "remoteBlocked": "Imagen remota bloqueada (privacidad)",

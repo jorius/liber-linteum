@@ -121,3 +121,29 @@
   min-height: 100%;
   border-radius: var(--radius-sm);
 }
+
+/* "…" menu button (M1b §10 d): shown on hover, focus and selection. */
+.more {
+  margin-left: auto;
+  flex: none;
+  border: none;
+  background: none;
+  color: inherit;
+  font: 700 14px var(--font-body);
+  line-height: 1;
+  padding: 2px 6px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  opacity: 0;
+}
+
+.row:hover .more,
+.row:focus .more,
+.row:focus-within .more,
+.selected .more {
+  opacity: 1;
+}
+
+.more:hover {
+  background: color-mix(in srgb, var(--color-sidebar-text) 16%, transparent);
+}

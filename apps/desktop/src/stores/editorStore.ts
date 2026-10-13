@@ -34,6 +34,10 @@ interface EditorState {
   syncPaths: (paths: string[]) => Promise<void>;
   /** Writes an orphaned page (deleted outside while dirty) to a new page. */
   saveAsNew: () => Promise<void>;
+  /** Saves every page; returns the paths that still have unsaved text. */
+  saveAll: () => Promise<string[]>;
+  /** Drops every page (after `saveAll` left nothing unsaved). */
+  reset: () => void;
 }
 
 /** Every page with a live document: the current one plus pages switched away
@@ -159,6 +163,11 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   syncPaths: async (paths) => {
     await Promise.all(paths.flatMap((p) => docs.get(p)?.sync() ?? []));
   },
+  saveAll: async () => {
+    await get().flushAll();
+    return [...docs.values()].filter((d) => d.dirty).map((d) => d.path);
+  },
+  reset: () => resetEditorStore(),
   saveAsNew: async () => {
     const doc = get().doc;
     if (!doc) return;
