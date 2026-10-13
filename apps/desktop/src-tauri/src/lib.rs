@@ -1,4 +1,7 @@
 pub mod commands;
+pub mod error;
+pub mod settings;
+pub mod state;
 
 /// Registers everything the app exposes to the webview. Shared by `run()` and the
 /// IPC integration tests so the tests exercise the real command registration.
