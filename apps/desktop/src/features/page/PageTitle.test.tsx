@@ -117,6 +117,26 @@ describe('editable title (M2b §2)', () => {
     expect([...disk.files.keys()].sort()).toEqual(['Notes/B.md', 'Notes/a.md']);
   });
 
+  it('final review m11b: with the tree loaded, a name differing only in case from another page is refused before any rename; a case-only rename of the page itself is allowed', async () => {
+    const disk = fakeDisk({ 'Notes/a.md': 'x\n', 'Notes/B.md': 'y\n' });
+    await act(() => useVaultStore.getState().refreshTree());
+    expect(useVaultStore.getState().nodes.map((n) => n.path)).toContain('Notes/B.md');
+    render(<PageView />);
+    await open('Notes/a.md');
+    await userEvent.clear(title());
+    await userEvent.type(title(), 'b{Enter}');
+    expect(screen.getByRole('alert')).toHaveTextContent(
+      'A page named “b” is already in this folder.',
+    );
+    expect(renames(disk.calls)).toEqual([]); // the tree check refused it, not the backend
+    await userEvent.clear(title());
+    await userEvent.type(title(), 'A{Enter}');
+    await waitFor(() => expect(usePageStore.getState().path).toBe('Notes/A.md'));
+    expect(renames(disk.calls)).toEqual([{ from: 'Notes/a.md', to: 'Notes/A.md' }]);
+    expect(screen.queryByRole('alert')).toBeNull();
+    expect([...disk.files.keys()].sort()).toEqual(['Notes/A.md', 'Notes/B.md']);
+  });
+
   it('pending text is saved before the rename', async () => {
     const disk = fakeDisk({ 'A.md': 'one\n' });
     render(<PageView />);
