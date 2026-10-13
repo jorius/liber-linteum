@@ -18,8 +18,11 @@ const block = (i: number) =>
   `- [ ] task ${i}\n- item with [md](page${i}.md) and 😀 emoji\n\n> [!note] Callout ${i}\n> body\n\n` +
   `| a | b |\n|---|---|\n| ${i} | x |\n\n1. one\n2. two\n\n`;
 
-function note(lines: number): string {
-  let src = '# Big note\n\n';
+/** Frontmatter, then a comment, as most real pages start (I2). */
+const HEAD = '---\ntags: [a, b]\ntitle: Big\n---\n%% todo: tidy up %%\n\n';
+
+function note(lines: number, head = ''): string {
+  let src = head + '# Big note\n\n';
   for (let i = 0; src.split('\n').length < lines; i++) src += block(i);
   return src;
 }
@@ -51,14 +54,15 @@ const NONLOCAL_PIECES = ['`', '```', '%%', '<b>', '[x]: y', ':::'];
 
 /** Applies `steps` seeded random edits; after each, the incremental model must
  *  equal a full parse. Returns how often untouched blocks were reused. */
-function fuzz(seed: number, pieces: string[], steps: number): number {
+function fuzz(seed: number, pieces: string[], steps: number, head = '', skipHead = false): number {
   const next = rng(seed);
-  let text = note(60);
+  let text = note(60, head);
+  const lo = skipHead ? head.length : 0;
   let page = parsePage(text);
   let reused = 0;
   for (let step = 0; step < steps; step++) {
     const firstBlock = page.tree.children[0];
-    const at = Math.floor(next() * (text.length + 1));
+    const at = lo + Math.floor(next() * (text.length - lo + 1));
     const edited =
       next() < 0.6
         ? text.slice(0, at) + pieces[Math.floor(next() * pieces.length)] + text.slice(at)
@@ -80,22 +84,38 @@ describe('incremental re-parse (M2a §7: typing in a 5,000-line note)', () => {
     fuzz(7, [...LOCAL_PIECES, ...NONLOCAL_PIECES], 200);
   }, 60_000);
 
-  it('re-parses one typed character in a 5,000-line note in under 50 ms', () => {
-    const text = note(5000);
-    let page = parsePage(text);
-    let current = text;
-    const times: number[] = [];
-    for (let i = 0; i < 5; i++) {
-      const at = current.indexOf('Some *text*', Math.floor(current.length / 2) + i * 997);
-      const typed = current.slice(0, at) + 'x' + current.slice(at);
-      const t0 = performance.now();
-      page = reparse(page, current, typed);
-      times.push(performance.now() - t0);
-      current = typed;
-    }
-    expect(page).toEqual(parsePage(current));
-    expect(Math.min(...times)).toBeLessThan(50);
-  }, 30_000); // two full parses + a deep compare of a 5,000-line tree
+  it('with frontmatter and a comment: equals the full parse, and mostly re-parses locally', () => {
+    // Edits anywhere, frontmatter and comment included (they may break it)…
+    fuzz(11, [...LOCAL_PIECES, ...NONLOCAL_PIECES], 200, HEAD);
+    // …and below them: the frontmatter stays a fixed block, so no full parse.
+    // Same order as the plain fuzz (seed 42: 139 plain, 122 here; the rest are
+    // edits that legitimately need a full parse).
+    expect(fuzz(42, LOCAL_PIECES, 200, HEAD, true)).toBeGreaterThan(110);
+  }, 60_000);
+
+  it.each([
+    ['plain', ''],
+    ['with frontmatter and a %% comment', HEAD],
+  ])(
+    're-parses one typed character in a 5,000-line note (%s) in under 50 ms',
+    (_, head) => {
+      const text = note(5000, head);
+      let page = parsePage(text);
+      let current = text;
+      const times: number[] = [];
+      for (let i = 0; i < 5; i++) {
+        const at = current.indexOf('Some *text*', Math.floor(current.length / 2) + i * 997);
+        const typed = current.slice(0, at) + 'x' + current.slice(at);
+        const t0 = performance.now();
+        page = reparse(page, current, typed);
+        times.push(performance.now() - t0);
+        current = typed;
+      }
+      expect(page).toEqual(parsePage(current));
+      expect(Math.min(...times)).toBeLessThan(50);
+    },
+    30_000,
+  ); // two full parses + a deep compare of a 5,000-line tree
 
   it('returns the previous model for identical text', () => {
     const page = parsePage('# A\n');

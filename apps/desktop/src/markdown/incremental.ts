@@ -61,9 +61,9 @@ const countLines = (text: string, from: number, to: number) => {
 export function reparse(prev: ParsedPage, prevText: string, text: string): ParsedPage {
   if (text === prevText) return prev;
   const blocks = prev.tree.children;
-  if (prev.frontmatter || prev.comments.length || blocks.length < 3 || text.startsWith('---')) {
-    return parsePage(text);
-  }
+  // Frontmatter stays a fixed first block as long as the edit is past its end.
+  const fixed = blocks[0]?.type === 'yaml' ? 1 : 0;
+  if (blocks.length - fixed < 3 || (!fixed && text.startsWith('---'))) return parsePage(text);
   // The changed region: [from, oldTo) in prevText became [from, newTo) in text.
   let from = 0;
   const max = Math.min(prevText.length, text.length);
@@ -82,17 +82,21 @@ export function reparse(prev: ParsedPage, prevText: string, text: string): Parse
   let first = blocks.findIndex((b) => end(b) >= from);
   let last = blocks.length - 1;
   while (last > 0 && begin(blocks[last]) > oldTo) last--;
-  if (first < 0 || last < first) return parsePage(text);
-  first = Math.max(0, first - 1);
+  if (first < fixed || last < first) return parsePage(text);
+  first = Math.max(fixed, first - 1);
   last = Math.min(blocks.length - 1, last + 1);
   const sliceStart = lineStart(prevText, begin(blocks[first]));
   const oldEnd = end(blocks[last]);
   if (from < sliceStart || oldTo > oldEnd) return parsePage(text);
+  // A comment reaching into the slice: its masking and pairing need the whole page.
+  if (prev.comments.some(([s, e]) => s < oldEnd && e > sliceStart)) return parsePage(text);
   const delta = text.length - prevText.length;
   const newEnd = oldEnd + delta;
   const slice = text.slice(sliceStart, newEnd);
+  // Right after the frontmatter's closing fence a new block always starts.
+  const afterFrontmatter = fixed === 1 && first === 1 && sliceStart === end(blocks[0]) + 1;
   if (
-    !blankBefore(text, sliceStart) ||
+    (!afterFrontmatter && !blankBefore(text, sliceStart)) ||
     !blankAfter(text, newEnd) ||
     NONLOCAL.test(slice) ||
     NONLOCAL.test(prevText.slice(sliceStart, oldEnd))
@@ -131,5 +135,8 @@ export function reparse(prev: ParsedPage, prevText: string, text: string): Parse
       },
     },
   };
-  return finishPage(tree, []);
+  const comments = prev.comments.map(([s, e]): [number, number] =>
+    s >= oldEnd ? [s + delta, e + delta] : [s, e],
+  );
+  return finishPage(tree, comments);
 }
