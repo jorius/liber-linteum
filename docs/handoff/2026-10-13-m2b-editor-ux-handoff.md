@@ -18,9 +18,10 @@ This milestone is Jose's real-window feedback on M2a: rename from the title, a b
 | Link trail: ← in the header, ⌘[ / ⌘], View → Back / Forward, follows renames and deletions | done, tested (store, navigation, header, keys, menu event over the mock runtime) |
 | Title = file name, editable in place (validation, duplicates, pending text saved first) | done, tested (+ axe) |
 | E2E in Chromium **and WebKit**: toolbar, rename, trail, palettes; zero-network across all palettes with installed fonts | done (27 tests) |
-| Real-window checks (§9) | **need you** |
+| Feedback round after the first real-window check (§14): plain-click links, line numbers, a findable toolbar toggle + View menu toggles, top-bar consistency, table/callout blank-line fix | done, tested |
+| Real-window checks (§9, §14) | **need you** |
 
-Totals after the final-review fix pass (§13): **439 vitest tests (50 files)**, **27 Playwright tests** (Chromium + WebKit), **192 cargo tests** (189 + 3 main-thread menu checks); eslint, prettier, tsc, i18n parity, clippy `-D warnings`, rustfmt and `cargo deny` all clean.
+Totals after the feedback round (§14): **446 vitest tests (51 files)**, **33 Playwright tests** (Chromium + WebKit), **193 cargo tests** (189 + 4 main-thread menu checks); eslint, prettier, tsc, i18n parity, clippy `-D warnings`, rustfmt and `cargo deny` all clean.
 
 ## 2. How to run
 
@@ -117,7 +118,7 @@ Tests: `tests/settings.rs` (3 new), `tests/commands.rs` (`m2b_settings_round_tri
 
 1. Atkinson Hyperlegible in Live Preview: typing feel and readability; try Literata and an installed font (e.g. Avenir Next) for Live Preview and Menlo for Source.
 2. Every palette in light and dark (Settings → Appearance); the custom accent with a very light colour (yellow) and a near-black.
-3. The toolbar in Live Preview, Source and Split: bold/italic/strike/highlight/code/link, headings, lists, quote, divider; ⌘B, ⌘I, ⌘⇧X, ⌘⇧H, ⌘E, ⌘K, ⌘⌥1–6, ⌘⇧7/8/9, ⌘⇧.; the "Aa" button hides/shows it.
+3. The toolbar in Live Preview, Source and Split: bold/italic/strike/highlight/code/link, headings, lists, quote, divider; ⌘B, ⌘I, ⌘⇧X, ⌘⇧H, ⌘E, ⌘K, ⌘⌥1–6, ⌘⇧7/8/9, ⌘⇧.; the "Format" button in the header (or View → Toggle Formatting Toolbar) hides/shows it.
 4. Tab inside a list indents; Tab in a paragraph leaves the editor (keyboard users never get stuck).
 5. Rename a page from its title; with backlinks (they update); try a name with `/` and an existing name.
 6. Follow 3–4 links, then ←, ⌘[, ⌘], and View → Back / Forward in the menu; open a page from the explorer (the arrow disappears).
@@ -181,3 +182,26 @@ Reviewer (opus, fresh context) on `2fa7ab1..7473d1f`: **0 Critical, 3 Important,
 | m11 | ⌘[ review-focus test couldn't fail; duplicate check untested with a tree | indented-list test pressing Ctrl (jsdom's Mod) for ⌘[ and ⌘]; tree-loaded duplicate + case-only test | `Interactions.test.tsx`, `PageTitle.test.tsx` |
 
 `src/test/setup.ts` stubs `document.hasFocus()` → true (jsdom returns false mid-blur). Deferred minors: §10 g–k.
+
+## 14. Feedback round (Jose's real-window check, 2026-10-13)
+
+Jose's notes after running the branch, and what changed. Spec: M2b §12 (it also supersedes M2a ED-04's ⌘-click).
+
+| Feedback | Root cause / decision | Change | Test(s) |
+|---|---|---|---|
+| "Clicking a link in Live Preview edits it; I need Ctrl+click" | By design in M2a (⌘-click). Obsidian follows on a plain click. | `livePreview.ts` `linkClick`: a plain left click on a `.cm-nimw-link` whose lines the selection doesn't touch follows it; on the cursor line the click places the cursor; shift/alt-click left alone; ⌘/Ctrl-click unchanged | `livePreview.test.ts` "a plain click on a link (as in Obsidian)" ×3; e2e "a plain click on a link in Live Preview opens the page" (Chromium + WebKit) |
+| "Line numbers toggle, in preview, source and split" | New | `lineNumbers` setting (Rust `Settings`/`SettingsPatch`/lenient parse; TS types + defaults); `Editor.tsx` `gutterSlot` compartment, reconfigured live and when a cached page is swapped in; gutter themed (muted, Source font); Live Preview centres gutter + text as a group (`Editor.module.css`) | `tests/settings.rs`, `tests/commands.rs` (real ACL round trip), `Editor.test.tsx` "line numbers" ×2, `SettingsDialog.test.tsx` |
+| "There's no toggle for the formatter bar at all" | It existed (the "Aa" chip next to "Saved", and Settings → Editor) but didn't read as a control | Header button → bordered "Format" + icon, tooltip "Hide/Show the formatting toolbar"; View → Toggle Formatting Toolbar / Toggle Line Numbers (`menu.rs` → `menu:toggle` → `stores/menuToggles.ts`) | `PageView.test.tsx` (label, tooltip both ways), `tests/menu.rs` `toggle_items_emit_menu_toggle` + outline, `menuToggles.test.ts` |
+| "Edit / Global view should look like close and settings" | Tall pill with a 1.5 px dark outline next to 40 px thin-bordered squares | `Shell.module.css` `.toggle`/`.tg`: same 40 px box, border, radius and background as `.iconButtonLight`; segments 32 px | e2e "the Edit · Global view group matches the settings and close buttons" (computed height/border/radius/background equal) |
+| (found while screenshotting) A table in Live Preview sat under ~330 px of blank lines | Block widgets inherited CodeMirror's `white-space: break-spaces`; the renderer's `\n` text nodes became lines | `.cm-nimw-widget { white-space: normal }` | e2e "a table or callout in Live Preview has no blank lines above it" (RED: 325.75 px gap) |
+
+**Please check in the real window** (restart `pnpm dev` — this round changed Rust: settings + menu):
+
+1. Live Preview: click a `[[link]]` and a `[text](page.md)` link once → the page opens; click a link on the line your cursor is on → the cursor goes there instead. A web link asks for confirmation first.
+2. Settings → Editor → "Show line numbers", and View → Toggle Line Numbers: numbers in Live Preview (beside the text), Source, and Split's source side. Long wrapped lines, headings and tables keep the numbers aligned.
+3. The "Format" button and View → Toggle Formatting Toolbar both hide/show the toolbar; the setting survives a restart.
+4. Top bar: Edit · Global view now looks like the settings / close buttons (light and dark, a couple of palettes).
+5. A note with tables and callouts: no gap above them in Live Preview.
+
+Not done (say if you want them): checkmarks on the View menu items (needs a command to sync native check state); a number for each line hidden inside a table/callout widget.
+

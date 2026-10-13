@@ -14,7 +14,7 @@ After M2a a person can open any page and **edit** it in Live Preview (default), 
 Success means:
 1. **ED-01:** Live Preview, Source and Split (source | rendered) per page; the last-used mode is remembered globally; Live Preview is the default.
 2. **ED-02:** in Split both panes stay in sync while typing; scroll is synchronized.
-3. **ED-04:** clicking a link (⌘-click in Live Preview) navigates; unresolved links offer "Create page"; `#heading` targets scroll.
+3. **ED-04:** clicking a link (⌘-click in Live Preview — superseded by M2b spec §12.1: a plain click on a rendered link) navigates; unresolved links offer "Create page"; `#heading` targets scroll.
 4. **ED-07 / ED-08:** undo/redo across all edits; autosave (no save button) with visible status; nothing typed is lost on failures.
 5. **External changes (VLT-04):** clean reload when no unsaved edits; 3-way merge when there are; conflict copy when edits overlap.
 6. **Rendering:** CommonMark + GFM + Obsidian (wikilinks, embeds, callouts incl. foldable, tags, highlights, comments, frontmatter hidden) + Tier B (columns, colored text, toggles = foldable callouts, dividers); embedded notes transcluded one level; images and audio from the vault.
