@@ -12,6 +12,9 @@ use percent_encoding::percent_decode_str;
 
 pub const SCHEME: &str = "nimw-asset";
 
+/// Policy for every `nimw-asset:` response (M2a review m2).
+pub const CSP: &str = "default-src 'none'; sandbox";
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct AssetResponse {
     pub status: u16,
@@ -35,7 +38,11 @@ impl AssetResponse {
             .status(self.status)
             .header("Content-Type", self.mime)
             .header("Cache-Control", "no-store")
-            .header("X-Content-Type-Options", "nosniff");
+            .header("X-Content-Type-Options", "nosniff")
+            // Opened as a document (an SVG navigated to), a vault file runs no
+            // script and gets no IPC. Embedding is unaffected: a response's CSP
+            // applies only when it is rendered as a document.
+            .header("Content-Security-Policy", CSP);
         for (k, v) in &self.headers {
             builder = builder.header(k.as_str(), v.as_str());
         }
@@ -102,10 +109,10 @@ pub fn serve(state: &AppState, uri_path: &str, range: Option<&str>) -> AssetResp
     if path.is_root() || path.as_str().split('/').any(is_hidden_name) {
         return AssetResponse::status(403);
     }
-    let bytes = match session.vault().read(&path) {
-        Ok((bytes, _)) => bytes,
-        Err(nimw_vault::VaultError::OutsideVault(_)) => return AssetResponse::status(403),
-        Err(_) => return AssetResponse::status(404),
+    // A symlink resolving outside the vault is, for the webview, a file that
+    // doesn't exist (403 stays for requests that are malformed on their face).
+    let Ok((bytes, _)) = session.vault().read(&path) else {
+        return AssetResponse::status(404);
     };
     let mime = mime_for(path.as_str());
     let len = bytes.len();

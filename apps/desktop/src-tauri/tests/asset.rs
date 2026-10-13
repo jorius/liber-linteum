@@ -164,3 +164,62 @@ fn closing_the_vault_stops_serving_it() {
     get_ipc_response(&main, request).unwrap();
     assert_eq!(serve(&app.state::<AppState>(), path, None).status, 404);
 }
+
+/// m2: a response opened as a document (e.g. an SVG navigated to) runs no
+/// script and gets no IPC; embedding as <img>/<audio>/<video> is unaffected,
+/// because a response's CSP applies only when it is rendered as a document.
+#[test]
+fn every_response_is_sandboxed_and_never_sniffed() {
+    let vault = copy_fixture("obsidian-basic");
+    std::fs::write(
+        vault.path().join("evil.svg"),
+        r#"<svg xmlns="http://www.w3.org/2000/svg"><script>alert(1)</script></svg>"#,
+    )
+    .unwrap();
+    let (app, _c, _k) = open(vault.path());
+    let state = app.state::<AppState>();
+    let audio = "/Character%20Design/assets/voice-reference.mp3";
+    for r in [
+        serve(&state, "/evil.svg", None),
+        serve(&state, audio, Some("bytes=0-3")),
+        serve(&state, "/nope.png", None),
+        serve(&state, "/../x", None),
+    ] {
+        let status = r.status;
+        let res = r.into_response();
+        let h = res.headers();
+        assert_eq!(
+            h.get("Content-Security-Policy")
+                .map(|v| v.to_str().unwrap()),
+            Some("default-src 'none'; sandbox"),
+            "status {status}"
+        );
+        assert_eq!(
+            h.get("X-Content-Type-Options").map(|v| v.to_str().unwrap()),
+            Some("nosniff")
+        );
+    }
+    assert_eq!(serve(&state, "/evil.svg", None).mime, "image/svg+xml");
+}
+
+/// m9: a symlink inside the vault that points outside it is never served.
+#[cfg(unix)]
+#[test]
+fn symlinks_escaping_the_vault_are_not_served() {
+    let vault = copy_fixture("obsidian-basic");
+    let outside = tempfile::tempdir().unwrap();
+    std::fs::write(outside.path().join("secret.png"), b"secret").unwrap();
+    std::os::unix::fs::symlink(
+        outside.path().join("secret.png"),
+        vault.path().join("leak.png"),
+    )
+    .unwrap();
+    std::os::unix::fs::symlink(outside.path(), vault.path().join("outside")).unwrap();
+    let (app, _c, _k) = open(vault.path());
+    let state = app.state::<AppState>();
+    for path in ["/leak.png", "/outside/secret.png"] {
+        let r = serve(&state, path, None);
+        assert_eq!(r.status, 404, "{path}");
+        assert!(r.body.is_empty(), "{path}");
+    }
+}
