@@ -394,7 +394,9 @@ const theme = EditorView.baseTheme({
   '.cm-nimw-codeblock': { fontFamily: 'var(--font-source)', fontSize: '0.9em' },
   '.cm-nimw-quote': { borderLeft: '3px solid var(--color-border-strong)', paddingLeft: '12px' },
   '.cm-nimw-frontmatter': { color: 'var(--color-text-muted)', fontFamily: 'var(--font-source)' },
-  '.cm-nimw-widget': { padding: '4px 0', cursor: 'default' },
+  // Rendered HTML, not editor text: CodeMirror's pre-wrapped whitespace would
+  // turn the renderer's newlines into blank lines.
+  '.cm-nimw-widget': { padding: '4px 0', cursor: 'default', whiteSpace: 'normal' },
   '.cm-nimw-checkbox': { margin: '0 4px 0 0', verticalAlign: 'middle', cursor: 'pointer' },
 });
 

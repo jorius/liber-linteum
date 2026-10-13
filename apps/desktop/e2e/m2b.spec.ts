@@ -67,6 +67,29 @@ test('a plain click on a link in Live Preview opens the page (as in Obsidian)', 
   await expect(page.getByRole('button', { name: 'Back to A' })).toBeVisible();
 });
 
+test('a table or callout in Live Preview has no blank lines above it', async ({ page }) => {
+  await page.addInitScript(installIpcMock, {
+    pages: {
+      'T.md': 'x\n\n| a | b |\n|---|---|\n| 1 | 2 |\n\n> [!note] Title\n> body\n\nend\n',
+    },
+    editorMode: 'livePreview',
+  });
+  await page.goto('/');
+  await page.getByRole('button', { name: /^vault/ }).click();
+  await page.getByRole('treeitem', { name: 'T' }).click();
+  const widgets = page.locator('.cm-nimw-widget');
+  await expect(widgets).toHaveCount(2);
+  for (const w of await widgets.all()) {
+    // The rendered block alone: CodeMirror's pre-wrapped whitespace must not
+    // turn the renderer's newlines into empty lines.
+    const gap = await w.evaluate((el) => {
+      const first = el.firstElementChild!.firstElementChild!; // table / callout in the wrapper
+      return first.getBoundingClientRect().top - el.getBoundingClientRect().top;
+    });
+    expect(gap).toBeLessThan(20);
+  }
+});
+
 test('a palette from Settings applies at once', async ({ page }) => {
   await open(page, 'A');
   await page.getByRole('button', { name: 'Settings' }).click();
