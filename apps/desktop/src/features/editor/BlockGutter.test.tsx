@@ -68,6 +68,22 @@ describe('the block gutter in the Split pane (M4 §4)', () => {
     expect(screen.getByRole('group', { name: 'List: a' })).toBeInTheDocument();
   });
 
+  it('a hovered block keeps its gutter while the pointer crosses the margin to it', async () => {
+    const pane = await split('P1\n\nP2\n');
+    await hover(block(pane, 'P2'));
+    expect(screen.getByRole('group', { name: 'P2' })).toBeInTheDocument();
+    // Between the block and its gutter (the pane's padding), or between blocks.
+    await hover(pane);
+    await hover(pane.querySelector('[data-source-start]')!.parentElement!);
+    expect(screen.getByRole('group', { name: 'P2' })).toBeInTheDocument();
+    // Another block takes it; leaving the pane hides it.
+    await hover(block(pane, 'P1'));
+    expect(screen.queryByRole('group', { name: 'P2' })).not.toBeInTheDocument();
+    await hover(block(pane, 'P2'));
+    act(() => fireEvent.mouseLeave(pane));
+    expect(screen.queryByRole('group', { name: 'P2' })).not.toBeInTheDocument();
+  });
+
   it('Move up moves the block in the source and says so', async () => {
     const pane = await split('P1\n\nP2\n');
     await hover(block(pane, 'P2'));

@@ -66,6 +66,20 @@ test('acceptance: P3 dragged above P1 reads P3, P1, P2; one undo restores the or
   await expect.poll(() => source(page)).toBe('P1 *one*\n\nP2\n\nP3 **three**');
 });
 
+test('a block’s grip can be reached with the pointer: its gutter stays while the pointer crosses to it', async ({
+  page,
+}) => {
+  const pane = await open(page, 'P1\n\nP2 is a paragraph\n\nP3\n');
+  const p2 = (await pane.getByText('P2 is').boundingBox())!;
+  await page.mouse.move(p2.x + 30, p2.y + p2.height / 2);
+  const grip = page.getByRole('button', { name: 'Drag to reorder: P2 is a paragraph' });
+  const g = (await grip.boundingBox())!;
+  // Gradually, as a hand would: through the gap between the block and its grip.
+  await page.mouse.move(g.x + g.width / 2, g.y + g.height / 2, { steps: 20 });
+  await expect(grip).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Move up' })).toBeVisible();
+});
+
 test('acceptance: a heading dragged below the next section takes its paragraphs along', async ({
   page,
 }) => {

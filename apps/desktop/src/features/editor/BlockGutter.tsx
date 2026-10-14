@@ -337,7 +337,9 @@ export function BlockGutter({
         deepest = blockOf.get(n);
         n = n.parentElement;
       }
-      setHover(deepest !== undefined ? [deepest] : []);
+      // Off any block (the margin the pointer crosses to reach a grip, the
+      // space between blocks), the last block keeps its gutter.
+      if (deepest !== undefined) setHover([deepest]);
     };
     const leave = () => setHover([]);
     const moved = () => relayout((n) => n + 1);
