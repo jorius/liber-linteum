@@ -4,6 +4,7 @@ import { createElement, type MouseEvent, type ReactNode } from 'react';
 import { assetUrl } from '../../ipc';
 import { followLink } from '../../stores/links';
 import { Callout } from './Callout';
+import { MathView } from './MathView';
 import { CodeBlock } from './CodeBlock';
 import { Embed } from './Embed';
 import styles from './Preview.module.css';
@@ -95,6 +96,10 @@ function renderElement(e: Element, key: number, ctx: RenderCtx): ReactNode {
   const p = e.properties;
   const { t } = ctx;
   switch (p.dataNimw) {
+    case 'math':
+      return (
+        <MathView key={key} tex={String(p.dataTex ?? '')} display={p.dataDisplay === 'block'} />
+      );
     case 'wikilink':
     case 'link':
       return pageLink(e, key, ctx);

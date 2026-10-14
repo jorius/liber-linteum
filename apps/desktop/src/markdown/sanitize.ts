@@ -79,6 +79,18 @@ const handlers: Record<string, Handler> = {
     state.patch(node, out);
     return out;
   },
+  // M4b part 2 §3: maths become placeholders the renderer draws with KaTeX
+  // after sanitizing (KaTeX's own markup would not pass the schema).
+  inlineMath(state: State, node: { value: string }) {
+    const out = el('span', { dataNimw: 'math', dataTex: node.value });
+    state.patch(node as unknown as MdastNodes, out);
+    return out;
+  },
+  math(state: State, node: { value: string }) {
+    const out = el('div', { dataNimw: 'math', dataTex: node.value, dataDisplay: 'block' });
+    state.patch(node as unknown as MdastNodes, out);
+    return out;
+  },
   highlight(state: State, node: Highlight) {
     const out = el('mark', {}, state.all(node as unknown as MdastNodes));
     state.patch(node, out);
@@ -226,10 +238,20 @@ const schema: Schema = {
       'dataWidth',
       'dataHeight',
       'dataTag',
+      'dataTex',
       // Syntax highlighting (M4b part 2 §2): highlight.js classes only.
       ['className', /^hljs-[\w-]+$/],
     ],
-    div: ['dataColor', 'dataBg', 'dataCallout', 'dataTitle', 'dataFoldable', 'dataFolded'],
+    div: [
+      'dataColor',
+      'dataBg',
+      'dataCallout',
+      'dataTitle',
+      'dataFoldable',
+      'dataFolded',
+      'dataTex',
+      'dataDisplay',
+    ],
     img: ['src', 'alt', 'width', 'height'],
     audio: ['src', 'controls'],
     video: ['src', 'controls', 'width', 'height'],

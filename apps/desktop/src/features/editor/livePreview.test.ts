@@ -228,3 +228,13 @@ describe('raw HTML blocks (M2c §7.7)', () => {
     expect(line(v, 3)).toBe('a <b>bold</b> c');
   });
 });
+
+describe('Live Preview maths (M4b part 2 §3)', () => {
+  it('inline maths renders unless the cursor is on its line; $$ blocks render as widgets', async () => {
+    const text = 'Intro $x^2$ end.\n\n$$\na+b\n$$\n\nAfter\n';
+    const v = editor(text, text.length - 1);
+    await vi.waitFor(() => expect(v.contentDOM.querySelectorAll('.katex').length).toBe(2));
+    await moveTo(v, 7);
+    await vi.waitFor(() => expect(line(v, 1)).toBe('Intro $x^2$ end.'));
+  });
+});

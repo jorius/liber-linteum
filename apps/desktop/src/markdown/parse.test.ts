@@ -180,3 +180,31 @@ describe('inline extensions keep mdast text values (I6)', () => {
     expect(shown(md).trim()).toBe(text);
   });
 });
+
+describe('parsePage — maths (M4b part 2 §3)', () => {
+  const kinds = (text: string) => [
+    ...findAll(parsePage(text).tree, 'math').map((n) => n.type),
+    ...findAll(parsePage(text).tree, 'inlineMath').map((n) => n.type),
+  ];
+
+  it('reads $inline$ and $$block$$ as maths', () => {
+    const page = parsePage('Energy is $E = mc^2$.\n\n$$\n\\int_0^1 x\\,dx\n$$\n');
+    const [inline] = findAll(page.tree, 'inlineMath');
+    const [block] = findAll(page.tree, 'math');
+    expect((inline as unknown as { value: string }).value).toBe('E = mc^2');
+    expect((block as unknown as { value: string }).value).toBe('\\int_0^1 x\\,dx');
+  });
+
+  it('prices and escaped dollars stay text, as in Obsidian', () => {
+    expect(kinds('It costs $5 and $10 today.\n')).toEqual([]);
+    expect(kinds('Not maths: \\$x\\$.\n')).toEqual([]);
+    expect(kinds('A $ x$ and $y $ too.\n')).toEqual([]);
+    expect(parsePage('It costs $5 and $10 today.\n').tree.children[0]).toMatchObject({
+      type: 'paragraph',
+    });
+  });
+
+  it('a #tag inside maths is not a tag; one outside still is', () => {
+    expect(parsePage('$a #fake$ and #real\n').tags).toEqual(['real']);
+  });
+});

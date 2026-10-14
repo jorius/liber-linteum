@@ -344,3 +344,18 @@ describe('Preview: copying code (M4b part 2 §2)', () => {
     expect(await screen.findByText('Copied')).toBeInTheDocument();
   });
 });
+
+describe('Preview: maths (M4b part 2 §3)', () => {
+  it('renders inline and display maths with KaTeX, MathML included', async () => {
+    const { container } = show('Inline $x^2$ here.\n\n$$\n\\frac{a}{b}\n$$\n');
+    await waitFor(() => expect(container.querySelectorAll('.katex').length).toBe(2));
+    expect(container.querySelector('.katex-display')).not.toBeNull();
+    expect(container.querySelectorAll('math').length).toBe(2);
+  });
+
+  it('broken TeX shows its source with the error, never a crash', async () => {
+    const { container } = show('Bad $\\frac{a$ maths.\n');
+    await waitFor(() => expect(container.querySelector('.katex-error')).not.toBeNull());
+    expect(container.querySelector('.katex-error')!.textContent).toContain('\\frac{a');
+  });
+});

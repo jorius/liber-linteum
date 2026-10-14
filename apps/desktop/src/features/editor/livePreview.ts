@@ -24,7 +24,7 @@ import { toSafeHast, vaultJoin } from '../../markdown/sanitize';
 import type { Embed, ParsedPage, WikiLink } from '../../markdown/types';
 import { rangeOf } from '../../markdown/walk';
 import { followLink } from '../../stores/links';
-import { CheckboxWidget, CodeBadgeWidget, PreviewWidget } from './widgets';
+import { CheckboxWidget, CodeBadgeWidget, InlineMathWidget, PreviewWidget } from './widgets';
 
 import { LARGE_NOTE_CHARS } from './limits';
 import { safeDecode } from '../../markdown/decode';
@@ -64,7 +64,7 @@ const MARKS = {
 };
 const lineClass = (cls: string) => Decoration.line({ class: cls });
 
-const BLOCK_WIDGET = new Set(['table', 'callout', 'columns', 'thematicBreak']);
+const BLOCK_WIDGET = new Set(['table', 'callout', 'columns', 'thematicBreak', 'math']);
 const TASK = /^(\s*(?:[-*+]|\d+[.)])[ \t]+)\[([ xX])\]/;
 
 /** Whether an HTML block renders nothing once sanitized (comments, scripts):
@@ -203,6 +203,14 @@ function build(state: EditorState, page: ParsedPage, active: Set<number>): Decor
       case 'tag':
         if (!reduced && from < to) out.push(MARKS.tag.range(from, to));
         return;
+      case 'inlineMath': {
+        // M4b part 2 §3: maths renders unless the cursor is on its line.
+        if (!reduced && !touched(from, to)) {
+          const tex = (node as unknown as { value: string }).value;
+          out.push(Decoration.replace({ widget: new InlineMathWidget(tex) }).range(from, to));
+        }
+        return;
+      }
       case 'code': {
         if (reduced) return;
         lines(from, to, lineClass('cm-nimw-codeblock'));

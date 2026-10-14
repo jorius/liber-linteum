@@ -1,6 +1,7 @@
 import { WidgetType, type EditorView } from '@codemirror/view';
 import i18next from 'i18next';
 import { languageName } from '../../markdown/codeHighlight';
+import { renderMath } from '../preview/MathView';
 import { openLanguagePicker } from './languagePickerOpen';
 import { createRoot, type Root } from 'react-dom/client';
 import { toggleTask } from '../../markdown/tasks';
@@ -138,6 +139,34 @@ export class CodeBadgeWidget extends WidgetType {
     copy.addEventListener('click', () => copyWithFeedback(this.code, copy));
     box.append(badge, copy);
     return box;
+  }
+
+  ignoreEvent(): boolean {
+    return true;
+  }
+}
+
+/** Inline maths in Live Preview (M4b part 2 §3); a click puts the cursor in
+ *  it, which shows its source. */
+export class InlineMathWidget extends WidgetType {
+  constructor(readonly tex: string) {
+    super();
+  }
+
+  eq(other: InlineMathWidget): boolean {
+    return other.tex === this.tex;
+  }
+
+  toDOM(view: EditorView): HTMLElement {
+    const el = document.createElement('span');
+    el.className = 'cm-nimw-math';
+    renderMath(this.tex, el, false);
+    el.addEventListener('mousedown', (e) => {
+      e.preventDefault();
+      view.dispatch({ selection: { anchor: view.posAtDOM(el) + 1 } });
+      view.focus();
+    });
+    return el;
   }
 
   ignoreEvent(): boolean {

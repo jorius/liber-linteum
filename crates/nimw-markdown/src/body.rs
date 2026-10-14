@@ -305,12 +305,29 @@ fn excerpt(src: &str, regions: &[Range<usize>]) -> String {
         words.push_str(&rendered.replace('\\', ""));
     }
     let collapsed = words.split_whitespace().collect::<Vec<_>>().join(" ");
+    let collapsed = without_display_maths(&collapsed);
     if collapsed.chars().count() <= EXCERPT_CHARS {
         collapsed
     } else {
         let cut: String = collapsed.chars().take(EXCERPT_CHARS).collect();
         format!("{}…", cut.trim_end())
     }
+}
+
+/// `text` without its `$$ … $$` spans (M4b part 2 §3), spaces re-collapsed;
+/// an unclosed `$$` is kept as written.
+fn without_display_maths(text: &str) -> String {
+    let mut out = String::new();
+    let mut rest = text;
+    while let Some(open) = rest.find("$$") {
+        let Some(close) = rest[open + 2..].find("$$") else {
+            break;
+        };
+        out.push_str(&rest[..open]);
+        rest = &rest[open + 2 + close + 2..];
+    }
+    out.push_str(rest);
+    out.split_whitespace().collect::<Vec<_>>().join(" ")
 }
 
 #[cfg(test)]
@@ -459,5 +476,12 @@ mod tests {
         let e = extract(&long, 0).excerpt;
         assert!(e.ends_with('…') && e.chars().count() <= 201);
         assert_eq!(extract("Intro\n\n# Title\n\nAfter", 0).excerpt, "After");
+    }
+
+    /// M4b part 2 §3: display maths (`$$ … $$`) is left out of the excerpt.
+    #[test]
+    fn excerpt_drops_display_maths() {
+        let b = extract("# T\n\nBefore\n\n$$\nE = mc^2\n$$\n\nAfter $x$ too", 0);
+        assert_eq!(b.excerpt, "Before After $x$ too");
     }
 }
