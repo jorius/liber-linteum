@@ -59,12 +59,17 @@
   display: flex;
   flex-direction: column;
   cursor: pointer;
-  outline: none;
 }
 
-.hit:focus-visible {
+/* The ring is on :focus, so WebKit < 15.4 (no :focus-visible) still shows
+   it; browsers that know :focus-visible hide it after a click. */
+.hit:focus {
   outline: 2px solid var(--color-focus);
   outline-offset: -2px;
+}
+
+.hit:focus:not(:focus-visible) {
+  outline: none;
 }
 
 .cover {
