@@ -56,6 +56,18 @@ export const openIndexPick = (card: GvCard) =>
 export const pageOf = (card: GvCard): string | null =>
   card.kind === 'page' ? card.path : card.indexPage;
 
+/** The connect button of the card standing for `path` (itself, or a folder
+ *  by its index note), made the canvas's tab stop: where a dialog opened for
+ *  that card puts the keyboard when what opened it is gone, such as a
+ *  toast's action (NFR-10, final review I2). */
+export function cardButtonFor(path: string): HTMLElement | null {
+  const { cards } = useGvStore.getState().canvas;
+  const card = cards.find((c) => c.path === path) ?? cards.find((c) => pageOf(c) === path);
+  if (!card) return null;
+  useGvStore.getState().setFocus(card.path);
+  return document.querySelector<HTMLElement>(`[data-gv-connect="${CSS.escape(card.path)}"]`);
+}
+
 /** What the canvas shows, derived from the loaded levels. */
 export interface Canvas {
   /** Every card on the canvas, once. */

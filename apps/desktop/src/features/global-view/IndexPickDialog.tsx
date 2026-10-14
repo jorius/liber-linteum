@@ -7,7 +7,7 @@ import { nameOf, parentOf } from '../../stores/tree';
 import { useVaultStore } from '../../stores/vaultStore';
 import { Dialog } from '../dialogs/Dialog';
 import styles from '../dialogs/Dialogs.module.css';
-import { useGvStore } from './gvStore';
+import { cardButtonFor, useGvStore } from './gvStore';
 
 /** A list longer than this gets a search field. */
 const SEARCH_FROM = 10;
@@ -54,7 +54,11 @@ export function IndexPickDialog({
   };
 
   return (
-    <Dialog title={t('gv.indexPick.title', { name: nameOf(folder) })} onClose={onClose}>
+    <Dialog
+      title={t('gv.indexPick.title', { name: nameOf(folder) })}
+      onClose={onClose}
+      returnFocus={() => cardButtonFor(folder)}
+    >
       <p className={styles.text}>{t('gv.indexPick.hint')}</p>
       {pages.length > SEARCH_FROM && (
         <label className={styles.field}>

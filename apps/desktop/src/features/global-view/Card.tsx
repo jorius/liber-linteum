@@ -141,6 +141,7 @@ export function Card({
               aria-expanded={menuOpen}
               aria-label={t('gv.relations.menu', { title: card.title })}
               title={t('gv.relations.menu', { title: card.title })}
+              data-gv-connect={card.path}
               onClick={() => setMenuOpen((o) => !o)}
             >
               <LinkIcon />

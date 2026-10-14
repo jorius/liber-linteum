@@ -10,7 +10,9 @@ export interface CardMenuItem {
  *  button, in a portal (React Flow's viewport is transformed, which would
  *  move a fixed-position menu with the canvas). Arrow keys, Home and End
  *  move, Escape and Tab close it and give the keyboard back to the button;
- *  a click elsewhere closes it. */
+ *  a click elsewhere closes it. An item gets the keyboard back to the button
+ *  before it runs: a dialog it opens returns there (NFR-10, final review
+ *  I2). */
 export function CardMenu({
   label,
   items,
@@ -70,7 +72,7 @@ export function CardMenu({
           role="menuitem"
           tabIndex={i === active ? 0 : -1}
           onClick={() => {
-            onClose(false);
+            onClose(true);
             item.run();
           }}
         >

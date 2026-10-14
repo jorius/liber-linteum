@@ -6,16 +6,20 @@ const FOCUSABLE =
 
 /** Modal dialog: labelled, focus trapped, Escape closes, focus restored on
  *  close. Initial focus: the `[data-autofocus]` element, else the first
- *  focusable one. With `onConfirm`, Enter confirms (except on other buttons). */
+ *  focusable one. With `onConfirm`, Enter confirms (except on other buttons).
+ *  `returnFocus` names where the keyboard goes on close when the element
+ *  that had it is gone (a toast's action button; NFR-10). */
 export function Dialog({
   title,
   onClose,
   onConfirm,
+  returnFocus,
   children,
 }: {
   title: string;
   onClose: () => void;
   onConfirm?: () => void;
+  returnFocus?: () => HTMLElement | null | undefined;
   children: ReactNode;
 }) {
   const box = useRef<HTMLDivElement>(null);
@@ -27,7 +31,12 @@ export function Dialog({
       box_?.querySelector<HTMLElement>('[data-autofocus]') ??
       box_?.querySelector<HTMLElement>(FOCUSABLE)
     )?.focus();
-    return () => previous?.focus?.();
+    return () => {
+      const kept = previous && previous !== document.body && previous.isConnected;
+      (kept ? previous : returnFocus?.())?.focus?.();
+    };
+    // Taken when the dialog opens, as the element it returns to.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const onKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {

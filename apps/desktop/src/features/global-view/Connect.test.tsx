@@ -12,6 +12,8 @@ import { useToastStore } from '../../stores/toastStore';
 import { useUiStore } from '../../stores/uiStore';
 import { fakeDisk, type FakeDisk } from '../../test/fakeDisk';
 import { installReactFlowStubs } from '../../test/reactFlow';
+import { DialogHost } from '../dialogs/DialogHost';
+import { Toaster } from '../toasts/Toaster';
 import { SINGLE_CLICK_MS } from './Card';
 import { GlobalView } from './GlobalView';
 import { levelKey, useGvStore } from './gvStore';
@@ -97,6 +99,10 @@ const press = async (path: string) =>
     return el;
   });
 
+/** The level is shown and has put the keyboard on its first card: a button
+ *  focused before that loses the keyboard to it. */
+const settled = () => waitFor(() => expect(document.activeElement).toHaveAttribute('data-gv-card'));
+
 async function startConnect(title: string) {
   await userEvent.click(await screen.findByRole('button', { name: `Connections of ${title}` }));
   await userEvent.click(screen.getByRole('menuitem', { name: 'Connect to…' }));
@@ -125,6 +131,7 @@ describe('connecting two cards (M3b §2)', () => {
   it('by keyboard: Enter on Connect to…, arrows to the target, Enter', async () => {
     render(<GlobalView />);
     const button = await screen.findByRole('button', { name: 'Connections of A' });
+    await settled();
     button.focus();
     await userEvent.keyboard('{Enter}');
     expect(screen.getByRole('menuitem', { name: 'Connect to…' })).toHaveFocus();
@@ -224,5 +231,61 @@ describe('connecting two cards (M3b §2)', () => {
       folder: 'Gamma',
       current: 'Gamma/b.md',
     });
+  });
+});
+
+describe('the keyboard after a menu item (NFR-10, final review I2)', () => {
+  const view = () =>
+    render(
+      <>
+        <GlobalView />
+        <DialogHost />
+        <Toaster />
+      </>,
+    );
+  /** Opens a card's menu by keyboard and runs the item `name`. */
+  async function runItem(title: string, name: string) {
+    const button = await screen.findByRole('button', { name: `Connections of ${title}` });
+    await settled();
+    button.focus();
+    await userEvent.keyboard('{Enter}');
+    while (document.activeElement !== screen.getByRole('menuitem', { name })) {
+      await userEvent.keyboard('{ArrowDown}');
+    }
+    await userEvent.keyboard('{Enter}');
+    return button;
+  }
+
+  it('Relationships…, then Escape or Close: back on the card’s connect button', async () => {
+    disk.files.set('A.md', '---\nrelated:\n  - "[[B]]"\n---\n# A\n');
+    view();
+    const button = await runItem('A', 'Relationships…');
+    const dialog = await screen.findByRole('dialog', { name: 'Relationships of A' });
+    await within(dialog).findByRole('group', { name: 'A → B' });
+    await userEvent.keyboard('{Escape}');
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+    expect(button).toHaveFocus();
+  });
+
+  it('Pick index note…, then Cancel: back on the card’s connect button', async () => {
+    view();
+    const button = await runItem('Gamma', 'Pick index note…');
+    const dialog = await screen.findByRole('dialog', { name: 'Index note for Gamma' });
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Cancel' }));
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(button).toHaveFocus();
+  });
+
+  it('Connect to… on a folder without an index note keeps the keyboard on its button; the toast’s Pick index note… brings it back there', async () => {
+    view();
+    const button = await runItem('Delta', 'Connect to…');
+    expect(screen.queryByRole('menu')).toBeNull();
+    expect(button).toHaveFocus();
+    await userEvent.click(screen.getByRole('button', { name: 'Pick index note…' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Index note for Delta' });
+    expect(dialog).toContainElement(document.activeElement as HTMLElement);
+    await userEvent.keyboard('{Escape}');
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(screen.getByRole('button', { name: 'Connections of Delta' })).toHaveFocus();
   });
 });

@@ -4,7 +4,7 @@ import { relationsOf, removeRelation, updateRelation, type Relation } from '../.
 import { nameOf } from '../../stores/tree';
 import { Dialog } from '../dialogs/Dialog';
 import styles from '../dialogs/Dialogs.module.css';
-import { useGvStore } from './gvStore';
+import { cardButtonFor, useGvStore } from './gvStore';
 
 /** The label limit (M3b §9.6). */
 export const LABEL_MAX = 40;
@@ -54,7 +54,7 @@ export function RelationsDialog({
     : t('gv.relations.of', { name: pageName(page) });
 
   return (
-    <Dialog title={title} onClose={onClose}>
+    <Dialog title={title} onClose={onClose} returnFocus={() => cardButtonFor(page)}>
       <div ref={list}>
         {rows === null ? (
           <p className={styles.text}>{t('gv.relations.loading')}</p>

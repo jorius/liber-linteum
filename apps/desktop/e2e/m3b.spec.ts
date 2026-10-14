@@ -139,3 +139,22 @@ test('a folder without an index note: pick one, and its card previews it', async
   await expect(dialog).toHaveCount(0);
   await expect(page.getByRole('group', { name: 'Beta, project' })).toContainText('Project · Beta');
 });
+
+test('the keyboard comes back to the connect button after Relationships… (NFR-10, final review I2)', async ({
+  page,
+}) => {
+  await globalView(page, {
+    ...PAGES,
+    'Welcome.md': '---\nrelated:\n  - "[[Notes]]"\n---\n# Welcome\n\nStart here.\n',
+  });
+  const button = page.getByRole('button', { name: 'Connections of Welcome' });
+  await button.focus();
+  await page.keyboard.press('Enter');
+  await page.keyboard.press('ArrowDown');
+  await expect(page.getByRole('menuitem', { name: 'Relationships…' })).toBeFocused();
+  await page.keyboard.press('Enter');
+  await expect(page.getByRole('dialog', { name: 'Relationships of Welcome' })).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  await expect(button).toBeFocused();
+});
