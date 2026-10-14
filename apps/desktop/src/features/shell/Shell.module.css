@@ -64,7 +64,7 @@
 }
 
 .iconButton:hover {
-  background: color-mix(in srgb, var(--color-sidebar-text) 12%, transparent);
+  background: var(--color-sidebar-hover);
 }
 
 .treeScroll {
@@ -81,7 +81,7 @@
   color: var(--color-text-faint);
   padding: 12px 8px 4px;
   margin: 0;
-  border-top: 1px solid color-mix(in srgb, var(--color-sidebar-text) 15%, transparent);
+  border-top: 1px solid var(--color-sidebar-divider);
 }
 
 .main {

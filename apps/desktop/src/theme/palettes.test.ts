@@ -85,6 +85,43 @@ describe('Global View tokens (M3a §4, §6)', () => {
   });
 });
 
+/** Shades that used to be color-mix() (M3b §7, Safari 15): the sidebar's
+ *  hover, pressed and divider shades as plain hex, the backdrops as rgba. */
+const SIDEBAR_SHADES = [
+  '--color-sidebar-hover',
+  '--color-sidebar-active',
+  '--color-sidebar-divider',
+] as const;
+const BACKDROPS = ['--color-backdrop', '--color-overlay'] as const;
+
+describe('Safari 15 shades (M3b §7)', () => {
+  it.each(PALETTES.flatMap((p) => (['light', 'dark'] as const).map((m) => [p.id, m] as const)))(
+    '%s %s: sidebar shades and backdrops',
+    (id, mode) => {
+      const p = PALETTES.find((x) => x.id === id)!;
+      const vars = paletteVars(p, mode);
+      for (const key of SIDEBAR_SHADES) {
+        expect(vars[key], key).toMatch(/^#[0-9a-f]{6}$/);
+        expect(vars[key], `${key} differs from the sidebar`).not.toBe(p[mode].side);
+        expect(
+          contrast(p[mode].sideText, vars[key]),
+          `sidebar text on ${key}`,
+        ).toBeGreaterThanOrEqual(4.5);
+      }
+      for (const key of BACKDROPS)
+        expect(vars[key], key).toMatch(/^rgba\(\d+, \d+, \d+, 0\.\d+\)$/);
+      expect(vars['--color-backdrop']).toMatch(/, 0\.6\)$/);
+      expect(vars['--color-overlay']).toMatch(/, 0\.7\)$/);
+    },
+  );
+
+  it('the default tokens define them too, in both modes', () => {
+    for (const key of [...SIDEBAR_SHADES, ...BACKDROPS]) {
+      expect(tokensCss.split(`${key}:`).length - 1, key).toBe(3);
+    }
+  });
+});
+
 describe('palette CSS', () => {
   it('maps every token and derives the in-between shades as plain hex (Safari 15)', () => {
     const vars = paletteVars(PALETTES[1], 'light');

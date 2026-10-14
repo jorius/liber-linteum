@@ -4,7 +4,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  background: color-mix(in srgb, var(--color-bg) 70%, transparent);
+  background: var(--color-overlay);
   z-index: 20;
 }
 
