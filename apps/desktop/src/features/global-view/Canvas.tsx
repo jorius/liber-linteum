@@ -24,7 +24,7 @@ import { useUiStore } from '../../stores/uiStore';
 import { Card } from './Card';
 import type { CardMenuItem } from './CardMenu';
 import { EdgeLayer, MAX_AGGREGATED, strongest, type DrawnEdge } from './edges';
-import { pageOf, useGvStore } from './gvStore';
+import { openIndexPick, pageOf, pickable, useGvStore } from './gvStore';
 import {
   CARD_H,
   CARD_W,
@@ -211,14 +211,17 @@ export function Canvas({ mode, toggles, width, onOpen, onOpenEditor }: CanvasPro
         run: () => useGvStore.getState().startConnect(card),
       };
       const page = pageOf(card);
-      if (!page) return [connect];
-      return [
-        connect,
-        {
+      const items: CardMenuItem[] = [connect];
+      if (page) {
+        items.push({
           label: t('gv.relations.open'),
           run: () => useUiStore.getState().openDialog({ type: 'relations', page }),
-        },
-      ];
+        });
+      }
+      if (pickable(card)) {
+        items.push({ label: t('gv.indexPick.pick'), run: () => openIndexPick(card) });
+      }
+      return items;
     },
     [t],
   );

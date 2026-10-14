@@ -279,6 +279,14 @@
     "obsidianFolder": "the “{name}” folder"
   },
   "gv": {
+    "indexPick": {
+      "title": "Index note for {name}",
+      "hint": "The page this folder’s card shows in the Global View.",
+      "search": "Find a page",
+      "legend": "Index note",
+      "none": "No index note",
+      "pick": "Pick index note…"
+    },
     "relations": {
       "changedOnDisk": "Couldn’t update {name}: it changed on disk. Try again.",
       "connect": "Connect to…",

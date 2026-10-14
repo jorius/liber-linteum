@@ -38,6 +38,19 @@ export const nextLevel = (card: GvCard): GvLevelRef =>
 export const canvasKey = (mode: GlobalViewMode, root: GvLevelRef): string =>
   mode === 'expand' ? `expand:${levelKey(root)}` : levelKey(root);
 
+/** A folder card whose index note may be picked (M3b §4): none of GV-02's
+ *  rules 1–2 (named like the folder, `index.md`) gives one. */
+export const pickable = (card: GvCard): boolean =>
+  card.kind !== 'page' && card.indexFrom !== 'named' && card.indexFrom !== 'index';
+
+/** Opens the index-note pick for a folder card. */
+export const openIndexPick = (card: GvCard) =>
+  useUiStore.getState().openDialog({
+    type: 'indexPick',
+    folder: card.path,
+    current: card.indexFrom === 'picked' ? card.indexPage : null,
+  });
+
 /** The page a card stands for in a relationship (M3b §2): itself, or a
  *  folder's index note; `null` for a folder without one. */
 export const pageOf = (card: GvCard): string | null =>
@@ -225,6 +238,7 @@ export const useGvStore = create<GvState>((set, get) => {
     useToastStore.getState().push({
       message: i18next.t('gv.relations.noIndex', { name: card.title }),
       tone: 'error',
+      action: { label: i18next.t('gv.indexPick.pick'), run: () => openIndexPick(card) },
     });
     return true;
   }

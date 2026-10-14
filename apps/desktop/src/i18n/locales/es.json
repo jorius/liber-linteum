@@ -279,6 +279,14 @@
     "obsidianFolder": "la carpeta «{name}»"
   },
   "gv": {
+    "indexPick": {
+      "title": "Nota índice de {name}",
+      "hint": "La página que muestra la tarjeta de esta carpeta en la Vista global.",
+      "search": "Buscar una página",
+      "legend": "Nota índice",
+      "none": "Sin nota índice",
+      "pick": "Elegir nota índice…"
+    },
     "relations": {
       "changedOnDisk": "No se pudo actualizar {name}: cambió en el disco. Inténtalo de nuevo.",
       "connect": "Conectar con…",

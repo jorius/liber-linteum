@@ -199,4 +199,30 @@ describe('connecting two cards (M3b §2)', () => {
     expect(group).toHaveAttribute('data-connecting');
     expect(within(group).getByRole('button', { name: 'A' })).toBeInTheDocument();
   });
+
+  it('a folder without an index note offers to pick one (menu and toast action)', async () => {
+    render(<GlobalView />);
+    await userEvent.click(await screen.findByRole('button', { name: 'Connections of Delta' }));
+    expect(screen.getAllByRole('menuitem').map((m) => m.textContent)).toEqual([
+      'Connect to…',
+      'Pick index note…',
+    ]);
+    await userEvent.click(screen.getByRole('menuitem', { name: 'Connect to…' }));
+    const toast = useToastStore.getState().toasts.at(-1)!;
+    expect(toast.action?.label).toBe('Pick index note…');
+    act(() => toast.action!.run());
+    expect(useUiStore.getState().dialog).toEqual({
+      type: 'indexPick',
+      folder: 'Delta',
+      current: null,
+    });
+    // A picked index note can be changed too.
+    await userEvent.click(screen.getByRole('button', { name: 'Connections of Gamma' }));
+    await userEvent.click(screen.getByRole('menuitem', { name: 'Pick index note…' }));
+    expect(useUiStore.getState().dialog).toEqual({
+      type: 'indexPick',
+      folder: 'Gamma',
+      current: 'Gamma/b.md',
+    });
+  });
 });
