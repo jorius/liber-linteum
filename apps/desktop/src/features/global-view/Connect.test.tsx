@@ -482,3 +482,61 @@ describe('the keyboard after a menu item (NFR-10, final review I2)', () => {
     expect(screen.getByRole('button', { name: 'Connections of Delta' })).toHaveFocus();
   });
 });
+
+describe('Connect cards from the toolbar (M4b §6)', () => {
+  it('asks for the card to connect from, then the card to connect it to', async () => {
+    render(<GlobalView />);
+    await settled();
+    const button = screen.getByRole('button', { name: 'Connect cards' });
+    await userEvent.click(button);
+    expect(button).toHaveAttribute('aria-pressed', 'true');
+    const bar = screen.getByRole('status', { name: 'Connecting' });
+    expect(bar).toHaveTextContent('Click the card to connect from');
+    expect(bar).toHaveTextContent('or drag from a card’s link handle');
+    // The first click picks the source (no drill-down)…
+    fireEvent.click(await press('A.md'));
+    await waitFor(() => expect(bar).toHaveTextContent('Pick the card to connect: A → ?'));
+    expect(useGvStore.getState().stack).toEqual([{ kind: 'vault' }]);
+    // …the second the other card.
+    fireEvent.click(await press('B.md'));
+    await waitFor(() =>
+      expect(disk.files.get('A.md')).toBe('---\nrelated:\n  - "[[B]]"\n---\n# A\n'),
+    );
+    expect(button).toHaveAttribute('aria-pressed', 'false');
+  });
+
+  it('Escape, or pressing the button again, leaves it', async () => {
+    render(<GlobalView />);
+    await settled();
+    const button = screen.getByRole('button', { name: 'Connect cards' });
+    await userEvent.click(button);
+    await userEvent.keyboard('{Escape}');
+    expect(button).toHaveAttribute('aria-pressed', 'false');
+    expect(screen.queryByRole('status', { name: 'Connecting' })).not.toBeInTheDocument();
+    await userEvent.click(button);
+    await userEvent.click(button);
+    expect(button).toHaveAttribute('aria-pressed', 'false');
+    // Clicking a card now drills in as usual.
+    fireEvent.click(await press('Delta'));
+    await waitFor(() => expect(useGvStore.getState().stack).toHaveLength(2));
+  });
+
+  it('a folder without an index note keeps it waiting; Cancel goes back to the button', async () => {
+    render(<GlobalView />);
+    await settled();
+    const button = screen.getByRole('button', { name: 'Connect cards' });
+    await userEvent.click(button);
+    fireEvent.click(await press('Delta'));
+    await waitFor(() =>
+      expect(useToastStore.getState().toasts.map((t) => t.message)).toContain(
+        'Delta has no index note. Pick one first.',
+      ),
+    );
+    const bar = screen.getByRole('status', { name: 'Connecting' });
+    expect(bar).toHaveTextContent('Click the card to connect from');
+    expect(useGvStore.getState().stack).toEqual([{ kind: 'vault' }]);
+    await userEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+    expect(button).toHaveFocus();
+    expect(button).toHaveAttribute('aria-pressed', 'false');
+  });
+});

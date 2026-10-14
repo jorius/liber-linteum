@@ -1,6 +1,7 @@
 import type { TFunction } from 'i18next';
 import { useTranslation } from 'react-i18next';
 import type { GlobalViewEdges, GvLevelRef } from '../../ipc';
+import { LinkIcon } from '../../app/icons';
 import { useSettingsStore } from '../../stores/settingsStore';
 import { nameOf } from '../../stores/tree';
 import { strokeOf, type GvEdgeKind } from './edges';
@@ -28,6 +29,7 @@ export function Toolbar() {
   const { t } = useTranslation();
   const stack = useGvStore((s) => s.stack);
   const titles = useGvStore((s) => s.titles);
+  const connecting = useGvStore((s) => s.connectPick || s.connectFrom !== null);
   const settings = useSettingsStore((s) => s.settings);
   const update = useSettingsStore((s) => s.update);
   const mode = settings.globalViewMode;
@@ -106,6 +108,20 @@ export function Toolbar() {
           );
         })}
       </div>
+      <button
+        type="button"
+        className={styles.connect}
+        data-gv-connect=""
+        aria-pressed={connecting}
+        onClick={() => {
+          const gv = useGvStore.getState();
+          if (connecting) gv.cancelConnect();
+          else gv.startConnectPick();
+        }}
+      >
+        <LinkIcon />
+        {t('gv.relations.connectCards')}
+      </button>
       <button
         type="button"
         className={styles.reset}
