@@ -14,6 +14,7 @@ import {
 } from './blockModel';
 import type { TextChange } from './frontmatterEdit';
 import { parsePage } from './parse';
+import type { ParsedPage } from './types';
 
 export interface Move {
   /** Non-overlapping edits of the original text, in order (one transaction). */
@@ -540,7 +541,7 @@ const itemEntry = (flags: string, checked: string, parent: string, key: string) 
  *  markers aside), the containers it sits in, task states, `%%` comments, the
  *  kinds of the top-level blocks, and the item holding each list item (so no
  *  list is taken into another one's item: final review I3). */
-function signature(src: string): string[] {
+function signature(src: string): { sig: string[]; open: boolean } {
   const page = parsePage(src);
   const out: string[] = page.comments.map(([s, e]) => `%${src.slice(s, e)}`);
   const norm = (n: Node) =>
@@ -579,13 +580,42 @@ function signature(src: string): string[] {
     if (node.type !== 'yaml') out.push(`top:${kindOf(node)}`);
     walk(node, '', '^');
   }
-  return out.sort();
+  return { sig: out.sort(), open: unpaired(src, page) };
+}
+
+/** Whether a `%%` outside code in `src` pairs with nothing there: it would
+ *  open a comment with the next `%%` after it. */
+function unpaired(src: string, page: ParsedPage): boolean {
+  if (!src.includes('%%')) return false;
+  const code: [number, number][] = [];
+  const walk = (n: Node) => {
+    if (n.type === 'code' || n.type === 'inlineCode' || n.type === 'html' || n.type === 'yaml') {
+      code.push([n.position!.start.offset!, n.position!.end.offset!]);
+      return;
+    }
+    for (const c of ((n as Parent).children as Node[]) ?? []) walk(c);
+  };
+  walk(page.tree);
+  // Comments pair delimiters in order, so only one after the last can be left.
+  const last = page.comments.length ? page.comments[page.comments.length - 1][1] : 0;
+  for (let i = src.indexOf('%%', last); i >= 0; i = src.indexOf('%%', i + 2)) {
+    if (!code.some(([s, e]) => i >= s && i < e)) return true;
+  }
+  return false;
 }
 
 /** The old text's windows around the edits: the top-level blocks they touch
- *  and one more on each side, merged where they meet. */
+ *  and one more on each side, merged where they meet. No edge falls inside a
+ *  `%%` comment, so each window pairs its comments as the whole page does
+ *  (final review M1). */
 function windows(text: string, model: BlockModel, changes: TextChange[]): [number, number][] {
   const tops = topUnits(model);
+  const startBefore = (pos: number) => {
+    let a = 0;
+    for (const u of tops) if (u.from <= pos) a = u.from;
+    return a;
+  };
+  const endAfter = (pos: number) => tops.find((u) => u.to >= pos)?.to ?? text.length;
   const spans = changes.map((c): [number, number] => {
     let i = -1;
     tops.forEach((u, k) => {
@@ -593,9 +623,16 @@ function windows(text: string, model: BlockModel, changes: TextChange[]): [numbe
     });
     let j = tops.findIndex((u) => u.to >= c.to);
     if (j < 0) j = tops.length;
-    const a = i >= 1 ? tops[i - 1].from : 0;
-    const b = j + 1 < tops.length ? tops[j + 1].to : text.length;
-    return [Math.min(a, c.from), Math.max(b, c.to)];
+    let a = Math.min(i >= 1 ? tops[i - 1].from : 0, c.from);
+    let b = Math.max(j + 1 < tops.length ? tops[j + 1].to : text.length, c.to);
+    for (let widened = true; widened;) {
+      widened = false;
+      for (const [s, e] of model.comments) {
+        if (s < a && a < e) [a, widened] = [startBefore(s), true];
+        if (s < b && b < e) [b, widened] = [endAfter(e), true];
+      }
+    }
+    return [a, b];
   });
   spans.sort((x, y) => x[0] - y[0]);
   const out: [number, number][] = [];
@@ -625,8 +662,25 @@ function holdsTheSameBlocks(
     // A window that doesn't start the note must not read as one: a `---`
     // there is a rule, not the start of front matter.
     const lead = a > 0 ? '\n' : '';
-    before.push(...signature(lead + text.slice(a, b)));
-    after.push(...signature(lead + next.slice(mapPos(changes, a, -1), mapPos(changes, b, 1))));
+    const end = mapPos(changes, b, 1);
+    const was = signature(lead + text.slice(a, b));
+    const now = signature(lead + next.slice(mapPos(changes, a, -1), end));
+    // A `%%` left open would hide everything up to the next one (M1).
+    if (now.open && next.indexOf('%%', end) >= 0) return false;
+    before.push(...was.sig);
+    after.push(...now.sig);
+  }
+  // A `%%` past the page's last comment pairs with nothing; one that no move
+  // touches must keep nothing after it to pair with (M1).
+  const { comments } = model;
+  const stray = text.indexOf('%%', comments.length ? comments[comments.length - 1][1] : 0);
+  if (stray >= 0 && !changes.some((c) => c.from <= stray && stray < c.to)) {
+    const count = (s: string, from: number) => {
+      let n = 0;
+      for (let i = s.indexOf('%%', from); i >= 0; i = s.indexOf('%%', i + 2)) n++;
+      return n;
+    };
+    if (count(next, mapPos(changes, stray, 1) + 2) > count(text, stray + 2)) return false;
   }
   // The moved item changes parent as its slot says; nothing else does.
   if (reparent && reparent.from !== reparent.to) {

@@ -118,6 +118,33 @@ describe('moving top-level blocks (M4 §3)', () => {
     expect(move('---\n\nA\n\nB\n', '---', null)).toBe('A\n\nB\n\n---\n');
   });
 
+  it('never changes which text a %% comment hides, across blocks (final review M1)', () => {
+    // The heading would land inside `%% *zeta*\n\n…%%`.
+    expect(move('delta %%\n\n%%c%% *zeta*\n\n%% delta2\n\n### H\n', '### H', '%% delta2')).toBe(
+      'refused',
+    );
+    // The opener leaving: its closer would pair with the next `%%`.
+    const draft =
+      'Intro\n\nDraft idea %%\nhidden one\n\nhidden two\n%%\n\nPara B\n\nPara C\n\nPara D\n';
+    expect(move(draft, 'Draft idea', null)).toBe('refused');
+    // A `%%` that pairs with nothing, moved before a comment, would open one.
+    const stray = 'A\n\nB\n\nC\n\nD\n\n%% c %%\n\nE 50%% off\n';
+    expect(move(stray, 'E 50%% off', 'A')).toBe('refused');
+    // …or a comment moved past one that stays: they'd pair.
+    const gap = 'P0\n\nP1 %%c%%\n\nP2\n\nP3\n\nP4 %% stray\n\nP5\n\nP6\n\nP7\n';
+    expect(move(gap, 'P1 %%c%%', null)).toBe('refused');
+    // …also when a comment, masked, turns an item's text into code.
+    const masked =
+      '+ %%c1%% [[alpha]]\n+ %%c2%% *zeta*\n+ beta\n\niota 50%% off\n\n> [!note] kappa\n> gamma\n\n> quote\n';
+    expect(move(masked, '+ %%c1%%', null)).toBe('refused');
+    expect(move(masked, '+ %%c1%%', '> quote')).toBe('refused');
+    // Comments that stay as they are don't stop a move.
+    expect(move(draft, 'Para D', 'Intro')).toBe(
+      'Para D\n\nIntro\n\nDraft idea %%\nhidden one\n\nhidden two\n%%\n\nPara B\n\nPara C\n',
+    );
+    expect(move(stray, 'A', 'D')).toBe('B\n\nC\n\nA\n\nD\n\n%% c %%\n\nE 50%% off\n');
+  });
+
   it('a slot that leaves the block where it is gives nothing', () => {
     expect(move('P1\n\nP2\n', 'P1', 'P2')).toBeNull();
     expect(move('P1\n\nP2\n', 'P2', null)).toBeNull();

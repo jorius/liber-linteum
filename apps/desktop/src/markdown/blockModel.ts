@@ -69,8 +69,10 @@ export interface BlockModel {
   units: Unit[];
   lists: ListInfo[];
   tables: TableInfo[];
-  /** Where content starts (after the front matter). */
+  /** Where content starts (after the front matter, or a byte-order mark). */
   contentStart: number;
+  /** The page's `%%` comments (source ranges), which the guard keeps whole. */
+  comments: [number, number][];
 }
 
 /** Where a block may go. */
@@ -218,7 +220,7 @@ export function movableBlocks(text: string, page: ParsedPage): BlockModel {
     }
     u.sectionTo = last.to;
   });
-  return { units, lists, tables, contentStart };
+  return { units, lists, tables, contentStart, comments: page.comments };
 }
 
 /** The top-level units, in order. */

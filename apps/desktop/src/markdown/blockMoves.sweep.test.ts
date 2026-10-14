@@ -252,6 +252,19 @@ const GENERATORS: Record<string, Generator> = {
         ? pick(r, [['---'], ['---  '], [`${w.word()}: ${w.word()}`], ['...'], [w.word(), '---']])
         : null,
   },
+  // M1: `%%` comments spanning blocks, and `%%` that pair with nothing.
+  comments: {
+    block: (r, w) =>
+      r() < 0.4
+        ? pick(r, [
+            [`${w.word()} %%`],
+            [`%% ${w.word()}`],
+            [`%%c%% ${w.word()}`],
+            [`${w.word()} 50%% off`],
+            ['%%', w.word(), '', w.word(), '%%'],
+          ])
+        : null,
+  },
   // I4: a byte-order mark first (files from Windows tools), front matter or not.
   bom: {
     block: () => null,
@@ -439,6 +452,7 @@ describe('the sweep’s fuzz: random notes × random moves (final review)', () =
     ['frontRules', 3, 25],
     ['indentedLists', 8, 8],
     ['bom', 5, 20],
+    ['comments', 6, 60],
   ] as const)(
     '%s notes (seed %i, %i notes): every accepted move keeps the note',
     (name, seed, notes) => {
