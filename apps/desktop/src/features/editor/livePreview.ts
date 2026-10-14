@@ -24,7 +24,7 @@ import { toSafeHast, vaultJoin } from '../../markdown/sanitize';
 import type { Embed, ParsedPage, WikiLink } from '../../markdown/types';
 import { rangeOf } from '../../markdown/walk';
 import { followLink } from '../../stores/links';
-import { CheckboxWidget, PreviewWidget } from './widgets';
+import { CheckboxWidget, CodeBadgeWidget, PreviewWidget } from './widgets';
 
 import { LARGE_NOTE_CHARS } from './limits';
 import { safeDecode } from '../../markdown/decode';
@@ -203,9 +203,23 @@ function build(state: EditorState, page: ParsedPage, active: Set<number>): Decor
       case 'tag':
         if (!reduced && from < to) out.push(MARKS.tag.range(from, to));
         return;
-      case 'code':
-        if (!reduced) lines(from, to, lineClass('cm-nimw-codeblock'));
+      case 'code': {
+        if (reduced) return;
+        lines(from, to, lineClass('cm-nimw-codeblock'));
+        // M4b part 2 §2: a fenced block's language badge and Copy button.
+        const first = doc.lineAt(from);
+        const fence = /^\s*(`{3,}|~{3,})(\S*)/.exec(first.text);
+        if (fence && !touched(from, to) && first.number < doc.lineAt(to).number) {
+          const body = text(first.to + 1, doc.lineAt(Math.min(to, doc.length)).from);
+          const code = body.endsWith('\n') ? body.slice(0, -1) : body;
+          out.push(
+            Decoration.widget({ widget: new CodeBadgeWidget(fence[2], code), side: 1 }).range(
+              first.to,
+            ),
+          );
+        }
         return;
+      }
       case 'yaml':
         lines(from, to, lineClass('cm-nimw-frontmatter'));
         return;
@@ -432,6 +446,22 @@ const theme = EditorView.baseTheme({
   // Rendered HTML, not editor text: CodeMirror's pre-wrapped whitespace would
   // turn the renderer's newlines into blank lines.
   '.cm-nimw-widget': { padding: '4px 0', cursor: 'default', whiteSpace: 'normal' },
+  '.cm-nimw-codebadge': {
+    display: 'inline-flex',
+    gap: '6px',
+    marginLeft: '10px',
+    verticalAlign: 'middle',
+    fontFamily: 'var(--font-body)',
+  },
+  '.cm-nimw-codebadge button': {
+    font: '600 11.5px var(--font-body)',
+    padding: '1px 8px',
+    borderRadius: '999px',
+    border: '1px solid var(--color-border-strong)',
+    background: 'var(--color-surface)',
+    color: 'var(--color-text-body)',
+    cursor: 'pointer',
+  },
   '.cm-nimw-checkbox': { margin: '0 4px 0 0', verticalAlign: 'middle', cursor: 'pointer' },
 });
 

@@ -21,6 +21,8 @@ import { BlockGutter, type Shown } from './BlockGutter';
 import { SplitHint } from './SplitHint';
 import { activeFormats, editorKeymap, type ActiveFormat } from './format';
 import { linkCompletion } from './linkComplete';
+import { LanguagePicker } from './LanguagePicker';
+import { setLanguagePickerOpener } from './languagePickerOpen';
 import { LinkPicker } from './LinkPicker';
 import { setLinkPickerOpener } from './linkPickerOpen';
 import type { PageDoc } from './pageDoc';
@@ -284,6 +286,7 @@ export function Editor({ doc, mode, label }: EditorProps) {
   const showNumbers = useSettingsStore((s) => s.settings.lineNumbers);
   const [toolbarView, setToolbarView] = useState<EditorView | null>(null);
   const [picker, setPicker] = useState(false);
+  const [langPicker, setLangPicker] = useState<{ at: number; anchor: HTMLElement } | null>(null);
   const [active, setActive] = useState<Set<ActiveFormat>>(() => new Set());
   const showFormats = useCallback((state: EditorState) => {
     const next = activeFormats(state);
@@ -302,6 +305,7 @@ export function Editor({ doc, mode, label }: EditorProps) {
     toolbarOf.set(v, showFormats);
     setToolbarView(v);
     setLinkPickerOpener(v, () => setPicker(true));
+    setLanguagePickerOpener(v, (at, anchor) => setLangPicker({ at, anchor }));
     showFormats(v.state);
     return () => {
       hideView(current.current, v);
@@ -310,6 +314,7 @@ export function Editor({ doc, mode, label }: EditorProps) {
       paneOf.delete(v);
       toolbarOf.delete(v);
       setLinkPickerOpener(v, null);
+      setLanguagePickerOpener(v, null);
       v.destroy();
       view.current = null;
     };
@@ -414,6 +419,14 @@ export function Editor({ doc, mode, label }: EditorProps) {
     <div className={styles.frame}>
       {showToolbar && toolbarView && <Toolbar view={toolbarView} active={active} />}
       {picker && toolbarView && <LinkPicker view={toolbarView} onClose={() => setPicker(false)} />}
+      {langPicker && toolbarView && (
+        <LanguagePicker
+          view={toolbarView}
+          at={langPicker.at}
+          anchor={langPicker.anchor}
+          onClose={() => setLangPicker(null)}
+        />
+      )}
       {split && <SplitHint />}
       <div className={split ? styles.split : styles.single}>
         <div

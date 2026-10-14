@@ -420,6 +420,13 @@
     "newEntry": "New entry"
   },
   "code": {
-    "plain": "Plain text"
+    "plain": "Plain text",
+    "copy": "Copy",
+    "copied": "Copied",
+    "copyCode": "Copy code",
+    "languageLabel": "Language: {name}",
+    "pickLanguage": "Code language",
+    "searchLanguage": "Search languages…",
+    "languages": "Languages"
   }
 }

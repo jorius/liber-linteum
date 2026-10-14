@@ -333,3 +333,14 @@ describe('Preview: code blocks (M4b part 2 §2)', () => {
     expect(screen.getByText('klingon')).toBeInTheDocument();
   });
 });
+
+describe('Preview: copying code (M4b part 2 §2)', () => {
+  it('Copy puts the block code on the clipboard', async () => {
+    const writeText = vi.fn(() => Promise.resolve());
+    Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true });
+    show('```py\nprint(1)\n```\n');
+    await userEvent.click(await screen.findByRole('button', { name: 'Copy code' }));
+    expect(writeText).toHaveBeenCalledWith('print(1)\n');
+    expect(await screen.findByText('Copied')).toBeInTheDocument();
+  });
+});

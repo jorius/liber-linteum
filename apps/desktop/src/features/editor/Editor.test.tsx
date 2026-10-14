@@ -1,6 +1,7 @@
 import { undo } from '@codemirror/commands';
 import { EditorView } from '@codemirror/view';
 import { act, render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { clearMocks } from '../../ipc/testing';
 import { fakeDisk, type FakeDisk } from '../../test/fakeDisk';
@@ -341,5 +342,35 @@ describe('code highlighting in the editor (M4b part 2 §2)', () => {
       );
       unmount();
     }
+  });
+});
+
+describe('code block badge and language picker (M4b part 2 §2)', () => {
+  it('shows the language; picking another rewrites the fence in one undo step', async () => {
+    disk = fakeDisk({ 'K.md': 'x\n\n```js\nconst a = 1;\n```\n' });
+    const doc = await load('K.md');
+    render(<Editor doc={doc} mode="livePreview" label="K" />);
+    const badge = await screen.findByRole('button', { name: 'Language: JavaScript' });
+    await userEvent.click(badge);
+    const search = await screen.findByRole('combobox', { name: 'Code language' });
+    await userEvent.type(search, 'pyth');
+    expect(await screen.findByRole('option', { name: 'Python' })).toBeInTheDocument();
+    await userEvent.keyboard('{Enter}');
+    expect(viewOf().state.doc.toString()).toBe('x\n\n```python\nconst a = 1;\n```\n');
+    expect(screen.queryByRole('combobox', { name: 'Code language' })).not.toBeInTheDocument();
+    act(() => undo(viewOf()));
+    expect(viewOf().state.doc.toString()).toBe('x\n\n```js\nconst a = 1;\n```\n');
+  });
+
+  it('Copy puts the code (without its fences) on the clipboard', async () => {
+    const writeText = vi.fn(() => Promise.resolve());
+    Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true });
+    disk = fakeDisk({ 'K.md': 'x\n\n```\nplain text\nline 2\n```\n' });
+    const doc = await load('K.md');
+    render(<Editor doc={doc} mode="livePreview" label="K" />);
+    expect(await screen.findByRole('button', { name: 'Language: Plain text' })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Copy code' }));
+    expect(writeText).toHaveBeenCalledWith('plain text\nline 2');
+    expect(await screen.findByText('Copied')).toBeInTheDocument();
   });
 });

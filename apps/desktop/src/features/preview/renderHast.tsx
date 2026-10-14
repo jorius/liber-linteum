@@ -186,7 +186,7 @@ function renderElement(e: Element, key: number, ctx: RenderCtx): ReactNode {
   if (e.tagName === 'pre') {
     const lang = typeof p.dataLang === 'string' ? p.dataLang : undefined;
     return (
-      <CodeBlock key={key} lang={lang}>
+      <CodeBlock key={key} lang={lang} code={hastText(e)}>
         {createElement('pre', reactProps(p), renderChildren(e, ctx))}
       </CodeBlock>
     );
@@ -263,4 +263,11 @@ export function renderChildren(parent: Root | Element, ctx: RenderCtx): ReactNod
     if (c.type === 'element') return renderElement(c, i, ctx);
     return null;
   });
+}
+
+/** The text an element holds (a code block's code, for Copy). */
+function hastText(n: Element | ElementContent): string {
+  if (n.type === 'text') return n.value;
+  if (n.type === 'element') return n.children.map(hastText).join('');
+  return '';
 }

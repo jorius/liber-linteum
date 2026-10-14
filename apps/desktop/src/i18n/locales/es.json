@@ -420,6 +420,13 @@
     "newEntry": "Nueva entrada"
   },
   "code": {
-    "plain": "Texto sin formato"
+    "plain": "Texto sin formato",
+    "copy": "Copiar",
+    "copied": "Copiado",
+    "copyCode": "Copiar el código",
+    "languageLabel": "Lenguaje: {name}",
+    "pickLanguage": "Lenguaje del código",
+    "searchLanguage": "Buscar lenguajes…",
+    "languages": "Lenguajes"
   }
 }
