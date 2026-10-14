@@ -304,3 +304,55 @@ describe('review focus: text on the veil over any cover (M4b §1)', () => {
     expect(rule).toContain('--color-text-muted: var(--color-text-body);');
   });
 });
+
+/** Syntax colours (M4b part 2 §2): one set per palette and mode, every
+ *  token ≥ 4.5:1 on that palette's code background. */
+const CODE_TOKENS = [
+  '--code-keyword',
+  '--code-string',
+  '--code-number',
+  '--code-comment',
+  '--code-function',
+  '--code-type',
+  '--code-meta',
+  '--code-variable',
+  '--code-punct',
+] as const;
+
+describe('code tokens (M4b part 2 §2)', () => {
+  const check = (vars: Record<string, string>, at: string) => {
+    for (const key of CODE_TOKENS) {
+      expect(vars[key], `${at} ${key}`).toMatch(/^#[0-9a-f]{6}$/);
+      expect(
+        contrast(vars[key], vars['--color-code-bg']),
+        `${at} ${key} on code-bg`,
+      ).toBeGreaterThanOrEqual(4.5);
+    }
+    // Keywords, strings and functions are told apart by more than lightness.
+    expect(
+      new Set([vars['--code-keyword'], vars['--code-string'], vars['--code-function']]).size,
+    ).toBe(3);
+  };
+  it.each(PALETTES.flatMap((p) => (['light', 'dark'] as const).map((m) => [p.id, m] as const)))(
+    '%s %s',
+    (id, mode) =>
+      check(
+        paletteVars(
+          PALETTES.find((p) => p.id === id)!,
+          mode,
+        ),
+        `${id} ${mode}`,
+      ),
+  );
+  it.each(['#d1477a', '#ffffff', '#000000', '#ffff00', '#2aa198', '#808080'])(
+    'custom accent %s',
+    (hex) => {
+      const p = { id: 'custom', ...derive(hex) } as unknown as (typeof PALETTES)[number];
+      check(paletteVars(p, 'light'), `${hex} light`);
+      check(paletteVars(p, 'dark'), `${hex} dark`);
+    },
+  );
+  it('the default tokens define them too, in both modes', () => {
+    for (const key of CODE_TOKENS) expect(tokensCss.split(`${key}:`).length - 1, key).toBe(3);
+  });
+});

@@ -418,5 +418,8 @@
     "fit": "Ajustar a la pantalla",
     "connections": "{links, plural, =0 {Sin enlaces.} one {Enlazada con # tarjeta.} other {Enlazada con # tarjetas.}} {manual, plural, =0 {} one {# relación.} other {# relaciones.}}",
     "newEntry": "Nueva entrada"
+  },
+  "code": {
+    "plain": "Texto sin formato"
   }
 }

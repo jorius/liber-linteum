@@ -1,5 +1,5 @@
 // `.ts` extension: scripts/gen-palettes.ts runs this file directly in Node.
-import { alpha, mix } from './color.ts';
+import { alpha, contrast, hexToOklch, mix, oklchToHex } from './color.ts';
 import type { Palette, PaletteTokens } from './palettes';
 
 /** A palette's mode as app CSS custom properties (M2b §4 mapping table). The
@@ -54,7 +54,47 @@ export function paletteVars(p: Palette, mode: 'light' | 'dark'): Record<string, 
     '--color-surface-veil': alpha(t.surface, 0.88),
     '--color-danger': DANGER[mode].bg,
     '--color-danger-contrast': DANGER[mode].text,
+    // M4b part 2 §2: syntax colours, readable on this palette's code background.
+    ...codeTokens(t.code, t.text, t.muted, mode),
   };
+}
+
+/** Hue and chroma per syntax token (OKLCH); lightness is found per palette. */
+const CODE_HUES = {
+  '--code-keyword': [305, 0.16],
+  '--code-string': [145, 0.14],
+  '--code-number': [50, 0.15],
+  '--code-function': [255, 0.15],
+  '--code-type': [85, 0.13],
+  '--code-meta': [0, 0.15],
+  '--code-comment': [270, 0.02],
+} as const;
+
+/** The first lightness, walking from the starting point away from the
+ *  background, at which `hue` reads at ≥ 4.6:1 on `bg`. */
+function readableOn(bg: string, hue: number, chroma: number, mode: 'light' | 'dark'): string {
+  const step = mode === 'light' ? -0.01 : 0.01;
+  for (let L = mode === 'light' ? 0.52 : 0.78; L > 0.05 && L < 0.99; L += step) {
+    const hex = oklchToHex(L, chroma, hue);
+    if (contrast(hex, bg) >= 4.6) return hex;
+  }
+  return mode === 'light' ? '#000000' : '#ffffff';
+}
+
+/** Syntax token colours for a code background (Safari 15: plain hex). */
+function codeTokens(
+  code: string,
+  text: string,
+  muted: string,
+  mode: 'light' | 'dark',
+): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const [key, [hue, chroma]] of Object.entries(CODE_HUES))
+    out[key] = readableOn(code, hue, chroma, mode);
+  out['--code-variable'] = text;
+  out['--code-punct'] =
+    contrast(muted, code) >= 4.5 ? muted : readableOn(code, hexToOklch(muted)[2], 0.02, mode);
+  return out;
 }
 
 /** Danger buttons (Delete, Remove, Discard): the shared red, text ≥ 4.5:1. */

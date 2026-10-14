@@ -20,6 +20,7 @@ import type {
   Tag,
   WikiLink,
 } from './types';
+import { highlightCode } from './codeHighlight';
 import { safeDecode } from './decode';
 
 /** Colors allowed in `data-color` / `data-bg` (theme-aware tokens). */
@@ -225,6 +226,8 @@ const schema: Schema = {
       'dataWidth',
       'dataHeight',
       'dataTag',
+      // Syntax highlighting (M4b part 2 §2): highlight.js classes only.
+      ['className', /^hljs-[\w-]+$/],
     ],
     div: ['dataColor', 'dataBg', 'dataCallout', 'dataTitle', 'dataFoldable', 'dataFolded'],
     img: ['src', 'alt', 'width', 'height'],
@@ -236,6 +239,7 @@ const schema: Schema = {
     li: ['className'],
     ul: ['className'],
     code: ['className'],
+    pre: ['dataLang'],
     td: ['align'],
     th: ['align'],
     input: [['type', 'checkbox'], 'checked', 'disabled'],
@@ -373,6 +377,7 @@ const POSITIONS = { file: { toString: () => '' } } as unknown as Parameters<type
 export function toSafeHast(page: ParsedPage, ctx: RenderContext): Root {
   const hast = toHast(page.tree, { allowDangerousHtml: true, handlers }) as Root;
   markSourceRanges(hast);
+  highlightCode(hast);
   const blocks = htmlBlocks(hast);
   const parsed = raw(hast, POSITIONS) as Root;
   const clean = sanitize(parsed, schema) as Root;

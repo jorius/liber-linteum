@@ -4,6 +4,7 @@ import { createElement, type MouseEvent, type ReactNode } from 'react';
 import { assetUrl } from '../../ipc';
 import { followLink } from '../../stores/links';
 import { Callout } from './Callout';
+import { CodeBlock } from './CodeBlock';
 import { Embed } from './Embed';
 import styles from './Preview.module.css';
 import type { Resolve } from './useResolved';
@@ -181,6 +182,14 @@ function renderElement(e: Element, key: number, ctx: RenderCtx): ReactNode {
           {renderChildren(e, ctx)}
         </span>
       );
+  }
+  if (e.tagName === 'pre') {
+    const lang = typeof p.dataLang === 'string' ? p.dataLang : undefined;
+    return (
+      <CodeBlock key={key} lang={lang}>
+        {createElement('pre', reactProps(p), renderChildren(e, ctx))}
+      </CodeBlock>
+    );
   }
   if (e.tagName === 'p') {
     const embed = loneEmbed(e);

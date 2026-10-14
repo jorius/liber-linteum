@@ -119,7 +119,10 @@ describe('Preview: every node type (M2a §4)', () => {
     const callout = screen.getByText('Careful').closest('details')!;
     expect(callout).toHaveAttribute('data-callout', 'warning');
     expect(callout).not.toHaveAttribute('open');
-    expect(screen.getByText('let x = 1;').closest('pre')).not.toBeNull();
+    // Highlighted (M4b part 2 §2): the code reads whole across its spans.
+    expect([...document.querySelectorAll('pre code')].map((c) => c.textContent)).toContain(
+      'let x = 1;\n',
+    );
     expect(screen.getByRole('table')).toHaveTextContent('12');
     const columns = screen.getByText('left').closest('[data-nimw="columns"]')!;
     expect(within(columns as HTMLElement).getByText('right')).toBeInTheDocument();
@@ -309,5 +312,24 @@ describe('heading anchors (M2c §6.2)', () => {
     usePageStore.setState({ anchor: { heading: 'Pipes and carets', nonce: 1 } });
     show('# Top\n\n## Pipes | and ^carets\n\nbody\n');
     await waitFor(() => expect(scrolled).toEqual(['Pipes | and ^carets']));
+  });
+});
+
+describe('Preview: code blocks (M4b part 2 §2)', () => {
+  it('a fenced block is highlighted by its language and shows its label', async () => {
+    show('```js\nconst answer = 42; // why\n```\n\n```\nplain\n```\n');
+    const keyword = await screen.findByText('const');
+    expect(keyword).toHaveClass('hljs-keyword');
+    expect(screen.getByText('42')).toHaveClass('hljs-number');
+    expect(screen.getByText('// why')).toHaveClass('hljs-comment');
+    // Unknown or missing languages stay plain text.
+    expect(screen.getByText('plain').querySelector('[class^="hljs"]')).toBeNull();
+    expect(screen.getByText('JavaScript')).toBeInTheDocument();
+  });
+
+  it('an unknown language is shown as written and not highlighted', async () => {
+    show('```klingon\nqapla\n```\n');
+    expect(await screen.findByText('qapla')).not.toHaveClass(/hljs/);
+    expect(screen.getByText('klingon')).toBeInTheDocument();
   });
 });

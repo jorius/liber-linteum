@@ -325,3 +325,21 @@ describe('block moves from the keyboard (M4 §5)', () => {
     expect(viewOf().state.doc.toString()).toBe('- a\n  - a1\n- b\n');
   });
 });
+
+describe('code highlighting in the editor (M4b part 2 §2)', () => {
+  it('a fenced block is highlighted by its language in Source and Live Preview', async () => {
+    disk = fakeDisk({ 'C.md': 'x\n\n```js\nconst a = 1;\n```\n' });
+    const doc = await load('C.md');
+    for (const mode of ['source', 'livePreview'] as const) {
+      const { unmount } = render(<Editor doc={doc} mode={mode} label="C" />);
+      await vi.waitFor(
+        () => {
+          const kw = [...viewOf().contentDOM.querySelectorAll('.cm-nimw-code-keyword')];
+          expect(kw.map((e) => e.textContent)).toContain('const');
+        },
+        { timeout: 3000 },
+      );
+      unmount();
+    }
+  });
+});

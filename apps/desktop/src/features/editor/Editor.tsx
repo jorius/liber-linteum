@@ -1,9 +1,10 @@
 import { history, historyKeymap } from '@codemirror/commands';
 import { markdown, markdownLanguage } from '@codemirror/lang-markdown';
+import { languages } from '@codemirror/language-data';
 import { HighlightStyle, syntaxHighlighting, syntaxTree } from '@codemirror/language';
 import { Compartment, EditorState, Transaction, type Extension } from '@codemirror/state';
 import { drawSelection, EditorView, keymap, lineNumbers } from '@codemirror/view';
-import { tags } from '@lezer/highlight';
+import { tagHighlighter, tags } from '@lezer/highlight';
 import { diffIndices } from 'node-diff3';
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -52,7 +53,39 @@ const sourceHighlight = HighlightStyle.define([
   },
 ]);
 
+/** Code tokens as classes, drawn with the palette's --code-* colours (the
+ *  rendered pane uses the same tokens through highlight.js classes). */
+const codeHighlighter = tagHighlighter([
+  {
+    tag: [tags.keyword, tags.bool, tags.null, tags.atom, tags.tagName],
+    class: 'cm-nimw-code-keyword',
+  },
+  { tag: [tags.string, tags.regexp, tags.special(tags.string)], class: 'cm-nimw-code-string' },
+  { tag: [tags.number, tags.integer, tags.float], class: 'cm-nimw-code-number' },
+  { tag: tags.comment, class: 'cm-nimw-code-comment' },
+  {
+    tag: [
+      tags.function(tags.variableName),
+      tags.function(tags.propertyName),
+      tags.propertyName,
+      tags.attributeName,
+    ],
+    class: 'cm-nimw-code-function',
+  },
+  { tag: [tags.typeName, tags.className, tags.namespace], class: 'cm-nimw-code-type' },
+  { tag: [tags.annotation, tags.modifier, tags.self], class: 'cm-nimw-code-meta' },
+  { tag: [tags.operator, tags.punctuation, tags.bracket], class: 'cm-nimw-code-punct' },
+]);
+
 const theme = EditorView.theme({
+  '.cm-nimw-code-keyword': { color: 'var(--code-keyword)' },
+  '.cm-nimw-code-string': { color: 'var(--code-string)' },
+  '.cm-nimw-code-number': { color: 'var(--code-number)' },
+  '.cm-nimw-code-comment': { color: 'var(--code-comment)', fontStyle: 'italic' },
+  '.cm-nimw-code-function': { color: 'var(--code-function)' },
+  '.cm-nimw-code-type': { color: 'var(--code-type)' },
+  '.cm-nimw-code-meta': { color: 'var(--code-meta)' },
+  '.cm-nimw-code-punct': { color: 'var(--code-punct)' },
   '&': { height: '100%', color: 'var(--color-text)', backgroundColor: 'transparent' },
   '&.cm-focused': { outline: 'none' },
   '.cm-scroller': {
@@ -188,7 +221,9 @@ function createState(d: PageDoc, mode: EditorMode, label: string, numbers: boole
       drawSelection(),
       EditorView.lineWrapping,
       // GFM syntax tree: Source highlighting and the toolbar's pressed state.
-      markdown({ base: markdownLanguage }),
+      markdown({ base: markdownLanguage, codeLanguages: languages }),
+      // Syntax colours inside fenced code (M4b part 2 §2), in every mode.
+      syntaxHighlighting(codeHighlighter),
       keymap.of([{ key: 'Mod-Enter', run: followLinkAtCursor }, ...editorKeymap, ...historyKeymap]),
       pagePath.of(() => d.path),
       theme,

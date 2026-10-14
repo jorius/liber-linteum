@@ -30,6 +30,15 @@
   --color-sidebar-selected: rgba(185, 162, 230, 0.22);
   --color-highlight-bg: #fbf1c7;
   --color-code-bg: #efe9f6;
+  --code-keyword: #7f4bb1;
+  --code-string: #1e7729;
+  --code-number: #a44c06;
+  --code-function: #1f68bc;
+  --code-type: #856304;
+  --code-meta: #a93b65;
+  --code-comment: #646975;
+  --code-variable: #1d1a22;
+  --code-punct: #6b5f80;
   /* Global View (M3a): lavender values; palettes.css derives them per palette. */
   --color-canvas: #f8f5fa;
   --color-card-border: #dcd3e5;
@@ -106,6 +115,15 @@
     --color-focus: #cbb8ef;
     --color-highlight-bg: #4a3f12;
     --color-code-bg: #2a2533;
+    --code-keyword: #cba1fa;
+    --code-string: #7acf7e;
+    --code-number: #fc9c64;
+    --code-function: #87bafc;
+    --code-type: #ddb049;
+    --code-meta: #fd91b4;
+    --code-comment: #b2b7c5;
+    --code-variable: #ece8f2;
+    --code-punct: #a59cb5;
     --color-canvas: #1a181f;
     --color-card-border: #3b3646;
     --color-edge-link: #b9a2e6;
@@ -163,6 +181,15 @@
   --color-focus: #cbb8ef;
   --color-highlight-bg: #4a3f12;
   --color-code-bg: #2a2533;
+  --code-keyword: #cba1fa;
+  --code-string: #7acf7e;
+  --code-number: #fc9c64;
+  --code-function: #87bafc;
+  --code-type: #ddb049;
+  --code-meta: #fd91b4;
+  --code-comment: #b2b7c5;
+  --code-variable: #ece8f2;
+  --code-punct: #a59cb5;
   --color-canvas: #1a181f;
   --color-card-border: #3b3646;
   --color-edge-link: #b9a2e6;
