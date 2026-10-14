@@ -174,3 +174,85 @@ export function AudioIcon() {
     </svg>
   );
 }
+
+/** Small icons for buttons that keep their text label (M4b §2): 14 px. */
+const small = { width: 14, height: 14, viewBox: '0 0 24 24', 'aria-hidden': true } as const;
+
+export function ImagePlusIcon() {
+  return (
+    <svg {...small} {...stroke}>
+      <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h7" />
+      <path d="M16 5h6M19 2v6" />
+      <circle cx="9" cy="9" r="2" />
+      <path d="M21 15l-3.1-3.1a2 2 0 0 0-2.8 0L6 21" />
+    </svg>
+  );
+}
+
+export function SmallImageIcon() {
+  return (
+    <svg {...small} {...stroke}>
+      <rect x="3" y="4" width="18" height="16" rx="2" />
+      <circle cx="9" cy="10" r="2" />
+      <path d="M21 17l-5-5-9 8" />
+    </svg>
+  );
+}
+
+export function MoveVerticalIcon() {
+  return (
+    <svg {...small} {...stroke}>
+      <path d="M12 2v20M8 6l4-4 4 4M8 18l4 4 4-4" />
+    </svg>
+  );
+}
+
+export function TrashIcon() {
+  return (
+    <svg {...small} {...stroke}>
+      <path d="M3 6h18M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6M10 11v6M14 11v6" />
+    </svg>
+  );
+}
+
+export function CheckIcon() {
+  return (
+    <svg {...small} {...stroke}>
+      <path d="M20 6L9 17l-5-5" />
+    </svg>
+  );
+}
+
+export function SmallCloseIcon() {
+  return (
+    <svg {...small} {...stroke}>
+      <path d="M6 6l12 12M18 6L6 18" />
+    </svg>
+  );
+}
+
+/** Live Preview (a pen), Source (`</>`) and Split (two columns): M4b §2. */
+export function PenIcon() {
+  return (
+    <svg {...small} {...stroke}>
+      <path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z" />
+    </svg>
+  );
+}
+
+export function CodeIcon() {
+  return (
+    <svg {...small} {...stroke}>
+      <path d="M16 18l6-6-6-6M8 6l-6 6 6 6" />
+    </svg>
+  );
+}
+
+export function ColumnsIcon() {
+  return (
+    <svg {...small} {...stroke}>
+      <rect x="3" y="4" width="18" height="16" rx="2" />
+      <path d="M12 4v16" />
+    </svg>
+  );
+}

@@ -284,6 +284,7 @@
     "cancel": "Cancel",
     "position": "Cover position",
     "positionValue": "{value}% from the top",
+    "dragHint": "Drag the image to place it",
     "remote": "Remote cover not loaded (privacy)",
     "missing": "Cover image not found"
   },

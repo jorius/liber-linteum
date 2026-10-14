@@ -24,6 +24,12 @@ const err = (kind: string, message: string, extra: object = {}) => ({ kind, mess
 const titleOf = (path: string, text: string) =>
   /^# (.+)$/m.exec(text)?.[1] ?? path.slice(path.lastIndexOf('/') + 1).replace(/\.md$/, '');
 
+/** `#tag`s in the text, like the index's (enough for tests: no code or
+ *  front matter awareness). */
+function tagsOf(text: string): string[] {
+  return [...new Set([...text.matchAll(/(?:^|\s)#([\p{L}\p{N}_/-]+)/gu)].map((m) => m[1]))];
+}
+
 /** Header fields from the note's frontmatter, as the index reads them. */
 function headerOf(text: string) {
   const data = parsePage(text).frontmatter?.data ?? {};
@@ -90,7 +96,7 @@ export function fakeDisk(initial: Record<string, string>, extra: Extra = {}): Fa
             path: args.path,
             title: titleOf(args.path, text),
             ...headerOf(text),
-            tags: [],
+            tags: tagsOf(text),
             links: 0,
             backlinks: 0,
             text,

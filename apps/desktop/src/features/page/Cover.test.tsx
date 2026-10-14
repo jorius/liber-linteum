@@ -209,7 +209,7 @@ describe('Cover (M2c §2)', () => {
       await waitFor(() => expect(add).toHaveFocus());
     });
 
-    it('Add cover moves focus to Change cover once the image shows', async () => {
+    it('Add cover puts the keyboard on the position slider once the image shows (M4b §2)', async () => {
       fakeDisk(
         { 'Rex.md': '# Rex\n' },
         {
@@ -223,11 +223,14 @@ describe('Cover (M2c §2)', () => {
       await userEvent.keyboard('{Enter}');
       await waitFor(() => expect(document.querySelector('img[data-cover]')).not.toBeNull());
       await waitFor(() =>
-        expect(screen.getByRole('button', { name: 'Change cover' })).toHaveFocus(),
+        expect(screen.getByRole('slider', { name: 'Cover position' })).toHaveFocus(),
       );
+      // Leaving reposition puts it on Reposition, never on the page.
+      await userEvent.keyboard('{Escape}');
+      expect(screen.getByRole('button', { name: 'Reposition' })).toHaveFocus();
     });
 
-    it('Change cover keeps focus on Change cover while the new image loads', async () => {
+    it('Change cover keeps focus on Change cover while the new image loads, then on the slider', async () => {
       fakeDisk(
         { 'Rex.md': '---\ncover: a.png\n---\n# Rex\n' },
         {
@@ -246,7 +249,9 @@ describe('Cover (M2c §2)', () => {
           'nimw-asset://localhost/b.png',
         ),
       );
-      expect(screen.getByRole('button', { name: 'Change cover' })).toHaveFocus();
+      await waitFor(() =>
+        expect(screen.getByRole('slider', { name: 'Cover position' })).toHaveFocus(),
+      );
     });
 
     it('cancelling Add cover leaves focus on Add cover', async () => {
@@ -274,7 +279,7 @@ describe('Cover (M2c §2)', () => {
       screen.getByRole('button', { name: 'Add cover' }).focus();
       await userEvent.keyboard('{Enter}');
       const subtitle = screen.getByRole('textbox', { name: 'Subtitle' });
-      act(() => subtitle.focus());
+      await userEvent.click(subtitle);
       await act(async () => answer({ path: 'sky.png', reference: 'sky.png' }));
       await waitFor(() => expect(document.querySelector('img[data-cover]')).not.toBeNull());
       expect(subtitle).toHaveFocus();
@@ -329,5 +334,96 @@ describe('Subtitle (M2c §3)', () => {
     await userEvent.click(field);
     await userEvent.click(document.body);
     await waitFor(() => expect(disk.files.get('Rex.md')).toBe('---\nsubtitle: Half\n---\n# Rex\n'));
+  });
+});
+
+describe('the header band (M4b §1, §2)', () => {
+  it('a new cover opens in reposition mode at once; one Save position writes cover-y', async () => {
+    const disk = fakeDisk(
+      { 'Rex.md': '# Rex\n' },
+      {
+        cover_pick: () => ({ path: 'sky.png', reference: 'sky.png' }),
+        links_resolve: resolveCovers,
+      },
+    );
+    render(<PageScreen />);
+    await open('Rex.md');
+    await userEvent.click(screen.getByRole('button', { name: 'Add cover' }));
+    const slider = await screen.findByRole('slider', { name: 'Cover position' });
+    expect(slider).toHaveAttribute('aria-valuenow', '50');
+    await userEvent.keyboard('{ArrowUp}{ArrowUp}');
+    await userEvent.click(screen.getByRole('button', { name: 'Save position' }));
+    await waitFor(() =>
+      expect(disk.files.get('Rex.md')).toBe('---\ncover: sky.png\ncover-y: 60\n---\n# Rex\n'),
+    );
+    expect(screen.queryByRole('slider')).not.toBeInTheDocument();
+  });
+
+  it('Cancel right after a pick keeps the new cover, centred (no cover-y)', async () => {
+    const disk = fakeDisk(
+      { 'Rex.md': '# Rex\n' },
+      {
+        cover_pick: () => ({ path: 'sky.png', reference: 'sky.png' }),
+        links_resolve: resolveCovers,
+      },
+    );
+    render(<PageScreen />);
+    await open('Rex.md');
+    await userEvent.click(screen.getByRole('button', { name: 'Add cover' }));
+    await screen.findByRole('slider', { name: 'Cover position' });
+    await userEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+    expect(screen.queryByRole('slider')).not.toBeInTheDocument();
+    expect(disk.files.get('Rex.md')).toBe('---\ncover: sky.png\n---\n# Rex\n');
+    expect(document.querySelector<HTMLImageElement>('img[data-cover]')!.style.objectPosition).toBe(
+      '50% 50%',
+    );
+  });
+
+  it('with a cover, the image is the band background; breadcrumb, controls, tags and counts sit on it in veiled pills', async () => {
+    fakeDisk(
+      { 'Notes/Rex.md': '---\ncover: a.png\n---\n# Rex\n\n#hero\n' },
+      { links_resolve: resolveCovers },
+    );
+    const { container } = render(<PageScreen />);
+    await open('Notes/Rex.md');
+    await waitFor(() => expect(document.querySelector('img[data-cover]')).not.toBeNull());
+    const band = container.querySelector<HTMLElement>('[data-band]')!;
+    expect(band.dataset.band).toBe('cover');
+    expect(band).toContainElement(document.querySelector('img[data-cover]'));
+    const pills = band.querySelectorAll('[class*="pill"]');
+    expect(pills.length).toBeGreaterThanOrEqual(2);
+    const inPill = (el: Element | null) => [...pills].some((p) => p.contains(el));
+    expect(inPill(within(band).getByRole('navigation', { name: 'Breadcrumb' }))).toBe(true);
+    expect(inPill(within(band).getByRole('list', { name: 'Tags' }))).toBe(true);
+    expect(inPill(within(band).getByText('0 links · 0 backlinks'))).toBe(true);
+    expect(within(band).getByRole('group', { name: 'Editor mode' })).toBeInTheDocument();
+  });
+
+  it('without a cover, the band is plain and Add cover sits in its first row', async () => {
+    fakeDisk({ 'Rex.md': '# Rex\n' });
+    const { container } = render(<PageScreen />);
+    await open('Rex.md');
+    const band = container.querySelector<HTMLElement>('[data-band]')!;
+    expect(band.dataset.band).toBe('plain');
+    expect(band.querySelector('img')).toBeNull();
+    expect(within(band).getByRole('button', { name: 'Add cover' })).toBeInTheDocument();
+  });
+
+  it('cover actions and the mode switch carry icons beside their labels', async () => {
+    fakeDisk({ 'Rex.md': '---\ncover: a.png\n---\n# Rex\n' }, { links_resolve: resolveCovers });
+    render(<PageScreen />);
+    await open('Rex.md');
+    const band = await screen.findByRole('group', { name: 'Cover' });
+    await waitFor(() => expect(document.querySelector('img[data-cover]')).not.toBeNull());
+    for (const name of ['Change cover', 'Reposition', 'Remove']) {
+      const button = within(band).getByRole('button', { name });
+      expect(button.querySelector('svg'), name).not.toBeNull();
+      expect(button).toHaveClass('btn');
+    }
+    expect(within(band).getByRole('button', { name: 'Remove' })).toHaveClass('btn-danger');
+    for (const name of ['Live Preview', 'Source', 'Split']) {
+      const label = screen.getByRole('radio', { name }).closest('label')!;
+      expect(label.querySelector('svg'), name).not.toBeNull();
+    }
   });
 });

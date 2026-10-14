@@ -1,5 +1,20 @@
-import { useEffect, useRef, useState, type KeyboardEvent, type PointerEvent } from 'react';
+import {
+  useEffect,
+  useRef,
+  useState,
+  type KeyboardEvent,
+  type PointerEvent,
+  type ReactNode,
+} from 'react';
 import { useTranslation } from 'react-i18next';
+import {
+  CheckIcon,
+  ImagePlusIcon,
+  MoveVerticalIcon,
+  SmallCloseIcon,
+  SmallImageIcon,
+  TrashIcon,
+} from '../../app/icons';
 import { assetUrl, coverPick, linksResolve, type Page } from '../../ipc';
 import { useEditorStore } from '../../stores/editorStore';
 import { errorMessage } from '../../stores/messages';
@@ -7,12 +22,13 @@ import { useToastStore } from '../../stores/toastStore';
 import { useVaultStore } from '../../stores/vaultStore';
 import styles from './PageView.module.css';
 
+/** `of`: the `cover:` value the state was resolved for. */
 type CoverState =
   | { kind: 'none' }
-  | { kind: 'loading' }
-  | { kind: 'remote' }
-  | { kind: 'missing' }
-  | { kind: 'image'; path: string };
+  | { kind: 'loading'; of: string }
+  | { kind: 'remote'; of: string }
+  | { kind: 'missing'; of: string }
+  | { kind: 'image'; path: string; of: string };
 
 /** Where the page's `cover:` points (remote URLs are never loaded). */
 function useCover(page: Page): CoverState {
@@ -24,15 +40,15 @@ function useCover(page: Page): CoverState {
       return;
     }
     if (/^[a-z][a-z0-9+.-]*:/i.test(cover)) {
-      setState({ kind: 'remote' });
+      setState({ kind: 'remote', of: cover });
       return;
     }
     let live = true;
-    setState({ kind: 'loading' });
+    setState({ kind: 'loading', of: cover });
     void linksResolve(page.path, [{ kind: 'cover', target: cover }]).then((res) => {
       if (!live) return;
       const path = res.ok ? res.value[0] : null;
-      setState(path ? { kind: 'image', path } : { kind: 'missing' });
+      setState(path ? { kind: 'image', path, of: cover } : { kind: 'missing', of: cover });
     });
     return () => {
       live = false;
@@ -43,9 +59,27 @@ function useCover(page: Page): CoverState {
 
 const clamp = (y: number) => Math.min(100, Math.max(0, Math.round(y)));
 
-/** The page cover (M2c §2): add (upload), change, reposition, remove. Without
- *  an editable document it is shown read-only. */
-export function Cover({ page, editable }: { page: Page; editable: boolean }) {
+/** What the band's rows get from the cover: the "Add cover" button (no cover
+ *  yet, editable page) and the cover's own controls, both placed by the rows. */
+export interface CoverSlots {
+  addCover: ReactNode;
+  controls: ReactNode;
+}
+
+/** The page's header band (M4b §1) and its cover (M2c §2): with a cover, the
+ *  image is the band's background and the rows sit on it; without one the
+ *  band is plain. Add (upload), change, reposition and remove; a new cover
+ *  opens in reposition mode at once (M4b §2). Without an editable document
+ *  the cover is shown read-only. */
+export function Cover({
+  page,
+  editable,
+  children,
+}: {
+  page: Page;
+  editable: boolean;
+  children: (slots: CoverSlots) => ReactNode;
+}) {
   const { t } = useTranslation();
   const cover = useCover(page);
   const saved = page.coverY ?? 50;
@@ -57,11 +91,37 @@ export function Cover({ page, editable }: { page: Page; editable: boolean }) {
   const reposition = useRef<HTMLButtonElement>(null);
   const repositioning = draft !== null;
   useEffect(() => setDraft(null), [page.path, page.cover]);
-  // Focus moves into the slider and back to "Reposition" (never lost).
+  // A cover just picked opens in reposition mode once its image shows, so it
+  // is placed with one Save position (M4b §2). The pick removed `cover-y`.
+  const [placeNext, setPlaceNext] = useState<string | null>(null);
+  useEffect(() => setPlaceNext(null), [page.path]);
+  useEffect(() => {
+    // Only once the picked value itself has resolved: before that the state
+    // still describes the previous cover (or none).
+    if (!placeNext || cover.kind === 'none' || cover.kind === 'loading') return;
+    if (cover.of !== placeNext) return;
+    setPlaceNext(null);
+    if (cover.kind === 'image') {
+      fromPick.current = true;
+      setDraft(50);
+    } else setRefocus('change');
+  }, [placeNext, cover]);
+  // Focus moves into the slider and back to "Reposition" (never lost). After
+  // a pick it goes to the slider unless the user clicked or typed somewhere
+  // while the dialog was being answered (WebKit doesn't focus a clicked
+  // button, and the explorer may refocus its row, so where focus sits says
+  // little about intent).
+  const band = useRef<HTMLDivElement>(null);
+  const fromPick = useRef(false);
+  const movedOn = useRef(false);
   const entered = useRef(false);
   useEffect(() => {
-    if (repositioning) slider.current?.focus();
-    else if (entered.current) reposition.current?.focus();
+    const active = document.activeElement;
+    const inBand = !active || active === document.body || !!band.current?.contains(active);
+    if (repositioning && (inBand || (fromPick.current && !movedOn.current))) {
+      slider.current?.focus();
+    } else if (!repositioning && entered.current && inBand) reposition.current?.focus();
+    fromPick.current = false;
     entered.current = repositioning;
   }, [repositioning]);
 
@@ -84,7 +144,16 @@ export function Cover({ page, editable }: { page: Page; editable: boolean }) {
   const edit = useEditorStore.getState().editFrontmatter;
 
   const pick = async () => {
-    const res = await coverPick(page.path);
+    movedOn.current = false;
+    const activity = () => {
+      movedOn.current = true;
+    };
+    window.addEventListener('pointerdown', activity, true);
+    window.addEventListener('keydown', activity, true);
+    const res = await coverPick(page.path).finally(() => {
+      window.removeEventListener('pointerdown', activity, true);
+      window.removeEventListener('keydown', activity, true);
+    });
     // The editor may have moved on while the dialog was open: `edit` changes
     // the current page, so the result is then dropped rather than written into
     // another page (final review M8). The image is in the vault already.
@@ -101,7 +170,8 @@ export function Cover({ page, editable }: { page: Page; editable: boolean }) {
     }
     if (!moved) {
       const ok = await edit({ cover: res.value.reference, 'cover-y': null });
-      setRefocus(ok ? 'change' : settled);
+      if (ok) setPlaceNext(res.value.reference.trim());
+      else setRefocus(settled);
     }
     void useVaultStore.getState().refreshTree();
   };
@@ -150,22 +220,30 @@ export function Cover({ page, editable }: { page: Page; editable: boolean }) {
     drag.current = null;
   };
 
-  if (cover.kind === 'none') {
-    return editable ? (
-      <button ref={addButton} type="button" className={styles.addCover} onClick={() => void pick()}>
+  const addCover =
+    editable && cover.kind === 'none' ? (
+      <button
+        ref={addButton}
+        type="button"
+        className={`btn btn-secondary btn-sm ${styles.addCover}`}
+        onClick={() => void pick()}
+      >
+        <ImagePlusIcon />
         {t('cover.add')}
       </button>
     ) : null;
-  }
 
-  const controls = editable && (
+  const controls = editable && cover.kind !== 'none' && (
     <div className={styles.coverControls}>
       {repositioning ? (
         <>
-          <button type="button" className={styles.coverButton} onClick={() => void save()}>
+          <span className={`${styles.pill} ${styles.repositionHint}`}>{t('cover.dragHint')}</span>
+          <button type="button" className="btn btn-primary btn-sm" onClick={() => void save()}>
+            <CheckIcon />
             {t('cover.save')}
           </button>
-          <button type="button" className={styles.coverButton} onClick={() => setDraft(null)}>
+          <button type="button" className="btn btn-secondary btn-sm" onClick={() => setDraft(null)}>
+            <SmallCloseIcon />
             {t('cover.cancel')}
           </button>
         </>
@@ -174,22 +252,25 @@ export function Cover({ page, editable }: { page: Page; editable: boolean }) {
           <button
             ref={changeButton}
             type="button"
-            className={styles.coverButton}
+            className="btn btn-secondary btn-sm"
             onClick={() => void pick()}
           >
+            <SmallImageIcon />
             {t('cover.change')}
           </button>
           {cover.kind === 'image' && (
             <button
               ref={reposition}
               type="button"
-              className={styles.coverButton}
+              className="btn btn-secondary btn-sm"
               onClick={() => setDraft(saved)}
             >
+              <MoveVerticalIcon />
               {t('cover.reposition')}
             </button>
           )}
-          <button type="button" className={styles.coverButton} onClick={() => void remove()}>
+          <button type="button" className="btn btn-danger btn-sm" onClick={() => void remove()}>
+            <TrashIcon />
             {t('cover.remove')}
           </button>
         </>
@@ -197,57 +278,76 @@ export function Cover({ page, editable }: { page: Page; editable: boolean }) {
     </div>
   );
 
-  // Every band has the same shape (body, then controls), so the controls stay
-  // mounted while a changed cover loads and a focused button keeps focus.
-  if (cover.kind !== 'image') {
+  const rows = (
+    <div className={styles.bandRows}>{children({ addCover, controls: controls || null })}</div>
+  );
+  if (cover.kind === 'none') {
     return (
-      <div role="group" aria-label={t('cover.label')} className={styles.coverBand}>
-        {cover.kind === 'loading' ? (
-          <div className={styles.coverFrame} />
-        ) : (
+      <div ref={band} data-band="plain" className={styles.band}>
+        {rows}
+      </div>
+    );
+  }
+
+  // The background: the image (a slider while repositioning), or a muted
+  // band saying why there is none. One wrapper either way, so the image
+  // element survives entering the mode.
+  let layer: ReactNode;
+  if (cover.kind !== 'image') {
+    layer = (
+      <div className={styles.coverLayer}>
+        {cover.kind !== 'loading' && (
           <p className={styles.coverPlaceholder}>
             {t(cover.kind === 'remote' ? 'cover.remote' : 'cover.missing')}
           </p>
         )}
-        {controls}
       </div>
     );
-  }
-  const image = (
-    <img
-      data-cover
-      className={styles.cover}
-      src={assetUrl(cover.path)}
-      alt=""
-      draggable={false}
-      style={{ objectPosition: `50% ${y}%` }}
-    />
-  );
-  // One wrapper either way, so the image element survives entering the mode.
-  const sliderProps = repositioning
-    ? {
-        role: 'slider',
-        tabIndex: 0,
-        'aria-label': t('cover.position'),
-        'aria-valuemin': 0,
-        'aria-valuemax': 100,
-        'aria-valuenow': y,
-        'aria-valuetext': t('cover.positionValue', { value: y }),
-        'aria-orientation': 'vertical' as const,
-        className: styles.coverSlider,
-        onKeyDown,
-        onPointerDown,
-        onPointerMove,
-        onPointerUp,
-        onPointerCancel: onPointerUp,
-      }
-    : { className: styles.coverFrame };
-  return (
-    <div role="group" aria-label={t('cover.label')} className={styles.coverBand}>
+  } else {
+    const image = (
+      <img
+        data-cover
+        className={styles.cover}
+        src={assetUrl(cover.path)}
+        alt=""
+        draggable={false}
+        style={{ objectPosition: `50% ${y}%` }}
+      />
+    );
+    const sliderProps = repositioning
+      ? {
+          role: 'slider',
+          tabIndex: 0,
+          'aria-label': t('cover.position'),
+          'aria-valuemin': 0,
+          'aria-valuemax': 100,
+          'aria-valuenow': y,
+          'aria-valuetext': t('cover.positionValue', { value: y }),
+          'aria-orientation': 'vertical' as const,
+          className: `${styles.coverLayer} ${styles.coverSlider}`,
+          onKeyDown,
+          onPointerDown,
+          onPointerMove,
+          onPointerUp,
+          onPointerCancel: onPointerUp,
+        }
+      : { className: styles.coverLayer };
+    layer = (
       <div ref={slider} {...sliderProps}>
         {image}
       </div>
-      {controls}
+    );
+  }
+  return (
+    <div
+      ref={band}
+      data-band="cover"
+      role="group"
+      aria-label={t('cover.label')}
+      className={`${styles.band} ${styles.bandCover} ${repositioning ? styles.repositioning : ''}`}
+    >
+      {layer}
+      {rows}
     </div>
   );
 }

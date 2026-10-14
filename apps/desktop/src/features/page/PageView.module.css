@@ -19,14 +19,6 @@
   flex-direction: column;
 }
 
-.header {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  padding: 16px 40px 12px;
-  border-bottom: 1px solid var(--color-border);
-}
-
 .bar {
   display: flex;
   align-items: center;
@@ -96,6 +88,9 @@
 .mode,
 .modeOn {
   position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
   font: 600 12.5px var(--font-body);
   padding: 4px 10px;
   border-radius: var(--radius-sm);
@@ -133,14 +128,67 @@
   white-space: nowrap;
 }
 
-/* Cover band (M2c §2): image, placeholder or reposition slider, with the
-   buttons at the bottom right (shown on hover and keyboard focus). */
-.coverBand {
+/* The header band (M4b §1): one compact strip under the top bar. With a
+   cover, the image is its background (132 px) and the rows sit on it in
+   pills of translucent surface (--color-surface-veil), readable on any image;
+   without one the band is just its two rows. */
+.band {
   position: relative;
-  height: 200px;
-  border-radius: var(--radius-lg);
-  overflow: hidden;
+  flex: none;
+  border-bottom: 1px solid var(--color-border);
+  background: var(--color-surface);
+}
+
+.bandCover {
+  min-height: 132px;
   background: var(--color-surface-subtle);
+}
+
+.bandRows {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 40px;
+}
+
+.bandCover .bandRows {
+  box-sizing: border-box;
+  min-height: 132px;
+  justify-content: space-between;
+}
+
+.bandCover .pill {
+  background: var(--color-surface-veil);
+  border-radius: var(--radius-md);
+  padding: 4px 10px;
+  box-shadow: 0 1px 3px rgb(0 0 0 / 0.08);
+}
+
+.bandFoot {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+}
+
+.facts {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  min-width: 0;
+}
+
+/* The cover behind the rows: the image, a slider while repositioning, or a
+   muted band saying why there is none. */
+.coverLayer {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
 }
 
 .cover {
@@ -151,12 +199,7 @@
   user-select: none;
 }
 
-.coverFrame {
-  height: 100%;
-}
-
 .coverSlider {
-  height: 100%;
   cursor: ns-resize;
   touch-action: none;
 }
@@ -172,55 +215,69 @@
   height: 100%;
   margin: 0;
   color: var(--color-text-muted);
-  font-size: 14px;
+  font-size: 13px;
 }
 
+/* Change / Reposition / Remove at the band's bottom right, shown on hover
+   and keyboard focus (separate rules: WebKit before 15.4 drops a selector
+   list holding :focus-within/:focus-visible). */
 .coverControls {
-  position: absolute;
-  right: 12px;
-  bottom: 12px;
   display: flex;
+  align-items: center;
   gap: 6px;
+  margin-left: auto;
   opacity: 0;
   transition: opacity 120ms ease;
 }
 
-.coverBand:hover .coverControls,
-.coverBand:focus-within .coverControls {
+.band:hover .coverControls {
   opacity: 1;
 }
 
-.coverButton,
+.coverControls:focus-within {
+  opacity: 1;
+}
+
+/* Repositioning: only the image and Save / Cancel; the image takes the
+   pointer through the rows. */
+.repositioning .coverControls {
+  opacity: 1;
+}
+
+.repositioning .bandRows {
+  pointer-events: none;
+}
+
+.repositioning .coverControls {
+  pointer-events: auto;
+}
+
+.repositioning .bar {
+  visibility: hidden;
+}
+
+.repositioning .facts {
+  visibility: hidden;
+}
+
+.repositionHint {
+  font-size: 12.5px;
+  color: var(--color-text);
+}
+
+.band .repositionHint {
+  background: var(--color-surface-veil);
+  border-radius: var(--radius-md);
+  padding: 4px 10px;
+}
+
+/* Add cover: in the first row, shown on hover and focus, always in the Tab
+   order. */
 .addCover {
-  height: 28px;
-  padding: 0 10px;
-  border: 1px solid var(--color-border-strong);
-  border-radius: var(--radius-sm);
-  background: var(--color-surface);
-  color: var(--color-text-body);
-  font: 600 12.5px var(--font-body);
-  cursor: pointer;
-}
-
-.coverButton:hover,
-.addCover:hover {
-  border-color: var(--color-accent);
-}
-
-.coverButton:focus-visible,
-.addCover:focus-visible {
-  outline: 2px solid var(--color-focus);
-  outline-offset: 2px;
-}
-
-.addCover {
-  align-self: flex-start;
   opacity: 0;
 }
 
-/* Separate rules: WebKit before 15.4 drops a whole selector list that holds
-   :focus-visible (final review M9). Any focus shows it, even there. */
-.header:hover .addCover {
+.band:hover .addCover {
   opacity: 1;
 }
 
@@ -283,7 +340,7 @@
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
-  margin: 4px 0 0;
+  margin: 0;
   padding: 0;
 }
 

@@ -284,6 +284,7 @@
     "cancel": "Cancelar",
     "position": "Posición de la portada",
     "positionValue": "{value} % desde arriba",
+    "dragHint": "Arrastra la imagen para colocarla",
     "remote": "Portada remota no cargada (privacidad)",
     "missing": "No se encuentra la imagen de portada"
   },
