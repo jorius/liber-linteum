@@ -1,5 +1,5 @@
 import type { TFunction } from 'i18next';
-import { useEffect, useId, useState, type KeyboardEvent } from 'react';
+import { useEffect, useId, useRef, useState, type KeyboardEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { vaultSettingsGet, vaultSettingsSet, type AttachmentMode } from '../../ipc';
 import { errorMessage } from '../../stores/messages';
@@ -29,11 +29,15 @@ export function VaultSettingsSection() {
   const [obsidian, setObsidian] = useState<string | null>(null);
   const [loaded, setLoaded] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // What `.nimw/vault.json` holds (as loaded, then as last saved): saving the
+  // same again would create `.nimw/` for nothing (final review M5).
+  const stored = useRef<{ mode: AttachmentMode; path: string } | null>(null);
 
   useEffect(() => {
     let live = true;
     void vaultSettingsGet().then((res) => {
       if (!live || !res.ok || !res.value?.attachments) return;
+      stored.current = res.value.attachments;
       setMode(res.value.attachments.mode);
       setPath(res.value.attachments.path);
       setObsidian(res.value.obsidian);
@@ -45,9 +49,14 @@ export function VaultSettingsSection() {
   }, []);
 
   const save = async (nextMode: AttachmentMode, nextPath: string) => {
+    const was = stored.current;
+    if (was && was.mode === nextMode && was.path === nextPath) return;
     const res = await vaultSettingsSet({ attachments: { mode: nextMode, path: nextPath } });
     if (!res.ok) setError(errorMessage(res.error));
-    else setError(null);
+    else {
+      stored.current = { mode: nextMode, path: nextPath };
+      setError(null);
+    }
   };
   const problem = (value: string): string | null => {
     const parts = mode === 'folder' ? value.split('/') : [value];

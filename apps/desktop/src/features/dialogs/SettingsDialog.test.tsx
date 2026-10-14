@@ -223,6 +223,35 @@ describe('Settings → This vault (M2c §5.4)', () => {
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
   });
 
+  it('tabbing through the untouched field writes nothing (no .nimw/ for nothing; final review M5)', async () => {
+    open();
+    const where = await screen.findByRole('combobox', { name: 'New attachments go to' });
+    await waitFor(() => expect(where).toBeEnabled());
+    const field = screen.getByRole('textbox', { name: 'Subfolder name' });
+    field.focus();
+    fireEvent.blur(field);
+    await userEvent.click(field);
+    await userEvent.keyboard('{Enter}');
+    await userEvent.tab();
+    await new Promise((r) => setTimeout(r, 20));
+    expect(vaultPatches).toEqual([]);
+  });
+
+  it('a value saved on Enter is not saved again on blur (final review M5)', async () => {
+    open();
+    const where = await screen.findByRole('combobox', { name: 'New attachments go to' });
+    await waitFor(() => expect(where).toBeEnabled());
+    const field = screen.getByRole('textbox', { name: 'Subfolder name' });
+    await userEvent.clear(field);
+    await userEvent.type(field, 'files{Enter}');
+    await waitFor(() =>
+      expect(vaultPatches).toEqual([{ attachments: { mode: 'subfolder', path: 'files' } }]),
+    );
+    await userEvent.tab();
+    await new Promise((r) => setTimeout(r, 20));
+    expect(vaultPatches).toHaveLength(1);
+  });
+
   it("Obsidian's setting wins: shown read-only with where files go", async () => {
     obsidian = './assets';
     open();
