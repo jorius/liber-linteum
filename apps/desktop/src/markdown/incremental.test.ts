@@ -182,6 +182,20 @@ describe('incremental re-parse (M2a §7: typing in a 5,000-line note)', () => {
     expect(page).toEqual(parsePage(typed));
   });
 
+  it('a file starting with a byte-order mark: typing anywhere equals the full parse (final review I4)', () => {
+    const text = '\uFEFFIntro\n\nP1\n\nP2\n\nP3\n\nP4\n';
+    for (const [a, b] of [
+      ['Intro', 'IntroX'],
+      ['P2', 'P2X'],
+      ['\uFEFF', ''],
+      ['Intro', '---\n\nIntro'],
+    ]) {
+      const typed = text.replace(a, b);
+      expect(reparse(parsePage(text), text, typed), `${a} → ${b}`).toEqual(parsePage(typed));
+      expect(reparse(parsePage(typed), typed, text), `${b} → ${a}`).toEqual(parsePage(text));
+    }
+  });
+
   it('returns the previous model for identical text', () => {
     const page = parsePage('# A\n');
     expect(reparse(page, '# A\n', '# A\n')).toBe(page);

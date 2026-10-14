@@ -91,7 +91,7 @@ export function reparse(prev: ParsedPage, prevText: string, text: string): Parse
   const blocks = prev.tree.children;
   // Frontmatter stays a fixed first block as long as the edit is past its end.
   const fixed = blocks[0]?.type === 'yaml' ? 1 : 0;
-  if (blocks.length - fixed < 3 || (!fixed && text.startsWith('---'))) return parsePage(text);
+  if (blocks.length - fixed < 3 || (!fixed && /^\uFEFF?---/.test(text))) return parsePage(text);
   // The changed region: [from, oldTo) in prevText became [from, newTo) in text.
   let from = 0;
   const max = Math.min(prevText.length, text.length);
@@ -116,6 +116,10 @@ export function reparse(prev: ParsedPage, prevText: string, text: string): Parse
   const sliceStart = lineStart(prevText, begin(blocks[first]));
   const oldEnd = end(blocks[last]);
   if (from < sliceStart || oldTo > oldEnd) return parsePage(text);
+  // A slice holding a byte-order mark: the full parse shifts past it.
+  if (sliceStart === 0 && (text.charCodeAt(0) === 0xfeff || prevText.charCodeAt(0) === 0xfeff)) {
+    return parsePage(text);
+  }
   // A comment reaching into the slice: its masking and pairing need the whole page.
   if (prev.comments.some(([s, e]) => s < oldEnd && e > sliceStart)) return parsePage(text);
   if (first > 0 && indentedCode(blocks[first - 1], prevText)) return parsePage(text);

@@ -446,6 +446,14 @@ export function moveBlock(
   const planned = plan(text, model, unit, slot, !!options.lineOnly);
   if (!planned) return null;
   const { move, topDelta } = planned;
+  // Edits CodeMirror applies just as `applyChanges` does: in order, apart,
+  // inside the text. Anything else (a model of other text) is refused, so the
+  // guard never judges a text the editor wouldn't show (final review I4).
+  const apart = move.changes.every(
+    (c, i) =>
+      c.from <= c.to && c.to <= text.length && (i === 0 || c.from >= move.changes[i - 1].to),
+  );
+  if (!apart) return { refused: true };
   const next = applyChanges(text, move.changes);
   if (frontHead(next) !== null && frontHead(next) !== frontHead(text)) return { refused: true };
   const ok = holdsTheSameBlocks(text, next, model, move.changes, {

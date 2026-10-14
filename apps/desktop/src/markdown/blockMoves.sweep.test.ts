@@ -252,6 +252,11 @@ const GENERATORS: Record<string, Generator> = {
         ? pick(r, [['---'], ['---  '], [`${w.word()}: ${w.word()}`], ['...'], [w.word(), '---']])
         : null,
   },
+  // I4: a byte-order mark first (files from Windows tools), front matter or not.
+  bom: {
+    block: () => null,
+    head: (r, w) => `\uFEFF${r() < 0.2 ? `---\ntitle: ${w.word()}\n---\n` : ''}`,
+  },
   // I3: top-level lists indented 2 or 3 spaces (pasted content), which nest
   // under a list moved in front of them.
   indentedLists: {
@@ -433,6 +438,7 @@ describe('the sweep’s fuzz: random notes × random moves (final review)', () =
     ['ordinary', 1, 20],
     ['frontRules', 3, 25],
     ['indentedLists', 8, 8],
+    ['bom', 5, 20],
   ] as const)(
     '%s notes (seed %i, %i notes): every accepted move keeps the note',
     (name, seed, notes) => {

@@ -1,6 +1,7 @@
 // The single Markdown model (M2a spec §2): unified + remark + our extensions.
 // Drives Live Preview decorations, the rendered pane and (M4) block dragging.
 import type { Image, Link, Parent, Root, RootContent, Text } from 'mdast';
+import type { Node, Point } from 'unist';
 import remarkFrontmatter from 'remark-frontmatter';
 import remarkGfm from 'remark-gfm';
 import remarkParse from 'remark-parse';
@@ -166,12 +167,46 @@ export function finishPage(tree: Root, comments: [number, number][]): ParsedPage
   };
 }
 
-/** Parses one page. Pure and synchronous; positions are UTF-16 offsets into `text`. */
-export function parsePage(text: string): ParsedPage {
+/** Every position in `tree` `by` characters on (the first line's columns too). */
+function shiftTree(tree: Root, by: number) {
+  const point = (p: Point): Point => ({
+    line: p.line,
+    column: p.line === 1 ? p.column + by : p.column,
+    offset: p.offset! + by,
+  });
+  const walk = (n: Node) => {
+    // New objects: a position may be shared by two nodes (a callout and its quote).
+    if (n.position) n.position = { start: point(n.position.start), end: point(n.position.end) };
+    for (const c of ((n as Parent).children as Node[] | undefined) ?? []) walk(c);
+  };
+  walk(tree);
+}
+
+/** The tree and comments of `text` (no byte-order mark). */
+function parseBody(text: string): { tree: Root; comments: [number, number][] } {
   const loc = locator(text);
   // Comments are blanked (same length) and the page re-parsed, so positions
   // still index `text` but nothing inside a comment renders or links.
   const comments = findComments(text, processorFor(text).parse(text) as Root);
   const source = maskComments(text, comments);
-  return finishPage(parseTree(source, loc), comments);
+  return { tree: parseTree(source, loc), comments };
+}
+
+/** Parses one page. Pure and synchronous; positions are UTF-16 offsets into `text`. */
+export function parsePage(text: string): ParsedPage {
+  // micromark skips a leading byte-order mark and counts offsets after it,
+  // while the editor holds the mark: parse without it, then shift every
+  // position past it (final review I4).
+  if (text.charCodeAt(0) === 0xfeff) {
+    const { tree, comments } = parseBody(text.slice(1));
+    shiftTree(tree, 1);
+    // The page itself still starts at the mark.
+    if (tree.position) tree.position.start = { line: 1, column: 1, offset: 0 };
+    return finishPage(
+      tree,
+      comments.map(([s, e]) => [s + 1, e + 1]),
+    );
+  }
+  const { tree, comments } = parseBody(text);
+  return finishPage(tree, comments);
 }

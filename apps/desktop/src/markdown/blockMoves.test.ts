@@ -1,6 +1,8 @@
+import { ChangeSet, Text } from '@codemirror/state';
 import { describe, expect, it } from 'vitest';
 import { movableBlocks, type BlockModel, type Slot, type Unit } from './blockModel';
-import { applyChanges, moveBlock } from './blockMoves';
+import { applyChanges, moveBlock, planMove } from './blockMoves';
+import type { TextChange } from './frontmatterEdit';
 import { parsePage } from './parse';
 
 const model = (text: string): BlockModel => movableBlocks(text, parsePage(text));
@@ -9,7 +11,8 @@ const model = (text: string): BlockModel => movableBlocks(text, parsePage(text))
 const named = (m: BlockModel, text: string, start: string): Unit => {
   const top = start.startsWith('top:');
   const s = top ? start.slice(4) : start;
-  const line = text.lastIndexOf('\n', text.indexOf(s) - 1) + 1;
+  // (A byte-order mark is no part of the first line.)
+  const line = Math.max(text.lastIndexOf('\n', text.indexOf(s) - 1) + 1, m.contentStart);
   const found = m.units
     .filter((x) => x.from === line && (!top || x.scope === 'top'))
     .sort((x, y) => x.to - x.from - (y.to - y.from))[0];
@@ -118,6 +121,75 @@ describe('moving top-level blocks (M4 §3)', () => {
   it('a slot that leaves the block where it is gives nothing', () => {
     expect(move('P1\n\nP2\n', 'P1', 'P2')).toBeNull();
     expect(move('P1\n\nP2\n', 'P2', null)).toBeNull();
+  });
+});
+
+describe('a file starting with a byte-order mark (final review I4)', () => {
+  const BOM = '\uFEFF';
+  /** The move's text, which CodeMirror's change set must give too. */
+  function moved(text: string, what: string, before: string | null) {
+    const out = move(text, what, before);
+    if (typeof out !== 'string') return out;
+    const m = model(text);
+    const r = moveBlock(text, m, named(m, text, what), {
+      scope: 'top',
+      before: before === null ? null : named(m, text, before).id,
+    });
+    const cm = ChangeSet.of((r as { changes: TextChange[] }).changes, text.length)
+      .apply(Text.of(text.split('\n')))
+      .toString();
+    expect(cm).toBe(out);
+    return out;
+  }
+
+  it('blocks start after the mark, and moves keep it first', () => {
+    const text = `${BOM}Para one\n\nPara two\n\nPara three\n`;
+    const m = model(text);
+    expect(m.units.map((u) => text.slice(u.from, u.to))).toEqual([
+      'Para one',
+      'Para two',
+      'Para three',
+    ]);
+    expect(moved(text, 'Para three', 'Para one')).toBe(
+      `${BOM}Para three\n\nPara one\n\nPara two\n`,
+    );
+    expect(moved(text, 'Para one', null)).toBe(`${BOM}Para two\n\nPara three\n\nPara one\n`);
+    expect(moved(`${BOM}Title\n---\n\nSecond para\n`, 'Second para', 'Title')).toBe(
+      `${BOM}Second para\n\nTitle\n---\n`,
+    );
+  });
+
+  it('list items and table rows move too', () => {
+    const text = `${BOM}- a\n- b\n`;
+    const m = model(text);
+    const items = m.units.filter((u) => u.scope === 'item');
+    const r = moveBlock(text, m, items[1], { scope: 'item', list: 0, before: items[0].id });
+    expect(r && 'changes' in r && applyChanges(text, r.changes)).toBe(`${BOM}- b\n- a\n`);
+    const table = `${BOM}| h |\n|---|\n| 1 |\n| 2 |\n`;
+    const t = model(table);
+    const rows = t.units.filter((u) => u.scope === 'row');
+    const s = moveBlock(table, t, rows[1], { scope: 'row', table: 0, before: rows[0].id });
+    expect(s && 'changes' in s && applyChanges(table, s.changes)).toBe(
+      `${BOM}| h |\n|---|\n| 2 |\n| 1 |\n`,
+    );
+  });
+
+  it('edits that overlap are refused: the guard and CodeMirror would apply them differently', () => {
+    // A model whose offsets miss the mark by one (what every BOM file got).
+    const text = `${BOM}gamma297\n---\n\n%%c298%% eps299 *iota300*\ngamma301 [[eta302]] #tag303\n`;
+    const stale = movableBlocks(text, parsePage(text.slice(1)));
+    const last = stale.units[stale.units.length - 1];
+    // Planned: delete [13, 68) and insert at 14.
+    const planned = planMove(text, stale, last, { scope: 'top', before: 1 })!;
+    expect(planned.changes[1].from).toBeLessThan(planned.changes[0].to);
+    expect(moveBlock(text, stale, last, { scope: 'top', before: 1 })).toEqual({ refused: true });
+  });
+
+  it('front matter after the mark stays first; a rule never becomes it', () => {
+    expect(moved(`${BOM}---\na: 1\n---\nP1\n\nP2\n`, 'P2', 'P1')).toBe(
+      `${BOM}---\na: 1\n---\nP2\n\nP1\n`,
+    );
+    expect(move(`${BOM}Intro\n\n---\n\nA\n\n---\n\nB\n`, 'Intro', 'A')).toBe('refused');
   });
 });
 

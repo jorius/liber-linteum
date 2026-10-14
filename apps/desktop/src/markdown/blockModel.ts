@@ -87,7 +87,11 @@ export type Slot =
 const start = (n: Node) => n.position!.start.offset!;
 const end = (n: Node) => n.position!.end.offset!;
 
-const lineStartAt = (text: string, pos: number) => text.lastIndexOf('\n', pos - 1) + 1;
+/** A leading byte-order mark is no text: the first line starts after it. */
+const bomOf = (text: string) => (text.charCodeAt(0) === 0xfeff ? 1 : 0);
+
+const lineStartAt = (text: string, pos: number) =>
+  Math.max(text.lastIndexOf('\n', pos - 1) + 1, bomOf(text));
 function lineEndAt(text: string, pos: number): number {
   let e = pos;
   while (e < text.length && text[e] !== '\n' && text[e] !== '\r') e++;
@@ -136,7 +140,7 @@ export function movableBlocks(text: string, page: ParsedPage): BlockModel {
   const lists: ListInfo[] = [];
   const tables: TableInfo[] = [];
   const fm = page.frontmatter;
-  const contentStart = fm ? Math.min(text.length, lineEndAt(text, fm.range[1]) + 1) : 0;
+  const contentStart = fm ? Math.min(text.length, lineEndAt(text, fm.range[1]) + 1) : bomOf(text);
 
   const add = (u: Omit<Unit, 'id'>): Unit => {
     const unit = { ...u, id: units.length } as Unit;

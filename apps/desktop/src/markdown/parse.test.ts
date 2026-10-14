@@ -139,6 +139,21 @@ describe('review focus: offsets', () => {
     const links = findAll<WikiLink>(parsePage(src).tree, 'wikiLink');
     expect(links.map((l) => slice(src, l))).toEqual(['[[A]]', '[[B|b]]']);
   });
+
+  it('a file starting with a byte-order mark keeps exact positions: the mark is no text (final review I4)', () => {
+    const src = '\uFEFF# Title [[A]]\n\nText %%c%% [[B]] #tag\n';
+    const page = parsePage(src);
+    expect(page.tree.children.map((n) => slice(src, n))).toEqual([
+      '# Title [[A]]',
+      'Text %%c%% [[B]] #tag',
+    ]);
+    expect(page.links.map((l) => src.slice(...l.range))).toEqual(['[[A]]', '[[B]]']);
+    expect(page.comments.map(([s, e]) => src.slice(s, e))).toEqual(['%%c%%']);
+    expect(page.tree.children[0].position!.start).toEqual({ line: 1, column: 2, offset: 1 });
+    // Front matter after the mark.
+    const fm = '\uFEFF---\na: 1\n---\nBody\n';
+    expect(fm.slice(...parsePage(fm).frontmatter!.range)).toBe('---\na: 1\n---');
+  });
 });
 
 describe('inline extensions keep mdast text values (I6)', () => {
