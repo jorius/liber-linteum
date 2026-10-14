@@ -401,6 +401,40 @@ function rowMove(text: string, model: BlockModel, unit: Unit, slot: Slot & { sco
   };
 }
 
+/** The edits of a move before the guard sees them, and how many top-level
+ *  lists it adds (an item becoming one) or takes away (a list's last item
+ *  leaving). */
+function plan(
+  text: string,
+  model: BlockModel,
+  unit: Unit,
+  slot: Slot,
+  lineOnly: boolean,
+): { move: Move; topDelta: number } | null {
+  if (!slotsFor(model, unit, lineOnly).some((s) => sameSlot(s, slot))) return null;
+  if (unit.scope === 'top' && slot.scope === 'top') {
+    const before = slot.before === null ? null : model.units[slot.before];
+    return { move: topMove(text, model, unit, before, lineOnly), topDelta: 0 };
+  }
+  if (unit.scope === 'item') return itemMove(text, model, unit, slot);
+  if (unit.scope === 'row' && slot.scope === 'row') {
+    return { move: rowMove(text, model, unit, slot), topDelta: 0 };
+  }
+  return null;
+}
+
+/** A move's edits without the guard: what `moveBlock` would check (tests use
+ *  it to tell a refusal that saves a block from one that needn't be). */
+export function planMove(
+  text: string,
+  model: BlockModel,
+  unit: Unit,
+  slot: Slot,
+  options: MoveOptions = {},
+): Move | null {
+  return plan(text, model, unit, slot, !!options.lineOnly)?.move ?? null;
+}
+
 /** Moves `unit` to `slot` (M4 §3). */
 export function moveBlock(
   text: string,
@@ -409,26 +443,25 @@ export function moveBlock(
   slot: Slot,
   options: MoveOptions = {},
 ): MoveResult {
-  const lineOnly = !!options.lineOnly;
-  if (!slotsFor(model, unit, lineOnly).some((s) => sameSlot(s, slot))) return null;
-  let move: Move | null = null;
-  let topDelta = 0;
-  if (unit.scope === 'top' && slot.scope === 'top') {
-    move = topMove(
-      text,
-      model,
-      unit,
-      slot.before === null ? null : model.units[slot.before],
-      lineOnly,
-    );
-  } else if (unit.scope === 'item') {
-    const r = itemMove(text, model, unit, slot);
-    if (r) ({ move, topDelta } = r);
-  } else if (unit.scope === 'row' && slot.scope === 'row') {
-    move = rowMove(text, model, unit, slot);
-  }
-  if (!move) return null;
-  return holdsTheSameBlocks(text, model, move.changes, topDelta) ? move : { refused: true };
+  const planned = plan(text, model, unit, slot, !!options.lineOnly);
+  if (!planned) return null;
+  const { move, topDelta } = planned;
+  const next = applyChanges(text, move.changes);
+  if (frontHead(next) !== null && frontHead(next) !== frontHead(text)) return { refused: true };
+  return holdsTheSameBlocks(text, next, model, move.changes, topDelta) ? move : { refused: true };
+}
+
+/** The note's head as some front matter reader may take it: a leading `---`
+ *  line (trailing spaces or tabs allowed) through the first later `---` or
+ *  `...` line, or the `---` line alone when none closes it; null when the
+ *  note doesn't open that way. A move must never give a note a head it didn't
+ *  have: the blocks up to the next `---` would turn into YAML (final review
+ *  C1). Losing one is fine: the rule, or what's above it, becomes a block. */
+function frontHead(text: string): string | null {
+  const open = /^\uFEFF?---[ \t]*(?:\r\n?|\n)/.exec(text);
+  if (!open) return null;
+  const close = /(?:^|[\r\n])(?:---|\.\.\.)[ \t]*(?=[\r\n]|$)/.exec(text.slice(open[0].length));
+  return close ? text.slice(0, open[0].length + close.index + close[0].length) : open[0];
 }
 
 // ---- the guard ------------------------------------------------------------
@@ -526,11 +559,11 @@ function windows(text: string, model: BlockModel, changes: TextChange[]): [numbe
  *  around the edits are parsed, so a 200 KB note stays fast (amendment). */
 function holdsTheSameBlocks(
   text: string,
+  next: string,
   model: BlockModel,
   changes: TextChange[],
   topLists = 0,
 ): boolean {
-  const next = applyChanges(text, changes);
   // A list item dropped among the top-level blocks makes a new list; the
   // last item leaving a list takes the list away.
   const before: string[] = Array.from({ length: Math.max(0, topLists) }, () => 'top:list');

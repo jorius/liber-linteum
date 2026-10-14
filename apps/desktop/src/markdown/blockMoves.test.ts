@@ -85,6 +85,36 @@ describe('moving top-level blocks (M4 §3)', () => {
     expect(move(text, '> quote', 'End.')).toBe('P0\n\nP1\n\nP2\n\nP3\n\n---\n\n> quote\n\nEnd.\n');
   });
 
+  it('never leaves a `---` line first: the note would open front matter (final review C1)', () => {
+    // Everything up to the next `---` would turn into YAML properties.
+    const meeting =
+      'Meeting intro\n\n---\n\nFirst point.\n\nSecond point.\n\nThird point.\n\n---\n\n## Actions\n\nCall Ana\n';
+    expect(move(meeting, 'Meeting intro', 'First point.')).toBe('refused');
+    expect(move(meeting, 'Meeting intro', null)).toBe('refused');
+    const props = 'status: draft\n\n---\n\ntags: x\n\nowner: me\n\n---\n\nBody\n';
+    expect(move(props, 'status: draft', 'tags: x')).toBe('refused');
+    // A rule moved to the top, closed or not further down.
+    expect(move('Intro\n\n---\n\nA\n', '---', 'Intro')).toBe('refused');
+    expect(move('Intro\n\nA\n\n---\n\nB\n\n---\n\nC\n', '---', 'Intro')).toBe('refused');
+    // Alt on a first heading leaves the rule after it first.
+    expect(move('# Title\n\n---\n\nA\n\n## B\n\nb\n', '# Title', null, true)).toBe('refused');
+    // A first list moved away; a setext underline closing the block.
+    expect(move('- a\n- b\n\n---\n\nP\n\nQ\n', 'top:- a', null)).toBe('refused');
+    expect(move('Intro\n\n---\n\nA\n\nTitle\n---\n\nE\n', 'Intro', 'E')).toBe('refused');
+    // CRLF, and a closer with trailing spaces.
+    expect(move('Intro\r\n\r\n---\r\n\r\nA\r\n\r\n---  \r\n\r\nB\r\n', 'Intro', 'B')).toBe(
+      'refused',
+    );
+  });
+
+  it('other rules may go first, and a leading `---` that nothing closes may stay or go', () => {
+    expect(move('Intro\n\n***\n\nA\n', '***', 'Intro')).toBe('***\n\nIntro\n\nA\n');
+    // A block above an unclosed leading rule, or reordered below it.
+    expect(move('---\n\nA\n\nB\n', 'B', '---')).toBe('B\n\n---\n\nA\n');
+    expect(move('---\n\nA\n\nB\n', 'B', 'A')).toBe('---\n\nB\n\nA\n');
+    expect(move('---\n\nA\n\nB\n', '---', null)).toBe('A\n\nB\n\n---\n');
+  });
+
   it('a slot that leaves the block where it is gives nothing', () => {
     expect(move('P1\n\nP2\n', 'P1', 'P2')).toBeNull();
     expect(move('P1\n\nP2\n', 'P2', null)).toBeNull();
