@@ -64,7 +64,7 @@ export function IndexPickDialog({
         <label className={styles.field}>
           <span>{t('gv.indexPick.search')}</span>
           <input
-            className={styles.hexInput}
+            className={styles.textInput}
             type="search"
             value={query}
             onChange={(e) => setQuery(e.target.value)}

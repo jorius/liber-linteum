@@ -5,7 +5,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { clearMocks } from '../../ipc/testing';
 import { resetEditorStore } from '../../stores/editorStore';
 import { fakeDisk } from '../../test/fakeDisk';
-import { RelationsDialog } from './RelationsDialog';
+import { LABEL_MAX, RelationsDialog } from './RelationsDialog';
 
 /** `[[X]]` resolves to `X.md`; the shortest target is the stem. */
 const extra = {
@@ -109,6 +109,18 @@ describe('relationships dialog (M3b §3)', () => {
     expect(screen.getByRole('group', { name: 'A → D' })).toBeVisible();
     expect(disk.writes()).toEqual([]);
     expect(screen.getByRole('dialog')).toContainElement(document.activeElement as HTMLElement);
+  });
+
+  it('the Label field is a text field with room for its 40 characters (final review m12)', async () => {
+    fakeDisk({ 'A.md': '---\nrelated:\n  - "[[B]]"\n---\n', 'B.md': '' }, extra);
+    render(<RelationsDialog page="A.md" onClose={vi.fn()} />);
+    const input = await screen.findByRole('textbox', { name: 'Label' });
+    expect(input).toHaveAttribute('maxLength', String(LABEL_MAX));
+    // Not the settings' 10ch monospace hex field: the dialog's width, in the
+    // body font.
+    const field = getComputedStyle(input);
+    expect(field.font).toBe('400 14px var(--font-body)');
+    expect(field.width).toBe('100%');
   });
 
   it('a page without any says how to add one; no axe violations', async () => {

@@ -123,7 +123,7 @@ function RelationRow({
       <label className={styles.field}>
         <span>{t('gv.relations.label')}</span>
         <input
-          className={styles.hexInput}
+          className={styles.textInput}
           type="text"
           maxLength={LABEL_MAX}
           value={label}

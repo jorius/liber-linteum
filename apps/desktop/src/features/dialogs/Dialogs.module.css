@@ -196,6 +196,24 @@
   border-color: var(--color-warn-border);
 }
 
+/* A field in a fieldset takes its own row (a relationship's label). */
+.fieldset > .field {
+  flex: 1 1 100%;
+}
+
+/* A text field (a relationship's label, up to 40 characters; a search): the
+   body font, the dialog's width (M3b final review m12). */
+.textInput {
+  box-sizing: border-box;
+  font: 400 14px var(--font-body);
+  width: 100%;
+  color: var(--color-text);
+  background: var(--color-surface-subtle);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-md);
+  padding: 6px 8px;
+}
+
 .error {
   margin: 0;
   font-size: 13px;

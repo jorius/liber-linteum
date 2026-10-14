@@ -66,7 +66,11 @@ describe('index note pick (M3b §4)', () => {
     const pages = Array.from({ length: 12 }, (_, i) => ({ path: `Big/p${i}.md`, kind: 'page' }));
     useVaultStore.setState({ nodes: [{ path: 'Big', kind: 'folder' }, ...pages] } as never);
     render(<IndexPickDialog folder="Big" current={null} onClose={vi.fn()} />);
-    await userEvent.type(screen.getByRole('searchbox', { name: 'Find a page' }), 'p1');
+    const search = screen.getByRole('searchbox', { name: 'Find a page' });
+    // A text field, not the settings' monospace hex field (final review m12).
+    expect(getComputedStyle(search).font).toBe('400 14px var(--font-body)');
+    expect(getComputedStyle(search).width).toBe('100%');
+    await userEvent.type(search, 'p1');
     expect(screen.getAllByRole('radio').map((r) => r.closest('label')?.textContent)).toEqual([
       'No index note',
       'p1',
