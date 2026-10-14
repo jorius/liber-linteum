@@ -130,7 +130,9 @@ export function CreatePageDialog({
   );
   const { dir, name, missing } = createTarget(source, target, folders);
   const folder = dir || (useVaultStore.getState().info?.name ?? '');
-  const bad = [...dir.split('/').filter(Boolean), name]
+  // Only names this dialog will create are checked: folders that already exist
+  // (made in Finder with "#", "[", ":" …) stay usable, as in M2a.
+  const bad = [...missing.map(nameOf), name]
     .map((part) => ({ part, problem: validateName(part) }))
     .find((x) => x.problem);
   const error = bad

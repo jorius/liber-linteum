@@ -88,6 +88,44 @@ describe('CreatePageDialog (M2c §7.6)', () => {
     expect(made).toEqual(['A/B', 'A/B/C']);
   });
 
+  it('a page in an existing folder named with "#" can still create a bare-name target (final review I2)', async () => {
+    const { d, made } = disk(['C# notes']);
+    d.files.set('C# notes/x.md', '# x\n');
+    render(<CreatePageDialog source="C# notes/x.md" target="New idea" onClose={() => {}} />);
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Create page' }));
+    await waitFor(() => expect(usePageStore.getState().path).toBe('C# notes/New idea.md'));
+    expect(made).toEqual([]);
+  });
+
+  it('existing folders on a path target are not validated, only the ones to create (final review I2)', async () => {
+    const { made } = disk(['C# notes']);
+    render(
+      <CreatePageDialog source="Projects/P.md" target="C# notes/Sub/Leaf" onClose={() => {}} />,
+    );
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Create page' }));
+    await waitFor(() => expect(usePageStore.getState().path).toBe('C# notes/Sub/Leaf.md'));
+    expect(made).toEqual(['C# notes/Sub']);
+  });
+
+  it('a folder to create under an existing odd folder is still validated by its own name (final review I2)', async () => {
+    const { d } = disk(['C# notes']);
+    render(
+      <CreatePageDialog source="Projects/P.md" target="C# notes/Bad:x/Leaf" onClose={() => {}} />,
+    );
+    expect(screen.getByRole('alert')).toHaveTextContent('“Bad:x” can’t be used as a name');
+    expect(screen.getByRole('button', { name: 'Create page' })).toBeDisabled();
+    expect(d.calls.some(([c]) => c.startsWith('entry_create'))).toBe(false);
+  });
+
+  it('an unusable page name is explained even in an odd existing folder (final review I2)', async () => {
+    disk(['C# notes']);
+    render(<CreatePageDialog source="C# notes/x.md" target="What?" onClose={() => {}} />);
+    expect(screen.getByRole('alert')).toHaveTextContent('“What?” can’t be used as a name');
+    expect(screen.getByRole('button', { name: 'Create page' })).toBeDisabled();
+  });
+
   it('an unusable folder name is explained and nothing is created', async () => {
     const { d } = disk();
     render(<CreatePageDialog source="Projects/P.md" target="Bad:Name/x" onClose={() => {}} />);
