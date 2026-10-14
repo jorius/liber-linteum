@@ -187,6 +187,67 @@ fn gv_16_page_level_is_the_page_and_its_neighbourhood() {
     assert!(level.cards.iter().all(|c| c.kind == CardKind::Page));
 }
 
+/// Final review m14: a hub page's neighbourhood is capped at
+/// `MAX_NEIGHBOURS` cards around the centre — the pages it links to and its
+/// relationships first, then the most recently modified backlinks — and the
+/// rest are counted, so the edges of what is shown stay within the
+/// `gv_edges` limit.
+#[test]
+fn m3a_a_hub_page_neighbourhood_is_capped_and_counts_the_rest() {
+    use nimw_session::{MAX_NEIGHBOURS, MAX_VISIBLE};
+    const BACKLINKS: usize = 300;
+    let dir = tempfile::tempdir().unwrap();
+    let r = dir.path();
+    // The hub also links to its oldest backlink: a page linked both ways
+    // counts as linked to.
+    write(
+        r,
+        "hub.md",
+        "# Hub\n\n[[out0]] [[out1]] [[out2]] [[b000]]\n",
+    );
+    for i in 0..3 {
+        write(r, &format!("out{i}.md"), "# Out\n");
+    }
+    write(
+        r,
+        "rel.md",
+        "---\nrelated:\n  - { link: \"[[hub]]\", directed: true }\n---\n# Rel\n",
+    );
+    let start = std::time::SystemTime::UNIX_EPOCH + std::time::Duration::from_secs(1_700_000_000);
+    for i in 0..BACKLINKS {
+        let path = r.join(format!("back/b{i:03}.md"));
+        write(r, &format!("back/b{i:03}.md"), "# Back\n\n[[hub]]\n");
+        // Older first: b299 is the most recently modified.
+        std::fs::File::options()
+            .write(true)
+            .open(&path)
+            .unwrap()
+            .set_modified(start + std::time::Duration::from_secs(i as u64))
+            .unwrap();
+    }
+    let (_c, s) = open(r);
+
+    let level = s.gv_children(&GvLevel::Page(vp("hub.md"))).unwrap();
+    assert_eq!(MAX_NEIGHBOURS, 200);
+    assert_eq!(level.cards.len(), 1 + MAX_NEIGHBOURS);
+    assert_eq!(level.omitted as usize, 3 + 1 + BACKLINKS - MAX_NEIGHBOURS);
+    assert_eq!(level.cards[0].path, "hub.md", "the centre is always shown");
+    let shown = paths(&level.cards);
+    for kept in ["out0.md", "out1.md", "out2.md", "rel.md", "back/b000.md"] {
+        assert!(shown.contains(&kept), "{kept} kept");
+    }
+    // 195 backlinks are left for the cap: the newest, b105..=b299.
+    assert!(shown.contains(&"back/b299.md") && shown.contains(&"back/b105.md"));
+    assert!(!shown.contains(&"back/b104.md") && !shown.contains(&"back/b001.md"));
+    let visible: Vec<String> = shown.iter().map(|p| p.to_string()).collect();
+    assert!(visible.len() <= MAX_VISIBLE);
+    assert!(!s.gv_edges(&visible).unwrap().is_empty());
+
+    let small = s.gv_children(&GvLevel::Page(vp("rel.md"))).unwrap();
+    assert_eq!((small.cards.len(), small.omitted), (2, 0));
+    assert_eq!(s.gv_children(&GvLevel::Vault).unwrap().omitted, 0);
+}
+
 #[test]
 fn m3a_levels_that_do_not_exist_are_errors() {
     let dir = vault();

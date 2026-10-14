@@ -1052,6 +1052,7 @@ fn m3a_gv_children_over_ipc() {
     assert_eq!(root["cards"][1]["indexPage"], "Game Design/Game 1.md");
     assert_eq!(root["cards"][1]["title"], "Game 1");
     assert_eq!(root["centre"], Value::Null);
+    assert_eq!(root["omitted"], 0, "m14: neighbours over the cap");
 
     let chars = level(json!({ "kind": "folder", "path": "Character Design" })).unwrap();
     assert_eq!(

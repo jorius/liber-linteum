@@ -69,10 +69,17 @@ pub struct GvChildren {
     pub cards: Vec<GvCard>,
     /// Page levels: the page itself.
     pub centre: Option<String>,
+    /// Page levels: neighbours left out by the [`MAX_NEIGHBOURS`] cap.
+    pub omitted: u32,
 }
 
 /// Most child titles a folder summary lists.
 pub const SUMMARY_TITLES: usize = 5;
+
+/// Most neighbour cards a page level shows around its centre (final review
+/// m14): a hub page with thousands of backlinks would otherwise make more
+/// cards than `gv_edges` accepts ([`MAX_VISIBLE`]).
+pub const MAX_NEIGHBOURS: usize = 200;
 
 impl VaultSession {
     /// The cards of one Global View level (M3a §3).
@@ -89,6 +96,7 @@ impl VaultSession {
             GvLevel::Vault => Ok(GvChildren {
                 cards: ctx.children("", CardKind::Project)?,
                 centre: None,
+                omitted: 0,
             }),
             GvLevel::Folder(folder) => {
                 match index.card(folder.as_str())? {
@@ -98,6 +106,7 @@ impl VaultSession {
                 Ok(GvChildren {
                     cards: ctx.children(folder.as_str(), CardKind::Folder)?,
                     centre: None,
+                    omitted: 0,
                 })
             }
             GvLevel::Page(page) => {
@@ -105,17 +114,18 @@ impl VaultSession {
                     Some(row) if row.kind == FileKind::Page => row,
                     _ => return Err(SessionError::NotIndexed(page.to_string())),
                 };
+                let around = neighbours(page.as_str(), &index.page_links_of(page.as_str())?);
+                let (around, omitted) = cap_neighbours(&index, around)?;
                 let mut cards = vec![page_card(&centre, Some(Relation::Centre))];
-                for (path, relation) in
-                    neighbours(page.as_str(), &index.page_links_of(page.as_str())?)
-                {
-                    if let Some(row) = index.card(&path)? {
-                        cards.push(page_card(&row, Some(relation)));
+                for n in around {
+                    if let Some(row) = index.card(&n.path)? {
+                        cards.push(page_card(&row, Some(n.relation)));
                     }
                 }
                 Ok(GvChildren {
                     cards,
                     centre: Some(page.to_string()),
+                    omitted,
                 })
             }
         }
@@ -226,41 +236,83 @@ fn page_card(row: &CardRow, relation: Option<Relation>) -> GvCard {
     }
 }
 
+/// A page around a page level's centre.
+struct Neighbour {
+    path: String,
+    relation: Relation,
+    /// The centre links to it, or they are related (`related:`): kept
+    /// before plain backlinks when the neighbourhood is capped.
+    preferred: bool,
+}
+
 /// The pages around `centre`, by name: links out (and undirected
 /// relationships either way) go right, links in and relationships directed
 /// at the centre go left; both ways is `Both`.
-fn neighbours(centre: &str, links: &[PageLink]) -> Vec<(String, Relation)> {
-    let mut sides: BTreeMap<(String, String), (bool, bool)> = BTreeMap::new();
+fn neighbours(centre: &str, links: &[PageLink]) -> Vec<Neighbour> {
+    // (in, out, preferred) per page.
+    let mut sides: BTreeMap<(String, String), (bool, bool, bool)> = BTreeMap::new();
     for l in links {
+        let related = l.kind == LinkKind::FrontmatterRelated;
         let (other, out) = if l.src == centre && l.target != centre {
             (&l.target, true)
         } else if l.target == centre && l.src != centre {
-            let undirected_related = l.kind == LinkKind::FrontmatterRelated && !l.directed;
-            (&l.src, undirected_related)
+            (&l.src, related && !l.directed)
         } else {
             continue;
         };
         let file = other.rsplit('/').next().unwrap_or(other);
         let entry = sides
             .entry((name_key(file), other.clone()))
-            .or_insert((false, false));
+            .or_insert((false, false, false));
         if out {
             entry.1 = true;
         } else {
             entry.0 = true;
         }
+        entry.2 |= l.src == centre || related;
     }
     sides
         .into_iter()
-        .map(|((_, path), side)| {
-            let relation = match side {
+        .map(|((_, path), (into, out, preferred))| {
+            let relation = match (into, out) {
                 (true, true) => Relation::Both,
                 (true, false) => Relation::In,
                 _ => Relation::Out,
             };
-            (path, relation)
+            Neighbour {
+                path,
+                relation,
+                preferred,
+            }
         })
         .collect()
+}
+
+/// At most [`MAX_NEIGHBOURS`] of `around`, still in name order, and how many
+/// were left out (final review m14). Pages the centre links to and related
+/// pages come first, then backlinks; within each, the most recently
+/// modified first.
+fn cap_neighbours(index: &Index, around: Vec<Neighbour>) -> Result<(Vec<Neighbour>, u32)> {
+    if around.len() <= MAX_NEIGHBOURS {
+        return Ok((around, 0));
+    }
+    let mut ranked = Vec::with_capacity(around.len());
+    for (at, n) in around.iter().enumerate() {
+        let mtime = index.stat(&n.path)?.map_or(i64::MIN, |s| s.mtime_ns);
+        ranked.push((!n.preferred, std::cmp::Reverse(mtime), at));
+    }
+    ranked.sort_unstable();
+    let keep: std::collections::HashSet<usize> = ranked[..MAX_NEIGHBOURS]
+        .iter()
+        .map(|&(_, _, at)| at)
+        .collect();
+    let omitted = (around.len() - MAX_NEIGHBOURS) as u32;
+    let kept = around
+        .into_iter()
+        .enumerate()
+        .filter_map(|(at, n)| keep.contains(&at).then_some(n))
+        .collect();
+    Ok((kept, omitted))
 }
 
 /// True when `path` is where the vault's attachments go (M3a §3.1).

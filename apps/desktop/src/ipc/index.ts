@@ -316,6 +316,13 @@ export interface GvLevel {
   cards: GvCard[];
   /** Page levels: the page itself. */
   centre: string | null;
+  /**
+   * Page levels: neighbours left out because a page shows at most 200 around
+   * it (links out and relationships first, then the newest backlinks); 0
+   * elsewhere. The UI can say "+N more not shown". The backend always sends
+   * it; optional only so level fixtures written before it needn't list it.
+   */
+  omitted?: number;
 }
 
 /** One edge between visible cards (M3a §6). */

@@ -9,14 +9,14 @@ describe('M3a ipc commands', () => {
     const calls: [string, unknown][] = [];
     mockIPC((cmd, args) => {
       calls.push([cmd, args]);
-      if (cmd === 'gv_children') return { cards: [], centre: null };
+      if (cmd === 'gv_children') return { cards: [], centre: null, omitted: 0 };
       if (cmd === 'gv_edges') return [];
       if (cmd === 'layout_get') return { A: { x: 1, y: 2 } };
       return null;
     });
     expect(await gvChildren({ kind: 'vault' })).toEqual({
       ok: true,
-      value: { cards: [], centre: null },
+      value: { cards: [], centre: null, omitted: 0 },
     });
     await gvChildren({ kind: 'folder', path: 'A' });
     await gvEdges(['A', 'b.md']);

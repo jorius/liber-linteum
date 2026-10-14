@@ -230,9 +230,13 @@ impl From<nimw_session::GvCard> for GvCardDto {
 }
 
 #[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct GvLevelResultDto {
     pub cards: Vec<GvCardDto>,
     pub centre: Option<String>,
+    /// Page levels: neighbours left out by the 200-card cap (final review
+    /// m14); 0 elsewhere.
+    pub omitted: u32,
 }
 
 /// One Global View edge (M3a §6).

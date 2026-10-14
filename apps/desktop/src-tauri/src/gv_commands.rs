@@ -21,6 +21,7 @@ pub(crate) fn gv_children_impl(state: &AppState, level: GvLevelDto) -> CmdResult
     Ok(GvLevelResultDto {
         cards: found.cards.into_iter().map(Into::into).collect(),
         centre: found.centre,
+        omitted: found.omitted,
     })
 }
 
