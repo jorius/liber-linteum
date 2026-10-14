@@ -15,6 +15,7 @@ import { Preview } from '../preview/Preview';
 import styles from './Editor.module.css';
 import { followLinkAtCursor, livePreview, pagePath } from './livePreview';
 import { attachmentHandlers } from './attachments';
+import { BlockGutter, type Shown } from './BlockGutter';
 import { activeFormats, editorKeymap, type ActiveFormat } from './format';
 import { linkCompletion } from './linkComplete';
 import { LinkPicker } from './LinkPicker';
@@ -354,6 +355,13 @@ export function Editor({ doc, mode, label }: EditorProps) {
     if (view.current) toggleTaskIn(view.current, at);
   }, []);
 
+  // What the Split pane shows, for its block gutter (M4 §4).
+  const [shown, setShown] = useState<Shown | null>(null);
+  const onRendered = useCallback(
+    (text: string, page: Shown['page']) => setShown({ text, page }),
+    [],
+  );
+
   return (
     <div className={styles.frame}>
       {showToolbar && toolbarView && <Toolbar view={toolbarView} active={active} />}
@@ -362,7 +370,13 @@ export function Editor({ doc, mode, label }: EditorProps) {
         <div ref={host} className={mode === 'livePreview' ? styles.live : styles.source} />
         {split && (
           <div ref={pane} className={styles.pane} role="region" aria-label={t('editor.preview')}>
-            <Preview text={text} path={doc.path} onToggleTask={toggleTask} />
+            {toolbarView && <BlockGutter view={toolbarView} pane={pane} shown={shown} />}
+            <Preview
+              text={text}
+              path={doc.path}
+              onToggleTask={toggleTask}
+              onRendered={onRendered}
+            />
           </div>
         )}
       </div>

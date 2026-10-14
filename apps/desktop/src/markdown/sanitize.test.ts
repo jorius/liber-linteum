@@ -139,6 +139,18 @@ describe('extension nodes become marked elements', () => {
     expect(h.properties.id).toBe('title');
   });
 
+  it('M4: an HTML block sits in a wrapper that carries its source range (the drag gutter needs one)', () => {
+    const src = 'Before\n\n<div class="x">raw <b>html</b></div>\n\n<!-- note -->\n\nAfter\n';
+    const wrappers = elements(render(src)).filter((e) => e.properties.dataNimw === 'html');
+    expect(
+      wrappers.map((w) =>
+        src.slice(Number(w.properties.dataSourceStart), Number(w.properties.dataSourceEnd)),
+      ),
+    ).toEqual(['<div class="x">raw <b>html</b></div>', '<!-- note -->']);
+    // The HTML itself still renders inside it.
+    expect(JSON.stringify(wrappers[0])).toContain('"tagName":"b"');
+  });
+
   it('frontmatter is not rendered', () => {
     expect(html('---\nsubtitle: S\n---\nBody\n')).not.toContain('subtitle');
   });

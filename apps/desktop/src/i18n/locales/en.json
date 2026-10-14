@@ -122,7 +122,33 @@
     "unsavedKeepsWindow": "Unsaved changes in “{name}” couldn’t be written, so the window stays open. Close it again to quit without them.",
     "copying": "Copying files…",
     "blocks": {
-      "refused": "This block can’t be moved here."
+      "refused": "This block can’t be moved here.",
+      "grip": "Drag to reorder: {block}",
+      "moveUp": "Move up",
+      "moveDown": "Move down",
+      "indent": "Indent",
+      "outdent": "Outdent",
+      "help": "Up and Down go from block to block. Alt+Up or Alt+Down moves the block, Alt+Right or Alt+Left indents or outdents a list item, and Alt+Shift moves a heading without its section. Enter picks the block up to choose where it goes.",
+      "moved": "Moved {block}.",
+      "picked": "{block} picked up. Arrow keys choose where, Enter drops it, Escape cancels.",
+      "cancelled": "Move cancelled.",
+      "slot": {
+        "before": "Before {block}",
+        "end": "At the end of the page",
+        "endOfList": "At the end of the list",
+        "inside": "Inside {block}",
+        "endOfTable": "At the end of the table"
+      },
+      "kinds": {
+        "list": "List",
+        "code": "Code block",
+        "table": "Table",
+        "rule": "Divider",
+        "embed": "Embed",
+        "html": "HTML block",
+        "columns": "Columns",
+        "other": "Block"
+      }
     }
   },
   "preview": {

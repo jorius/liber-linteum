@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { pageRead } from '../../ipc';
 import { sameHeading } from '../../markdown/headings';
 import { parsePage } from '../../markdown/parse';
+import type { ParsedPage } from '../../markdown/types';
 import { toSafeHast } from '../../markdown/sanitize';
 import { sectionOf } from '../../markdown/section';
 import { openPage } from '../../stores/navigate';
@@ -32,6 +33,9 @@ export interface PreviewProps {
   /** Makes task checkboxes clickable: toggles the task whose list item starts
    *  at the source offset (relative to `text`). */
   onToggleTask?: (at: number) => void;
+  /** Called with the text and model each time the pane shows a new version
+   *  (the Split pane's block gutter, M4 §4, maps blocks by their offsets). */
+  onRendered?: (text: string, page: ParsedPage) => void;
 }
 
 /** The rendered pane (M2a §4): sanitized Markdown with resolved links and
@@ -52,6 +56,7 @@ function PreviewBody({
   chain = [],
   embedded = false,
   onToggleTask,
+  onRendered,
 }: PreviewProps) {
   const { t } = useTranslation();
   const shown = useDebounced(text, RENDER_DEBOUNCE_MS);
@@ -63,6 +68,7 @@ function PreviewBody({
     return toSafeHast(part, { sourcePath: path });
   }, [page, path, heading]);
   const resolve = useResolved(path, tree);
+  useEffect(() => onRendered?.(shown, page), [onRendered, shown, page]);
   const anchor = usePageStore((s) => (depth === 0 && !embedded ? s.anchor : null));
   const box = useRef<HTMLDivElement>(null);
 
@@ -148,7 +154,7 @@ function NoteEmbed({
   const title = heading ? `${name} › ${heading}` : name;
   const missing = text === null || (text && heading && !sectionOf(parsePage(text).tree, heading));
   return (
-    <section ref={ref} className={styles.noteEmbed} aria-label={title}>
+    <section ref={ref} className={styles.noteEmbed} aria-label={title} data-note-embed="">
       <header className={styles.noteHeader}>
         <span className={styles.noteTitle}>{title}</span>
         <button

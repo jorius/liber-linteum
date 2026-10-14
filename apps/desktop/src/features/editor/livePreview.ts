@@ -74,8 +74,15 @@ const emptyHtml = new Map<string, boolean>();
 function rendersEmpty(source: string): boolean {
   let empty = emptyHtml.get(source);
   if (empty === undefined) {
-    const visible = (n: { type: string; value?: unknown; children?: unknown[] }): boolean =>
-      n.type === 'element' ||
+    const visible = (n: {
+      type: string;
+      value?: unknown;
+      children?: unknown[];
+      properties?: Record<string, unknown>;
+    }): boolean =>
+      // The wrapper every HTML block gets (M4: the gutter's anchor) shows
+      // only what's inside it.
+      (n.type === 'element' && n.properties?.dataNimw !== 'html') ||
       (n.type === 'text' && typeof n.value === 'string' && n.value.trim() !== '') ||
       (n.children ?? []).some((c) => visible(c as never));
     empty = !visible(toSafeHast(parsePage(source), { sourcePath: '' }) as never);

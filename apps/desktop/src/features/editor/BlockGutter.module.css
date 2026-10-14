@@ -1,0 +1,110 @@
+/* The Split pane's block gutter (M4 §4): drawn over the pane's content, in
+   its scroll coordinates (the pane is `position: relative`). */
+.layer {
+  position: absolute;
+  inset: 0 auto auto 0;
+  width: 0;
+  height: 0;
+  z-index: 2;
+}
+
+.gutter {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  width: 22px;
+}
+
+/* The block with the keyboard keeps a gutter for its tab stop, shown only
+   while it has the keyboard. */
+.idle {
+  opacity: 0;
+}
+
+.idle:focus-within {
+  opacity: 1;
+}
+
+.extra {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 2px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-card);
+}
+
+.grip,
+.button {
+  display: inline-grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-text-muted);
+  font: 600 12px var(--font-body);
+  cursor: pointer;
+}
+
+.grip {
+  cursor: grab;
+}
+
+.grip:hover,
+.button:hover {
+  background: var(--color-surface-subtle);
+  color: var(--color-text-strong);
+}
+
+.grip:focus {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 1px;
+}
+
+.grip:focus:not(:focus-visible) {
+  outline: none;
+}
+
+.drop {
+  position: absolute;
+  height: 2px;
+  background: var(--color-accent);
+  border-radius: 1px;
+  pointer-events: none;
+}
+
+.drop::before {
+  content: '';
+  position: absolute;
+  left: -4px;
+  top: -3px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--color-accent);
+}
+
+.flash {
+  position: absolute;
+  border-radius: var(--radius-sm);
+  outline: 2px solid var(--color-accent);
+  background: var(--color-accent-soft);
+  opacity: 0.45;
+  pointer-events: none;
+}
+
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}

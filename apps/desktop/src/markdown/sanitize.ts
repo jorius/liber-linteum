@@ -317,9 +317,28 @@ function addHeadingIds(tree: Root) {
   walk(tree);
 }
 
+/** HTML blocks (raw at the top level) in a `div` carrying their source
+ *  range: the HTML parsed from them has no position, and the block gutter
+ *  (M4 §4) needs an element to sit next to. */
+function wrapHtmlBlocks(root: Root) {
+  root.children = root.children.map((c) => {
+    if (c.type !== 'raw' || !c.position) return c;
+    return el(
+      'div',
+      {
+        dataNimw: 'html',
+        dataSourceStart: c.position.start.offset,
+        dataSourceEnd: c.position.end.offset,
+      },
+      [c as unknown as ElementContent],
+    );
+  });
+}
+
 /** The page as a sanitized hast tree, ready for React rendering. */
 export function toSafeHast(page: ParsedPage, ctx: RenderContext): Root {
   const hast = toHast(page.tree, { allowDangerousHtml: true, handlers }) as Root;
+  wrapHtmlBlocks(hast);
   markSourceRanges(hast);
   const parsed = raw(hast) as Root;
   const clean = sanitize(parsed, schema) as Root;
