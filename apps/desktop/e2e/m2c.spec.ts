@@ -105,29 +105,42 @@ test('a pasted image is saved and embedded at the cursor', async ({ page }) => {
   expect(await csp(page)).toEqual([]);
 });
 
-test('files dropped from the OS land where they were dropped', async ({ page }) => {
-  const outside = await open(page, 'B');
-  const line = page.locator('.cm-line', { hasText: 'The second page.' });
-  const box = (await line.boundingBox())!;
-  const ratio = await page.evaluate(() => window.devicePixelRatio);
-  // Tauri reports physical pixels from the webview's corner.
-  const at = { x: (box.x + 2) * ratio, y: (box.y + box.height / 2) * ratio };
-  await page.evaluate((position) => {
-    const emit = (window as unknown as { __nimwEmit: (e: string, p: unknown) => void }).__nimwEmit;
-    emit('tauri://drag-enter', { paths: ['/Users/me/brief.pdf'], position });
-    emit('tauri://drag-over', { position });
-  }, at);
-  await expect(page.locator('.cm-nimw-drop-caret')).toBeAttached();
-  await page.evaluate((position) => {
-    const emit = (window as unknown as { __nimwEmit: (e: string, p: unknown) => void }).__nimwEmit;
-    emit('tauri://drag-drop', { paths: ['/Users/me/brief.pdf', '/Users/me/data.zip'], position });
-  }, at);
-  await expect
-    .poll(() => lastWrite(page))
-    .toContain('![[brief.pdf]]\n[[data.zip]]The second page.');
-  await expect(page.locator('.cm-nimw-drop-caret')).toHaveCount(0);
-  expect(outside).toEqual([]);
-  expect(await csp(page)).toEqual([]);
+test.describe('on a 2× screen', () => {
+  test.use({ deviceScaleFactor: 2 });
+
+  test('files dropped from the OS land where they were dropped', async ({ page }) => {
+    const outside = await open(page, 'B');
+    const line = page.locator('.cm-line', { hasText: 'The second page.' });
+    const box = (await line.boundingBox())!;
+    // Tauri's drag position is from the webview's corner: physical pixels from
+    // WebView2 (Windows), CSS pixels from WKWebView and WebKitGTK (final review
+    // C1). Chromium here has a Windows user agent, WebKit a macOS one.
+    const ratio = await page.evaluate(() =>
+      /^Win/i.test(navigator.platform) || /Windows/i.test(navigator.userAgent)
+        ? window.devicePixelRatio
+        : 1,
+    );
+    expect(await page.evaluate(() => window.devicePixelRatio)).toBe(2);
+    const at = { x: (box.x + 2) * ratio, y: (box.y + box.height / 2) * ratio };
+    await page.evaluate((position) => {
+      const emit = (window as unknown as { __nimwEmit: (e: string, p: unknown) => void })
+        .__nimwEmit;
+      emit('tauri://drag-enter', { paths: ['/Users/me/brief.pdf'], position });
+      emit('tauri://drag-over', { position });
+    }, at);
+    await expect(page.locator('.cm-nimw-drop-caret')).toBeAttached();
+    await page.evaluate((position) => {
+      const emit = (window as unknown as { __nimwEmit: (e: string, p: unknown) => void })
+        .__nimwEmit;
+      emit('tauri://drag-drop', { paths: ['/Users/me/brief.pdf', '/Users/me/data.zip'], position });
+    }, at);
+    await expect
+      .poll(() => lastWrite(page))
+      .toContain('![[brief.pdf]]\n[[data.zip]]The second page.');
+    await expect(page.locator('.cm-nimw-drop-caret')).toHaveCount(0);
+    expect(outside).toEqual([]);
+    expect(await csp(page)).toEqual([]);
+  });
 });
 
 test('[[ autocomplete writes [[file|Title]] (PG-05)', async ({ page }) => {

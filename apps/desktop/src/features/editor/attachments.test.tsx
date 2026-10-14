@@ -5,7 +5,7 @@ import { clearMocks, emit, mockWindows } from '../../ipc/testing';
 import { resetEditorStore, useEditorStore } from '../../stores/editorStore';
 import { useToastStore } from '../../stores/toastStore';
 import { fakeDisk } from '../../test/fakeDisk';
-import { embedFor, installFileDrop, pastedName } from './attachments';
+import { dragPixelRatio, embedFor, installFileDrop, pastedName } from './attachments';
 import { Editor } from './Editor';
 import { PageDoc } from './pageDoc';
 
@@ -183,19 +183,66 @@ describe('drop (M2c §5.2)', () => {
     await stop();
   });
 
-  it('review focus: drop positions are physical pixels (Retina ÷ 2)', async () => {
-    mockWindows('main');
-    fakeDisk({ 'P.md': 'x\n' });
-    const stop = await installFileDrop();
-    await mount('P.md');
-    const ratio = vi.spyOn(window, 'devicePixelRatio', 'get').mockReturnValue(2);
-    const at = vi.spyOn(document, 'elementFromPoint').mockReturnValue(viewOf().contentDOM);
-    const pos = vi.spyOn(viewOf(), 'posAtCoords').mockReturnValue(1);
-    await act(() => emit('tauri://drag-over', payload(40, 60)));
-    expect(at).toHaveBeenCalledWith(20, 30);
-    expect(pos).toHaveBeenCalledWith({ x: 20, y: 30 });
-    ratio.mockRestore();
-    await stop();
+  describe('drop coordinates (final review C1)', () => {
+    // Tauri types drag positions as physical pixels, but only WebView2 reports
+    // them so. On macOS wry 0.57.0 passes AppKit points (CSS pixels) through
+    // and tauri-runtime-wry 2.12.1 wraps them in PhysicalPosition unscaled.
+    const MAC = {
+      platform: 'MacIntel',
+      ua: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko)',
+    };
+    const LINUX = {
+      platform: 'Linux x86_64',
+      ua: 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/605.1.15 (KHTML, like Gecko)',
+    };
+    const WINDOWS = {
+      platform: 'Win32',
+      ua: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36 Edg/120.0.0.0',
+    };
+    /** A `ratio`× screen on `os`. */
+    function on(os: { platform: string; ua: string }, ratio: number) {
+      vi.spyOn(navigator, 'platform', 'get').mockReturnValue(os.platform);
+      vi.spyOn(navigator, 'userAgent', 'get').mockReturnValue(os.ua);
+      vi.spyOn(window, 'devicePixelRatio', 'get').mockReturnValue(ratio);
+    }
+
+    it('only Windows reports physical pixels', () => {
+      on(MAC, 2);
+      expect(dragPixelRatio()).toBe(1);
+      on(LINUX, 2);
+      expect(dragPixelRatio()).toBe(1);
+      on(WINDOWS, 2);
+      expect(dragPixelRatio()).toBe(2);
+      on(WINDOWS, 1.5);
+      expect(dragPixelRatio()).toBe(1.5);
+    });
+
+    async function hoverAt(x: number, y: number) {
+      mockWindows('main');
+      fakeDisk({ 'P.md': 'x\n' });
+      const stop = await installFileDrop();
+      await mount('P.md');
+      const at = vi.spyOn(document, 'elementFromPoint').mockReturnValue(viewOf().contentDOM);
+      const pos = vi.spyOn(viewOf(), 'posAtCoords').mockReturnValue(1);
+      await act(() => emit('tauri://drag-enter', payload(x, y, ['/u/a.png'])));
+      await act(() => emit('tauri://drag-over', payload(x, y)));
+      await stop();
+      return { at, pos };
+    }
+
+    it('on a Retina Mac the position is used as is (CSS pixels)', async () => {
+      on(MAC, 2);
+      const { at, pos } = await hoverAt(40, 60);
+      expect(at).toHaveBeenLastCalledWith(40, 60);
+      expect(pos).toHaveBeenLastCalledWith({ x: 40, y: 60 });
+    });
+
+    it('on Windows the position is divided by devicePixelRatio', async () => {
+      on(WINDOWS, 2);
+      const { at, pos } = await hoverAt(40, 60);
+      expect(at).toHaveBeenLastCalledWith(20, 30);
+      expect(pos).toHaveBeenLastCalledWith({ x: 20, y: 30 });
+    });
   });
 
   it('a drop outside the text explains where to drop', async () => {

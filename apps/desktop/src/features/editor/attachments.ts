@@ -141,11 +141,24 @@ export function attachmentHandlers(): Extension {
 
 // ---- drop ----
 
-/** The editor under a drag position (physical px from the webview's corner). */
+/** Device pixels per unit of a Tauri drag position (final review C1). Tauri
+ *  types the position as `PhysicalPosition`, but only WebView2 (Windows)
+ *  reports physical pixels. On macOS wry 0.57.0 (`wkwebview/drag_drop.rs`)
+ *  takes `NSDraggingInfo.draggingLocation()` and the view frame in AppKit
+ *  points, with no `convertPointToBacking`, and tauri-runtime-wry 2.12.1 wraps
+ *  that in `PhysicalPosition` unscaled: points are CSS pixels. WebKitGTK
+ *  (Linux) reports logical widget coordinates too. */
+export function dragPixelRatio(): number {
+  const windows = /^Win/i.test(navigator.platform) || /Windows/i.test(navigator.userAgent);
+  return windows ? window.devicePixelRatio || 1 : 1;
+}
+
+/** The editor under a drag position (from the webview's top-left corner). */
 function target(e: DragDropPayload): { view: EditorView; pos: number } | null {
   if (e.x === undefined || e.y === undefined) return null;
-  const x = e.x / window.devicePixelRatio;
-  const y = e.y / window.devicePixelRatio;
+  const ratio = dragPixelRatio();
+  const x = e.x / ratio;
+  const y = e.y / ratio;
   const el = document.elementFromPoint?.(x, y)?.closest('.cm-editor');
   const view = el instanceof HTMLElement ? EditorView.findFromDOM(el) : null;
   if (!view) return null;
