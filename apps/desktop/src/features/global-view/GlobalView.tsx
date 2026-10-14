@@ -159,17 +159,24 @@ export function GlobalView() {
   return (
     <section ref={region} className={styles.view} aria-label={t('gv.region')} onKeyDown={onKeyDown}>
       <Toolbar />
-      {connectFrom && (
-        <div ref={bar} className={styles.connectBar}>
-          <LinkIcon />
-          <p role="status" aria-label={t('gv.relations.connecting')} className={styles.connectText}>
-            {t('gv.relations.pick', { name: connectFrom.title })}
-          </p>
+      {/* The bar's live region stays mounted, empty outside connect mode: one
+          mounted with its text is usually not announced (VoiceOver; final
+          review m10). */}
+      <div ref={bar} className={connectFrom ? styles.connectBar : undefined}>
+        {connectFrom && <LinkIcon />}
+        <p
+          role="status"
+          aria-label={connectFrom ? t('gv.relations.connecting') : undefined}
+          className={styles.connectText}
+        >
+          {connectFrom && t('gv.relations.pick', { name: connectFrom.title })}
+        </p>
+        {connectFrom && (
           <button type="button" onClick={leaveConnect}>
             {t('dialogs.cancel')}
           </button>
-        </div>
-      )}
+        )}
+      </div>
       <div ref={area} className={styles.area}>
         <ReactFlowProvider>
           <Canvas

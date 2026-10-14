@@ -202,8 +202,9 @@ describe('Global View screen (M3a §5, §6)', () => {
     await cardButton('A');
     expect(screen.queryByText(/not shown/)).not.toBeInTheDocument();
     await act(() => useGvStore.getState().open(card('root.md', 'page', { title: 'Sparda' })));
-    expect(await screen.findByRole('status')).toHaveTextContent(
-      '104 more linked pages aren’t shown here.',
+    expect(await screen.findByText('104 more linked pages aren’t shown here.')).toHaveAttribute(
+      'role',
+      'status',
     );
   });
 

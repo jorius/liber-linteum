@@ -209,6 +209,20 @@ describe('connecting two cards (M3b §2)', () => {
     expect(within(group).getByRole('button', { name: 'A' })).toBeInTheDocument();
   });
 
+  it('the bar’s live region is in place, empty, before connect mode fills it (final review m10)', async () => {
+    render(<GlobalView />);
+    await press('A.md');
+    // Mounted with its text, a live region usually isn't announced.
+    const live = screen.getByRole('status');
+    expect(live).toBeEmptyDOMElement();
+    await startConnect('A');
+    expect(screen.getByRole('status', { name: 'Connecting' })).toBe(live);
+    expect(live).toHaveTextContent('Pick the card to connect: A → ?');
+    await userEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+    expect(screen.getByRole('status')).toBe(live);
+    expect(live).toBeEmptyDOMElement();
+  });
+
   it('a folder without an index note offers to pick one (menu and toast action)', async () => {
     render(<GlobalView />);
     await userEvent.click(await screen.findByRole('button', { name: 'Connections of Delta' }));
