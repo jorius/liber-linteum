@@ -77,10 +77,22 @@ function unitAtSelection(state: EditorState, model: BlockModel): Unit | null {
   return sel.from >= u.from && sel.to <= u.to ? u : null;
 }
 
+/** A selection touching a table's header or delimiter row: lines that aren't
+ *  blocks, and that a line move would tear off the table (final review M3). */
+function onTableHead(state: EditorState, model: BlockModel): boolean {
+  return model.tables.some((t) => {
+    const table = model.units[t.unit];
+    const headTo = t.rows.length ? model.units[t.rows[0]].from - 1 : table.to;
+    return state.selection.ranges.some((r) => r.from <= headTo && r.to >= table.from);
+  });
+}
+
 /** Alt+↑ (-1) / Alt+↓ (+1). */
 export function moveBlockAtCursor(dir: -1 | 1): Command {
   return (view) => {
     const { model } = modelFor(view.state);
+    // Nothing moves there, as at an edge (the table moves from its gutter).
+    if (onTableHead(view.state, model)) return true;
     const unit = unitAtSelection(view.state, model);
     if (!unit) return false;
     const slot = neighbourSlot(model, unit, dir);

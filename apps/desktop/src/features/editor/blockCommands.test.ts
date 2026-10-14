@@ -65,6 +65,23 @@ describe('moving blocks from the editor (M4 §5)', () => {
     expect(text(v)).toBe('| h |\n|---|\n| 2 |\n| 1 |\n');
   });
 
+  it('Alt+↑ / ↓ on a table’s header or delimiter row does nothing: those rows aren’t blocks (final review M3)', async () => {
+    const doc = 'Intro\n\n| h | i |\n|---|---|\n| 1 | 2 |\n\nEnd\n';
+    for (const at of [doc.indexOf('| h'), doc.indexOf('|---') + 2]) {
+      for (const key of ['ArrowUp', 'ArrowDown']) {
+        const v = editor(doc, at);
+        await press(v, key, { altKey: true });
+        expect(text(v), `${key} at ${at}`).toBe(doc);
+        v.destroy();
+      }
+    }
+    // A selection reaching into the header from a body row: the same.
+    const v = editor(doc, 0);
+    act(() => v.dispatch({ selection: { anchor: doc.indexOf('|---'), head: doc.indexOf('| 1') } }));
+    await press(v, 'ArrowDown', { altKey: true });
+    expect(text(v)).toBe(doc);
+  });
+
   it('in a paragraph Alt+↑ stays CodeMirror’s line move', async () => {
     const v = editor('one\ntwo\n', 5);
     await press(v, 'ArrowUp', { altKey: true });
