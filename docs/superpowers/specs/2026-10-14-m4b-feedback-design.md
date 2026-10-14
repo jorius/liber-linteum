@@ -141,3 +141,55 @@ The macOS Dock icon is drawn edge to edge on its 1024 canvas, so it looks bigger
 - custom button themes;
 - a sidebar collapse toggle (the prototype's ⧉ button);
 - moving the explorer actions.
+
+## 10. Amendments from planning
+
+The plan (`docs/superpowers/plans/2026-10-14-m4b-feedback.md`) was replayed end to end on a scratch clone. These rulings and deviations came out of it.
+
+### Layout and header
+
+1. **`PageHeader` is a `div`, not a `<header>`.** The top bar is the page's only banner. A second `<header>` in the page area made two banners.
+2. **The note's own title** ("Title in the note: …") is a separate `NoteTitle` in the band's second row. `PageTitle` no longer renders it.
+3. **Muted text on the cover pills uses the body colour.** On the 88% veil over a black or white cover, `--color-text-muted` fell to about 4.0:1 in several palettes. Inside `.bandCover .pill`, `--color-text-muted` resolves to `--color-text-body` (6.7:1 at worst), and the 88% veil stays. A palette test checks text and body colours over black and white for every palette, mode and derived accent.
+4. **A long page or folder name never widens the sidebar** (`.side { min-width: 0 }`). Before, a very long name widened the sidebar to fit its explorer row and pushed Edit · Global view out of the window. This bug dates from M1 and was found by the M4b e2e test.
+5. **Buttons:**
+   - the Settings dialog's Close is secondary;
+   - the cover's Remove is danger, Save position primary, and Add cover, Change, Reposition and Cancel secondary (small);
+   - the Global View connect bar's Cancel is secondary (small).
+
+### Cover
+
+6. **The cover state records the `cover:` value it was resolved for** (`of`). Reposition starts only once the picked value itself has an image, never on the previous cover's state.
+7. **Focus after a pick goes to the position slider** if focus is in the band or on the body, or if there was no click or keypress while the file dialog was open. Where focus sits after the dialog says little about intent: WebKit doesn't focus clicked buttons, and the explorer's refocus replaces its row element.
+
+### Editor
+
+8. **With 0 matches, CodeMirror shows no `[[` list**, so there is no search line either. The count is still announced.
+9. **An undecodable pasted image shows a toast** ("This image can't be pasted. Save it as PNG or JPEG first.") instead of falling back to normal paste. This differs from §4: the paste event has already been taken when decoding fails, so it can't go back to the editor's own paste. Other images in the same paste are still saved, in order.
+10. **The ⌘K picker always has an anchor.** CodeMirror keeps the selected line drawn even when it's scrolled far out of view, so `coordsAtPos` stays valid, and `placePopup` clamps the picker to the window's edge.
+11. **The Link picker and the "+ Related page" picker share one `PickerPopup`**, which re-anchors on any scroll (captured on `window`) and on resize.
+
+### Attachments
+
+12. **`overrideObsidian` is a top-level field** of `vault_settings_get`'s result and `vault_settings_set`'s patch, not inside `attachments`. In `.nimw/vault.json` it stays `attachments.overrideObsidian`, and it is written only once set. A patch with only `overrideObsidian` turns the override on or off and keeps NIMW's place. While Obsidian's setting applies, saving the same place is allowed; a different place is refused, as in M2c.
+
+### Relationships
+
+13. **A Related chip is followed like a link**, so the back arrow returns to the page it was on. The first build used a direct navigation, which reset the trail; the e2e test found it.
+14. **Connect cards:**
+    - the "(or drag from a card's link handle)" hint shows only while the first card is being picked;
+    - picking a folder without an index note shows the M3b toast and keeps the pick waiting;
+    - Cancel from the bar returns focus to the Connect cards button while no card was picked yet (or to the first card once one was);
+    - a slow double click in pick mode counts as connecting, so it doesn't open the editor;
+    - going back a level, changing the view mode or leaving the Global View ends the mode.
+
+### App icon
+
+15. **The drop shadow is seven stacked translucent rounded squares**, not an SVG filter: `sips` (CoreSVG) draws no SVG filters. The 1024 PNG comes from `sips`, so there's no new dependency. The steps to regenerate it are in the SVG's comment.
+16. **The icon test is a Vitest test in the Node environment, run on macOS only** (`src/appIcon.test.ts`). It reads the icns's 1024 representation with `sips` and decodes it with `node:zlib`.
+
+### Testing
+
+17. **The fake disk reports `#tags`**, so the band's tags can be tested.
+18. **Add cover going straight into reposition is tested end to end in `m2c.spec.ts`** (updated), not repeated in `m4b.spec.ts`.
+19. **Every M4b e2e test checks for zero network and no CSP violations**, in Chromium and WebKit. There's no separate zero-network test for M4b.
