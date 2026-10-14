@@ -121,7 +121,9 @@ impl Vault {
     /// and writes it back atomically (compare-and-swap), keeping every key
     /// `edit` doesn't touch and adding `"version": 1`. A missing file is
     /// created only when `create` (VLT-02: `.nimw/` appears on first need);
-    /// a file that isn't a JSON object is never overwritten.
+    /// a file that isn't a JSON object is never overwritten, and one `edit`
+    /// leaves as it was is not rewritten (final review I3: every write is
+    /// an fsync).
     pub(crate) fn update_json_object(
         &self,
         rel: &str,
@@ -143,8 +145,12 @@ impl Vault {
             Err(VaultError::NotFound(_)) => return Ok(()),
             Err(e) => return Err(e),
         };
-        map.entry("version").or_insert(1.into());
+        let before = expected.map(|_| map.clone());
         edit(&mut map);
+        if before.as_ref() == Some(&map) {
+            return Ok(());
+        }
+        map.entry("version").or_insert(1.into());
         let dir = self.fs_path(&VaultPath::new(".nimw")?)?;
         if !dir.is_dir() {
             std::fs::create_dir(&dir).map_err(|e| io_err(".nimw", e))?;

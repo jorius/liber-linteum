@@ -112,6 +112,39 @@ fn m3a_layout_follows_renames_of_folders_and_pages() {
     let _ = dir;
 }
 
+/// Final review I3: a remap that moves nothing never rewrites (and fsyncs)
+/// the file; a batch of renames is applied in one pass.
+#[test]
+fn m3a_a_remap_that_matches_nothing_leaves_the_file_untouched() {
+    let (dir, vault) = fresh();
+    std::fs::create_dir(dir.path().join(".nimw")).unwrap();
+    // Compact on purpose: any write would pretty-print it.
+    let compact = r#"{"version":1,"levels":{"":{"a.md":{"x":1,"y":2},"b.md":{"x":3,"y":4}}}}"#;
+    std::fs::write(dir.path().join(".nimw/layout.json"), compact).unwrap();
+    let text = || std::fs::read_to_string(dir.path().join(".nimw/layout.json")).unwrap();
+
+    vault.remap_layout("Other/x.md", "Other2/x.md").unwrap();
+    vault
+        .remap_layout_many(&[
+            ("Other/y.md".to_string(), "Other2/y.md".to_string()),
+            ("ab.md".to_string(), "c.md".to_string()),
+        ])
+        .unwrap();
+    assert_eq!(text(), compact);
+
+    vault
+        .remap_layout_many(&[
+            ("a.md".to_string(), "Moved/a.md".to_string()),
+            ("b.md".to_string(), "Moved/b.md".to_string()),
+            ("zzz.md".to_string(), "Moved/zzz.md".to_string()),
+        ])
+        .unwrap();
+    assert_eq!(
+        vault.layout_level(""),
+        positions(&[("Moved/a.md", 1.0, 2.0), ("Moved/b.md", 3.0, 4.0)])
+    );
+}
+
 #[test]
 fn m3a_remap_without_a_layout_writes_nothing_and_bad_numbers_are_refused() {
     let (dir, vault) = fresh();

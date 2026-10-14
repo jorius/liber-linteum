@@ -6,7 +6,7 @@
 use crate::error::{Result, VaultError};
 use crate::vault::{Vault, read_json};
 use serde::{Deserialize, Serialize};
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashMap};
 
 const LAYOUT_JSON: &str = ".nimw/layout.json";
 
@@ -62,16 +62,36 @@ impl Vault {
     /// keys and card paths at or below `from` move below `to`. Without a
     /// layout file nothing is written.
     pub fn remap_layout(&self, from: &str, to: &str) -> Result<()> {
+        self.remap_layout_many(&[(from.to_string(), to.to_string())])
+    }
+
+    /// [`Vault::remap_layout`] for a batch of renames (e.g. one watcher
+    /// batch): one read, every pair applied in one pass, and one write — only
+    /// when a key or entry actually moved (final review I3: each write is an
+    /// fsync, and another program moving 1,000 notes reports 1,000 renames).
+    pub fn remap_layout_many(&self, renames: &[(String, String)]) -> Result<()> {
+        if renames.is_empty() {
+            return Ok(());
+        }
+        let moves: HashMap<&str, &str> = renames
+            .iter()
+            .map(|(from, to)| (from.as_str(), to.as_str()))
+            .collect();
         self.update_json_object(LAYOUT_JSON, false, |map| {
-            let levels = levels_of(map);
+            let Some(levels) = map
+                .get_mut("levels")
+                .and_then(serde_json::Value::as_object_mut)
+            else {
+                return;
+            };
             let old = std::mem::take(levels);
             for (key, cards) in old {
-                let key = remap_level_key(&key, from, to).unwrap_or(key);
+                let key = remap_level_key(&key, &moves).unwrap_or(key);
                 let cards = match cards {
                     serde_json::Value::Object(cards) => serde_json::Value::Object(
                         cards
                             .into_iter()
-                            .map(|(path, pos)| (remap(&path, from, to).unwrap_or(path), pos))
+                            .map(|(path, pos)| (remap(&path, &moves).unwrap_or(path), pos))
                             .collect(),
                     ),
                     other => other,
@@ -105,21 +125,25 @@ fn levels_of(
     entry.as_object_mut().expect("just made an object")
 }
 
-/// `path` with `from` (itself or as a folder prefix) replaced by `to`.
-fn remap(path: &str, from: &str, to: &str) -> Option<String> {
-    if path == from {
-        return Some(to.to_string());
+/// `path` moved by the nearest rename at or above it: a `from` equal to
+/// `path`, or to one of its folders (whole components only, so `Alpha` never
+/// touches `Alphabet`), is replaced by its `to`.
+fn remap(path: &str, moves: &HashMap<&str, &str>) -> Option<String> {
+    let mut prefix = path;
+    loop {
+        if let Some(to) = moves.get(prefix) {
+            return Some(format!("{to}{}", &path[prefix.len()..]));
+        }
+        prefix = &prefix[..prefix.rfind('/')?];
     }
-    let rest = path.strip_prefix(from)?.strip_prefix('/')?;
-    Some(format!("{to}/{rest}"))
 }
 
-fn remap_level_key(key: &str, from: &str, to: &str) -> Option<String> {
+fn remap_level_key(key: &str, moves: &HashMap<&str, &str>) -> Option<String> {
     if let Some(rest) = key.strip_prefix("expand:") {
-        return remap_level_key(rest, from, to).map(|k| format!("expand:{k}"));
+        return remap_level_key(rest, moves).map(|k| format!("expand:{k}"));
     }
     if let Some(rest) = key.strip_prefix("page:") {
-        return remap(rest, from, to).map(|p| format!("page:{p}"));
+        return remap(rest, moves).map(|p| format!("page:{p}"));
     }
-    remap(key, from, to)
+    remap(key, moves)
 }

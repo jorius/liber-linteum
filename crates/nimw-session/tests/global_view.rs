@@ -389,3 +389,80 @@ fn m3a_pinned_positions_follow_in_app_and_external_renames() {
         "{root:?}"
     );
 }
+
+/// Final review I3: a rename that matches no pinned position leaves
+/// `layout.json` alone — no rewrite, no fsync (a hand-written compact file
+/// would come back pretty-printed after any write).
+#[test]
+fn m3a_layout_is_not_rewritten_when_a_rename_matches_nothing() {
+    use nimw_vault::WatchEvent;
+    let dir = vault();
+    let compact = r#"{"version":1,"levels":{"":{"Alpha":{"x":1,"y":2}}}}"#;
+    write(dir.path(), ".nimw/layout.json", compact);
+    let (_c, s) = open(dir.path());
+    let layout = || std::fs::read_to_string(dir.path().join(".nimw/layout.json")).unwrap();
+
+    s.rename(&vp("zeta.md"), &vp("omega.md"), false).unwrap();
+    assert_eq!(layout(), compact, "in-app rename");
+
+    std::fs::rename(
+        dir.path().join("Beta/only.md"),
+        dir.path().join("Beta/solo.md"),
+    )
+    .unwrap();
+    s.apply(vec![
+        WatchEvent::Removed(vp("Beta/only.md")),
+        WatchEvent::Changed(vp("Beta/solo.md")),
+    ])
+    .unwrap();
+    assert_eq!(layout(), compact, "external rename");
+}
+
+/// Final review I3: another program moving 1,000 pinned notes (FSEvents
+/// reports them as per-file renames) costs one layout write, not 1,000
+/// fsynced rewrites. Release only:
+/// `cargo test --release -p nimw-session --test global_view -- --ignored`.
+#[test]
+#[ignore = "perf: run in release with --ignored"]
+fn m3a_an_external_move_of_1000_pinned_notes_writes_the_layout_once() {
+    use nimw_vault::WatchEvent;
+    const N: usize = 1000;
+    let dir = tempfile::tempdir().unwrap();
+    for i in 0..N {
+        write(dir.path(), &format!("A/n{i}.md"), &format!("# Note {i}\n"));
+    }
+    // 50 other levels × 100 entries, plus an Expand canvas pinning every note.
+    let mut levels: Vec<String> = (0..50)
+        .map(|l| {
+            let cards: Vec<String> = (0..100)
+                .map(|e| format!(r#""L{l}/e{e}.md":{{"x":{e},"y":{l}}}"#))
+                .collect();
+            format!(r#""L{l}":{{{}}}"#, cards.join(","))
+        })
+        .collect();
+    let pins: Vec<String> = (0..N)
+        .map(|i| format!(r#""A/n{i}.md":{{"x":{i},"y":0}}"#))
+        .collect();
+    levels.push(format!(r#""expand:":{{{}}}"#, pins.join(",")));
+    write(
+        dir.path(),
+        ".nimw/layout.json",
+        &format!(r#"{{"version":1,"levels":{{{}}}}}"#, levels.join(",")),
+    );
+    let (_c, s) = open(dir.path());
+
+    std::fs::rename(dir.path().join("A"), dir.path().join("B")).unwrap();
+    let mut events = vec![WatchEvent::Removed(vp("A")), WatchEvent::Changed(vp("B"))];
+    for i in 0..N {
+        events.push(WatchEvent::Removed(vp(&format!("A/n{i}.md"))));
+        events.push(WatchEvent::Changed(vp(&format!("B/n{i}.md"))));
+    }
+    let started = std::time::Instant::now();
+    s.apply(events).unwrap();
+    let took = started.elapsed();
+    let pinned = s.vault().layout_level("expand:");
+    assert_eq!(pinned.len(), N);
+    assert!(pinned.keys().all(|k| k.starts_with("B/")), "{pinned:?}");
+    eprintln!("external move of {N} pinned notes, watcher batch: {took:?}");
+    assert!(took < std::time::Duration::from_secs(1), "{took:?}");
+}

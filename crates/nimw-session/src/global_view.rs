@@ -302,12 +302,17 @@ fn has_scheme(value: &str) -> bool {
 }
 
 impl VaultSession {
-    /// Pinned Global View positions follow a rename (M3a §7). The layout is
-    /// a convenience: a failure is reported, never fails the rename.
-    pub(crate) fn follow_layout(&self, from: &str, to: &str) {
-        if let Err(e) = self.vault.remap_layout(from, to) {
+    /// Pinned Global View positions follow renames (M3a §7), all of them in
+    /// one layout update (final review I3). The layout is a convenience: a
+    /// failure is reported, never fails the rename.
+    pub(crate) fn follow_layout(&self, renames: &[(String, String)]) {
+        if let Err(e) = self.vault.remap_layout_many(renames) {
+            let what = match renames {
+                [(from, to)] => format!("{from} → {to}"),
+                _ => format!("{} renamed entries", renames.len()),
+            };
             self.emit(crate::events::SessionEvent::Warning(format!(
-                "Global View layout not updated for {from} → {to}: {e}"
+                "Global View layout not updated for {what}: {e}"
             )));
         }
     }
