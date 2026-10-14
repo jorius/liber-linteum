@@ -27,6 +27,13 @@ async function globalView(page: Page, pages: Record<string, string> = PAGES) {
   await page.getByRole('button', { name: /^vault/ }).click();
   await page.getByRole('button', { name: 'Global view' }).click();
   await expect(page.getByRole('button', { name: 'Welcome', exact: true })).toBeVisible();
+  // The level is fitted in view once its cards are placed: boxes measured
+  // before that move, and the move closes an open card menu (m9).
+  await expect
+    .poll(() =>
+      page.locator('.react-flow__viewport').evaluate((n) => (n as HTMLElement).style.transform),
+    )
+    .not.toBe('translate(0px, 0px) scale(1)');
 }
 
 const card = (page: Page, name: string) => page.getByRole('button', { name, exact: true });
