@@ -117,6 +117,36 @@ describe('Link picker (M2c §6.3)', () => {
     expect(viewOf().hasFocus).toBe(true);
   });
 
+  it('selected text with [[, ]], | or brackets is made link-safe in the alias (final review M11)', async () => {
+    const doc = 'a [[x]] | list[0] b\nz\n';
+    await mount(doc, 0, doc.indexOf('\nz'));
+    pressModK();
+    await userEvent.type(picker(), 'spa');
+    await waitFor(() => expect(options()).toHaveLength(1));
+    await userEvent.keyboard('{Enter}');
+    expect(text()).toBe('[[Sparda|a x list 0 b]]\nz\n');
+  });
+
+  it('a selection of only link syntax falls back to the page title (final review M11)', async () => {
+    await mount('[[]]|\n', 0, 5);
+    pressModK();
+    await userEvent.type(picker(), 'rex');
+    await waitFor(() => expect(options()).toHaveLength(1));
+    await userEvent.keyboard('{Enter}');
+    expect(text()).toBe('[[rex-draft|Generator Rex]]\n');
+  });
+
+  it('links the live selection when the text changes while the picker is open (final review M11)', async () => {
+    await mount('see the twins now\n', 4, 13);
+    pressModK();
+    await userEvent.type(picker(), 'spa');
+    await waitFor(() => expect(options()).toHaveLength(1));
+    // A merge from disk lands while the picker is open.
+    act(() => viewOf().dispatch({ changes: { from: 0, insert: 'We ' } }));
+    await userEvent.keyboard('{Enter}');
+    expect(text()).toBe('We see [[Sparda|the twins]] now\n');
+  });
+
   it('the toolbar Link button opens the picker too; no axe violations', async () => {
     await mount('x\n', 0);
     await userEvent.click(screen.getByRole('button', { name: 'Link' }));

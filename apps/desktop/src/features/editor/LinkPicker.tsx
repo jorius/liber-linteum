@@ -1,5 +1,5 @@
 import type { EditorView } from '@codemirror/view';
-import { useEffect, useId, useRef, useState, type KeyboardEvent } from 'react';
+import { useEffect, useId, useState, type KeyboardEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { linkSuggest, type LinkSuggestion } from '../../ipc';
 import styles from './Editor.module.css';
@@ -11,13 +11,16 @@ const MAX_PAGES = 8;
 
 type Option = { kind: 'url'; url: string } | { kind: 'page'; page: LinkSuggestion };
 
+/** Text that can sit in `[[target|…]]`: brackets, pipes and line breaks would
+ *  end or split the link, so they become spaces (final review M11). */
+const linkSafe = (text: string) => text.replace(/[[\]|\r\n]/g, ' ').replace(/\s{2,}/g, ' ');
+
 /** "Link to…" (M2c §6.3): a combobox over the vault's pages, plus the typed
  *  web address. A page links the selection as `[[target|selection]]` (or
  *  `[[target]]` / `[[target|Title]]` without one); a URL gives `[text](url)`. */
 export function LinkPicker({ view, onClose }: { view: EditorView; onClose: () => void }) {
   const { t } = useTranslation();
   const listId = useId();
-  const range = useRef(view.state.selection.main);
   const [query, setQuery] = useState('');
   const [pages, setPages] = useState<LinkSuggestion[]>([]);
   const [active, setActive] = useState(0);
@@ -46,14 +49,15 @@ export function LinkPicker({ view, onClose }: { view: EditorView; onClose: () =>
     if (refocus) view.focus();
   };
   const pick = (o: Option) => {
-    const length = view.state.doc.length;
-    const from = Math.min(range.current.from, length);
-    const to = Math.min(range.current.to, length);
-    const selected = view.state.sliceDoc(from, to).replace(/\n/g, ' ');
+    // The live selection: CodeMirror maps it through changes made while the
+    // picker is open, such as a merge from disk (final review M11).
+    const { from, to } = view.state.selection.main;
+    const selected = view.state.sliceDoc(from, to);
     let insert: string;
-    if (o.kind === 'url') insert = `[${selected || o.url}](${o.url})`;
+    if (o.kind === 'url') insert = `[${selected.replace(/\n/g, ' ') || o.url}](${o.url})`;
     else {
-      const alias = selected || aliasFor(o.page);
+      const own = linkSafe(selected);
+      const alias = own.trim() ? own : aliasFor(o.page);
       insert = alias ? `[[${o.page.target}|${alias}]]` : `[[${o.page.target}]]`;
     }
     view.dispatch({
@@ -80,7 +84,7 @@ export function LinkPicker({ view, onClose }: { view: EditorView; onClose: () =>
     }
   };
 
-  const at = view.coordsAtPos(range.current.from);
+  const at = view.coordsAtPos(view.state.selection.main.from);
   const style = at ? { top: at.bottom + 6, left: at.left } : undefined;
   const optionId = (i: number) => `${listId}-${i}`;
   return (
