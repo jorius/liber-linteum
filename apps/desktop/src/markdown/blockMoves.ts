@@ -535,8 +535,11 @@ function holdsTheSameBlocks(
   const before: string[] = Array.from({ length: Math.max(0, topLists) }, () => 'top:list');
   const after: string[] = Array.from({ length: Math.max(0, -topLists) }, () => 'top:list');
   for (const [a, b] of windows(text, model, changes)) {
-    before.push(...signature(text.slice(a, b)));
-    after.push(...signature(next.slice(mapPos(changes, a, -1), mapPos(changes, b, 1))));
+    // A window that doesn't start the note must not read as one: a `---`
+    // there is a rule, not the start of front matter.
+    const lead = a > 0 ? '\n' : '';
+    before.push(...signature(lead + text.slice(a, b)));
+    after.push(...signature(lead + next.slice(mapPos(changes, a, -1), mapPos(changes, b, 1))));
   }
   return before.sort().join('\u0000') === after.sort().join('\u0000');
 }

@@ -78,6 +78,13 @@ describe('moving top-level blocks (M4 §3)', () => {
     expect(move('- a\n\nPara\n\n- b\n', 'Para', null)).toBe('refused');
   });
 
+  it('a move next to a horizontal rule is not refused (found by the sweep)', () => {
+    // The guard's window around the drop starts at `---`: a rule there, not
+    // the start of front matter.
+    const text = 'P0\n\n> quote\n\nP1\n\nP2\n\nP3\n\n---\n\nEnd.\n';
+    expect(move(text, '> quote', 'End.')).toBe('P0\n\nP1\n\nP2\n\nP3\n\n---\n\n> quote\n\nEnd.\n');
+  });
+
   it('a slot that leaves the block where it is gives nothing', () => {
     expect(move('P1\n\nP2\n', 'P1', 'P2')).toBeNull();
     expect(move('P1\n\nP2\n', 'P2', null)).toBeNull();
