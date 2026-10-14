@@ -20,6 +20,17 @@ export type FrontmatterEdit = { ok: true; change: TextChange | null } | { ok: fa
 /** A leading `---` … `---` block, confirmed by the same parser the app uses. */
 const BLOCK = /^---\n(?:[\s\S]*?\n)?---(?:\n|$)/;
 
+/** Whether the text opens like a frontmatter block that BLOCK and remark
+ *  don't both confirm (final review Minor 2): a byte-order mark before `---`,
+ *  or a `---` line (trailing spaces allowed) with a later `---` / `...` line
+ *  that some reader (remark, nimw-markdown, Obsidian) could take as its end.
+ *  A new block in front of it would hide it from one reader or another. */
+function unconfirmedBlock(text: string): boolean {
+  const open = /^\uFEFF?---[ \t]*\r?\n/.exec(text);
+  if (!open) return false;
+  return text.startsWith('\uFEFF') || /^(?:---|\.\.\.)[ \t]*\r?$/m.test(text.slice(open[0].length));
+}
+
 /** The value as written: newlines folded to spaces. */
 function oneLine(value: string | number): string | number {
   return typeof value === 'string' ? value.replace(/\s*\n\s*/g, ' ') : value;
@@ -91,6 +102,7 @@ export function setFrontmatter(text: string, patch: FrontmatterPatch): Frontmatt
   const m = BLOCK.exec(text);
   const block = m && parsePage(m[0]).frontmatter ? m[0] : null;
   if (!block) {
+    if (unconfirmedBlock(text)) return { ok: false };
     const lines = Object.entries(patch)
       .filter((e): e is [string, string | number] => e[1] !== null)
       .map(([k, v]) => `${scalar(k)}: ${scalar(v)}\n`);

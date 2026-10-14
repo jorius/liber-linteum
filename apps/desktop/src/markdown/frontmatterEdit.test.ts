@@ -235,3 +235,34 @@ describe('setFrontmatter never corrupts the frontmatter (final review C2)', () =
     }
   });
 });
+
+describe('setFrontmatter never puts a second block in front of one (final review Minor 2)', () => {
+  it('refuses a block closed with `...` (nimw-markdown reads it, remark does not)', () => {
+    const text = '---\ntags: [x]\n...\n\nbody\n';
+    expect(setFrontmatter(text, { subtitle: 'S' })).toEqual({ ok: false });
+    expect(setFrontmatter(text, { cover: null })).toEqual({ ok: false });
+  });
+
+  it('refuses a block whose fences have trailing spaces (remark reads it, nimw-markdown does not)', () => {
+    expect(setFrontmatter('---\ntitle: a\n--- \n\nbody\n', { subtitle: 'S' })).toEqual({
+      ok: false,
+    });
+    expect(setFrontmatter('--- \ntitle: a\n---\n\nbody\n', { subtitle: 'S' })).toEqual({
+      ok: false,
+    });
+  });
+
+  it('refuses a block after a byte-order mark', () => {
+    expect(setFrontmatter('\uFEFF---\ncover: a.png\n---\nB\n', { subtitle: 'S' })).toEqual({
+      ok: false,
+    });
+    expect(setFrontmatter('\uFEFF---\n\nText\n', { subtitle: 'S' })).toEqual({ ok: false });
+  });
+
+  it('a leading thematic break with no closing line still gets a new block', () => {
+    expect(edit('--- \n\nText\n', { subtitle: 'S' })).toBe('---\nsubtitle: S\n---\n--- \n\nText\n');
+    expect(edit('---\n\nText\n\n***\n', { subtitle: 'S' })).toBe(
+      '---\nsubtitle: S\n---\n---\n\nText\n\n***\n',
+    );
+  });
+});
