@@ -123,6 +123,58 @@ describe('relationships dialog (M3b §3)', () => {
     expect(field.width).toBe('100%');
   });
 
+  describe('changes not saved yet (final review m13)', () => {
+    const page = () =>
+      fakeDisk(
+        { 'A.md': '---\nrelated:\n  - "[[B]]"\n  - "[[C]]"\n---\n', 'B.md': '', 'C.md': '' },
+        extra,
+      );
+
+    it('Close saves them, then closes; the dialog says so', async () => {
+      const disk = page();
+      const onClose = vi.fn();
+      render(<RelationsDialog page="A.md" onClose={onClose} />);
+      const b = await screen.findByRole('group', { name: 'A → B' });
+      expect(
+        screen.getByText('Close saves the changes you haven’t saved yet; Escape discards them.'),
+      ).toBeVisible();
+      await userEvent.type(within(b).getByRole('textbox', { name: 'Label' }), 'why');
+      const c = screen.getByRole('group', { name: 'A → C' });
+      await userEvent.click(within(c).getByRole('checkbox', { name: 'Arrow to C' }));
+      await userEvent.click(screen.getByRole('button', { name: 'Close' }));
+      await waitFor(() => expect(onClose).toHaveBeenCalled());
+      expect(disk.files.get('A.md')).toBe(
+        '---\nrelated:\n  - { link: "[[B]]", label: why }\n  - { link: "[[C]]", directed: true }\n---\n',
+      );
+    });
+
+    it('Escape discards them', async () => {
+      const disk = page();
+      const onClose = vi.fn();
+      render(<RelationsDialog page="A.md" onClose={onClose} />);
+      const b = await screen.findByRole('group', { name: 'A → B' });
+      await userEvent.type(within(b).getByRole('textbox', { name: 'Label' }), 'why');
+      await userEvent.keyboard('{Escape}');
+      expect(onClose).toHaveBeenCalled();
+      expect(disk.writes()).toEqual([]);
+    });
+
+    it('a Close whose save is refused keeps the dialog, showing the list as it is now', async () => {
+      const disk = page();
+      const onClose = vi.fn();
+      render(<RelationsDialog page="A.md" onClose={onClose} />);
+      const b = await screen.findByRole('group', { name: 'A → B' });
+      await userEvent.type(within(b).getByRole('textbox', { name: 'Label' }), 'why');
+      disk.files.set('A.md', '---\nrelated:\n  - "[[C]]"\n---\n');
+      await userEvent.click(screen.getByRole('button', { name: 'Close' }));
+      await waitFor(() =>
+        expect(screen.queryByRole('group', { name: 'A → B' })).not.toBeInTheDocument(),
+      );
+      expect(onClose).not.toHaveBeenCalled();
+      expect(disk.writes()).toEqual([]);
+    });
+  });
+
   it('a page without any says how to add one; no axe violations', async () => {
     fakeDisk({ 'A.md': '# A\n' }, extra);
     render(<RelationsDialog page="A.md" onClose={vi.fn()} />);

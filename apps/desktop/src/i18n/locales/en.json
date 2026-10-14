@@ -302,6 +302,7 @@
       "edge": "{from} → {to}",
       "label": "Label",
       "arrow": "Arrow to {to}",
+      "closeHint": "Close saves the changes you haven’t saved yet; Escape discards them.",
       "save": "Save",
       "delete": "Delete relationship",
       "menu": "Connections of {title}",

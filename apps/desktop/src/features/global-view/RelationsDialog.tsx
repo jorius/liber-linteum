@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import type { RelatedChange } from '../../markdown/related';
 import { relationsOf, removeRelation, updateRelation, type Relation } from '../../stores/relations';
 import { nameOf } from '../../stores/tree';
 import { Dialog } from '../dialogs/Dialog';
@@ -11,9 +12,17 @@ export const LABEL_MAX = 40;
 
 const pageName = (path: string) => nameOf(path).replace(/\.md$/i, '');
 
+/** A row's label and arrow, changed and not saved yet. */
+interface Draft {
+  relation: Relation;
+  change: RelatedChange;
+}
+
 /** A page's relationships, or those between two pages (`other`), each with
  *  its label, arrow, Save and Delete (M3b §3). Changes are written to the
- *  relationship's own page; the Global View re-reads its edges. */
+ *  relationship's own page; the Global View re-reads its edges. Close saves
+ *  the changes not saved yet; Escape discards them, as the dialog says
+ *  (final review m13). */
 export function RelationsDialog({
   page,
   other,
@@ -25,7 +34,14 @@ export function RelationsDialog({
 }) {
   const { t } = useTranslation();
   const [rows, setRows] = useState<Relation[] | null>(null);
+  const [closing, setClosing] = useState(false);
   const list = useRef<HTMLDivElement>(null);
+  /** Each row's changes not saved yet, by row key. */
+  const drafts = useRef(new Map<string, Draft>());
+  const setDraft = useCallback((key: string, draft: Draft | null) => {
+    if (draft) drafts.current.set(key, draft);
+    else drafts.current.delete(key);
+  }, []);
 
   const reload = useCallback(async () => {
     const lists = await Promise.all((other ? [page, other] : [page]).map(relationsOf));
@@ -58,6 +74,24 @@ export function RelationsDialog({
     if (useGvStore.getState().loaded) void useGvStore.getState().load();
   };
 
+  /** Close: the changes not saved yet are saved first. One refused (the
+   *  list moved, the page changed on disk) keeps the dialog open on the list
+   *  as it is now, so nothing is lost without a word. */
+  const close = async () => {
+    const pending = [...drafts.current.values()];
+    if (pending.length === 0) return onClose();
+    setClosing(true);
+    let saved = true;
+    for (const d of pending) saved = (await updateRelation(d.relation, d.change)) && saved;
+    if (saved) {
+      if (useGvStore.getState().loaded) void useGvStore.getState().load();
+      onClose();
+      return;
+    }
+    await changed();
+    setClosing(false);
+  };
+
   const title = other
     ? t('gv.relations.between', { a: pageName(page), b: pageName(other) })
     : t('gv.relations.of', { name: pageName(page) });
@@ -70,17 +104,30 @@ export function RelationsDialog({
         ) : rows.length === 0 ? (
           <p className={styles.text}>{t('gv.relations.none')}</p>
         ) : (
-          rows.map((r) => (
-            <RelationRow
-              key={`${r.source}:${r.index}:${r.link}`}
-              relation={r}
-              onChanged={changed}
-            />
-          ))
+          rows.map((r) => {
+            const key = `${r.source}:${r.index}:${r.link}`;
+            return (
+              <RelationRow
+                key={key}
+                draftKey={key}
+                relation={r}
+                onChanged={changed}
+                onDraft={setDraft}
+              />
+            );
+          })
         )}
       </div>
+      {rows !== null && rows.length > 0 && (
+        <p className={styles.hint}>{t('gv.relations.closeHint')}</p>
+      )}
       <div className={styles.buttons}>
-        <button type="button" className={styles.button} onClick={onClose}>
+        <button
+          type="button"
+          className={styles.button}
+          disabled={closing}
+          onClick={() => void close()}
+        >
           {t('dialogs.close')}
         </button>
       </div>
@@ -89,11 +136,15 @@ export function RelationsDialog({
 }
 
 function RelationRow({
+  draftKey,
   relation,
   onChanged,
+  onDraft,
 }: {
+  draftKey: string;
   relation: Relation;
   onChanged: () => Promise<void>;
+  onDraft: (key: string, draft: Draft | null) => void;
 }) {
   const { t } = useTranslation();
   const [label, setLabel] = useState(relation.label ?? '');
@@ -101,6 +152,15 @@ function RelationRow({
   const [busy, setBusy] = useState(false);
   const target = relation.path ? pageName(relation.path) : relation.target;
   const dirty = label.trim() !== (relation.label ?? '') || directed !== relation.directed;
+
+  // The dialog's Close saves what's changed here and not saved yet.
+  useEffect(() => {
+    onDraft(
+      draftKey,
+      dirty ? { relation, change: { label: label.trim() || null, directed } } : null,
+    );
+  }, [draftKey, dirty, relation, label, directed, onDraft]);
+  useEffect(() => () => onDraft(draftKey, null), [draftKey, onDraft]);
 
   // Re-read whether or not the change went through: one refused because the
   // list moved shows the list as it is now (§10.7, final review m5).

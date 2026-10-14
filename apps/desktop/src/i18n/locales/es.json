@@ -302,6 +302,7 @@
       "edge": "{from} → {to}",
       "label": "Etiqueta",
       "arrow": "Flecha hacia {to}",
+      "closeHint": "Cerrar guarda los cambios que aún no has guardado; Escape los descarta.",
       "save": "Guardar",
       "delete": "Eliminar relación",
       "menu": "Conexiones de {title}",
