@@ -65,19 +65,43 @@ export function Cover({ page, editable }: { page: Page; editable: boolean }) {
     entered.current = repositioning;
   }, [repositioning]);
 
+  // Add, Change and Remove swap the band, unmounting the focused button: once
+  // the matching button renders, focus goes there (final review I3), unless the
+  // user has moved focus elsewhere meanwhile.
+  const addButton = useRef<HTMLButtonElement>(null);
+  const changeButton = useRef<HTMLButtonElement>(null);
+  const [refocus, setRefocus] = useState<'add' | 'change' | null>(null);
+  useEffect(() => setRefocus(null), [page.path]);
+  useEffect(() => {
+    if (!refocus) return;
+    const target = (refocus === 'add' ? addButton : changeButton).current;
+    if (!target) return; // not rendered yet: the cover is still settling
+    setRefocus(null);
+    const active = document.activeElement;
+    if (!active || active === document.body || active === target) target.focus();
+  }, [refocus, cover.kind, editable, repositioning]);
+
   const edit = useEditorStore.getState().editFrontmatter;
 
   const pick = async () => {
     const res = await coverPick(page.path);
+    const settled = cover.kind === 'none' ? 'add' : 'change';
     if (!res.ok) {
       useToastStore.getState().push({ message: errorMessage(res.error), tone: 'error' });
+      setRefocus(settled);
       return;
     }
-    if (!res.value) return;
-    await edit({ cover: res.value.reference, 'cover-y': null });
+    if (!res.value) {
+      setRefocus(settled); // cancelled
+      return;
+    }
+    const ok = await edit({ cover: res.value.reference, 'cover-y': null });
+    setRefocus(ok ? 'change' : settled);
     void useVaultStore.getState().refreshTree();
   };
-  const remove = () => void edit({ cover: null, 'cover-y': null });
+  const remove = async () => {
+    if (await edit({ cover: null, 'cover-y': null })) setRefocus('add');
+  };
   const save = async () => {
     if (draft === null) return;
     const value = draft;
@@ -122,12 +146,11 @@ export function Cover({ page, editable }: { page: Page; editable: boolean }) {
 
   if (cover.kind === 'none') {
     return editable ? (
-      <button type="button" className={styles.addCover} onClick={() => void pick()}>
+      <button ref={addButton} type="button" className={styles.addCover} onClick={() => void pick()}>
         {t('cover.add')}
       </button>
     ) : null;
   }
-  if (cover.kind === 'loading') return <div className={styles.coverBand} aria-hidden="true" />;
 
   const controls = editable && (
     <div className={styles.coverControls}>
@@ -142,7 +165,12 @@ export function Cover({ page, editable }: { page: Page; editable: boolean }) {
         </>
       ) : (
         <>
-          <button type="button" className={styles.coverButton} onClick={() => void pick()}>
+          <button
+            ref={changeButton}
+            type="button"
+            className={styles.coverButton}
+            onClick={() => void pick()}
+          >
             {t('cover.change')}
           </button>
           {cover.kind === 'image' && (
@@ -155,7 +183,7 @@ export function Cover({ page, editable }: { page: Page; editable: boolean }) {
               {t('cover.reposition')}
             </button>
           )}
-          <button type="button" className={styles.coverButton} onClick={remove}>
+          <button type="button" className={styles.coverButton} onClick={() => void remove()}>
             {t('cover.remove')}
           </button>
         </>
@@ -163,12 +191,18 @@ export function Cover({ page, editable }: { page: Page; editable: boolean }) {
     </div>
   );
 
+  // Every band has the same shape (body, then controls), so the controls stay
+  // mounted while a changed cover loads and a focused button keeps focus.
   if (cover.kind !== 'image') {
     return (
       <div role="group" aria-label={t('cover.label')} className={styles.coverBand}>
-        <p className={styles.coverPlaceholder}>
-          {t(cover.kind === 'remote' ? 'cover.remote' : 'cover.missing')}
-        </p>
+        {cover.kind === 'loading' ? (
+          <div className={styles.coverFrame} />
+        ) : (
+          <p className={styles.coverPlaceholder}>
+            {t(cover.kind === 'remote' ? 'cover.remote' : 'cover.missing')}
+          </p>
+        )}
         {controls}
       </div>
     );

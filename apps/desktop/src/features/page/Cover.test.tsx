@@ -167,6 +167,96 @@ describe('Cover (M2c §2)', () => {
     expect(screen.getByText('S')).toBeInTheDocument();
   });
 
+  describe('keyboard focus is never lost (final review I3)', () => {
+    /** Answers after a real delay, so the "loading" band is committed in
+     *  between, as with the real IPC. */
+    const slowResolve = (args: Record<string, unknown>) =>
+      new Promise((r) => setTimeout(() => r(resolveCovers(args)), 20));
+
+    it('Remove moves focus to Add cover', async () => {
+      fakeDisk({ 'Rex.md': '---\ncover: a.png\n---\n# Rex\n' }, { links_resolve: slowResolve });
+      render(<PageView />);
+      await open('Rex.md');
+      const band = await screen.findByRole('group', { name: 'Cover' });
+      await waitFor(() => expect(document.querySelector('img[data-cover]')).not.toBeNull());
+      within(band).getByRole('button', { name: 'Remove' }).focus();
+      await userEvent.keyboard('{Enter}');
+      const add = await screen.findByRole('button', { name: 'Add cover' });
+      await waitFor(() => expect(add).toHaveFocus());
+    });
+
+    it('Add cover moves focus to Change cover once the image shows', async () => {
+      fakeDisk(
+        { 'Rex.md': '# Rex\n' },
+        {
+          cover_pick: () => ({ path: 'sky.png', reference: 'sky.png' }),
+          links_resolve: slowResolve,
+        },
+      );
+      render(<PageView />);
+      await open('Rex.md');
+      screen.getByRole('button', { name: 'Add cover' }).focus();
+      await userEvent.keyboard('{Enter}');
+      await waitFor(() => expect(document.querySelector('img[data-cover]')).not.toBeNull());
+      await waitFor(() =>
+        expect(screen.getByRole('button', { name: 'Change cover' })).toHaveFocus(),
+      );
+    });
+
+    it('Change cover keeps focus on Change cover while the new image loads', async () => {
+      fakeDisk(
+        { 'Rex.md': '---\ncover: a.png\n---\n# Rex\n' },
+        {
+          cover_pick: () => ({ path: 'b.png', reference: 'b.png' }),
+          links_resolve: slowResolve,
+        },
+      );
+      render(<PageView />);
+      await open('Rex.md');
+      await waitFor(() => expect(document.querySelector('img[data-cover]')).not.toBeNull());
+      screen.getByRole('button', { name: 'Change cover' }).focus();
+      await userEvent.keyboard('{Enter}');
+      await waitFor(() =>
+        expect(document.querySelector('img[data-cover]')).toHaveAttribute(
+          'src',
+          'nimw-asset://localhost/b.png',
+        ),
+      );
+      expect(screen.getByRole('button', { name: 'Change cover' })).toHaveFocus();
+    });
+
+    it('cancelling Add cover leaves focus on Add cover', async () => {
+      const disk = fakeDisk({ 'Rex.md': '# Rex\n' }, { cover_pick: () => null });
+      render(<PageView />);
+      await open('Rex.md');
+      const add = screen.getByRole('button', { name: 'Add cover' });
+      add.focus();
+      await userEvent.keyboard('{Enter}');
+      await waitFor(() => expect(disk.calls.some(([c]) => c === 'cover_pick')).toBe(true));
+      await waitFor(() => expect(add).toHaveFocus());
+    });
+
+    it('does not pull focus back if the user moved it elsewhere meanwhile', async () => {
+      let answer!: (v: unknown) => void;
+      fakeDisk(
+        { 'Rex.md': '# Rex\n' },
+        {
+          cover_pick: () => new Promise((r) => (answer = r)),
+          links_resolve: slowResolve,
+        },
+      );
+      render(<PageView />);
+      await open('Rex.md');
+      screen.getByRole('button', { name: 'Add cover' }).focus();
+      await userEvent.keyboard('{Enter}');
+      const subtitle = screen.getByRole('textbox', { name: 'Subtitle' });
+      act(() => subtitle.focus());
+      await act(async () => answer({ path: 'sky.png', reference: 'sky.png' }));
+      await waitFor(() => expect(document.querySelector('img[data-cover]')).not.toBeNull());
+      expect(subtitle).toHaveFocus();
+    });
+  });
+
   it('has no axe violations with the cover controls', async () => {
     fakeDisk({ 'Rex.md': '---\ncover: a.png\n---\n# Rex\n' }, { links_resolve: resolveCovers });
     render(<PageView />);
