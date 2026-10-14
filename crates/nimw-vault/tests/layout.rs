@@ -268,3 +268,57 @@ fn m3a_remap_without_a_layout_writes_nothing_and_bad_numbers_are_refused() {
     );
     assert!(!dir.path().join(".nimw").exists());
 }
+
+/// Final review m11: level saves (IPC threads) and remaps (the watcher)
+/// update the file at the same time: none fails with a conflict and none
+/// is lost.
+#[test]
+fn m3a_concurrent_layout_writers_neither_fail_nor_lose_updates() {
+    let (dir, vault) = fresh();
+    let names: Vec<String> = (0..8).map(|i| format!("L{i}")).collect();
+    for name in &names {
+        touch(&dir, &[format!("{name}/a.md").as_str()]);
+    }
+    touch(&dir, &["Moved"]);
+    vault
+        .set_layout_level("", &positions(&[("L0", 0.0, 0.0)]))
+        .unwrap();
+    std::thread::scope(|s| {
+        for (t, name) in names.iter().enumerate() {
+            let vault = &vault;
+            s.spawn(move || {
+                let entry = format!("{name}/a.md");
+                for round in 0..5 {
+                    vault
+                        .set_layout_level(name, &positions(&[(&entry, round as f64, t as f64)]))
+                        .unwrap();
+                }
+            });
+        }
+        // The watcher: entries of renamed pages follow.
+        s.spawn(|| {
+            for i in 0..5 {
+                let (page, renamed) = (format!("Moved/n{i}.md"), format!("Moved/r{i}.md"));
+                touch(&dir, &[&page]);
+                vault
+                    .set_layout_level("Moved", &positions(&[(&page, 1.0, 1.0)]))
+                    .unwrap();
+                std::fs::rename(dir.path().join(&page), dir.path().join(&renamed)).unwrap();
+                vault.remap_layout(&page, &renamed).unwrap();
+                assert_eq!(
+                    vault.layout_level("Moved"),
+                    positions(&[(&renamed, 1.0, 1.0)])
+                );
+            }
+        });
+    });
+    for (t, name) in names.iter().enumerate() {
+        let entry = format!("{name}/a.md");
+        assert_eq!(
+            vault.layout_level(name),
+            positions(&[(&entry, 4.0, t as f64)]),
+            "{name}"
+        );
+    }
+    assert_eq!(vault.layout_level(""), positions(&[("L0", 0.0, 0.0)]));
+}

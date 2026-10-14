@@ -6,6 +6,7 @@ use crate::is_hidden_name;
 use crate::path::VaultPath;
 use globset::{Glob, GlobSet, GlobSetBuilder};
 use std::path::{Path, PathBuf};
+use std::sync::Mutex;
 
 /// An open vault folder. Opening reads configuration but never writes (VLT-02).
 #[derive(Debug)]
@@ -13,6 +14,8 @@ pub struct Vault {
     pub(crate) root: PathBuf,
     pub(crate) excludes: GlobSet,
     warnings: Vec<String>,
+    /// Serializes read-modify-write updates of `.nimw/*.json` (m11).
+    json_lock: Mutex<()>,
 }
 
 impl Vault {
@@ -52,6 +55,7 @@ impl Vault {
             root,
             excludes,
             warnings,
+            json_lock: Mutex::new(()),
         })
     }
 
@@ -124,11 +128,31 @@ impl Vault {
     /// a file that isn't a JSON object is never overwritten, and one `edit`
     /// leaves as it was is not rewritten (final review I3: every write is
     /// an fsync).
+    ///
+    /// Updates are serialized within the process (final review m11: the
+    /// IPC threads save layout levels while the watcher remaps them), and a
+    /// compare-and-swap lost to another program is retried once: `edit` is
+    /// then applied again to what that program wrote.
     pub(crate) fn update_json_object(
         &self,
         rel: &str,
         create: bool,
-        edit: impl FnOnce(&mut serde_json::Map<String, serde_json::Value>),
+        mut edit: impl FnMut(&mut serde_json::Map<String, serde_json::Value>),
+    ) -> Result<()> {
+        let _serialized = self.json_lock.lock().unwrap_or_else(|e| e.into_inner());
+        match self.try_update_json_object(rel, create, &mut edit) {
+            Err(VaultError::Conflict { .. } | VaultError::AlreadyExists(_)) => {
+                self.try_update_json_object(rel, create, &mut edit)
+            }
+            done => done,
+        }
+    }
+
+    fn try_update_json_object(
+        &self,
+        rel: &str,
+        create: bool,
+        edit: &mut impl FnMut(&mut serde_json::Map<String, serde_json::Value>),
     ) -> Result<()> {
         let file = VaultPath::new(rel)?;
         let (mut map, expected) = match self.read(&file) {
@@ -216,5 +240,68 @@ pub(crate) fn read_json<T: serde::de::DeserializeOwned + Default>(
             );
             T::default()
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const LAYOUT: &str = ".nimw/layout.json";
+
+    fn vault_with_layout(text: &str) -> (tempfile::TempDir, Vault) {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::create_dir(dir.path().join(".nimw")).unwrap();
+        std::fs::write(dir.path().join(LAYOUT), text).unwrap();
+        let vault = Vault::open(dir.path()).unwrap();
+        (dir, vault)
+    }
+
+    fn json(dir: &tempfile::TempDir) -> serde_json::Value {
+        serde_json::from_slice(&std::fs::read(dir.path().join(LAYOUT)).unwrap()).unwrap()
+    }
+
+    /// Final review m11: another program writing the file between our read
+    /// and our write is a conflict; the update is re-applied once to what
+    /// it wrote, so neither change is lost.
+    #[test]
+    fn m11_an_outside_write_between_read_and_write_is_retried_once() {
+        let (dir, vault) = vault_with_layout(r#"{"version":1,"a":1}"#);
+        let mut calls = 0;
+        vault
+            .update_json_object(LAYOUT, false, |map| {
+                calls += 1;
+                if calls == 1 {
+                    std::fs::write(dir.path().join(LAYOUT), r#"{"version":1,"a":2}"#).unwrap();
+                }
+                map.insert("b".into(), 3.into());
+            })
+            .unwrap();
+        assert_eq!(calls, 2);
+        assert_eq!(
+            json(&dir),
+            serde_json::json!({ "version": 1, "a": 2, "b": 3 })
+        );
+    }
+
+    /// Only once: a file that keeps changing under us is still an error.
+    #[test]
+    fn m11_a_second_conflict_is_reported() {
+        let (dir, vault) = vault_with_layout(r#"{"version":1}"#);
+        let mut calls = 0;
+        let result = vault.update_json_object(LAYOUT, false, |map| {
+            calls += 1;
+            std::fs::write(
+                dir.path().join(LAYOUT),
+                format!(r#"{{"version":1,"n":{calls}}}"#),
+            )
+            .unwrap();
+            map.insert("b".into(), 3.into());
+        });
+        assert!(
+            matches!(result, Err(VaultError::Conflict { .. })),
+            "{result:?}"
+        );
+        assert_eq!(calls, 2);
     }
 }
