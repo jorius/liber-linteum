@@ -35,7 +35,12 @@ export function frontmatterLinks(fm: Frontmatter | null): LinkRef[] {
       range: fm.range,
     });
   }
-  const related = Array.isArray(data.related) ? data.related : [];
+  // A list, or one relationship written without it (M3b §5, as nimw-markdown).
+  const related = Array.isArray(data.related)
+    ? data.related
+    : data.related !== undefined && data.related !== null
+      ? [data.related]
+      : [];
   for (const item of related) {
     const raw =
       typeof item === 'string'
