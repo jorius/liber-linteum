@@ -6,7 +6,7 @@ import userEvent from '@testing-library/user-event';
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { GvCard, GvEdge, GvLevel, GvLevelRef } from '../../ipc';
 import { clearMocks } from '../../ipc/testing';
-import { resetEditorStore } from '../../stores/editorStore';
+import { resetEditorStore, useEditorStore } from '../../stores/editorStore';
 import { DEFAULT_SETTINGS, useSettingsStore } from '../../stores/settingsStore';
 import { useToastStore } from '../../stores/toastStore';
 import { useUiStore } from '../../stores/uiStore';
@@ -128,6 +128,23 @@ describe('connecting two cards (M3b §2)', () => {
       'Relationship created.',
     );
     await waitFor(() => expect(edgeReads).toBeGreaterThan(reads));
+  });
+
+  it('a source page whose save is failing: the toast says it is still saving (final review m6)', async () => {
+    await act(() => useEditorStore.getState().open('A.md'));
+    disk.failWrites(1000);
+    render(<GlobalView />);
+    await startConnect('A');
+    fireEvent.click(await press('B.md'));
+    await waitFor(() =>
+      expect(useToastStore.getState().toasts.map((t) => t.message)).toContain(
+        'Relationship added; saving…',
+      ),
+    );
+    expect(useToastStore.getState().toasts.map((t) => t.message)).not.toContain(
+      'Relationship created.',
+    );
+    expect(disk.files.get('A.md')).toBe('# A\n');
   });
 
   it('by keyboard: Enter on Connect to…, arrows to the target, Enter', async () => {

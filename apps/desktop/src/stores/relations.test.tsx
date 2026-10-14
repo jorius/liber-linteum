@@ -134,6 +134,18 @@ describe('relationships written to pages (M3b §5)', () => {
     expect(disk.writes()).toHaveLength(writes);
   });
 
+  it('an open page whose save is failing: created, but said to be pending (final review m6)', async () => {
+    const disk = fakeDisk({ 'A.md': '# A\n', 'B.md': '# B\n', 'C.md': '# C\n' }, extra);
+    await act(() => editor().open('A.md'));
+    disk.failWrites(1000);
+    expect(await relate('A.md', 'B.md')).toEqual({ status: 'created', pending: true });
+    expect(disk.files.get('A.md')).toBe('# A\n');
+    expect(editor().status).toBe('retrying');
+    disk.failWrites(0);
+    expect(await relate('A.md', 'C.md')).toEqual({ status: 'created' });
+    expect(disk.files.get('A.md')).toBe('---\nrelated:\n  - "[[B]]"\n  - "[[C]]"\n---\n# A\n');
+  });
+
   it('two quick connects to the same page write one relationship (final review m7)', async () => {
     const disk = fakeDisk({ 'A.md': '# A\n', 'B.md': '# B\n' }, extra);
     const results = await Promise.all([relate('A.md', 'B.md'), relate('A.md', 'B.md')]);

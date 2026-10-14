@@ -26,8 +26,12 @@ export interface Relation extends RelatedEntry {
   path: string | null;
 }
 
+/** `pending`: made in the page's live document, but its save hasn't
+ *  reached the disk yet (it keeps retrying; final review m6). */
 export type RelateResult =
-  { status: 'created' } | { status: 'exists'; index: number } | { status: 'failed' };
+  | { status: 'created'; pending?: true }
+  | { status: 'exists'; index: number }
+  | { status: 'failed' };
 
 /** An edit that found the list changed under it: refused without a toast
  *  (the caller re-reads). */
@@ -63,9 +67,10 @@ export async function relationsOf(page: string): Promise<Relation[]> {
   }));
 }
 
-/** Applies `edit` to `page`'s frontmatter. `false` when refused or failed
- *  (with a toast, except for a stale list). */
-async function editRelations(page: string, edit: Edit): Promise<boolean> {
+/** Applies `edit` to `page`'s frontmatter: `saved`, `pending` (made in its
+ *  live document, whose save is still retrying), or `false` when refused or
+ *  failed (with a toast, except for a stale list). */
+async function editRelations(page: string, edit: Edit): Promise<'saved' | 'pending' | false> {
   let stale = false;
   const guarded = (text: string): FrontmatterEdit => {
     const res = edit(text);
@@ -76,7 +81,7 @@ async function editRelations(page: string, edit: Edit): Promise<boolean> {
     return res;
   };
   const live = await useEditorStore.getState().editPage(page, guarded);
-  if (live !== null) return live && !stale;
+  if (live !== null) return live === 'refused' || stale ? false : live;
   for (let attempt = 0; attempt < 2; attempt++) {
     const read = await pageRead(page);
     if (!read.ok) {
@@ -91,11 +96,11 @@ async function editRelations(page: string, edit: Edit): Promise<boolean> {
       toast(i18next.t('page.frontmatterInvalid'));
       return false;
     }
-    if (!res.change) return true;
+    if (!res.change) return 'saved';
     const c = res.change;
     const next = fromLf(text.slice(0, c.from) + c.insert + text.slice(c.to), eol);
     const written = await pageWrite(page, next, read.value.hash);
-    if (written.ok) return true;
+    if (written.ok) return 'saved';
     if (written.error.kind !== 'conflict') {
       toast(errorMessage(written.error));
       return false;
@@ -122,14 +127,15 @@ export async function relate(source: string, target: string): Promise<RelateResu
   // Checked again on the text the item is appended to: another connect may
   // have written it meanwhile (final review m7).
   let found: number | null = null;
-  const ok = await editRelations(source, (text) => {
+  const done = await editRelations(source, (text) => {
     const same = readRelated(text).find((e) => sameTarget(e.target, link.value));
     if (!same) return appendRelated(text, link.value);
     found = same.index;
     return { ok: true, change: null };
   });
   if (found !== null) return { status: 'exists', index: found };
-  return ok ? { status: 'created' } : { status: 'failed' };
+  if (!done) return { status: 'failed' };
+  return done === 'pending' ? { status: 'created', pending: true } : { status: 'created' };
 }
 
 /** The entry the caller read, if the list still has it there. */
@@ -137,11 +143,13 @@ const still = (text: string, r: Relation) =>
   readRelated(text).find((e) => e.index === r.index && e.link === r.link);
 
 /** Changes a relationship's label and arrow (M3b §3). */
-export const updateRelation = (r: Relation, change: RelatedChange): Promise<boolean> =>
-  editRelations(r.source, (text) =>
+export const updateRelation = async (r: Relation, change: RelatedChange): Promise<boolean> =>
+  (await editRelations(r.source, (text) =>
     still(text, r) ? updateRelated(text, r.index, change) : STALE,
-  );
+  )) !== false;
 
 /** Deletes a relationship (M3b §3). */
-export const removeRelation = (r: Relation): Promise<boolean> =>
-  editRelations(r.source, (text) => (still(text, r) ? removeRelated(text, r.index) : STALE));
+export const removeRelation = async (r: Relation): Promise<boolean> =>
+  (await editRelations(r.source, (text) =>
+    still(text, r) ? removeRelated(text, r.index) : STALE,
+  )) !== false;

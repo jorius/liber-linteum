@@ -276,7 +276,11 @@ export const useGvStore = create<GvState>((set, get) => {
     const target = pageOf(to)!;
     const res = await relate(source, target);
     if (res.status === 'created') {
-      useToastStore.getState().push({ message: i18next.t('gv.relations.created'), tone: 'info' });
+      // Not on disk yet when the page's save is retrying (final review m6).
+      const message = i18next.t(
+        res.pending ? 'gv.relations.createdPending' : 'gv.relations.created',
+      );
+      useToastStore.getState().push({ message, tone: 'info' });
       await get().load();
     } else if (res.status === 'exists') {
       useUiStore.getState().openDialog({ type: 'relations', page: source, other: target });

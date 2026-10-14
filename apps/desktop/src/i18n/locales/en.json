@@ -296,6 +296,7 @@
       "noIndex": "{name} has no index note. Pick one first.",
       "samePage": "{a} and {b} stand for the same page: it can’t be related to itself.",
       "created": "Relationship created.",
+      "createdPending": "Relationship added; saving…",
       "of": "Relationships of {name}",
       "between": "Relationships between {a} and {b}",
       "loading": "Loading…",

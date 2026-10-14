@@ -17,6 +17,9 @@ import { nameOf, remap } from './tree';
 /** How long closing the window waits for pending saves (M2a §3.3). */
 export const QUIT_FLUSH_MS = 2000;
 
+/** How a frontmatter edit of a live document ended. */
+export type LiveEdit = 'saved' | 'pending' | 'refused';
+
 interface EditorState {
   /** The page being edited, or `null`. */
   doc: PageDoc | null;
@@ -55,8 +58,10 @@ interface EditorState {
   /** A frontmatter edit of `path` while it has a live document (M3b §5):
    *  the current page as an undoable editor change, a background page as a
    *  text change; saved at once. `null` when the page has no live document
-   *  (the caller writes the file). `false` (with the toast) when refused. */
-  editPage: (path: string, edit: (text: string) => FrontmatterEdit) => Promise<boolean | null>;
+   *  (the caller writes the file); `refused` (with the toast); `pending`
+   *  when made but not on disk yet: its save is retrying, or the page was
+   *  deleted outside (final review m6). */
+  editPage: (path: string, edit: (text: string) => FrontmatterEdit) => Promise<LiveEdit | null>;
   /** The text of `path`'s live document (the current page or a background
    *  one), as `editPage` would edit it; `null` without one (final review m7). */
   liveText: (path: string) => string | null;
@@ -107,14 +112,14 @@ const hooks: PageDocHooks = {
 const textOf = (doc: PageDoc) => viewOf(doc)?.state.doc.toString() ?? doc.text;
 
 /** A frontmatter edit of a live document: through its view when it has one
- *  (undoable), else its text; saved at once. Refused: toast, `false`. */
-async function applyEdit(doc: PageDoc, edit: (text: string) => FrontmatterEdit): Promise<boolean> {
+ *  (undoable), else its text; saved at once. Refused: toast. */
+async function applyEdit(doc: PageDoc, edit: (text: string) => FrontmatterEdit): Promise<LiveEdit> {
   const view = viewOf(doc);
   const text = textOf(doc);
   const res = edit(text);
   if (!res.ok) {
     useToastStore.getState().push({ message: i18next.t('page.frontmatterInvalid'), tone: 'error' });
-    return false;
+    return 'refused';
   }
   const c = res.change;
   if (c) {
@@ -122,7 +127,7 @@ async function applyEdit(doc: PageDoc, edit: (text: string) => FrontmatterEdit):
     else doc.edit(text.slice(0, c.from) + c.insert + text.slice(c.to));
   }
   await doc.flush();
-  return true;
+  return doc.status === 'saved' && !doc.orphaned ? 'saved' : 'pending';
 }
 
 /** A background page is dropped once it's saved. An orphaned one (deleted
@@ -152,7 +157,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   editFrontmatter: async (patch) => {
     const doc = get().doc;
     if (!doc) return false;
-    return applyEdit(doc, (text) => setFrontmatter(text, patch));
+    return (await applyEdit(doc, (text) => setFrontmatter(text, patch))) !== 'refused';
   },
   editPage: async (path, edit) => {
     const doc = get().doc?.path === path ? get().doc : docs.get(path);

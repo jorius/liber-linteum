@@ -296,6 +296,7 @@
       "noIndex": "{name} no tiene nota índice. Elige una primero.",
       "samePage": "{a} y {b} representan la misma página: no se puede relacionar consigo misma.",
       "created": "Relación creada.",
+      "createdPending": "Relación añadida; guardando…",
       "of": "Relaciones de {name}",
       "between": "Relaciones entre {a} y {b}",
       "loading": "Cargando…",
