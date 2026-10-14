@@ -294,6 +294,24 @@
     "hasAudio": "Has audio",
     "seeAll": "See all",
     "seeAllLabel": "See all: {title}",
-    "move": "Move card"
+    "move": "Move card",
+    "breadcrumb": "Global View path",
+    "mode": "Next level",
+    "drill": "Drill-down",
+    "expand": "Expand in place",
+    "edges": "Edges",
+    "edge": {
+      "links": "Text links",
+      "tree": "Parent / child",
+      "manual": "Manual",
+      "aggregated": "Links from inside folders"
+    },
+    "reset": "Reset layout",
+    "empty": "Empty folder.",
+    "zoom": "Zoom",
+    "zoomIn": "Zoom in",
+    "zoomOut": "Zoom out",
+    "fit": "Fit to screen",
+    "connections": "{links, plural, =0 {No links.} one {Linked with # card.} other {Linked with # cards.}} {manual, plural, =0 {} one {# relationship.} other {# relationships.}}"
   }
 }

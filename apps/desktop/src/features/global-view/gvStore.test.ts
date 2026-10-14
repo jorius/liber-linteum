@@ -153,6 +153,19 @@ describe('Global View store (M3a §5)', () => {
     expect(useGvStore.getState().pinned).toEqual({});
   });
 
+  it('failing edge and layout reads leave the cards showing', async () => {
+    mockIPC((cmd, raw) => {
+      const args = (raw ?? {}) as Record<string, unknown>;
+      if (cmd === 'gv_children') return levels[levelKey(args.level as GvLevelRef)];
+      if (cmd === 'gv_edges') throw { kind: 'io', message: 'x' };
+      return undefined; // layout_get answering nothing
+    });
+    await useGvStore.getState().load();
+    expect(paths()).toEqual(['A', 'B', 'root.md']);
+    expect(useGvStore.getState().edges).toEqual([]);
+    expect(useGvStore.getState().pinned).toEqual({});
+  });
+
   it('a slower, older load never overwrites a newer one', async () => {
     let release: () => void = () => undefined;
     const held = new Promise<void>((r) => (release = r));

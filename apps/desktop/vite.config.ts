@@ -1,10 +1,13 @@
 import react from '@vitejs/plugin-react';
 import { defineConfig } from 'vitest/config';
+import { freezeSafe } from './scripts/freezeSafe';
 
 const host = process.env.TAURI_DEV_HOST;
 
 export default defineConfig({
-  plugins: [react()],
+  // freezeSafe: third-party code must load with Object.prototype frozen
+  // (tauri.conf.json "freezePrototype": true).
+  plugins: [freezeSafe(), react()],
   clearScreen: false,
   server: {
     port: 1420,

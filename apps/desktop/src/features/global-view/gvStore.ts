@@ -181,8 +181,10 @@ export const useGvStore = create<GvState>((set, get) => {
         expanded,
         levels,
         canvas,
-        edges: edges.ok ? edges.value : [],
-        pinned: pinned.ok ? pinned.value : {},
+        // A layout or edge read that fails (or answers nothing) just means
+        // none: the canvas still shows.
+        edges: edges.ok && Array.isArray(edges.value) ? edges.value : [],
+        pinned: pinned.ok && pinned.value ? pinned.value : {},
         focus: focus && shown.has(focus) ? focus : null,
         loaded: true,
       });

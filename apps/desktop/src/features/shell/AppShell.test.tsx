@@ -3,10 +3,11 @@ import { EditorView } from '@codemirror/view';
 import { act, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import axe from 'axe-core';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeAll, describe, expect, it } from 'vitest';
 import type { TreeNode } from '../../ipc';
 import { clearMocks, mockIPC } from '../../ipc/testing';
 import { fakeDisk } from '../../test/fakeDisk';
+import { installReactFlowStubs } from '../../test/reactFlow';
 import { openPage } from '../../stores/navigate';
 import { usePageStore } from '../../stores/pageStore';
 import { childrenByParent } from '../../stores/tree';
@@ -42,6 +43,8 @@ function backend(handlers: Record<string, (a: Record<string, unknown>) => unknow
   });
   return calls;
 }
+
+beforeAll(installReactFlowStubs);
 
 afterEach(async () => {
   await resetVaultStore();

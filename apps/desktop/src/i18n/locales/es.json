@@ -294,6 +294,24 @@
     "hasAudio": "Tiene audio",
     "seeAll": "Ver todo",
     "seeAllLabel": "Ver todo: {title}",
-    "move": "Mover tarjeta"
+    "move": "Mover tarjeta",
+    "breadcrumb": "Ruta de la vista global",
+    "mode": "Siguiente nivel",
+    "drill": "Profundizar",
+    "expand": "Expandir aquí",
+    "edges": "Conexiones",
+    "edge": {
+      "links": "Enlaces de texto",
+      "tree": "Padre / hijo",
+      "manual": "Manuales",
+      "aggregated": "Enlaces desde dentro de carpetas"
+    },
+    "reset": "Restablecer disposición",
+    "empty": "Carpeta vacía.",
+    "zoom": "Zoom",
+    "zoomIn": "Acercar",
+    "zoomOut": "Alejar",
+    "fit": "Ajustar a la pantalla",
+    "connections": "{links, plural, =0 {Sin enlaces.} one {Enlazada con # tarjeta.} other {Enlazada con # tarjetas.}} {manual, plural, =0 {} one {# relación.} other {# relaciones.}}"
   }
 }
