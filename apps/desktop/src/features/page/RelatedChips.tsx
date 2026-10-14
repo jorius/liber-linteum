@@ -12,7 +12,7 @@ const pageName = (r: Relation) =>
   r.path ? nameOf(r.path).replace(/\.md$/i, '') : r.target.replace(/^.*\//, '');
 
 /** The page's own relationships (`related:`) as chips in the header band
- *  (M4b §6): a chip opens its page, × removes it, "+ Related page" adds one
+ *  (M4b §6): a chip opens its page (as a followed link), × removes it, "+ Related page" adds one
  *  through the page picker. Incoming ones show in the Global View. */
 export function RelatedChips({ page, editable }: { page: Page; editable: boolean }) {
   const { t } = useTranslation();
@@ -76,7 +76,8 @@ export function RelatedChips({ page, editable }: { page: Page; editable: boolean
                   type="button"
                   className={styles.relatedOpen}
                   title={r.label ?? undefined}
-                  onClick={() => void openPage(r.path!)}
+                  // Followed like a link: the back arrow returns here.
+                  onClick={() => void openPage(r.path!, null, 'link')}
                 >
                   {label}
                 </button>

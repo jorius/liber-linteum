@@ -7,6 +7,7 @@ import { resetEditorStore } from '../../stores/editorStore';
 import { usePageStore } from '../../stores/pageStore';
 import { DEFAULT_SETTINGS, useSettingsStore } from '../../stores/settingsStore';
 import { useToastStore } from '../../stores/toastStore';
+import { useTrailStore } from '../../stores/trailStore';
 import { resetVaultStore, useVaultStore } from '../../stores/vaultStore';
 import { fakeDisk } from '../../test/fakeDisk';
 import { PageScreen } from '../../test/pageScreen';
@@ -32,6 +33,7 @@ beforeEach(() => {
   useSettingsStore.setState({ settings: DEFAULT_SETTINGS });
   useVaultStore.setState({ info: { name: 'Vault', root: '/v', report: {} as never } });
   useToastStore.getState().clear();
+  useTrailStore.getState().reset();
 });
 afterEach(async () => {
   usePageStore.getState().clear();
@@ -41,7 +43,7 @@ afterEach(async () => {
 });
 
 describe('Related chips in the header band (M4b §6)', () => {
-  it('lists the page’s own relationships; a chip opens its page; directed ones show →', async () => {
+  it('lists the page’s own relationships; a chip is followed like a link; directed ones show →', async () => {
     fakeDisk(
       {
         'A.md':
@@ -59,6 +61,8 @@ describe('Related chips in the header band (M4b §6)', () => {
     expect(c).toHaveAttribute('title', 'rival');
     await userEvent.click(within(list).getByRole('button', { name: 'B' }));
     await waitFor(() => expect(usePageStore.getState().path).toBe('B.md'));
+    // The back arrow returns to the page the chip was on.
+    expect(useTrailStore.getState().back).toEqual([{ path: 'A.md', heading: null }]);
   });
 
   it('× removes a relationship from the frontmatter', async () => {
