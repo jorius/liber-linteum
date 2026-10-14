@@ -142,6 +142,40 @@ impl From<FontChoice> for String {
     }
 }
 
+/// How a Global View click opens the next level (M3a §5, GV-13).
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum GlobalViewMode {
+    /// The next level replaces the canvas (breadcrumb back).
+    #[default]
+    Drill,
+    /// The next level is added beside the clicked card.
+    Expand,
+}
+
+/// Which Global View edge kinds are shown (M3a §6, GV-21); a missing key
+/// means shown.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct GlobalViewEdges {
+    pub links: bool,
+    pub tree: bool,
+    pub manual: bool,
+    /// "Links from inside folders" (GV-25).
+    pub aggregated: bool,
+}
+
+impl Default for GlobalViewEdges {
+    fn default() -> GlobalViewEdges {
+        GlobalViewEdges {
+            links: true,
+            tree: true,
+            manual: true,
+            aggregated: true,
+        }
+    }
+}
+
 pub const MIN_FONT_SIZE: u8 = 13;
 pub const MAX_FONT_SIZE: u8 = 20;
 
@@ -206,6 +240,10 @@ pub struct Settings {
     pub toolbar: bool,
     /// Line numbers in the editor gutter (M2b §11, feedback round).
     pub line_numbers: bool,
+    /// Global View: Drill-down or Expand in place (M3a §5).
+    pub global_view_mode: GlobalViewMode,
+    /// Global View: edge kinds shown (M3a §6).
+    pub global_view_edges: GlobalViewEdges,
     pub recent_vaults: Vec<RecentVault>,
     /// Keys this build does not know (written by a newer version); kept on save.
     #[serde(flatten)]
@@ -228,6 +266,8 @@ impl Default for Settings {
             font_size: FontSize::default(),
             toolbar: true,
             line_numbers: false,
+            global_view_mode: GlobalViewMode::Drill,
+            global_view_edges: GlobalViewEdges::default(),
             recent_vaults: Vec::new(),
             extra: serde_json::Map::new(),
         }
@@ -250,6 +290,8 @@ pub struct SettingsPatch {
     pub font_size: Option<FontSize>,
     pub toolbar: Option<bool>,
     pub line_numbers: Option<bool>,
+    pub global_view_mode: Option<GlobalViewMode>,
+    pub global_view_edges: Option<GlobalViewEdges>,
 }
 
 /// A recent vault as shown on the welcome screen.
@@ -305,6 +347,8 @@ fn parse_lenient(text: &str) -> Result<(Settings, Vec<String>), serde_json::Erro
     field!("fontSize", font_size);
     field!("toolbar", toolbar);
     field!("lineNumbers", line_numbers);
+    field!("globalViewMode", global_view_mode);
+    field!("globalViewEdges", global_view_edges);
     match map.remove("recentVaults") {
         None => {}
         Some(Value::Array(items)) => {
@@ -426,6 +470,12 @@ impl SettingsStore {
         }
         if let Some(v) = patch.line_numbers {
             next.line_numbers = v;
+        }
+        if let Some(v) = patch.global_view_mode {
+            next.global_view_mode = v;
+        }
+        if let Some(v) = patch.global_view_edges {
+            next.global_view_edges = v;
         }
         self.save(&next)?;
         *s = next.clone();

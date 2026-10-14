@@ -168,6 +168,20 @@ export interface Settings {
   toolbar: boolean;
   /** Line numbers in the editor gutter. */
   lineNumbers: boolean;
+  /** Global View: how a click opens the next level (M3a §5). */
+  globalViewMode: GlobalViewMode;
+  /** Global View: edge kinds shown (M3a §6). */
+  globalViewEdges: GlobalViewEdges;
+}
+
+export type GlobalViewMode = 'drill' | 'expand';
+
+export interface GlobalViewEdges {
+  links: boolean;
+  tree: boolean;
+  manual: boolean;
+  /** "Links from inside folders". */
+  aggregated: boolean;
 }
 
 /** `language: 'system'` means follow the OS again. */
@@ -184,6 +198,8 @@ export interface SettingsPatch {
   fontSize?: number;
   toolbar?: boolean;
   lineNumbers?: boolean;
+  globalViewMode?: GlobalViewMode;
+  globalViewEdges?: GlobalViewEdges;
 }
 
 export interface SettingsResponse {

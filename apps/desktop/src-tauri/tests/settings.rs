@@ -309,3 +309,56 @@ fn m2b_font_size_is_clamped_and_font_choices_are_bounded() {
     assert!(HexColor::parse("#abc").is_none());
     assert!(HexColor::parse("abcdef").is_none());
 }
+
+/// M3a §5, §6, §8: the Global View's mode and edge toggles are global
+/// settings with defaults (Drill-down, every edge kind shown), persisted, and
+/// reset on their own when unreadable.
+#[test]
+fn m3a_global_view_settings_default_persist_and_reset() {
+    use nimw_desktop::settings::{GlobalViewEdges, GlobalViewMode};
+    let dir = tempfile::tempdir().unwrap();
+    let s = store(dir.path());
+    let d = s.get().0;
+    assert_eq!(d.global_view_mode, GlobalViewMode::Drill);
+    assert_eq!(
+        d.global_view_edges,
+        GlobalViewEdges {
+            links: true,
+            tree: true,
+            manual: true,
+            aggregated: true
+        }
+    );
+    s.update(SettingsPatch {
+        global_view_mode: Some(GlobalViewMode::Expand),
+        global_view_edges: Some(GlobalViewEdges {
+            links: true,
+            tree: false,
+            manual: true,
+            aggregated: false,
+        }),
+        ..Default::default()
+    })
+    .unwrap();
+    let saved: serde_json::Value =
+        serde_json::from_str(&std::fs::read_to_string(dir.path().join("settings.json")).unwrap())
+            .unwrap();
+    assert_eq!(saved["globalViewMode"], "expand");
+    assert_eq!(
+        saved["globalViewEdges"],
+        serde_json::json!({ "links": true, "tree": false, "manual": true, "aggregated": false })
+    );
+    assert_eq!(store(dir.path()).get().0, s.get().0, "round-trips");
+
+    // A missing toggle defaults to shown; an unknown mode resets on its own.
+    std::fs::write(
+        dir.path().join("settings.json"),
+        r#"{"globalViewMode":"radial","globalViewEdges":{"tree":false},"theme":"dark"}"#,
+    )
+    .unwrap();
+    let (s, warning) = store(dir.path()).get();
+    assert_eq!(s.global_view_mode, GlobalViewMode::Drill);
+    assert!(!s.global_view_edges.tree && s.global_view_edges.links);
+    assert_eq!(s.theme, Theme::Dark);
+    assert!(warning.unwrap().contains("globalViewMode"));
+}

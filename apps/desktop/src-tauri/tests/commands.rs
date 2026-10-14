@@ -632,7 +632,9 @@ fn m2b_settings_round_trip_over_ipc() {
             "fontSource": "source-code-pro",
             "fontSize": 17,
             "toolbar": false,
-            "lineNumbers": true
+            "lineNumbers": true,
+            "globalViewMode": "expand",
+            "globalViewEdges": { "links": false, "tree": true, "manual": true, "aggregated": true }
         }}),
     )
     .unwrap();
@@ -643,6 +645,8 @@ fn m2b_settings_round_trip_over_ipc() {
     assert_eq!(saved["fontSize"], 17);
     assert_eq!(saved["toolbar"], false);
     assert_eq!(saved["lineNumbers"], true);
+    assert_eq!(saved["globalViewMode"], "expand");
+    assert_eq!(saved["globalViewEdges"]["links"], false);
     let got = call(&h.main, "settings_get", json!({})).unwrap();
     assert_eq!(got["settings"]["palette"], "graphite");
     assert!(

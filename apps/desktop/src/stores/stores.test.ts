@@ -87,6 +87,17 @@ describe('settingsStore', () => {
     expect(i18next.language).toBe('es');
   });
 
+  it('M3a: the Global View defaults (Drill-down, every edge kind) fill in for an older backend', async () => {
+    const older: Partial<typeof DEFAULT_SETTINGS> = { ...DEFAULT_SETTINGS };
+    delete older.globalViewMode;
+    delete older.globalViewEdges;
+    backend({ settings_get: () => ({ settings: older }) });
+    await useSettingsStore.getState().load();
+    const s = useSettingsStore.getState().settings;
+    expect(s.globalViewMode).toBe('drill');
+    expect(s.globalViewEdges).toEqual({ links: true, tree: true, manual: true, aggregated: true });
+  });
+
   it('falls back to defaults outside Tauri / on error', async () => {
     backend({
       settings_get: () => {
