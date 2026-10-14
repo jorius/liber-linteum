@@ -315,13 +315,14 @@ export function Canvas({ mode, toggles, width, onOpen, onOpenEditor }: CanvasPro
   }, [connectFrom]);
 
   /** A drag from a connect handle ended: the card under the pointer, if any,
-   *  is the other end (M3b §2). */
+   *  is the other end (M3b §2) — anywhere on it, header and footer included
+   *  (final review m2): its React Flow node's id is its path. */
   const onConnectEnd: OnConnectEnd = (event, state) => {
     const from = state.fromNode?.id;
     if (!from) return;
     const point = 'changedTouches' in event ? event.changedTouches[0] : event;
     const under = point ? document.elementFromPoint(point.clientX, point.clientY) : null;
-    const to = under?.closest<HTMLElement>('[data-gv-card]')?.dataset.gvCard ?? null;
+    const to = under?.closest<HTMLElement>('.react-flow__node')?.dataset.id ?? null;
     void useGvStore.getState().connectByDrag(from, to);
   };
 

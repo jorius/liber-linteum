@@ -88,6 +88,28 @@ test('a drag from the connect handle onto another card relates them', async ({ p
   await expect(page.getByRole('menu')).toHaveCount(0);
 });
 
+for (const [where, y] of [
+  ['header', (box: { y: number }) => box.y + 10],
+  ['footer', (box: { y: number; height: number }) => box.y + box.height - 10],
+] as const) {
+  test(`a drag dropped on a card’s ${where} relates them too (final review m2)`, async ({
+    page,
+  }) => {
+    await globalView(page);
+    const from = (await page
+      .getByRole('button', { name: 'Connections of Welcome' })
+      .boundingBox())!;
+    const to = (await page.getByRole('group', { name: 'Notes, page' }).boundingBox())!;
+    await page.mouse.move(from.x + from.width / 2, from.y + from.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(to.x + to.width / 2, y(to), { steps: 12 });
+    await page.mouse.up();
+    await expect
+      .poll(() => writesTo(page, 'Welcome.md'))
+      .toEqual(['---\nrelated:\n  - "[[Notes]]"\n---\n# Welcome\n\nStart here.\n']);
+  });
+}
+
 test('a relationship’s edge opens its dialog: label and arrow, then delete', async ({ page }) => {
   await globalView(page, {
     ...PAGES,
