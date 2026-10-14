@@ -256,6 +256,44 @@ fn m3a_writes_prune_levels_and_positions_of_deleted_paths() {
     assert!(vault.layout_level("page:gone.md").is_empty());
 }
 
+/// Final review m8: a malformed level or entry, or data a later version
+/// adds, hides only itself — never every pinned position — and what this
+/// version can't read survives a save.
+#[test]
+fn m3a_a_malformed_entry_hides_only_itself_and_unknown_data_survives() {
+    let (dir, vault) = fresh();
+    touch(&dir, &["Alpha/a.md", "Alpha/b.md", "Beta", "Gamma"]);
+    std::fs::create_dir(dir.path().join(".nimw")).unwrap();
+    std::fs::write(
+        dir.path().join(".nimw/layout.json"),
+        r#"{"version":1,"levels":{
+            "":{"Alpha":{"x":1,"y":2},"Beta":{"x":3},"viewport":{"zoom":1.5}},
+            "Alpha":{"Alpha/a.md":{"x":"1","y":2},"Alpha/b.md":{"x":5,"y":6,"at":7}},
+            "Beta":42,
+            "Gamma":null
+        }}"#,
+    )
+    .unwrap();
+    assert_eq!(vault.layout_level(""), positions(&[("Alpha", 1.0, 2.0)]));
+    assert_eq!(
+        vault.layout_level("Alpha"),
+        positions(&[("Alpha/b.md", 5.0, 6.0)])
+    );
+    assert!(vault.layout_level("Beta").is_empty());
+    assert!(vault.layout_level("Gamma").is_empty());
+
+    vault
+        .set_layout_level("", &positions(&[("Alpha", 10.0, 20.0)]))
+        .unwrap();
+    let json = file(&dir);
+    assert_eq!(json["levels"][""]["Alpha"]["x"], 10.0);
+    assert_eq!(json["levels"][""]["viewport"]["zoom"], 1.5);
+    assert_eq!(json["levels"][""]["Beta"]["x"], 3);
+    assert_eq!(json["levels"]["Alpha"]["Alpha/a.md"]["x"], "1");
+    assert_eq!(json["levels"]["Beta"], 42);
+    assert_eq!(vault.layout_level(""), positions(&[("Alpha", 10.0, 20.0)]));
+}
+
 #[test]
 fn m3a_remap_without_a_layout_writes_nothing_and_bad_numbers_are_refused() {
     let (dir, vault) = fresh();

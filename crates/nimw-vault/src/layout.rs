@@ -18,22 +18,36 @@ pub struct CardPosition {
     pub y: f64,
 }
 
-#[derive(Debug, Default, Deserialize)]
-struct LayoutJson {
-    #[serde(default)]
-    levels: BTreeMap<String, BTreeMap<String, CardPosition>>,
+/// An entry's position, when it is one (finite `x` and `y`).
+fn position(value: &serde_json::Value) -> Option<CardPosition> {
+    CardPosition::deserialize(value)
+        .ok()
+        .filter(|p| p.x.is_finite() && p.y.is_finite())
 }
 
 impl Vault {
     /// The pinned positions of one level (none when the file is missing or
-    /// unreadable — the layout is a convenience, never an error).
+    /// unreadable — the layout is a convenience, never an error). Read per
+    /// entry (final review m8): a malformed level or entry, or one a later
+    /// version adds, is skipped on its own.
     pub fn layout_level(&self, level: &str) -> BTreeMap<String, CardPosition> {
-        let layout: LayoutJson = read_json(self.root(), LAYOUT_JSON, &mut Vec::new());
-        layout.levels.get(level).cloned().unwrap_or_default()
+        let layout: serde_json::Value = read_json(self.root(), LAYOUT_JSON, &mut Vec::new());
+        let Some(cards) = layout
+            .get("levels")
+            .and_then(|levels| levels.get(level))
+            .and_then(serde_json::Value::as_object)
+        else {
+            return BTreeMap::new();
+        };
+        cards
+            .iter()
+            .filter_map(|(path, value)| Some((path.clone(), position(value)?)))
+            .collect()
     }
 
     /// Stores a level's pinned positions (an empty map removes the level).
-    /// The file is created on first need; other keys are kept.
+    /// The file is created on first need; other keys are kept, and so are
+    /// the level's entries this version can't read as positions (m8).
     ///
     /// The file doesn't only grow (final review m10): positions of paths
     /// that no longer exist are dropped from the saved level, a level whose
@@ -54,21 +68,30 @@ impl Vault {
                 reason: "card positions must be finite numbers".to_string(),
             });
         }
-        let stored: BTreeMap<&String, &CardPosition> = if self.level_exists(level) {
-            positions
-                .iter()
-                .filter(|(path, _)| self.path_exists(path))
-                .collect()
-        } else {
-            BTreeMap::new()
-        };
-        let value = serde_json::to_value(&stored).expect("positions serialize");
-        self.update_json_object(LAYOUT_JSON, !stored.is_empty(), |map| {
+        let level_exists = self.level_exists(level);
+        let saved: serde_json::Map<String, serde_json::Value> = positions
+            .iter()
+            .filter(|(path, _)| level_exists && self.path_exists(path))
+            .map(|(path, p)| {
+                let value = serde_json::to_value(p).expect("finite positions serialize");
+                (path.clone(), value)
+            })
+            .collect();
+        self.update_json_object(LAYOUT_JSON, !saved.is_empty(), |map| {
             let levels = levels_of(map);
-            if stored.is_empty() {
+            let mut cards: serde_json::Map<String, serde_json::Value> = match levels.get(level) {
+                Some(serde_json::Value::Object(old)) => old
+                    .iter()
+                    .filter(|(_, value)| position(value).is_none())
+                    .map(|(k, v)| (k.clone(), v.clone()))
+                    .collect(),
+                _ => serde_json::Map::new(),
+            };
+            cards.extend(saved.clone());
+            if cards.is_empty() {
                 levels.remove(level);
             } else {
-                levels.insert(level.to_string(), value.clone());
+                levels.insert(level.to_string(), serde_json::Value::Object(cards));
             }
             levels.retain(|key, _| self.level_exists(key));
         })
