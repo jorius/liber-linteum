@@ -101,8 +101,9 @@ describe('editing and deleting a relationship (M3b §3, §5)', () => {
     expect(labelled).toContain('  - { link: "[[A]]", label: inspired by }   # first\n');
     const plain = apply(text, updateRelated(text, 1, { label: null, directed: false }));
     expect(plain).toContain('  - "[[B]]"\n');
+    // A block map item stays one: only its arrow's line is added (final review I1).
     const arrow = apply(text, updateRelated(text, 2, { label: 'multi', directed: true }));
-    expect(arrow).toContain('  - { link: "[[C]]", label: multi, directed: true }\nz: 1\n');
+    expect(arrow).toContain('  - link: "[[C]]"\n    label: multi\n    directed: true\nz: 1\n');
     expect(data(arrow).z).toBe(1);
   });
 
@@ -134,6 +135,95 @@ describe('editing and deleting a relationship (M3b §3, §5)', () => {
   });
 });
 
+describe('an item’s other keys and a non-string label are kept (final review I1)', () => {
+  it('a flow map keeps its other keys byte for byte; only label and arrow change', () => {
+    const text = '---\nrelated:\n  - { link: "[[B]]", label: x, color: red }\nz: 1\n---\n# A\n';
+    expect(apply(text, updateRelated(text, 0, { label: 'x', directed: true }))).toBe(
+      '---\nrelated:\n  - { link: "[[B]]", label: x, color: red, directed: true }\nz: 1\n---\n# A\n',
+    );
+    expect(apply(text, updateRelated(text, 0, { label: 'why, not', directed: false }))).toBe(
+      '---\nrelated:\n  - { link: "[[B]]", label: "why, not", color: red }\nz: 1\n---\n# A\n',
+    );
+    // Neither a label nor an arrow left: still a map, for `color`.
+    expect(apply(text, updateRelated(text, 0, { label: null, directed: false }))).toBe(
+      '---\nrelated:\n  - { link: "[[B]]", color: red }\nz: 1\n---\n# A\n',
+    );
+  });
+
+  it('a block map stays a block map: lines added or removed, the rest untouched', () => {
+    const text =
+      '---\nrelated:\n  - link: "[[C]]"   # why C\n    label: multi\n    note: keep this\n---\n';
+    expect(apply(text, updateRelated(text, 0, { label: 'multi', directed: true }))).toBe(
+      '---\nrelated:\n  - link: "[[C]]"   # why C\n    label: multi\n    note: keep this\n    directed: true\n---\n',
+    );
+    expect(apply(text, updateRelated(text, 0, { label: 'other: one', directed: false }))).toBe(
+      '---\nrelated:\n  - link: "[[C]]"   # why C\n    label: "other: one"\n    note: keep this\n---\n',
+    );
+    expect(apply(text, updateRelated(text, 0, { label: null, directed: false }))).toBe(
+      '---\nrelated:\n  - link: "[[C]]"   # why C\n    note: keep this\n---\n',
+    );
+  });
+
+  it('a label that isn’t a string reads as its text and is kept unless changed', () => {
+    const text = '---\nrelated:\n  - { link: "[[C]]", label: 2024, kind: parent }\n---\n# A\n';
+    expect(readRelated(text)[0].label).toBe('2024');
+    expect(readRelated('---\nrelated:\n  - { link: "[[C]]", label: 1.50 }\n---\n')[0].label).toBe(
+      '1.50',
+    );
+    const arrow = apply(text, updateRelated(text, 0, { label: '2024', directed: true }));
+    expect(arrow).toBe(
+      '---\nrelated:\n  - { link: "[[C]]", label: 2024, kind: parent, directed: true }\n---\n# A\n',
+    );
+    expect(data(arrow).related[0].label).toBe(2024);
+    const relabelled = apply(text, updateRelated(text, 0, { label: '2025', directed: false }));
+    expect(data(relabelled).related[0]).toEqual({ link: '[[C]]', label: '2025', kind: 'parent' });
+  });
+
+  it('a map with nothing but its link left turns back into the string form', () => {
+    const text =
+      '---\nrelated:\n  - { link: "[[B]]", label: 2024 }\n  - link: "[[C]]"\n    directed: true\n---\n';
+    const out = apply(text, updateRelated(text, 0, { label: null, directed: false }));
+    expect(out).toBe('---\nrelated:\n  - "[[B]]"\n  - link: "[[C]]"\n    directed: true\n---\n');
+    expect(apply(out, updateRelated(out, 1, { label: null, directed: false }))).toBe(
+      '---\nrelated:\n  - "[[B]]"\n  - "[[C]]"\n---\n',
+    );
+  });
+
+  it('a map inside a flow list or written without a list keeps its keys too', () => {
+    const flow = '---\nrelated: [{ link: "[[B]]", color: red }, "[[C]]"]\n---\n';
+    expect(apply(flow, updateRelated(flow, 0, { label: null, directed: true }))).toBe(
+      '---\nrelated:\n  - { link: "[[B]]", color: red, directed: true }\n  - "[[C]]"\n---\n',
+    );
+    const one = '---\nrelated: { link: "[[B]]", label: 7, color: red }\n---\n';
+    expect(apply(one, updateRelated(one, 0, { label: '7', directed: true }))).toBe(
+      '---\nrelated:\n  - { link: "[[B]]", label: 7, color: red, directed: true }\n---\n',
+    );
+  });
+
+  it('a label that is no scalar (shown as none) is kept unless one is typed', () => {
+    const text = '---\nrelated:\n  - { link: "[[B]]", label: [a, b] }\n---\n';
+    expect(apply(text, updateRelated(text, 0, { label: null, directed: true }))).toBe(
+      '---\nrelated:\n  - { link: "[[B]]", label: [a, b], directed: true }\n---\n',
+    );
+    expect(apply(text, updateRelated(text, 0, { label: 'x', directed: false }))).toBe(
+      '---\nrelated:\n  - { link: "[[B]]", label: x }\n---\n',
+    );
+  });
+
+  it('a comment inside a map keeps the map form; a map that can’t be edited in place is refused', () => {
+    const text = '---\nrelated:\n  - link: "[[C]]"   # why C\n    label: x\n---\n';
+    expect(apply(text, updateRelated(text, 0, { label: null, directed: false }))).toBe(
+      '---\nrelated:\n  - link: "[[C]]"   # why C\n---\n',
+    );
+    // The label is the first key and a comment follows it: refused, not lost.
+    const first = '---\nrelated:\n  - label: x   # why\n    link: "[[C]]"\n    color: red\n---\n';
+    expect(updateRelated(first, 0, { label: null, directed: false })).toEqual({ ok: false });
+    expect(apply(first, updateRelated(first, 0, { label: 'y', directed: false }))).toBe(
+      '---\nrelated:\n  - label: y   # why\n    link: "[[C]]"\n    color: red\n---\n',
+    );
+  });
+});
+
 describe('sweep: every relationship edit reads back exactly or is refused', () => {
   const texts = [
     '# none\n',
@@ -150,12 +240,31 @@ describe('sweep: every relationship edit reads back exactly or is refused', () =
     '---\n  related:\n    - "[[A]]"\n  y: 1\n---\n',
     '---\nrelated: |\n  [[A]]\n---\n',
     '---\nrelated: [oops\n---\n',
+    // Final review I1: other keys, non-string labels.
+    '---\nrelated:\n  - { link: "[[A]]", label: x, color: red }\n---\n',
+    '---\nrelated:\n  - link: "[[A]]"\n    label: multi\n    note: keep this\n---\n',
+    '---\nrelated:\n  - { link: "[[A]]", label: 2024, kind: parent }\n  - "[[B]]"\n---\n',
+    '---\nrelated:\n  - label: first\n    link: "[[A]]"\n    directed: true\n---\n',
+    '---\nrelated:\n  - {\n      link: "[[A]]", # c\n      label: x,\n      color: red\n    }\n---\n',
   ];
+  /** An item without its label and arrow (a string item: its link). */
+  const rest = (item: unknown) =>
+    item && typeof item === 'object'
+      ? Object.fromEntries(Object.entries(item).filter(([k]) => k !== 'label' && k !== 'directed'))
+      : { link: item };
+  const list = (t: string): unknown[] => {
+    const r = (data(t) as { related?: unknown }).related;
+    return r === undefined || r === null ? [] : Array.isArray(r) ? r : [r];
+  };
   it.each(texts)('%j', (text) => {
     const ops: [string, (t: string) => FrontmatterEdit][] = [
       ['append', (t) => appendRelated(t, 'New')],
       ['label 0', (t) => updateRelated(t, 0, { label: 'why, not', directed: true })],
       ['plain 0', (t) => updateRelated(t, 0, { label: null, directed: false })],
+      [
+        'arrow 0',
+        (t) => updateRelated(t, 0, { label: readRelated(t)[0]?.label ?? null, directed: true }),
+      ],
       ['remove 0', (t) => removeRelated(t, 0)],
       ['remove 1', (t) => removeRelated(t, 1)],
     ];
@@ -168,6 +277,15 @@ describe('sweep: every relationship edit reads back exactly or is refused', () =
       expect(parsePage(out).frontmatter?.error, name).toBeUndefined();
       const body = (t: string) => t.replace(/^---\n[\s\S]*?\n?---(?:\n|$)/, '');
       expect(body(out), name).toBe(body(text));
+      if (name.endsWith(' 0') && !name.startsWith('remove')) {
+        // An edit changes the label and arrow only (final review I1).
+        expect(list(out).map(rest), name).toEqual(list(text).map(rest));
+      }
+      if (name === 'arrow 0') {
+        // The label shown is kept as written (a number stays a number).
+        const label = (t: string) => (list(t)[0] as { label?: unknown } | undefined)?.label;
+        expect(label(out), name).toEqual(label(text));
+      }
     }
   });
 });

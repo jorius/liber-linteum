@@ -133,4 +133,18 @@ describe('relationships written to pages (M3b §5)', () => {
     expect(await removeRelation(b)).toBe(false);
     expect(disk.writes()).toHaveLength(writes);
   });
+
+  it('turning on an arrow keeps the item’s other keys and its number label (final review I1)', async () => {
+    const disk = fakeDisk(
+      { 'A.md': '---\nrelated:\n  - { link: "[[B]]", label: 2024, kind: parent }\n---\n# A\n' },
+      extra,
+    );
+    const [r] = await relationsOf('A.md');
+    expect(r.label).toBe('2024');
+    expect(await updateRelation(r, { label: r.label, directed: true })).toBe(true);
+    expect(disk.files.get('A.md')).toBe(
+      '---\nrelated:\n  - { link: "[[B]]", label: 2024, kind: parent, directed: true }\n---\n# A\n',
+    );
+    expect(toasts()).toEqual([]);
+  });
 });
