@@ -120,6 +120,46 @@ export function summaryOf(text: string, unit: Unit, t: TFunction): string {
   return short || t(`editor.blocks.kinds.${kind ?? 'other'}`);
 }
 
+/** What the live region says after a move (M4 §4): the block, and where it
+ *  went — after the block now before it, or at the top of the page, before
+ *  the next item, or into its parent item (final review M5). `after` is the
+ *  note after the move, `at` where the moved block starts in it. */
+export function movedMessage(after: Seen, at: number, moved: Unit, t: TFunction): string {
+  const { text, model } = after;
+  const name = (id: number) => summaryOf(text, model.units[id], t);
+  const here = model.units.filter((u) => u.from === at);
+  const unit =
+    here.find((u) => u.kind === moved.kind) ??
+    here.sort((a, b) => a.to - a.from - (b.to - b.from))[0];
+  if (!unit) return t('editor.blocks.moved', { block: summaryOf(text, moved, t) });
+  const block = name(unit.id);
+  const top = (id: number) => {
+    const tops = model.units.filter((u) => u.scope === 'top');
+    const i = tops.findIndex((u) => u.id === id);
+    return i > 0
+      ? t('editor.blocks.movedAfter', { block, after: name(tops[i - 1].id) })
+      : t('editor.blocks.movedFirst', { block });
+  };
+  const among = (ids: number[]) => {
+    const k = ids.indexOf(unit.id);
+    if (k > 0) return t('editor.blocks.movedAfter', { block, after: name(ids[k - 1]) });
+    if (ids.length > 1) return t('editor.blocks.movedBefore', { block, before: name(ids[1]) });
+    return null;
+  };
+  if (unit.scope === 'row') {
+    return among(model.tables[unit.container!].rows) ?? t('editor.blocks.moved', { block });
+  }
+  if (unit.scope === 'item') {
+    const list = model.lists[unit.container!];
+    if (list.items[0] === unit.id && list.parentItem !== null) {
+      return t('editor.blocks.movedInto', { block, parent: name(list.parentItem) });
+    }
+    // Alone in a list of its own: placed among the top-level blocks.
+    return among(list.items) ?? top(list.top);
+  }
+  return top(unit.id);
+}
+
 /** Where a slot is drawn, in the pane's content coordinates. */
 function slotLine(
   pane: HTMLElement,
@@ -332,9 +372,7 @@ export function BlockGutter({
       return;
     }
     movedAt.current = view.state.selection.main.head;
-    setStatus(
-      t('editor.blocks.moved', { block: summaryOf(origin.text, origin.model.units[id], t) }),
-    );
+    setStatus(movedMessage(modelFor(view.state), movedAt.current, origin.model.units[id], t));
   };
 
   live.current = { seen, anchors, move };

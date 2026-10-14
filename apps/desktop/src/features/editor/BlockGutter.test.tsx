@@ -1,13 +1,14 @@
 import { EditorView } from '@codemirror/view';
-import { act, fireEvent, render, screen, within } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import axe from 'axe-core';
+import i18next from 'i18next';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { clearMocks } from '../../ipc/testing';
 import { movableBlocks } from '../../markdown/blockModel';
 import { parsePage } from '../../markdown/parse';
 import { useToastStore } from '../../stores/toastStore';
 import { fakeDisk } from '../../test/fakeDisk';
-import { anchorsOf } from './BlockGutter';
+import { anchorsOf, movedMessage } from './BlockGutter';
 import { Editor } from './Editor';
 import { PageDoc } from './pageDoc';
 
@@ -73,7 +74,7 @@ describe('the block gutter in the Split pane (M4 §4)', () => {
     const up = within(opened('P2')).getByRole('button', { name: 'Move up' });
     await act(() => up.click());
     expect(source()).toBe('P2\n\nP1\n');
-    expect(status()).toBe('Moved P2.');
+    expect(status()).toBe('Moved P2 to the top of the page.');
   });
 
   it('Indent and Outdent move a list item between levels', async () => {
@@ -82,6 +83,28 @@ describe('the block gutter in the Split pane (M4 §4)', () => {
     const indent = within(opened('b')).getByRole('button', { name: 'Indent' });
     await act(() => indent.click());
     expect(source()).toBe('- a\n  - b\n');
+    expect(status()).toBe('Moved b into a.');
+  });
+
+  it('final review M5: the live region says where the block went', async () => {
+    let pane = await split('P1\n\nP2\n\nP3\n');
+    await hover(block(pane, 'P1'));
+    const down = within(opened('P1')).getByRole('button', { name: 'Move down' });
+    await act(() => down.click());
+    expect(source()).toBe('P2\n\nP1\n\nP3\n');
+    expect(status()).toBe('Moved P1 after P2.');
+    cleanup();
+    pane = await split('- a\n- b\n\n| h |\n|---|\n| 1 |\n| 2 |\n');
+    await hover(block(pane, 'b'));
+    const up = within(opened('b')).getByRole('button', { name: 'Move up' });
+    await act(() => up.click());
+    expect(status()).toBe('Moved b before a.');
+    await wait(50);
+    await hover(block(pane, '1'));
+    const rowDown = within(opened('1')).getByRole('button', { name: 'Move down' });
+    await act(() => rowDown.click());
+    expect(source()).toBe('- b\n- a\n\n| h |\n|---|\n| 2 |\n| 1 |\n');
+    expect(status()).toBe('Moved 1 after 2.');
   });
 
   it('keyboard: one tab stop, ↑/↓ go from block to block, Alt+↑ moves it and its grip keeps the keyboard', async () => {
@@ -94,7 +117,7 @@ describe('the block gutter in the Split pane (M4 §4)', () => {
     await key(grip('P2'), 'ArrowUp', { altKey: true });
     expect(source()).toBe('P2\n\nP1\n\nP3\n');
     await vi.waitFor(() => expect(grip('P2')).toHaveFocus());
-    expect(status()).toBe('Moved P2.');
+    expect(status()).toBe('Moved P2 to the top of the page.');
   });
 
   it('after a move the pane shows it at once; a key while the pane lags the editor does nothing', async () => {
@@ -112,7 +135,7 @@ describe('the block gutter in the Split pane (M4 §4)', () => {
     await key(grip('P2'), 'ArrowDown', { altKey: true });
     await key(grip('P2'), 'Enter');
     expect(source()).toBe('P2\n\nP1\n\nP3\nx');
-    expect(status()).toBe('Moved P2.');
+    expect(status()).toBe('Moved P2 to the top of the page.');
   });
 
   it('Enter picks a block up: arrows choose a place, Enter drops it; Escape cancels', async () => {
@@ -229,7 +252,7 @@ describe('dragging a block (M4 §4)', () => {
     expect(document.querySelector('[data-drop-line]')).not.toBeNull();
     await pointer(window, 'pointerup', 4, 2);
     expect(source()).toBe('P3\n\nP1\n\nP2\n');
-    expect(status()).toBe('Moved P3.');
+    expect(status()).toBe('Moved P3 to the top of the page.');
     expect(document.querySelector('[data-drop-line]')).toBeNull();
   });
 
@@ -490,5 +513,24 @@ describe('mapping blocks to the pane (final review I2)', () => {
       ['listItem', 'LI'],
       ['quote', 'BLOCKQUOTE'],
     ]);
+  });
+});
+
+describe('the live region after a move (final review M5)', () => {
+  const after = (text: string) => ({ text, model: movableBlocks(text, parsePage(text)) });
+  const paragraph = movableBlocks('x\n', parsePage('x\n')).units[0];
+
+  it('names the block and where it went, in English and Spanish; names are taken as written', async () => {
+    const note = after('P2\n\nDon’t {stop} it\n\nP3\n');
+    const t = i18next.t.bind(i18next);
+    expect(movedMessage(note, 4, paragraph, t)).toBe('Moved Don’t {stop} it after P2.');
+    expect(movedMessage(note, 0, paragraph, t)).toBe('Moved P2 to the top of the page.');
+    await i18next.changeLanguage('es');
+    expect(movedMessage(note, 4, paragraph, t)).toBe('Se movió Don’t {stop} it después de P2.');
+    expect(movedMessage(note, 0, paragraph, t)).toBe('Se movió P2 al principio de la página.');
+    const list = after('- a\n  - b\n- c\n');
+    const item = list.model.units[2];
+    expect(movedMessage(list, 4, item, t)).toBe('Se movió b dentro de a.');
+    expect(movedMessage(list, 0, item, t)).toBe('Se movió a antes de c.');
   });
 });

@@ -58,7 +58,9 @@ test('acceptance: P3 dragged above P1 reads P3, P1, P2; one undo restores the or
   const p1 = (await pane.getByText('P1').boundingBox())!;
   await drag(page, pane.getByText('P3'), 'P3 three', p1.x + 40, p1.y + 2);
   await expect.poll(() => source(page)).toBe('P3 **three**\n\nP1 *one*\n\nP2');
-  await expect(page.getByRole('status').filter({ hasText: 'Moved P3 three.' })).toBeAttached();
+  await expect(
+    page.getByRole('status').filter({ hasText: 'Moved P3 three to the top of the page.' }),
+  ).toBeAttached();
   await page.locator('.cm-content').click();
   await page.keyboard.press('ControlOrMeta+z');
   await expect.poll(() => source(page)).toBe('P1 *one*\n\nP2\n\nP3 **three**');
