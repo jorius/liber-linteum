@@ -167,6 +167,30 @@ describe('Cover (M2c §2)', () => {
     expect(screen.getByText('S')).toBeInTheDocument();
   });
 
+  it('a pick that finishes after switching pages writes into neither page (final review M8)', async () => {
+    let answer!: (v: unknown) => void;
+    const disk = fakeDisk(
+      { 'A.md': '# A\n', 'B.md': '# B\n' },
+      {
+        cover_pick: () => new Promise((r) => (answer = r)),
+        links_resolve: resolveCovers,
+      },
+    );
+    render(<PageView />);
+    await open('A.md');
+    await userEvent.click(screen.getByRole('button', { name: 'Add cover' }));
+    await waitFor(() => expect(disk.calls.some(([c]) => c === 'cover_pick')).toBe(true));
+    await open('B.md');
+    await act(async () =>
+      answer({ path: 'attachments/sky.png', reference: 'attachments/sky.png' }),
+    );
+    // The image was copied into the vault, so the tree still refreshes.
+    await waitFor(() => expect(disk.calls.some(([c]) => c === 'vault_tree')).toBe(true));
+    expect(disk.files.get('A.md')).toBe('# A\n');
+    expect(disk.files.get('B.md')).toBe('# B\n');
+    expect(disk.writes()).toEqual([]);
+  });
+
   describe('keyboard focus is never lost (final review I3)', () => {
     /** Answers after a real delay, so the "loading" band is committed in
      *  between, as with the real IPC. */

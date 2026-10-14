@@ -85,18 +85,24 @@ export function Cover({ page, editable }: { page: Page; editable: boolean }) {
 
   const pick = async () => {
     const res = await coverPick(page.path);
+    // The editor may have moved on while the dialog was open: `edit` changes
+    // the current page, so the result is then dropped rather than written into
+    // another page (final review M8). The image is in the vault already.
+    const moved = useEditorStore.getState().path !== page.path;
     const settled = cover.kind === 'none' ? 'add' : 'change';
     if (!res.ok) {
       useToastStore.getState().push({ message: errorMessage(res.error), tone: 'error' });
-      setRefocus(settled);
+      if (!moved) setRefocus(settled);
       return;
     }
     if (!res.value) {
-      setRefocus(settled); // cancelled
+      if (!moved) setRefocus(settled); // cancelled
       return;
     }
-    const ok = await edit({ cover: res.value.reference, 'cover-y': null });
-    setRefocus(ok ? 'change' : settled);
+    if (!moved) {
+      const ok = await edit({ cover: res.value.reference, 'cover-y': null });
+      setRefocus(ok ? 'change' : settled);
+    }
     void useVaultStore.getState().refreshTree();
   };
   const remove = async () => {
