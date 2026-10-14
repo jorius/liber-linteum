@@ -428,5 +428,10 @@
     "pickLanguage": "Lenguaje del código",
     "searchLanguage": "Buscar lenguajes…",
     "languages": "Lenguajes"
+  },
+  "diagram": {
+    "label": "Diagrama: {first}",
+    "failed": "Diagrama que no se pudo dibujar",
+    "newerMacos": "Este diagrama necesita una versión más reciente de macOS."
   }
 }

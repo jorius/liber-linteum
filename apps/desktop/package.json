@@ -48,6 +48,7 @@
     "lowlight": "3.3.0",
     "mdast-util-directive": "^3.1.1",
     "mdast-util-to-hast": "^13.2.1",
+    "mermaid": "11.17.2",
     "micromark-extension-directive": "^4.0.0",
     "micromark-util-decode-string": "^2.0.1",
     "node-diff3": "^3.2.1",

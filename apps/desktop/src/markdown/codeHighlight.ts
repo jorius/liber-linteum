@@ -50,6 +50,7 @@ export function highlightCode(root: Root | Element) {
         .map(String)
         .find((c) => c.startsWith('language-'))
         ?.slice(9);
+      if (code && lang?.toLowerCase() === 'mermaid') child.properties.dataLang = 'mermaid';
       if (code && lang && !NOT_CODE.has(lang.toLowerCase())) {
         child.properties.dataLang = lang;
         const grammar = grammarFor(lang);

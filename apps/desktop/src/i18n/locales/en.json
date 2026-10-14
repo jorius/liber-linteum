@@ -428,5 +428,10 @@
     "pickLanguage": "Code language",
     "searchLanguage": "Search languages…",
     "languages": "Languages"
+  },
+  "diagram": {
+    "label": "Diagram: {first}",
+    "failed": "Diagram that couldn't be drawn",
+    "newerMacos": "This diagram needs a newer macOS."
   }
 }

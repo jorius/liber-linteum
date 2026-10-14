@@ -393,3 +393,35 @@ summary.calloutTitle {
   color: var(--color-text-body);
   cursor: pointer;
 }
+
+/* Mermaid diagrams (M4b part 2 §4). */
+.diagram {
+  margin: 0 0 1em;
+  overflow-x: auto;
+  text-align: center;
+}
+
+.diagram :global(svg) {
+  max-width: 100%;
+  height: auto;
+}
+
+.diagramError {
+  margin: 0 0 1em;
+  padding: 8px 12px;
+  border: 1px dashed var(--color-border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--color-code-bg);
+  color: var(--color-text-muted);
+}
+
+.diagramError pre {
+  margin: 0 0 6px;
+  font: 400 12.5px var(--font-source);
+  white-space: pre-wrap;
+}
+
+.diagramError p {
+  margin: 0;
+  font-size: 12.5px;
+}

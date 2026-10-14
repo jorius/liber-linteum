@@ -213,6 +213,14 @@ function build(state: EditorState, page: ParsedPage, active: Set<number>): Decor
       }
       case 'code': {
         if (reduced) return;
+        // M4b part 2 §4: a diagram off the cursor is drawn as a block widget.
+        if (
+          (node as unknown as { lang?: string }).lang?.toLowerCase() === 'mermaid' &&
+          !touched(from, to)
+        ) {
+          blockWidget(node);
+          return;
+        }
         lines(from, to, lineClass('cm-nimw-codeblock'));
         // M4b part 2 §2: a fenced block's language badge and Copy button.
         const first = doc.lineAt(from);

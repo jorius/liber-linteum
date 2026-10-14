@@ -238,3 +238,12 @@ describe('Live Preview maths (M4b part 2 §3)', () => {
     await vi.waitFor(() => expect(line(v, 1)).toBe('Intro $x^2$ end.'));
   });
 });
+
+describe('Live Preview diagrams (M4b part 2 §4)', () => {
+  it('a mermaid fence off the cursor is a block widget without a code badge', async () => {
+    const text = 'x\n\n```mermaid\ngraph TD; A-->B\n```\n\nend\n';
+    const v = editor(text, text.length - 1);
+    expect(v.contentDOM.querySelector('.cm-nimw-widget')).not.toBeNull();
+    expect(v.contentDOM.querySelector('.cm-nimw-codebadge')).toBeNull();
+  });
+});

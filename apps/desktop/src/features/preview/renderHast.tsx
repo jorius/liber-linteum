@@ -5,6 +5,7 @@ import { assetUrl } from '../../ipc';
 import { followLink } from '../../stores/links';
 import { Callout } from './Callout';
 import { MathView } from './MathView';
+import { MermaidView } from './MermaidView';
 import { CodeBlock } from './CodeBlock';
 import { Embed } from './Embed';
 import styles from './Preview.module.css';
@@ -187,6 +188,9 @@ function renderElement(e: Element, key: number, ctx: RenderCtx): ReactNode {
           {renderChildren(e, ctx)}
         </span>
       );
+  }
+  if (e.tagName === 'pre' && p.dataLang === 'mermaid') {
+    return <MermaidView key={key} source={hastText(e).replace(/\n$/, '')} />;
   }
   if (e.tagName === 'pre') {
     const lang = typeof p.dataLang === 'string' ? p.dataLang : undefined;

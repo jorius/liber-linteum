@@ -359,3 +359,21 @@ describe('Preview: maths (M4b part 2 §3)', () => {
     expect(container.querySelector('.katex-error')!.textContent).toContain('\\frac{a');
   });
 });
+
+describe('Preview: diagrams (M4b part 2 §4)', () => {
+  it('a ```mermaid fence becomes a diagram, not a code block', async () => {
+    show('```mermaid\ngraph TD; A-->B\n```\n');
+    // jsdom can't lay SVG out, so Mermaid may answer with its error box:
+    // either way the fence is drawn as a diagram, never as code.
+    await waitFor(
+      () =>
+        expect(
+          document.querySelector(
+            '[aria-label="Diagram: graph TD; A-->B"], [aria-label="Diagram that couldn’t be drawn"], [aria-label="Diagram that couldn\'t be drawn"]',
+          ),
+        ).not.toBeNull(),
+      { timeout: 4000 },
+    );
+    expect(screen.queryByRole('button', { name: 'Copy code' })).not.toBeInTheDocument();
+  });
+});
