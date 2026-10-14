@@ -945,3 +945,77 @@ fn m2c_cover_outside_the_page_folder_is_vault_rooted_and_resolves() {
     .unwrap();
     assert_eq!(resolved, json!(["Media/sky.png"]));
 }
+
+/// Final review M7: the `page` an attachment is placed for must be a visible,
+/// indexed page. A compromised UI naming a hidden one (`.obsidian/x.md`,
+/// `.git/hooks/x.md`) or a missing one is refused before anything is written
+/// (and, for the cover, before the dialog opens).
+#[test]
+fn m2c_attachments_refuse_a_hidden_or_missing_page() {
+    let h = harness();
+    let vault = copy_fixture("obsidian-basic"); // attachmentFolderPath "./assets"
+    std::fs::write(vault.path().join(".obsidian/x.md"), "# x\n").unwrap();
+    std::fs::create_dir_all(vault.path().join(".git/hooks")).unwrap();
+    std::fs::write(vault.path().join(".git/hooks/x.md"), "# x\n").unwrap();
+    call(&h.main, "vault_open", json!({ "path": vault.path() })).unwrap();
+
+    // Paste.
+    for page in [".obsidian/x.md", ".git/hooks/x.md", "Nope.md"] {
+        let err = get_ipc_response(
+            &h.main,
+            raw_request(
+                "attachment_paste",
+                b"\x89PNG".to_vec(),
+                &[("x-nimw-page", page), ("x-nimw-name", "shot.png")],
+            ),
+        )
+        .map(|r| r.deserialize::<Value>().unwrap())
+        .unwrap_err();
+        assert_eq!(kind(err), "notFound", "paste for {page}");
+    }
+    assert!(!vault.path().join(".obsidian/assets").exists());
+    assert!(!vault.path().join(".git/hooks/assets").exists());
+    assert!(!vault.path().join("assets").exists());
+
+    // Drop: granted by a native drop, so only the page decides.
+    let outside = tempfile::tempdir().unwrap();
+    let dropped = outside.path().join("main.js");
+    std::fs::write(&dropped, b"evil()").unwrap();
+    let window = h.main.as_ref().window();
+    nimw_desktop::drops::on_window_event(
+        &window,
+        &tauri::WindowEvent::DragDrop(tauri::DragDropEvent::Drop {
+            paths: vec![dropped.clone()],
+            position: tauri::PhysicalPosition::new(10.0, 10.0),
+        }),
+    );
+    let err = call(
+        &h.main,
+        "attachment_import",
+        json!({ "page": ".obsidian/x.md", "paths": [dropped] }),
+    )
+    .unwrap_err();
+    assert_eq!(kind(err), "notFound");
+    assert!(!vault.path().join(".obsidian/assets").exists());
+
+    // Cover: refused before the dialog opens.
+    let asked = Arc::new(Mutex::new(0));
+    let image = outside.path().join("sky.png");
+    std::fs::write(&image, b"\x89PNG").unwrap();
+    let state = h.app.state::<nimw_desktop::state::AppState>();
+    let counter = asked.clone();
+    state.set_cover_picker(Some(Arc::new(move || {
+        *counter.lock().unwrap() += 1;
+        Some(image.clone())
+    })));
+    for page in [".git/hooks/x.md", ".obsidian/x.md", "Nope.md"] {
+        let err = call(&h.main, "cover_pick", json!({ "page": page })).unwrap_err();
+        assert_eq!(kind(err), "notFound", "cover for {page}");
+    }
+    assert_eq!(*asked.lock().unwrap(), 0);
+    assert!(!vault.path().join(".git/hooks/assets").exists());
+
+    // A visible page still works.
+    let cover = call(&h.main, "cover_pick", json!({ "page": "Welcome.md" })).unwrap();
+    assert_eq!(cover["path"], "assets/sky.png");
+}

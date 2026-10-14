@@ -10,8 +10,8 @@ use crate::dto::{
 use crate::error::{CmdResult, CommandError, ErrorKind};
 use crate::state::AppState;
 use crate::vault_commands::blocking;
-use nimw_session::cover_reference;
-use nimw_vault::VaultPath;
+use nimw_session::{VaultSession, cover_reference};
+use nimw_vault::{EntryKind, VaultPath};
 use percent_encoding::percent_decode_str;
 use std::path::PathBuf;
 use tauri::ipc::{InvokeBody, Request};
@@ -29,6 +29,25 @@ pub const SUGGEST_LIMIT: usize = 50;
 
 fn invalid(message: impl Into<String>) -> CommandError {
     CommandError::new(ErrorKind::InvalidName, message)
+}
+
+/// The page an attachment is placed for (final review M7): a visible file on
+/// disk that the index knows as a page. A hidden or excluded path
+/// (`.obsidian/x.md`, `.git/hooks/x.md`) would steer the attachment folder
+/// policy into that folder, so it is refused like a missing page.
+fn visible_page(session: &VaultSession, page: &str) -> CmdResult<VaultPath> {
+    let path = VaultPath::new(page)?;
+    let on_disk = session
+        .vault()
+        .stat(&path)?
+        .is_some_and(|e| e.kind == EntryKind::File);
+    if !on_disk || session.page(&path)?.is_none() {
+        return Err(CommandError::new(
+            ErrorKind::NotFound,
+            format!("not a page in the vault: {page}"),
+        ));
+    }
+    Ok(path)
 }
 
 /// The page path, file name and bytes of a paste: a raw body with
@@ -68,7 +87,7 @@ pub(crate) fn attachment_paste_impl(
     bytes: Vec<u8>,
 ) -> CmdResult<AttachedDto> {
     let session = state.session()?;
-    let page = VaultPath::new(&page)?;
+    let page = visible_page(&session, &page)?;
     let ext = name
         .rsplit_once('.')
         .map(|(_, e)| e.to_ascii_lowercase())
@@ -88,7 +107,7 @@ pub(crate) fn attachment_import_impl(
     paths: Vec<String>,
 ) -> CmdResult<Vec<ImportResultDto>> {
     let session = state.session()?;
-    let page = VaultPath::new(&page)?;
+    let page = visible_page(&session, &page)?;
     Ok(paths
         .into_iter()
         .map(|source| {
@@ -126,7 +145,7 @@ pub(crate) fn cover_pick_impl<R: Runtime>(
 ) -> CmdResult<Option<CoverDto>> {
     let state = app.state::<AppState>();
     let session = state.session()?;
-    let page = VaultPath::new(&page)?;
+    let page = visible_page(&session, &page)?;
     let picked = match state.cover_picker() {
         Some(pick) => pick(),
         None => app
