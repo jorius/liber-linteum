@@ -281,6 +281,67 @@ describe('dragging a block (M4 §4)', () => {
   });
 });
 
+const wait = (ms: number) => act(() => new Promise((r) => setTimeout(r, ms)));
+const lastToast = () => {
+  const toasts = useToastStore.getState().toasts;
+  return toasts.length ? toasts[toasts.length - 1].message : null;
+};
+const CHANGED = 'That block changed, so it wasn’t moved. Try again.';
+
+describe('the block moved is the block picked (final review C2)', () => {
+  it('text that changes during a drag: the dragged block is found again in the new text and moves', async () => {
+    const pane = await split('P1\n\nP2\n\nP3\n');
+    layout(pane);
+    await hover(block(pane, 'P3'));
+    await pointer(grip('P3'), 'pointerdown', 4, 61);
+    await pointer(window, 'pointermove', 4, 30);
+    // Meanwhile a paragraph arrives at the top (typing, a reload, a merge),
+    // and the pane shows it.
+    act(() => viewOf().dispatch({ changes: { from: 0, insert: 'New\n\n' } }));
+    await wait(200);
+    layout(pane);
+    // Above P1, which is now the second block.
+    await pointer(window, 'pointermove', 4, 32);
+    await pointer(window, 'pointerup', 4, 32);
+    expect(source()).toBe('New\n\nP3\n\nP1\n\nP2\n');
+  });
+
+  it('a dragged block that was edited meanwhile stays put, and the drop says why', async () => {
+    const pane = await split('P1\n\nP2\n\nP3\n');
+    layout(pane);
+    await hover(block(pane, 'P3'));
+    await pointer(grip('P3'), 'pointerdown', 4, 61);
+    await pointer(window, 'pointermove', 4, 2);
+    act(() => viewOf().dispatch({ changes: { from: 10, insert: 'x' } }));
+    await pointer(window, 'pointerup', 4, 2);
+    expect(source()).toBe('P1\n\nP2\n\nP3x\n');
+    expect(status()).toBe('Move cancelled.');
+    expect(lastToast()).toBe(CHANGED);
+  });
+
+  it('a pane that lags the editor: Move up finds its block in the current text', async () => {
+    const pane = await split('P1\n\nP2\n');
+    await hover(block(pane, 'P2'));
+    const up = within(opened('P2')).getByRole('button', { name: 'Move up' });
+    act(() => viewOf().dispatch({ changes: { from: 0, insert: 'New\n\n' } }));
+    await act(() => up.click());
+    expect(source()).toBe('New\n\nP2\n\nP1\n');
+  });
+
+  it('typing next to a --- rule, then a pick-up: the quote moves, not a list item', async () => {
+    const pane = await split('Intro\n\n---\n\nPara\n\n- a\n- b\n\n> q\n\nEnd\n');
+    act(() => viewOf().dispatch({ changes: { from: 16, insert: 'X' } }));
+    await wait(200);
+    await hover(block(pane, 'q'));
+    act(() => grip('q').focus());
+    await key(grip('q'), 'Enter');
+    for (let k = 0; k < 10; k++) await key(grip('q'), 'ArrowUp');
+    expect(status()).toBe('Before Intro');
+    await key(grip('q'), 'Enter');
+    expect(source()).toBe('> q\n\nIntro\n\n---\n\nParaX\n\n- a\n- b\n\nEnd\n');
+  });
+});
+
 describe('mapping blocks to the pane (final review I2)', () => {
   it('maps a large note’s blocks in linear time: typing in Split doesn’t stall', () => {
     // ~3,000 rendered blocks, like a 200 KB note: matching each block against

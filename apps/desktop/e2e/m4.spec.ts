@@ -121,6 +121,75 @@ test('keyboard only: ↓ to the next block, Alt+↑ moves it, Enter picks a bloc
   await expect.poll(() => source(page)).toBe('P1\n\nP3\n\nP2');
 });
 
+test('final review C2: text that changes during a drag — the dragged block moves, not the one now at its index', async ({
+  page,
+}) => {
+  const pane = await open(page, 'P1\n\nP2\n\nP3\n');
+  await pane.getByText('P3').hover();
+  const grip = page.getByRole('button', { name: 'Drag to reorder: P3' });
+  const g = (await grip.boundingBox())!;
+  const p1 = (await pane.getByText('P1').boundingBox())!;
+  await page.mouse.move(g.x + g.width / 2, g.y + g.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(p1.x + 40, p1.y + 2, { steps: 6 });
+  await expect(page.locator('[data-drop-line]')).toBeVisible();
+  // Meanwhile a paragraph is typed at the top (the editor has the keyboard:
+  // WebKit/macOS buttons don't take focus on click), and the pane shows it.
+  await page.locator('.cm-content').evaluate((el) => (el as HTMLElement).focus());
+  await page.keyboard.press('ControlOrMeta+Home');
+  await page.keyboard.type('New');
+  await page.keyboard.press('Enter');
+  await page.keyboard.press('Enter');
+  await expect(pane.locator('[data-source-start]').first()).toHaveText('New');
+  const p1b = (await pane.getByText('P1').boundingBox())!;
+  await page.mouse.move(p1b.x + 40, p1b.y + 2, { steps: 3 });
+  await page.mouse.up();
+  await expect.poll(() => source(page)).toBe('New\n\nP3\n\nP1\n\nP2');
+});
+
+/** The note of final review C2's first trigger, after typing X in "Para". */
+async function typedNextToRule(page: Page) {
+  const pane = await open(page, 'Intro\n\n---\n\nPara\n\n- a\n- b\n\n> q\n\nEnd\n');
+  await page.locator('.cm-line', { hasText: /^Para$/ }).click();
+  await page.keyboard.press('End');
+  await page.keyboard.type('X');
+  await expect(pane.getByText('ParaX')).toBeVisible();
+  await pane.locator('blockquote').hover();
+  const grip = page.getByRole('button', { name: 'Drag to reorder: q' });
+  await grip.focus();
+  return grip;
+}
+
+test('final review C2: after typing next to a --- rule, a picked-up quote moves — not a list item', async ({
+  page,
+}) => {
+  await typedNextToRule(page);
+  await page.keyboard.press('Enter');
+  for (let k = 0; k < 10; k++) await page.keyboard.press('ArrowUp');
+  await expect(page.getByRole('status').filter({ hasText: 'Before Intro' })).toBeAttached();
+  await page.keyboard.press('Enter');
+  await expect.poll(() => source(page)).toBe('> q\n\nIntro\n\n---\n\nParaX\n\n- a\n- b\n\nEnd');
+});
+
+test('final review C2: after typing next to a --- rule, Alt+↑ on the quote never moves another block', async ({
+  page,
+}) => {
+  await typedNextToRule(page);
+  await page.keyboard.press('Alt+ArrowUp');
+  await page.waitForTimeout(300);
+  // Above the list; or, if the pane's re-parse misreads the list after the
+  // rule (the C2 trigger), cancelled with a message: never a list item.
+  expect([
+    'Intro\n\n---\n\nParaX\n\n> q\n\n- a\n- b\n\nEnd',
+    'Intro\n\n---\n\nParaX\n\n- a\n- b\n\n> q\n\nEnd',
+  ]).toContain(await source(page));
+  if ((await source(page)).endsWith('> q\n\nEnd')) {
+    await expect(
+      page.getByText('That block changed, so it wasn’t moved. Try again.'),
+    ).toBeVisible();
+  }
+});
+
 test('final review I1: a <details> block still folds the Markdown after it, and has a gutter', async ({
   page,
 }) => {

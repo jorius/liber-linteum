@@ -27,7 +27,9 @@ import {
   type Unit,
 } from '../../markdown/blockModel';
 import type { ParsedPage } from '../../markdown/types';
+import { useToastStore } from '../../stores/toastStore';
 import { applyMove, modelFor } from './blockCommands';
+import { matcher, type Seen } from './blockMatch';
 import styles from './BlockGutter.module.css';
 
 export interface Shown {
@@ -165,6 +167,9 @@ function slotLine(
   }
 }
 
+/** Moves block `id` of version `origin` to `slot` of version `at`. */
+type Move = (origin: Seen, id: number, slot: Slot | null, lineOnly?: boolean, at?: Seen) => void;
+
 interface Picking {
   unit: number;
   slots: Slot[];
@@ -183,6 +188,11 @@ export function BlockGutter({
 }) {
   const { t } = useTranslation();
   const model = useMemo(() => (shown ? movableBlocks(shown.text, shown.page) : null), [shown]);
+  /** The version the pane shows: what the gutter's ids and slots refer to. */
+  const seen = useMemo<Seen | null>(
+    () => (shown && model ? { text: shown.text, model } : null),
+    [shown, model],
+  );
   const [anchors, setAnchors] = useState<Map<number, HTMLElement>>(new Map());
   const [hover, setHover] = useState<number[]>([]);
   const [current, setCurrent] = useState<number | null>(null);
@@ -196,19 +206,21 @@ export function BlockGutter({
   const focusNext = useRef(false);
   /** After a move: the offset the moved block starts at in the new text. */
   const movedAt = useRef<number | null>(null);
-  /** A pointer drag in progress (M4 §4): which block, and where it would land. */
+  /** A pointer drag in progress (M4 §4): which block, and where it would
+   *  land (a slot of the version `seen`). */
   const [dragging, setDragging] = useState<{
-    id: number;
+    label: string;
     slot: Slot | null;
+    seen: Seen | null;
     x: number;
     y: number;
   } | null>(null);
   // What the window listeners of a drag read.
   const live = useRef<{
-    model: BlockModel | null;
+    seen: Seen | null;
     anchors: Map<number, HTMLElement>;
-    move: (id: number, slot: Slot | null, lineOnly?: boolean) => void;
-  }>({ model, anchors, move: () => undefined });
+    move: Move;
+  }>({ seen, anchors, move: () => undefined });
 
   // The rendered elements of the version shown (the pane commits first).
   useLayoutEffect(() => {
@@ -291,23 +303,37 @@ export function BlockGutter({
     };
   }, [pane, anchors]);
 
-  /** Moves a block of the version shown; nothing when the editor has moved
-   *  on (the pane catches up within its render delay). */
-  const move = (id: number, slot: Slot | null, lineOnly = false) => {
-    if (!slot || !shown || view.state.doc.toString() !== shown.text) return;
-    const fresh = modelFor(view.state).model;
-    const label = name(id);
-    if (applyMove(view, fresh.units[id], slot, { lineOnly }) !== 'moved') return;
+  /** Moves block `id` of the version `origin` to `slot` (of the version
+   *  `at`) in the editor's text as it is now. The text may have changed since
+   *  (typing, a reload, a merge) and the editor's blocks come from another
+   *  parse, so both are found again there first; when either is gone the
+   *  move is cancelled (final review C2). */
+  const move: Move = (origin, id, slot, lineOnly = false, at = origin) => {
+    if (!slot) return;
+    const now = modelFor(view.state);
+    const found = matcher(origin, now);
+    const unit = found.unit(id);
+    const target = unit && (at === origin ? found : matcher(at, now)).slot(slot);
+    const outcome = unit && target ? applyMove(view, unit, target, { lineOnly }) : 'none';
+    if (outcome === 'refused') return;
+    if (outcome === 'none') {
+      setStatus(t('editor.blocks.cancelled'));
+      useToastStore.getState().push({ message: t('editor.blocks.changed'), tone: 'error' });
+      return;
+    }
     movedAt.current = view.state.selection.main.head;
-    setStatus(t('editor.blocks.moved', { block: label }));
+    setStatus(
+      t('editor.blocks.moved', { block: summaryOf(origin.text, origin.model.units[id], t) }),
+    );
   };
 
-  live.current = { model, anchors, move };
+  live.current = { seen, anchors, move };
 
   /** The slot nearest to the pointer: by height, and for list levels also by
    *  how far right the pointer is. */
   const nearest = (id: number, lineOnly: boolean, x: number, y: number): Slot | null => {
-    const { model: m, anchors: a } = live.current;
+    const { seen: v, anchors: a } = live.current;
+    const m = v?.model;
     const p = pane.current;
     if (!m || !p) return null;
     const pr = p.getBoundingClientRect();
@@ -327,11 +353,35 @@ export function BlockGutter({
   /** Pressing a grip: past 4 px it's a drag; Escape cancels; the drop moves
    *  the block (Alt held: a heading without its section). */
   const startDrag = (e: ReactPointerEvent, id: number) => {
-    if (e.button !== 0 || !live.current.model) return;
-    const unit = live.current.model.units[id];
+    const origin = live.current.seen;
+    if (e.button !== 0 || !origin) return;
+    const unit = origin.model.units[id];
+    const label = summaryOf(origin.text, unit, t);
     const from = { x: e.clientX, y: e.clientY };
     let started = false;
-    let last: { slot: Slot | null; lineOnly: boolean } = { slot: null, lineOnly: false };
+    let last: { slot: Slot | null; lineOnly: boolean; seen: Seen } = {
+      slot: null,
+      lineOnly: false,
+      seen: origin,
+    };
+    // The dragged block in the version the pane shows now: the pane may
+    // re-render during the drag (final review C2).
+    let found: { seen: Seen | null; id: number | null } = { seen: origin, id };
+    const locate = () => {
+      const now = live.current.seen;
+      if (now !== found.seen) {
+        found = { seen: now, id: now ? (matcher(origin, now).unit(id)?.id ?? null) : null };
+      }
+      return found;
+    };
+    const slotAtPointer = (lineOnly: boolean, x: number, y: number) => {
+      const here = locate();
+      return {
+        slot: here.id === null ? null : nearest(here.id, lineOnly, x, y),
+        lineOnly,
+        seen: here.seen ?? origin,
+      };
+    };
     let frame = 0;
     let lastY = e.clientY;
     (e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId);
@@ -356,9 +406,8 @@ export function BlockGutter({
       if (!started && Math.hypot(ev.clientX - from.x, ev.clientY - from.y) < 4) return;
       started = true;
       lastY = ev.clientY;
-      const lineOnly = ev.altKey && unit.kind === 'heading';
-      last = { slot: nearest(id, lineOnly, ev.clientX, ev.clientY), lineOnly };
-      setDragging({ id, slot: last.slot, x: ev.clientX, y: ev.clientY });
+      last = slotAtPointer(ev.altKey && unit.kind === 'heading', ev.clientX, ev.clientY);
+      setDragging({ label, slot: last.slot, seen: last.seen, x: ev.clientX, y: ev.clientY });
       if (!frame) frame = requestAnimationFrame(scroll);
     };
     const stop = () => {
@@ -372,9 +421,9 @@ export function BlockGutter({
       stop();
       if (!started) return;
       const lineOnly = ev.altKey && unit.kind === 'heading';
-      const slot =
-        lineOnly === last.lineOnly ? last.slot : nearest(id, lineOnly, ev.clientX, ev.clientY);
-      live.current.move(id, slot, lineOnly);
+      const drop =
+        lineOnly === last.lineOnly ? last : slotAtPointer(lineOnly, ev.clientX, ev.clientY);
+      live.current.move(origin, id, drop.slot, lineOnly, drop.seen);
     };
     const onEscape = (ev: KeyboardEvent) => {
       if (ev.key !== 'Escape') return;
@@ -409,7 +458,7 @@ export function BlockGutter({
   };
 
   const onKey = (e: ReactKeyboardEvent, id: number) => {
-    if (!model || !shown) return;
+    if (!model || !shown || !seen) return;
     // Until the pane shows the editor's text (a move a moment ago), a key
     // would act on blocks that have moved: it waits.
     if (view.state.doc.toString() !== shown.text) {
@@ -427,7 +476,7 @@ export function BlockGutter({
         setStatus(describe(picking.slots[index]));
       } else if (e.key === 'Enter' || e.key === ' ') {
         setPicking(null);
-        move(picking.unit, picking.slots[picking.index], picking.lineOnly);
+        move(seen, picking.unit, picking.slots[picking.index], picking.lineOnly);
       } else if (e.key === 'Escape' || e.key === 'Tab') {
         setPicking(null);
         setStatus(t('editor.blocks.cancelled'));
@@ -445,9 +494,10 @@ export function BlockGutter({
         setCurrent(order[k]);
       }
     } else if (e.altKey && (e.key === 'ArrowUp' || e.key === 'ArrowDown')) {
-      move(id, neighbourSlot(model, unit, e.key === 'ArrowUp' ? -1 : 1, e.shiftKey), e.shiftKey);
+      const dir = e.key === 'ArrowUp' ? -1 : 1;
+      move(seen, id, neighbourSlot(model, unit, dir, e.shiftKey), e.shiftKey);
     } else if (e.altKey && (e.key === 'ArrowRight' || e.key === 'ArrowLeft')) {
-      move(id, indentSlot(model, unit, e.key === 'ArrowRight' ? 1 : -1));
+      move(seen, id, indentSlot(model, unit, e.key === 'ArrowRight' ? 1 : -1));
     } else if (plain && (e.key === 'Enter' || e.key === ' ')) {
       const slots = slotsFor(model, unit, false);
       if (!slots.length) return;
@@ -460,7 +510,7 @@ export function BlockGutter({
     e.stopPropagation();
   };
 
-  if (!model || !shown || !pane.current) {
+  if (!model || !shown || !seen || !pane.current) {
     return <div ref={layer} className={styles.layer} />;
   }
   const p = pane.current;
@@ -481,7 +531,11 @@ export function BlockGutter({
       ...(picking ? [picking.unit] : []),
     ]),
   ];
-  const dropSlot = picking ? picking.slots[picking.index] : (dragging?.slot ?? null);
+  const dropSlot = picking
+    ? picking.slots[picking.index]
+    : dragging?.seen === seen
+      ? dragging.slot
+      : null;
   const drop = dropSlot ? slotLine(p, model, dropSlot, anchors) : null;
 
   return (
@@ -502,7 +556,7 @@ export function BlockGutter({
           style={{ left: dragging.x + 12, top: dragging.y + 8 }}
           aria-hidden="true"
         >
-          {name(dragging.id)}
+          {dragging.label}
         </div>
       )}
       {visible.map((id) => {
@@ -574,12 +628,12 @@ export function BlockGutter({
             {/* Shown while the gutter is hovered or has the keyboard. */}
             {opened === id && (
               <div className={styles.extra}>
-                {button('moveUp', () => move(id, neighbourSlot(model, unit, -1)), '↑')}
-                {button('moveDown', () => move(id, neighbourSlot(model, unit, 1)), '↓')}
+                {button('moveUp', () => move(seen, id, neighbourSlot(model, unit, -1)), '↑')}
+                {button('moveDown', () => move(seen, id, neighbourSlot(model, unit, 1)), '↓')}
                 {unit.scope === 'item' &&
-                  button('indent', () => move(id, indentSlot(model, unit, 1)), '→')}
+                  button('indent', () => move(seen, id, indentSlot(model, unit, 1)), '→')}
                 {unit.scope === 'item' &&
-                  button('outdent', () => move(id, indentSlot(model, unit, -1)), '←')}
+                  button('outdent', () => move(seen, id, indentSlot(model, unit, -1)), '←')}
               </div>
             )}
           </div>

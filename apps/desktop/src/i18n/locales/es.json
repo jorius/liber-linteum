@@ -132,6 +132,7 @@
       "moved": "Se movió {block}.",
       "picked": "Tomaste {block}. Las flechas eligen dónde, Intro lo suelta y Escape cancela.",
       "cancelled": "Movimiento cancelado.",
+      "changed": "Ese bloque cambió, así que no se movió. Vuelve a intentarlo.",
       "slot": {
         "before": "Antes de {block}",
         "end": "Al final de la página",
