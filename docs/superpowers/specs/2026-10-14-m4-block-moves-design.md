@@ -172,6 +172,26 @@ These override the sections above where they conflict.
 8. **The hint bar:** dismissing it is remembered in `localStorage` (try/catch), not in settings. Losing it shows the hint once more.
 9. **The block model** is cached per editor document and re-parsed incrementally. The first move in a large note opened in Source pays a full parse (~1.5 s in jsdom at 200 KB). Later moves take ~10 ms. Making the top-level slots linear time (they were O(n²)) brought a list item's move from ~110 ms to well under 100 ms.
 10. **Live Preview's "HTML renders nothing" check** (M2c §7.7) is M3b's again: there is no HTML wrapper to look through (final review I1).
-11. **Safari 15:** M4 code avoids `Array.prototype.at`.
+11. **Safari 15:** M4 code avoids `Array.prototype.at`. (Final review M7: the move path still reached it through `blocks.ts` and `incremental.ts`; both are fixed, and a test scans the move path for APIs newer than Safari 15.0. Other code outside the move path is swept separately.)
 12. **Tests:** the fake disk now resolves a wiki target to a page it holds, so embeds render in jsdom.
+
+## 11. Amendments from the final review: the move engine and its guard
+
+These override the sections above where they conflict.
+
+1. **Front matter (C1).**
+   - A move never gives the note a head it didn't have. The head is what some front matter reader may take as one: a leading `---` line (trailing spaces or tabs allowed, after a byte-order mark too) through the first later `---` or `...` line, or that line alone when nothing closes it. Such a move is refused with the toast. Losing a head is allowed: a block moved above an unclosed leading rule, or the rule moved down.
+   - The slots stay offered; the refusal explains itself. (Filtering them would mean computing every result when slots are listed.)
+   - The parser runs remark-frontmatter only when the note starts with a closed block. Its construct, failing at the end of a note that opens with an unclosed `---`, kept micromark from seeing lists and quotes on every line it held.
+2. **The guard compares more than block texts.**
+   - **Nesting (I3):** each list item's entry carries the item holding it (by first line). The moved item takes the parent its slot gives; nothing else may change parent, so a list indented 2+ spaces can't be taken into another list's item.
+   - **Comments (M1):** the block model keeps the page's comments. No guard window edge falls inside one, so a window pairs them as the page does. A window left with a `%%` that pairs with nothing is refused when another `%%` follows; the stray `%%` after the page's last comment (outside code blocks) may not get a `%%` after it that it didn't have.
+   - **Where a window starts:** never right after indented code (micromark keeps it open across blank lines: an ordered list not at 1, or an empty item, can't start there), on an indented line, or after a block with a comment starting a line (masked, it can end a list early, while the page pairs comments on the unmasked text).
+   - **Edits (I4):** a move whose edits aren't in order, apart and inside the text is refused, so the guard never judges a text CodeMirror wouldn't produce.
+3. **Byte-order mark (I4).** Positions index the text the editor holds, mark included: `parsePage` parses without it and shifts every position past it. The block model's content starts after it, so moves keep it first.
+4. **Code in list items (M4).** Moving an item keeps whitespace-only lines past its own indentation (inside code they are content) and shifts them with the item when its marker's width changes.
+5. **Alt+↑/↓ on a table's header or delimiter row (M3)** does nothing, as at an edge: those rows aren't blocks. The whole table moves from its gutter.
+6. **The incremental re-parse** reads a slice past the page's start without front matter. It takes a full parse after indented code (or when the slice's last block becomes or stops being indented code), when the line after the slice opens a `%%` comment, and for a slice holding a byte-order mark. A chain of 8,000 random edits per seed now keeps the full parse's block model.
+7. **Timings (200 KB, Node):** a move with its guard takes 1–7 ms after the first (plain, comments, BOM, front matter). The model's next re-parse takes 3–7 ms, or ~350 ms when it falls back to a full parse (an edit next to a comment or the mark).
+8. **Tests:** the sweep gets the review's fuzz with fixed seeds: random notes × random moves checked by oracles that don't use the guard's windows (lines, a full parse's structure, item parents, list membership, front matter, change set and inverse, placement), with generators for front-matter rules, indented lists, byte-order marks, `%%` comments and code with blank lines (that one strict: no refusal of a move that would have kept the note).
 
