@@ -337,3 +337,23 @@ Make a page feel finished: a cover, a subtitle, pasted screenshots, dropped file
 7. **Paste cap:** 64 MiB; drops have no size cap (streamed copy).
 8. **Create page with folders** is done in the UI with existing commands (no new command).
 9. **HTML comments** in Live Preview stay visible (muted) rather than disappearing.
+
+## 13. Amendments from planning (plan `docs/superpowers/plans/2026-10-14-m2c-page-extras.md`, replayed end-to-end)
+
+These override the sections above where they conflict.
+
+1. **Attachment policy** (§5.3): `Vault::attachment_policy()` re-reads both config files on every call and returns an owned policy. NIMW's own modes gain `folder` (Obsidian's fixed-folder form); `vault` with a path still reads as a folder (M1a compatibility). An Obsidian value that isn't a usable path is ignored (NIMW's setting applies) and isn't reported as "Set by Obsidian".
+2. **Dropped Markdown files** are copied like any file, indexed as pages (title parsed) and linked as `[[name]]`.
+3. **Error kinds:** besides `tooLarge` and `notPermitted`, `notAFile` (a dropped folder). Dropped and pasted names are sanitized with `-` for every character `validate_name` refuses, a leading dot included; empty becomes `file`.
+4. **Ranking** (§6, §7.2): match quality first; the page/attachment preference (`[[` / `![[`) breaks ties, then shorter path, then newer file. Subsequence matching applies to names and titles, not paths. An empty query sorts by that preference, then by modification time. `link_suggest` returns `{ path, kind, title, target }` (no `mtime`).
+5. **Frontmatter edits** (§4) replace only the touched pairs' source text (yaml Document ranges): re-stringifying the Document reformats untouched keys (`[a, b]` → `[ a, b ]`). New keys are appended; values are folded to one line. The edit entry point is `editorStore.editFrontmatter(patch)` (current page) with the view registry in `features/editor/views.ts`, instead of `applyEdit(path, change)`.
+6. **Reposition** (§2): a vertical slider — ↑ increases `cover-y` (slider semantics), PageUp/PageDown ±20, Home/End, Enter saves, Escape cancels; `aria-valuetext` carries the announcement (no separate live region); focus returns to Reposition. Add cover is invisible until the header is hovered or the button focused, and always in the Tab order.
+7. **Heading links** (§6.2): writing headings link-safe (spaces, collapsed) can change their slug (`Pipes | and ^carets`), so Split's anchor scroll and `![[Page#Heading]]` sections also match through `sameHeading` (link-safe, case-insensitive).
+8. **Link picker** (§6.3): the opener registry is `linkPickerOpen.ts` (`linkPicker.ts` would shadow `LinkPicker.tsx` on case-insensitive file systems). Without a React editor host, ⌘K keeps the Markdown `[text](url)` insertion. Pages only, at most 8.
+9. **Create page** (§7.6): a target with a leading `/` is vault-root-relative too; the "in Folder/" title is used only for path targets.
+10. **Paste** (§5.1): a clipboard that also has `text/plain` (e.g. an image copied from a browser with its URL) is pasted as text by CodeMirror.
+11. **Drop** (§5.2): the position falls back to the cursor when `posAtCoords` has none; the pending insertion point is a mapped StateField, so typing while files copy can't misplace them; the caret is `.cm-nimw-drop-caret`. Grants are recorded from both the window and the webview drag-drop events (webview windows report drops on the window).
+12. **HTML blocks** (§7.7): muted with `cm-nimw-muted`; "renders nothing" is decided by running the sanitizer (memoized per block text).
+13. **This vault** (§5.4): labelled "New attachments go to" with "A subfolder next to the page / The page's folder / The vault root / A folder in the vault"; a subfolder or folder name is saved on Enter or blur; when Obsidian's setting applies, the text says in plain words where files go.
+14. **Autocomplete list** is styled with a scoped `EditorView.theme` (a base theme loses to `@codemirror/autocomplete`'s own); `@codemirror/autocomplete` is declared `^6.20.3` like the other CodeMirror packages.
+15. **Tooling:** `pnpm check:i18n` needs Node ≥ 22.18 (`.nvmrc`: 24); the e2e mock gains `remoteCover`, a new hash per write (the header refreshes on it) and an event bus for `tauri://drag-*`.
