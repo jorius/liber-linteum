@@ -18,8 +18,20 @@ const processor = unified()
   .use(remarkGfm)
   .use(remarkFrontmatter, ['yaml'])
   .use(remarkContainerDirectives);
-/** For text that can't hold front matter: a slice of a page past its start. */
+/** For text without front matter. */
 const noFrontmatter = unified().use(remarkParse).use(remarkGfm).use(remarkContainerDirectives);
+
+/** Whether `src` starts with a block remark-frontmatter reads as YAML: a
+ *  `---` line (trailing spaces or tabs allowed) closed by a later one. Its
+ *  construct mis-parses a note that opens with `---` and never closes it —
+ *  every later list and quote becomes a paragraph (final review C1) — so it
+ *  only runs when the block is there. */
+export function hasFrontmatter(src: string): boolean {
+  const open = /^\uFEFF?---[ \t]*(?:\r\n?|\n)/.exec(src);
+  return !!open && /(?:^|[\r\n])---[ \t]*(?:[\r\n]|$)/.test(src.slice(open[0].length));
+}
+
+const processorFor = (src: string) => (hasFrontmatter(src) ? processor : noFrontmatter);
 
 /** Parents whose text is never scanned for extensions. */
 const OPAQUE = new Set(['link', 'linkReference', 'image', 'imageReference']);
@@ -136,7 +148,7 @@ function collectTags(tree: Root, fmTags: string[]): string[] {
  *  `frontmatter: false` for a slice that doesn't start the page: a `---`
  *  first there is a rule (final review C2). */
 export function parseTree(src: string, loc = locator(src), frontmatter = true): Root {
-  const tree = (frontmatter ? processor : noFrontmatter).parse(src) as Root;
+  const tree = (frontmatter ? processorFor(src) : noFrontmatter).parse(src) as Root;
   transformBlocks(tree, src, loc);
   transformInline(tree, src, loc);
   return tree;
@@ -159,7 +171,7 @@ export function parsePage(text: string): ParsedPage {
   const loc = locator(text);
   // Comments are blanked (same length) and the page re-parsed, so positions
   // still index `text` but nothing inside a comment renders or links.
-  const comments = findComments(text, processor.parse(text) as Root);
+  const comments = findComments(text, processorFor(text).parse(text) as Root);
   const source = maskComments(text, comments);
   return finishPage(parseTree(source, loc), comments);
 }

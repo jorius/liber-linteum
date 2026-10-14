@@ -100,6 +100,29 @@ describe('parsePage — frontmatter', () => {
     expect(p.frontmatter?.error).toBeTruthy();
     expect(p.links.map((l) => l.target)).toEqual(['target']);
   });
+
+  it('a note opening with a `---` rule that nothing closes keeps its lists and quotes (final review C1)', () => {
+    // remark-frontmatter's construct, failing at the end of the note, left
+    // every later line without its containers: lists and quotes read as
+    // paragraphs.
+    const types = (src: string) => parsePage(src).tree.children.map((n) => n.type);
+    expect(types('---\n\n> quote\n\n- item\n\n# h\n')).toEqual([
+      'thematicBreak',
+      'blockquote',
+      'list',
+      'heading',
+    ]);
+    expect(types('---\r\nPara\r\n\r\n1. one\r\n')).toEqual(['thematicBreak', 'paragraph', 'list']);
+    expect(types('---  \n```\ncode\n```\n\n> q\n')).toEqual([
+      'thematicBreak',
+      'code',
+      'blockquote',
+    ]);
+    // A closed block is front matter, as before (trailing spaces allowed).
+    expect(types('---\na: 1\n---  \n> q\n')).toEqual(['yaml', 'blockquote']);
+    expect(types('---\n---\n- x\n')).toEqual(['yaml', 'list']);
+    expect(parsePage('---\r\na: 1\r\n---\r\nBody\r\n').frontmatter?.data).toEqual({ a: 1 });
+  });
 });
 
 describe('review focus: offsets', () => {
