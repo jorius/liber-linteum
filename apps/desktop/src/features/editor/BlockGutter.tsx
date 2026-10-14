@@ -87,6 +87,9 @@ export function summaryOf(text: string, unit: Unit, t: TFunction): string {
     .replace(/^[ \t>]*/, '')
     .replace(/^(#{1,6}[ \t]+|(?:[-*+]|\d+[.)])[ \t]+(?:\[[ xX]\][ \t]+)?)/, '')
     .replace(/\[!(\w+)\][+-]?/, '$1')
+    // [[target|alias]] and ![[embed]] read as their alias or target; [text](url) as its text.
+    .replace(/!?\[\[(?:[^\]|]*\|)?([^\]]*)\]\]/g, '$1')
+    .replace(/!?\[([^\]]*)\]\([^)]*\)/g, '$1')
     .replace(/[*_`~=[\]|#]/g, ' ')
     .replace(/\s+/g, ' ')
     .trim();

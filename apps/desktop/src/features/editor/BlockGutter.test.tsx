@@ -3,6 +3,7 @@ import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import axe from 'axe-core';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { clearMocks } from '../../ipc/testing';
+import { useToastStore } from '../../stores/toastStore';
 import { fakeDisk } from '../../test/fakeDisk';
 import { Editor } from './Editor';
 import { PageDoc } from './pageDoc';
@@ -123,6 +124,36 @@ describe('the block gutter in the Split pane (M4 §4)', () => {
     await key(grip('P1'), 'ArrowDown');
     await key(grip('P1'), 'Enter');
     expect(source()).toBe('P2\n\nP3\n\nP1\n');
+  });
+
+  it('review focus: blocks of an embedded note get no gutter; the embed itself does', async () => {
+    // The embedded note's paragraph starts at offset 12, like this page's P2:
+    // its offsets must never be taken for the page's.
+    fakeDisk({
+      'B.md': '![[Other]]\n\nP2\n',
+      'Other.md': '# Other no\n\nInside the other note.\n',
+    });
+    const res = await PageDoc.load('B.md', hooks);
+    if (!res.ok) throw new Error(res.error.message);
+    render(<Editor doc={res.value} mode="split" label="B" />);
+    const pane = await screen.findByRole('region', { name: 'Preview' });
+    const inner = await within(pane).findByText('Inside the other note.');
+    // The gutter maps blocks again once the embed has loaded (any change).
+    act(() => viewOf().dispatch({ changes: { from: viewOf().state.doc.length, insert: '\n' } }));
+    await act(() => new Promise((r) => setTimeout(r, 200)));
+    await hover(inner);
+    expect(screen.queryByRole('group', { name: 'Inside the other note.' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('group', { name: 'P2' })).not.toBeInTheDocument();
+    expect(screen.getByRole('group', { name: 'Other' })).toBeInTheDocument();
+  });
+
+  it('review focus: a move the guard refuses changes nothing and says why', async () => {
+    const pane = await split('- a\n\nPara\n\n- b\n');
+    await hover(block(pane, 'Para'));
+    const down = within(opened('Para')).getByRole('button', { name: 'Move down' });
+    await act(() => down.click());
+    expect(source()).toBe('- a\n\nPara\n\n- b\n');
+    expect(useToastStore.getState().toasts.at(-1)?.message).toBe('This block can’t be moved here.');
   });
 
   it('NFR-10: no axe violations with a gutter showing', async () => {
