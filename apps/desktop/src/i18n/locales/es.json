@@ -2,7 +2,8 @@
   "app": {
     "name": "Notes In My Way",
     "tagline": "Notas privadas que viven en tu disco. Sin nube, sin cuentas, sin telemetría.",
-    "version": "v{version}"
+    "version": "v{version}",
+    "credits": "Vista global hecha con React Flow (MIT)."
   },
   "welcome": {
     "language": "Idioma",

@@ -39,6 +39,14 @@ network requests.
 Network access is blocked by a strict CSP, a Tauri capability allowlist, an
 ESLint ban on network APIs, and a cargo-deny ban on HTTP client crates.
 
+## Third-party software
+
+The Global View's canvas is built with [React Flow](https://reactflow.dev)
+(`@xyflow/react` and `@xyflow/system`, MIT, © 2019-2025 webkid GmbH). The app
+hides React Flow's on-canvas attribution badge, which the MIT licence allows,
+and credits it here and on the welcome screen instead. Its licence text is in
+`THIRD-PARTY-NOTICES.md`.
+
 ## License
 
 GPL-3.0-or-later. See `LICENSE`.

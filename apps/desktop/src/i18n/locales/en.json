@@ -2,7 +2,8 @@
   "app": {
     "name": "Notes In My Way",
     "tagline": "Private notes that live on your disk. No cloud, no accounts, no telemetry.",
-    "version": "v{version}"
+    "version": "v{version}",
+    "credits": "Global View made with React Flow (MIT)."
   },
   "welcome": {
     "language": "Language",
