@@ -279,6 +279,9 @@
     "obsidianFolder": "la carpeta «{name}»"
   },
   "gv": {
+    "relations": {
+      "changedOnDisk": "No se pudo actualizar {name}: cambió en el disco. Inténtalo de nuevo."
+    },
     "region": "Vista global",
     "canvas": "Tarjetas de la vista global",
     "a11y": {

@@ -279,6 +279,9 @@
     "obsidianFolder": "the “{name}” folder"
   },
   "gv": {
+    "relations": {
+      "changedOnDisk": "Couldn’t update {name}: it changed on disk. Try again."
+    },
     "region": "Global View",
     "canvas": "Global View cards",
     "a11y": {
