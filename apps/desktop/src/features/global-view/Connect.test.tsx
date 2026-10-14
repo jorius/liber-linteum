@@ -201,6 +201,26 @@ describe('connecting two cards (M3b §2)', () => {
     expect(disk.writes().filter((w) => w.path === 'B.md')).toEqual([]);
   });
 
+  it('React Flow’s click-to-connect stays off: Safari 15.0–15.3 has no structuredClone (final review m15)', async () => {
+    // Clicks on two connect handles in a row would be a click-to-connect,
+    // whose handler finds the handle under the pointer, then clones the
+    // connection with structuredClone.
+    const clone = vi.fn(<T,>(value: T) => value);
+    vi.stubGlobal('structuredClone', clone);
+    document.elementFromPoint = () => null;
+    try {
+      render(<GlobalView />);
+      await userEvent.click(await screen.findByRole('button', { name: 'Connections of A' }));
+      await userEvent.keyboard('{Escape}');
+      await userEvent.click(screen.getByRole('button', { name: 'Connections of B' }));
+      expect(screen.getByRole('menu', { name: 'Connections of B' })).toBeVisible();
+      expect(clone).not.toHaveBeenCalled();
+    } finally {
+      vi.unstubAllGlobals();
+      delete (document as Partial<Document>).elementFromPoint;
+    }
+  });
+
   it('the source card is marked while connecting', async () => {
     render(<GlobalView />);
     await startConnect('A');
