@@ -142,3 +142,36 @@ Non-negotiables as before: no network; i18n en + es; axe-clean; Safari 15 floor;
 5. **Only blank lines and a list item's indent and number change in a move.** A re-parse guard refuses anything else.
 6. **A one-time, dismissible hint bar,** copied from the prototype.
 7. **Live Preview gets the keyboard moves but no drag gutter,** following DND-01's "preview pane only".
+
+## 10. Amendments from planning (plan `docs/superpowers/plans/2026-10-14-m4-block-moves.md`, replayed end to end)
+
+These override the sections above where they conflict.
+
+1. **The guard (§3) parses windows, not the note.**
+   - It re-parses the top-level blocks each edit touches, plus one more on each side, before and after the move, and compares their signatures: block texts (indentation, `>` and list markers aside), containers, task states, `%%` comments and top-level kinds.
+   - A full parse of 200 KB takes ~450 ms in jsdom, while a move with its guard takes ~2.5 ms.
+   - A window that doesn't start the note gets a leading blank line, so a `---` there reads as a rule, not front matter. The sweep found this.
+2. **List items (§3):**
+   - **Markers:** an item takes the marker of the list it joins (its bullet character, or ordered with that list's delimiter), because a different marker would start a new list. Its checkbox stays.
+   - **Numbering:** ordered lists are renumbered only when they were sequential, or all one number; others keep each item's number. When a marker's width changes (9. → 10.), the item's other lines shift with it, so nested items stay nested.
+   - **Becoming its own list:** an item dropped among top-level blocks keeps its own marker. A new nested ordered list starts at 1 (the M2b rule).
+3. **Slots and refusals:**
+   - A list, or an item becoming one, is never offered a slot next to a list with the same marker (the two would merge).
+   - Moves the guard refuses are refused with "This block can't be moved here." That covers lists merging after a block between them leaves, and an indented code block or paragraph taken into a list. A refused move changes nothing.
+4. **Editor keys (§5):**
+   - Alt+↑/↓ moves the heading's section, the list item or the table row holding the selection. Anywhere else it stays CodeMirror's line move. At the edge nothing moves.
+   - Alt+←/→ (word moves on macOS) and Alt+Shift+↑/↓ (copy line) are **not** taken in the editor. Those moves live on the gutter's grip; Tab/⇧Tab still indent and outdent list items in the editor.
+   - A section's Move up passes the previous heading of its level or higher. Move down passes the next section at its level.
+5. **The gutter (§4):**
+   - **Hover:** it shows only the deepest block under the pointer. A whole list shows its own gutter from its margin (outside its items) and is always reachable by keyboard.
+   - **Buttons:** at rest a gutter is just the grip. Its buttons open while it's hovered or holds the keyboard (React state; WebKit before 15.4 and jsdom ignore `:hover` rules for this).
+   - **Keyboard:** one tab stop; ↑/↓ go from block to block; Enter picks a block up (the first place after it is preselected); Tab or Escape cancels.
+   - **Anchors:** HTML blocks render inside `div[data-nimw="html"]` carrying their source range, so they have a gutter. Blocks of an embedded note never get one, because their offsets are the other note's.
+6. **The pane after a move:** it renders at once, without the 150 ms typing delay. A gutter key that arrives while the pane still lags the editor does nothing, and a pick-up made on blocks that have since changed is cancelled. The e2e test found this: keys pressed right after a move acted on the old blocks.
+7. **Pointer drag:** the nearest slot is chosen by |dy| + 0.3·|dx| for list slots, so pointing further right picks a deeper level.
+8. **The hint bar:** dismissing it is remembered in `localStorage` (try/catch), not in settings. Losing it shows the hint once more.
+9. **The block model** is cached per editor document and re-parsed incrementally. The first move in a large note opened in Source pays a full parse (~1.5 s in jsdom at 200 KB). Later moves take ~10 ms. Making the top-level slots linear time (they were O(n²)) brought a list item's move from ~110 ms to well under 100 ms.
+10. **Live Preview's "HTML renders nothing" check** (M2c §7.7) looks through the new HTML wrapper.
+11. **Safari 15:** M4 code avoids `Array.prototype.at`.
+12. **Tests:** the fake disk now resolves a wiki target to a page it holds, so embeds render in jsdom.
+
