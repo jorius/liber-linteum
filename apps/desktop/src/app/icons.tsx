@@ -135,6 +135,15 @@ export function NewPageIcon() {
 }
 
 /** Global View card handle (drag to move). */
+/** Connect / relationships (the prototype's chain link). */
+export function LinkIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true" {...stroke}>
+      <path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1" />
+    </svg>
+  );
+}
+
 export function GripIcon() {
   return (
     <svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true" fill="currentColor">

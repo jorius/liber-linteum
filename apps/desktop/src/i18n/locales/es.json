@@ -280,7 +280,18 @@
   },
   "gv": {
     "relations": {
-      "changedOnDisk": "No se pudo actualizar {name}: cambió en el disco. Inténtalo de nuevo."
+      "changedOnDisk": "No se pudo actualizar {name}: cambió en el disco. Inténtalo de nuevo.",
+      "of": "Relaciones de {name}",
+      "between": "Relaciones entre {a} y {b}",
+      "loading": "Cargando…",
+      "none": "Aún no hay relaciones. Usa «Conectar con…» en una tarjeta para añadir una.",
+      "edge": "{from} → {to}",
+      "label": "Etiqueta",
+      "arrow": "Flecha hacia {to}",
+      "save": "Guardar",
+      "delete": "Eliminar relación",
+      "menu": "Conexiones de {title}",
+      "open": "Relaciones…"
     },
     "region": "Vista global",
     "canvas": "Tarjetas de la vista global",

@@ -2,7 +2,7 @@
 // reference vault has ~2,600 aggregated edges, nearly all with a count:
 // drawn as React Flow edges with HTML count labels they took 1.5–2.5 s in
 // WebKit against NFR-03's 300 ms (final review I2).
-import { render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import type { GvCard, GvEdge, GvLevel, GvLevelRef } from '../../ipc';
 import { clearMocks, mockIPC } from '../../ipc/testing';
@@ -160,5 +160,22 @@ describe('Global View edges (M3a §6, final review I2)', () => {
     render(<GlobalView />);
     await waitFor(() => expect(drawn()).toHaveLength(1));
     expect(screen.queryByText(/strongest/)).toBeNull();
+  });
+
+  it('M3b: a manual edge opens the relationships between its two cards', async () => {
+    level0 = { cards: [card('A'), card('B'), card('C')], centre: null };
+    edges = [
+      edge('A', 'B', { kind: 'manual', aggregated: false, label: 'why' }),
+      edge('A', 'C', { kind: 'manual', aggregated: true }),
+    ];
+    render(<GlobalView />);
+    await waitFor(() => expect(drawn()).toHaveLength(2));
+    // Only the direct relationship takes the pointer: an aggregated one stands
+    // for many inside folders.
+    const hits = document.querySelectorAll<SVGPathElement>('[data-gv-hit]');
+    expect(hits).toHaveLength(1);
+    expect(hits[0].classList).toContain('nopan');
+    fireEvent.click(hits[0]);
+    expect(useUiStore.getState().dialog).toEqual({ type: 'relations', page: 'A', other: 'B' });
   });
 });

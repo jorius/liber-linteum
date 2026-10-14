@@ -10,7 +10,9 @@ import {
 } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { GlobalViewEdges, GvCard } from '../../ipc';
+import { useUiStore } from '../../stores/uiStore';
 import { Card } from './Card';
+import type { CardMenuItem } from './CardMenu';
 import { EdgeLayer, MAX_AGGREGATED, strongest, type DrawnEdge } from './edges';
 import { useGvStore } from './gvStore';
 import {
@@ -31,6 +33,7 @@ interface CardData extends Record<string, unknown> {
   open: boolean;
   focusable: boolean;
   connections: string;
+  menu: CardMenuItem[];
   onOpen: (card: GvCard) => void;
   onOpenEditor: (card: GvCard) => void;
 }
@@ -48,6 +51,7 @@ function CardNodeView({ data }: NodeProps<CardNode>) {
         open={data.open}
         focusable={data.focusable}
         connections={data.connections}
+        menu={data.menu}
         onOpen={() => data.onOpen(data.card)}
         onOpenEditor={() => data.onOpenEditor(data.card)}
         onFocus={() => setFocus(data.card.path)}
@@ -176,6 +180,27 @@ export function Canvas({ mode, toggles, width, onOpen, onOpenEditor }: CanvasPro
       t('gv.connections', { links: links.get(path) ?? 0, manual: manual.get(path) ?? 0 });
   }, [edges, t]);
 
+  /** The page a card stands for in a relationship (M3b §2): itself, or a
+   *  folder's index note. */
+  const menuOf = useCallback(
+    (card: GvCard): CardMenuItem[] => {
+      const page = card.kind === 'page' ? card.path : card.indexPage;
+      if (!page) return [];
+      return [
+        {
+          label: t('gv.relations.open'),
+          run: () => useUiStore.getState().openDialog({ type: 'relations', page }),
+        },
+      ];
+    },
+    [t],
+  );
+  const openRelations = useCallback(
+    (page: string, other: string) =>
+      useUiStore.getState().openDialog({ type: 'relations', page, other }),
+    [],
+  );
+
   const tabStop = focus ?? canvas.centre ?? canvas.cards[0]?.path ?? null;
   const computed = useMemo<CardNode[]>(
     () =>
@@ -201,11 +226,12 @@ export function Canvas({ mode, toggles, width, onOpen, onOpenEditor }: CanvasPro
           open: canvas.centre === card.path || expandedPaths.has(card.path),
           focusable: card.path === tabStop,
           connections: connections(card.path),
+          menu: menuOf(card),
           onOpen: open,
           onOpenEditor,
         },
       })),
-    [canvas, positions, expandedPaths, tabStop, connections, open, onOpenEditor],
+    [canvas, positions, expandedPaths, tabStop, connections, menuOf, open, onOpenEditor],
   );
   const ariaLabelConfig = useMemo(
     () => ({
@@ -304,7 +330,7 @@ export function Canvas({ mode, toggles, width, onOpen, onOpenEditor }: CanvasPro
         maxZoom={2}
         proOptions={{ hideAttribution: true }}
       >
-        <EdgeLayer edges={drawn.edges} />
+        <EdgeLayer edges={drawn.edges} onRelations={openRelations} />
       </ReactFlow>
       {drawn.hidden > 0 && (
         <p className={styles.capNote}>

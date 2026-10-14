@@ -140,4 +140,37 @@ describe('Global View card (M3a §4)', () => {
     const results = await axe.run(container, { rules: { 'color-contrast': { enabled: false } } });
     expect(results.violations).toEqual([]);
   });
+
+  it('M3b: the connect button opens the card’s menu; Escape gives the keyboard back', async () => {
+    const run = vi.fn();
+    render(
+      <Card
+        card={card()}
+        open={false}
+        focusable
+        connections=""
+        menu={[{ label: 'Relationships…', run }]}
+        onOpen={vi.fn()}
+        onOpenEditor={vi.fn()}
+        onFocus={() => undefined}
+      />,
+    );
+    const button = screen.getByRole('button', { name: 'Connections of Generator Rex' });
+    expect(button).toHaveAttribute('aria-haspopup', 'menu');
+    await userEvent.click(button);
+    const menu = screen.getByRole('menu', { name: 'Connections of Generator Rex' });
+    expect(screen.getByRole('menuitem', { name: 'Relationships…' })).toHaveFocus();
+    await userEvent.keyboard('{Escape}');
+    expect(menu).not.toBeInTheDocument();
+    expect(button).toHaveFocus();
+    await userEvent.click(button);
+    await userEvent.click(screen.getByRole('menuitem', { name: 'Relationships…' }));
+    expect(run).toHaveBeenCalledOnce();
+    expect(screen.queryByRole('menu')).not.toBeInTheDocument();
+  });
+
+  it('M3b: without menu items there is no connect button', () => {
+    show(card());
+    expect(screen.queryByRole('button', { name: /^Connections of/ })).not.toBeInTheDocument();
+  });
 });

@@ -8,6 +8,9 @@ export type DialogState =
   | { type: 'createPage'; source: string; target: string }
   | { type: 'openExternal'; url: string }
   | { type: 'openFile'; path: string }
+  /** A page's relationships, or (with `other`) those between two cards'
+   *  pages (M3b §3). */
+  | { type: 'relations'; page: string; other?: string }
   | null;
 
 /** Which screen the open vault shows (M3a §2). */

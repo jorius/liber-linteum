@@ -191,14 +191,31 @@ export function strongest(edges: DrawnEdge[], max = MAX_AGGREGATED) {
 
 export interface EdgeLayerProps {
   edges: DrawnEdge[];
+  /** A direct relationship edge was clicked (M3b §3): its two cards. */
+  onRelations?: (a: string, b: string) => void;
 }
+
+/** A wide, invisible stroke over a direct relationship that takes the
+ *  pointer (the layer itself ignores it); `nopan`, so pressing on it doesn't
+ *  pan the canvas. */
+const EdgeHit = memo(function EdgeHit({ from, to, onClick }: EndsProps & { onClick: () => void }) {
+  const { s, t } = line(from, to);
+  return (
+    <path
+      className={`${styles.edgeHit} nopan`}
+      d={`M${s.x},${s.y}L${t.x},${t.y}`}
+      data-gv-hit=""
+      onClick={onClick}
+    />
+  );
+});
 
 /** Every edge of the canvas, in the viewport under the cards: one group per
  *  style (strokes inherit), counts and labels on top. Card positions come
  *  from React Flow's store, so edges appear with their cards and follow a
  *  drag; a card that stays put keeps its position object, so only a moved
  *  card's edges redraw. */
-export const EdgeLayer = memo(function EdgeLayer({ edges }: EdgeLayerProps) {
+export const EdgeLayer = memo(function EdgeLayer({ edges, onRelations }: EdgeLayerProps) {
   const nodes = useStore(nodesOf);
   const positions = useMemo(
     () => new Map<string, XY>(nodes.map((n) => [n.id, n.position])),
@@ -239,6 +256,24 @@ export const EdgeLayer = memo(function EdgeLayer({ edges }: EdgeLayerProps) {
             </g>
           );
         })}
+        {onRelations && (
+          <g>
+            {edges.map((e) => {
+              if (e.kind !== 'manual' || e.aggregated) return null;
+              const from = positions.get(e.source);
+              const to = positions.get(e.target);
+              if (!from || !to) return null;
+              return (
+                <EdgeHit
+                  key={e.id}
+                  from={from}
+                  to={to}
+                  onClick={() => onRelations(e.source, e.target)}
+                />
+              );
+            })}
+          </g>
+        )}
         <g className={styles.edgeLabels}>
           {labelled.map(({ e, text }) => {
             const from = positions.get(e.source);

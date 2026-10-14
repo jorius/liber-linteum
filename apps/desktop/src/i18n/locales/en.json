@@ -280,7 +280,18 @@
   },
   "gv": {
     "relations": {
-      "changedOnDisk": "Couldn’t update {name}: it changed on disk. Try again."
+      "changedOnDisk": "Couldn’t update {name}: it changed on disk. Try again.",
+      "of": "Relationships of {name}",
+      "between": "Relationships between {a} and {b}",
+      "loading": "Loading…",
+      "none": "No relationships yet. Use “Connect to…” on a card to add one.",
+      "edge": "{from} → {to}",
+      "label": "Label",
+      "arrow": "Arrow to {to}",
+      "save": "Save",
+      "delete": "Delete relationship",
+      "menu": "Connections of {title}",
+      "open": "Relationships…"
     },
     "region": "Global View",
     "canvas": "Global View cards",

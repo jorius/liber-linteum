@@ -53,6 +53,35 @@
   background: var(--color-accent-soft);
 }
 
+/* The connect / relationships button (M3b §2, prototype `.ib` link). */
+.connect {
+  display: inline-grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-text-muted);
+  cursor: pointer;
+}
+
+.connect:hover,
+.connect[aria-expanded='true'] {
+  background: var(--color-accent-soft);
+  color: var(--color-accent);
+}
+
+.connect:focus {
+  outline: 2px solid var(--color-focus);
+  outline-offset: -2px;
+}
+
+.connect:focus:not(:focus-visible) {
+  outline: none;
+}
+
 .hit {
   position: relative;
   flex: 1;

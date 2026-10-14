@@ -172,6 +172,15 @@
   stroke-linecap: round;
 }
 
+/* A direct relationship takes the pointer (M3b §3): an invisible, wide
+   stroke over it. */
+.edges .edgeHit {
+  stroke: transparent;
+  stroke-width: 14px;
+  pointer-events: stroke;
+  cursor: pointer;
+}
+
 .edges .edgeArrow {
   fill: currentColor;
   stroke: none;
