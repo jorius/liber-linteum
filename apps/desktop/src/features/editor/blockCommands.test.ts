@@ -85,3 +85,19 @@ describe('moving blocks from the editor (M4 §5)', () => {
     expect(modelFor(v.state)).toBe(modelFor(v.state));
   });
 });
+
+describe('a large note (review focus)', () => {
+  it('after the first, Alt+↑ in a 200 KB note takes well under 100 ms (the model re-parses incrementally)', async () => {
+    let note = '';
+    for (let i = 0; note.length < 200_000; i++) {
+      note += `## Section ${i}\n\nParagraph ${i} with **bold** and [[link]].\n\n`;
+    }
+    note += '- a\n- b\n- c\n';
+    const v = editor(note, note.length - 2);
+    await press(v, 'ArrowUp', { altKey: true }); // the first move parses the note
+    const t = performance.now();
+    await press(v, 'ArrowUp', { altKey: true });
+    expect(performance.now() - t).toBeLessThan(100);
+    expect(text(v).endsWith('- c\n- a\n- b\n')).toBe(true);
+  }, 30_000);
+});

@@ -276,12 +276,11 @@ export function slotsFor(model: BlockModel, unit: Unit, lineOnly = false): Slot[
         : null;
   const all = topUnits(model);
   const nextAfter = all.find((u) => u.from > spanTo && !skip.has(u.id));
-  const prevOf = (pos: number) => [...tops].reverse().find((u) => u.to <= pos);
-  const topSlot = (before: Unit | null) => {
+  // `tops` is in order, so the block before a slot is the one before it.
+  const topSlot = (before: Unit | null, prev: Unit | undefined) => {
     if (unit.scope === 'top' && (before?.id ?? null) === (nextAfter?.id ?? null)) return;
     if (unit.scope === 'top' && before?.id === unit.id) return;
     if (ownKind) {
-      const prev = prevOf(before ? before.from : Number.MAX_SAFE_INTEGER);
       if (
         topListKind(model, prev) === ownKind ||
         topListKind(model, before ?? undefined) === ownKind
@@ -290,8 +289,8 @@ export function slotsFor(model: BlockModel, unit: Unit, lineOnly = false): Slot[
     }
     out.push({ scope: 'top', before: before?.id ?? null });
   };
-  for (const u of tops) topSlot(u);
-  topSlot(null);
+  tops.forEach((u, k) => topSlot(u, tops[k - 1]));
+  topSlot(null, tops[tops.length - 1]);
 
   if (unit.scope !== 'item') return out;
 
