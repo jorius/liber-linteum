@@ -31,6 +31,14 @@ const source = (page: Page) =>
       .trimEnd(),
   );
 
+/** The last text autosaved (the editor renders only the lines in view, so a
+ *  long note is read from what was written). */
+const saved = (page: Page) =>
+  page.evaluate(() => {
+    const writes = (window as unknown as { __nimwWrites?: { text: string }[] }).__nimwWrites ?? [];
+    return writes.length ? writes[writes.length - 1].text : null;
+  });
+
 /** Drags the grip of the block `from` to the point (x, y) of the page. */
 async function drag(page: Page, from: Locator, name: string, x: number, y: number) {
   await from.hover();
@@ -70,6 +78,29 @@ test('a list item dropped right of an item’s text nests under it', async ({ pa
   const a = (await pane.locator('li', { hasText: 'a' }).first().boundingBox())!;
   await drag(page, pane.locator('li', { hasText: 'c' }), 'c', a.x + 60, a.y + a.height - 1);
   await expect.poll(() => source(page)).toBe('- a\n  - c\n- b');
+});
+
+test('review focus: in a scrolled pane, a drag near the top edge scrolls up and drops where the line shows', async ({
+  page,
+}) => {
+  const paras = Array.from({ length: 40 }, (_, i) => `Paragraph ${i + 1}.`);
+  const pane = await open(page, `${paras.join('\n\n')}\n`);
+  await pane.evaluate((el) => (el.scrollTop = el.scrollHeight));
+  const last = pane.getByText('Paragraph 40.');
+  await last.hover();
+  const grip = page.getByRole('button', { name: 'Drag to reorder: Paragraph 40.' });
+  const g = (await grip.boundingBox())!;
+  const box = (await pane.boundingBox())!;
+  await page.mouse.move(g.x + g.width / 2, g.y + g.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(g.x + 40, box.y + 8, { steps: 6 });
+  // Held near the top edge, the pane scrolls up.
+  await expect.poll(() => pane.evaluate((el) => el.scrollTop)).toBeLessThan(200);
+  await page.mouse.up();
+  await expect.poll(() => saved(page)).not.toBeNull();
+  const lines = (await saved(page))!.trimEnd().split('\n\n');
+  expect(lines.indexOf('Paragraph 40.')).toBeLessThan(30);
+  expect([...lines].sort()).toEqual([...paras].sort());
 });
 
 test('keyboard only: ↓ to the next block, Alt+↑ moves it, Enter picks a block up and drops it', async ({

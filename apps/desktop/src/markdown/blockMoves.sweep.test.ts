@@ -92,6 +92,9 @@ const NOTES: Record<string, string> = {
     '- a\n\n- b\n  1. b1\n  2. b2\n\n- c\n\nPara\n\n1. one\n2. two\n3. three\n4. four\n5. five\n6. six\n7. seven\n8. eight\n9. nine\n   - nested\n10. ten\n',
 };
 NOTES.crlf = NOTES.everything.replace(/\n/g, '\r\n');
+// Review focus: setext headings, `)` and 0-based ordered lists, a task list.
+NOTES.variants =
+  'Title\n=====\n\nIntro.\n\nSub\n---\n\n0) zero\n1) one\n2) two\n\n- [ ] todo\n- [x] done\n\nEnd.\n';
 // Moves the guard must refuse: an indented code block after a list item
 // becomes part of it; taking `Para` away merges the two lists.
 NOTES.hazards = '- a\n\nPara\n\n- b\n\nP2\n\n    indented code\n\nTail\n';
