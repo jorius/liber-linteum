@@ -218,8 +218,13 @@
   opacity: 0;
 }
 
-.header:hover .addCover,
-.addCover:focus-visible {
+/* Separate rules: WebKit before 15.4 drops a whole selector list that holds
+   :focus-visible (final review M9). Any focus shows it, even there. */
+.header:hover .addCover {
+  opacity: 1;
+}
+
+.addCover:focus {
   opacity: 1;
 }
 
