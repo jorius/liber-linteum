@@ -1,4 +1,10 @@
-import { acceptCompletion, CompletionContext, startCompletion } from '@codemirror/autocomplete';
+import {
+  acceptCompletion,
+  closeCompletion,
+  CompletionContext,
+  completionStatus,
+  startCompletion,
+} from '@codemirror/autocomplete';
 import { EditorSelection, EditorState } from '@codemirror/state';
 import { EditorView } from '@codemirror/view';
 import { act } from '@testing-library/react';
@@ -243,5 +249,31 @@ describe('the search line and debounce (M4b §4)', () => {
       expect(document.querySelector('.cm-nimw-search')).toHaveTextContent('gen'),
     );
     expect(queries).toEqual(['gen']);
+  });
+
+  it('review focus: Escape while the query waits leaves the list closed and asks Rust nothing', async () => {
+    const queries: string[] = [];
+    mockIPC((cmd, args) => {
+      if (cmd === 'link_suggest') queries.push((args as { query: string }).query);
+      return [REX];
+    });
+    const v = editor('See [[');
+    act(() => {
+      startCompletion(v);
+    });
+    act(() =>
+      v.dispatch({
+        changes: { from: v.state.doc.length, insert: 'g' },
+        selection: { anchor: v.state.doc.length + 1 },
+        userEvent: 'input.type',
+      }),
+    );
+    act(() => {
+      closeCompletion(v);
+    });
+    await act(() => new Promise((r) => setTimeout(r, 200)));
+    expect(completionStatus(v.state)).toBeNull();
+    expect(document.querySelector('.cm-tooltip-autocomplete')).toBeNull();
+    expect(queries).toEqual([]);
   });
 });
