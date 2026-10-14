@@ -53,19 +53,36 @@ const TAGS: Record<Unit['kind'], RegExp> = {
 };
 
 /** Each unit's rendered element: the outermost element of its kind starting
- *  on its first line (blocks of embedded notes aside). */
-function anchorsOf(pane: HTMLElement, model: BlockModel, text: string): Map<number, HTMLElement> {
-  const els = [...pane.querySelectorAll<HTMLElement>('[data-source-start]')].filter(
-    (el) => !el.closest('[data-note-embed]'),
-  );
+ *  on its first line (blocks of embedded notes aside). Linear in the blocks
+ *  and elements (final review I2: it runs after every typing pause). */
+export function anchorsOf(
+  pane: HTMLElement,
+  model: BlockModel,
+  text: string,
+): Map<number, HTMLElement> {
+  // The elements starting at each offset, in document order.
+  const at = new Map<number, HTMLElement[]>();
+  for (const el of pane.querySelectorAll<HTMLElement>('[data-source-start]')) {
+    if (el.closest('[data-note-embed]')) continue;
+    const start = Number(el.getAttribute('data-source-start'));
+    const list = at.get(start);
+    if (list) list.push(el);
+    else at.set(start, [el]);
+  }
   const out = new Map<number, HTMLElement>();
   for (const u of model.units) {
-    const first = u.from + (/^[ \t]*/.exec(text.slice(u.from, u.to))?.[0].length ?? 0);
-    const el = els.find((e) => {
-      const at = Number(e.dataset.sourceStart);
-      return at >= u.from && at <= first && TAGS[u.kind].test(e.tagName);
-    });
-    if (el) out.set(u.id, el);
+    let first = u.from;
+    while (first < u.to && (text[first] === ' ' || text[first] === '\t')) first++;
+    // The first in document order of those starting from the line's start to
+    // its first character.
+    let best: HTMLElement | null = null;
+    for (let k = u.from; k <= first; k++) {
+      const el = at.get(k)?.find((e) => TAGS[u.kind].test(e.tagName));
+      if (el && (!best || best.compareDocumentPosition(el) & Node.DOCUMENT_POSITION_PRECEDING)) {
+        best = el;
+      }
+    }
+    if (best) out.set(u.id, best);
   }
   return out;
 }
@@ -246,15 +263,19 @@ export function BlockGutter({
   useEffect(() => {
     const p = pane.current;
     if (!p) return;
+    const blockOf = new Map<Element, number>();
+    for (const [id, el] of anchors) if (!blockOf.has(el)) blockOf.set(el, id);
     const over = (e: Event) => {
       const target = e.target as Element;
       if (layer.current?.contains(target)) return;
       // The deepest block under the pointer: a list item, not its list (a
       // list shows its own gutter from its margin, outside its items).
-      const deepest = [...anchors.entries()]
-        .filter(([, el]) => el.contains(target))
-        .sort(([, a], [, b]) => (a.contains(b) ? 1 : b.contains(a) ? -1 : 0))[0];
-      setHover(deepest ? [deepest[0]] : []);
+      let deepest: number | undefined;
+      for (let n: Element | null = target; n && n !== p && deepest === undefined;) {
+        deepest = blockOf.get(n);
+        n = n.parentElement;
+      }
+      setHover(deepest !== undefined ? [deepest] : []);
     };
     const leave = () => setHover([]);
     const moved = () => relayout((n) => n + 1);

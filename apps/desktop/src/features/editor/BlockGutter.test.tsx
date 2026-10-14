@@ -3,8 +3,11 @@ import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import axe from 'axe-core';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { clearMocks } from '../../ipc/testing';
+import { movableBlocks } from '../../markdown/blockModel';
+import { parsePage } from '../../markdown/parse';
 import { useToastStore } from '../../stores/toastStore';
 import { fakeDisk } from '../../test/fakeDisk';
+import { anchorsOf } from './BlockGutter';
 import { Editor } from './Editor';
 import { PageDoc } from './pageDoc';
 
@@ -275,5 +278,45 @@ describe('dragging a block (M4 §4)', () => {
     await pointer(window, 'pointermove', 4, 115, { altKey: true });
     await pointer(window, 'pointerup', 4, 115, { altKey: true });
     expect(source()).toBe('pa\n\n# B\n\npb\n\n# A\n');
+  });
+});
+
+describe('mapping blocks to the pane (final review I2)', () => {
+  it('maps a large note’s blocks in linear time: typing in Split doesn’t stall', () => {
+    // ~3,000 rendered blocks, like a 200 KB note: matching each block against
+    // every element took seconds here (and ~300 ms a render in WebKit).
+    const text = `${Array.from({ length: 3000 }, (_, i) => `Paragraph ${i}.`).join('\n\n')}\n`;
+    const model = movableBlocks(text, parsePage(text));
+    const pane = document.createElement('div');
+    pane.innerHTML = model.units
+      .map((u) => `<p data-source-start="${u.from}" data-source-end="${u.to}">x</p>`)
+      .join('');
+    const t0 = performance.now();
+    const anchors = anchorsOf(pane, model, text);
+    const ms = performance.now() - t0;
+    expect(anchors.size).toBe(3000);
+    expect(anchors.get(2999)?.dataset.sourceStart).toBe(String(model.units[2999].from));
+    expect(ms).toBeLessThan(250);
+  });
+
+  it('a block’s anchor is the outermost element of its kind starting on its first line', () => {
+    const text = '- a\n  - b\n\n> q\n';
+    const model = movableBlocks(text, parsePage(text));
+    const pane = document.createElement('div');
+    pane.innerHTML =
+      '<ul data-source-start="0"><li data-source-start="0"><p data-source-start="2">a</p>' +
+      '<ul data-source-start="6"><li data-source-start="6">b</li></ul></li></ul>' +
+      '<section data-note-embed=""><p data-source-start="11">other note</p></section>' +
+      '<blockquote data-source-start="11"><p data-source-start="13">q</p></blockquote>';
+    const tags = [...anchorsOf(pane, model, text)].map(([id, el]) => [
+      model.units[id].kind,
+      el.tagName,
+    ]);
+    expect(tags).toEqual([
+      ['list', 'UL'],
+      ['listItem', 'LI'],
+      ['listItem', 'LI'],
+      ['quote', 'BLOCKQUOTE'],
+    ]);
   });
 });
