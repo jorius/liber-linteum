@@ -54,21 +54,28 @@
 }
 
 .hit {
+  position: relative;
   flex: 1;
   min-height: 0;
   display: flex;
   flex-direction: column;
+}
+
+/* The card's button: over the whole body, holding no text (Card.tsx). */
+.press {
+  position: absolute;
+  inset: 0;
   cursor: pointer;
 }
 
 /* The ring is on :focus, so WebKit < 15.4 (no :focus-visible) still shows
    it; browsers that know :focus-visible hide it after a click. */
-.hit:focus {
+.press:focus {
   outline: 2px solid var(--color-focus);
   outline-offset: -2px;
 }
 
-.hit:focus:not(:focus-visible) {
+.press:focus:not(:focus-visible) {
   outline: none;
 }
 

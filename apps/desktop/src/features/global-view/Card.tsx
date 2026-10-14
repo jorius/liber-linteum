@@ -109,18 +109,7 @@ export function Card({
           <GripIcon />
         </span>
       </div>
-      <div
-        className={styles.hit}
-        role="button"
-        tabIndex={focusable ? 0 : -1}
-        aria-label={card.title}
-        aria-describedby={descId}
-        data-gv-card={card.path}
-        onClick={click}
-        onDoubleClick={doubleClick}
-        onKeyDown={keyDown}
-        onFocus={onFocus}
-      >
+      <div className={styles.hit}>
         <div
           className={`${styles.cover} ${card.cover ? '' : summary ? styles.coverFolder : styles.coverNone}`}
         >
@@ -132,6 +121,22 @@ export function Card({
         <span id={descId} className={styles.srOnly}>
           {[card.subtitle, card.excerpt, connections].filter(Boolean).join(' ')}
         </span>
+        {/* The card's button lies over the whole body and holds no text: its
+            name is the title, the rest is its description. Wrapping the text
+            made a button named "Alpha" show "No cover Alpha …" (axe
+            label-content-name-mismatch, final review m5). */}
+        <div
+          className={styles.press}
+          role="button"
+          tabIndex={focusable ? 0 : -1}
+          aria-label={card.title}
+          aria-describedby={descId}
+          data-gv-card={card.path}
+          onClick={click}
+          onDoubleClick={doubleClick}
+          onKeyDown={keyDown}
+          onFocus={onFocus}
+        />
       </div>
       <div className={styles.foot}>
         {card.hasImage && (
