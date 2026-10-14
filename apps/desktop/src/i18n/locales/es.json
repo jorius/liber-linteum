@@ -148,7 +148,9 @@
         "html": "Bloque HTML",
         "columns": "Columnas",
         "other": "Bloque"
-      }
+      },
+      "hint": "Arrastra los bloques en la vista previa para reordenarlos; el Markdown de la izquierda los sigue.",
+      "dismissHint": "Cerrar la sugerencia"
     }
   },
   "preview": {

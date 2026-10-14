@@ -148,7 +148,9 @@
         "html": "HTML block",
         "columns": "Columns",
         "other": "Block"
-      }
+      },
+      "hint": "Drag blocks in the preview to reorder them; the Markdown on the left follows.",
+      "dismissHint": "Dismiss the hint"
     }
   },
   "preview": {

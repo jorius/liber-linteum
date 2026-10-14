@@ -16,6 +16,7 @@ import styles from './Editor.module.css';
 import { followLinkAtCursor, livePreview, pagePath } from './livePreview';
 import { attachmentHandlers } from './attachments';
 import { BlockGutter, type Shown } from './BlockGutter';
+import { SplitHint } from './SplitHint';
 import { activeFormats, editorKeymap, type ActiveFormat } from './format';
 import { linkCompletion } from './linkComplete';
 import { LinkPicker } from './LinkPicker';
@@ -366,6 +367,7 @@ export function Editor({ doc, mode, label }: EditorProps) {
     <div className={styles.frame}>
       {showToolbar && toolbarView && <Toolbar view={toolbarView} active={active} />}
       {picker && toolbarView && <LinkPicker view={toolbarView} onClose={() => setPicker(false)} />}
+      {split && <SplitHint />}
       <div className={split ? styles.split : styles.single}>
         <div ref={host} className={mode === 'livePreview' ? styles.live : styles.source} />
         {split && (

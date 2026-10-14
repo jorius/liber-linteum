@@ -126,3 +126,36 @@
   text-overflow: ellipsis;
   pointer-events: none;
 }
+
+/* The one-time hint above the Split panes (from the prototype). */
+.hint {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 12px 6px 20px;
+  border-bottom: 1px solid var(--color-border);
+  background: var(--color-surface-subtle);
+  color: var(--color-text-muted);
+  font: 500 13px var(--font-body);
+}
+
+.hint > span {
+  flex: 1;
+}
+
+.hintClose {
+  display: inline-grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-text-muted);
+  cursor: pointer;
+}
+
+.hintClose:hover {
+  background: var(--color-surface);
+  color: var(--color-text-strong);
+}
