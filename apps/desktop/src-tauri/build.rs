@@ -29,6 +29,10 @@ const COMMANDS: &[&str] = &[
     "attachment_import",
     "cover_pick",
     "link_suggest",
+    "gv_children",
+    "gv_edges",
+    "layout_get",
+    "layout_set",
 ];
 
 fn main() {

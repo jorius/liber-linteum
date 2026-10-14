@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-gv-edges"
+description = "Enables the gv_edges command without any pre-configured scope."
+commands.allow = ["gv_edges"]
+
+[[permission]]
+identifier = "deny-gv-edges"
+description = "Denies the gv_edges command without any pre-configured scope."
+commands.deny = ["gv_edges"]

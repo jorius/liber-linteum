@@ -283,6 +283,57 @@ export interface VaultSettingsPatch {
   attachments?: { mode: AttachmentMode; path: string };
 }
 
+/** What one Global View click opens (M3a §3). */
+export type GvLevelRef =
+  { kind: 'vault' } | { kind: 'folder'; path: string } | { kind: 'page'; path: string };
+
+export type GvCardKind = 'project' | 'folder' | 'page';
+export type GvRelation = 'centre' | 'in' | 'out' | 'both';
+
+/** One Global View card (M3a §4). */
+export interface GvCard {
+  path: string;
+  kind: GvCardKind;
+  title: string;
+  subtitle: string | null;
+  /** The cover's vault path (`null`: none, remote or missing). */
+  cover: string | null;
+  coverRemote: boolean;
+  coverY: number | null;
+  excerpt: string;
+  hasImage: boolean;
+  hasAudio: boolean;
+  /** Folders: the page previewed on the card. */
+  indexPage: string | null;
+  pages: number;
+  folders: number;
+  childTitles: string[];
+  /** Page levels: where the card sits around the centre. */
+  relation: GvRelation | null;
+}
+
+export interface GvLevel {
+  cards: GvCard[];
+  /** Page levels: the page itself. */
+  centre: string | null;
+}
+
+/** One edge between visible cards (M3a §6). */
+export interface GvEdge {
+  from: string;
+  to: string;
+  kind: 'link' | 'manual';
+  count: number;
+  aggregated: boolean;
+  directed: boolean;
+  label: string | null;
+}
+
+export interface CardPosition {
+  x: number;
+  y: number;
+}
+
 // ---- commands ----
 
 const call = <T>(cmd: string, args?: Record<string, unknown>) =>
@@ -334,6 +385,12 @@ export const attachmentImport = (page: string, paths: string[]) =>
 export const coverPick = (page: string) => call<CoverPick | null>('cover_pick', { page });
 export const linkSuggest = (source: string, query: string, embed: boolean) =>
   call<LinkSuggestion[]>('link_suggest', { source, query, embed });
+export const gvChildren = (level: GvLevelRef) => call<GvLevel>('gv_children', { level });
+export const gvEdges = (visible: string[]) => call<GvEdge[]>('gv_edges', { visible });
+export const layoutGet = (level: string) =>
+  call<Record<string, CardPosition>>('layout_get', { level });
+export const layoutSet = (level: string, positions: Record<string, CardPosition>) =>
+  call<void>('layout_set', { level, positions });
 export const vaultSettingsGet = () => call<VaultSettings>('vault_settings_get');
 export const vaultSettingsSet = (patch: VaultSettingsPatch) =>
   call<VaultSettings>('vault_settings_set', { patch });

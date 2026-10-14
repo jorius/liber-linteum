@@ -164,3 +164,103 @@ pub struct VaultSettingsDto {
 pub struct VaultSettingsPatch {
     pub attachments: Option<AttachmentsDto>,
 }
+
+/// `gv_children`'s argument: which level to open (M3a §3).
+#[derive(Debug, Clone, serde::Deserialize)]
+#[serde(tag = "kind", rename_all = "lowercase")]
+pub enum GvLevelDto {
+    Vault,
+    Folder { path: String },
+    Page { path: String },
+}
+
+/// One Global View card (M3a §4, §8).
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GvCardDto {
+    pub path: String,
+    /// `"project" | "folder" | "page"`.
+    pub kind: &'static str,
+    pub title: String,
+    pub subtitle: Option<String>,
+    pub cover: Option<String>,
+    pub cover_remote: bool,
+    pub cover_y: Option<u8>,
+    pub excerpt: String,
+    pub has_image: bool,
+    pub has_audio: bool,
+    pub index_page: Option<String>,
+    pub pages: u32,
+    pub folders: u32,
+    pub child_titles: Vec<String>,
+    /// Page levels: `"centre" | "in" | "out" | "both"`.
+    pub relation: Option<&'static str>,
+}
+
+impl From<nimw_session::GvCard> for GvCardDto {
+    fn from(c: nimw_session::GvCard) -> GvCardDto {
+        use nimw_session::{CardKind, Relation};
+        GvCardDto {
+            path: c.path,
+            kind: match c.kind {
+                CardKind::Project => "project",
+                CardKind::Folder => "folder",
+                CardKind::Page => "page",
+            },
+            title: c.title,
+            subtitle: c.subtitle,
+            cover: c.cover,
+            cover_remote: c.cover_remote,
+            cover_y: c.cover_y,
+            excerpt: c.excerpt,
+            has_image: c.has_image,
+            has_audio: c.has_audio,
+            index_page: c.index_page,
+            pages: c.pages,
+            folders: c.folders,
+            child_titles: c.child_titles,
+            relation: c.relation.map(|r| match r {
+                Relation::Centre => "centre",
+                Relation::In => "in",
+                Relation::Out => "out",
+                Relation::Both => "both",
+            }),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct GvLevelResultDto {
+    pub cards: Vec<GvCardDto>,
+    pub centre: Option<String>,
+}
+
+/// One Global View edge (M3a §6).
+#[derive(Debug, Clone, Serialize)]
+pub struct GvEdgeDto {
+    pub from: String,
+    pub to: String,
+    /// `"link" | "manual"`.
+    pub kind: &'static str,
+    pub count: u32,
+    pub aggregated: bool,
+    pub directed: bool,
+    pub label: Option<String>,
+}
+
+impl From<nimw_session::GvEdge> for GvEdgeDto {
+    fn from(e: nimw_session::GvEdge) -> GvEdgeDto {
+        GvEdgeDto {
+            from: e.from,
+            to: e.to,
+            kind: match e.kind {
+                nimw_session::EdgeKind::Link => "link",
+                nimw_session::EdgeKind::Manual => "manual",
+            },
+            count: e.count,
+            aggregated: e.aggregated,
+            directed: e.directed,
+            label: e.label,
+        }
+    }
+}

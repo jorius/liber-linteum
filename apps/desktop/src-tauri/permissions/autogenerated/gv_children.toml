@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-gv-children"
+description = "Enables the gv_children command without any pre-configured scope."
+commands.allow = ["gv_children"]
+
+[[permission]]
+identifier = "deny-gv-children"
+description = "Denies the gv_children command without any pre-configured scope."
+commands.deny = ["gv_children"]
