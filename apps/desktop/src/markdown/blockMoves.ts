@@ -171,7 +171,8 @@ function setMarker(lines: string[], s: number, e: number, marker: string) {
   const d = contentCol(lines[s]) - before;
   if (!d) return;
   for (let k = s + 1; k <= e; k++) {
-    if (!lines[k].trim()) continue;
+    // Only empty lines stay: whitespace in code is its content (M4).
+    if (!lines[k]) continue;
     lines[k] = d > 0 ? ' '.repeat(d) + lines[k] : stripCols(lines[k], -d);
   }
 }
@@ -297,9 +298,12 @@ function itemMove(
     insertAt = spanIn(target, p.id)[1] + 1;
     if (own[3]) marker = `1${own[4]}`;
   }
+  // Blank lines stay blank; a whitespace-only line reaching past the item's
+  // own indentation keeps the rest (in code it's content: final review M4).
+  const ownIndent = leadCols(srcLines[s]);
   const chunk = srcLines
     .slice(s, e + 1)
-    .map((l) => (l.trim() ? indent + stripCols(l, leadCols(srcLines[s])) : ''));
+    .map((l) => (l.trim() || leadCols(l) > ownIndent ? indent + stripCols(l, ownIndent) : ''));
   setMarker(chunk, 0, chunk.length - 1, marker);
   const ins =
     slot.scope === 'item' && loose

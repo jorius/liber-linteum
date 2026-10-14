@@ -126,6 +126,19 @@ describe('moving list items (M4 §3)', () => {
     expect(move(pasted, '* moved', { top: null })).toBe('Para\n\n  - x\n- y\n\n* moved\n');
   });
 
+  it('an item holding code with a whitespace-only line moves, the code unchanged (final review M4)', () => {
+    const text = '- a\n  ```\n  x\n    \n  y\n  ```\n- b\n';
+    expect(move(text, '- a', { end: '- b' })).toBe('- b\n- a\n  ```\n  x\n    \n  y\n  ```\n');
+    expect(move(text, '- a', { child: '- b' })).toBe(
+      '- b\n  - a\n    ```\n    x\n      \n    y\n    ```\n',
+    );
+    // Its marker growing (9. → 10.) shifts that line with the others.
+    const wide = '8. h\n9. i\n   ```\n   x\n      \n   ```\n10. j\n';
+    expect(move(wide, '9. i', { end: '8. h' })).toBe(
+      '8. h\n9. j\n10. i\n    ```\n    x\n       \n    ```\n',
+    );
+  });
+
   it('keeps CRLF', () => {
     expect(move('- a\r\n- b\r\n', '- b', { before: '- a' })).toBe('- b\r\n- a\r\n');
   });

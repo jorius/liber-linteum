@@ -6,7 +6,7 @@ import { ChangeSet, Text } from '@codemirror/state';
 import type { Node, Parent } from 'mdast';
 import { describe, expect, it } from 'vitest';
 import { movableBlocks, slotsFor, type BlockModel, type Slot } from './blockModel';
-import { applyChanges, moveBlock } from './blockMoves';
+import { applyChanges, moveBlock, planMove, type Move } from './blockMoves';
 import { parsePage } from './parse';
 
 const LEAVES = new Set([
@@ -241,6 +241,9 @@ interface Generator {
   block(r: Rand, w: Writer): string[] | null;
   /** Front matter or a byte-order mark before the blocks. */
   head?(r: Rand, w: Writer): string;
+  /** No refusal of a move that would have kept the note, or of an item
+   *  reordered in its own list. */
+  strict?: boolean;
 }
 
 const GENERATORS: Record<string, Generator> = {
@@ -270,6 +273,37 @@ const GENERATORS: Record<string, Generator> = {
     block: () => null,
     head: (r, w) => `\uFEFF${r() < 0.2 ? `---\ntitle: ${w.word()}\n---\n` : ''}`,
   },
+  // M4: list items holding code with blank and whitespace-only lines (their
+  // markers growing 9. → 10.), code blocks, tables. Every move must go.
+  codeLines: {
+    strict: true,
+    block: (r, w) =>
+      pick(r, [
+        () => {
+          const out: string[] = [];
+          const ordered = r() < 0.5;
+          for (let k = 0; k < 2 + Math.floor(r() * 3); k++) {
+            const marker = ordered ? `${k + 8}.` : '-';
+            const col = ' '.repeat(marker.length + 1);
+            out.push(`${marker} ${w.word()}`);
+            if (r() < 0.6) {
+              const gap = pick(r, ['', ' ', `${col}  `, `${col}    `]);
+              out.push(
+                `${col}\`\`\``,
+                `${col}${w.word()}`,
+                gap,
+                `${col}${w.word()}`,
+                `${col}\`\`\``,
+              );
+            }
+          }
+          return out;
+        },
+        () => ['```', w.word(), '    ', '', w.word(), '```'],
+        () => ['| h | i |', '|---|---|', `| ${w.word()} | 1 |`, `| ${w.word()} | 2 |`],
+        () => [w.sentence()],
+      ])(),
+  },
   // I3: top-level lists indented 2 or 3 spaces (pasted content), which nest
   // under a list moved in front of them.
   indentedLists: {
@@ -288,7 +322,8 @@ function note(r: Rand, gen: Generator): string {
   );
   let text = gen.head ? gen.head(r, w) : r() < 0.2 ? `---\ntitle: ${w.word()}\n---\n` : '';
   blocks.forEach((b, i) => {
-    if (i > 0) text += pick(r, ['\n\n', '\n\n', '\n', '\n\n\n']);
+    // (A strict note's blocks stand apart: no lazy line joins an item.)
+    if (i > 0) text += gen.strict ? '\n\n' : pick(r, ['\n\n', '\n\n', '\n', '\n\n\n']);
     text += b.join('\n');
   });
   return text + (r() < 0.8 ? '\n' : '');
@@ -335,7 +370,14 @@ function structure(src: string) {
   const page = parsePage(src);
   const sig: string[] = page.comments.map(([s, e]) => `%${src.slice(s, e)}`);
   const parents = new Map<string, string>();
+  /** Each list's items (keys): which lists merge or split. */
+  const lists: string[][] = [];
   const walk = (n: Node, flags: string, parent: string) => {
+    if (n.type === 'list') {
+      lists.push(
+        ((n as Parent).children as Node[]).map((c) => itemKey(src, c.position!.start.offset!)),
+      );
+    }
     if (n.type === 'listItem') {
       const key = itemKey(src, n.position!.start.offset!);
       sig.push(`item:${flags}:${String((n as { checked?: boolean | null }).checked ?? '')}`);
@@ -368,8 +410,20 @@ function structure(src: string) {
     walk(n, '', '');
   }
   const fm = page.frontmatter;
-  return { sig: sig.sort(), parents, frontmatter: fm ? src.slice(...fm.range) : null };
+  return { sig: sig.sort(), parents, lists, frontmatter: fm ? src.slice(...fm.range) : null };
 }
+
+/** The lists' item sets, `moved` aside (it may join or leave one). */
+const listSets = (lists: string[][], moved: string | null) =>
+  lists
+    .map((l) =>
+      l
+        .filter((k) => k !== moved)
+        .sort()
+        .join('\u0001'),
+    )
+    .filter(Boolean)
+    .sort();
 
 const leadRule = (t: string) => /^\uFEFF?---[ \t]*\r?\n/.test(t);
 
@@ -405,38 +459,51 @@ function fuzz(seed: number, gen: Generator, count: number) {
             continue;
           }
           if (!res) problems.push(`NULL ${where}`);
-          if (!res || 'refused' in res) continue;
-          const next = applyChanges(text, res.changes);
-          const after = structure(next);
-          const found: string[] = [];
-          if (JSON.stringify(contentLines(next)) !== JSON.stringify(lines)) found.push('CONTENT');
-          if (JSON.stringify(after.sig) !== JSON.stringify(before.sig)) found.push('STRUCTURE');
-          if (after.frontmatter !== before.frontmatter) found.push('FRONTMATTER');
-          if (leadRule(next) && !leadRule(text)) found.push('LEADRULE');
-          // Every item keeps its parent item; the moved one takes its slot's.
-          for (const [key, parent] of before.parents) {
-            const now = after.parents.get(key);
-            if (parent === '<dup>' || now === '<dup>') continue;
-            const want = key === moved ? slotParent(text, model, slot) : parent;
-            if (now !== want) {
-              found.push(`NESTING ${JSON.stringify(key)} under ${JSON.stringify(now)}`);
-              break;
+          if (!res) continue;
+          /** What's wrong with the note after `move`. */
+          const check = (move: Move): string[] => {
+            const next = applyChanges(text, move.changes);
+            const after = structure(next);
+            const found: string[] = [];
+            if (JSON.stringify(contentLines(next)) !== JSON.stringify(lines)) found.push('CONTENT');
+            if (JSON.stringify(after.sig) !== JSON.stringify(before.sig)) found.push('STRUCTURE');
+            if (after.frontmatter !== before.frontmatter) found.push('FRONTMATTER');
+            if (leadRule(next) && !leadRule(text)) found.push('LEADRULE');
+            const sets = (lists: string[][]) => JSON.stringify(listSets(lists, moved));
+            if (sets(after.lists) !== sets(before.lists)) found.push('LISTS');
+            // Every item keeps its parent item; the moved one takes its slot's.
+            for (const [key, parent] of before.parents) {
+              const now = after.parents.get(key);
+              if (parent === '<dup>' || now === '<dup>') continue;
+              const want = key === moved ? slotParent(text, model, slot) : parent;
+              if (now !== want) {
+                found.push(`NESTING ${JSON.stringify(key)} under ${JSON.stringify(now)}`);
+                break;
+              }
             }
+            const first = text
+              .slice(unit.from, unit.to)
+              .replace(/^\uFEFF/, '')
+              .split(/\r?\n/)[0]
+              .replace(/^[ \t]*(?:[-*+]|\d+[.)])?[ \t]*/, '');
+            if (!next.slice(move.at).split(/\r?\n/)[0].includes(first)) found.push('PLACEMENT');
+            if (!text.includes('\r')) {
+              const doc = Text.of(text.split('\n'));
+              const set = ChangeSet.of(move.changes, text.length);
+              if (set.apply(doc).toString() !== next) found.push('CHANGESET');
+              else if (set.invert(doc).apply(set.apply(doc)).toString() !== text)
+                found.push('INVERSE');
+            }
+            return found.length ? [`${found.join(',')} ${where}\n→ ${JSON.stringify(next)}`] : [];
+          };
+          if (!('refused' in res)) problems.push(...check(res));
+          else if (gen.strict) {
+            // An item reordered in its own list touches nothing else.
+            if (slot.scope === 'item' && slot.list === unit.container)
+              problems.push(`REFUSED IN ITS LIST ${where}`);
+            const planned = planMove(text, model, unit, slot, { lineOnly });
+            if (planned && !check(planned).length) problems.push(`NEEDLESS REFUSAL ${where}`);
           }
-          const first = text
-            .slice(unit.from, unit.to)
-            .replace(/^\uFEFF/, '')
-            .split(/\r?\n/)[0]
-            .replace(/^[ \t]*(?:[-*+]|\d+[.)])?[ \t]*/, '');
-          if (!next.slice(res.at).split(/\r?\n/)[0].includes(first)) found.push('PLACEMENT');
-          if (!text.includes('\r')) {
-            const doc = Text.of(text.split('\n'));
-            const set = ChangeSet.of(res.changes, text.length);
-            if (set.apply(doc).toString() !== next) found.push('CHANGESET');
-            else if (set.invert(doc).apply(set.apply(doc)).toString() !== text)
-              found.push('INVERSE');
-          }
-          if (found.length) problems.push(`${found.join(',')} ${where}\n→ ${JSON.stringify(next)}`);
         }
       }
     }
@@ -453,6 +520,7 @@ describe('the sweep’s fuzz: random notes × random moves (final review)', () =
     ['indentedLists', 8, 8],
     ['bom', 5, 20],
     ['comments', 6, 60],
+    ['codeLines', 7, 30],
   ] as const)(
     '%s notes (seed %i, %i notes): every accepted move keeps the note',
     (name, seed, notes) => {
