@@ -64,7 +64,8 @@ describe('PageView (M2a §5)', () => {
     // M2b §2: the title is the file name; the note's own title is shown under it.
     expect(screen.getByRole('heading', { level: 1, name: 'rex' })).toBeInTheDocument();
     expect(screen.getByText('Title in the note: Generator Rex')).toBeInTheDocument();
-    expect(screen.getByText('Hero redesign · v3')).toBeInTheDocument();
+    // M2c §3: the subtitle is editable in place.
+    expect(screen.getByRole('textbox', { name: 'Subtitle' })).toHaveValue('Hero redesign · v3');
     expect(screen.getByRole('list', { name: 'Tags' })).toHaveTextContent('#character#redesign');
     expect(screen.getByText('8 links · 1 backlink')).toBeInTheDocument();
     await waitFor(() =>

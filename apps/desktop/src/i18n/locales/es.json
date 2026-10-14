@@ -96,7 +96,9 @@
     "titleLabel": "Título de la página",
     "titleTaken": "Ya hay una página llamada «{name}» en esta carpeta.",
     "frontmatterInvalid": "Corrige primero el frontmatter de la nota (no es YAML válido).",
-    "titleInNote": "Título en la nota: {title}"
+    "titleInNote": "Título en la nota: {title}",
+    "subtitleLabel": "Subtítulo",
+    "subtitlePlaceholder": "Añade un subtítulo"
   },
   "editor": {
     "conflictCopy": "Alguien más cambió esta página — su versión se guardó como «{name}»",
@@ -231,5 +233,18 @@
   },
   "trail": {
     "back": "Volver a {name}"
+  },
+  "cover": {
+    "label": "Portada",
+    "add": "Añadir portada",
+    "change": "Cambiar portada",
+    "reposition": "Reposicionar",
+    "remove": "Quitar",
+    "save": "Guardar posición",
+    "cancel": "Cancelar",
+    "position": "Posición de la portada",
+    "positionValue": "{value} % desde arriba",
+    "remote": "Portada remota no cargada (privacidad)",
+    "missing": "No se encuentra la imagen de portada"
   }
 }

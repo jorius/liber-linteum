@@ -96,7 +96,9 @@
     "titleLabel": "Page title",
     "titleTaken": "A page named “{name}” is already in this folder.",
     "titleInNote": "Title in the note: {title}",
-    "frontmatterInvalid": "Fix the note’s frontmatter first (it isn’t valid YAML)."
+    "frontmatterInvalid": "Fix the note’s frontmatter first (it isn’t valid YAML).",
+    "subtitleLabel": "Subtitle",
+    "subtitlePlaceholder": "Add a subtitle"
   },
   "editor": {
     "conflictCopy": "Someone else changed this page — their version was saved as “{name}”",
@@ -231,5 +233,18 @@
   },
   "trail": {
     "back": "Back to {name}"
+  },
+  "cover": {
+    "label": "Cover",
+    "add": "Add cover",
+    "change": "Change cover",
+    "reposition": "Reposition",
+    "remove": "Remove",
+    "save": "Save position",
+    "cancel": "Cancel",
+    "position": "Cover position",
+    "positionValue": "{value}% from the top",
+    "remote": "Remote cover not loaded (privacy)",
+    "missing": "Cover image not found"
   }
 }

@@ -2,6 +2,7 @@
 // writes with the M2a conflict payload, conflict copies, page creation and
 // header data. `extra` overrides or adds commands per test.
 import { mockIPC } from '../ipc/testing';
+import { parsePage } from '../markdown/parse';
 
 export const hashOf = (text: string) => `h:${text}`;
 
@@ -22,6 +23,18 @@ const err = (kind: string, message: string, extra: object = {}) => ({ kind, mess
 /** First `# Heading`, else the file name (enough for header tests). */
 const titleOf = (path: string, text: string) =>
   /^# (.+)$/m.exec(text)?.[1] ?? path.slice(path.lastIndexOf('/') + 1).replace(/\.md$/, '');
+
+/** Header fields from the note's frontmatter, as the index reads them. */
+function headerOf(text: string) {
+  const data = parsePage(text).frontmatter?.data ?? {};
+  const str = (v: unknown) => (typeof v === 'string' && v.trim() ? v : null);
+  const y = data['cover-y'];
+  return {
+    subtitle: str(data.subtitle),
+    cover: str(data.cover),
+    coverY: typeof y === 'number' ? Math.min(100, Math.max(0, Math.round(y))) : null,
+  };
+}
 
 export function fakeDisk(initial: Record<string, string>, extra: Extra = {}): FakeDisk {
   const files = new Map(Object.entries(initial));
@@ -76,8 +89,7 @@ export function fakeDisk(initial: Record<string, string>, extra: Extra = {}): Fa
           return {
             path: args.path,
             title: titleOf(args.path, text),
-            subtitle: null,
-            cover: null,
+            ...headerOf(text),
             tags: [],
             links: 0,
             backlinks: 0,

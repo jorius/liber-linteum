@@ -133,11 +133,94 @@
   white-space: nowrap;
 }
 
-.cover {
-  width: 100%;
-  max-height: 180px;
-  object-fit: cover;
+/* Cover band (M2c §2): image, placeholder or reposition slider, with the
+   buttons at the bottom right (shown on hover and keyboard focus). */
+.coverBand {
+  position: relative;
+  height: 200px;
   border-radius: var(--radius-lg);
+  overflow: hidden;
+  background: var(--color-surface-subtle);
+}
+
+.cover {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  user-select: none;
+}
+
+.coverFrame {
+  height: 100%;
+}
+
+.coverSlider {
+  height: 100%;
+  cursor: ns-resize;
+  touch-action: none;
+}
+
+.coverSlider:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: -2px;
+}
+
+.coverPlaceholder {
+  display: grid;
+  place-items: center;
+  height: 100%;
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: 14px;
+}
+
+.coverControls {
+  position: absolute;
+  right: 12px;
+  bottom: 12px;
+  display: flex;
+  gap: 6px;
+  opacity: 0;
+  transition: opacity 120ms ease;
+}
+
+.coverBand:hover .coverControls,
+.coverBand:focus-within .coverControls {
+  opacity: 1;
+}
+
+.coverButton,
+.addCover {
+  height: 28px;
+  padding: 0 10px;
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  color: var(--color-text-body);
+  font: 600 12.5px var(--font-body);
+  cursor: pointer;
+}
+
+.coverButton:hover,
+.addCover:hover {
+  border-color: var(--color-accent);
+}
+
+.coverButton:focus-visible,
+.addCover:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 2px;
+}
+
+.addCover {
+  align-self: flex-start;
+  opacity: 0;
+}
+
+.header:hover .addCover,
+.addCover:focus-visible {
+  opacity: 1;
 }
 
 .title {
@@ -151,6 +234,39 @@
   margin: 0;
   font-size: 16px;
   color: var(--color-text-body);
+}
+
+/* Subtitle field (M2c §3): reads like the subtitle; the placeholder shows only
+   on hover and focus. */
+.subtitleInput {
+  font: inherit;
+  font-size: 16px;
+  color: var(--color-text-body);
+  width: 100%;
+  margin: 0 0 0 -6px;
+  padding: 2px 6px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  outline: 1px dashed transparent;
+}
+
+.subtitleInput::placeholder {
+  color: transparent;
+}
+
+.subtitleInput:hover::placeholder,
+.subtitleInput:focus::placeholder {
+  color: var(--color-text-faint);
+}
+
+.subtitleInput:hover {
+  outline-color: var(--color-border-strong);
+}
+
+.subtitleInput:focus {
+  outline: 1px dashed var(--color-accent);
+  background: var(--color-accent-soft);
 }
 
 .tags {
