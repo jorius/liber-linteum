@@ -347,8 +347,9 @@ export const onMenuToggle = (cb: (key: string) => void): Promise<UnlistenFn> =>
 export const onVaultWarning = (cb: (p: WarningPayload) => void): Promise<UnlistenFn> =>
   listen<WarningPayload>('vault:warning', (e) => cb(e.payload));
 
-/** A native file drag over the window (M2c §5.2). `x`/`y` are physical
- *  pixels from the webview's top-left corner. */
+/** A native file drag over the window (M2c §5.2). `x`/`y` are from the
+ *  webview's top-left corner: CSS pixels on macOS and Linux despite Tauri's
+ *  `PhysicalPosition` type, physical pixels on Windows (`dragPixelRatio`). */
 export interface DragDropPayload {
   type: 'enter' | 'over' | 'drop' | 'leave';
   paths?: string[];

@@ -105,7 +105,7 @@ Make a page feel finished: a cover, a subtitle, pasted screenshots, dropped file
     - The selection moves to after the insertion.
   - **`drop` elsewhere:** a toast says "Drop files onto the page's text to attach them".
   - **`leave`:** the caret is removed.
-- **Coordinates:** the drop position is in physical pixels relative to the webview. Divide by `devicePixelRatio`.
+- **Coordinates:** the drop position is relative to the webview. Divide by `devicePixelRatio` on Windows only; macOS and Linux already report CSS pixels (§14.1).
 - **Errors and progress:**
   - dropped folders are skipped, with the toast "Folders can't be attached";
   - per-file failures show one toast listing the names and the reason;
@@ -357,3 +357,24 @@ These override the sections above where they conflict.
 13. **This vault** (§5.4): labelled "New attachments go to" with "A subfolder next to the page / The page's folder / The vault root / A folder in the vault"; a subfolder or folder name is saved on Enter or blur; when Obsidian's setting applies, the text says in plain words where files go.
 14. **Autocomplete list** is styled with a scoped `EditorView.theme` (a base theme loses to `@codemirror/autocomplete`'s own); `@codemirror/autocomplete` is declared `^6.20.3` like the other CodeMirror packages.
 15. **Tooling:** `pnpm check:i18n` needs Node ≥ 22.18 (`.nvmrc`: 24); the e2e mock gains `remoteCover`, a new hash per write (the header refreshes on it) and an event bus for `tauri://drag-*`.
+
+## 14. Amendments from the final review (fix pass, `.superpowers` ledger)
+
+1. **Drop coordinates (C1):** wry 0.57 / tauri-runtime-wry 2.12 report drag positions in CSS pixels on macOS and Linux despite the `PhysicalPosition` type; only Windows reports physical pixels. `dragPixelRatio()` divides only on Windows.
+2. **Frontmatter guard (C2, Minor 1):**
+   - only a plain, non-empty, untagged scalar is swapped in place;
+   - any other value (empty, block scalar, tag, collection, alias) is rewritten as `key: value` from the key to the end of its value's line, keeping a trailing comment;
+   - added keys use the map's indentation;
+   - every edit is re-parsed (remark's and the Rust/Obsidian view) and refused unless it reads back exactly as the patch with every other key unchanged.
+3. **Unconfirmed blocks (Minor 2):** a header edit is refused when the text opens with a BOM + `---`, or with a `---` line that a later `---`/`...` line could close but remark doesn't treat as frontmatter. A note that merely starts with a thematic break still gets a new block.
+4. **The refusal toast** reads "NIMW can't safely change this note's frontmatter. Edit it in Source mode."
+5. **Paste/drop target page (I1):** the page is captured when the paste or drop starts; a result arriving after a page switch goes into that page's stored editor state and text (still undoable), never into the page on screen; nothing is inserted once another vault is open.
+6. **Drags without files (Minor 3)**, such as text drags, are ignored (paths remembered from `enter`).
+7. **Pending drops (Minor 4)** have their own mapped positions, one per drop, separate from the hover caret.
+8. **Create page (I2)** validates only the folders it creates, plus the page name.
+9. **Cover focus (I3):** Remove → Add cover; Add/Change → Change cover (kept mounted while the image loads); a cancelled Add → Add cover. A cover pick that finishes after a page switch is dropped (Minor 8).
+10. **CSS (Minor 9):** `:focus-visible` never shares a selector list (a guard test scans all CSS); Add cover shows on `:focus`.
+11. **This vault (Minor 5)** saves only real changes.
+12. **Link picker (Minor 11):** the alias is link-safe (`[`, `]`, `|`, line breaks → spaces), and the live selection is used at pick time.
+13. **Attachment commands (Minor 7)** require the `page` argument to be a visible, indexed page; anything else is `notFound`, checked before the cover dialog opens.
+
