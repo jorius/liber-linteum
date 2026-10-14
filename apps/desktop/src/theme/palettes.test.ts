@@ -260,3 +260,47 @@ describe('buttons and the header veil (M4b §1, §3)', () => {
     }
   });
 });
+
+/** `rgba(r, g, b, a)` over an opaque `#rrggbb`, as `#rrggbb`. */
+function over(rgba: string, under: string): string {
+  const [r, g, b, a] = rgba.match(/[\d.]+/g)!.map(Number);
+  const u = [1, 3, 5].map((i) => parseInt(under.slice(i, i + 2), 16));
+  return `#${[r, g, b]
+    .map((c, i) =>
+      Math.round(c * a + u[i] * (1 - a))
+        .toString(16)
+        .padStart(2, '0'),
+    )
+    .join('')}`;
+}
+
+const pageCss = readFileSync(
+  new URL('../features/page/PageView.module.css', import.meta.url),
+  'utf8',
+);
+
+describe('review focus: text on the veil over any cover (M4b §1)', () => {
+  const palettes = [
+    ...PALETTES,
+    ...['#d1477a', '#2aa198', '#f5d000', '#808080', '#ffffff', '#000000'].map((hex) => ({
+      id: 'custom' as const,
+      ...derive(hex),
+    })),
+  ];
+  it.each(
+    palettes.flatMap((p, i) => (['light', 'dark'] as const).map((m) => [i, p.id, m] as const)),
+  )('#%s %s %s: pill text meets AA on the veil over black and over white', (i, _id, mode) => {
+    const vars = paletteVars(palettes[i], mode);
+    for (const image of ['#000000', '#ffffff']) {
+      const pill = over(vars['--color-surface-veil'], image);
+      for (const text of ['--color-text', '--color-text-body'] as const) {
+        expect(contrast(vars[text], pill), `${text} over ${image}`).toBeGreaterThanOrEqual(4.5);
+      }
+    }
+  });
+
+  it('muted text in a pill is drawn in the body colour (muted alone falls to ~4.0:1)', () => {
+    const rule = /\.bandCover \.pill \{([^}]*)\}/.exec(pageCss)?.[1] ?? '';
+    expect(rule).toContain('--color-text-muted: var(--color-text-body);');
+  });
+});

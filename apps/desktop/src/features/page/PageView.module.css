@@ -159,7 +159,10 @@
   justify-content: space-between;
 }
 
+/* On the veil, muted text would fall to about 4:1 over a dark or bright
+   cover: it takes the body colour (M4b review focus). */
 .bandCover .pill {
+  --color-text-muted: var(--color-text-body);
   background: var(--color-surface-veil);
   border-radius: var(--radius-md);
   padding: 4px 10px;
