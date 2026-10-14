@@ -119,7 +119,7 @@ function toCallout(quote: Blockquote, src: string, loc: Locator): Callout | null
   else children.shift();
   if (title.length) {
     const s = title[0].position!.start.offset!;
-    const e = title.at(-1)!.position!.end.offset!;
+    const e = title[title.length - 1].position!.end.offset!;
     children.unshift({ type: 'calloutTitle', children: title, position: loc.position(s, e) });
   }
   return {
