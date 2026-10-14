@@ -43,8 +43,10 @@ function blankBefore(text: string, pos: number): boolean {
 }
 
 /** After `pos` comes the end of its line, a blank line, then a line that
- *  isn't indented (so it can't continue a list or a code block) — or nothing. */
-function blankAfter(text: string, pos: number): boolean {
+ *  isn't indented (so it can't continue a list or a code block) — or nothing.
+ *  That line mustn't open a comment (`comments`: ranges in `text`): masked,
+ *  its lines read as blank or indented ones. */
+function blankAfter(text: string, pos: number, comments: [number, number][]): boolean {
   const m = /^[ \t]*(?:\n|$)/.exec(text.slice(pos, pos + 200));
   if (!m) return false;
   const rest = text.slice(pos + m[0].length);
@@ -52,8 +54,15 @@ function blankAfter(text: string, pos: number): boolean {
   const blank = /^[ \t]*\n/.exec(rest);
   if (!blank) return false;
   const after = rest.slice(blank[0].length).replace(/^([ \t]*\n)+/, '');
-  return after === '' || !/^[ \t]/.test(after);
+  const at = text.length - after.length;
+  return after === '' || (!/^[ \t]/.test(after) && !comments.some(([s]) => s === at));
 }
+
+/** Indented (not fenced) code: micromark keeps it open across blank lines, so
+ *  the block after it can read differently than at the start of a slice (an
+ *  empty list item there can't start a list). */
+const indentedCode = (n: Node | undefined, src: string) =>
+  n?.type === 'code' && !/^[ \t]*(?:`{3}|~{3})/.test(src.slice(begin(n), begin(n) + 64));
 
 /** Moves every position in `nodes` by `offset` characters and `lines` lines. */
 function shift(nodes: Node[], offset: number, lines: number) {
@@ -109,14 +118,18 @@ export function reparse(prev: ParsedPage, prevText: string, text: string): Parse
   if (from < sliceStart || oldTo > oldEnd) return parsePage(text);
   // A comment reaching into the slice: its masking and pairing need the whole page.
   if (prev.comments.some(([s, e]) => s < oldEnd && e > sliceStart)) return parsePage(text);
+  if (first > 0 && indentedCode(blocks[first - 1], prevText)) return parsePage(text);
   const delta = text.length - prevText.length;
+  const commentsAfter = prev.comments
+    .filter(([s]) => s >= oldEnd)
+    .map(([s, e]): [number, number] => [s + delta, e + delta]);
   const newEnd = oldEnd + delta;
   const slice = text.slice(sliceStart, newEnd);
   // Right after the frontmatter's closing fence a new block always starts.
   const afterFrontmatter = fixed === 1 && first === 1 && sliceStart === end(blocks[0]) + 1;
   if (
     (!afterFrontmatter && !blankBefore(text, sliceStart)) ||
-    !blankAfter(text, newEnd) ||
+    !blankAfter(text, newEnd, commentsAfter) ||
     NONLOCAL.test(slice) ||
     NONLOCAL.test(prevText.slice(sliceStart, oldEnd)) ||
     // `[ref]` / `[^1]` resolve against definitions elsewhere on the page.
@@ -131,11 +144,14 @@ export function reparse(prev: ParsedPage, prevText: string, text: string): Parse
   const after = blocks.slice(last + 1);
   // Lists separated only by blank lines merge: let the full parse decide.
   const edgeList = (a?: RootContent, b?: RootContent) => a?.type === 'list' && b?.type === 'list';
+  const lastPart = part[part.length - 1] as RootContent | undefined;
   if (
     !part.length ||
     part.some((n) => n.type === 'yaml') ||
-    edgeList(before.at(-1), part[0]) ||
-    edgeList(part.at(-1), after[0])
+    edgeList(before[before.length - 1], part[0]) ||
+    edgeList(lastPart, after[0]) ||
+    // The block after the slice follows indented code now, or did before.
+    (after.length > 0 && (indentedCode(lastPart, slice) || indentedCode(blocks[last], prevText)))
   ) {
     return parsePage(text);
   }

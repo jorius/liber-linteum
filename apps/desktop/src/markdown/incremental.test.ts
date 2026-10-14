@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { movableBlocks } from './blockModel';
 import { reparse } from './incremental';
 import { parsePage } from './parse';
 
@@ -164,8 +165,102 @@ describe('incremental re-parse (M2a §7: typing in a 5,000-line note)', () => {
     expect(next.tree.children[0]).toBe(prev.tree.children[0]);
   });
 
+  it('after indented code, an empty list item reads as in the full parse (the code stays open across blank lines)', () => {
+    // micromark keeps indented code open across blank lines, so an empty
+    // item after it can't start a list — a slice parsed alone would say it does.
+    const text = '    code\n\n1. \n2. y\n\nPara\n\nEnd\n';
+    const typed = text.replace('Para', 'ParaX');
+    expect(reparse(parsePage(text), text, typed)).toEqual(parsePage(typed));
+  });
+
+  it('a comment right after the slice reads as blank lines: they can join the slice’s last block', () => {
+    // Indenting the last block makes it code; the comment masked to spaces,
+    // its lines are that code's too.
+    const text = 'A\n\nB\n\n# Head\n\n%% multi\nline %%\n';
+    const typed = text.replace('# Head', '\t# Head');
+    const page = reparse(parsePage(text), text, typed);
+    expect(page).toEqual(parsePage(typed));
+  });
+
   it('returns the previous model for identical text', () => {
     const page = parsePage('# A\n');
     expect(reparse(page, '# A\n', '# A\n')).toBe(page);
   });
+});
+
+// The reviewer's re-parse chain (final review C2): random notes of every
+// block kind, random typing-like edits, each re-parsed from the last model.
+// Two models of the same text (the editor's and the pane's) must never
+// disagree, or a move acts on a block other than the one picked.
+const CHAIN_BLOCKS = [
+  'Para one',
+  '# Head',
+  '- a\n- b\n  - c',
+  '1. x\n2. y',
+  '> quote',
+  '| a | b |\n|---|---|\n| 1 | 2 |',
+  '```\ncode\n```',
+  '---',
+  'Para two\nline',
+  '* s\n* t',
+  '%% c %%',
+  '<div>x</div>',
+  '![[img.png]]',
+  '    indented code',
+  '%% multi\n\nline %%',
+];
+const CHAIN_EDITS = [
+  '\n',
+  '\n\n',
+  '- ',
+  '  ',
+  'x',
+  '#',
+  '> ',
+  '1. ',
+  '*',
+  '`',
+  '|',
+  '---\n',
+  '\t',
+  ' ',
+  '%%',
+];
+
+/** What the gutter and moves read off a model: its units, lists, comments. */
+function blockModelOf(text: string, page: ReturnType<typeof parsePage>) {
+  const m = movableBlocks(text, page);
+  return {
+    units: m.units.map((u) => [u.kind, u.from, u.to, u.scope, u.depth, u.container, u.sectionTo]),
+    lists: m.lists.map((l) => [l.from, l.to, l.depth, l.marker, l.items, l.parentItem]),
+    comments: page.comments,
+  };
+}
+
+describe('incremental re-parse: a chain of edits keeps a full parse’s block model (final review C2)', () => {
+  it.each([2, 6])(
+    'seed %i',
+    (seed) => {
+      const next = rng(seed);
+      const pick = <T>(xs: T[]) => xs[Math.floor(next() * xs.length)];
+      for (let d = 0; d < 200; d++) {
+        const n = 4 + Math.floor(next() * 8);
+        let text = Array.from({ length: n }, () => pick(CHAIN_BLOCKS)).join('\n\n') + '\n';
+        let page = parsePage(text);
+        for (let k = 0; k < 40; k++) {
+          const at = Math.floor(next() * (text.length + 1));
+          const edited =
+            next() < 0.6
+              ? text.slice(0, at) + pick(CHAIN_EDITS) + text.slice(at)
+              : text.slice(0, at) +
+                text.slice(Math.min(text.length, at + 1 + Math.floor(next() * 3)));
+          page = reparse(page, text, edited);
+          const where = `seed ${seed}: ${JSON.stringify(text)} → ${JSON.stringify(edited)}`;
+          text = edited;
+          expect(blockModelOf(text, page), where).toEqual(blockModelOf(text, parsePage(text)));
+        }
+      }
+    },
+    60_000,
+  );
 });
