@@ -60,6 +60,9 @@ pub(crate) struct NimwVaultJson {
     pub exclude: Vec<String>,
     #[serde(default)]
     pub attachments: Option<NimwAttachments>,
+    /// Folder → the page picked as its card preview (GV-02, picked in M3b).
+    #[serde(default, rename = "indexPicks")]
+    pub index_picks: std::collections::HashMap<String, String>,
 }
 
 #[derive(Debug, Clone, Deserialize)]

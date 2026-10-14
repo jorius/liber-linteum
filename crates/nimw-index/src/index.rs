@@ -1,5 +1,6 @@
 use crate::rows::{
-    FileKind, FileRow, LinkCandidate, LinkRow, PageRow, Stat, TreeNode, ext_of, split_path,
+    CardRow, FileKind, FileRow, LinkCandidate, LinkRow, PageLink, PageRow, Stat, TreeNode, ext_of,
+    split_path,
 };
 use crate::schema::{SCHEMA, SCHEMA_VERSION};
 use nimw_markdown::{FileSet, LinkKind, PageMeta, Tag, link_key, name_key, resolve};
@@ -51,6 +52,41 @@ fn link_row(r: &Row<'_>) -> rusqlite::Result<LinkRow> {
         angle: r.get(11)?,
         label: r.get(12)?,
         directed: r.get(13)?,
+    })
+}
+
+const CARD_SELECT: &str = "SELECT f.path, f.parent, f.name, f.kind, p.title, p.subtitle, p.cover, \
+     (SELECT l.target_path FROM links l WHERE l.src = f.path AND l.kind = 'cover' LIMIT 1), \
+     p.cover_y, p.excerpt, p.has_image, p.has_audio \
+     FROM files f LEFT JOIN pages p ON p.path = f.path";
+
+fn card_row(r: &Row<'_>) -> rusqlite::Result<CardRow> {
+    Ok(CardRow {
+        path: r.get(0)?,
+        parent: r.get(1)?,
+        name: r.get(2)?,
+        kind: FileKind::parse(&r.get::<_, String>(3)?),
+        title: r.get(4)?,
+        subtitle: r.get(5)?,
+        cover: r.get(6)?,
+        cover_path: r.get(7)?,
+        cover_y: r.get::<_, Option<i64>>(8)?.map(|v| v.clamp(0, 100) as u8),
+        excerpt: r.get(9)?,
+        has_image: r.get::<_, Option<bool>>(10)?.unwrap_or(false),
+        has_audio: r.get::<_, Option<bool>>(11)?.unwrap_or(false),
+    })
+}
+
+/// Link kinds that connect pages in the Global View.
+const PAGE_LINK_KINDS: &str = "('wiki', 'embed', 'markdown', 'related')";
+
+fn page_link(r: &Row<'_>) -> rusqlite::Result<PageLink> {
+    Ok(PageLink {
+        src: r.get(0)?,
+        target: r.get(1)?,
+        kind: LinkKind::parse(&r.get::<_, String>(2)?).unwrap_or(LinkKind::Wiki),
+        label: r.get(3)?,
+        directed: r.get(4)?,
     })
 }
 
@@ -209,6 +245,58 @@ impl Index {
             )
         });
         Ok(nodes)
+    }
+
+    /// The entries directly inside `parent` (`""`: the vault root) with their
+    /// card data, folders first, then by name like the explorer (M3a §3).
+    pub fn card_children(&self, parent: &str) -> Result<Vec<CardRow>> {
+        let mut stmt = self
+            .conn
+            .prepare_cached(&format!("{CARD_SELECT} WHERE f.parent = ?1"))?;
+        let mut rows = stmt
+            .query_map([parent], card_row)?
+            .collect::<rusqlite::Result<Vec<_>>>()?;
+        rows.sort_by_cached_key(|r| {
+            (
+                r.kind != FileKind::Folder,
+                name_key(&r.name),
+                r.name.clone(),
+            )
+        });
+        Ok(rows)
+    }
+
+    /// One entry with its card data.
+    pub fn card(&self, path: &str) -> Result<Option<CardRow>> {
+        let mut stmt = self
+            .conn
+            .prepare_cached(&format!("{CARD_SELECT} WHERE f.path = ?1"))?;
+        Ok(stmt.query_row([path], card_row).optional()?)
+    }
+
+    /// Every resolved link between two pages (M3a §6).
+    pub fn page_links(&self) -> Result<Vec<PageLink>> {
+        let mut stmt = self.conn.prepare_cached(&format!(
+            "SELECT l.src, l.target_path, l.kind, l.label, l.directed FROM links l \
+             JOIN files t ON t.path = l.target_path \
+             WHERE t.kind = 'page' AND l.kind IN {PAGE_LINK_KINDS} ORDER BY l.src, l.start"
+        ))?;
+        Ok(stmt
+            .query_map([], page_link)?
+            .collect::<rusqlite::Result<Vec<_>>>()?)
+    }
+
+    /// Resolved page-to-page links from or to `path` (a page's neighbourhood).
+    pub fn page_links_of(&self, path: &str) -> Result<Vec<PageLink>> {
+        let mut stmt = self.conn.prepare_cached(&format!(
+            "SELECT l.src, l.target_path, l.kind, l.label, l.directed FROM links l \
+             JOIN files t ON t.path = l.target_path \
+             WHERE t.kind = 'page' AND l.kind IN {PAGE_LINK_KINDS} \
+             AND (l.src = ?1 OR l.target_path = ?1) ORDER BY l.src, l.start"
+        ))?;
+        Ok(stmt
+            .query_map([path], page_link)?
+            .collect::<rusqlite::Result<Vec<_>>>()?)
     }
 
     /// Every page and attachment with its title (pages) and mtime (M2c §7.2).

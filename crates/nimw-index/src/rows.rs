@@ -54,6 +54,37 @@ pub struct LinkCandidate {
     pub mtime_ns: i64,
 }
 
+/// A file with the page data a Global View card shows (M3a §8). Page
+/// columns are `None` for folders and attachments.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CardRow {
+    pub path: String,
+    pub parent: String,
+    pub name: String,
+    pub kind: FileKind,
+    pub title: Option<String>,
+    pub subtitle: Option<String>,
+    /// The frontmatter `cover:` value as written.
+    pub cover: Option<String>,
+    /// Where `cover:` resolves (`None`: no cover, remote or missing).
+    pub cover_path: Option<String>,
+    pub cover_y: Option<u8>,
+    pub excerpt: Option<String>,
+    pub has_image: bool,
+    pub has_audio: bool,
+}
+
+/// A resolved link from one page to another page (Global View edges and
+/// neighbourhoods, M3a §3, §6): text links, embeds of pages and `related:`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PageLink {
+    pub src: String,
+    pub target: String,
+    pub kind: LinkKind,
+    pub label: Option<String>,
+    pub directed: bool,
+}
+
 /// An explorer row (EXP-01). `title` is set for pages.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TreeNode {

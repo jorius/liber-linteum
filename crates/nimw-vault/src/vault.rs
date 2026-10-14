@@ -146,6 +146,13 @@ impl Vault {
         (nimw.attachments, obsidian)
     }
 
+    /// `indexPicks` from `.nimw/vault.json` (folder → page; GV-02), re-read on
+    /// every call like the attachment policy. Unreadable: none.
+    pub fn index_picks(&self) -> std::collections::HashMap<String, String> {
+        let nimw: NimwVaultJson = read_json(&self.root, NIMW_JSON, &mut Vec::new());
+        nimw.index_picks
+    }
+
     /// Non-fatal configuration problems found while opening.
     pub fn warnings(&self) -> &[String] {
         &self.warnings
