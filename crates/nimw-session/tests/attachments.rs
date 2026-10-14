@@ -119,6 +119,18 @@ fn m2c_import_copies_outside_files_and_links_inside_ones() {
     assert_eq!(md.path.as_str(), "attachments/Draft.md");
     assert_eq!(md.link, "Draft");
     assert_eq!(s.page(&md.path).unwrap().unwrap().title, "Draft title");
+    // Review focus: a dropped name invalid in the vault is sanitized, not refused.
+    std::fs::write(outside.path().join("Q3: plan?.pdf"), b"%PDF").unwrap();
+    let odd = s
+        .import_attachment(&page, &outside.path().join("Q3: plan?.pdf"))
+        .unwrap();
+    assert_eq!(odd.path.as_str(), "attachments/Q3- plan-.pdf");
+    assert_eq!(
+        s.resolve_links(&page, &[(LinkKind::Embed, odd.link.clone())])
+            .unwrap()[0]
+            .as_deref(),
+        Some("attachments/Q3- plan-.pdf")
+    );
     // Folders are refused.
     let err = s.import_attachment(&page, outside.path()).unwrap_err();
     assert!(matches!(err, SessionError::NotAFile(_)), "{err:?}");

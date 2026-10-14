@@ -911,3 +911,37 @@ fn m2c_link_suggest_and_cover_y_over_ipc() {
     let welcome = call(&h.main, "page_get", json!({ "path": "Welcome.md" })).unwrap();
     assert_eq!(welcome["coverY"], Value::Null);
 }
+
+/// Review focus (M2c §2): a cover saved outside the page's folder (attachments
+/// in a fixed vault folder) gets a vault-rooted reference that resolves back.
+#[test]
+fn m2c_cover_outside_the_page_folder_is_vault_rooted_and_resolves() {
+    let h = harness();
+    let vault = tempfile::tempdir().unwrap();
+    std::fs::create_dir(vault.path().join("Chars")).unwrap();
+    std::fs::write(vault.path().join("Chars/Rex.md"), "# Rex\n").unwrap();
+    call(&h.main, "vault_open", json!({ "path": vault.path() })).unwrap();
+    call(
+        &h.main,
+        "vault_settings_set",
+        json!({ "patch": { "attachments": { "mode": "folder", "path": "Media" } } }),
+    )
+    .unwrap();
+    let outside = tempfile::tempdir().unwrap();
+    let image = outside.path().join("sky.png");
+    std::fs::write(&image, b"\x89PNG").unwrap();
+    let state = h.app.state::<nimw_desktop::state::AppState>();
+    state.set_cover_picker(Some(Arc::new(move || Some(image.clone()))));
+    let cover = call(&h.main, "cover_pick", json!({ "page": "Chars/Rex.md" })).unwrap();
+    assert_eq!(
+        cover,
+        json!({ "path": "Media/sky.png", "reference": "/Media/sky.png" })
+    );
+    let resolved = call(
+        &h.main,
+        "links_resolve",
+        json!({ "source": "Chars/Rex.md", "targets": [{ "kind": "cover", "target": "/Media/sky.png" }] }),
+    )
+    .unwrap();
+    assert_eq!(resolved, json!(["Media/sky.png"]));
+}

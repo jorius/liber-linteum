@@ -183,6 +183,21 @@ describe('drop (M2c §5.2)', () => {
     await stop();
   });
 
+  it('review focus: drop positions are physical pixels (Retina ÷ 2)', async () => {
+    mockWindows('main');
+    fakeDisk({ 'P.md': 'x\n' });
+    const stop = await installFileDrop();
+    await mount('P.md');
+    const ratio = vi.spyOn(window, 'devicePixelRatio', 'get').mockReturnValue(2);
+    const at = vi.spyOn(document, 'elementFromPoint').mockReturnValue(viewOf().contentDOM);
+    const pos = vi.spyOn(viewOf(), 'posAtCoords').mockReturnValue(1);
+    await act(() => emit('tauri://drag-over', payload(40, 60)));
+    expect(at).toHaveBeenCalledWith(20, 30);
+    expect(pos).toHaveBeenCalledWith({ x: 20, y: 30 });
+    ratio.mockRestore();
+    await stop();
+  });
+
   it('a drop outside the text explains where to drop', async () => {
     mockWindows('main');
     const disk = fakeDisk({ 'P.md': 'x\n' });

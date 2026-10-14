@@ -267,6 +267,29 @@ describe('frontmatter edits from the header (M2c §4)', () => {
     expect(editor().doc!.text).toBe('Body\n');
   });
 
+  it('review focus: a CRLF note keeps CRLF line endings after a header edit', async () => {
+    const disk = fakeDisk({ 'A.md': '# A\r\n\r\nBody\r\n' });
+    await editor().open('A.md');
+    expect(await editor().editFrontmatter({ subtitle: 'Hero' })).toBe(true);
+    expect(disk.files.get('A.md')).toBe('---\r\nsubtitle: Hero\r\n---\r\n# A\r\n\r\nBody\r\n');
+  });
+
+  it('review focus: typing then a header edit — undo reverts only the header edit', async () => {
+    const disk = fakeDisk({ 'A.md': '# A\n' });
+    await act(() => editor().open('A.md'));
+    render(<Editor doc={editor().doc!} mode="source" label="A" />);
+    const view = EditorView.findFromDOM(document.querySelector<HTMLElement>('.cm-editor')!)!;
+    act(() => view.dispatch({ changes: { from: 4, insert: 'typed\n' }, userEvent: 'input.type' }));
+    await act(async () => {
+      await editor().editFrontmatter({ subtitle: 'S' });
+    });
+    expect(disk.files.get('A.md')).toBe('---\nsubtitle: S\n---\n# A\ntyped\n');
+    act(() => {
+      undo(view);
+    });
+    expect(view.state.doc.toString()).toBe('# A\ntyped\n');
+  });
+
   it('invalid YAML is never rewritten: a toast says to fix it', async () => {
     const disk = fakeDisk({ 'A.md': '---\nsubtitle: [oops\n---\nBody\n' });
     await editor().open('A.md');
