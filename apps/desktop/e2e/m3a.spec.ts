@@ -11,13 +11,26 @@ const PAGES = {
   'Welcome.md': '# Welcome\n\nStart here.\n',
 };
 
-async function globalView(page: Page, settings: Record<string, unknown> = {}) {
+async function globalView(page: Page, settings: Record<string, unknown> = {}, latencyMs = 0) {
   await page.addInitScript(installIpcMock, {
     pages: { ...PAGES },
     editorMode: 'livePreview',
     settings,
     remoteCover: false,
   });
+  // A real backend answers later than the mock: every command waits a little.
+  if (latencyMs) {
+    await page.addInitScript((ms) => {
+      type Invoke = (...args: unknown[]) => Promise<unknown>;
+      const ipc = (window as unknown as { __TAURI_INTERNALS__: { invoke: Invoke } })
+        .__TAURI_INTERNALS__;
+      const invoke = ipc.invoke;
+      ipc.invoke = async (...args) => {
+        await new Promise((r) => setTimeout(r, ms));
+        return invoke(...args);
+      };
+    }, latencyMs);
+  }
   await page.goto('/');
   await page.getByRole('button', { name: /^vault/ }).click();
   await page.getByRole('button', { name: 'Global view' }).click();
@@ -143,4 +156,33 @@ test('keyboard only: arrows move, Enter opens, Escape goes back, Shift+Enter edi
   await expect(card(page, 'Welcome')).toBeFocused();
   await page.keyboard.press('Shift+Enter');
   await expect(page.getByRole('textbox', { name: 'Page title' })).toHaveValue('Welcome');
+});
+
+for (const latencyMs of [0, 40]) {
+  test(`the keyboard follows: Shift+Enter and ⌘1 land in the editor, ⌘2 back on the card, IPC +${latencyMs} ms (final review I4)`, async ({
+    page,
+  }) => {
+    await globalView(page, {}, latencyMs);
+    await card(page, 'Alpha').focus();
+    await page.keyboard.press('ArrowRight');
+    await page.keyboard.press('ArrowRight');
+    await expect(card(page, 'Welcome')).toBeFocused();
+    await page.keyboard.press('Shift+Enter');
+    await expect(page.getByRole('textbox', { name: 'Page title' })).toHaveValue('Welcome');
+    await expect(page.locator('.cm-content')).toBeFocused();
+    await page.keyboard.press('ControlOrMeta+2');
+    await expect(card(page, 'Welcome')).toBeFocused();
+    await page.keyboard.press('ControlOrMeta+1');
+    await expect(page.locator('.cm-content')).toBeFocused();
+    await page.keyboard.type('!');
+    await expect(page.locator('.cm-content')).toContainText('!');
+  });
+}
+
+test('a double click lands in the editor with the keyboard (final review I4)', async ({ page }) => {
+  await globalView(page);
+  await card(page, 'Alpha').click();
+  await card(page, 'One').dblclick();
+  await expect(page.getByRole('textbox', { name: 'Page title' })).toHaveValue('One');
+  await expect(page.locator('.cm-content')).toBeFocused();
 });

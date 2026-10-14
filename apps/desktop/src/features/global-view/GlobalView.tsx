@@ -1,5 +1,5 @@
 import { ReactFlowProvider } from '@xyflow/react';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PlusIcon } from '../../app/icons';
 import { entryCreatePage, type GvCard } from '../../ipc';
@@ -26,8 +26,34 @@ export function GlobalView() {
   const toggles = useSettingsStore((s) => s.settings.globalViewEdges);
   const loaded = useGvStore((s) => s.loaded);
   const empty = useGvStore((s) => s.canvas.cards.length === 0);
+  const shownKey = useGvStore((s) => s.shownKey);
+  const region = useRef<HTMLElement>(null);
   const area = useRef<HTMLDivElement>(null);
+  const emptyNote = useRef<HTMLParagraphElement>(null);
   const [width, setWidth] = useState(1220);
+
+  // Leaving for the editor with the keyboard in here: the editor takes it
+  // when it shows (a page opened from a card, ⌘1), unless New entry asked
+  // for the title (M3a final review I4). A layout cleanup: the view is still
+  // in the document.
+  useLayoutEffect(
+    () => () => {
+      const pages = usePageStore.getState();
+      if (region.current?.contains(document.activeElement) && !pages.titleFocus) {
+        pages.requestEditorFocus();
+      }
+    },
+    [],
+  );
+
+  // An empty level has no card to take the keyboard: the note does, and
+  // Escape there goes back up (I4).
+  useEffect(() => {
+    if (!loaded || !empty) return;
+    const active = document.activeElement;
+    const lost = !active || active === document.body || active.closest('[hidden]') !== null;
+    if (lost || area.current?.contains(active)) emptyNote.current?.focus();
+  }, [loaded, empty, shownKey]);
 
   // Load on show; re-read when the vault or a saved page changes.
   useEffect(() => {
@@ -89,7 +115,7 @@ export function GlobalView() {
   };
 
   return (
-    <section className={styles.view} aria-label={t('gv.region')}>
+    <section ref={region} className={styles.view} aria-label={t('gv.region')}>
       <Toolbar />
       <div ref={area} className={styles.area}>
         <ReactFlowProvider>
@@ -101,7 +127,20 @@ export function GlobalView() {
             onOpenEditor={onOpenEditor}
           />
         </ReactFlowProvider>
-        {loaded && empty && <p className={styles.empty}>{t('gv.empty')}</p>}
+        {loaded && empty && (
+          <p
+            ref={emptyNote}
+            className={styles.empty}
+            tabIndex={-1}
+            onKeyDown={(e) => {
+              if (e.key !== 'Escape') return;
+              e.preventDefault();
+              void useGvStore.getState().up(null);
+            }}
+          >
+            {t('gv.empty')}
+          </p>
+        )}
         <button type="button" className={styles.fab} onClick={() => void newEntry()}>
           <PlusIcon />
           {t('gv.newEntry')}

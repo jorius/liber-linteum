@@ -206,6 +206,12 @@
   color: var(--color-text-muted);
 }
 
+/* It takes the keyboard on an empty level (final review I4). */
+.empty:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 4px;
+}
+
 .fab {
   position: absolute;
   right: 28px;

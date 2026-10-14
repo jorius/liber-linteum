@@ -105,6 +105,7 @@ beforeEach(() => {
 
 afterEach(() => {
   usePageStore.getState().clear();
+  usePageStore.getState().clearTitleFocus();
   clearMocks();
 });
 
@@ -215,5 +216,52 @@ describe('Global View screen (M3a §5, §6)', () => {
     await cardButton('A');
     const results = await axe.run(container, { rules: { 'color-contrast': { enabled: false } } });
     expect(results.violations).toEqual([]);
+  });
+});
+
+describe('keyboard focus after leaving a level (final review I4)', () => {
+  it('an empty level takes the keyboard; Escape goes back up to the card that opened it', async () => {
+    render(<GlobalView />);
+    await waitFor(async () => expect(document.activeElement).toBe(await cardButton('A')));
+    await userEvent.keyboard('{ArrowRight}{Enter}');
+    const note = await screen.findByText('Empty folder.');
+    await waitFor(() => expect(document.activeElement).toBe(note));
+    await userEvent.keyboard('{Escape}');
+    await waitFor(async () => expect(document.activeElement).toBe(await cardButton('B')));
+  });
+
+  it('shown again (⌘2 from the editor), the keyboard is back on the last focused card', async () => {
+    const first = render(<GlobalView />);
+    await waitFor(async () => expect(document.activeElement).toBe(await cardButton('A')));
+    await userEvent.keyboard('{ArrowRight}');
+    expect(document.activeElement).toBe(await cardButton('B'));
+    first.unmount();
+    // The editor is hidden, not unmounted: it may still hold the focus.
+    const hidden = document.body.appendChild(document.createElement('div'));
+    const editor = hidden.appendChild(document.createElement('div'));
+    editor.tabIndex = 0;
+    editor.focus();
+    hidden.hidden = true;
+    expect(document.activeElement).toBe(editor);
+    try {
+      render(<GlobalView />);
+      await waitFor(async () => expect(document.activeElement).toBe(await cardButton('B')));
+    } finally {
+      hidden.remove();
+    }
+  });
+
+  it('leaving with the keyboard in the view asks the editor to take it, unless New entry asked for the title', async () => {
+    const view = render(<GlobalView />);
+    await waitFor(async () => expect(document.activeElement).toBe(await cardButton('A')));
+    view.unmount();
+    expect(usePageStore.getState().editorFocus).toBe(true);
+    act(() => usePageStore.getState().clearEditorFocus());
+    const again = render(<GlobalView />);
+    await waitFor(async () => expect(document.activeElement).toBe(await cardButton('A')));
+    act(() => usePageStore.getState().requestTitleFocus('A/Untitled.md'));
+    again.unmount();
+    expect(usePageStore.getState().editorFocus).toBe(false);
+    act(() => usePageStore.getState().clearTitleFocus());
   });
 });

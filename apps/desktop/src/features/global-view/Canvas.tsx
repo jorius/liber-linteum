@@ -200,8 +200,10 @@ export function Canvas({ mode, toggles, width, onOpen, onOpenEditor }: CanvasPro
     if (nodes.length !== ids.length || nodes.some((n, i) => n.id !== ids[i])) return;
     fitted.current = shownKey;
     void flow.fitView({ padding: 0.12, maxZoom: 1, duration: 0 });
+    // Lost: on the page, or still in the editor that just hid (⌘2).
     const active = document.activeElement;
-    if (active === document.body || (active && wrapper.current?.contains(active))) {
+    const lost = !active || active === document.body || active.closest('[hidden]') !== null;
+    if (lost || wrapper.current?.contains(active)) {
       const first = useGvStore.getState().focus ?? canvas.centre ?? canvas.cards[0]?.path;
       if (first) focusCard(first);
     }
