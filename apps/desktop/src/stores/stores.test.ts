@@ -4,6 +4,7 @@ import type { TreeNode } from '../ipc';
 import { clearMocks, emit, mockIPC } from '../ipc/testing';
 import { usePageStore } from './pageStore';
 import { DEFAULT_SETTINGS, useSettingsStore } from './settingsStore';
+import { useGvStore } from '../features/global-view/gvStore';
 import { useTrailStore } from './trailStore';
 import { useToastStore } from './toastStore';
 import { resetVaultStore, useVaultStore } from './vaultStore';
@@ -190,6 +191,16 @@ describe('vaultStore', () => {
     await emit('vault:changed', { created: ['A.md'], modified: [], removed: [], renamed: [] });
     await vi.advanceTimersByTimeAsync(150);
     expect(useTrailStore.getState().back.map((x) => x.path)).toEqual(['A.md']);
+  });
+
+  it('M3a: opening or closing a vault starts the Global View over at level 0', async () => {
+    backend({ vault_open: () => info, vault_tree: () => [], vault_close: () => null });
+    useGvStore.setState({ stack: [{ kind: 'vault' }, { kind: 'folder', path: 'Old' }] });
+    await useVaultStore.getState().open('/v');
+    expect(useGvStore.getState().stack).toEqual([{ kind: 'vault' }]);
+    useGvStore.setState({ stack: [{ kind: 'vault' }, { kind: 'folder', path: 'Old' }] });
+    await useVaultStore.getState().close();
+    expect(useGvStore.getState().stack).toEqual([{ kind: 'vault' }]);
   });
 
   it('VLT-01 open: closed → opening → open, with tree loaded', async () => {

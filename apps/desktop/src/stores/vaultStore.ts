@@ -25,6 +25,7 @@ import { errorMessage } from './messages';
 import { usePageStore } from './pageStore';
 import { useToastStore } from './toastStore';
 import { useTrailStore } from './trailStore';
+import { useGvStore } from '../features/global-view/gvStore';
 import { useUiStore } from './uiStore';
 import { childrenByParent, joinPath, nextFreeName, parentOf, remap } from './tree';
 
@@ -186,6 +187,7 @@ export const useVaultStore = create<VaultState>((set, get) => {
     }
     set({ info: res.value, selected: null, expanded: new Set(), renaming: null });
     useUiStore.getState().setScreen('edit');
+    useGvStore.getState().reset();
     useTrailStore.getState().reset();
     usePageStore.getState().clear();
     useEditorStore.getState().reset();
@@ -238,6 +240,7 @@ export const useVaultStore = create<VaultState>((set, get) => {
       useEditorStore.getState().reset();
       stopListening();
       await vaultClose();
+      useGvStore.getState().reset();
       useTrailStore.getState().reset();
       usePageStore.getState().clear();
       treeSeq++;
