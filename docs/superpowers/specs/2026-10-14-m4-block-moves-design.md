@@ -2,7 +2,7 @@
 
 **Status:** written on 2026-10-14 without Jose's review. He asked to "carry on with everything that's missing" and review features in bulk later.
 - **Grounding:** product spec §8 (DND-01–DND-08, Q-DND-1 and Q-A11Y-1, all DECIDED), architecture §4.3, and the prototype's Split-pane block gutter (`design/prototype/Main.dc.html`: grip plus Move up / Move down, the hint "Drag blocks in the preview to reorder them; the Markdown on the left follows.").
-- **Builds on:** M3b (`feat/m3b-relationships`).
+- **Builds on:** M3b (`feat/m3b-relationships`, after its final-review fix pass).
 - **Judgement calls** are listed in §9.
 
 ---
