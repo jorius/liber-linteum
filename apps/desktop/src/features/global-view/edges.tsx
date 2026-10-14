@@ -207,15 +207,22 @@ const pageOfNode = (n: Node): string | null => {
 
 /** A wide, invisible stroke over a direct relationship that takes the
  *  pointer (the layer itself ignores it); `nopan`, so pressing on it doesn't
- *  pan the canvas. */
-const EdgeHit = memo(function EdgeHit({ from, to, onClick }: EndsProps & { onClick: () => void }) {
+ *  pan the canvas. Its props are plain values and the layer's one callback,
+ *  so it redraws only when one of its cards moved (final review m16). */
+const EdgeHit = memo(function EdgeHit({
+  from,
+  to,
+  a,
+  b,
+  onRelations,
+}: EndsProps & { a: string; b: string; onRelations: (a: string, b: string) => void }) {
   const { s, t } = line(from, to);
   return (
     <path
       className={`${styles.edgeHit} nopan`}
       d={`M${s.x},${s.y}L${t.x},${t.y}`}
       data-gv-hit=""
-      onClick={onClick}
+      onClick={() => onRelations(a, b)}
     />
   );
 });
@@ -279,7 +286,9 @@ export const EdgeLayer = memo(function EdgeLayer({ edges, onRelations }: EdgeLay
               const a = pages.get(e.source);
               const b = pages.get(e.target);
               if (!from || !to || !a || !b) return null;
-              return <EdgeHit key={e.id} from={from} to={to} onClick={() => onRelations(a, b)} />;
+              return (
+                <EdgeHit key={e.id} from={from} to={to} a={a} b={b} onRelations={onRelations} />
+              );
             })}
           </g>
         )}

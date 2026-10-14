@@ -3,13 +3,14 @@
 // drawn as React Flow edges with HTML count labels they took 1.5–2.5 s in
 // WebKit against NFR-03's 300 ms (final review I2).
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { ReactFlow, ReactFlowProvider, type Node } from '@xyflow/react';
+import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { GvCard, GvEdge, GvLevel, GvLevelRef } from '../../ipc';
 import { clearMocks, mockIPC } from '../../ipc/testing';
 import { DEFAULT_SETTINGS, useSettingsStore } from '../../stores/settingsStore';
 import { useUiStore } from '../../stores/uiStore';
 import { installReactFlowStubs } from '../../test/reactFlow';
-import { MAX_AGGREGATED } from './edges';
+import { EdgeLayer, MAX_AGGREGATED, type DrawnEdge } from './edges';
 import { GlobalView } from './GlobalView';
 import { levelKey, useGvStore } from './gvStore';
 
@@ -215,5 +216,58 @@ describe('Global View edges (M3a §6, final review I2)', () => {
       page: 'Gamma/b.md',
       other: 'zeta.md',
     });
+  });
+});
+
+describe('EdgeLayer hit paths (final review m16)', () => {
+  it('a card that moves leaves the other edges’ hit paths alone (they are memoised)', () => {
+    // Counts the edge layer's reads of each card's position (React Flow
+    // reads every position on each change itself): a hit path that
+    // re-renders reads its two cards' positions to draw itself.
+    const reads = new Map<string, number>();
+    const at = (id: string, x: number, y: number) => ({
+      get x() {
+        if (/edges\.tsx/.test(new Error().stack ?? '')) reads.set(id, (reads.get(id) ?? 0) + 1);
+        return x;
+      },
+      get y() {
+        return y;
+      },
+    });
+    const node = (id: string, position: { x: number; y: number }): Node => ({
+      id,
+      position,
+      data: { card: card(id, 'page') },
+      style: { width: 240, height: 300 },
+    });
+    const manual = (source: string, target: string): DrawnEdge => ({
+      id: `manual:${source}→${target}`,
+      source,
+      target,
+      kind: 'manual',
+      aggregated: false,
+      directed: false,
+      count: 1,
+      label: null,
+    });
+    const onRelations = vi.fn();
+    const view = (nodes: Node[]) => (
+      <ReactFlowProvider>
+        <ReactFlow nodes={nodes} edges={[]}>
+          <EdgeLayer edges={[manual('A.md', 'B.md')]} onRelations={onRelations} />
+        </ReactFlow>
+      </ReactFlowProvider>
+    );
+    const a = node('A.md', at('A.md', 0, 0));
+    const b = node('B.md', at('B.md', 400, 0));
+    const { rerender } = render(view([a, b, node('C.md', at('C.md', 0, 400))]));
+    expect(document.querySelectorAll('[data-gv-hit]')).toHaveLength(1);
+    reads.clear();
+    // C is dragged: a drag frame.
+    rerender(view([a, b, node('C.md', at('C.md', 40, 400))]));
+    expect(reads.get('A.md') ?? 0).toBe(0);
+    expect(reads.get('B.md') ?? 0).toBe(0);
+    fireEvent.click(document.querySelector('[data-gv-hit]')!);
+    expect(onRelations).toHaveBeenCalledWith('A.md', 'B.md');
   });
 });
