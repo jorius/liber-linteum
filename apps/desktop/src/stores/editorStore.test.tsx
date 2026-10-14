@@ -290,13 +290,19 @@ describe('frontmatter edits from the header (M2c §4)', () => {
     expect(view.state.doc.toString()).toBe('# A\ntyped\n');
   });
 
-  it('invalid YAML is never rewritten: a toast says to fix it', async () => {
-    const disk = fakeDisk({ 'A.md': '---\nsubtitle: [oops\n---\nBody\n' });
-    await editor().open('A.md');
-    expect(await editor().editFrontmatter({ subtitle: 'x' })).toBe(false);
-    expect(disk.writes()).toEqual([]);
-    expect(useToastStore.getState().toasts.at(-1)?.message).toBe(
-      'Fix the note’s frontmatter first (it isn’t valid YAML).',
-    );
+  it('frontmatter it can’t edit safely is never rewritten: a toast says to use Source', async () => {
+    // Invalid YAML, and valid YAML the guard refuses (a flow map), get the same advice.
+    for (const text of [
+      '---\nsubtitle: [oops\n---\nBody\n',
+      '---\n{subtitle: a, cover: x.png}\n---\nBody\n',
+    ]) {
+      const disk = fakeDisk({ 'A.md': text });
+      await editor().open('A.md');
+      expect(await editor().editFrontmatter({ subtitle: null })).toBe(false);
+      expect(disk.writes()).toEqual([]);
+      expect(useToastStore.getState().toasts.at(-1)?.message).toBe(
+        'NIMW can’t safely change this note’s frontmatter. Edit it in Source mode.',
+      );
+    }
   });
 });

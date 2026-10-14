@@ -95,7 +95,7 @@
     "breadcrumb": "Ruta",
     "titleLabel": "Título de la página",
     "titleTaken": "Ya hay una página llamada «{name}» en esta carpeta.",
-    "frontmatterInvalid": "Corrige primero el frontmatter de la nota (no es YAML válido).",
+    "frontmatterInvalid": "NIMW no puede cambiar con seguridad el frontmatter de esta nota. Edítalo en el modo Código.",
     "titleInNote": "Título en la nota: {title}",
     "subtitleLabel": "Subtítulo",
     "subtitlePlaceholder": "Añade un subtítulo"

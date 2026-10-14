@@ -45,7 +45,8 @@ interface EditorState {
   reset: () => void;
   /** Header edits (cover, subtitle, M2c §4): changes the current page's
    *  frontmatter as an undoable editor change and saves at once. `false` when
-   *  there is no editable page or its frontmatter isn't valid YAML (toast). */
+   *  there is no editable page or its frontmatter can't be edited safely (invalid
+   *  YAML, or a form the byte-minimal edit refuses; toast). */
   editFrontmatter: (patch: FrontmatterPatch) => Promise<boolean>;
 }
 

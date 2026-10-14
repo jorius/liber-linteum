@@ -96,7 +96,7 @@
     "titleLabel": "Page title",
     "titleTaken": "A page named “{name}” is already in this folder.",
     "titleInNote": "Title in the note: {title}",
-    "frontmatterInvalid": "Fix the note’s frontmatter first (it isn’t valid YAML).",
+    "frontmatterInvalid": "NIMW can’t safely change this note’s frontmatter. Edit it in Source mode.",
     "subtitleLabel": "Subtitle",
     "subtitlePlaceholder": "Add a subtitle"
   },
