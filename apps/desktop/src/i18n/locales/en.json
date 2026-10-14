@@ -120,7 +120,10 @@
     "saveStatus": "Save status",
     "unsavedBlocks": "Unsaved changes in “{name}” couldn’t be written, so the vault stays open.",
     "unsavedKeepsWindow": "Unsaved changes in “{name}” couldn’t be written, so the window stays open. Close it again to quit without them.",
-    "copying": "Copying files…"
+    "copying": "Copying files…",
+    "blocks": {
+      "refused": "This block can’t be moved here."
+    }
   },
   "preview": {
     "remoteBlocked": "Remote image blocked (privacy)",

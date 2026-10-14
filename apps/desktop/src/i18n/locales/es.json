@@ -120,7 +120,10 @@
     "saveStatus": "Estado de guardado",
     "unsavedBlocks": "Los cambios sin guardar en «{name}» no se pudieron escribir, así que la bóveda sigue abierta.",
     "unsavedKeepsWindow": "Los cambios sin guardar en «{name}» no se pudieron escribir, así que la ventana sigue abierta. Ciérrala otra vez para salir sin ellos.",
-    "copying": "Copiando archivos…"
+    "copying": "Copiando archivos…",
+    "blocks": {
+      "refused": "Este bloque no se puede mover aquí."
+    }
   },
   "preview": {
     "remoteBlocked": "Imagen remota bloqueada (privacidad)",

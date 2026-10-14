@@ -302,3 +302,26 @@ describe('the keyboard back in the editor (M3a final review I4)', () => {
     button.remove();
   });
 });
+
+describe('block moves from the keyboard (M4 §5)', () => {
+  it('Alt+↓ moves a list item in Live Preview too, as one undo step', async () => {
+    // With a nested item, so it can't pass as CodeMirror's line move.
+    disk = fakeDisk({ 'L.md': '- a\n  - a1\n- b\n' });
+    const doc = await load('L.md');
+    render(<Editor doc={doc} mode="livePreview" label="L" />);
+    act(() => viewOf().dispatch({ selection: { anchor: 1 } }));
+    act(() => {
+      viewOf().contentDOM.dispatchEvent(
+        new KeyboardEvent('keydown', {
+          key: 'ArrowDown',
+          altKey: true,
+          bubbles: true,
+          cancelable: true,
+        }),
+      );
+    });
+    expect(viewOf().state.doc.toString()).toBe('- b\n- a\n  - a1\n');
+    act(() => undo(viewOf()));
+    expect(viewOf().state.doc.toString()).toBe('- a\n  - a1\n- b\n');
+  });
+});
