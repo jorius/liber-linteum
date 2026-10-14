@@ -36,6 +36,9 @@ export interface PreviewProps {
   /** Called with the text and model each time the pane shows a new version
    *  (the Split pane's block gutter, M4 §4, maps blocks by their offsets). */
   onRendered?: (text: string, page: ParsedPage) => void;
+  /** Render delay after a change (default RENDER_DEBOUNCE_MS; 0 after a
+   *  block move). */
+  delay?: number;
 }
 
 /** The rendered pane (M2a §4): sanitized Markdown with resolved links and
@@ -57,9 +60,10 @@ function PreviewBody({
   embedded = false,
   onToggleTask,
   onRendered,
+  delay = RENDER_DEBOUNCE_MS,
 }: PreviewProps) {
   const { t } = useTranslation();
-  const shown = useDebounced(text, RENDER_DEBOUNCE_MS);
+  const shown = useDebounced(text, delay);
   const page = useParsed(shown);
   const tree = useMemo(() => {
     const part = heading

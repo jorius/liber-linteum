@@ -220,6 +220,16 @@ export function BlockGutter({
     return () => clearTimeout(timer);
   }, [model, anchors]);
 
+  // A pick-up made on blocks that have since changed is off.
+  const pickedOn = useRef<BlockModel | null>(null);
+  useEffect(() => {
+    if (picking && pickedOn.current && pickedOn.current !== model) {
+      setPicking(null);
+      setStatus(t('editor.blocks.cancelled'));
+    }
+    pickedOn.current = model;
+  }, [model, picking, t]);
+
   // The grip with the keyboard follows `current`.
   useEffect(() => {
     if (!focusNext.current || tabStop === null) return;
@@ -373,7 +383,13 @@ export function BlockGutter({
   };
 
   const onKey = (e: ReactKeyboardEvent, id: number) => {
-    if (!model) return;
+    if (!model || !shown) return;
+    // Until the pane shows the editor's text (a move a moment ago), a key
+    // would act on blocks that have moved: it waits.
+    if (view.state.doc.toString() !== shown.text) {
+      if (e.key.startsWith('Arrow') || e.key === 'Enter' || e.key === ' ') e.preventDefault();
+      return;
+    }
     const unit = model.units[id];
     if (picking) {
       if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
@@ -447,9 +463,9 @@ export function BlockGutter({
       <div className={styles.srOnly} role="status" data-block-status="">
         {status}
       </div>
-      <p id="block-gutter-help" className={styles.srOnly}>
+      <span id="block-gutter-help" className={styles.srOnly}>
         {t('editor.blocks.help')}
-      </p>
+      </span>
       {flash !== null && anchors.get(flash) && (
         <div className={styles.flash} style={placeOf(anchors.get(flash)!)} aria-hidden="true" />
       )}

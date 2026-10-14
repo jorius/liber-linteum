@@ -89,6 +89,24 @@ describe('the block gutter in the Split pane (M4 §4)', () => {
     expect(status()).toBe('Moved P2.');
   });
 
+  it('after a move the pane shows it at once; a key while the pane lags the editor does nothing', async () => {
+    const pane = await split('P1\n\nP2\n\nP3\n');
+    act(() => grip('P1').focus());
+    await key(grip('P1'), 'ArrowDown');
+    await key(grip('P2'), 'ArrowUp', { altKey: true });
+    // Well within the 150 ms render delay for typing.
+    await act(() => new Promise((r) => setTimeout(r, 30)));
+    expect(pane.querySelector('[data-source-start]')!.textContent).toBe('P2');
+    await vi.waitFor(() => expect(grip('P2')).toHaveFocus());
+    // Typing reaches the pane only after its delay: meanwhile a gutter key
+    // would act on blocks that have changed, so it does nothing.
+    act(() => viewOf().dispatch({ changes: { from: viewOf().state.doc.length, insert: 'x' } }));
+    await key(grip('P2'), 'ArrowDown', { altKey: true });
+    await key(grip('P2'), 'Enter');
+    expect(source()).toBe('P2\n\nP1\n\nP3\nx');
+    expect(status()).toBe('Moved P2.');
+  });
+
   it('Enter picks a block up: arrows choose a place, Enter drops it; Escape cancels', async () => {
     await split('P1\n\nP2\n\nP3\n');
     act(() => grip('P1').focus());

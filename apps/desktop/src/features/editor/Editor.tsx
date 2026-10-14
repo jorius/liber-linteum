@@ -28,7 +28,7 @@ import { hideView, pageDocOf, showView, storedState, storeState } from './views'
 import { toggleTaskIn } from './widgets';
 
 /** The Split pane of the component currently showing each view. */
-const paneOf = new WeakMap<EditorView, (text: string) => void>();
+const paneOf = new WeakMap<EditorView, (text: string, now: boolean) => void>();
 /** The toolbar's pressed state of the component currently showing each view. */
 const toolbarOf = new WeakMap<EditorView, (state: EditorState) => void>();
 const modeSlot = new Compartment();
@@ -210,7 +210,12 @@ function createState(d: PageDoc, mode: EditorMode, label: string, numbers: boole
         if (!u.docChanged) return;
         const next = u.state.doc.toString();
         u.state.facet(pageDocOf)?.edit(next);
-        paneOf.get(u.view)?.(next);
+        // A block move shows in the pane at once (its gutter acts on what
+        // the pane shows, M4 §4); typing waits for the render delay.
+        paneOf.get(u.view)?.(
+          next,
+          u.transactions.some((tr) => tr.isUserEvent('move.block')),
+        );
       }),
     ],
   });
@@ -233,6 +238,11 @@ export function Editor({ doc, mode, label }: EditorProps) {
   const split = mode === 'split';
   // The text for the Split pane (cheap to track: the pane renders only in Split).
   const [text, setText] = useState(doc.text);
+  const [renderNow, setRenderNow] = useState(false);
+  const toPane = useCallback((next: string, now: boolean) => {
+    setText(next);
+    setRenderNow(now);
+  }, []);
   const showToolbar = useSettingsStore((s) => s.settings.toolbar);
   const showNumbers = useSettingsStore((s) => s.settings.lineNumbers);
   const [toolbarView, setToolbarView] = useState<EditorView | null>(null);
@@ -251,7 +261,7 @@ export function Editor({ doc, mode, label }: EditorProps) {
     const v = new EditorView({ parent: host.current!, state: stateFor(current.current) });
     view.current = v;
     showView(current.current, v);
-    paneOf.set(v, setText);
+    paneOf.set(v, toPane);
     toolbarOf.set(v, showFormats);
     setToolbarView(v);
     setLinkPickerOpener(v, () => setPicker(true));
@@ -378,6 +388,7 @@ export function Editor({ doc, mode, label }: EditorProps) {
               path={doc.path}
               onToggleTask={toggleTask}
               onRendered={onRendered}
+              delay={renderNow ? 0 : undefined}
             />
           </div>
         )}
