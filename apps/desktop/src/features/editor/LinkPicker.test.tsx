@@ -2,7 +2,7 @@ import { EditorView } from '@codemirror/view';
 import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import axe from 'axe-core';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { clearMocks } from '../../ipc/testing';
 import type { LinkSuggestion } from '../../ipc';
 import { DEFAULT_SETTINGS, useSettingsStore } from '../../stores/settingsStore';
@@ -156,5 +156,34 @@ describe('Link picker (M2c §6.3)', () => {
       .run(box.parentElement!, { rules: { 'color-contrast': { enabled: false } } })
       .then((r) => r.violations);
     expect(violations).toEqual([]);
+  });
+});
+
+describe('the picker follows the text (M4b §4)', () => {
+  it('re-anchors when the editor scrolls or the window resizes, and stays in the window', async () => {
+    await mount('Hello there\n', 0, 5);
+    let line = { top: 100, bottom: 120, left: 200 };
+    const spy = vi
+      .spyOn(viewOf(), 'coordsAtPos')
+      .mockImplementation(() => ({ ...line, right: line.left }));
+    pressModK();
+    const box = () => screen.getByRole('combobox', { name: 'Link to…' }).closest('div')!;
+    await waitFor(() => expect(box().style.top).toBe('126px'));
+    expect(box().style.left).toBe('200px');
+
+    // The text scrolls up: the picker moves with it.
+    line = { top: 40, bottom: 60, left: 200 };
+    act(() => {
+      viewOf().scrollDOM.dispatchEvent(new Event('scroll'));
+    });
+    await waitFor(() => expect(box().style.top).toBe('66px'));
+
+    // Scrolled out of view at the top: clamped to the window's edge.
+    line = { top: -500, bottom: -480, left: 200 };
+    act(() => {
+      window.dispatchEvent(new Event('resize'));
+    });
+    await waitFor(() => expect(box().style.top).toBe('8px'));
+    spy.mockRestore();
   });
 });
