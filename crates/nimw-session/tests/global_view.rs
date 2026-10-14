@@ -643,6 +643,30 @@ fn m3b_index_picks_follow_renames() {
     );
 }
 
+/// Final review m4: a page name holding `"` is linked single-quoted
+/// (`'[[say "hi"]]'`, as the app writes it); nimw-markdown indexes it, and
+/// the relationship resolves to the page: a direct manual edge.
+#[test]
+fn m3b_a_single_quoted_link_with_double_quotes_is_indexed_and_resolves() {
+    let dir = tempfile::tempdir().unwrap();
+    let r = dir.path();
+    write(r, "say \"hi\".md", "# Hi\n");
+    write(
+        r,
+        "A.md",
+        "---\nrelated:\n  - '[[say \"hi\"]]'\n  - { link: '[[say \"hi\"]]', label: x, directed: true }\n---\n# A\n",
+    );
+    let (_c, s) = open(r);
+    assert_eq!(
+        s.link_target(&vp("A.md"), &vp("say \"hi\".md")).unwrap(),
+        "say \"hi\""
+    );
+    let edges = s.gv_edges(&visible(&["A.md", "say \"hi\".md"])).unwrap();
+    let e = edge(&edges, "A.md", "say \"hi\".md", EdgeKind::Manual);
+    assert_eq!((e.count, e.aggregated, e.directed), (2, false, true));
+    assert_eq!(e.label.as_deref(), Some("x"));
+}
+
 /// M3b §6: the wiki target a relationship writes — the shortest unique one.
 #[test]
 fn m3b_link_target_is_the_shortest_unique_wiki_target() {

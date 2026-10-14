@@ -297,6 +297,7 @@
       "samePage": "{a} and {b} stand for the same page: it can’t be related to itself.",
       "created": "Relationship created.",
       "createdPending": "Relationship added; saving…",
+      "unlinkable": "Can’t link to {name}: links can’t hold # | ^ [ ] or both kinds of quote in a page or folder name. Rename it first.",
       "of": "Relationships of {name}",
       "between": "Relationships between {a} and {b}",
       "loading": "Loading…",

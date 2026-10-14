@@ -146,6 +146,39 @@ describe('relationships written to pages (M3b §5)', () => {
     expect(disk.files.get('A.md')).toBe('---\nrelated:\n  - "[[B]]"\n  - "[[C]]"\n---\n# A\n');
   });
 
+  it('a page whose name a link can’t hold is refused with a toast, never written (final review m4)', async () => {
+    const names = ['C# notes', 'a|b', 'x^y', '[draft] z', 'It’s "fun" and it\'s'];
+    const disk = fakeDisk(
+      Object.fromEntries([['A.md', '# A\n'], ...names.map((n) => [`${n}.md`, '# x\n'])]),
+      extra,
+    );
+    for (const name of names) {
+      useToastStore.getState().clear();
+      expect(await relate('A.md', `${name}.md`), name).toEqual({ status: 'failed' });
+      expect(await relate('A.md', `${name}.md`), name).toEqual({ status: 'failed' });
+      // One toast per attempt.
+      expect(toasts(), name).toEqual(
+        Array(2).fill(
+          `Can’t link to ${name}: links can’t hold # | ^ [ ] or both kinds of quote in a page or folder name. Rename it first.`,
+        ),
+      );
+    }
+    expect(disk.writes()).toEqual([]);
+  });
+
+  it('a page name with double quotes is written single-quoted, as nimw-markdown indexes it (final review m4)', async () => {
+    const disk = fakeDisk({ 'A.md': '# A\n', 'say "hi".md': '# x\n' }, extra);
+    expect(await relate('A.md', 'say "hi".md')).toEqual({ status: 'created' });
+    expect(disk.files.get('A.md')).toBe('---\nrelated:\n  - \'[[say "hi"]]\'\n---\n# A\n');
+    const [r] = await relationsOf('A.md');
+    expect(r.path).toBe('say "hi".md');
+    expect(await updateRelation(r, { label: 'x', directed: true })).toBe(true);
+    expect(disk.files.get('A.md')).toBe(
+      '---\nrelated:\n  - { link: \'[[say "hi"]]\', label: x, directed: true }\n---\n# A\n',
+    );
+    expect(await relate('A.md', 'say "hi".md')).toEqual({ status: 'exists', index: 0 });
+  });
+
   it('two quick connects to the same page write one relationship (final review m7)', async () => {
     const disk = fakeDisk({ 'A.md': '# A\n', 'B.md': '# B\n' }, extra);
     const results = await Promise.all([relate('A.md', 'B.md'), relate('A.md', 'B.md')]);

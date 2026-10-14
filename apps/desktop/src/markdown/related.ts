@@ -100,15 +100,21 @@ export function readRelated(text: string): RelatedEntry[] {
   });
 }
 
+/** A link as a YAML scalar. One holding `"` or `\` is single-quoted, so its
+ *  source text is the link itself: nimw-markdown finds a link by its text,
+ *  and skips an escaped one (final review m4). */
+function linkYaml(link: string): string {
+  const single = /["\\]/.test(link) && !link.includes("'");
+  return stringify(link, { lineWidth: 0, singleQuote: single }).replace(/\n$/, '');
+}
+
 /** One list item: the string form, or the map form when it has a label or an
  *  arrow (flow style, so the item stays one line). */
 function itemYaml(link: string, change: RelatedChange): string {
   const label = change.label?.replace(/\s*\n\s*/g, ' ').trim() || null;
-  if (!label && !change.directed) return stringify(link, { lineWidth: 0 }).replace(/\n$/, '');
-  const map: Record<string, unknown> = { link };
-  if (label) map.label = label;
-  if (change.directed) map.directed = true;
-  return stringify(map, { collectionStyle: 'flow', lineWidth: 0 }).replace(/\n$/, '');
+  if (!label && !change.directed) return linkYaml(link);
+  const rest = [label && pairYaml('label', label), change.directed && 'directed: true'];
+  return `{ ${[`link: ${linkYaml(link)}`, ...rest.filter(Boolean)].join(', ')} }`;
 }
 
 /** The data `related:` should hold after the edit, given what it held. */

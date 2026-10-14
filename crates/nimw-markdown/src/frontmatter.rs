@@ -336,6 +336,25 @@ mod tests {
         assert!(fm("---\nrelated: not a link\n---\n").links.is_empty());
     }
 
+    /// Final review m4: NIMW writes a link holding `"` or `\` single-quoted
+    /// (no escapes), so its target is found in the source and indexed with
+    /// its range; an escaped (double-quoted) one isn't.
+    #[test]
+    fn m3b_single_quoted_links_with_quotes_or_backslashes_are_indexed() {
+        let src = "---\nrelated:\n  - '[[say \"hi\"]]'\n  - { link: '[[a\\b]]', label: x }\n  - \"[[It's \\\"fun\\\"]]\"\n---\n";
+        let f = fm(src);
+        let targets: Vec<_> = f
+            .links
+            .iter()
+            .map(|l| (&src[l.range.clone()], l.target.as_str()))
+            .collect();
+        assert_eq!(
+            targets,
+            vec![("say \"hi\"", "say \"hi\""), ("a\\b", "a\\b")]
+        );
+        assert_eq!(f.links[1].label.as_deref(), Some("x"));
+    }
+
     #[test]
     fn malformed_yaml_sets_error_and_no_values() {
         let f = fm("---\ntags: [unclosed\nsubtitle: x\n---\n");

@@ -110,6 +110,13 @@ async function editRelations(page: string, edit: Edit): Promise<'saved' | 'pendi
   return false;
 }
 
+/** A wiki target a `[[…]]` link can hold: `#`, `|` and `^` would start a
+ *  heading, an alias or a block, `[`/`]` end the link, and both kinds of
+ *  quote can't be written without YAML escapes, which nimw-markdown
+ *  doesn't index (final review m4). */
+const linkable = (target: string) =>
+  !/[#|^[\]]/.test(target) && !(target.includes("'") && target.includes('"'));
+
 /** Wiki targets name the same page whatever their case or Unicode form. */
 const sameTarget = (a: string, b: string) =>
   a.normalize('NFC').toLowerCase() === b.normalize('NFC').toLowerCase();
@@ -122,6 +129,10 @@ export async function relate(source: string, target: string): Promise<RelateResu
   const link = await linkTarget(source, target);
   if (!link.ok) {
     toast(errorMessage(link.error));
+    return { status: 'failed' };
+  }
+  if (!linkable(link.value)) {
+    toast(i18next.t('gv.relations.unlinkable', { name: pageName(target) }));
     return { status: 'failed' };
   }
   // Checked again on the text the item is appended to: another connect may

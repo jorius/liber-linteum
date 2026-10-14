@@ -297,6 +297,7 @@
       "samePage": "{a} y {b} representan la misma página: no se puede relacionar consigo misma.",
       "created": "Relación creada.",
       "createdPending": "Relación añadida; guardando…",
+      "unlinkable": "No se puede enlazar {name}: los enlaces no admiten # | ^ [ ] ni los dos tipos de comillas en el nombre de una página o carpeta. Cámbialo primero.",
       "of": "Relaciones de {name}",
       "between": "Relaciones entre {a} y {b}",
       "loading": "Cargando…",

@@ -85,6 +85,20 @@ describe('appending a relationship (M3b §2, §5)', () => {
     expect(apply(empty, appendRelated(empty, 'C'))).toBe('---\nrelated:\n  - "[[C]]"\nz: 1\n---\n');
   });
 
+  it('a link with " or \\ is single-quoted: no escapes, as nimw-markdown indexes it (final review m4)', () => {
+    for (const [target, item] of [
+      ['say "hi"', `'[[say "hi"]]'`],
+      ['a\\b', `'[[a\\b]]'`],
+      ["It's", `"[[It's]]"`],
+    ]) {
+      const out = apply('# x\n', appendRelated('# x\n', target));
+      expect(out, target).toBe(`---\nrelated:\n  - ${item}\n---\n# x\n`);
+      expect(readRelated(out)[0].target, target).toBe(target);
+      const labelled = apply(out, updateRelated(out, 0, { label: 'x', directed: false }));
+      expect(labelled, target).toBe(`---\nrelated:\n  - { link: ${item}, label: x }\n---\n# x\n`);
+    }
+  });
+
   it('refuses frontmatter it can’t edit safely, and never doubles a block', () => {
     expect(appendRelated('---\nrelated: [oops\n---\n', 'A')).toEqual({ ok: false });
     expect(appendRelated('---\nx: &a [1]\nrelated: *a\n---\n', 'A')).toEqual({ ok: false });
