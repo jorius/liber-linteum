@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <!-- macOS (M4b §7): app-icon.svg's artwork inside Apple's icon grid, an
+       824 × 824 rounded square (radius 184) centred on a transparent 1024
+       canvas. Only icon.icns is made from it. The soft drop shadow is
+       stacked translucent squares: sips (CoreSVG) draws no SVG filters.
+       To regenerate (macOS), from the repo root, with <tmp> a new folder (an absolute path):
+         sips -s format png apps/desktop/src-tauri/icons/app-icon-macos.svg -o <tmp>/icon.png
+         pnpm -F @nimw/desktop tauri icon <tmp>/icon.png -o <tmp>/out
+         cp <tmp>/out/icon.icns apps/desktop/src-tauri/icons/icon.icns -->
+  <g fill="#000" fill-opacity="0.035">
+    <rect x="76" y="84" width="872" height="872" rx="208"/>
+    <rect x="80" y="88" width="864" height="864" rx="204"/>
+    <rect x="84" y="92" width="856" height="856" rx="200"/>
+    <rect x="88" y="96" width="848" height="848" rx="196"/>
+    <rect x="91" y="99" width="842" height="842" rx="193"/>
+    <rect x="94" y="102" width="836" height="836" rx="190"/>
+    <rect x="97" y="105" width="830" height="830" rx="187"/>
+  </g>
+  <rect x="100" y="100" width="824" height="824" rx="184" fill="#f4eff8"/>
+  <g transform="translate(100 100) scale(20.6) translate(2 2) scale(0.9)">
+    <rect x="3" y="7" width="20" height="26" rx="4" fill="#4b2f86"/>
+    <rect x="17" y="7" width="20" height="26" rx="4" fill="none" stroke="#4b2f86" stroke-width="2.5"/>
+    <path d="M9 15h8M9 20h8M9 25h5" stroke="#fff" stroke-width="2" stroke-linecap="round"/>
+  </g>
+</svg>
