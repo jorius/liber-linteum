@@ -278,6 +278,22 @@
     "obsidianFolder": "the “{name}” folder"
   },
   "gv": {
-    "region": "Global View"
+    "region": "Global View",
+    "vault": "Vault",
+    "kind": {
+      "project": "Project",
+      "folder": "Folder",
+      "page": "Page"
+    },
+    "kindWithName": "{kind} · {name}",
+    "cardName": "{title}, {kind}",
+    "noCover": "No cover",
+    "remoteCover": "Remote cover not loaded",
+    "counts": "{pages, plural, one {# page} other {# pages}} · {folders, plural, one {# folder} other {# folders}}",
+    "hasImage": "Has images",
+    "hasAudio": "Has audio",
+    "seeAll": "See all",
+    "seeAllLabel": "See all: {title}",
+    "move": "Move card"
   }
 }

@@ -278,6 +278,22 @@
     "obsidianFolder": "la carpeta «{name}»"
   },
   "gv": {
-    "region": "Vista global"
+    "region": "Vista global",
+    "vault": "Bóveda",
+    "kind": {
+      "project": "Proyecto",
+      "folder": "Carpeta",
+      "page": "Página"
+    },
+    "kindWithName": "{kind} · {name}",
+    "cardName": "{title}, {kind}",
+    "noCover": "Sin portada",
+    "remoteCover": "Portada remota no cargada",
+    "counts": "{pages, plural, one {# página} other {# páginas}} · {folders, plural, one {# carpeta} other {# carpetas}}",
+    "hasImage": "Tiene imágenes",
+    "hasAudio": "Tiene audio",
+    "seeAll": "Ver todo",
+    "seeAllLabel": "Ver todo: {title}",
+    "move": "Mover tarjeta"
   }
 }

@@ -1,0 +1,159 @@
+import { useEffect, useId, useRef, type KeyboardEvent } from 'react';
+import { useTranslation } from 'react-i18next';
+import { AudioIcon, FolderIcon, GripIcon, ImageIcon } from '../../app/icons';
+import { assetUrl, type GvCard } from '../../ipc';
+import { nameOf } from '../../stores/tree';
+import styles from './Card.module.css';
+
+/** A single click waits this long for a second one (prototype; M3a §5), so
+ *  a double click never also opens the next level. */
+export const SINGLE_CLICK_MS = 240;
+
+export interface CardProps {
+  card: GvCard;
+  /** Accent ring: the card this level was opened from, or an expanded card. */
+  open: boolean;
+  /** Roving tabindex (GV-18): only one card is in the Tab order. */
+  focusable: boolean;
+  /** Its edges in plain words, for screen readers (M3a §6). */
+  connections: string;
+  /** Single click / Enter: the next level (GV-11). */
+  onOpen: () => void;
+  /** Double click / Shift+Enter / See all: the editor (GV-12). */
+  onOpenEditor: () => void;
+  onFocus: () => void;
+}
+
+/** One Global View card (M3a §4, prototype `.card`). */
+export function Card({
+  card,
+  open,
+  focusable,
+  connections,
+  onOpen,
+  onOpenEditor,
+  onFocus,
+}: CardProps) {
+  const { t } = useTranslation();
+  const descId = useId();
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(
+    () => () => {
+      if (timer.current) clearTimeout(timer.current);
+    },
+    [],
+  );
+
+  const kind = t(`gv.kind.${card.kind}`);
+  const label =
+    card.kind !== 'page' && card.indexPage
+      ? t('gv.kindWithName', { kind, name: nameOf(card.path) })
+      : kind;
+  const summary = card.kind !== 'page' && !card.indexPage;
+
+  const click = () => {
+    if (timer.current) clearTimeout(timer.current);
+    timer.current = setTimeout(() => {
+      timer.current = null;
+      onOpen();
+    }, SINGLE_CLICK_MS);
+  };
+  const doubleClick = () => {
+    if (timer.current) clearTimeout(timer.current);
+    timer.current = null;
+    onOpenEditor();
+  };
+  const keyDown = (e: KeyboardEvent) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      if (e.shiftKey) onOpenEditor();
+      else onOpen();
+    }
+  };
+
+  let cover;
+  if (card.cover) {
+    cover = (
+      <img
+        className={styles.image}
+        src={assetUrl(card.cover)}
+        alt=""
+        loading="lazy"
+        draggable={false}
+        style={{ objectPosition: `50% ${card.coverY ?? 50}%` }}
+      />
+    );
+  } else if (summary) {
+    cover = (
+      <span className={styles.summary}>
+        <FolderIcon />
+        {t('gv.counts', { pages: card.pages, folders: card.folders })}
+      </span>
+    );
+  } else {
+    cover = (
+      <span className={styles.none}>{t(card.coverRemote ? 'gv.remoteCover' : 'gv.noCover')}</span>
+    );
+  }
+
+  return (
+    <div
+      className={styles.card}
+      data-open={open || undefined}
+      role="group"
+      aria-label={t('gv.cardName', { title: card.title, kind: kind.toLocaleLowerCase() })}
+    >
+      <div className={styles.head}>
+        <span className={styles.kind}>{label}</span>
+        <span className={`${styles.grip} gv-grip`} title={t('gv.move')} aria-hidden="true">
+          <GripIcon />
+        </span>
+      </div>
+      <div
+        className={styles.hit}
+        role="button"
+        tabIndex={focusable ? 0 : -1}
+        aria-label={card.title}
+        aria-describedby={descId}
+        data-gv-card={card.path}
+        onClick={click}
+        onDoubleClick={doubleClick}
+        onKeyDown={keyDown}
+        onFocus={onFocus}
+      >
+        <div
+          className={`${styles.cover} ${card.cover ? '' : summary ? styles.coverFolder : styles.coverNone}`}
+        >
+          {cover}
+        </div>
+        <p className={styles.title}>{card.title}</p>
+        {card.subtitle && <p className={styles.subtitle}>{card.subtitle}</p>}
+        {card.excerpt && <p className={styles.excerpt}>{card.excerpt}</p>}
+        <span id={descId} className={styles.srOnly}>
+          {[card.subtitle, card.excerpt, connections].filter(Boolean).join(' ')}
+        </span>
+      </div>
+      <div className={styles.foot}>
+        {card.hasImage && (
+          <span role="img" aria-label={t('gv.hasImage')} className={styles.media}>
+            <ImageIcon />
+          </span>
+        )}
+        {card.hasAudio && (
+          <span role="img" aria-label={t('gv.hasAudio')} className={styles.media}>
+            <AudioIcon />
+          </span>
+        )}
+        <button
+          type="button"
+          className={styles.seeAll}
+          tabIndex={focusable ? 0 : -1}
+          aria-label={t('gv.seeAllLabel', { title: card.title })}
+          onClick={onOpenEditor}
+        >
+          {t('gv.seeAll')}
+        </button>
+      </div>
+    </div>
+  );
+}

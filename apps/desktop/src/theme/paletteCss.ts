@@ -32,8 +32,19 @@ export function paletteVars(p: Palette, mode: 'light' | 'dark'): Record<string, 
     '--color-drop-ring': p.dark.accent,
     '--color-highlight-bg': t.mark,
     '--color-code-bg': t.code,
+    // Global View (M3a §4, §6): the canvas sits between page and card;
+    // relationships are orange in every palette and drawn wider than links,
+    // so the kinds differ by more than colour.
+    '--color-canvas': mix(t.bg, t.surface, 0.35),
+    '--color-card-border': mix(t.border, t.text, 0.05),
+    '--color-edge-link': t.accent,
+    '--color-edge-tree': t.muted,
+    '--color-edge-manual': mode === 'light' ? MANUAL_EDGE.light : MANUAL_EDGE.dark,
   };
 }
+
+/** Manual-relationship edges (prototype `#c2571a`, kept readable on every canvas). */
+export const MANUAL_EDGE = { light: '#b4501a', dark: '#e8935a' } as const;
 
 const block = (selector: string, vars: Record<string, string>, indent = '') =>
   `${indent}${selector} {\n${Object.entries(vars)
