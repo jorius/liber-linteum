@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { clearMocks, emit, mockIPC } from '../ipc/testing';
-import { installMenuToggles } from './menuToggles';
+import { installMenuScreen, installMenuToggles } from './menuToggles';
+import { useUiStore } from './uiStore';
 import { DEFAULT_SETTINGS, useSettingsStore } from './settingsStore';
 
 let patches: Record<string, unknown>[];
@@ -38,6 +39,21 @@ describe('View menu toggles (M2b feedback round)', () => {
     await emit('menu:toggle', 'palette');
     await new Promise((r) => setTimeout(r, 10));
     expect(patches).toEqual([]);
+    stop();
+  });
+});
+
+describe('View → Editor / Global View (M3a §2)', () => {
+  it('switch the screen (menu:screen); an unknown payload is ignored', async () => {
+    useUiStore.setState({ screen: 'edit' });
+    const stop = await installMenuScreen();
+    await emit('menu:screen', 'global');
+    await vi.waitFor(() => expect(useUiStore.getState().screen).toBe('global'));
+    await emit('menu:screen', 'sideways');
+    await new Promise((r) => setTimeout(r, 10));
+    expect(useUiStore.getState().screen).toBe('global');
+    await emit('menu:screen', 'edit');
+    await vi.waitFor(() => expect(useUiStore.getState().screen).toBe('edit'));
     stop();
   });
 });

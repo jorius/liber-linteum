@@ -1,9 +1,13 @@
+import { undo } from '@codemirror/commands';
+import { EditorView } from '@codemirror/view';
 import { act, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import axe from 'axe-core';
 import { afterEach, describe, expect, it } from 'vitest';
 import type { TreeNode } from '../../ipc';
 import { clearMocks, mockIPC } from '../../ipc/testing';
+import { fakeDisk } from '../../test/fakeDisk';
+import { openPage } from '../../stores/navigate';
 import { usePageStore } from '../../stores/pageStore';
 import { childrenByParent } from '../../stores/tree';
 import { useUiStore } from '../../stores/uiStore';
@@ -43,6 +47,7 @@ afterEach(async () => {
   await resetVaultStore();
   usePageStore.getState().clear();
   useUiStore.getState().closeDialog();
+  useUiStore.setState({ screen: 'edit' });
   clearMocks();
 });
 
@@ -58,13 +63,56 @@ describe('AppShell', () => {
     expect(screen.getByText('Pick a page in the explorer')).toBeInTheDocument();
   });
 
-  it('has Edit active and Global view disabled with an explanation', () => {
+  it('M3a §2: Edit and Global view switch the screen; the editor stays mounted (undo survives)', async () => {
     seed();
+    fakeDisk(
+      { 'Welcome.md': 'hello\n' },
+      {
+        vault_tree: () => nodes,
+        gv_children: () => ({ cards: [], centre: null }),
+        gv_edges: () => [],
+        layout_get: () => ({}),
+      },
+    );
     render(<AppShell />);
-    expect(screen.getByRole('button', { name: 'Edit' })).toHaveAttribute('aria-pressed', 'true');
+    await act(() => openPage('Welcome.md'));
+    const view = () => EditorView.findFromDOM(document.querySelector<HTMLElement>('.cm-editor')!)!;
+    const before = view();
+    act(() => before.dispatch({ changes: { from: 5, insert: ' world' }, userEvent: 'input.type' }));
+
+    const edit = screen.getByRole('button', { name: 'Edit' });
     const global = screen.getByRole('button', { name: 'Global view' });
-    expect(global).toHaveAttribute('aria-disabled', 'true');
-    expect(global).toHaveAccessibleDescription('Global view arrives in a later milestone.');
+    expect(edit).toHaveAttribute('aria-pressed', 'true');
+    await userEvent.click(global);
+    expect(global).toHaveAttribute('aria-pressed', 'true');
+    expect(edit).toHaveAttribute('aria-pressed', 'false');
+    expect(screen.getByRole('region', { name: 'Global View' })).toBeInTheDocument();
+    expect(screen.queryByRole('region', { name: 'Page' })).not.toBeInTheDocument();
+
+    await userEvent.click(edit);
+    expect(screen.queryByRole('region', { name: 'Global View' })).not.toBeInTheDocument();
+    expect(view()).toBe(before);
+    expect(view().state.doc.toString()).toBe('hello world\n');
+    act(() => {
+      undo(view());
+    });
+    expect(view().state.doc.toString()).toBe('hello\n');
+  });
+
+  it('M3a §2: ⌘1 / ⌘2 (Ctrl elsewhere) switch between Edit and the Global View', async () => {
+    seed();
+    fakeDisk({}, { gv_children: () => ({ cards: [], centre: null }), gv_edges: () => [] });
+    render(<AppShell />);
+    const key = (k: string) =>
+      act(() => {
+        window.dispatchEvent(
+          new KeyboardEvent('keydown', { key: k, ctrlKey: true, bubbles: true }),
+        );
+      });
+    await key('2');
+    expect(useUiStore.getState().screen).toBe('global');
+    await key('1');
+    expect(useUiStore.getState().screen).toBe('edit');
   });
 
   it("new page goes into the selected folder (or the selected file's folder)", async () => {

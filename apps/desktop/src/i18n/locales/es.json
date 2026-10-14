@@ -80,7 +80,6 @@
     "view": "Vista",
     "edit": "Editar",
     "globalView": "Vista global",
-    "globalLater": "La vista global llega en un hito posterior.",
     "settings": "Ajustes",
     "closeVault": "Cerrar bóveda"
   },
@@ -277,5 +276,8 @@
     "obsidianSame": "la carpeta de la página",
     "obsidianSubfolder": "la carpeta «{name}» junto a la página",
     "obsidianFolder": "la carpeta «{name}»"
+  },
+  "gv": {
+    "region": "Vista global"
   }
 }

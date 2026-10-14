@@ -22,9 +22,18 @@ function trailKey(e: KeyboardEvent): 'back' | 'forward' | null {
   return null;
 }
 
+/** ⌘1 Edit, ⌘2 Global View (M3a §2): the digit key, or the physical one
+ *  on layouts where digits need ⇧ (French). */
+function screenKey(e: KeyboardEvent): 'edit' | 'global' | null {
+  if (e.key === '1' || (e.shiftKey && e.code === 'Digit1')) return 'edit';
+  if (e.key === '2' || (e.shiftKey && e.code === 'Digit2')) return 'global';
+  return null;
+}
+
 /** ⌘ (macOS) / Ctrl shortcuts (spec §3.5): ⇧E explorer, O open vault,
  * , settings, N new page, ⇧N new folder, [ / ] back and forward along the
- * link trail (M2b §3). Ignored while a dialog is open. */
+ * link trail (M2b §3), 1 / 2 Edit and Global View (M3a §2). Ignored while a
+ * dialog is open. */
 export function useGlobalShortcuts(menuOpen: boolean) {
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
@@ -39,7 +48,10 @@ export function useGlobalShortcuts(menuOpen: boolean) {
       if (e.altKey) return;
       const vault = useVaultStore.getState();
       const key = e.key.toLowerCase();
-      if (key === ',') {
+      const screen = screenKey(e);
+      if (screen) {
+        useUiStore.getState().setScreen(screen);
+      } else if (key === ',') {
         useUiStore.getState().openDialog({ type: 'settings' });
       } else if (key === 'o' && !e.shiftKey) {
         void pickFolder()

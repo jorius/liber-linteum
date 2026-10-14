@@ -25,6 +25,7 @@ import { errorMessage } from './messages';
 import { usePageStore } from './pageStore';
 import { useToastStore } from './toastStore';
 import { useTrailStore } from './trailStore';
+import { useUiStore } from './uiStore';
 import { childrenByParent, joinPath, nextFreeName, parentOf, remap } from './tree';
 
 /** External changes arriving within this window trigger one tree refresh. */
@@ -184,6 +185,7 @@ export const useVaultStore = create<VaultState>((set, get) => {
       return res;
     }
     set({ info: res.value, selected: null, expanded: new Set(), renaming: null });
+    useUiStore.getState().setScreen('edit');
     useTrailStore.getState().reset();
     usePageStore.getState().clear();
     useEditorStore.getState().reset();

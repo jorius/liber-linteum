@@ -10,14 +10,21 @@ export type DialogState =
   | { type: 'openFile'; path: string }
   | null;
 
+/** Which screen the open vault shows (M3a §2). */
+export type Screen = 'edit' | 'global';
+
 interface UiState {
   dialog: DialogState;
+  screen: Screen;
+  setScreen: (screen: Screen) => void;
   openDialog: (d: Exclude<DialogState, null>) => void;
   closeDialog: () => void;
 }
 
 export const useUiStore = create<UiState>((set) => ({
   dialog: null,
+  screen: 'edit',
+  setScreen: (screen) => set({ screen }),
   openDialog: (dialog) => set({ dialog }),
   closeDialog: () => set({ dialog: null }),
 }));

@@ -118,6 +118,8 @@ fn macos_menu_quit_is_ours_and_the_standard_items_stay() {
         "Forward",
         "Toggle Formatting Toolbar",
         "Toggle Line Numbers",
+        "Editor",
+        "Global View",
     ] {
         assert!(view.iter().any(|t| t == want), "{want}: {view:?}");
     }
@@ -235,6 +237,39 @@ fn toggle_items_emit_menu_toggle() {
     );
 }
 
+/// M3a §2: View → Editor / Global View tell the page which screen to show.
+fn screen_items_emit_menu_screen() {
+    use tauri::Listener;
+    let got: Arc<std::sync::Mutex<Vec<String>>> = Arc::default();
+    let log = got.clone();
+    build_app("screen").run_return(move |handle, event| {
+        if let RunEvent::Ready = event {
+            let log = log.clone();
+            handle.listen("menu:screen", move |e| {
+                log.lock().unwrap().push(e.payload().to_string());
+            });
+            for id in [
+                nimw_desktop::menu::EDITOR_ID,
+                nimw_desktop::menu::GLOBAL_VIEW_ID,
+            ] {
+                nimw_desktop::menu::on_menu_event(
+                    handle,
+                    MenuEvent {
+                        id: MenuId::new(id),
+                    },
+                );
+            }
+            for window in handle.webview_windows().into_values() {
+                window.close().unwrap();
+            }
+        }
+    });
+    assert_eq!(
+        *got.lock().unwrap(),
+        ["\"edit\"".to_string(), "\"global\"".into()]
+    );
+}
+
 fn main() {
     #[cfg(target_os = "macos")]
     {
@@ -247,4 +282,6 @@ fn main() {
     println!("test back_and_forward_items_emit_menu_navigate ... ok");
     toggle_items_emit_menu_toggle();
     println!("test toggle_items_emit_menu_toggle ... ok");
+    screen_items_emit_menu_screen();
+    println!("test screen_items_emit_menu_screen ... ok");
 }

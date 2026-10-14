@@ -417,6 +417,9 @@ export const onMenuNavigate = (cb: (direction: 'back' | 'forward') => void): Pro
  *  the settings key to flip. */
 export const onMenuToggle = (cb: (key: string) => void): Promise<UnlistenFn> =>
   listen<string>('menu:toggle', (e) => cb(e.payload));
+/** View → Editor / Global View in the app menu (M3a §2). */
+export const onMenuScreen = (cb: (screen: string) => void): Promise<UnlistenFn> =>
+  listen<string>('menu:screen', (e) => cb(e.payload));
 export const onVaultWarning = (cb: (p: WarningPayload) => void): Promise<UnlistenFn> =>
   listen<WarningPayload>('vault:warning', (e) => cb(e.payload));
 
