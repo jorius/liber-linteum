@@ -189,7 +189,8 @@ Values come from the prototype (`.card`, lines 64-79 and 291-312), expressed as 
 
 **Rules for all commands:** async via `blocking()`; registered in `build.rs`, `generate_handler!`, capabilities and the test COMMANDS list; each with a real-ACL test.
 
-- **`gv_children(level: { kind: "vault" } | { kind: "folder", path } | { kind: "page", path }) -> GvLevel { cards: Vec<GvCard>, centre: Option<String> }`**
+- **`gv_children(level: { kind: "vault" } | { kind: "folder", path } | { kind: "page", path }) -> GvLevel { cards: Vec<GvCard>, centre: Option<String>, omitted: u32 }`**
+  - A page level shows at most 200 neighbours around the centre (always shown): pages it links to and related pages first, then backlinks, the most recently modified first within each; `omitted` counts the rest (0 for vault and folder levels). This keeps a hub page's level under the `gv_edges` limit (final review m14).
   - `GvCard`:
     - `{ path, kind: "project"|"folder"|"page", title, subtitle, cover: Option<String>, coverRemote: bool, coverY: Option<u8>, excerpt, hasImage, hasAudio }`;
     - for folders also `indexPage: Option<String>`, `pages: u32`, `folders: u32`, `childTitles: Vec<String>` (≤ 5);
@@ -203,7 +204,11 @@ Values come from the prototype (`.card`, lines 64-79 and 291-312), expressed as 
 - **`layout_get(level: String) -> HashMap<String, {x, y}>` and `layout_set(level, positions)`**
   - `.nimw/layout.json` holds `{ "version": 1, "levels": { … } }`. It is created lazily and written atomically.
   - An empty map removes the level.
-- **`VaultSession::rename`** and the watcher's rename path call `layout_remap(from, to)` (prefix remap for keys and entries). They do nothing when no `layout.json` exists.
+  - It is read per level and per entry: a malformed entry, or one a later version adds, is skipped on its own, and a save keeps the saved level's entries it can't read as positions (final review m8).
+  - Updates are serialized in the process (`layout_set` threads and the watcher), a compare-and-swap lost to another program is retried once, and an update that changes nothing is not written (final review I3, m11).
+  - Pruning (final review m10): a level save drops that level's positions for paths that no longer exist and doesn't store a level whose own folder or page is gone; a level save, or a remap that moved something, drops the levels of deleted folders and pages (one `lstat` per level key). Reads and no-op remaps never write just to prune.
+- **`VaultSession::rename`** and the watcher's rename path call `layout_remap(from, to)` (prefix remap for keys and entries). They do nothing when no `layout.json` exists. The watcher remaps a whole batch at once (`remap_layout_many`: one read, at most one write), before announcing the change. Keys and entries already at a rename's destination are leftovers of a deleted path and are replaced by the moved ones (final review I3, m10).
+- **`.nimw/vault.json`** is read field by field: a malformed `indexPicks`, `attachments` or `exclude` item is reported and ignored on its own, and never disables `exclude` (final review m9).
 - **Settings:** `globalViewMode` (`"drill"` default) and `globalViewEdges` (`{ links, tree, manual, aggregated }`, all `true`), each lenient per field (M1/M2b pattern).
 - **The DTO for `PageDto`** is unchanged. Cards come only from `gv_children`.
 
