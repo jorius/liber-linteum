@@ -1,7 +1,7 @@
 import { history, historyKeymap } from '@codemirror/commands';
 import { markdown, markdownLanguage } from '@codemirror/lang-markdown';
 import { HighlightStyle, syntaxHighlighting, syntaxTree } from '@codemirror/language';
-import { Compartment, EditorState, Facet, Transaction, type Extension } from '@codemirror/state';
+import { Compartment, EditorState, Transaction, type Extension } from '@codemirror/state';
 import { drawSelection, EditorView, keymap, lineNumbers } from '@codemirror/view';
 import { tags } from '@lezer/highlight';
 import { diffIndices } from 'node-diff3';
@@ -20,17 +20,9 @@ import { setLinkPickerOpener } from './linkPickerOpen';
 import type { PageDoc } from './pageDoc';
 import { blockForOffset, offsetAtTop, topIn } from './scrollSync';
 import { Toolbar } from './Toolbar';
-import { hideView, showView } from './views';
+import { hideView, pageDocOf, showView, storedState, storeState } from './views';
 import { toggleTaskIn } from './widgets';
 
-/** Each page keeps its CodeMirror state (text, selection, undo) while the app
- *  runs, so switching pages or modes never loses history (ED-07). */
-const states = new WeakMap<PageDoc, EditorState>();
-/** The page a state belongs to: a cached state is reused by whichever editor
- *  shows the page next, so nothing in it may close over a component. */
-const pageDocOf = Facet.define<PageDoc, PageDoc | null>({
-  combine: (values) => values[0] ?? null,
-});
 /** The Split pane of the component currently showing each view. */
 const paneOf = new WeakMap<EditorView, (text: string) => void>();
 /** The toolbar's pressed state of the component currently showing each view. */
@@ -248,7 +240,7 @@ export function Editor({ doc, mode, label }: EditorProps) {
   }, []);
 
   const stateFor = (d: PageDoc): EditorState =>
-    states.get(d) ?? createState(d, mode, label, showNumbers);
+    storedState(d) ?? createState(d, mode, label, showNumbers);
 
   // One view for the component's lifetime; page states are swapped into it.
   useLayoutEffect(() => {
@@ -262,7 +254,7 @@ export function Editor({ doc, mode, label }: EditorProps) {
     showFormats(v.state);
     return () => {
       hideView(current.current, v);
-      states.set(current.current, v.state);
+      storeState(current.current, v.state);
       current.current.sink = null;
       paneOf.delete(v);
       toolbarOf.delete(v);
@@ -276,7 +268,7 @@ export function Editor({ doc, mode, label }: EditorProps) {
   useLayoutEffect(() => {
     const v = view.current!;
     if (current.current !== doc) {
-      states.set(current.current, v.state);
+      storeState(current.current, v.state);
       current.current.sink = null;
       hideView(current.current, v);
       current.current = doc;

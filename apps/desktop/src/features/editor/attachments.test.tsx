@@ -1,9 +1,11 @@
+import { undo } from '@codemirror/commands';
 import { EditorView } from '@codemirror/view';
 import { act, render } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { clearMocks, emit, mockWindows } from '../../ipc/testing';
 import { resetEditorStore, useEditorStore } from '../../stores/editorStore';
 import { useToastStore } from '../../stores/toastStore';
+import { useVaultStore } from '../../stores/vaultStore';
 import { fakeDisk } from '../../test/fakeDisk';
 import { dragPixelRatio, embedFor, installFileDrop, pastedName } from './attachments';
 import { Editor } from './Editor';
@@ -370,5 +372,133 @@ describe('drop (M2c §5.2)', () => {
     );
     expect(disk.calls.some(([c]) => c === 'attachment_import')).toBe(false);
     await stop();
+  });
+});
+
+describe('a page switch while a paste or drop is saved (final review I1)', () => {
+  const payload = (paths: string[]) => ({ paths, position: { x: 1, y: 1 } });
+  const caretCount = () => viewOf().contentDOM.querySelectorAll('.cm-nimw-drop-caret').length;
+  /** `attachment_import` held: the drop is copying until `held.release`. */
+  function slowImport(files: Record<string, string>) {
+    const held: { release: (v: unknown) => void } = { release: () => undefined };
+    const disk = fakeDisk(files, {
+      attachment_import: () =>
+        new Promise((r) => {
+          held.release = r;
+        }),
+    });
+    return { disk, held };
+  }
+  const bigMov = [
+    { source: '/u/big.mov', ok: { path: 'A/attachments/big.mov', link: 'big.mov', copied: true } },
+  ];
+  async function load(path: string) {
+    const res = await PageDoc.load(path, hooks);
+    if (!res.ok) throw new Error(res.error.message);
+    return res.value;
+  }
+  /** Shows `a` and drops big.mov after its first character. */
+  async function dropOnA(a: PageDoc) {
+    const shown = render(<Editor doc={a} mode="source" label="P" />);
+    vi.spyOn(document, 'elementFromPoint').mockReturnValue(viewOf().contentDOM);
+    vi.spyOn(viewOf(), 'posAtCoords').mockReturnValue(1);
+    await act(() => emit('tauri://drag-drop', payload(['/u/big.mov'])));
+    return shown;
+  }
+
+  it('a drop lands in the page it was dropped on, not the one shown now', async () => {
+    mockWindows('main');
+    const { disk, held } = slowImport({ 'A/a.md': 'AAA\n', 'B/b.md': 'BBB\n' });
+    const stop = await installFileDrop();
+    const a = await load('A/a.md');
+    const b = await load('B/b.md');
+    const { rerender } = await dropOnA(a);
+    rerender(<Editor doc={b} mode="source" label="P" />);
+    held.release(bigMov);
+    await vi.waitFor(() => expect(a.text).toBe('A![[big.mov]]AA\n'));
+    expect(b.text).toBe('BBB\n');
+    expect(viewOf().state.doc.toString()).toBe('BBB\n');
+    await a.flush();
+    expect(disk.files.get('A/a.md')).toBe('A![[big.mov]]AA\n');
+    expect(disk.files.get('B/b.md')).toBe('BBB\n');
+    // Back on A: the embed is there, no caret is left, and ⌘Z undoes it.
+    rerender(<Editor doc={a} mode="source" label="P" />);
+    expect(viewOf().state.doc.toString()).toBe('A![[big.mov]]AA\n');
+    expect(caretCount()).toBe(0);
+    act(() => void undo(viewOf()));
+    expect(viewOf().state.doc.toString()).toBe('AAA\n');
+    await stop();
+  });
+
+  it('keeps what changed on disk in the background meanwhile', async () => {
+    mockWindows('main');
+    const { disk, held } = slowImport({ 'A/a.md': 'AAA\n', 'B/b.md': 'BBB\n' });
+    const stop = await installFileDrop();
+    const a = await load('A/a.md');
+    const b = await load('B/b.md');
+    const { rerender } = await dropOnA(a);
+    rerender(<Editor doc={b} mode="source" label="P" />);
+    disk.files.set('A/a.md', 'AAA\nfrom Obsidian\n');
+    await a.sync();
+    expect(a.text).toBe('AAA\nfrom Obsidian\n');
+    held.release(bigMov);
+    await vi.waitFor(() => expect(a.text).toBe('A![[big.mov]]AA\nfrom Obsidian\n'));
+    rerender(<Editor doc={a} mode="source" label="P" />);
+    expect(viewOf().state.doc.toString()).toBe('A![[big.mov]]AA\nfrom Obsidian\n');
+    await stop();
+  });
+
+  it('a drop that finishes after the editor closed still reaches its page', async () => {
+    mockWindows('main');
+    const { held } = slowImport({ 'A/a.md': 'AAA\n' });
+    const stop = await installFileDrop();
+    const a = await load('A/a.md');
+    const { unmount } = await dropOnA(a);
+    unmount();
+    held.release(bigMov);
+    await vi.waitFor(() => expect(a.text).toBe('A![[big.mov]]AA\n'));
+    await stop();
+  });
+
+  it('a drop that finishes after another vault opened is not linked anywhere', async () => {
+    mockWindows('main');
+    useVaultStore.setState({ info: { name: 'One', root: '/one', report: {} as never } });
+    const { held } = slowImport({ 'A/a.md': 'AAA\n' });
+    const stop = await installFileDrop();
+    const a = await load('A/a.md');
+    const { unmount } = await dropOnA(a);
+    unmount();
+    useVaultStore.setState({ info: { name: 'Two', root: '/two', report: {} as never } });
+    held.release(bigMov);
+    await act(() => new Promise((r) => setTimeout(r, 0)));
+    expect(a.text).toBe('AAA\n');
+    useVaultStore.setState({ info: null });
+    await stop();
+  });
+
+  it('a paste lands in the page it was pasted into', async () => {
+    const held: { release: (v: unknown) => void } = { release: () => undefined };
+    let asked = false;
+    fakeDisk(
+      { 'A/a.md': 'AAA\n', 'B/b.md': 'BBB\n' },
+      {
+        attachment_paste: () =>
+          new Promise((r) => {
+            asked = true;
+            held.release = r;
+          }),
+      },
+    );
+    const a = await load('A/a.md');
+    const b = await load('B/b.md');
+    const { rerender } = render(<Editor doc={a} mode="source" label="P" />);
+    act(() => viewOf().dispatch({ selection: { anchor: 1, head: 2 } }));
+    paste([new File([new Uint8Array([1])], 'i.png', { type: 'image/png' })]);
+    await vi.waitFor(() => expect(asked).toBe(true));
+    rerender(<Editor doc={b} mode="source" label="P" />);
+    held.release({ path: 'A/attachments/shot.png', link: 'shot.png', copied: true });
+    await vi.waitFor(() => expect(a.text).toBe('A![[shot.png]]A\n'));
+    expect(b.text).toBe('BBB\n');
+    expect(viewOf().state.doc.toString()).toBe('BBB\n');
   });
 });

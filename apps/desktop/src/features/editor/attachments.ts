@@ -1,7 +1,14 @@
 // Pasted images and files dropped from the OS (M2c §5): saved into the vault
 // by Rust, then an embed or link is inserted where they landed. Drops come
 // from Tauri's native drag events (Rust only imports paths it saw dropped).
-import { StateEffect, StateField, type EditorState, type Extension } from '@codemirror/state';
+import {
+  EditorState,
+  StateEffect,
+  StateField,
+  Transaction,
+  type Extension,
+  type TransactionSpec,
+} from '@codemirror/state';
 import { Decoration, EditorView, WidgetType, type DecorationSet } from '@codemirror/view';
 import i18next from 'i18next';
 import {
@@ -18,6 +25,8 @@ import { useToastStore } from '../../stores/toastStore';
 import { nameOf } from '../../stores/tree';
 import { useVaultStore } from '../../stores/vaultStore';
 import { pagePath } from './livePreview';
+import type { PageDoc } from './pageDoc';
+import { pageDocOf, storedState, storeState, viewOf } from './views';
 
 const PASTE_TYPES: Record<string, string> = {
   'image/png': 'png',
@@ -129,7 +138,70 @@ function track(delta: number) {
   useEditorStore.setState((s) => ({ copying: Math.max(0, s.copying + delta) }));
 }
 
+// ---- the page a paste or drop belongs to (final review I1) ----
+
+/** The page a paste or drop was made in, taken when it starts. Saving can take
+ *  seconds (a large video), and by then the editor may show another page (it
+ *  swaps page states into one view) or be gone. */
+interface Origin {
+  view: EditorView;
+  doc: PageDoc | null;
+  /** The vault it was made in. */
+  root: string | null;
+}
+
+const vaultRoot = () => useVaultStore.getState().info?.root ?? null;
+
+const originOf = (view: EditorView): Origin => ({
+  view,
+  doc: view.state.facet(pageDocOf),
+  root: vaultRoot(),
+});
+
+/** `state` brought up to `text` (the page was reloaded or merged while in the
+ *  background) as the editor does when it shows the page again: outside the
+ *  undo history. One change over the differing middle keeps every position
+ *  before and after it. */
+function caughtUp(state: EditorState, text: string): EditorState {
+  const old = state.doc.toString();
+  if (old === text) return state;
+  const max = Math.min(old.length, text.length);
+  let head = 0;
+  while (head < max && old.charCodeAt(head) === text.charCodeAt(head)) head++;
+  let tail = 0;
+  while (
+    tail < max - head &&
+    old.charCodeAt(old.length - 1 - tail) === text.charCodeAt(text.length - 1 - tail)
+  ) {
+    tail++;
+  }
+  return state.update({
+    changes: { from: head, to: old.length - tail, insert: text.slice(head, text.length - tail) },
+    annotations: [Transaction.addToHistory.of(false), Transaction.remote.of(true)],
+  }).state;
+}
+
+/** Applies `spec` to the page the paste or drop was made in, wherever it is
+ *  now: through the view showing it; else (switched away from, or the editor
+ *  closed) to its stored state and its text, which autosaves. Never to the page
+ *  shown instead, and not at all once another vault is open. */
+function land(origin: Origin, spec: (state: EditorState) => TransactionSpec): void {
+  const { doc } = origin;
+  if (!doc) return origin.view.dispatch(spec(origin.view.state));
+  const live = viewOf(doc);
+  if (live) return live.dispatch(spec(live.state));
+  if (vaultRoot() !== origin.root) return;
+  const stored = storedState(doc);
+  const state = caughtUp(stored ?? EditorState.create({ doc: doc.text }), doc.text);
+  const next = state.update(spec(state)).state;
+  if (stored) storeState(doc, next);
+  doc.edit(next.doc.toString());
+}
+
+// ---- paste ----
+
 async function pasteImages(view: EditorView, files: File[]) {
+  const origin = originOf(view);
   const page = view.state.facet(pagePath)();
   const inserted: string[] = [];
   track(1);
@@ -145,11 +217,13 @@ async function pasteImages(view: EditorView, files: File[]) {
   }
   if (!inserted.length) return;
   const text = inserted.join('\n');
-  const { from, to } = view.state.selection.main;
-  view.dispatch({
-    changes: { from, to, insert: text },
-    selection: { anchor: from + text.length },
-    userEvent: 'input.paste',
+  land(origin, (state) => {
+    const { from, to } = state.selection.main;
+    return {
+      changes: { from, to, insert: text },
+      selection: { anchor: from + text.length },
+      userEvent: 'input.paste',
+    };
   });
   void useVaultStore.getState().refreshTree();
 }
@@ -204,29 +278,28 @@ const failureLine = (source: string, error: CommandError) =>
 /** Drops so far: each pending insertion point has its own id. */
 let drops = 0;
 
-async function dropFiles(view: EditorView, id: number, paths: string[]) {
-  const page = view.state.facet(pagePath)();
+async function dropFiles(origin: Origin, id: number, paths: string[]) {
+  const page = origin.view.state.facet(pagePath)();
   track(1);
   const res = await attachmentImport(page, paths).finally(() => track(-1));
   if (!res.ok) {
-    view.dispatch({ effects: endPending.of(id) });
+    land(origin, () => ({ effects: endPending.of(id) }));
     useToastStore.getState().push({ message: errorMessage(res.error), tone: 'error' });
     return;
   }
   const links = res.value.flatMap((r) => (r.ok ? [embedFor(r.ok.link)] : []));
   const failed = res.value.flatMap((r) => (r.err ? [failureLine(r.source, r.err)] : []));
   const text = links.join('\n');
-  const pos = pendingAt(view.state, id) ?? view.state.selection.main.head;
-  view.dispatch(
-    text
-      ? {
-          changes: { from: pos, insert: text },
-          selection: { anchor: pos + text.length },
-          userEvent: 'input.drop',
-          effects: endPending.of(id),
-        }
-      : { effects: endPending.of(id) },
-  );
+  land(origin, (state) => {
+    if (!text) return { effects: endPending.of(id) };
+    const pos = pendingAt(state, id) ?? state.selection.main.head;
+    return {
+      changes: { from: pos, insert: text },
+      selection: { anchor: pos + text.length },
+      userEvent: 'input.drop',
+      effects: endPending.of(id),
+    };
+  });
   if (text) void useVaultStore.getState().refreshTree();
   if (failed.length) {
     useToastStore.getState().push({
@@ -267,7 +340,7 @@ function onDrag(e: DragDropPayload) {
   }
   const id = ++drops;
   hit.view.dispatch({ effects: addPending.of({ id, pos: hit.pos }) });
-  void dropFiles(hit.view, id, paths);
+  void dropFiles(originOf(hit.view), id, paths);
 }
 
 /** Listens to native file drags for the whole window; returns the unsubscribe. */
