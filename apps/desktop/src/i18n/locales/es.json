@@ -95,6 +95,7 @@
     "breadcrumb": "Ruta",
     "titleLabel": "Título de la página",
     "titleTaken": "Ya hay una página llamada «{name}» en esta carpeta.",
+    "frontmatterInvalid": "Corrige primero el frontmatter de la nota (no es YAML válido).",
     "titleInNote": "Título en la nota: {title}"
   },
   "editor": {

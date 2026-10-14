@@ -16,6 +16,7 @@ import { activeFormats, editorKeymap, type ActiveFormat } from './format';
 import type { PageDoc } from './pageDoc';
 import { blockForOffset, offsetAtTop, topIn } from './scrollSync';
 import { Toolbar } from './Toolbar';
+import { hideView, showView } from './views';
 import { toggleTaskIn } from './widgets';
 
 /** Each page keeps its CodeMirror state (text, selection, undo) while the app
@@ -245,11 +246,13 @@ export function Editor({ doc, mode, label }: EditorProps) {
   useLayoutEffect(() => {
     const v = new EditorView({ parent: host.current!, state: stateFor(current.current) });
     view.current = v;
+    showView(current.current, v);
     paneOf.set(v, setText);
     toolbarOf.set(v, showFormats);
     setToolbarView(v);
     showFormats(v.state);
     return () => {
+      hideView(current.current, v);
       states.set(current.current, v.state);
       current.current.sink = null;
       paneOf.delete(v);
@@ -265,7 +268,9 @@ export function Editor({ doc, mode, label }: EditorProps) {
     if (current.current !== doc) {
       states.set(current.current, v.state);
       current.current.sink = null;
+      hideView(current.current, v);
       current.current = doc;
+      showView(doc, v);
       v.setState(stateFor(doc));
       showFormats(v.state);
     }

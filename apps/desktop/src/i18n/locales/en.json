@@ -95,7 +95,8 @@
     "breadcrumb": "Breadcrumb",
     "titleLabel": "Page title",
     "titleTaken": "A page named “{name}” is already in this folder.",
-    "titleInNote": "Title in the note: {title}"
+    "titleInNote": "Title in the note: {title}",
+    "frontmatterInvalid": "Fix the note’s frontmatter first (it isn’t valid YAML)."
   },
   "editor": {
     "conflictCopy": "Someone else changed this page — their version was saved as “{name}”",
