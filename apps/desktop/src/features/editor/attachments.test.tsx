@@ -558,6 +558,34 @@ describe('pasting other image types (M4b §4)', () => {
     expect(viewOf().state.doc.toString()).toBe('x\n');
   });
 
+  it('review focus: one undecodable image among others: the rest are saved, in order', async () => {
+    decoder(false);
+    const saved: number[][] = [];
+    fakeDisk(
+      { 'P.md': 'x\n' },
+      {
+        attachment_paste: (bytes) => {
+          saved.push([...(bytes as unknown as Uint8Array)]);
+          const link = saved.length === 1 ? 'one.png' : 'two.jpg';
+          return { path: `attachments/${link}`, link, copied: true };
+        },
+      },
+    );
+    await mount('P.md');
+    paste([
+      new File([new Uint8Array([1])], 'a.png', { type: 'image/png' }),
+      new File([new Uint8Array([2])], 'odd.heic', { type: 'image/heic' }),
+      new File([new Uint8Array([3])], 'b.jpg', { type: 'image/jpeg' }),
+    ]);
+    await vi.waitFor(() =>
+      expect(viewOf().state.doc.toString()).toBe('![[one.png]]\n![[two.jpg]]x\n'),
+    );
+    expect(saved).toEqual([[1], [3]]);
+    expect(useToastStore.getState().toasts.at(-1)?.message).toBe(
+      'This image can’t be pasted. Save it as PNG or JPEG first.',
+    );
+  });
+
   it('SVG is left to the editor’s own paste (never decoded or saved)', async () => {
     decoder(true);
     const disk = fakeDisk({ 'P.md': 'x\n' });
