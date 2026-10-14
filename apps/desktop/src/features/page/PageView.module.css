@@ -321,16 +321,6 @@
   padding: 16px 40px;
 }
 
-.button {
-  font: 600 13px var(--font-body);
-  color: var(--color-accent-contrast);
-  background: var(--color-accent);
-  border: none;
-  border-radius: var(--radius-md);
-  padding: 8px 14px;
-  cursor: pointer;
-}
-
 /* Shows/hides the formatting toolbar (M2b §6). */
 .toolbarToggle {
   display: inline-flex;

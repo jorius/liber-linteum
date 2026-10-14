@@ -172,7 +172,7 @@ export function GlobalView() {
           {connectFrom && t('gv.relations.pick', { name: connectFrom.title })}
         </p>
         {connectFrom && (
-          <button type="button" onClick={leaveConnect}>
+          <button type="button" className="btn btn-secondary btn-sm" onClick={leaveConnect}>
             {t('dialogs.cancel')}
           </button>
         )}

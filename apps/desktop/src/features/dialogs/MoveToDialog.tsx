@@ -49,12 +49,12 @@ export function MoveToDialog({ path, onClose }: { path: string; onClose: () => v
         </select>
       </label>
       <div className={styles.buttons}>
-        <button type="button" className={styles.button} onClick={onClose}>
+        <button type="button" className="btn btn-secondary" onClick={onClose}>
           {t('dialogs.cancel')}
         </button>
         <button
           type="button"
-          className={`${styles.button} ${styles.primary}`}
+          className="btn btn-primary"
           disabled={targets.length === 0}
           onClick={() => void move()}
         >

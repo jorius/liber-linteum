@@ -48,8 +48,20 @@ export function paletteVars(p: Palette, mode: 'light' | 'dark'): Record<string, 
     '--color-edge-link': t.accent,
     '--color-edge-tree': t.muted,
     '--color-edge-manual': mode === 'light' ? MANUAL_EDGE.light : MANUAL_EDGE.dark,
+    // M4b §1, §3: the header band's pills over a cover (translucent surface,
+    // no color-mix()), and the danger button, fixed per mode like the manual
+    // edge so it reads as "danger" in every palette.
+    '--color-surface-veil': alpha(t.surface, 0.88),
+    '--color-danger': DANGER[mode].bg,
+    '--color-danger-contrast': DANGER[mode].text,
   };
 }
+
+/** Danger buttons (Delete, Remove, Discard): the shared red, text ≥ 4.5:1. */
+export const DANGER = {
+  light: { bg: '#b42318', text: '#ffffff' },
+  dark: { bg: '#ff9d92', text: '#1b1426' },
+} as const;
 
 /** Manual-relationship edges (prototype `#c2571a`, kept readable on every canvas). */
 export const MANUAL_EDGE = { light: '#b4501a', dark: '#e8935a' } as const;

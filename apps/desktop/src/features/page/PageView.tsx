@@ -40,7 +40,7 @@ export function PageView() {
       <p className={styles.notice}>{t('editor.orphaned')}</p>
       <button
         type="button"
-        className={styles.button}
+        className="btn btn-primary"
         onClick={() => void useEditorStore.getState().saveAsNew()}
       >
         {t('editor.saveAsNew')}

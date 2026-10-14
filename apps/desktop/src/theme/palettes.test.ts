@@ -219,3 +219,44 @@ describe('custom accent → palette (M2b §4, derive.ts)', () => {
     expect(pr, 'pink tints the background toward red').toBeGreaterThan(pg);
   });
 });
+
+/** Buttons and the header band (M4b §1, §3). */
+const BUTTON_TOKENS = [
+  '--color-surface-veil',
+  '--color-danger',
+  '--color-danger-contrast',
+] as const;
+
+describe('buttons and the header veil (M4b §1, §3)', () => {
+  const palettes = [
+    ...PALETTES,
+    ...['#d1477a', '#2aa198', '#f5d000', '#808080', '#ffffff', '#000000'].map((hex) => ({
+      id: 'custom' as const,
+      ...derive(hex),
+    })),
+  ];
+  it.each(
+    palettes.flatMap((p, i) => (['light', 'dark'] as const).map((m) => [i, p.id, m] as const)),
+  )(
+    '#%s %s %s: primary and danger buttons are readable; the veil is translucent surface',
+    (i, _id, mode) => {
+      const vars = paletteVars(palettes[i], mode);
+      expect(
+        contrast(vars['--color-accent-contrast'], vars['--color-accent']),
+        'primary: text on accent',
+      ).toBeGreaterThanOrEqual(4.5);
+      expect(vars['--color-danger'], 'danger').toMatch(/^#[0-9a-f]{6}$/);
+      expect(
+        contrast(vars['--color-danger-contrast'], vars['--color-danger']),
+        'danger: text on danger',
+      ).toBeGreaterThanOrEqual(4.5);
+      expect(vars['--color-surface-veil']).toMatch(/^rgba\(\d+, \d+, \d+, 0\.88\)$/);
+    },
+  );
+
+  it('the default tokens define them too, in both modes', () => {
+    for (const key of BUTTON_TOKENS) {
+      expect(tokensCss.split(`${key}:`).length - 1, key).toBe(3);
+    }
+  });
+});
