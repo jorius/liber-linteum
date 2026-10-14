@@ -65,3 +65,13 @@ body {
 .nimw-menu [role='menuitem']:focus-visible {
   background: var(--color-accent-soft);
 }
+
+/* Text for screen readers only (live regions made outside React). */
+.nimw-sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}

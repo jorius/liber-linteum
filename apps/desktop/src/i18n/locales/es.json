@@ -292,6 +292,12 @@
     "dropOnText": "Suelta los archivos sobre el texto de la página para adjuntarlos",
     "someFailed": "Algunos archivos no se adjuntaron"
   },
+  "linkComplete": {
+    "search": "Buscar: {query}",
+    "typeToFilter": "Escribe para filtrar",
+    "matches": "{count, plural, one {# resultado} other {# resultados}}",
+    "matchesFor": "{count, plural, one {# resultado} other {# resultados}} para «{query}»"
+  },
   "linkPicker": {
     "label": "Enlazar a…",
     "placeholder": "Nombre de página o dirección web",

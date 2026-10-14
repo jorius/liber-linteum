@@ -292,6 +292,12 @@
     "dropOnText": "Drop files onto the page’s text to attach them",
     "someFailed": "Some files weren’t attached"
   },
+  "linkComplete": {
+    "search": "Search: {query}",
+    "typeToFilter": "Type to filter",
+    "matches": "{count, plural, one {# match} other {# matches}}",
+    "matchesFor": "{count, plural, one {# match} other {# matches}} for “{query}”"
+  },
   "linkPicker": {
     "label": "Link to…",
     "placeholder": "Page name or web address",

@@ -9,7 +9,9 @@ import {
   type Completion,
   type CompletionContext,
   type CompletionResult,
+  type CompletionSection,
 } from '@codemirror/autocomplete';
+import i18next from 'i18next';
 import { Prec, type EditorState, type Extension } from '@codemirror/state';
 import { EditorView, keymap } from '@codemirror/view';
 import type { Heading, RootContent } from 'mdast';
@@ -133,30 +135,90 @@ async function headingsFor(
   return text === null ? [] : headingsIn(text);
 }
 
+/** A query waits this long for the next keystroke before asking Rust, so a
+ *  word typed quickly costs one search (M4b §4). */
+export const SUGGEST_DEBOUNCE_MS = 80;
+
+const pause = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+const SEARCH_ICON =
+  '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" ' +
+  'stroke-width="2.2" stroke-linecap="round" aria-hidden="true">' +
+  '<circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg>';
+
+/** The polite live region that reads the count out (the search line is part
+ *  of the list's visuals, so it is hidden from screen readers). */
+function announce(text: string) {
+  let region = document.querySelector<HTMLElement>('[data-nimw-complete-status]');
+  if (!region) {
+    region = document.createElement('div');
+    region.setAttribute('data-nimw-complete-status', '');
+    region.setAttribute('role', 'status');
+    region.className = 'nimw-sr-only';
+    document.body.appendChild(region);
+  }
+  region.textContent = text;
+}
+
+/** The list's first line (M4b §4): what was typed, or a hint, and how many
+ *  match; it stays at the top while the list scrolls. */
+function searchSection(query: string, count: number): CompletionSection {
+  const typed = query.trim();
+  const matches = i18next.t('linkComplete.matches', { count });
+  announce(typed ? i18next.t('linkComplete.matchesFor', { count, query: typed }) : matches);
+  return {
+    name: 'search',
+    header: () => {
+      const line = document.createElement('div');
+      line.className = 'cm-nimw-search';
+      line.setAttribute('aria-hidden', 'true');
+      line.innerHTML = SEARCH_ICON;
+      const what = document.createElement('span');
+      what.className = 'cm-nimw-search-text';
+      what.textContent = typed
+        ? i18next.t('linkComplete.search', { query: typed })
+        : i18next.t('linkComplete.typeToFilter');
+      const count_ = document.createElement('span');
+      count_.className = 'cm-nimw-search-count';
+      count_.textContent = matches;
+      line.append(what, count_);
+      return line;
+    },
+  };
+}
+
 /** The completion source for `[[`, `![[` and `#` headings. */
 export async function linkSource(context: CompletionContext): Promise<CompletionResult | null> {
   const q = linkQueryAt(context.state, context.pos);
   if (!q) return null;
   const source = context.state.facet(pagePath)();
   if (q.kind === 'file') {
+    await pause(SUGGEST_DEBOUNCE_MS);
+    if (context.aborted) return null;
     const res = await linkSuggest(source, q.query, q.embed);
     if (context.aborted || !res.ok) return null;
-    return { from: q.from, options: res.value.map((s) => fileOption(s, q)), filter: false };
+    const section = searchSection(q.query, res.value.length);
+    return {
+      from: q.from,
+      options: res.value.map((s) => ({ ...fileOption(s, q), section })),
+      filter: false,
+    };
   }
   const headings = await headingsFor(q, context.state, source);
   if (context.aborted) return null;
   const needle = q.query.trim().toLowerCase();
+  const found = headings.filter((h) => h.text.toLowerCase().includes(needle));
+  const section = searchSection(q.query, found.length);
   return {
     from: q.from,
     filter: false,
-    options: headings
-      .filter((h) => h.text.toLowerCase().includes(needle))
-      .map((h) => ({
-        label: h.text,
-        detail: `H${h.depth}`,
-        type: 'keyword',
-        apply: applyText(headingLinkText(h.text), q.closed),
-      })),
+    options: found.map((h) => ({
+      label: h.text,
+      detail: `H${h.depth}`,
+      type: 'keyword',
+      section,
+      apply: applyText(headingLinkText(h.text), q.closed),
+    })),
   };
 }
 
@@ -182,6 +244,29 @@ const theme = EditorView.theme({
   '.cm-tooltip.cm-tooltip-autocomplete > ul > li[aria-selected]': {
     background: 'var(--color-accent-soft)',
     color: 'var(--color-text-strong)',
+  },
+  '.cm-tooltip.cm-tooltip-autocomplete .cm-nimw-search': {
+    position: 'sticky',
+    top: '0',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '6px',
+    padding: '5px 10px',
+    background: 'var(--color-surface-subtle)',
+    borderBottom: '1px solid var(--color-border)',
+    color: 'var(--color-text-muted)',
+    fontSize: '12.5px',
+  },
+  '.cm-tooltip.cm-tooltip-autocomplete .cm-nimw-search-text': {
+    color: 'var(--color-text)',
+    fontWeight: '600',
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+    whiteSpace: 'nowrap',
+  },
+  '.cm-tooltip.cm-tooltip-autocomplete .cm-nimw-search-count': {
+    marginLeft: 'auto',
+    flex: 'none',
   },
   '.cm-tooltip.cm-tooltip-autocomplete .cm-completionDetail': {
     marginLeft: '10px',
