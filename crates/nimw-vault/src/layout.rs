@@ -171,7 +171,9 @@ impl Vault {
 
     /// Index-note picks (`.nimw/vault.json` `indexPicks`) follow a batch of
     /// renames, folder keys and page values alike (M3b §4); one write, and
-    /// none when nothing moved.
+    /// none when nothing changed. A pick whose page no longer sits directly
+    /// in its folder — moved out, or hand-edited that way — is dropped, never
+    /// carried along to the page's new folder (final review I4).
     pub fn remap_index_picks_many(&self, renames: &[(String, String)]) -> Result<()> {
         if renames.is_empty() {
             return Ok(());
@@ -188,13 +190,17 @@ impl Vault {
                 return;
             };
             for (folder, page) in std::mem::take(picks) {
+                let folder = remap(&folder, &moves).unwrap_or(folder);
                 let page = match page {
                     serde_json::Value::String(p) => {
-                        serde_json::Value::String(remap(&p, &moves).unwrap_or(p))
+                        let p = remap(&p, &moves).unwrap_or(p);
+                        if !crate::vault::pick_holds(&folder, &p) {
+                            continue;
+                        }
+                        serde_json::Value::String(p)
                     }
                     other => other,
                 };
-                let folder = remap(&folder, &moves).unwrap_or(folder);
                 picks.insert(folder, page);
             }
         })

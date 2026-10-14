@@ -191,10 +191,14 @@ impl Ctx<'_> {
         let own = name_key(&folder.name);
         let named_like = pages.iter().find(|r| name_key(stem(&r.name)) == own);
         let index_md = pages.iter().find(|r| name_key(&r.name) == "index.md");
-        let picked = match self.picks.get(&folder.path) {
-            Some(p) => self.index.card(p)?.filter(|r| r.kind == FileKind::Page),
-            None => None,
-        };
+        // A pick holds only for a page directly in the folder; one that
+        // points elsewhere (hand-edited, or left by an older version) is
+        // ignored (final review I4).
+        let picked = self
+            .picks
+            .get(&folder.path)
+            .and_then(|p| pages.iter().find(|r| &r.path == p))
+            .map(|r| (*r).clone());
         let only = (pages.len() == 1 && subfolders.is_empty()).then(|| pages[0].clone());
         let (index_row, index_from) = if let Some(r) = named_like {
             (Some((*r).clone()), Some(IndexFrom::Named))

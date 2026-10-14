@@ -643,6 +643,103 @@ fn m3b_index_picks_follow_renames() {
     );
 }
 
+/// Final review I4: a pick holds only while its page sits directly in its
+/// folder. Moved out in the app, the pick is dropped (not carried along to
+/// the page's new folder), and the folder falls back to the other rules.
+#[test]
+fn m3b_a_pick_is_dropped_when_its_page_moves_out_of_the_folder_in_app() {
+    let dir = vault();
+    let (_c, s) = open(dir.path());
+    s.rename(&vp("Gamma/b.md"), &vp("Alpha/b.md"), false)
+        .unwrap();
+    assert_eq!(s.vault().index_picks().get("Gamma"), None, "dropped");
+    let gamma = s.gv_children(&GvLevel::Vault).unwrap().cards;
+    let gamma = card(&gamma, "Gamma");
+    // Gamma/a.md is now its only page (rule 4).
+    assert_eq!(gamma.index_page.as_deref(), Some("Gamma/a.md"));
+    assert_eq!(gamma.index_from, Some(IndexFrom::Only));
+}
+
+/// Final review I4: the same when another program moves the page (the
+/// watcher reports a delete and a create with the same content).
+#[test]
+fn m3b_a_pick_is_dropped_when_its_page_moves_out_of_the_folder_externally() {
+    use nimw_vault::WatchEvent;
+    let dir = vault();
+    write(dir.path(), "Gamma/c.md", "# Gamma C\n");
+    let (_c, s) = open(dir.path());
+    std::fs::rename(dir.path().join("Gamma/b.md"), dir.path().join("Delta/b.md")).unwrap();
+    s.apply(vec![
+        WatchEvent::Removed(vp("Gamma/b.md")),
+        WatchEvent::Changed(vp("Delta/b.md")),
+    ])
+    .unwrap();
+    assert_eq!(s.vault().index_picks().get("Gamma"), None, "dropped");
+    let cards = s.gv_children(&GvLevel::Vault).unwrap().cards;
+    let gamma = card(&cards, "Gamma");
+    assert_eq!(
+        (gamma.index_page.as_deref(), gamma.index_from),
+        (None, None)
+    );
+    // A move within the folder still follows.
+    s.vault()
+        .set_index_pick("Gamma", Some("Gamma/c.md"))
+        .unwrap();
+    s.rename(&vp("Gamma/c.md"), &vp("Gamma/home.md"), false)
+        .unwrap();
+    assert_eq!(
+        s.vault().index_picks().get("Gamma").map(String::as_str),
+        Some("Gamma/home.md")
+    );
+}
+
+/// Final review I4: a hand-edited pick naming a page outside its folder is
+/// ignored when read, and dropped by the next write of the picks.
+#[test]
+fn m3b_a_hand_written_pick_outside_its_folder_is_ignored() {
+    let dir = vault();
+    write(
+        dir.path(),
+        ".nimw/vault.json",
+        r#"{"version":1,"indexPicks":{"Gamma":"Gamma/b.md","Delta":"Welcome.md","Alpha/Sub":"Alpha/Sub/deep.md"}}"#,
+    );
+    let (_c, s) = open(dir.path());
+    let cards = s.gv_children(&GvLevel::Vault).unwrap().cards;
+    let delta = card(&cards, "Delta");
+    assert_eq!(
+        (delta.index_page.as_deref(), delta.index_from),
+        (None, None)
+    );
+    assert_eq!(
+        card(&cards, "Gamma").index_page.as_deref(),
+        Some("Gamma/b.md")
+    );
+    // A pick of a page in a subfolder isn't one either.
+    s.vault()
+        .set_index_pick("Delta/Inner", Some("Delta/x.md"))
+        .unwrap();
+    let delta = s.gv_children(&GvLevel::Folder(vp("Delta"))).unwrap().cards;
+    assert_eq!(
+        card(&delta, "Delta/Inner").index_from,
+        Some(IndexFrom::Only)
+    );
+    assert_eq!(
+        card(&delta, "Delta/Inner").index_page.as_deref(),
+        Some("Delta/Inner/i.md")
+    );
+    // The next write of the picks drops the invalid ones.
+    s.index_pick_set(&vp("Delta"), Some(&vp("Delta/y.md")))
+        .unwrap();
+    let picks = s.vault().index_picks();
+    assert_eq!(picks.get("Delta").map(String::as_str), Some("Delta/y.md"));
+    assert_eq!(picks.get("Delta/Inner"), None);
+    assert_eq!(picks.get("Gamma").map(String::as_str), Some("Gamma/b.md"));
+    assert_eq!(
+        picks.get("Alpha/Sub").map(String::as_str),
+        Some("Alpha/Sub/deep.md")
+    );
+}
+
 /// Final review m4: a page name holding `"` is linked single-quoted
 /// (`'[[say "hi"]]'`, as the app writes it); nimw-markdown indexes it, and
 /// the relationship resolves to the page: a direct manual edge.

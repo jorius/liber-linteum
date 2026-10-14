@@ -208,7 +208,8 @@ impl Vault {
     /// Picks (`Some`) or clears (`None`) `folder`'s index note in
     /// `.nimw/vault.json` (M3b §4), keeping every other key. Clearing a pick
     /// that isn't there writes nothing, and a vault without the file gets one
-    /// only for a pick (VLT-02).
+    /// only for a pick (VLT-02). Picks whose page isn't directly in their
+    /// folder (hand-edited) are dropped on the way (final review I4).
     pub fn set_index_pick(&self, folder: &str, page: Option<&str>) -> Result<()> {
         self.update_json_object(NIMW_JSON, page.is_some(), |map| {
             let picks = map
@@ -226,6 +227,7 @@ impl Vault {
                     picks.remove(folder);
                 }
             }
+            picks.retain(|folder, page| page.as_str().is_none_or(|p| pick_holds(folder, p)));
             if picks.is_empty() {
                 map.remove("indexPicks");
             }
@@ -245,6 +247,13 @@ impl Vault {
 
 pub(crate) const NIMW_JSON: &str = ".nimw/vault.json";
 const OBSIDIAN_JSON: &str = ".obsidian/app.json";
+
+/// True when an index-note pick can hold: `page` sits directly in `folder`
+/// (GV-02, M3b §6; final review I4).
+pub(crate) fn pick_holds(folder: &str, page: &str) -> bool {
+    page.rsplit_once('/')
+        .is_some_and(|(parent, _)| parent == folder)
+}
 
 /// `.nimw/vault.json`, field by field (final review m9).
 fn read_nimw_json(root: &Path, warnings: &mut Vec<String>) -> NimwVaultJson {
