@@ -158,6 +158,30 @@ test('a relationship’s edge opens its dialog: label and arrow, then delete', a
   await expect(page.locator('[data-gv-edge="manual"]')).toHaveCount(0);
 });
 
+test('a folder card stands for its index note: connected, its edge is direct and opens that page’s relationships (final review I3)', async ({
+  page,
+}) => {
+  await globalView(page);
+  await page.getByRole('button', { name: 'Connections of Beta' }).click();
+  await page.getByRole('menuitem', { name: 'Pick index note…' }).click();
+  const pick = page.getByRole('dialog', { name: 'Index note for Beta' });
+  await pick.getByRole('radio', { name: 'Four' }).check();
+  await pick.getByRole('button', { name: 'Save' }).click();
+  await expect(pick).toHaveCount(0);
+
+  await page.getByRole('button', { name: 'Connections of Beta' }).click();
+  await page.getByRole('menuitem', { name: 'Connect to…' }).click();
+  await card(page, 'Notes').click();
+  await expect
+    .poll(() => writesTo(page, 'Beta/Four.md'))
+    .toEqual(['---\nrelated:\n  - "[[Notes]]"\n---\n# Four\n\nFourth.\n']);
+  await expect(page.locator('[data-gv-edge="manual"]')).toHaveCount(1);
+  await expect(page.locator('[data-gv-edge="manual-aggregated"]')).toHaveCount(0);
+  await page.locator('[data-gv-hit]').click({ force: true });
+  const dialog = page.getByRole('dialog', { name: 'Relationships between Four and Notes' });
+  await expect(dialog.getByRole('group', { name: 'Four → Notes' })).toBeVisible();
+});
+
 test('a folder without an index note: pick one, and its card previews it', async ({ page }) => {
   await globalView(page);
   await page.getByRole('button', { name: 'Connections of Beta' }).click();

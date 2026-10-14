@@ -283,6 +283,11 @@ export function installIpcMock({
         const x = lift(src);
         const y = lift(target);
         if (!x || !y || x === y) return;
+        // A folder card stands for its index note in a relationship: one
+        // between the cards' own pages is direct (final review I3).
+        const stands = (card: string, page: string) => card === page || picks[card] === page;
+        const lifted =
+          kind === 'manual' ? !(stands(x, src) && stands(y, target)) : x !== src || y !== target;
         const [from, to] = directed ? [x, y] : x < y ? [x, y] : [y, x];
         const key = `${kind}|${[x, y].sort().join('|')}`;
         const e = edges.get(key) ?? {
@@ -295,7 +300,8 @@ export function installIpcMock({
           label: null,
         };
         e.count++;
-        e.aggregated ||= x !== src || y !== target;
+        e.aggregated =
+          kind === 'manual' && e.count > 1 ? e.aggregated && lifted : e.aggregated || lifted;
         if (directed) Object.assign(e, { directed, from, to });
         e.label ??= label;
         edges.set(key, e);

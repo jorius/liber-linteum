@@ -740,6 +740,78 @@ fn m3b_a_hand_written_pick_outside_its_folder_is_ignored() {
     );
 }
 
+/// Final review I3: a folder card stands for its index note in a
+/// relationship (M3b §2), so a relationship whose two ends are the visible
+/// cards' own pages or index notes is a direct manual edge between those
+/// cards (clickable, never hidden or capped as "from inside folders"). One
+/// from any other page inside a folder stays aggregated; text links keep
+/// their rules.
+#[test]
+fn m3b_relationships_of_folder_cards_index_notes_are_direct_edges() {
+    let dir = vault();
+    let r = dir.path();
+    // Gamma's index note (picked) → a root page and Alpha's index note.
+    write(
+        r,
+        "Gamma/b.md",
+        "---\nrelated:\n  - \"[[zeta]]\"\n  - { link: \"[[Alpha]]\", label: sibling, directed: true }\n---\n# Gamma B\n",
+    );
+    // A root page → Beta's index note (its only page).
+    write(
+        r,
+        "zeta.md",
+        "---\nrelated:\n  - \"[[only]]\"\n---\n# Zeta\n\nBack to [[Welcome]].\n",
+    );
+    // Inside Alpha, the index note and another page both relate to zeta.
+    write(
+        r,
+        "Alpha/Alpha.md",
+        "---\nrelated:\n  - { link: \"[[zeta]]\", label: direct }\n---\n# Alpha home\n",
+    );
+    write(
+        r,
+        "Alpha/note.md",
+        "---\nrelated:\n  - { link: \"[[zeta]]\", label: inside }\n---\n# A note\n",
+    );
+    let (_c, s) = open(r);
+    let shown: Vec<String> = s
+        .gv_children(&GvLevel::Vault)
+        .unwrap()
+        .cards
+        .iter()
+        .map(|c| c.path.clone())
+        .collect();
+    let edges = s.gv_edges(&shown).unwrap();
+
+    let gz = edge(&edges, "Gamma", "zeta.md", EdgeKind::Manual);
+    assert_eq!((gz.count, gz.aggregated), (1, false));
+    let ga = edge(&edges, "Gamma", "Alpha", EdgeKind::Manual);
+    assert_eq!((ga.from.as_str(), ga.to.as_str()), ("Gamma", "Alpha"));
+    assert!(!ga.aggregated && ga.directed);
+    assert_eq!(ga.label.as_deref(), Some("sibling"));
+    let zb = edge(&edges, "zeta.md", "Beta", EdgeKind::Manual);
+    assert_eq!((zb.count, zb.aggregated), (1, false));
+    // Alpha's index note and a page inside it: one direct edge, counting
+    // both, labelled from the direct relationship.
+    let az = edge(&edges, "Alpha", "zeta.md", EdgeKind::Manual);
+    assert_eq!((az.count, az.aggregated), (2, false));
+    assert_eq!(az.label.as_deref(), Some("direct"));
+    // Pages inside folders that aren't their index notes: aggregated.
+    assert!(edge(&edges, "Gamma", "Welcome.md", EdgeKind::Manual).aggregated);
+    assert!(edge(&edges, "Delta", "Welcome.md", EdgeKind::Manual).aggregated);
+    // A text link from an index note is still a link from inside a folder.
+    assert!(edge(&edges, "Beta", "Welcome.md", EdgeKind::Link).aggregated);
+
+    // Only the inside page relates to zeta: aggregated, its own label.
+    write(r, "Alpha/Alpha.md", "# Alpha home\n");
+    s.apply(vec![nimw_vault::WatchEvent::Changed(vp("Alpha/Alpha.md"))])
+        .unwrap();
+    let edges = s.gv_edges(&shown).unwrap();
+    let az = edge(&edges, "Alpha", "zeta.md", EdgeKind::Manual);
+    assert_eq!((az.count, az.aggregated), (1, true));
+    assert_eq!(az.label.as_deref(), Some("inside"));
+}
+
 /// Final review m4: a page name holding `"` is linked single-quoted
 /// (`'[[say "hi"]]'`, as the app writes it); nimw-markdown indexes it, and
 /// the relationship resolves to the page: a direct manual edge.

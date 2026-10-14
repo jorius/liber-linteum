@@ -163,10 +163,10 @@ describe('Global View edges (M3a §6, final review I2)', () => {
   });
 
   it('M3b: a manual edge opens the relationships between its two cards', async () => {
-    level0 = { cards: [card('A'), card('B'), card('C')], centre: null };
+    level0 = { cards: [card('A.md', 'page'), card('B.md', 'page'), card('C')], centre: null };
     edges = [
-      edge('A', 'B', { kind: 'manual', aggregated: false, label: 'why' }),
-      edge('A', 'C', { kind: 'manual', aggregated: true }),
+      edge('A.md', 'B.md', { kind: 'manual', aggregated: false, label: 'why' }),
+      edge('A.md', 'C', { kind: 'manual', aggregated: true }),
     ];
     render(<GlobalView />);
     await waitFor(() => expect(drawn()).toHaveLength(2));
@@ -176,6 +176,44 @@ describe('Global View edges (M3a §6, final review I2)', () => {
     expect(hits).toHaveLength(1);
     expect(hits[0].classList).toContain('nopan');
     fireEvent.click(hits[0]);
-    expect(useUiStore.getState().dialog).toEqual({ type: 'relations', page: 'A', other: 'B' });
+    expect(useUiStore.getState().dialog).toEqual({
+      type: 'relations',
+      page: 'A.md',
+      other: 'B.md',
+    });
+  });
+
+  it('a relationship of a folder card is direct: drawn without the inside-folders toggle, and opens its index note’s dialog (final review I3)', async () => {
+    useSettingsStore.setState({
+      settings: {
+        ...DEFAULT_SETTINGS,
+        globalViewEdges: { ...DEFAULT_SETTINGS.globalViewEdges, aggregated: false },
+      },
+    });
+    const gamma = { ...card('Gamma'), indexPage: 'Gamma/b.md', indexFrom: 'picked' as const };
+    const alpha = { ...card('Alpha'), indexPage: 'Alpha/Alpha.md', indexFrom: 'named' as const };
+    level0 = { cards: [alpha, gamma, card('Delta'), card('zeta.md', 'page')], centre: null };
+    edges = [
+      edge('Gamma', 'Alpha', { kind: 'manual', aggregated: false, directed: true }),
+      edge('Gamma', 'zeta.md', { kind: 'manual', aggregated: false }),
+      edge('Delta', 'zeta.md', { kind: 'manual', aggregated: true }),
+    ];
+    render(<GlobalView />);
+    await waitFor(() => expect(drawn('[data-gv-edge="manual"]')).toHaveLength(2));
+    expect(drawn('[data-gv-edge="manual-aggregated"]')).toHaveLength(0);
+    const hits = document.querySelectorAll<SVGPathElement>('[data-gv-hit]');
+    expect(hits).toHaveLength(2);
+    fireEvent.click(hits[0]);
+    expect(useUiStore.getState().dialog).toEqual({
+      type: 'relations',
+      page: 'Gamma/b.md',
+      other: 'Alpha/Alpha.md',
+    });
+    fireEvent.click(hits[1]);
+    expect(useUiStore.getState().dialog).toEqual({
+      type: 'relations',
+      page: 'Gamma/b.md',
+      other: 'zeta.md',
+    });
   });
 });
