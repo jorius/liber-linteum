@@ -186,6 +186,70 @@ describe('drop (M2c §5.2)', () => {
     await stop();
   });
 
+  it('a second drag while files copy leaves the first drop point alone (final review minor 4)', async () => {
+    mockWindows('main');
+    let release: (v: unknown) => void = () => undefined;
+    fakeDisk(
+      { 'P.md': 'abcdefghij\n' },
+      {
+        attachment_import: () =>
+          new Promise((r) => {
+            release = r;
+          }),
+      },
+    );
+    const stop = await installFileDrop();
+    await mount('P.md');
+    act(() => viewOf().dispatch({ selection: { anchor: 9 } }));
+    const carets = () => viewOf().contentDOM.querySelectorAll('.cm-nimw-drop-caret').length;
+    vi.spyOn(document, 'elementFromPoint').mockReturnValue(viewOf().contentDOM);
+    const pos = vi.spyOn(viewOf(), 'posAtCoords').mockReturnValue(2);
+    await act(() => emit('tauri://drag-enter', payload(1, 1, ['/u/a.png'])));
+    await act(() => emit('tauri://drag-drop', payload(1, 1, ['/u/a.png'])));
+    expect(carets()).toBe(1); // where a.png will land
+    // Another file is dragged over the text and away while a.png copies.
+    pos.mockReturnValue(5);
+    await act(() => emit('tauri://drag-enter', payload(1, 1, ['/u/b.png'])));
+    await act(() => emit('tauri://drag-over', payload(1, 1)));
+    expect(carets()).toBe(2);
+    await act(() => emit('tauri://drag-leave', null));
+    expect(carets()).toBe(1);
+    act(() => viewOf().dispatch({ changes: { from: 0, insert: 'XX' } }));
+    release([{ source: '/u/a.png', ok: { path: 'a.png', link: 'a.png', copied: true } }]);
+    await vi.waitFor(() => expect(viewOf().state.doc.toString()).toBe('XXab![[a.png]]cdefghij\n'));
+    expect(carets()).toBe(0);
+    await stop();
+  });
+
+  it('drops copying at the same time each land at their own point', async () => {
+    mockWindows('main');
+    const releases: ((v: unknown) => void)[] = [];
+    fakeDisk(
+      { 'P.md': 'abcdefghij\n' },
+      {
+        attachment_import: () =>
+          new Promise((r) => {
+            releases.push(r);
+          }),
+      },
+    );
+    const stop = await installFileDrop();
+    await mount('P.md');
+    vi.spyOn(document, 'elementFromPoint').mockReturnValue(viewOf().contentDOM);
+    const pos = vi.spyOn(viewOf(), 'posAtCoords').mockReturnValue(2);
+    await act(() => emit('tauri://drag-drop', payload(1, 1, ['/u/a.png'])));
+    pos.mockReturnValue(5);
+    await act(() => emit('tauri://drag-drop', payload(1, 1, ['/u/b.png'])));
+    await vi.waitFor(() => expect(releases).toHaveLength(2));
+    releases[1]([{ source: '/u/b.png', ok: { path: 'b.png', link: 'b.png', copied: true } }]);
+    await vi.waitFor(() => expect(viewOf().state.doc.toString()).toBe('abcde![[b.png]]fghij\n'));
+    releases[0]([{ source: '/u/a.png', ok: { path: 'a.png', link: 'a.png', copied: true } }]);
+    await vi.waitFor(() =>
+      expect(viewOf().state.doc.toString()).toBe('ab![[a.png]]cde![[b.png]]fghij\n'),
+    );
+    await stop();
+  });
+
   describe('drop coordinates (final review C1)', () => {
     // Tauri types drag positions as physical pixels, but only WebView2 reports
     // them so. On macOS wry 0.57.0 passes AppKit points (CSS pixels) through

@@ -1,7 +1,7 @@
 // Pasted images and files dropped from the OS (M2c §5): saved into the vault
 // by Rust, then an embed or link is inserted where they landed. Drops come
 // from Tauri's native drag events (Rust only imports paths it saw dropped).
-import { StateEffect, StateField, type Extension } from '@codemirror/state';
+import { StateEffect, StateField, type EditorState, type Extension } from '@codemirror/state';
 import { Decoration, EditorView, WidgetType, type DecorationSet } from '@codemirror/view';
 import i18next from 'i18next';
 import {
@@ -52,10 +52,18 @@ export function embedFor(link: string): string {
   return EMBEDDED.has(ext) ? `![[${link}]]` : `[[${link}]]`;
 }
 
-// ---- drop caret / pending insertion point ----
+// ---- drop caret and pending insertion points ----
 
-/** Where dropped files will land; mapped through edits made while copying. */
+/** The hover caret: where files dragged over the text would land. */
 const setDropAt = StateEffect.define<number | null>();
+
+/** A drop whose files are being copied, and where they will land. */
+interface Pending {
+  id: number;
+  pos: number;
+}
+const addPending = StateEffect.define<Pending>();
+const endPending = StateEffect.define<number>();
 
 class CaretWidget extends WidgetType {
   toDOM(): HTMLElement {
@@ -66,19 +74,43 @@ class CaretWidget extends WidgetType {
   }
 }
 
+const caretsAt = (positions: readonly number[]): DecorationSet =>
+  Decoration.set(
+    positions.map((pos) => Decoration.widget({ widget: new CaretWidget(), side: 1 }).range(pos)),
+    true,
+  );
+
 const dropAt = StateField.define<number | null>({
   create: () => null,
   update(pos, tr) {
     for (const e of tr.effects) if (e.is(setDropAt)) return e.value;
     return pos === null ? null : tr.changes.mapPos(pos, 1);
   },
-  provide: (f) =>
-    EditorView.decorations.from(f, (pos): DecorationSet =>
-      pos === null
-        ? Decoration.none
-        : Decoration.set([Decoration.widget({ widget: new CaretWidget(), side: 1 }).range(pos)]),
-    ),
+  provide: (f) => EditorView.decorations.from(f, (pos) => caretsAt(pos === null ? [] : [pos])),
 });
+
+/** Insertion points of drops still copying, one per drop, mapped through edits
+ *  made meanwhile. They are kept apart from the hover caret, so dragging more
+ *  files over the text can't move them (final review minor 4); each shows a
+ *  caret until its files land. */
+const pending = StateField.define<readonly Pending[]>({
+  create: () => [],
+  update(list, tr) {
+    let next =
+      tr.docChanged && list.length
+        ? list.map(({ id, pos }) => ({ id, pos: tr.changes.mapPos(pos, 1) }))
+        : list;
+    for (const e of tr.effects) {
+      if (e.is(addPending)) next = [...next, e.value];
+      else if (e.is(endPending)) next = next.filter((p) => p.id !== e.value);
+    }
+    return next;
+  },
+  provide: (f) => EditorView.decorations.from(f, (list) => caretsAt(list.map((p) => p.pos))),
+});
+
+const pendingAt = (state: EditorState, id: number): number | undefined =>
+  state.field(pending, false)?.find((p) => p.id === id)?.pos;
 
 const caretTheme = EditorView.baseTheme({
   '.cm-nimw-drop-caret': {
@@ -136,7 +168,7 @@ const pasteHandler = EditorView.domEventHandlers({
 
 /** Paste handling and the drop caret, for every editor mode. */
 export function attachmentHandlers(): Extension {
-  return [pasteHandler, dropAt, caretTheme];
+  return [pasteHandler, dropAt, pending, caretTheme];
 }
 
 // ---- drop ----
@@ -169,27 +201,33 @@ function target(e: DragDropPayload): { view: EditorView; pos: number } | null {
 const failureLine = (source: string, error: CommandError) =>
   `${nameOf(source.replace(/[\\/]+$/, ''))}: ${errorMessage(error)}`;
 
-async function dropFiles(view: EditorView, paths: string[]) {
+/** Drops so far: each pending insertion point has its own id. */
+let drops = 0;
+
+async function dropFiles(view: EditorView, id: number, paths: string[]) {
   const page = view.state.facet(pagePath)();
   track(1);
   const res = await attachmentImport(page, paths).finally(() => track(-1));
-  const pos = view.state.field(dropAt, false) ?? view.state.selection.main.head;
-  view.dispatch({ effects: setDropAt.of(null) });
   if (!res.ok) {
+    view.dispatch({ effects: endPending.of(id) });
     useToastStore.getState().push({ message: errorMessage(res.error), tone: 'error' });
     return;
   }
   const links = res.value.flatMap((r) => (r.ok ? [embedFor(r.ok.link)] : []));
   const failed = res.value.flatMap((r) => (r.err ? [failureLine(r.source, r.err)] : []));
-  if (links.length) {
-    const text = links.join('\n');
-    view.dispatch({
-      changes: { from: pos, insert: text },
-      selection: { anchor: pos + text.length },
-      userEvent: 'input.drop',
-    });
-    void useVaultStore.getState().refreshTree();
-  }
+  const text = links.join('\n');
+  const pos = pendingAt(view.state, id) ?? view.state.selection.main.head;
+  view.dispatch(
+    text
+      ? {
+          changes: { from: pos, insert: text },
+          selection: { anchor: pos + text.length },
+          userEvent: 'input.drop',
+          effects: endPending.of(id),
+        }
+      : { effects: endPending.of(id) },
+  );
+  if (text) void useVaultStore.getState().refreshTree();
   if (failed.length) {
     useToastStore.getState().push({
       message: i18next.t('attach.someFailed'),
@@ -222,13 +260,14 @@ function onDrag(e: DragDropPayload) {
   if (!paths.length) return moveCaret(null);
   const hit = target(e);
   if (e.type !== 'drop') return moveCaret(hit);
-  caretView = null;
+  moveCaret(null);
   if (!hit) {
     useToastStore.getState().push({ message: i18next.t('attach.dropOnText') });
     return;
   }
-  hit.view.dispatch({ effects: setDropAt.of(hit.pos) });
-  void dropFiles(hit.view, paths);
+  const id = ++drops;
+  hit.view.dispatch({ effects: addPending.of({ id, pos: hit.pos }) });
+  void dropFiles(hit.view, id, paths);
 }
 
 /** Listens to native file drags for the whole window; returns the unsubscribe. */
