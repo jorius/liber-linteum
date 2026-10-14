@@ -159,3 +159,29 @@ These override the sections above where they conflict.
 11. **Safari 15 tokens** (§7): one hover shade (12 % of the sidebar text over the sidebar) for both its icon buttons and the explorer rows (rows used 10 %), `--color-sidebar-active` 16 %, `--color-sidebar-divider` 15 %; backdrops as `rgba()` of the background at 60 % / 70 %. A test fails on any `color-mix(` in the app's CSS.
 12. **Index pick dialog:** a radio list of the folder's own pages (search when there are more than 10) plus "No index note"; it re-reads the level after saving.
 13. **Tests:** `nimw-session` gains `serde_json` as a dev-dependency; the e2e IPC mock draws manual edges from frontmatter lines naming `[[X]]` and no longer counts frontmatter links as text links.
+
+## 11. Rulings from the final review's fix pass: UI, focus and connect mode
+
+These override the sections above where they conflict. The review is `.superpowers/sdd/2026-10-14-m3b-relationships/final-review.md`, and the finding ids are its own.
+
+1. **Focus never lands on `<body>` (I2, NFR-10):**
+   - A connections-menu item gives the keyboard back to the card's connect button before it runs, so a dialog it opens (Relationships…, Pick index note…) returns there when it closes.
+   - Connect to… on a folder without an index note leaves the keyboard on that button.
+   - When the element that opened a dialog is gone (the "has no index note" toast's action), `Dialog`'s `returnFocus` puts the keyboard on the card's connect button.
+   - Leaving connect mode from the bar (Cancel, or Escape) puts the keyboard on the source card.
+2. **Drop target (m2):** the card's React Flow node (`.react-flow__node[data-id]`), so a drop anywhere on the card counts, header and footer included. This replaces `[data-gv-card]` in §10.5.
+3. **Escape (m3)** leaves connect mode from anywhere in the Global View: a card, the bar, a connect button or the toolbar.
+4. **Connect-mode corner cases (m8):**
+   - A folder card and its index note's own card stand for the same page. Picking one from the other keeps connect mode on, and an info toast (polite) says "{a} and {b} stand for the same page: it can't be related to itself"; a drag between them says so too. A click on the source card itself stays silent (§2).
+   - In connect mode, a slow double click on a card only connects; the page doesn't open afterwards.
+   - **A click on a relationship edge in connect mode leaves connect mode, then opens the edge's dialog.** An edge isn't a card, so it ends picking like a click on the background, and does what an edge click does.
+   - Connect mode ends when the Global View goes (⌘1, a page opened elsewhere) or when its source card leaves the canvas on a re-read. A re-read that keeps the card leaves connect mode, and the keyboard, as they were.
+5. **The connections menu (m9)** portals into the landmark region holding its card (the Global View section), not `<body>`. Placed once, it closes on a pan or zoom (React Flow's `onMoveStart`), when another level shows, or when cards are expanded.
+6. **The connect bar's live region (m10)** stays mounted, empty and unnamed outside connect mode; connect mode fills it and names it "Connecting".
+7. **The Relationships dialog (m5, m13):**
+   - Save and Delete re-read the list whatever the outcome, so an edit refused because the list moved shows the list as it is now (§10.7). The keyboard stays in the dialog when its row goes away.
+   - **Close saves the changes not saved yet**, then closes; if one is refused (the list moved, the page changed on disk), the dialog stays open on the list as it is now.
+   - **Escape keeps the dialog convention and discards them.** The dialog says so: "Close saves the changes you haven't saved yet; Escape discards them."
+8. **Index pick on a single-page folder (m14, `indexFrom: 'only'`):** the page is preselected, and the dialog explains that the card already uses it. Saving it writes the pick, which keeps it once more pages are added; "No index note" changes nothing there (rule 4).
+9. **Dialog text fields (m12)** use `.textInput` (the body font, the dialog's width) instead of the settings' monospace `.hexInput`.
+10. **Safari 15.0–15.3 (m15):** a test fails if two clicks on connect handles in a row reach `structuredClone`, which pins `connectOnClick={false}`.
