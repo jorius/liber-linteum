@@ -1,5 +1,14 @@
 import '@xyflow/react/dist/base.css';
-import { ReactFlow, useNodesState, useReactFlow, type Node, type NodeProps } from '@xyflow/react';
+import {
+  Handle,
+  Position,
+  ReactFlow,
+  useNodesState,
+  useReactFlow,
+  type Node,
+  type NodeProps,
+  type OnConnectEnd,
+} from '@xyflow/react';
 import {
   useCallback,
   useEffect,
@@ -7,6 +16,7 @@ import {
   useRef,
   type KeyboardEvent,
   type MouseEvent,
+  type ReactElement,
 } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { GlobalViewEdges, GvCard } from '../../ipc';
@@ -14,7 +24,7 @@ import { useUiStore } from '../../stores/uiStore';
 import { Card } from './Card';
 import type { CardMenuItem } from './CardMenu';
 import { EdgeLayer, MAX_AGGREGATED, strongest, type DrawnEdge } from './edges';
-import { useGvStore } from './gvStore';
+import { pageOf, useGvStore } from './gvStore';
 import {
   CARD_H,
   CARD_W,
@@ -34,14 +44,23 @@ interface CardData extends Record<string, unknown> {
   focusable: boolean;
   connections: string;
   menu: CardMenuItem[];
+  connecting: boolean;
   onOpen: (card: GvCard) => void;
   onOpenEditor: (card: GvCard) => void;
 }
 
 type CardNode = Node<CardData, 'card'>;
 
-/** A card as a React Flow node. Edges need no handles: EdgeLayer draws
- *  them border to border (edges.tsx). */
+/** The connect button as React Flow's drag-to-connect source handle (M3b
+ *  §2): a press that moves draws the connection line; a click opens the
+ *  menu. Edges need no handles: EdgeLayer draws them border to border. */
+const connectHandle = (button: ReactElement) => (
+  <Handle type="source" position={Position.Right} className={styles.connectHandle}>
+    {button}
+  </Handle>
+);
+
+/** A card as a React Flow node. */
 function CardNodeView({ data }: NodeProps<CardNode>) {
   const setFocus = useGvStore((s) => s.setFocus);
   return (
@@ -52,6 +71,8 @@ function CardNodeView({ data }: NodeProps<CardNode>) {
         focusable={data.focusable}
         connections={data.connections}
         menu={data.menu}
+        connecting={data.connecting}
+        wrapConnect={connectHandle}
         onOpen={() => data.onOpen(data.card)}
         onOpenEditor={() => data.onOpenEditor(data.card)}
         onFocus={() => setFocus(data.card.path)}
@@ -87,6 +108,7 @@ export function Canvas({ mode, toggles, width, onOpen, onOpenEditor }: CanvasPro
   const pinned = useGvStore((s) => s.pinned);
   const expanded = useGvStore((s) => s.expanded);
   const focus = useGvStore((s) => s.focus);
+  const connectFrom = useGvStore((s) => s.connectFrom);
   const flow = useReactFlow();
   const wrapper = useRef<HTMLDivElement>(null);
 
@@ -184,9 +206,14 @@ export function Canvas({ mode, toggles, width, onOpen, onOpenEditor }: CanvasPro
    *  folder's index note. */
   const menuOf = useCallback(
     (card: GvCard): CardMenuItem[] => {
-      const page = card.kind === 'page' ? card.path : card.indexPage;
-      if (!page) return [];
+      const connect = {
+        label: t('gv.relations.connect'),
+        run: () => useGvStore.getState().startConnect(card),
+      };
+      const page = pageOf(card);
+      if (!page) return [connect];
       return [
+        connect,
         {
           label: t('gv.relations.open'),
           run: () => useUiStore.getState().openDialog({ type: 'relations', page }),
@@ -227,11 +254,22 @@ export function Canvas({ mode, toggles, width, onOpen, onOpenEditor }: CanvasPro
           focusable: card.path === tabStop,
           connections: connections(card.path),
           menu: menuOf(card),
+          connecting: connectFrom?.path === card.path,
           onOpen: open,
           onOpenEditor,
         },
       })),
-    [canvas, positions, expandedPaths, tabStop, connections, menuOf, open, onOpenEditor],
+    [
+      canvas,
+      positions,
+      expandedPaths,
+      tabStop,
+      connections,
+      menuOf,
+      connectFrom,
+      open,
+      onOpenEditor,
+    ],
   );
   const ariaLabelConfig = useMemo(
     () => ({
@@ -266,6 +304,23 @@ export function Canvas({ mode, toggles, width, onOpen, onOpenEditor }: CanvasPro
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [shownKey, nodes, canvas]);
+
+  // Connect mode started from a card's menu: the keyboard goes back to that
+  // card, to move on to the target from there (M3b §2).
+  useEffect(() => {
+    if (connectFrom) focusCard(connectFrom.path);
+  }, [connectFrom]);
+
+  /** A drag from a connect handle ended: the card under the pointer, if any,
+   *  is the other end (M3b §2). */
+  const onConnectEnd: OnConnectEnd = (event, state) => {
+    const from = state.fromNode?.id;
+    if (!from) return;
+    const point = 'changedTouches' in event ? event.changedTouches[0] : event;
+    const under = point ? document.elementFromPoint(point.clientX, point.clientY) : null;
+    const to = under?.closest<HTMLElement>('[data-gv-card]')?.dataset.gvCard ?? null;
+    void useGvStore.getState().connectByDrag(from, to);
+  };
 
   /** Moves the keyboard to a card: at once when it is on screen, else after
    *  the next render (a level that just loaded). */
@@ -319,8 +374,14 @@ export function Canvas({ mode, toggles, width, onOpen, onOpenEditor }: CanvasPro
         nodeTypes={nodeTypes}
         onNodesChange={onNodesChange}
         onNodeDragStop={(_, node) => useGvStore.getState().pin(node.id, node.position)}
-        nodesConnectable={false}
+        // Connections only start from the connect handles (M3b §2); React
+        // Flow's click-to-connect stays off: it uses structuredClone, which
+        // Safari 15.0–15.3 lacks — the menu's "Connect to…" replaces it.
+        nodesConnectable
         connectOnClick={false}
+        onConnectEnd={onConnectEnd}
+        connectionLineStyle={{ stroke: 'var(--color-edge-manual)', strokeWidth: 3 }}
+        onPaneClick={() => useGvStore.getState().cancelConnect()}
         elementsSelectable={false}
         nodesFocusable={false}
         edgesFocusable={false}

@@ -1,7 +1,7 @@
 import { ReactFlowProvider } from '@xyflow/react';
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { PlusIcon } from '../../app/icons';
+import { LinkIcon, PlusIcon } from '../../app/icons';
 import { entryCreatePage, type GvCard } from '../../ipc';
 import { useEditorStore } from '../../stores/editorStore';
 import { errorMessage } from '../../stores/messages';
@@ -27,6 +27,7 @@ export function GlobalView() {
   const loaded = useGvStore((s) => s.loaded);
   const empty = useGvStore((s) => s.canvas.cards.length === 0);
   const shownKey = useGvStore((s) => s.shownKey);
+  const connectFrom = useGvStore((s) => s.connectFrom);
   // A hub page's neighbourhood is capped (final review m14): say how many
   // linked pages the level leaves out.
   const omitted = useGvStore((s) => (s.shownKey ? (s.levels[s.shownKey]?.omitted ?? 0) : 0));
@@ -97,8 +98,13 @@ export function GlobalView() {
 
   const onOpen = useCallback((card: GvCard) => void useGvStore.getState().open(card), []);
   /** Double click / See all (GV-12): the page, or a folder's index note; a
-   *  folder without one opens as the next level. */
+   *  folder without one opens as the next level. In connect mode it picks
+   *  the card (M3b §2). */
   const onOpenEditor = useCallback((card: GvCard) => {
+    if (useGvStore.getState().connectFrom) {
+      void useGvStore.getState().completeConnect(card);
+      return;
+    }
     const page = card.kind === 'page' ? card.path : card.indexPage;
     if (page) void openPage(page);
     else void useGvStore.getState().open(card);
@@ -120,6 +126,17 @@ export function GlobalView() {
   return (
     <section ref={region} className={styles.view} aria-label={t('gv.region')}>
       <Toolbar />
+      {connectFrom && (
+        <div className={styles.connectBar}>
+          <LinkIcon />
+          <p role="status" aria-label={t('gv.relations.connecting')} className={styles.connectText}>
+            {t('gv.relations.pick', { name: connectFrom.title })}
+          </p>
+          <button type="button" onClick={() => useGvStore.getState().cancelConnect()}>
+            {t('dialogs.cancel')}
+          </button>
+        </div>
+      )}
       <div ref={area} className={styles.area}>
         <ReactFlowProvider>
           <Canvas

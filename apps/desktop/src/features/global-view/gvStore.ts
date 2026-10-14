@@ -17,8 +17,10 @@ import {
   type IpcResult,
 } from '../../ipc';
 import { errorMessage } from '../../stores/messages';
+import { relate } from '../../stores/relations';
 import { useSettingsStore } from '../../stores/settingsStore';
 import { useToastStore } from '../../stores/toastStore';
+import { useUiStore } from '../../stores/uiStore';
 import { onBeforeVaultSwitch, useVaultStore } from '../../stores/vaultStore';
 
 /** Saving a dragged card waits this long for the next drag (M3a §7). */
@@ -35,6 +37,11 @@ export const nextLevel = (card: GvCard): GvLevelRef =>
 /** The layout key of what the canvas shows. */
 export const canvasKey = (mode: GlobalViewMode, root: GvLevelRef): string =>
   mode === 'expand' ? `expand:${levelKey(root)}` : levelKey(root);
+
+/** The page a card stands for in a relationship (M3b §2): itself, or a
+ *  folder's index note; `null` for a folder without one. */
+export const pageOf = (card: GvCard): string | null =>
+  card.kind === 'page' ? card.path : card.indexPage;
 
 /** What the canvas shows, derived from the loaded levels. */
 export interface Canvas {
@@ -97,6 +104,8 @@ interface GvState {
   pinned: Record<string, CardPosition>;
   /** The card with keyboard focus (roving tabindex). */
   focus: string | null;
+  /** Connect mode (M3b §2): the card a relationship starts from. */
+  connectFrom: GvCard | null;
   loaded: boolean;
   /** Reads what the canvas shows: levels (falling back from deleted ones;
    *  any other failure keeps what is shown), edges and pinned positions. */
@@ -116,6 +125,13 @@ interface GvState {
   pin: (path: string, at: CardPosition) => void;
   resetLayout: () => Promise<void>;
   setFocus: (path: string | null) => void;
+  /** "Connect to…": the next card picked completes the relationship. */
+  startConnect: (card: GvCard) => void;
+  cancelConnect: () => void;
+  /** A card picked in connect mode (click, Enter). */
+  completeConnect: (target: GvCard) => Promise<void>;
+  /** A drag from `from`'s connect handle dropped on `to` (or on nothing). */
+  connectByDrag: (from: string, to: string | null) => Promise<void>;
   reset: () => void;
 }
 
@@ -203,7 +219,34 @@ export const useGvStore = create<GvState>((set, get) => {
     }
   }
 
+  /** A folder without an index note can't take part (M3b §2). */
+  function needsIndex(card: GvCard): boolean {
+    if (pageOf(card)) return false;
+    useToastStore.getState().push({
+      message: i18next.t('gv.relations.noIndex', { name: card.title }),
+      tone: 'error',
+    });
+    return true;
+  }
+
+  /** Relates the pages `from` and `to` stand for: a new relationship (the
+   *  edges are re-read), or the dialog of the one that exists. */
+  async function relateCards(from: GvCard, to: GvCard) {
+    if (needsIndex(from) || needsIndex(to)) return;
+    const source = pageOf(from)!;
+    const target = pageOf(to)!;
+    if (source === target) return;
+    const res = await relate(source, target);
+    if (res.status === 'created') {
+      useToastStore.getState().push({ message: i18next.t('gv.relations.created'), tone: 'info' });
+      await get().load();
+    } else if (res.status === 'exists') {
+      useUiStore.getState().openDialog({ type: 'relations', page: source, other: target });
+    }
+  }
+
   return {
+    connectFrom: null,
     stack: [{ kind: 'vault' }],
     expanded: [],
     levels: {},
@@ -272,6 +315,8 @@ export const useGvStore = create<GvState>((set, get) => {
       });
     },
     open: async (card) => {
+      // Connect mode: a click picks the other card (no navigation, M3b §2).
+      if (get().connectFrom) return get().completeConnect(card);
       if (mode() === 'drill') {
         // The page this level is about: already open (final review m2).
         if (card.path === get().canvas.centre) return;
@@ -290,6 +335,7 @@ export const useGvStore = create<GvState>((set, get) => {
       return get().load();
     },
     back: async (i) => {
+      set({ connectFrom: null });
       const stack = get().stack.slice(0, Math.max(1, i + 1));
       // A level is opened from the card of the same path: the keyboard goes
       // back to it (final review m13).
@@ -299,6 +345,7 @@ export const useGvStore = create<GvState>((set, get) => {
       return get().load();
     },
     up: async (path) => {
+      if (get().connectFrom) return get().cancelConnect();
       if (mode() === 'expand') {
         const ref = get().expanded.find((r) => r.kind !== 'vault' && r.path === path);
         const card = get().canvas.cards.find((c) => c.path === path);
@@ -308,7 +355,7 @@ export const useGvStore = create<GvState>((set, get) => {
       if (get().stack.length > 1) return get().back(get().stack.length - 2);
     },
     modeChanged: async () => {
-      set({ expanded: [], focus: null });
+      set({ expanded: [], focus: null, connectFrom: null });
       return get().load();
     },
     entryDir: () => {
@@ -354,6 +401,24 @@ export const useGvStore = create<GvState>((set, get) => {
       reportSave(await layoutSet(key, {}));
     },
     setFocus: (focus) => set({ focus }),
+    startConnect: (card) => {
+      if (needsIndex(card)) return;
+      set({ connectFrom: card, focus: card.path });
+    },
+    cancelConnect: () => set({ connectFrom: null }),
+    completeConnect: async (target) => {
+      const from = get().connectFrom;
+      if (!from || target.path === from.path) return;
+      set({ connectFrom: null });
+      await relateCards(from, target);
+    },
+    connectByDrag: async (from, to) => {
+      if (!to || to === from) return;
+      const cards = get().canvas.cards;
+      const a = cards.find((c) => c.path === from);
+      const b = cards.find((c) => c.path === to);
+      if (a && b) await relateCards(a, b);
+    },
     reset: () => {
       seq++;
       if (pinTimer) clearTimeout(pinTimer);
@@ -363,6 +428,7 @@ export const useGvStore = create<GvState>((set, get) => {
       saveFailed = false;
       shownAt = null;
       set({
+        connectFrom: null,
         stack: [{ kind: 'vault' }],
         expanded: [],
         levels: {},

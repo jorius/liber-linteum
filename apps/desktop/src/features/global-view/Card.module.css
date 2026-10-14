@@ -18,6 +18,12 @@
   box-shadow: 0 0 0 2px var(--color-accent);
 }
 
+/* Connect mode starts here (M3b §2, prototype `.card.from`). */
+.card[data-connecting] {
+  border-color: var(--color-edge-manual);
+  box-shadow: 0 0 0 2px var(--color-edge-manual);
+}
+
 .head {
   display: flex;
   align-items: center;

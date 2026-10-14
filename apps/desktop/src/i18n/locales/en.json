@@ -281,6 +281,11 @@
   "gv": {
     "relations": {
       "changedOnDisk": "Couldn’t update {name}: it changed on disk. Try again.",
+      "connect": "Connect to…",
+      "connecting": "Connecting",
+      "pick": "Pick the card to connect: {name} → ?",
+      "noIndex": "{name} has no index note. Pick one first.",
+      "created": "Relationship created.",
       "of": "Relationships of {name}",
       "between": "Relationships between {a} and {b}",
       "loading": "Loading…",

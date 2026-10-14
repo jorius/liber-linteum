@@ -281,6 +281,11 @@
   "gv": {
     "relations": {
       "changedOnDisk": "No se pudo actualizar {name}: cambió en el disco. Inténtalo de nuevo.",
+      "connect": "Conectar con…",
+      "connecting": "Conectando",
+      "pick": "Elige la tarjeta que conectar: {name} → ?",
+      "noIndex": "{name} no tiene nota índice. Elige una primero.",
+      "created": "Relación creada.",
       "of": "Relaciones de {name}",
       "between": "Relaciones entre {a} y {b}",
       "loading": "Cargando…",

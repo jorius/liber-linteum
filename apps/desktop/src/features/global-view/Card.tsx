@@ -1,4 +1,12 @@
-import { useEffect, useId, useRef, useState, type KeyboardEvent } from 'react';
+import {
+  useEffect,
+  useId,
+  useRef,
+  useState,
+  type KeyboardEvent,
+  type ReactElement,
+  type ReactNode,
+} from 'react';
 import { useTranslation } from 'react-i18next';
 import { AudioIcon, FolderIcon, GripIcon, ImageIcon, LinkIcon } from '../../app/icons';
 import { assetUrl, type GvCard } from '../../ipc';
@@ -20,6 +28,11 @@ export interface CardProps {
   connections: string;
   /** The connect button's menu (M3b §3); none: no button. */
   menu?: CardMenuItem[];
+  /** Connect mode starts from this card (M3b §2): manual-colour ring. */
+  connecting?: boolean;
+  /** Wraps the connect button (the canvas makes it a drag-to-connect
+   *  handle, M3b §2). */
+  wrapConnect?: (button: ReactElement) => ReactNode;
   /** Single click / Enter: the next level (GV-11). */
   onOpen: () => void;
   /** Double click / Shift+Enter / See all: the editor (GV-12). */
@@ -34,6 +47,8 @@ export function Card({
   focusable,
   connections,
   menu = [],
+  connecting = false,
+  wrapConnect = (button) => button,
   onOpen,
   onOpenEditor,
   onFocus,
@@ -106,6 +121,7 @@ export function Card({
     <div
       className={styles.card}
       data-open={open || undefined}
+      data-connecting={connecting || undefined}
       role="group"
       aria-label={t('gv.cardName', { title: card.title, kind: kind.toLocaleLowerCase() })}
     >
@@ -114,21 +130,22 @@ export function Card({
         <span className={`${styles.grip} gv-grip`} title={t('gv.move')} aria-hidden="true">
           <GripIcon />
         </span>
-        {menu.length > 0 && (
-          <button
-            ref={menuButton}
-            type="button"
-            className={`${styles.connect} nodrag`}
-            tabIndex={focusable ? 0 : -1}
-            aria-haspopup="menu"
-            aria-expanded={menuOpen}
-            aria-label={t('gv.relations.menu', { title: card.title })}
-            title={t('gv.relations.menu', { title: card.title })}
-            onClick={() => setMenuOpen((o) => !o)}
-          >
-            <LinkIcon />
-          </button>
-        )}
+        {menu.length > 0 &&
+          wrapConnect(
+            <button
+              ref={menuButton}
+              type="button"
+              className={`${styles.connect} nodrag`}
+              tabIndex={focusable ? 0 : -1}
+              aria-haspopup="menu"
+              aria-expanded={menuOpen}
+              aria-label={t('gv.relations.menu', { title: card.title })}
+              title={t('gv.relations.menu', { title: card.title })}
+              onClick={() => setMenuOpen((o) => !o)}
+            >
+              <LinkIcon />
+            </button>,
+          )}
         {menuOpen && menuButton.current && (
           <CardMenu
             label={t('gv.relations.menu', { title: card.title })}
