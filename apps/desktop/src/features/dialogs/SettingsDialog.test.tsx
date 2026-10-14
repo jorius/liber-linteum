@@ -4,6 +4,7 @@ import axe from 'axe-core';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { clearMocks, mockIPC } from '../../ipc/testing';
 import { DEFAULT_SETTINGS, useSettingsStore } from '../../stores/settingsStore';
+import { resetVaultStore, useVaultStore } from '../../stores/vaultStore';
 import { SettingsDialog } from './SettingsDialog';
 
 let patches: Record<string, unknown>[];
@@ -157,5 +158,87 @@ describe('Settings dialog (M2b §4, §5, §7)', () => {
     open();
     const live = screen.getByRole('combobox', { name: 'Live Preview font' });
     expect(within(live).getAllByRole('option').length).toBe(6);
+  });
+});
+
+describe('Settings → This vault (M2c §5.4)', () => {
+  let vaultPatches: unknown[];
+  let obsidian: string | null;
+  let stored: { mode: string; path: string };
+
+  beforeEach(() => {
+    vaultPatches = [];
+    obsidian = null;
+    stored = { mode: 'subfolder', path: 'attachments' };
+    useVaultStore.setState({ info: { name: 'Vault', root: '/v', report: {} as never } });
+    mockIPC((cmd, raw) => {
+      const args = (raw ?? {}) as Record<string, unknown>;
+      if (cmd === 'vault_settings_get') return { attachments: stored, obsidian };
+      if (cmd === 'vault_settings_set') {
+        vaultPatches.push(args.patch);
+        stored = (args.patch as { attachments: typeof stored }).attachments;
+        return { attachments: stored, obsidian };
+      }
+      if (cmd === 'fonts_list') return [];
+      return null;
+    });
+  });
+  afterEach(async () => {
+    await resetVaultStore();
+  });
+
+  it('is hidden without an open vault', async () => {
+    await resetVaultStore();
+    open();
+    expect(screen.queryByRole('heading', { name: 'This vault' })).not.toBeInTheDocument();
+  });
+
+  it("shows NIMW's setting and saves another mode at once", async () => {
+    open();
+    const where = await screen.findByRole('combobox', { name: 'New attachments go to' });
+    await waitFor(() => expect(where).toHaveValue('subfolder'));
+    expect(screen.getByRole('textbox', { name: 'Subfolder name' })).toHaveValue('attachments');
+    await userEvent.selectOptions(where, 'same');
+    await waitFor(() =>
+      expect(vaultPatches).toEqual([{ attachments: { mode: 'same', path: '' } }]),
+    );
+    expect(screen.queryByRole('textbox', { name: 'Subfolder name' })).not.toBeInTheDocument();
+  });
+
+  it('a folder is saved on Enter; an unusable name is explained and not saved', async () => {
+    open();
+    const where = await screen.findByRole('combobox', { name: 'New attachments go to' });
+    await waitFor(() => expect(where).toHaveValue('subfolder'));
+    await userEvent.selectOptions(where, 'folder');
+    const field = screen.getByRole('textbox', { name: 'Folder in the vault' });
+    expect(vaultPatches).toEqual([]);
+    await userEvent.type(field, 'Me:dia{Enter}');
+    expect(screen.getByRole('alert')).toHaveTextContent('Names can\'t contain ":"');
+    expect(vaultPatches).toEqual([]);
+    await userEvent.clear(field);
+    await userEvent.type(field, 'Media/Img{Enter}');
+    await waitFor(() =>
+      expect(vaultPatches).toEqual([{ attachments: { mode: 'folder', path: 'Media/Img' } }]),
+    );
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
+
+  it("Obsidian's setting wins: shown read-only with where files go", async () => {
+    obsidian = './assets';
+    open();
+    const where = await screen.findByRole('combobox', { name: 'New attachments go to' });
+    await waitFor(() => expect(where).toBeDisabled());
+    expect(
+      screen.getByText(
+        'Set by Obsidian: ./assets — new attachments go to the “assets” folder next to the page.',
+      ),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText('Change it in Obsidian (Settings → Files and links).'),
+    ).toBeInTheDocument();
+    const violations = await axe
+      .run(screen.getByRole('dialog'), { rules: { 'color-contrast': { enabled: false } } })
+      .then((r) => r.violations);
+    expect(violations).toEqual([]);
   });
 });

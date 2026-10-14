@@ -185,7 +185,8 @@
     "sections": {
       "appearance": "Apariencia",
       "editor": "Editor",
-      "files": "Archivos"
+      "files": "Archivos",
+      "vault": "Esta bóveda"
     },
     "palette": "Paleta",
     "palettes": {
@@ -259,5 +260,22 @@
     "placeholder": "Nombre de página o dirección web",
     "results": "Páginas",
     "url": "Enlazar a {url}"
+  },
+  "vault": {
+    "attachmentsLabel": "Los adjuntos nuevos van a",
+    "modes": {
+      "subfolder": "Una subcarpeta junto a la página",
+      "same": "La carpeta de la página",
+      "vault": "La raíz de la bóveda",
+      "folder": "Una carpeta de la bóveda"
+    },
+    "subfolderName": "Nombre de la subcarpeta",
+    "folderPath": "Carpeta de la bóveda",
+    "obsidianSet": "Definido por Obsidian: {value} — los adjuntos nuevos van a {place}.",
+    "obsidianHint": "Cámbialo en Obsidian (Ajustes → Archivos y enlaces).",
+    "obsidianRoot": "la raíz de la bóveda",
+    "obsidianSame": "la carpeta de la página",
+    "obsidianSubfolder": "la carpeta «{name}» junto a la página",
+    "obsidianFolder": "la carpeta «{name}»"
   }
 }
