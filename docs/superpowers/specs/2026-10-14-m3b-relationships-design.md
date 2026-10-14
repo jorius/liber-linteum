@@ -141,3 +141,21 @@ The non-negotiables are as in M3a.
 6. **Label limit:** 40 characters.
 7. **The scalar `related:` form is now indexed,** and writes always produce the block-list form.
 8. **The Safari 15 `color-mix` cleanup rides along** with this milestone.
+
+## 10. Amendments from planning (plan `docs/superpowers/plans/2026-10-14-m3b-relationships.md`, replayed end-to-end)
+
+These override the sections above where they conflict.
+
+1. **Editing from an edge** (§3): a click on a direct relationship edge opens the Relationships **dialog** for the two cards (both pages' entries to each other), not a popover anchored at the midpoint. It is the app's modal pattern (focus trap, Escape, focus restored). Edges take the pointer through an invisible, 14 px wide `nopan` stroke; **aggregated** manual edges are not clickable (they stand for many relationships inside folders).
+2. **A page's Relationships dialog** lists only its own `related:` entries. Incoming ones are edited from the other card's dialog or from the edge; they are not listed read-only.
+3. **The connections menu** is the card's connect button (ARIA menu button, rendered in a portal because React Flow's viewport is transformed). Items: **Connect to…**, **Relationships…** (cards with a page), **Pick index note…** (folders where `indexFrom` isn't `named`/`index`). The pick is offered there and as the "has no index note" toast's action, not as a separate button on the card.
+4. **Connect mode** (§2): success is a toast, "Relationship created."; the bar's text is the `role="status"` region named "Connecting". Choosing **Connect to…** on a folder without an index note shows the toast at once instead of entering connect mode.
+5. **Drag to connect:** the connect button is wrapped in React Flow's source `Handle`; the other end is the card under the pointer when the drag ends (`elementFromPoint` → `[data-gv-card]`). Cards have no target handles. `nodesConnectable` is on, `connectOnClick` stays off (React Flow's only `structuredClone` is in its click-to-connect handler).
+6. **Writing items** (§5): map items are written in flow style on one line (`{ link: "[[B]]", label: x, directed: true }`); a block-map item is replaced whole when edited. A flow list or a single value is rewritten as a block list; an empty `related:` key gets its first item; a block-scalar value is refused.
+7. **Stale lists:** an edit or delete names the entry it read (index **and** link text) and is refused silently when the list moved; the dialog re-reads.
+8. **Write path:** `editorStore.editPage(path, edit)` applies to a page with a live document (the current page through its view — undoable — or a background one as text), saving at once; other pages are read, edited on LF text and written back in their own line endings against their hash, retried once on a conflict, then the toast "Couldn’t update {name}: it changed on disk. Try again."
+9. **`GvCard.indexFrom`** (`named` | `index` | `picked` | `only` | null) tells which GV-02 rule chose the index note; optional in TS (fixtures before it needn't list it), always sent by Rust.
+10. **`link_target`** uses the existing `shortest_unique_target` rule (`[[note]]` resolves by path order among equal names, so only the other `note` needs its folder).
+11. **Safari 15 tokens** (§7): one hover shade (12 % of the sidebar text over the sidebar) for both its icon buttons and the explorer rows (rows used 10 %), `--color-sidebar-active` 16 %, `--color-sidebar-divider` 15 %; backdrops as `rgba()` of the background at 60 % / 70 %. A test fails on any `color-mix(` in the app's CSS.
+12. **Index pick dialog:** a radio list of the folder's own pages (search when there are more than 10) plus "No index note"; it re-reads the level after saving.
+13. **Tests:** `nimw-session` gains `serde_json` as a dev-dependency; the e2e IPC mock draws manual edges from frontmatter lines naming `[[X]]` and no longer counts frontmatter links as text links.
