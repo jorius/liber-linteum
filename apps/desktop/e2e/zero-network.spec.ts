@@ -125,3 +125,31 @@ for (const palette of [
     expect(outside).toEqual([]);
   });
 }
+
+// M3a §1: the Global View — cards with remote covers, edges, a page's
+// neighbourhood and Expand — loads nothing from outside either.
+test('zero network requests: the Global View', async ({ page }) => {
+  const { outside, problems } = await openRemotePage(page, 'livePreview');
+  await page.getByRole('button', { name: 'Global view' }).click();
+  const remote = page.getByRole('button', { name: 'Remote references', exact: true });
+  await expect(remote).toBeVisible();
+  const gv = page.getByRole('region', { name: 'Global View' });
+  await expect(gv.getByText('Remote cover not loaded', { exact: true }).first()).toBeVisible();
+  await remote.click();
+  await expect(page.getByRole('navigation', { name: 'Global View path' })).toContainText(
+    'Remote references',
+  );
+  await page.getByRole('button', { name: 'Expand in place' }).click();
+  await expect(page.getByRole('button', { name: 'Expand in place' })).toHaveAttribute(
+    'aria-pressed',
+    'true',
+  );
+  await page.waitForLoadState('networkidle');
+  await page.waitForTimeout(300);
+  const csp = await page.evaluate(
+    () => (window as unknown as { __nimwCspViolations: string[] }).__nimwCspViolations,
+  );
+  expect(problems).toEqual([]);
+  expect(csp).toEqual([]);
+  expect(outside).toEqual([]);
+});

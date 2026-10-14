@@ -13,7 +13,7 @@ export default defineConfig({
     {
       name: 'webkit',
       use: { ...devices['Desktop Safari'], browserName: 'webkit' },
-      testMatch: /\/(checklist|m2b|m2c)\.spec\.ts$/,
+      testMatch: /\/(checklist|m2b|m2c|m3a)\.spec\.ts$/,
     },
   ],
   webServer: {
