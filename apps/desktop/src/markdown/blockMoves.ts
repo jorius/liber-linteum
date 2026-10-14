@@ -448,7 +448,24 @@ export function moveBlock(
   const { move, topDelta } = planned;
   const next = applyChanges(text, move.changes);
   if (frontHead(next) !== null && frontHead(next) !== frontHead(text)) return { refused: true };
-  return holdsTheSameBlocks(text, next, model, move.changes, topDelta) ? move : { refused: true };
+  const ok = holdsTheSameBlocks(text, next, model, move.changes, {
+    topLists: topDelta,
+    reparent: reparenting(text, model, unit, slot),
+  });
+  return ok ? move : { refused: true };
+}
+
+/** A moved item's key, and its parent item's before and after (`^`: none). */
+function reparenting(text: string, model: BlockModel, unit: Unit, slot: Slot): Reparent | null {
+  if (unit.scope !== 'item') return null;
+  const key = (id: number | null) => (id === null ? '^' : itemKey(text, model.units[id].from));
+  const to =
+    slot.scope === 'child'
+      ? key(slot.of)
+      : slot.scope === 'item'
+        ? key(model.lists[slot.list].parentItem)
+        : '^';
+  return { key: key(unit.id), from: key(model.lists[unit.container!].parentItem), to };
 }
 
 /** The note's head as some front matter reader may take it: a leading `---`
@@ -489,9 +506,32 @@ const LEAF = new Set([
   'calloutTitle',
 ]);
 
+/** An item's first line without its marker and the indentation or `>`
+ *  before it: which item it is, for "which item holds which". */
+function itemKey(src: string, from: number): string {
+  const nl = src.indexOf('\n', from);
+  return src
+    .slice(from, nl < 0 ? src.length : nl)
+    .replace(/^[ \t>]*(?:[-*+]|\d{1,9}[.)])/, '')
+    .trim();
+}
+
+/** The item a move takes from parent item `from` to parent item `to`. */
+interface Reparent {
+  key: string;
+  from: string;
+  to: string;
+}
+
+/** A list item's signature entry: its containers and task state, then its
+ *  parent item's key and its own. */
+const itemEntry = (flags: string, checked: string, parent: string, key: string) =>
+  `item:${flags}:${checked}\u0001${parent}\u0001${key}`;
+
 /** What must survive a move: every block's text (indentation, `>` and list
- *  markers aside), the containers it sits in, task states, `%%` comments and
- *  the kinds of the top-level blocks. */
+ *  markers aside), the containers it sits in, task states, `%%` comments, the
+ *  kinds of the top-level blocks, and the item holding each list item (so no
+ *  list is taken into another one's item: final review I3). */
 function signature(src: string): string[] {
   const page = parsePage(src);
   const out: string[] = page.comments.map(([s, e]) => `%${src.slice(s, e)}`);
@@ -501,9 +541,13 @@ function signature(src: string): string[] {
       .split(/\r?\n/)
       .map((l) => l.replace(/^[ \t>]*/, '').trimEnd())
       .join('\n');
-  const walk = (node: Node, flags: string) => {
-    if (node.type === 'listItem')
-      out.push(`item:${flags}:${String((node as { checked?: boolean | null }).checked ?? '')}`);
+  const walk = (node: Node, flags: string, parent: string) => {
+    if (node.type === 'listItem') {
+      const key = itemKey(src, node.position!.start.offset!);
+      const checked = String((node as { checked?: boolean | null }).checked ?? '');
+      out.push(itemEntry(flags, checked, parent, key));
+      parent = key;
+    }
     if (LEAF.has(node.type)) {
       const n = node as {
         depth?: number;
@@ -521,11 +565,11 @@ function signature(src: string): string[] {
         ? flags
         : `${flags}L`
       : flags + (FLAG[node.type] ?? '');
-    for (const c of ((node as Parent).children as Node[]) ?? []) walk(c, next);
+    for (const c of ((node as Parent).children as Node[]) ?? []) walk(c, next, parent);
   };
   for (const node of page.tree.children as RootContent[]) {
     if (node.type !== 'yaml') out.push(`top:${kindOf(node)}`);
-    walk(node, '');
+    walk(node, '', '^');
   }
   return out.sort();
 }
@@ -562,10 +606,11 @@ function holdsTheSameBlocks(
   next: string,
   model: BlockModel,
   changes: TextChange[],
-  topLists = 0,
+  expected: { topLists: number; reparent: Reparent | null },
 ): boolean {
   // A list item dropped among the top-level blocks makes a new list; the
   // last item leaving a list takes the list away.
+  const { topLists, reparent } = expected;
   const before: string[] = Array.from({ length: Math.max(0, topLists) }, () => 'top:list');
   const after: string[] = Array.from({ length: Math.max(0, -topLists) }, () => 'top:list');
   for (const [a, b] of windows(text, model, changes)) {
@@ -574,6 +619,13 @@ function holdsTheSameBlocks(
     const lead = a > 0 ? '\n' : '';
     before.push(...signature(lead + text.slice(a, b)));
     after.push(...signature(lead + next.slice(mapPos(changes, a, -1), mapPos(changes, b, 1))));
+  }
+  // The moved item changes parent as its slot says; nothing else does.
+  if (reparent && reparent.from !== reparent.to) {
+    const tail = `\u0001${reparent.from}\u0001${reparent.key}`;
+    const i = before.findIndex((e) => e.startsWith('item:') && e.endsWith(tail));
+    if (i >= 0)
+      before[i] = `${before[i].slice(0, -tail.length)}\u0001${reparent.to}\u0001${reparent.key}`;
   }
   return before.sort().join('\u0000') === after.sort().join('\u0000');
 }

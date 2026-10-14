@@ -115,6 +115,17 @@ describe('moving list items (M4 §3)', () => {
     expect(parsePage(out).tree.children).toHaveLength(1);
   });
 
+  it('never makes another list’s items children of a moved list or of a neighbour (final review I3)', () => {
+    // `  - x` is a top-level list, indented: after another list it nests.
+    const pasted = '* moved\n\nPara\n\n  - x\n- y\n';
+    expect(move(pasted, '* moved', { top: '  - x' })).toBe('refused');
+    expect(move('* keep\n\nPara\n\n  - x\n- y\n', 'Para', { top: null })).toBe('refused');
+    // An item dropped right before it, as a list of its own.
+    expect(move('- a\n- b\n\nPara\n\n  * x\n- y\n', '- b', { top: '  * x' })).toBe('refused');
+    // Moves that keep it out of reach still go.
+    expect(move(pasted, '* moved', { top: null })).toBe('Para\n\n  - x\n- y\n\n* moved\n');
+  });
+
   it('keeps CRLF', () => {
     expect(move('- a\r\n- b\r\n', '- b', { before: '- a' })).toBe('- b\r\n- a\r\n');
   });

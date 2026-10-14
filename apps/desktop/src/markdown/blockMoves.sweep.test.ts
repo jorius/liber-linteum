@@ -5,7 +5,7 @@
 import { ChangeSet, Text } from '@codemirror/state';
 import type { Node, Parent } from 'mdast';
 import { describe, expect, it } from 'vitest';
-import { movableBlocks, slotsFor } from './blockModel';
+import { movableBlocks, slotsFor, type BlockModel, type Slot } from './blockModel';
 import { applyChanges, moveBlock } from './blockMoves';
 import { parsePage } from './parse';
 
@@ -252,6 +252,14 @@ const GENERATORS: Record<string, Generator> = {
         ? pick(r, [['---'], ['---  '], [`${w.word()}: ${w.word()}`], ['...'], [w.word(), '---']])
         : null,
   },
+  // I3: top-level lists indented 2 or 3 spaces (pasted content), which nest
+  // under a list moved in front of them.
+  indentedLists: {
+    block: (r, w) =>
+      r() < 0.35
+        ? w.list(0, pick(r, ['  ', '   '])).concat(r() < 0.5 ? [`- ${w.word()}`] : [])
+        : null,
+  },
 };
 
 function note(r: Rand, gen: Generator): string {
@@ -347,6 +355,13 @@ function structure(src: string) {
 
 const leadRule = (t: string) => /^\uFEFF?---[ \t]*\r?\n/.test(t);
 
+/** The parent item (its key, '' for none) an item moved to `slot` gets. */
+function slotParent(text: string, model: BlockModel, slot: Slot): string {
+  if (slot.scope === 'child') return itemKey(text, model.units[slot.of].from);
+  const parent = slot.scope === 'item' ? model.lists[slot.list].parentItem : null;
+  return parent === null ? '' : itemKey(text, model.units[parent].from);
+}
+
 /** Every problem `count` random notes' moves show; [] when all hold. */
 function fuzz(seed: number, gen: Generator, count: number) {
   const r = rng(seed);
@@ -358,6 +373,7 @@ function fuzz(seed: number, gen: Generator, count: number) {
     const lines = contentLines(text);
     const before = structure(text);
     for (const unit of model.units) {
+      const moved = unit.scope === 'item' ? itemKey(text, unit.from) : null;
       for (const lineOnly of unit.kind === 'heading' ? [false, true] : [false]) {
         const slots = slotsFor(model, unit, lineOnly);
         for (const slot of slots.length > 6 ? slots.filter(() => r() < 6 / slots.length) : slots) {
@@ -379,6 +395,16 @@ function fuzz(seed: number, gen: Generator, count: number) {
           if (JSON.stringify(after.sig) !== JSON.stringify(before.sig)) found.push('STRUCTURE');
           if (after.frontmatter !== before.frontmatter) found.push('FRONTMATTER');
           if (leadRule(next) && !leadRule(text)) found.push('LEADRULE');
+          // Every item keeps its parent item; the moved one takes its slot's.
+          for (const [key, parent] of before.parents) {
+            const now = after.parents.get(key);
+            if (parent === '<dup>' || now === '<dup>') continue;
+            const want = key === moved ? slotParent(text, model, slot) : parent;
+            if (now !== want) {
+              found.push(`NESTING ${JSON.stringify(key)} under ${JSON.stringify(now)}`);
+              break;
+            }
+          }
           const first = text
             .slice(unit.from, unit.to)
             .replace(/^\uFEFF/, '')
@@ -401,13 +427,16 @@ function fuzz(seed: number, gen: Generator, count: number) {
 }
 
 describe('the sweep’s fuzz: random notes × random moves (final review)', () => {
+  // [generator, seed, notes]: a few seconds in all; the seeds are ones that
+  // found the generator's bug before its fix.
   it.each([
-    ['ordinary', 1],
-    ['frontRules', 3],
-  ])(
-    '%s notes (seed %i): every accepted move keeps the note',
-    (name, seed) => {
-      const { problems, tried } = fuzz(seed, GENERATORS[name], 25);
+    ['ordinary', 1, 20],
+    ['frontRules', 3, 25],
+    ['indentedLists', 8, 8],
+  ] as const)(
+    '%s notes (seed %i, %i notes): every accepted move keeps the note',
+    (name, seed, notes) => {
+      const { problems, tried } = fuzz(seed, GENERATORS[name], notes);
       expect(problems).toEqual([]);
       expect(tried).toBeGreaterThan(150);
     },
