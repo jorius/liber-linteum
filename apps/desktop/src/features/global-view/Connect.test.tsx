@@ -234,6 +234,38 @@ describe('connecting two cards (M3b §2)', () => {
   });
 });
 
+describe('Escape anywhere in the view leaves connect mode (final review m3)', () => {
+  const connecting = () => useGvStore.getState().connectFrom !== null;
+
+  it('from the Cancel button, a connect button or the toolbar', async () => {
+    render(<GlobalView />);
+    for (const target of [
+      () => screen.getByRole('button', { name: 'Cancel' }),
+      () => screen.getByRole('button', { name: 'Connections of B' }),
+      () => screen.getByRole('button', { name: 'Drill-down' }),
+    ]) {
+      await startConnect('A');
+      expect(connecting()).toBe(true);
+      target().focus();
+      await userEvent.keyboard('{Escape}');
+      expect(connecting()).toBe(false);
+    }
+    expect(useGvStore.getState().stack).toEqual([{ kind: 'vault' }]);
+  });
+
+  it('leaving from the bar puts the keyboard back on the source card, not on the page', async () => {
+    render(<GlobalView />);
+    await startConnect('A');
+    screen.getByRole('button', { name: 'Cancel' }).focus();
+    await userEvent.keyboard('{Escape}');
+    expect(await press('A.md')).toHaveFocus();
+    await startConnect('A');
+    await userEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+    expect(connecting()).toBe(false);
+    expect(await press('A.md')).toHaveFocus();
+  });
+});
+
 describe('the keyboard after a menu item (NFR-10, final review I2)', () => {
   const view = () =>
     render(
