@@ -109,4 +109,23 @@ describe('Related chips in the header band (M4b §6)', () => {
       .then((r) => r.violations);
     expect(violations).toEqual([]);
   });
+
+  it('review focus: picking a page that is already related says so and writes nothing', async () => {
+    const before = '---\nrelated:\n  - "[[Beta]]"\n---\n# A\n';
+    const disk = fakeDisk({ 'A.md': before, 'Beta.md': '# Beta\n' }, backend(['A.md', 'Beta.md']));
+    render(<PageScreen />);
+    await open('A.md');
+    await waitFor(() => expect(within(related()).getAllByRole('listitem')).toHaveLength(1));
+    await userEvent.click(screen.getByRole('button', { name: 'Add a related page' }));
+    await userEvent.type(screen.getByRole('combobox', { name: 'Related page' }), 'bet');
+    await userEvent.click(await screen.findByRole('option', { name: /Beta/ }));
+    await waitFor(() =>
+      expect(useToastStore.getState().toasts.map((t) => t.message)).toContain(
+        'Already related to Beta',
+      ),
+    );
+    expect(disk.files.get('A.md')).toBe(before);
+    expect(disk.calls.some(([c]) => c === 'page_write')).toBe(false);
+    expect(within(related()).getAllByRole('listitem')).toHaveLength(1);
+  });
 });
