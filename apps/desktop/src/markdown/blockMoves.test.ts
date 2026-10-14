@@ -148,6 +148,34 @@ describe('moving top-level blocks (M4 §3)', () => {
     expect(move(code, 'P1 %%c%%', null)).toBe('P2\n\n```\nx %% y\n```\n\nP3\n\nP1 %%c%%\n');
   });
 
+  it('the guard reads a block after indented code as the page does (review fuzz)', () => {
+    // After indented code an ordered list not at 1 can't start: `8. a` is a
+    // paragraph there, which a window starting at it would read as a list.
+    const after = '    code\n\n8. a\n   ```\n   x\n   ```\n9. b\n10. c\n';
+    const m = model(after);
+    const list = m.units.find((u) => u.kind === 'list')!;
+    const fence = m.units.find((u) => u.kind === 'code' && after.startsWith('   ```', u.from))!;
+    expect(moveBlock(after, m, list, { scope: 'top', before: fence.id })).not.toEqual({
+      refused: true,
+    });
+    // …and so sees an item that would join a list it couldn't see.
+    const joins =
+      '    code\n\n9. a\n   8) b\n      + k\n   9) %%c%% t\n\n      gamma\n   10) c\n\n10. d\n';
+    expect(move(joins, '   10) c', '      gamma')).toBe('refused');
+  });
+
+  it('the guard pairs comments as the page does where a comment starts a line (review fuzz)', () => {
+    // `+ %%c1%%` masked is an empty item: `lazy` ends the list, and the last
+    // line reads as code. The page pairs comments on the unmasked text, where
+    // it's an item: `%%c2%%` is a comment until the quote lands before it.
+    const text = '> q\n</div>\n\n  + %%c1%%\nlazy\n\n    - `x` b %%c2%%';
+    const m = model(text);
+    const last = m.units.filter((u) => u.scope === 'top').pop()!;
+    expect(moveBlock(text, m, m.units[0], { scope: 'top', before: last.id })).toEqual({
+      refused: true,
+    });
+  });
+
   it('a slot that leaves the block where it is gives nothing', () => {
     expect(move('P1\n\nP2\n', 'P1', 'P2')).toBeNull();
     expect(move('P1\n\nP2\n', 'P2', null)).toBeNull();

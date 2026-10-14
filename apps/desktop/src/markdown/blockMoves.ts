@@ -610,10 +610,39 @@ function unpaired(src: string, page: ParsedPage): boolean {
  *  (final review M1). */
 function windows(text: string, model: BlockModel, changes: TextChange[]): [number, number][] {
   const tops = topUnits(model);
+  // A window starts where the page reads its first block as the window does:
+  // not after indented code (micromark keeps it open across blank lines, so
+  // an ordered list not at 1, or an empty item, can't start there), not on an
+  // indented line (which may belong to a block before it), and not after a
+  // block whose comment starts a line (masked, it can end a list early: the
+  // page pairs comments on the text read without masking).
+  const indentedCode = (u: Unit) =>
+    u.kind === 'code' && !/^[ \t]*(?:`{3}|~{3})/.test(text.slice(u.from, u.from + 64));
+  const lineComment = (u: Unit) =>
+    model.comments.some(
+      ([s]) =>
+        s >= u.from &&
+        s < u.to &&
+        /^[ \t>]*(?:(?:[-*+]|\d{1,9}[.)])[ \t]+)?$/.test(
+          text.slice(text.lastIndexOf('\n', s - 1) + 1, s),
+        ),
+    );
+  const settle = (k: number) => {
+    while (
+      k > 0 &&
+      (indentedCode(tops[k - 1]) ||
+        lineComment(tops[k - 1]) ||
+        /^[ \t]/.test(text[tops[k].from] ?? ''))
+    )
+      k--;
+    return k;
+  };
   const startBefore = (pos: number) => {
-    let a = 0;
-    for (const u of tops) if (u.from <= pos) a = u.from;
-    return a;
+    let k = -1;
+    tops.forEach((u, i) => {
+      if (u.from <= pos) k = i;
+    });
+    return k < 0 ? 0 : tops[settle(k)].from;
   };
   const endAfter = (pos: number) => tops.find((u) => u.to >= pos)?.to ?? text.length;
   const spans = changes.map((c): [number, number] => {
@@ -623,7 +652,7 @@ function windows(text: string, model: BlockModel, changes: TextChange[]): [numbe
     });
     let j = tops.findIndex((u) => u.to >= c.to);
     if (j < 0) j = tops.length;
-    let a = Math.min(i >= 1 ? tops[i - 1].from : 0, c.from);
+    let a = Math.min(i >= 1 ? tops[settle(i - 1)].from : 0, c.from);
     let b = Math.max(j + 1 < tops.length ? tops[j + 1].to : text.length, c.to);
     for (let widened = true; widened;) {
       widened = false;
