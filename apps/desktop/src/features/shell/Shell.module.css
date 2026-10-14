@@ -7,6 +7,9 @@
 
 .side {
   flex: 0 0 270px;
+  /* A long page or folder name is cut short in its row; it never widens the
+     sidebar (M4b review focus). */
+  min-width: 0;
   background: var(--color-sidebar-bg);
   color: var(--color-sidebar-text);
   padding: 16px 10px;

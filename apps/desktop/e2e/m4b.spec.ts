@@ -11,6 +11,7 @@ const PAGES = {
   'A.md': '# Alpha\n\nhello world\n\nSee [[B]].\n',
   'B.md': '# Beta\n\nThe second page.\n',
   'Long.md': `# Long\n\n${LONG}\n`,
+  [`${'A very long page name '.repeat(6).trim()}.md`]: '# Wordy\n\nText.\n',
 };
 
 /** Requests that would leave the machine (the test server is 127.0.0.1). */
@@ -109,17 +110,19 @@ test('M4b §4: the ⌘K picker follows the text as it scrolls, and stays in the 
   await expect(input).toBeFocused();
   const picker = input.locator('..');
   const box = async () => (await picker.boundingBox())!;
-  // Under the selected line (or above it, near the bottom of the window).
-  const lineBox = (await line.boundingBox())!;
-  const first = await box();
-  expect(
-    Math.abs(first.y - (lineBox.y + lineBox.height)) < 40 ||
-      Math.abs(first.y + first.height - lineBox.y) < 40,
-  ).toBe(true);
+  /** Right under the selected line, or right above it when there's no room
+   *  below (M4b §4). */
+  const attached = async () => {
+    const [p, l] = [await box(), (await line.boundingBox())!];
+    return Math.abs(p.y - (l.y + l.height)) < 12 || Math.abs(p.y + p.height - l.y) < 12;
+  };
+  await expect.poll(attached).toBe(true);
   // The text scrolls up: the picker goes with it.
+  const before = (await line.boundingBox())!.y;
   await page.mouse.move(1180, 700);
   await page.mouse.wheel(0, 200);
-  await expect.poll(async () => (await box()).y).toBeLessThan(first.y - 100);
+  await expect.poll(async () => (await line.boundingBox())!.y).toBeLessThan(before - 100);
+  await expect.poll(attached).toBe(true);
   // Far away: it stays inside the window, open.
   // CodeMirror keeps the selected line drawn, now far above the window.
   await page.mouse.wheel(0, 6000);
@@ -174,3 +177,23 @@ test('M4b §6: Connect cards picks the card to connect from, then the other', as
   await expect(connect).toHaveAttribute('aria-pressed', 'false');
   await stayedLocal(page, outside);
 });
+
+for (const width of [1280, 900]) {
+  test(`review focus: a very long title is cut short in the top bar at ${width} px; Edit · Global view stay whole`, async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width, height: 900 });
+    const name = 'A very long page name '.repeat(6).trim();
+    const outside = await open(page, name);
+    const bar = page.getByRole('banner');
+    const title = (await bar.getByRole('textbox', { name: 'Page title' }).boundingBox())!;
+    const edit = (await bar.getByRole('button', { name: 'Edit' }).boundingBox())!;
+    const gv = (await bar.getByRole('button', { name: 'Global view' }).boundingBox())!;
+    expect(title.x + title.width).toBeLessThanOrEqual(edit.x);
+    expect(gv.x + gv.width).toBeLessThanOrEqual(width);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(
+      width,
+    );
+    await stayedLocal(page, outside);
+  });
+}
