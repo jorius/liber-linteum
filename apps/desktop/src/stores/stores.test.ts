@@ -203,6 +203,34 @@ describe('vaultStore', () => {
     expect(useGvStore.getState().stack).toEqual([{ kind: 'vault' }]);
   });
 
+  it('M3a: a card drag waiting for its save is written before the vault switches (final review I1/m15)', async () => {
+    const calls = backend({
+      vault_open: () => info,
+      vault_tree: () => tree,
+      vault_close: () => null,
+      gv_children: () => ({ cards: [], centre: null }),
+      gv_edges: () => [],
+      layout_get: () => ({}),
+      layout_set: () => null,
+    });
+    await useVaultStore.getState().open('/v');
+    await useGvStore.getState().load();
+    useGvStore.getState().pin('A', { x: 1, y: 2 });
+    await useVaultStore.getState().open('/w');
+    expect(calls.filter((c) => c === 'layout_set' || c === 'vault_open')).toEqual([
+      'vault_open',
+      'layout_set',
+      'vault_open',
+    ]);
+    await useGvStore.getState().load();
+    useGvStore.getState().pin('A', { x: 3, y: 4 });
+    await useVaultStore.getState().close();
+    expect(calls.filter((c) => c === 'layout_set' || c === 'vault_close').slice(-2)).toEqual([
+      'layout_set',
+      'vault_close',
+    ]);
+  });
+
   it('VLT-01 open: closed → opening → open, with tree loaded', async () => {
     const gate = deferred<typeof info>();
     backend({ vault_open: () => gate.promise, vault_tree: () => tree });

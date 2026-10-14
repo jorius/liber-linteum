@@ -19,7 +19,7 @@ import {
 import { errorMessage } from '../../stores/messages';
 import { useSettingsStore } from '../../stores/settingsStore';
 import { useToastStore } from '../../stores/toastStore';
-import { useVaultStore } from '../../stores/vaultStore';
+import { onBeforeVaultSwitch, useVaultStore } from '../../stores/vaultStore';
 
 /** Saving a dragged card waits this long for the next drag (M3a §7). */
 export const PIN_SAVE_MS = 300;
@@ -130,6 +130,8 @@ let pending: { key: string; positions: Positions } | null = null;
 /** Saves sent and not yet answered, by key: a read of that level may still
  *  come back without them. */
 const inFlight = new Map<string, Positions>();
+/** The same saves, to wait for before the vault switches. */
+const sending = new Set<Promise<void>>();
 
 /** A failed save was reported; the next failure is, once one succeeds. */
 let saveFailed = false;
@@ -159,10 +161,12 @@ function flushPins() {
   pending = null;
   if (!save) return;
   inFlight.set(save.key, save.positions);
-  void layoutSet(save.key, save.positions).then((res) => {
+  const sent = layoutSet(save.key, save.positions).then((res) => {
     if (inFlight.get(save.key) === save.positions) inFlight.delete(save.key);
+    sending.delete(sent);
     reportSave(res);
   });
+  sending.add(sent);
 }
 
 /** Pins of `key` not yet on disk (sent, or still waiting). */
@@ -372,4 +376,15 @@ export const useGvStore = create<GvState>((set, get) => {
       });
     },
   };
+});
+
+// A drag still waiting is saved into its own vault before another opens or
+// it closes; a new vault (or none) starts the view over at level 0. The
+// view subscribes to the vault store, which knows nothing of it (m15).
+onBeforeVaultSwitch(async () => {
+  flushPins();
+  await Promise.all([...sending]);
+});
+useVaultStore.subscribe((s, prev) => {
+  if (s.info !== prev.info) useGvStore.getState().reset();
 });
