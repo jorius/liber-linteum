@@ -251,5 +251,11 @@
   "attach": {
     "dropOnText": "Drop files onto the page’s text to attach them",
     "someFailed": "Some files weren’t attached"
+  },
+  "linkPicker": {
+    "label": "Link to…",
+    "placeholder": "Page name or web address",
+    "results": "Pages",
+    "url": "Link to {url}"
   }
 }

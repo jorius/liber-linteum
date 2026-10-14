@@ -15,6 +15,8 @@ import { followLinkAtCursor, livePreview, pagePath } from './livePreview';
 import { attachmentHandlers } from './attachments';
 import { activeFormats, editorKeymap, type ActiveFormat } from './format';
 import { linkCompletion } from './linkComplete';
+import { LinkPicker } from './LinkPicker';
+import { setLinkPickerOpener } from './linkPickerOpen';
 import type { PageDoc } from './pageDoc';
 import { blockForOffset, offsetAtTop, topIn } from './scrollSync';
 import { Toolbar } from './Toolbar';
@@ -238,6 +240,7 @@ export function Editor({ doc, mode, label }: EditorProps) {
   const showToolbar = useSettingsStore((s) => s.settings.toolbar);
   const showNumbers = useSettingsStore((s) => s.settings.lineNumbers);
   const [toolbarView, setToolbarView] = useState<EditorView | null>(null);
+  const [picker, setPicker] = useState(false);
   const [active, setActive] = useState<Set<ActiveFormat>>(() => new Set());
   const showFormats = useCallback((state: EditorState) => {
     const next = activeFormats(state);
@@ -255,6 +258,7 @@ export function Editor({ doc, mode, label }: EditorProps) {
     paneOf.set(v, setText);
     toolbarOf.set(v, showFormats);
     setToolbarView(v);
+    setLinkPickerOpener(v, () => setPicker(true));
     showFormats(v.state);
     return () => {
       hideView(current.current, v);
@@ -262,6 +266,7 @@ export function Editor({ doc, mode, label }: EditorProps) {
       current.current.sink = null;
       paneOf.delete(v);
       toolbarOf.delete(v);
+      setLinkPickerOpener(v, null);
       v.destroy();
       view.current = null;
     };
@@ -345,6 +350,7 @@ export function Editor({ doc, mode, label }: EditorProps) {
   return (
     <div className={styles.frame}>
       {showToolbar && toolbarView && <Toolbar view={toolbarView} active={active} />}
+      {picker && toolbarView && <LinkPicker view={toolbarView} onClose={() => setPicker(false)} />}
       <div className={split ? styles.split : styles.single}>
         <div ref={host} className={mode === 'livePreview' ? styles.live : styles.source} />
         {split && (

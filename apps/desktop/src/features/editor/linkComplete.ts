@@ -58,7 +58,7 @@ const key = (s: string) => s.normalize('NFC').toLowerCase();
 const baseName = (path: string) => path.slice(path.lastIndexOf('/') + 1);
 
 /** PG-05: the title as an alias when it differs from the file name. */
-function aliasFor(s: LinkSuggestion): string | null {
+export function aliasFor(s: LinkSuggestion): string | null {
   if (s.kind !== 'page' || !s.title) return null;
   const stem = baseName(s.path).replace(/\.md$/i, '');
   if (key(s.title) === key(stem)) return null;

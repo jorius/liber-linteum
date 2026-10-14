@@ -11,6 +11,7 @@ import {
   type StateCommand,
 } from '@codemirror/state';
 import type { KeyBinding } from '@codemirror/view';
+import { openLinkPicker } from './linkPickerOpen';
 
 export type InlineFormat = 'bold' | 'italic' | 'strike' | 'highlight' | 'code';
 export type BlockFormat = 'bullet' | 'numbered' | 'task' | 'quote';
@@ -442,7 +443,8 @@ export const formatKeymap: readonly KeyBinding[] = [
   { key: 'Mod-Shift-x', run: toggleInline('strike') },
   { key: 'Mod-Shift-h', run: toggleInline('highlight') },
   { key: 'Mod-e', run: toggleInline('code') },
-  { key: 'Mod-k', run: insertLink },
+  // The Link picker when the editor has one (M2c §6.3), else `[text](url)`.
+  { key: 'Mod-k', run: (view) => openLinkPicker(view) || insertLink(view) },
   ...([0, 1, 2, 3, 4, 5, 6] as const).map((n) => ({ key: `Mod-Alt-${n}`, run: setHeading(n) })),
   { key: 'Mod-Shift-7', run: toggleBlock('numbered') },
   { key: 'Mod-Shift-8', run: toggleBlock('bullet') },

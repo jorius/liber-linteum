@@ -251,5 +251,11 @@
   "attach": {
     "dropOnText": "Suelta los archivos sobre el texto de la página para adjuntarlos",
     "someFailed": "Algunos archivos no se adjuntaron"
+  },
+  "linkPicker": {
+    "label": "Enlazar a…",
+    "placeholder": "Nombre de página o dirección web",
+    "results": "Páginas",
+    "url": "Enlazar a {url}"
   }
 }
