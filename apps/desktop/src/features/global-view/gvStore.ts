@@ -97,6 +97,8 @@ interface GvState {
   up: (path: string | null) => Promise<void>;
   /** The mode changed: keep the root level, forget expansions. */
   modeChanged: () => Promise<void>;
+  /** The folder New entry creates its page in (GV-17, M3a §5). */
+  entryDir: () => string;
   pin: (path: string, at: CardPosition) => void;
   resetLayout: () => Promise<void>;
   setFocus: (path: string | null) => void;
@@ -220,6 +222,16 @@ export const useGvStore = create<GvState>((set, get) => {
     modeChanged: async () => {
       set({ expanded: [], focus: null });
       return get().load();
+    },
+    entryDir: () => {
+      const parent = (p: string) => p.slice(0, Math.max(0, p.lastIndexOf('/')));
+      const { stack, focus, canvas } = get();
+      const focused =
+        mode() === 'expand' && focus ? canvas.cards.find((c) => c.path === focus) : null;
+      if (focused) return focused.kind === 'page' ? parent(focused.path) : focused.path;
+      const root = stack[stack.length - 1];
+      if (root.kind === 'vault') return '';
+      return root.kind === 'folder' ? root.path : parent(root.path);
     },
     pin: (path, at) => {
       set({ pinned: { ...get().pinned, [path]: at } });

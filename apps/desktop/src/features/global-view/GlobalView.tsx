@@ -1,10 +1,15 @@
 import { ReactFlowProvider } from '@xyflow/react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import type { GvCard } from '../../ipc';
+import { PlusIcon } from '../../app/icons';
+import { entryCreatePage, type GvCard } from '../../ipc';
 import { useEditorStore } from '../../stores/editorStore';
-import { openPage } from '../../stores/navigate';
+import { errorMessage } from '../../stores/messages';
+import { openNewPage, openPage } from '../../stores/navigate';
+import { usePageStore } from '../../stores/pageStore';
 import { useSettingsStore } from '../../stores/settingsStore';
+import { useToastStore } from '../../stores/toastStore';
+import { nextFreeName } from '../../stores/tree';
 import { useVaultStore } from '../../stores/vaultStore';
 import { Canvas } from './Canvas';
 import { canvasKey, useGvStore } from './gvStore';
@@ -71,6 +76,19 @@ export function GlobalView() {
     else void useGvStore.getState().open(card);
   }, []);
 
+  /** GV-17: "Untitled" in the folder shown, opened with its name selected. */
+  const newEntry = async () => {
+    const dir = useGvStore.getState().entryDir();
+    const name = nextFreeName(useVaultStore.getState().nodes, dir, t('explorer.untitled'), '.md');
+    const res = await entryCreatePage(dir, name);
+    if (!res.ok) {
+      useToastStore.getState().push({ message: errorMessage(res.error), tone: 'error' });
+      return;
+    }
+    usePageStore.getState().requestTitleFocus(res.value);
+    await openNewPage(res.value);
+  };
+
   return (
     <section className={styles.view} aria-label={t('gv.region')}>
       <Toolbar />
@@ -86,6 +104,10 @@ export function GlobalView() {
           />
         </ReactFlowProvider>
         {loaded && empty && <p className={styles.empty}>{t('gv.empty')}</p>}
+        <button type="button" className={styles.fab} onClick={() => void newEntry()}>
+          <PlusIcon />
+          {t('gv.newEntry')}
+        </button>
       </div>
     </section>
   );

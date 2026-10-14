@@ -189,6 +189,24 @@ describe('Global View store (M3a §5)', () => {
   });
 });
 
+describe('New entry folder (GV-17)', () => {
+  it('is the vault root, the folder shown or the folder of a page level; in Expand, the focused card', async () => {
+    const gv = useGvStore.getState();
+    await gv.load();
+    expect(gv.entryDir()).toBe('');
+    await gv.open(card('A', 'project'));
+    expect(useGvStore.getState().entryDir()).toBe('A');
+    await useGvStore.getState().open(card('A/a.md'));
+    expect(useGvStore.getState().entryDir()).toBe('A');
+    mode('expand');
+    await useGvStore.getState().back(0);
+    useGvStore.getState().setFocus('B');
+    expect(useGvStore.getState().entryDir()).toBe('B');
+    useGvStore.getState().setFocus('root.md');
+    expect(useGvStore.getState().entryDir()).toBe('');
+  });
+});
+
 describe('canvas helpers', () => {
   it('canvas keys follow the arch §3.1 level keys', () => {
     expect(levelKey({ kind: 'vault' })).toBe('');

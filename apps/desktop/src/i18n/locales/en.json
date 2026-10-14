@@ -312,6 +312,7 @@
     "zoomIn": "Zoom in",
     "zoomOut": "Zoom out",
     "fit": "Fit to screen",
-    "connections": "{links, plural, =0 {No links.} one {Linked with # card.} other {Linked with # cards.}} {manual, plural, =0 {} one {# relationship.} other {# relationships.}}"
+    "connections": "{links, plural, =0 {No links.} one {Linked with # card.} other {Linked with # cards.}} {manual, plural, =0 {} one {# relationship.} other {# relationships.}}",
+    "newEntry": "New entry"
   }
 }

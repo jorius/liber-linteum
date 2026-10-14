@@ -78,6 +78,10 @@ beforeEach(() => {
         };
       case 'page_read':
         return { text: '', hash: 'h' };
+      case 'entry_create_page':
+        return `${args.dir}/${args.name}.md`;
+      case 'vault_tree':
+        return [];
       default:
         return null;
     }
@@ -144,6 +148,19 @@ describe('Global View screen (M3a §5, §6)', () => {
     );
     await userEvent.click(screen.getByRole('button', { name: 'Reset layout' }));
     expect(calls).toContainEqual(['layout_set', { level: 'expand:', positions: {} }]);
+  });
+
+  it('GV-17: New entry creates a page in the folder shown and opens it, title selected', async () => {
+    render(<GlobalView />);
+    await userEvent.click(await cardButton('A'));
+    await cardButton('a');
+    await userEvent.click(screen.getByRole('button', { name: 'New entry' }));
+    await waitFor(() =>
+      expect(calls).toContainEqual(['entry_create_page', { dir: 'A', name: 'Untitled' }]),
+    );
+    await waitFor(() => expect(usePageStore.getState().path).toBe('A/Untitled.md'));
+    expect(useUiStore.getState().screen).toBe('edit');
+    expect(usePageStore.getState().titleFocus).toEqual({ path: 'A/Untitled.md' });
   });
 
   it('an empty folder says so', async () => {

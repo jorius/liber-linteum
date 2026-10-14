@@ -18,6 +18,11 @@ interface PageState {
   page: Page | null;
   state: PageViewState;
   anchor: Anchor | null;
+  /** Asks the title field of `path` to take focus with the name selected
+   *  (a page just made from the Global View, M3a §5); consumed once. */
+  titleFocus: { path: string } | null;
+  requestTitleFocus: (path: string) => void;
+  clearTitleFocus: () => void;
   /** Scrolls the open page to `heading`. */
   reveal: (heading: string | null) => void;
   /** Opens `path` (header data + editor). */
@@ -54,6 +59,9 @@ export const usePageStore = create<PageState>((set, get) => ({
   page: null,
   state: 'empty',
   anchor: null,
+  titleFocus: null,
+  requestTitleFocus: (path) => set({ titleFocus: { path } }),
+  clearTitleFocus: () => set({ titleFocus: null }),
   reveal: (heading) =>
     set({ anchor: heading ? { heading, nonce: (get().anchor?.nonce ?? 0) + 1 } : null }),
   load: async (path) => {

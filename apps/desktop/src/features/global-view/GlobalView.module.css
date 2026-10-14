@@ -205,3 +205,31 @@
   font: 400 15px var(--font-body);
   color: var(--color-text-muted);
 }
+
+.fab {
+  position: absolute;
+  right: 28px;
+  bottom: 28px;
+  z-index: 5;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 52px;
+  padding: 14px 28px;
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: var(--color-accent);
+  color: var(--color-accent-contrast);
+  font: 600 16px var(--font-body);
+  box-shadow: var(--shadow-panel);
+  cursor: pointer;
+}
+
+.fab:hover {
+  background: var(--color-accent-hover);
+}
+
+.fab:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 3px;
+}
