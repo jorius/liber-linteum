@@ -350,7 +350,7 @@ describe('sweep: every relationship edit reads back exactly or is refused', () =
       expect(body(out), name).toBe(body(text));
       if (!name.startsWith('remove')) {
         // Comments are kept (final review m1).
-        const comments = (t: string) => t.match(/(?<=^|\s)#[^\n]*/gm) ?? [];
+        const comments = (t: string) => [...t.matchAll(/(?:^|\s)(#[^\n]*)/gm)].map((m) => m[1]);
         for (const c of comments(text)) expect(comments(out), name).toContain(c);
       }
       if (name.endsWith(' 0') && !name.startsWith('remove')) {
