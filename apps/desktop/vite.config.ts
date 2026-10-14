@@ -8,6 +8,10 @@ export default defineConfig({
   // freezeSafe: third-party code must load with Object.prototype frozen
   // (tauri.conf.json "freezePrototype": true).
   plugins: [freezeSafe(), react()],
+  // Dev serves dependencies from Vite's pre-bundle, which Rolldown builds
+  // without the plugins above; Tauri freezes the prototype in dev too, so
+  // the pre-bundle needs the same patch (tests/devPrebundle.test.ts).
+  optimizeDeps: { rolldownOptions: { plugins: [freezeSafe()] } },
   clearScreen: false,
   server: {
     port: 1420,
