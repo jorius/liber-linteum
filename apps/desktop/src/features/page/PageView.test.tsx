@@ -10,6 +10,7 @@ import { DEFAULT_SETTINGS, useSettingsStore } from '../../stores/settingsStore';
 import { resetVaultStore, useVaultStore } from '../../stores/vaultStore';
 import { fakeDisk } from '../../test/fakeDisk';
 import { AUTOSAVE_MS } from '../editor/pageDoc';
+import { COUNT_DEBOUNCE_MS } from './WordCount';
 import { LARGE_NOTE_CHARS } from '../editor/livePreview';
 import { openPage } from '../../stores/navigate';
 import { PageScreen } from '../../test/pageScreen';
@@ -131,6 +132,35 @@ describe('PageView (M2a §5)', () => {
     const tree = await screen.findByRole('tree', { name: 'Outline' });
     expect(within(tree).getAllByRole('treeitem')).toHaveLength(2);
     expect(toggle).toHaveAttribute('aria-pressed', 'true');
+  });
+
+  it('M4b part 2 §5: the word count follows typing and the selection', async () => {
+    const src = '---\ntags: [x]\n---\n# Title\n\nOne **two** [three](https://x.y/z).\n';
+    fakeDisk({ 'A.md': src });
+    render(<PageScreen />);
+    await open('A.md');
+    const count = screen.getByText('4 words · 1 min');
+    expect(count).toHaveAttribute('title', '20 characters · 17 without spaces');
+    vi.useFakeTimers();
+    await type(' four five', src.length - 1);
+    expect(count).toHaveTextContent('4 words');
+    await act(() => vi.advanceTimersByTimeAsync(COUNT_DEBOUNCE_MS));
+    expect(count).toHaveTextContent('6 words · 1 min');
+    const view = EditorView.findFromDOM(document.querySelector<HTMLElement>('.cm-editor')!)!;
+    const text = view.state.doc.toString();
+    act(() =>
+      view.dispatch({ selection: { anchor: text.indexOf('One'), head: text.indexOf(' **two') } }),
+    );
+    expect(count).toHaveTextContent('1 of 6 words');
+  });
+
+  it('M4b part 2 §5: another page shows its own count (CJK characters are words)', async () => {
+    fakeDisk({ 'A.md': 'one two\n', 'B.md': '日本語 three\n' });
+    render(<PageScreen />);
+    await open('A.md');
+    expect(screen.getByText('2 words · 1 min')).toBeInTheDocument();
+    await act(() => openPage('B.md', null, 'link'));
+    expect(await screen.findByText('4 words · 1 min')).toBeInTheDocument();
   });
 
   it('M4b part 2 §1: the Full width button widens this page and remembers it', async () => {

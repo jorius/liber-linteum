@@ -28,7 +28,7 @@ import { setLinkPickerOpener } from './linkPickerOpen';
 import type { PageDoc } from './pageDoc';
 import { Outline } from './Outline';
 import { blockForOffset, offsetAtTop, topIn } from './scrollSync';
-import { notifyViewUpdate } from './viewUpdates';
+import { notifyViewReset, notifyViewUpdate, setCurrentView } from './viewUpdates';
 import { Toolbar } from './Toolbar';
 import { hideView, pageDocOf, showView, storedState, storeState } from './views';
 import { toggleTaskIn } from './widgets';
@@ -311,7 +311,9 @@ export function Editor({ doc, mode, label }: EditorProps) {
     setLinkPickerOpener(v, () => setPicker(true));
     setLanguagePickerOpener(v, (at, anchor) => setLangPicker({ at, anchor }));
     showFormats(v.state);
+    setCurrentView(v);
     return () => {
+      setCurrentView(null);
       hideView(current.current, v);
       storeState(current.current, v.state);
       current.current.sink = null;
@@ -335,6 +337,7 @@ export function Editor({ doc, mode, label }: EditorProps) {
       showView(doc, v);
       v.setState(stateFor(doc));
       showFormats(v.state);
+      notifyViewReset(v);
     }
     doc.sink = (next) => applyExternal(v, next);
     // Changed while it was in the background (reload or merge without a view).

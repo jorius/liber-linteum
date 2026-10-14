@@ -71,9 +71,16 @@
   padding: 2px 4px;
 }
 
-.status {
+.status,
+.count {
   font-size: 12.5px;
   color: var(--color-text-muted);
+}
+
+/* Word count (M4b part 2 §5): digits that don't jiggle while typing. */
+.count {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
 }
 
 .modes {

@@ -441,5 +441,11 @@
     "hide": "Hide the outline",
     "empty": "No headings yet.",
     "resize": "Outline width"
+  },
+  "count": {
+    "words": "{count, plural, one {# word} other {# words}} · {minutes, number} min",
+    "selected": "{selected, number} of {count, plural, one {# word} other {# words}}",
+    "chars": "{chars, plural, one {# character} other {# characters}} · {bare, number} without spaces",
+    "lines": "{lines, plural, one {# line} other {# lines}} · {chars, plural, one {# character} other {# characters}}"
   }
 }

@@ -12,6 +12,7 @@ import { Cover } from './Cover';
 import { ModeToggle } from './ModeToggle';
 import { NoteTitle } from './NoteTitle';
 import { RelatedChips } from './RelatedChips';
+import { WordCount } from './WordCount';
 import styles from './PageView.module.css';
 
 /** The header band (M4b §1): first row, the back arrow and breadcrumb, then
@@ -61,6 +62,7 @@ export function PageHeader({ page, mode }: { page: Page; mode: EditorMode }) {
                   {copying ? t('editor.copying') : t(`editor.${status}`)}
                 </span>
               )}
+              {hasDoc && <WordCount />}
               {hasDoc && (
                 <button
                   type="button"

@@ -78,7 +78,7 @@ export function Outline({ view, text }: { view: EditorView; text: string }) {
     };
     fromCursor();
     const off = onViewUpdate(view, (u) => {
-      if (u.selectionSet || u.docChanged) fromCursor();
+      if (!u || u.selectionSet || u.docChanged) fromCursor();
     });
     const onScroll = () => {
       if (performance.now() - selected > 250) setCurrent(headingAt(items, topLine(view)));
