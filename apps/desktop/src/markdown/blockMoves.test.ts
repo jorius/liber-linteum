@@ -143,6 +143,9 @@ describe('moving top-level blocks (M4 §3)', () => {
       'Para D\n\nIntro\n\nDraft idea %%\nhidden one\n\nhidden two\n%%\n\nPara B\n\nPara C\n',
     );
     expect(move(stray, 'A', 'D')).toBe('B\n\nC\n\nA\n\nD\n\n%% c %%\n\nE 50%% off\n');
+    // A `%%` in a code block pairs with nothing either way.
+    const code = 'P1 %%c%%\n\nP2\n\n```\nx %% y\n```\n\nP3\n';
+    expect(move(code, 'P1 %%c%%', null)).toBe('P2\n\n```\nx %% y\n```\n\nP3\n\nP1 %%c%%\n');
   });
 
   it('a slot that leaves the block where it is gives nothing', () => {

@@ -673,7 +673,13 @@ function holdsTheSameBlocks(
   // A `%%` past the page's last comment pairs with nothing; one that no move
   // touches must keep nothing after it to pair with (M1).
   const { comments } = model;
-  const stray = text.indexOf('%%', comments.length ? comments[comments.length - 1][1] : 0);
+  const code = model.units.filter(
+    (u) => u.scope === 'top' && (u.kind === 'code' || u.kind === 'html'),
+  );
+  let stray = text.indexOf('%%', comments.length ? comments[comments.length - 1][1] : 0);
+  while (stray >= 0 && code.some((u) => u.from <= stray && stray < u.to)) {
+    stray = text.indexOf('%%', stray + 2);
+  }
   if (stray >= 0 && !changes.some((c) => c.from <= stray && stray < c.to)) {
     const count = (s: string, from: number) => {
       let n = 0;
