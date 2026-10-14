@@ -193,6 +193,7 @@ pub(crate) fn vault_settings_get_impl(state: &AppState) -> CmdResult<VaultSettin
             path: config.path,
         },
         obsidian: config.obsidian,
+        override_obsidian: config.override_obsidian,
     })
 }
 
@@ -201,8 +202,13 @@ pub(crate) fn vault_settings_set_impl(
     patch: VaultSettingsPatch,
 ) -> CmdResult<VaultSettingsDto> {
     let session = state.session()?;
-    if let Some(a) = patch.attachments {
-        session.set_attachment_settings(&a.mode, &a.path)?;
+    match patch.attachments {
+        Some(a) => session.set_attachment_settings(&a.mode, &a.path, patch.override_obsidian)?,
+        None => {
+            if let Some(on) = patch.override_obsidian {
+                session.set_attachment_override(on)?;
+            }
+        }
     }
     vault_settings_get_impl(state)
 }

@@ -717,7 +717,11 @@ fn m2c_vault_settings_round_trip_over_ipc() {
     let got = call(&h.main, "vault_settings_get", json!({})).unwrap();
     assert_eq!(
         got,
-        json!({ "attachments": { "mode": "subfolder", "path": "attachments" }, "obsidian": null })
+        json!({
+            "attachments": { "mode": "subfolder", "path": "attachments" },
+            "obsidian": null,
+            "overrideObsidian": false
+        })
     );
     let saved = call(
         &h.main,
@@ -751,6 +755,47 @@ fn m2c_vault_settings_round_trip_over_ipc() {
     )
     .unwrap_err();
     assert_eq!(kind(err), "notPermitted");
+}
+
+/// M4b §5: with Obsidian's setting present, NIMW's own place applies only
+/// while `overrideObsidian` is on; turning it off restores Obsidian's.
+#[test]
+fn m4b_vault_settings_override_obsidian_over_ipc() {
+    let h = harness();
+    let vault = open_fixture(&h, "obsidian-basic");
+    let app_json = std::fs::read(vault.path().join(".obsidian/app.json")).unwrap();
+    let got = call(&h.main, "vault_settings_get", json!({})).unwrap();
+    assert_eq!(got["obsidian"], "./assets");
+    assert_eq!(got["overrideObsidian"], false);
+    let saved = call(
+        &h.main,
+        "vault_settings_set",
+        json!({ "patch": { "attachments": { "mode": "same" }, "overrideObsidian": true } }),
+    )
+    .unwrap();
+    assert_eq!(saved["overrideObsidian"], true);
+    assert_eq!(saved["attachments"], json!({ "mode": "same", "path": "" }));
+    // The override alone can be turned off; the place is kept for next time.
+    let saved = call(
+        &h.main,
+        "vault_settings_set",
+        json!({ "patch": { "overrideObsidian": false } }),
+    )
+    .unwrap();
+    assert_eq!(saved["overrideObsidian"], false);
+    assert_eq!(saved["attachments"], json!({ "mode": "same", "path": "" }));
+    // Without the override, the place can't change while Obsidian's applies.
+    let err = call(
+        &h.main,
+        "vault_settings_set",
+        json!({ "patch": { "attachments": { "mode": "vault" } } }),
+    )
+    .unwrap_err();
+    assert_eq!(kind(err), "notPermitted");
+    assert_eq!(
+        std::fs::read(vault.path().join(".obsidian/app.json")).unwrap(),
+        app_json
+    );
 }
 
 /// M2c §5.1 / §7.3: a pasted image arrives as a raw body with percent-encoded

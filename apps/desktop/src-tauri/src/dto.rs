@@ -154,15 +154,20 @@ pub struct AttachmentsDto {
 }
 
 #[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct VaultSettingsDto {
     pub attachments: AttachmentsDto,
-    /// Obsidian's `attachmentFolderPath` when set (it wins).
+    /// Obsidian's `attachmentFolderPath` when set (it wins unless overridden).
     pub obsidian: Option<String>,
+    /// NIMW's place wins over Obsidian's (M4b §5).
+    pub override_obsidian: bool,
 }
 
 #[derive(Debug, Clone, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct VaultSettingsPatch {
     pub attachments: Option<AttachmentsDto>,
+    pub override_obsidian: Option<bool>,
 }
 
 /// `gv_children`'s argument: which level to open (M3a §3).

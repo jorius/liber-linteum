@@ -275,12 +275,15 @@ export type AttachmentMode = 'vault' | 'same' | 'subfolder' | 'folder';
 
 export interface VaultSettings {
   attachments: { mode: AttachmentMode; path: string };
-  /** Obsidian's `attachmentFolderPath` when set (it wins). */
+  /** Obsidian's `attachmentFolderPath` when set (it wins unless overridden). */
   obsidian: string | null;
+  /** NIMW's place wins over Obsidian's (M4b §5). */
+  overrideObsidian: boolean;
 }
 
 export interface VaultSettingsPatch {
   attachments?: { mode: AttachmentMode; path: string };
+  overrideObsidian?: boolean;
 }
 
 /** What one Global View click opens (M3a §3). */

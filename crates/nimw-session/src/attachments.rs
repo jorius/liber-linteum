@@ -124,9 +124,19 @@ impl VaultSession {
         self.vault.attachment_config()
     }
 
-    /// Stores NIMW's attachment setting. Refused while Obsidian's applies.
-    pub fn set_attachment_settings(&self, mode: &str, path: &str) -> Result<()> {
-        if self.vault.attachment_config().obsidian.is_some() {
+    /// Stores NIMW's attachment setting and, when given, whether it overrides
+    /// Obsidian's (M4b §5). While Obsidian's applies (no override), the place
+    /// can't change; turning the override off keeps the place for next time.
+    pub fn set_attachment_settings(
+        &self,
+        mode: &str,
+        path: &str,
+        override_obsidian: Option<bool>,
+    ) -> Result<()> {
+        let config = self.vault.attachment_config();
+        let overrides = override_obsidian.unwrap_or(config.override_obsidian);
+        let same_place = mode == config.mode && path.trim().trim_matches('/') == config.path;
+        if config.obsidian.is_some() && !overrides && !same_place {
             return Err(SessionError::NotPermitted(
                 "attachments are set by Obsidian (.obsidian/app.json)".into(),
             ));
@@ -143,8 +153,16 @@ impl VaultSession {
             }
             _ => {}
         }
-        self.vault.set_nimw_attachments(mode, path)?;
+        self.vault
+            .set_nimw_attachments(mode, path, override_obsidian)?;
         Ok(())
+    }
+
+    /// Turns the override of Obsidian's attachment setting on or off, keeping
+    /// NIMW's place (M4b §5).
+    pub fn set_attachment_override(&self, on: bool) -> Result<()> {
+        let config = self.vault.attachment_config();
+        self.set_attachment_settings(&config.mode, &config.path, Some(on))
     }
 
     /// Up to `limit` files matching `query` by name, title or path, best first

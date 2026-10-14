@@ -164,20 +164,24 @@ describe('Settings dialog (M2b §4, §5, §7)', () => {
 describe('Settings → This vault (M2c §5.4)', () => {
   let vaultPatches: unknown[];
   let obsidian: string | null;
+  let overrideObsidian: boolean;
   let stored: { mode: string; path: string };
 
   beforeEach(() => {
     vaultPatches = [];
     obsidian = null;
+    overrideObsidian = false;
     stored = { mode: 'subfolder', path: 'attachments' };
     useVaultStore.setState({ info: { name: 'Vault', root: '/v', report: {} as never } });
     mockIPC((cmd, raw) => {
       const args = (raw ?? {}) as Record<string, unknown>;
-      if (cmd === 'vault_settings_get') return { attachments: stored, obsidian };
+      if (cmd === 'vault_settings_get') return { attachments: stored, obsidian, overrideObsidian };
       if (cmd === 'vault_settings_set') {
         vaultPatches.push(args.patch);
-        stored = (args.patch as { attachments: typeof stored }).attachments;
-        return { attachments: stored, obsidian };
+        const patch = args.patch as { attachments?: typeof stored; overrideObsidian?: boolean };
+        if (patch.attachments) stored = patch.attachments;
+        if (patch.overrideObsidian !== undefined) overrideObsidian = patch.overrideObsidian;
+        return { attachments: stored, obsidian, overrideObsidian };
       }
       if (cmd === 'fonts_list') return [];
       return null;
@@ -259,15 +263,38 @@ describe('Settings → This vault (M2c §5.4)', () => {
     await waitFor(() => expect(where).toBeDisabled());
     expect(
       screen.getByText(
-        'Set by Obsidian: ./assets — new attachments go to the “assets” folder next to the page.',
+        'Obsidian puts new attachments in ./assets (the “assets” folder next to the page).',
       ),
     ).toBeInTheDocument();
     expect(
-      screen.getByText('Change it in Obsidian (Settings → Files and links).'),
-    ).toBeInTheDocument();
+      screen.getByRole('checkbox', { name: 'Use a different place in Notes In My Way' }),
+    ).not.toBeChecked();
     const violations = await axe
       .run(screen.getByRole('dialog'), { rules: { 'color-contrast': { enabled: false } } })
       .then((r) => r.violations);
     expect(violations).toEqual([]);
+  });
+
+  it("M4b §5: a switch lets NIMW use its own place; off restores Obsidian's", async () => {
+    obsidian = './assets';
+    open();
+    const where = await screen.findByRole('combobox', { name: 'New attachments go to' });
+    await waitFor(() => expect(where).toBeDisabled());
+    const own = screen.getByRole('checkbox', { name: 'Use a different place in Notes In My Way' });
+    await userEvent.click(own);
+    await waitFor(() =>
+      expect(vaultPatches).toEqual([
+        { attachments: { mode: 'subfolder', path: 'attachments' }, overrideObsidian: true },
+      ]),
+    );
+    expect(own).toBeChecked();
+    expect(where).toBeEnabled();
+    await userEvent.selectOptions(where, 'same');
+    await waitFor(() => expect(vaultPatches).toHaveLength(2));
+    expect(vaultPatches[1]).toEqual({ attachments: { mode: 'same', path: '' } });
+    await userEvent.click(own);
+    await waitFor(() => expect(vaultPatches[2]).toEqual({ overrideObsidian: false }));
+    expect(where).toBeDisabled();
+    expect(where).toHaveValue('same');
   });
 });

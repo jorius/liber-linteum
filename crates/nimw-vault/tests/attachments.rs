@@ -72,7 +72,9 @@ fn m2c_folder_mode_and_dirs_per_policy() {
         dir_for(&AttachmentPolicy::Folder(vp("Media"))).as_deref(),
         Some("Media")
     );
-    vault.set_nimw_attachments("folder", "Media/Img").unwrap();
+    vault
+        .set_nimw_attachments("folder", "Media/Img", None)
+        .unwrap();
     assert_eq!(
         vault.attachment_policy(),
         AttachmentPolicy::Folder(vp("Media/Img"))
@@ -86,7 +88,7 @@ fn m2c_set_nimw_attachments_keeps_other_keys_and_creates_nimw_lazily() {
         !dir.path().join(".nimw").exists(),
         "VLT-02: nothing written on open"
     );
-    vault.set_nimw_attachments("same", "").unwrap();
+    vault.set_nimw_attachments("same", "", None).unwrap();
     let json: serde_json::Value =
         serde_json::from_slice(&std::fs::read(dir.path().join(".nimw/vault.json")).unwrap())
             .unwrap();
@@ -98,7 +100,9 @@ fn m2c_set_nimw_attachments_keeps_other_keys_and_creates_nimw_lazily() {
         r#"{ "version": 1, "exclude": ["Drafts/**"], "viewMode": "drill", "future": {"x": 1} }"#,
     )
     .unwrap();
-    vault.set_nimw_attachments("subfolder", "files").unwrap();
+    vault
+        .set_nimw_attachments("subfolder", "files", None)
+        .unwrap();
     let json: serde_json::Value =
         serde_json::from_slice(&std::fs::read(dir.path().join(".nimw/vault.json")).unwrap())
             .unwrap();
@@ -123,7 +127,7 @@ fn m2c_set_nimw_attachments_refuses_bad_values_and_never_clobbers_broken_json() 
     ] {
         assert!(
             matches!(
-                vault.set_nimw_attachments(mode, path),
+                vault.set_nimw_attachments(mode, path, None),
                 Err(VaultError::InvalidConfig { .. })
             ),
             "{mode} {path}"
@@ -132,7 +136,7 @@ fn m2c_set_nimw_attachments_refuses_bad_values_and_never_clobbers_broken_json() 
     std::fs::create_dir(dir.path().join(".nimw")).unwrap();
     std::fs::write(dir.path().join(".nimw/vault.json"), "{ not json").unwrap();
     assert!(matches!(
-        vault.set_nimw_attachments("same", ""),
+        vault.set_nimw_attachments("same", "", None),
         Err(VaultError::InvalidConfig { .. })
     ));
     assert_eq!(
@@ -187,4 +191,53 @@ fn m2c_import_file_streams_a_create_only_copy() {
         vault.import_file(&src, &vp("no/such/x.png")),
         Err(VaultError::NotFound(_))
     ));
+}
+
+/// M4b §5: NIMW's own setting can override Obsidian's when the user says so;
+/// `.obsidian/app.json` is never written.
+#[test]
+fn m4b_nimw_override_wins_over_obsidian_until_turned_off() {
+    let dir = copy_fixture("obsidian-basic"); // app.json: "./assets"
+    let app_json = std::fs::read(dir.path().join(".obsidian/app.json")).unwrap();
+    let vault = Vault::open(dir.path()).unwrap();
+    assert!(!vault.attachment_config().override_obsidian);
+
+    vault.set_nimw_attachments("same", "", Some(true)).unwrap();
+    assert_eq!(vault.attachment_policy(), AttachmentPolicy::SameAsNote);
+    let config = vault.attachment_config();
+    assert!(config.override_obsidian);
+    assert_eq!(config.obsidian.as_deref(), Some("./assets"));
+
+    // Changing the place keeps the override (None leaves the flag as is).
+    vault.set_nimw_attachments("folder", "Media", None).unwrap();
+    assert_eq!(
+        vault.attachment_policy(),
+        AttachmentPolicy::Folder(VaultPath::new("Media").unwrap())
+    );
+    assert!(vault.attachment_config().override_obsidian);
+
+    // Off: Obsidian's applies again; NIMW's choice is kept for next time.
+    vault
+        .set_nimw_attachments("folder", "Media", Some(false))
+        .unwrap();
+    assert_eq!(
+        vault.attachment_policy(),
+        AttachmentPolicy::Subfolder("assets".into())
+    );
+    let config = vault.attachment_config();
+    assert!(!config.override_obsidian);
+    assert_eq!(
+        (config.mode.as_str(), config.path.as_str()),
+        ("folder", "Media")
+    );
+    let stored: serde_json::Value = serde_json::from_str(
+        &std::fs::read_to_string(dir.path().join(".nimw/vault.json")).unwrap(),
+    )
+    .unwrap();
+    assert_eq!(stored["attachments"]["overrideObsidian"], false);
+    assert_eq!(
+        std::fs::read(dir.path().join(".obsidian/app.json")).unwrap(),
+        app_json,
+        "Obsidian's file is never written"
+    );
 }
