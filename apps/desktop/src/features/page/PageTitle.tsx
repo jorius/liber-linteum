@@ -8,6 +8,9 @@ import { useVaultStore } from '../../stores/vaultStore';
 import { validateName } from '../explorer/nameRules';
 import styles from './PageView.module.css';
 
+/** `Notes/My page.md` → `My page`. */
+export const stemOf = (path: string): string => split(path).stem;
+
 /** `Notes/My page.md` → `My page` and `.md`. */
 function split(path: string): { stem: string; ext: string } {
   const name = nameOf(path);
@@ -17,8 +20,8 @@ function split(path: string): { stem: string; ext: string } {
 
 /** The page title, editable in place (M2b §2): it is the file name, so Enter
  *  or leaving the field renames the file (links updated as for any rename);
- *  Escape puts the name back. The note's own title (first heading or
- *  `title:`) is shown under it when it differs. */
+ *  Escape puts the name back. It sits in the top bar (M4b §1); the note's own
+ *  title, when it differs, shows in the header band (`NoteTitle`). */
 export function PageTitle({ page }: { page: Page }) {
   const { t } = useTranslation();
   const { stem, ext } = split(page.path);
@@ -114,9 +117,6 @@ export function PageTitle({ page }: { page: Page }) {
         <p id={errorId} role="alert" className={styles.titleError}>
           {error}
         </p>
-      )}
-      {page.title && page.title !== stem && (
-        <p className={styles.noteTitle}>{t('page.titleInNote', { title: page.title })}</p>
       )}
     </>
   );

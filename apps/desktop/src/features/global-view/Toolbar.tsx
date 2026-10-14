@@ -1,3 +1,4 @@
+import type { TFunction } from 'i18next';
 import { useTranslation } from 'react-i18next';
 import type { GlobalViewEdges, GvLevelRef } from '../../ipc';
 import { useSettingsStore } from '../../stores/settingsStore';
@@ -13,6 +14,14 @@ const TOGGLES: { key: keyof GlobalViewEdges; kind: GvEdgeKind; aggregated: boole
   { key: 'aggregated', kind: 'link', aggregated: true },
 ];
 
+/** A level's name: "Vault", a folder's name, or a page's title (its file
+ *  name until the level has loaded). The breadcrumb and the top bar (M4b §1). */
+export function levelLabel(ref: GvLevelRef, titles: Record<string, string>, t: TFunction): string {
+  if (ref.kind === 'vault') return t('gv.vault');
+  if (ref.kind === 'folder') return nameOf(ref.path);
+  return titles[ref.path] ?? nameOf(ref.path).replace(/\.md$/i, '');
+}
+
 /** Breadcrumb, Drill-down | Expand in place, edge toggles and Reset layout
  *  (M3a §5–§7; prototype `.gvbar`). */
 export function Toolbar() {
@@ -24,11 +33,7 @@ export function Toolbar() {
   const mode = settings.globalViewMode;
   const toggles = settings.globalViewEdges;
 
-  const crumbLabel = (ref: GvLevelRef) => {
-    if (ref.kind === 'vault') return t('gv.vault');
-    if (ref.kind === 'folder') return nameOf(ref.path);
-    return titles[ref.path] ?? nameOf(ref.path).replace(/\.md$/i, '');
-  };
+  const crumbLabel = (ref: GvLevelRef) => levelLabel(ref, titles, t);
   // Expand canvases show only their root level in the breadcrumb (M3a §5).
   const crumbs = stack;
 

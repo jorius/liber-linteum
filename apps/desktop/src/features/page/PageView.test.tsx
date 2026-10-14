@@ -12,7 +12,7 @@ import { fakeDisk } from '../../test/fakeDisk';
 import { AUTOSAVE_MS } from '../editor/pageDoc';
 import { LARGE_NOTE_CHARS } from '../editor/livePreview';
 import { openPage } from '../../stores/navigate';
-import { PageView } from './PageView';
+import { PageScreen } from '../../test/pageScreen';
 
 const open = (path: string) => act(() => usePageStore.getState().load(path));
 const view = () => EditorView.findFromDOM(document.querySelector<HTMLElement>('.cm-editor')!)!;
@@ -33,7 +33,7 @@ afterEach(async () => {
 
 describe('PageView (M2a §5)', () => {
   it('shows the empty state when nothing is selected', () => {
-    render(<PageView />);
+    render(<PageScreen />);
     expect(screen.getByText('Pick a page in the explorer')).toBeInTheDocument();
   });
 
@@ -56,7 +56,7 @@ describe('PageView (M2a §5)', () => {
         links_resolve: () => ['Character Design/assets/rex-cover.png'],
       },
     );
-    render(<PageView />);
+    render(<PageScreen />);
     await open('Character Design/rex.md');
     expect(screen.getByRole('navigation', { name: 'Breadcrumb' })).toHaveTextContent(
       'VaultCharacter Designrex',
@@ -78,7 +78,7 @@ describe('PageView (M2a §5)', () => {
 
   it('edits the page; the mode toggle switches modes and remembers the choice', async () => {
     const disk = fakeDisk({ 'A.md': '# A\n\nbody\n' });
-    render(<PageView />);
+    render(<PageScreen />);
     await open('A.md');
     expect(view().state.doc.toString()).toBe('# A\n\nbody\n');
     expect(screen.getByRole('radio', { name: 'Live Preview' })).toBeChecked();
@@ -91,7 +91,7 @@ describe('PageView (M2a §5)', () => {
 
   it('M2b §3: the back arrow appears after following a link and goes back', async () => {
     fakeDisk({ 'A.md': '# A\n\n[[B]]\n', 'B.md': '# B\n' });
-    render(<PageView />);
+    render(<PageScreen />);
     await open('A.md');
     expect(screen.queryByRole('button', { name: /^Back to/ })).not.toBeInTheDocument();
     await act(() => openPage('B.md', null, 'link'));
@@ -103,7 +103,7 @@ describe('PageView (M2a §5)', () => {
 
   it('M2b §6: the header button shows and hides the formatting toolbar', async () => {
     const disk = fakeDisk({ 'A.md': '# A\n\nbody\n' });
-    render(<PageView />);
+    render(<PageScreen />);
     await open('A.md');
     const toggle = screen.getByRole('button', { name: 'Formatting toolbar' });
     expect(toggle).toHaveAttribute('aria-pressed', 'true');
@@ -120,7 +120,7 @@ describe('PageView (M2a §5)', () => {
 
   it('save status: Saved → Saving… → Saved; failures say "Unsaved — retrying"', async () => {
     const disk = fakeDisk({ 'A.md': '# A\n' });
-    render(<PageView />);
+    render(<PageScreen />);
     await open('A.md');
     vi.useFakeTimers();
     const status = screen.getByRole('status', { name: 'Save status' });
@@ -139,7 +139,7 @@ describe('PageView (M2a §5)', () => {
 
   it('the header follows an own save (title from the new text)', async () => {
     fakeDisk({ 'A.md': '# Old\n' });
-    render(<PageView />);
+    render(<PageScreen />);
     await open('A.md');
     expect(screen.getByText('Title in the note: Old')).toBeInTheDocument();
     await act(async () => {
@@ -151,7 +151,7 @@ describe('PageView (M2a §5)', () => {
 
   it('deleted outside while dirty: the text stays and can be saved as a new page', async () => {
     const disk = fakeDisk({ 'notes/A.md': '# A\n' });
-    render(<PageView />);
+    render(<PageScreen />);
     await open('notes/A.md');
     await type('kept ', 4);
     disk.files.delete('notes/A.md');
@@ -170,7 +170,7 @@ describe('PageView (M2a §5)', () => {
 
   it('C2: the orphan banner shows whenever the page is orphaned, even while it is loaded', async () => {
     fakeDisk({ 'A.md': '# A\n' });
-    render(<PageView />);
+    render(<PageScreen />);
     await open('A.md');
     await type('kept ', 4);
     expect(usePageStore.getState().state).toBe('ready');
@@ -187,7 +187,7 @@ describe('PageView (M2a §5)', () => {
         return { path: 'x.md', title: 'x', tags: [], links: 0, backlinks: 0, binary: true };
       throw { kind: 'binary', message: 'not UTF-8 text: x.md' };
     });
-    render(<PageView />);
+    render(<PageScreen />);
     act(() => usePageStore.setState({ path: 'x.md', state: 'loading' }));
     expect(screen.getByRole('status')).toHaveTextContent('Loading…');
     await open('x.md');
@@ -203,14 +203,14 @@ describe('PageView (M2a §5)', () => {
     fakeDisk({
       'big.md': `# Big\n\n${para.repeat(Math.ceil(LARGE_NOTE_CHARS / para.length) + 10)}`,
     });
-    render(<PageView />);
+    render(<PageScreen />);
     await open('big.md');
     expect(screen.getByText('Simplified preview for large notes')).toBeInTheDocument();
   }, 30_000);
 
   it('NFR-10 has no axe violations', async () => {
     fakeDisk({ 'A.md': '# A\n\n- [x] done\n\n[[B]]\n' });
-    const { container } = render(<PageView />);
+    const { container } = render(<PageScreen />);
     await open('A.md');
     const results = await axe.run(container, { rules: { 'color-contrast': { enabled: false } } });
     expect(results.violations).toEqual([]);

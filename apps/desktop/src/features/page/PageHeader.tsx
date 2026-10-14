@@ -9,8 +9,7 @@ import { nameOf } from '../../stores/tree';
 import { Breadcrumb } from './Breadcrumb';
 import { Cover } from './Cover';
 import { ModeToggle } from './ModeToggle';
-import { PageSubtitle } from './PageSubtitle';
-import { PageTitle } from './PageTitle';
+import { NoteTitle } from './NoteTitle';
 import styles from './PageView.module.css';
 
 /** Breadcrumb, cover, title, subtitle, tags, link counts, the mode toggle and
@@ -25,7 +24,7 @@ export function PageHeader({ page, mode }: { page: Page; mode: EditorMode }) {
   const previous = useTrailStore((s) => s.back[s.back.length - 1] ?? null);
   const editable = useEditorStore((s) => s.doc !== null && s.path === page.path);
   return (
-    <header className={styles.header}>
+    <div className={styles.header}>
       <div className={styles.bar}>
         <div className={styles.where}>
           {previous && (
@@ -64,8 +63,6 @@ export function PageHeader({ page, mode }: { page: Page; mode: EditorMode }) {
         </div>
       </div>
       <Cover page={page} editable={editable} />
-      <PageTitle page={page} />
-      <PageSubtitle page={page} editable={editable} />
       {page.tags.length > 0 && (
         <ul className={styles.tags} aria-label={t('page.tags')}>
           {page.tags.map((tag) => (
@@ -77,8 +74,9 @@ export function PageHeader({ page, mode }: { page: Page; mode: EditorMode }) {
       )}
       <p className={styles.meta}>
         <span>{t('page.meta', { links: page.links, backlinks: page.backlinks })}</span>
+        <NoteTitle page={page} />
         {large && mode === 'livePreview' && <span>{t('editor.largeNote')}</span>}
       </p>
-    </header>
+    </div>
   );
 }

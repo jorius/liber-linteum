@@ -17,9 +17,11 @@ export function Sidebar(treeProps: ExplorerTreeProps) {
   };
   return (
     <aside className={styles.side} aria-label={t('shell.files', { name })}>
-      <div className={styles.brand}>
+      {/* The vault, not the app (M4b §1): the app's name is in the window
+          title, the About panel and the welcome screen. */}
+      <div className={styles.brand} title={name}>
         <BrandMark size={26} />
-        {t('app.name')}
+        <span className={styles.brandName}>{name}</span>
       </div>
       <div className={styles.sideHeader}>
         <span className={styles.sideLabel}>{t('shell.files', { name })}</span>

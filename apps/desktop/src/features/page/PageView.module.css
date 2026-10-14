@@ -228,24 +228,28 @@
   opacity: 1;
 }
 
+/* In the top bar (M4b §1): one compact line each for title and subtitle. */
 .title {
-  font: 700 32px/1.1 var(--font-display);
+  font: 700 20px/1.2 var(--font-display);
   color: var(--color-text-strong);
   margin: 0;
-  overflow-wrap: anywhere;
+  min-width: 0;
 }
 
 .subtitle {
   margin: 0;
-  font-size: 16px;
+  font-size: 13px;
   color: var(--color-text-body);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 /* Subtitle field (M2c §3): reads like the subtitle; the placeholder shows only
    on hover and focus. */
 .subtitleInput {
   font: inherit;
-  font-size: 16px;
+  font-size: 13px;
   color: var(--color-text-body);
   width: 100%;
   margin: 0 0 0 -6px;
@@ -415,7 +419,6 @@
 }
 
 .noteTitle {
-  margin: 0;
   font-size: 13px;
   color: var(--color-text-muted);
 }

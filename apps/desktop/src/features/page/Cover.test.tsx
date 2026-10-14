@@ -8,7 +8,7 @@ import { usePageStore } from '../../stores/pageStore';
 import { DEFAULT_SETTINGS, useSettingsStore } from '../../stores/settingsStore';
 import { resetVaultStore, useVaultStore } from '../../stores/vaultStore';
 import { fakeDisk } from '../../test/fakeDisk';
-import { PageView } from './PageView';
+import { PageScreen } from '../../test/pageScreen';
 
 const open = (path: string) => act(() => usePageStore.getState().load(path));
 
@@ -42,7 +42,7 @@ describe('Cover (M2c §2)', () => {
         links_resolve: resolveCovers,
       },
     );
-    render(<PageView />);
+    render(<PageScreen />);
     await open('Chars/Rex.md');
     await userEvent.click(screen.getByRole('button', { name: 'Add cover' }));
     expect(disk.calls).toContainEqual(['cover_pick', { page: 'Chars/Rex.md' }]);
@@ -60,7 +60,7 @@ describe('Cover (M2c §2)', () => {
 
   it('cancelling the dialog changes nothing', async () => {
     const disk = fakeDisk({ 'Rex.md': '# Rex\n' }, { cover_pick: () => null });
-    render(<PageView />);
+    render(<PageScreen />);
     await open('Rex.md');
     await userEvent.click(screen.getByRole('button', { name: 'Add cover' }));
     await waitFor(() => expect(disk.calls.some(([c]) => c === 'cover_pick')).toBe(true));
@@ -72,7 +72,7 @@ describe('Cover (M2c §2)', () => {
       { 'Rex.md': '---\ncover: a.png\ncover-y: 30\nsubtitle: S\n---\n# Rex\n' },
       { links_resolve: resolveCovers },
     );
-    render(<PageView />);
+    render(<PageScreen />);
     await open('Rex.md');
     const band = await screen.findByRole('group', { name: 'Cover' });
     await userEvent.click(within(band).getByRole('button', { name: 'Remove' }));
@@ -88,7 +88,7 @@ describe('Cover (M2c §2)', () => {
       { 'Rex.md': '---\ncover: a.png\ncover-y: 40\n---\n# Rex\n' },
       { links_resolve: resolveCovers },
     );
-    render(<PageView />);
+    render(<PageScreen />);
     await open('Rex.md');
     const img = await waitFor(() => document.querySelector<HTMLImageElement>('img[data-cover]')!);
     expect(img.style.objectPosition).toBe('50% 40%');
@@ -120,7 +120,7 @@ describe('Cover (M2c §2)', () => {
       },
       { links_resolve: resolveCovers },
     );
-    render(<PageView />);
+    render(<PageScreen />);
     await open('Web.md');
     const web = await screen.findByRole('group', { name: 'Cover' });
     expect(web).toHaveTextContent('Remote cover not loaded (privacy)');
@@ -158,7 +158,7 @@ describe('Cover (M2c §2)', () => {
         links_resolve: () => ['a.png'],
       },
     );
-    render(<PageView />);
+    render(<PageScreen />);
     await open('x.md');
     await waitFor(() => expect(document.querySelector('img[data-cover]')).not.toBeNull());
     expect(screen.queryByRole('button', { name: 'Remove' })).not.toBeInTheDocument();
@@ -176,7 +176,7 @@ describe('Cover (M2c §2)', () => {
         links_resolve: resolveCovers,
       },
     );
-    render(<PageView />);
+    render(<PageScreen />);
     await open('A.md');
     await userEvent.click(screen.getByRole('button', { name: 'Add cover' }));
     await waitFor(() => expect(disk.calls.some(([c]) => c === 'cover_pick')).toBe(true));
@@ -199,7 +199,7 @@ describe('Cover (M2c §2)', () => {
 
     it('Remove moves focus to Add cover', async () => {
       fakeDisk({ 'Rex.md': '---\ncover: a.png\n---\n# Rex\n' }, { links_resolve: slowResolve });
-      render(<PageView />);
+      render(<PageScreen />);
       await open('Rex.md');
       const band = await screen.findByRole('group', { name: 'Cover' });
       await waitFor(() => expect(document.querySelector('img[data-cover]')).not.toBeNull());
@@ -217,7 +217,7 @@ describe('Cover (M2c §2)', () => {
           links_resolve: slowResolve,
         },
       );
-      render(<PageView />);
+      render(<PageScreen />);
       await open('Rex.md');
       screen.getByRole('button', { name: 'Add cover' }).focus();
       await userEvent.keyboard('{Enter}');
@@ -235,7 +235,7 @@ describe('Cover (M2c §2)', () => {
           links_resolve: slowResolve,
         },
       );
-      render(<PageView />);
+      render(<PageScreen />);
       await open('Rex.md');
       await waitFor(() => expect(document.querySelector('img[data-cover]')).not.toBeNull());
       screen.getByRole('button', { name: 'Change cover' }).focus();
@@ -251,7 +251,7 @@ describe('Cover (M2c §2)', () => {
 
     it('cancelling Add cover leaves focus on Add cover', async () => {
       const disk = fakeDisk({ 'Rex.md': '# Rex\n' }, { cover_pick: () => null });
-      render(<PageView />);
+      render(<PageScreen />);
       await open('Rex.md');
       const add = screen.getByRole('button', { name: 'Add cover' });
       add.focus();
@@ -269,7 +269,7 @@ describe('Cover (M2c §2)', () => {
           links_resolve: slowResolve,
         },
       );
-      render(<PageView />);
+      render(<PageScreen />);
       await open('Rex.md');
       screen.getByRole('button', { name: 'Add cover' }).focus();
       await userEvent.keyboard('{Enter}');
@@ -283,7 +283,7 @@ describe('Cover (M2c §2)', () => {
 
   it('has no axe violations with the cover controls', async () => {
     fakeDisk({ 'Rex.md': '---\ncover: a.png\n---\n# Rex\n' }, { links_resolve: resolveCovers });
-    render(<PageView />);
+    render(<PageScreen />);
     await open('Rex.md');
     await screen.findByRole('group', { name: 'Cover' });
     await userEvent.click(screen.getByRole('button', { name: 'Reposition' }));
@@ -298,7 +298,7 @@ describe('Cover (M2c §2)', () => {
 describe('Subtitle (M2c §3)', () => {
   it('Enter writes subtitle:, Escape restores, empty removes the key', async () => {
     const disk = fakeDisk({ 'Rex.md': '# Rex\n' });
-    render(<PageView />);
+    render(<PageScreen />);
     await open('Rex.md');
     const field = screen.getByRole('textbox', { name: 'Subtitle' });
     expect(field).toHaveAttribute('placeholder', 'Add a subtitle');
@@ -317,7 +317,7 @@ describe('Subtitle (M2c §3)', () => {
 
   it('switching apps mid-edit (window blur) does not save; a click elsewhere does', async () => {
     const disk = fakeDisk({ 'Rex.md': '# Rex\n' });
-    render(<PageView />);
+    render(<PageScreen />);
     await open('Rex.md');
     const field = screen.getByRole('textbox', { name: 'Subtitle' });
     await userEvent.type(field, 'Half');

@@ -10,7 +10,7 @@ import { useToastStore } from '../../stores/toastStore';
 import { DEFAULT_SETTINGS, useSettingsStore } from '../../stores/settingsStore';
 import { resetVaultStore, useVaultStore } from '../../stores/vaultStore';
 import { fakeDisk } from '../../test/fakeDisk';
-import { PageView } from './PageView';
+import { PageScreen } from '../../test/pageScreen';
 
 const open = (path: string) => act(() => usePageStore.getState().load(path));
 const title = () => screen.getByRole('textbox', { name: 'Page title' });
@@ -32,7 +32,7 @@ afterEach(async () => {
 describe('editable title (M2b §2)', () => {
   it('shows the file name and renames the file on Enter; the page follows', async () => {
     const disk = fakeDisk({ 'Notes/Old.md': '# Heading\n\nbody\n' });
-    render(<PageView />);
+    render(<PageScreen />);
     await open('Notes/Old.md');
     expect(screen.getByRole('heading', { level: 1 })).toContainElement(title());
     expect(title()).toHaveValue('Old');
@@ -48,7 +48,7 @@ describe('editable title (M2b §2)', () => {
 
   it('final review I3: focus stays on the title after renaming with Enter (NFR-10)', async () => {
     fakeDisk({ 'A.md': 'x\n' });
-    render(<PageView />);
+    render(<PageScreen />);
     await open('A.md');
     await userEvent.clear(title());
     await userEvent.type(title(), 'B{Enter}');
@@ -63,7 +63,7 @@ describe('editable title (M2b §2)', () => {
 
   it('Escape puts the name back; blur renames; an unchanged name does nothing', async () => {
     const disk = fakeDisk({ 'A.md': 'x\n' });
-    render(<PageView />);
+    render(<PageScreen />);
     await open('A.md');
     await userEvent.clear(title());
     await userEvent.type(title(), 'Z{Escape}');
@@ -78,7 +78,7 @@ describe('editable title (M2b §2)', () => {
 
   it('final review m6: a blur because the window lost focus keeps the edit uncommitted', async () => {
     const disk = fakeDisk({ 'A.md': 'x\n' });
-    render(<PageView />);
+    render(<PageScreen />);
     await open('A.md');
     await userEvent.type(title(), 'B');
     const hasFocus = vi.spyOn(document, 'hasFocus').mockReturnValue(false);
@@ -98,7 +98,7 @@ describe('editable title (M2b §2)', () => {
 
   it('names that cannot be files, or that are taken, are explained under the title', async () => {
     const disk = fakeDisk({ 'Notes/A.md': 'x\n', 'Notes/B.md': 'y\n' });
-    render(<PageView />);
+    render(<PageScreen />);
     await open('Notes/A.md');
     await userEvent.clear(title());
     await userEvent.type(title(), 'a/b{Enter}');
@@ -121,7 +121,7 @@ describe('editable title (M2b §2)', () => {
     const disk = fakeDisk({ 'Notes/a.md': 'x\n', 'Notes/B.md': 'y\n' });
     await act(() => useVaultStore.getState().refreshTree());
     expect(useVaultStore.getState().nodes.map((n) => n.path)).toContain('Notes/B.md');
-    render(<PageView />);
+    render(<PageScreen />);
     await open('Notes/a.md');
     await userEvent.clear(title());
     await userEvent.type(title(), 'b{Enter}');
@@ -139,7 +139,7 @@ describe('editable title (M2b §2)', () => {
 
   it('pending text is saved before the rename', async () => {
     const disk = fakeDisk({ 'A.md': 'one\n' });
-    render(<PageView />);
+    render(<PageScreen />);
     await open('A.md');
     act(() => {
       const v = EditorView.findFromDOM(document.querySelector<HTMLElement>('.cm-editor')!)!;
@@ -161,7 +161,7 @@ describe('editable title (M2b §2)', () => {
       { 'A.md': 'x\n' },
       { entry_rename: () => Promise.reject({ kind: 'io', message: 'disk is read-only' }) },
     );
-    render(<PageView />);
+    render(<PageScreen />);
     await open('A.md');
     await userEvent.clear(title());
     await userEvent.type(title(), 'B{Enter}');
@@ -180,7 +180,7 @@ describe('editable title (M2b §2)', () => {
             : Promise.reject({ kind: 'alreadyExists', message: String(a.to) }),
       },
     );
-    render(<PageView />);
+    render(<PageScreen />);
     await open('A.md');
     await userEvent.clear(title());
     await userEvent.type(title(), 'B{Enter}'); // taken, though the tree didn't know
@@ -196,7 +196,7 @@ describe('editable title (M2b §2)', () => {
   it('M3a §5: a title focus request (New entry) focuses and selects the name once', async () => {
     fakeDisk({ 'Notes/Untitled.md': '' });
     act(() => usePageStore.getState().requestTitleFocus('Notes/Untitled.md'));
-    render(<PageView />);
+    render(<PageScreen />);
     await open('Notes/Untitled.md');
     await waitFor(() => expect(document.activeElement).toBe(title()));
     const input = title() as HTMLInputElement;
@@ -206,7 +206,7 @@ describe('editable title (M2b §2)', () => {
 
   it('has no axe violations', async () => {
     fakeDisk({ 'A.md': 'x\n' });
-    render(<PageView />);
+    render(<PageScreen />);
     await open('A.md');
     const header = screen.getByRole('banner');
     const violations = await axe
