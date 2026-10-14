@@ -154,6 +154,40 @@ describe('Global View store (M3a §5)', () => {
     expect(paths()).toEqual(['A/Sub', 'A/a.md', 'A/b.md']);
   });
 
+  it('a level read failing for another reason keeps the breadcrumb and says why (final review m12)', async () => {
+    useToastStore.getState().clear();
+    await useGvStore.getState().load();
+    await useGvStore.getState().open(card('A', 'project'));
+    await useGvStore.getState().open(card('A/Sub', 'folder'));
+    mockIPC((cmd, raw) => {
+      const args = (raw ?? {}) as Record<string, unknown>;
+      const key = levelKey(args.level as GvLevelRef);
+      if (cmd === 'gv_children' && key !== '' && key !== 'A') {
+        throw { kind: 'io', message: 'busy' };
+      }
+      if (cmd === 'gv_children') return levels[key];
+      if (cmd === 'gv_edges') return [];
+      if (cmd === 'layout_get') return {};
+      return null;
+    });
+    await useGvStore.getState().load(); // a refresh
+    expect(useGvStore.getState().stack).toEqual([
+      { kind: 'vault' },
+      { kind: 'folder', path: 'A' },
+      { kind: 'folder', path: 'A/Sub' },
+    ]);
+    expect(paths()).toEqual(['A/Sub/deep.md']);
+    expect(useToastStore.getState().toasts.map((t) => [t.tone, t.message])).toEqual([
+      ['error', 'Something went wrong: busy'],
+    ]);
+    // A drill-in that can't be read leaves the breadcrumb on the level shown.
+    await useGvStore.getState().back(1);
+    await useGvStore.getState().open(card('A/b.md'));
+    expect(useGvStore.getState().stack).toEqual([{ kind: 'vault' }, { kind: 'folder', path: 'A' }]);
+    expect(useGvStore.getState().shownKey).toBe('A');
+    useToastStore.getState().clear();
+  });
+
   it('GV-31: dragged positions are saved per canvas (debounced, only cards on it); reset clears them', async () => {
     vi.useFakeTimers();
     const gv = useGvStore.getState();

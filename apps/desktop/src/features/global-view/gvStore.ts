@@ -8,6 +8,7 @@ import {
   layoutGet,
   layoutSet,
   type CardPosition,
+  type CommandError,
   type GlobalViewMode,
   type GvCard,
   type GvEdge,
@@ -94,8 +95,8 @@ interface GvState {
   /** The card with keyboard focus (roving tabindex). */
   focus: string | null;
   loaded: boolean;
-  /** Reads what the canvas shows: levels (falling back from deleted ones),
-   *  edges and pinned positions. */
+  /** Reads what the canvas shows: levels (falling back from deleted ones;
+   *  any other failure keeps what is shown), edges and pinned positions. */
   load: () => Promise<void>;
   /** A single click: the next level (Drill-down; none for a page level's
    *  own page) or expand / collapse. */
@@ -143,6 +144,9 @@ function reportSave(res: IpcResult<void>) {
   }
 }
 
+/** The drill stack and expansions of the canvas shown. */
+let shownAt: { stack: GvLevelRef[]; expanded: GvLevelRef[] } | null = null;
+
 /** Sends the waiting drag now. */
 function flushPins() {
   if (pinTimer) clearTimeout(pinTimer);
@@ -178,6 +182,19 @@ export const useGvStore = create<GvState>((set, get) => {
     return out;
   }
 
+  /** A level read failing for another reason than being gone (a busy or
+   *  closing session): the breadcrumb stays on the level the canvas shows,
+   *  and the error is told (final review m12). */
+  function unreadable(error: CommandError) {
+    if (shownAt && get().stack !== shownAt.stack) {
+      set({ stack: shownAt.stack, expanded: shownAt.expanded });
+    }
+    // No vault: it is closing, and the view starts over with the next one.
+    if (error.kind !== 'noVault') {
+      useToastStore.getState().push({ message: errorMessage(error), tone: 'error' });
+    }
+  }
+
   return {
     stack: [{ kind: 'vault' }],
     expanded: [],
@@ -204,12 +221,15 @@ export const useGvStore = create<GvState>((set, get) => {
           levels[levelKey(root)] = res.value;
           break;
         }
+        if (res.error.kind !== 'notFound' || root.kind === 'vault') return unreadable(res.error);
         stack = stack.length > 1 ? stack.slice(0, -1) : [{ kind: 'vault' }];
         expanded = [];
-        if (root.kind === 'vault') return; // no vault open
       }
       const results = await Promise.all(expanded.map((ref) => gvChildren(ref)));
       if (mine !== seq) return;
+      for (const res of results) {
+        if (!res.ok && res.error.kind !== 'notFound') return unreadable(res.error);
+      }
       expanded = expanded.filter((ref, i) => {
         const res = results[i];
         if (res.ok) levels[levelKey(ref)] = res.value;
@@ -225,6 +245,7 @@ export const useGvStore = create<GvState>((set, get) => {
       const shown = new Set(canvas.cards.map((c) => c.path));
       const focus = get().focus;
       const key = canvasKey(m, root);
+      shownAt = { stack, expanded };
       set({
         stack,
         expanded,
@@ -323,6 +344,7 @@ export const useGvStore = create<GvState>((set, get) => {
       pending = null;
       inFlight.clear();
       saveFailed = false;
+      shownAt = null;
       set({
         stack: [{ kind: 'vault' }],
         expanded: [],
