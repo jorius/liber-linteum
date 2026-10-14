@@ -145,6 +145,9 @@ describe('drop (M2c §5.2)', () => {
     await act(() => useEditorStore.setState({ doc, path: 'P.md' }));
     vi.spyOn(document, 'elementFromPoint').mockReturnValue(viewOf().contentDOM);
     vi.spyOn(viewOf(), 'posAtCoords').mockReturnValue(4); // start of "two"
+    await act(() =>
+      emit('tauri://drag-enter', payload(20, 30, ['/u/a.png', '/u/b.zip', '/u/dir'])),
+    );
     await act(() => emit('tauri://drag-over', payload(20, 30)));
     expect(viewOf().contentDOM.querySelector('.cm-nimw-drop-caret')).not.toBeNull();
     await act(() => emit('tauri://drag-drop', payload(20, 30, ['/u/a.png', '/u/b.zip', '/u/dir'])));
@@ -243,6 +246,52 @@ describe('drop (M2c §5.2)', () => {
       expect(at).toHaveBeenLastCalledWith(20, 30);
       expect(pos).toHaveBeenLastCalledWith({ x: 20, y: 30 });
     });
+  });
+
+  it('text drags (no files) are ignored: no caret, toast or copy (final review minor 3)', async () => {
+    // wry routes every drag through the native handler; a text drag has no paths.
+    mockWindows('main');
+    const disk = fakeDisk({ 'P.md': 'x\n' });
+    const stop = await installFileDrop();
+    await mount('P.md');
+    const copying: number[] = [];
+    const unsubscribe = useEditorStore.subscribe((s) => copying.push(s.copying));
+    const at = vi.spyOn(document, 'elementFromPoint').mockReturnValue(viewOf().contentDOM);
+    vi.spyOn(viewOf(), 'posAtCoords').mockReturnValue(1);
+    await act(() => emit('tauri://drag-enter', payload(1, 1, [])));
+    await act(() => emit('tauri://drag-over', payload(1, 1)));
+    expect(viewOf().contentDOM.querySelector('.cm-nimw-drop-caret')).toBeNull();
+    await act(() => emit('tauri://drag-drop', payload(1, 1, [])));
+    // …and dropped outside the text.
+    at.mockReturnValue(document.body);
+    await act(() => emit('tauri://drag-enter', payload(1, 1, [])));
+    await act(() => emit('tauri://drag-over', payload(1, 1)));
+    await act(() => emit('tauri://drag-drop', payload(1, 1, [])));
+    await act(() => emit('tauri://drag-leave', null));
+    await act(() => new Promise((r) => setTimeout(r, 0)));
+    unsubscribe();
+    expect(useToastStore.getState().toasts).toEqual([]);
+    expect(disk.calls.some(([c]) => c === 'attachment_import')).toBe(false);
+    expect(copying.filter((n) => n > 0)).toEqual([]);
+    expect(viewOf().state.doc.toString()).toBe('x\n');
+    await stop();
+  });
+
+  it('a file drag after a text drag shows the caret again', async () => {
+    mockWindows('main');
+    fakeDisk({ 'P.md': 'x\n' });
+    const stop = await installFileDrop();
+    await mount('P.md');
+    vi.spyOn(document, 'elementFromPoint').mockReturnValue(viewOf().contentDOM);
+    vi.spyOn(viewOf(), 'posAtCoords').mockReturnValue(1);
+    await act(() => emit('tauri://drag-enter', payload(1, 1, [])));
+    await act(() => emit('tauri://drag-leave', null));
+    await act(() => emit('tauri://drag-enter', payload(1, 1, ['/u/a.png'])));
+    await act(() => emit('tauri://drag-over', payload(1, 1)));
+    expect(viewOf().contentDOM.querySelector('.cm-nimw-drop-caret')).not.toBeNull();
+    await act(() => emit('tauri://drag-leave', null));
+    expect(viewOf().contentDOM.querySelector('.cm-nimw-drop-caret')).toBeNull();
+    await stop();
   });
 
   it('a drop outside the text explains where to drop', async () => {

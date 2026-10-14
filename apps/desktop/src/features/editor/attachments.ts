@@ -209,8 +209,17 @@ function moveCaret(next: { view: EditorView; pos: number } | null) {
   next?.view.dispatch({ effects: setDropAt.of(next.pos) });
 }
 
+/** The files of the drag in progress, from its `enter` (`over` carries none).
+ *  wry routes every drag through the native handler, so dragging text gives
+ *  an empty list: such drags are left alone (final review minor 3). */
+let dragPaths: string[] = [];
+
 function onDrag(e: DragDropPayload) {
+  if (e.type === 'enter') dragPaths = e.paths ?? [];
+  const paths = e.type === 'drop' ? (e.paths ?? dragPaths) : dragPaths;
+  if (e.type === 'drop' || e.type === 'leave') dragPaths = [];
   if (e.type === 'leave') return moveCaret(null);
+  if (!paths.length) return moveCaret(null);
   const hit = target(e);
   if (e.type !== 'drop') return moveCaret(hit);
   caretView = null;
@@ -219,7 +228,7 @@ function onDrag(e: DragDropPayload) {
     return;
   }
   hit.view.dispatch({ effects: setDropAt.of(hit.pos) });
-  void dropFiles(hit.view, e.paths ?? []);
+  void dropFiles(hit.view, paths);
 }
 
 /** Listens to native file drags for the whole window; returns the unsubscribe. */
