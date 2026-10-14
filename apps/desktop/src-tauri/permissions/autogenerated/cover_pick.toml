@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-cover-pick"
+description = "Enables the cover_pick command without any pre-configured scope."
+commands.allow = ["cover_pick"]
+
+[[permission]]
+identifier = "deny-cover-pick"
+description = "Denies the cover_pick command without any pre-configured scope."
+commands.deny = ["cover_pick"]

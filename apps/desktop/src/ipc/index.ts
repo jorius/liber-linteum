@@ -103,6 +103,8 @@ export interface Page {
   title: string;
   subtitle: string | null;
   cover: string | null;
+  /** Frontmatter `cover-y` (0–100), `null` when absent (M2c §4). */
+  coverY: number | null;
   tags: string[];
   links: number;
   backlinks: number;
@@ -221,6 +223,49 @@ export interface WarningPayload {
   message: string;
 }
 
+/** A file saved into (or found in) the vault for a page (M2c §7.3). */
+export interface Attached {
+  path: string;
+  /** Wiki-style target that resolves from the page back to `path`. */
+  link: string;
+  /** `false` when the dropped file already lived in the vault. */
+  copied: boolean;
+}
+
+/** One dropped path's outcome. */
+export interface ImportResult {
+  source: string;
+  ok?: Attached;
+  err?: CommandError;
+}
+
+/** The cover image Rust imported and its frontmatter `cover:` value. */
+export interface CoverPick {
+  path: string;
+  reference: string;
+}
+
+/** One `[[` suggestion (M2c §7.2). */
+export interface LinkSuggestion {
+  path: string;
+  kind: 'page' | 'attachment';
+  title: string | null;
+  /** What to write between `[[` and `]]`. */
+  target: string;
+}
+
+export type AttachmentMode = 'vault' | 'same' | 'subfolder' | 'folder';
+
+export interface VaultSettings {
+  attachments: { mode: AttachmentMode; path: string };
+  /** Obsidian's `attachmentFolderPath` when set (it wins). */
+  obsidian: string | null;
+}
+
+export interface VaultSettingsPatch {
+  attachments?: { mode: AttachmentMode; path: string };
+}
+
 // ---- commands ----
 
 const call = <T>(cmd: string, args?: Record<string, unknown>) =>
@@ -255,6 +300,26 @@ export const fileOpenExternal = (path: string) => call<void>('file_open_external
 
 /** Font families installed on this computer (M2b §5). */
 export const fontsList = () => call<string[]>('fonts_list');
+/** Saves pasted image bytes (raw body; page and name travel in headers). */
+export const attachmentPaste = (page: string, name: string, bytes: Uint8Array) =>
+  ipcCall(() =>
+    invoke<Attached>('attachment_paste', bytes, {
+      headers: {
+        'x-nimw-page': encodeURIComponent(page),
+        'x-nimw-name': encodeURIComponent(name),
+      },
+    }),
+  );
+/** Imports files from the latest native drop (other paths are refused). */
+export const attachmentImport = (page: string, paths: string[]) =>
+  call<ImportResult[]>('attachment_import', { page, paths });
+/** Opens the native image dialog (Rust side); `null` when cancelled. */
+export const coverPick = (page: string) => call<CoverPick | null>('cover_pick', { page });
+export const linkSuggest = (source: string, query: string, embed: boolean) =>
+  call<LinkSuggestion[]>('link_suggest', { source, query, embed });
+export const vaultSettingsGet = () => call<VaultSettings>('vault_settings_get');
+export const vaultSettingsSet = (patch: VaultSettingsPatch) =>
+  call<VaultSettings>('vault_settings_set', { patch });
 
 /** URL of a vault file for <img>/<audio> through the `nimw-asset:` protocol
  *  (M2a §2.5); WebView2 on Windows reaches custom protocols over http. */

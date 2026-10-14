@@ -50,6 +50,9 @@ pub struct PageDto {
     pub title: String,
     pub subtitle: Option<String>,
     pub cover: Option<String>,
+    /// Frontmatter `cover-y` (0–100), M2c §4.
+    #[serde(rename = "coverY")]
+    pub cover_y: Option<u8>,
     pub tags: Vec<String>,
     pub links: usize,
     pub backlinks: usize,
@@ -95,4 +98,69 @@ pub struct ChangedPayload {
 #[derive(Debug, Clone, Serialize)]
 pub struct WarningPayload {
     pub message: String,
+}
+
+/// A file saved into (or found in) the vault for a page (M2c §7.3).
+#[derive(Debug, Clone, Serialize)]
+pub struct AttachedDto {
+    pub path: String,
+    pub link: String,
+    pub copied: bool,
+}
+
+impl From<nimw_session::Attached> for AttachedDto {
+    fn from(a: nimw_session::Attached) -> AttachedDto {
+        AttachedDto {
+            path: a.path.to_string(),
+            link: a.link,
+            copied: a.copied,
+        }
+    }
+}
+
+/// One dropped path's outcome: `ok` or `err`.
+#[derive(Debug, Clone, Serialize)]
+pub struct ImportResultDto {
+    pub source: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub ok: Option<AttachedDto>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub err: Option<crate::error::CommandError>,
+}
+
+/// `cover_pick`: the imported image and its frontmatter `cover:` value.
+#[derive(Debug, Clone, Serialize)]
+pub struct CoverDto {
+    pub path: String,
+    pub reference: String,
+}
+
+/// One `[[` suggestion (M2c §7.2).
+#[derive(Debug, Clone, Serialize)]
+pub struct LinkSuggestionDto {
+    pub path: String,
+    /// `"page" | "attachment"`.
+    pub kind: &'static str,
+    pub title: Option<String>,
+    pub target: String,
+}
+
+/// `.nimw/vault.json` attachments: `vault` | `same` | `subfolder` | `folder`.
+#[derive(Debug, Clone, Serialize, serde::Deserialize, PartialEq, Eq)]
+pub struct AttachmentsDto {
+    pub mode: String,
+    #[serde(default)]
+    pub path: String,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct VaultSettingsDto {
+    pub attachments: AttachmentsDto,
+    /// Obsidian's `attachmentFolderPath` when set (it wins).
+    pub obsidian: Option<String>,
+}
+
+#[derive(Debug, Clone, serde::Deserialize)]
+pub struct VaultSettingsPatch {
+    pub attachments: Option<AttachmentsDto>,
 }

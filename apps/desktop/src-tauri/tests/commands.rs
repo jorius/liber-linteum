@@ -7,7 +7,7 @@ use serde_json::{Value, json};
 use std::sync::{Arc, Mutex};
 use tauri::test::MockRuntime;
 use tauri::{
-    App, Listener, WebviewWindow, WebviewWindowBuilder,
+    App, Listener, Manager, WebviewWindow, WebviewWindowBuilder,
     ipc::{CallbackFn, InvokeBody},
     test::{INVOKE_KEY, get_ipc_response, mock_builder},
     webview::InvokeRequest,
@@ -36,6 +36,12 @@ const COMMANDS: &[&str] = &[
     "url_open",
     "file_open_external",
     "fonts_list",
+    "vault_settings_get",
+    "vault_settings_set",
+    "attachment_paste",
+    "attachment_import",
+    "cover_pick",
+    "link_suggest",
 ];
 
 struct Harness {
@@ -388,6 +394,7 @@ fn nfr_ui_thread_never_runs_disk_or_index_commands() {
         include_str!("../src/settings_commands.rs"),
         include_str!("../src/editor_commands.rs"),
         include_str!("../src/fonts.rs"),
+        include_str!("../src/attachment_commands.rs"),
     ];
     let mut offenders = Vec::new();
     for src in sources {
@@ -672,4 +679,235 @@ fn m2b_fonts_list_returns_installed_families() {
     assert_eq!(families, sorted, "sorted case-insensitively, no duplicates");
     // Cached: a second call returns the same list.
     assert_eq!(call(&h.main, "fonts_list", json!({})).unwrap(), list);
+}
+
+/// A raw-body request (`invoke(cmd, Uint8Array, { headers })` in the UI).
+fn raw_request(cmd: &str, body: Vec<u8>, headers: &[(&'static str, &str)]) -> InvokeRequest {
+    let mut req = request(cmd, json!({}));
+    req.body = InvokeBody::Raw(body);
+    for (name, value) in headers {
+        req.headers
+            .insert(*name, tauri::http::HeaderValue::from_str(value).unwrap());
+    }
+    req
+}
+
+fn open_fixture(h: &Harness, name: &str) -> tempfile::TempDir {
+    let vault = copy_fixture(name);
+    call(&h.main, "vault_open", json!({ "path": vault.path() })).unwrap();
+    vault
+}
+
+/// M2c §7.5: NIMW's attachment setting over IPC; Obsidian's wins and blocks it.
+#[test]
+fn m2c_vault_settings_round_trip_over_ipc() {
+    let h = harness();
+    let vault = tempfile::tempdir().unwrap();
+    call(&h.main, "vault_open", json!({ "path": vault.path() })).unwrap();
+    let got = call(&h.main, "vault_settings_get", json!({})).unwrap();
+    assert_eq!(
+        got,
+        json!({ "attachments": { "mode": "subfolder", "path": "attachments" }, "obsidian": null })
+    );
+    let saved = call(
+        &h.main,
+        "vault_settings_set",
+        json!({ "patch": { "attachments": { "mode": "folder", "path": "Media" } } }),
+    )
+    .unwrap();
+    assert_eq!(
+        saved["attachments"],
+        json!({ "mode": "folder", "path": "Media" })
+    );
+    assert!(vault.path().join(".nimw/vault.json").is_file());
+    let err = call(
+        &h.main,
+        "vault_settings_set",
+        json!({ "patch": { "attachments": { "mode": "subfolder", "path": "a/b" } } }),
+    )
+    .unwrap_err();
+    assert_eq!(kind(err), "invalidName");
+
+    let h = harness();
+    let _obsidian = open_fixture(&h, "obsidian-basic");
+    assert_eq!(
+        call(&h.main, "vault_settings_get", json!({})).unwrap()["obsidian"],
+        "./assets"
+    );
+    let err = call(
+        &h.main,
+        "vault_settings_set",
+        json!({ "patch": { "attachments": { "mode": "same" } } }),
+    )
+    .unwrap_err();
+    assert_eq!(kind(err), "notPermitted");
+}
+
+/// M2c §5.1 / §7.3: a pasted image arrives as a raw body with percent-encoded
+/// headers; it is saved, indexed and linked. Wrong types and JSON are refused.
+#[test]
+fn m2c_attachment_paste_takes_a_raw_body() {
+    let h = harness();
+    let vault = open_fixture(&h, "obsidian-basic");
+    let page = "Character%20Design/rex-draft.md";
+    let name = "Pasted%20image%2020261014101500.png";
+    let res = get_ipc_response(
+        &h.main,
+        raw_request(
+            "attachment_paste",
+            b"\x89PNG".to_vec(),
+            &[("x-nimw-page", page), ("x-nimw-name", name)],
+        ),
+    )
+    .map(|r| r.deserialize::<Value>().unwrap())
+    .unwrap();
+    assert_eq!(
+        res,
+        json!({
+            "path": "Character Design/assets/Pasted image 20261014101500.png",
+            "link": "Pasted image 20261014101500.png",
+            "copied": true
+        })
+    );
+    assert_eq!(
+        std::fs::read(
+            vault
+                .path()
+                .join("Character Design/assets/Pasted image 20261014101500.png")
+        )
+        .unwrap(),
+        b"\x89PNG"
+    );
+    let refuse = |body: Vec<u8>, name: &str| {
+        kind(
+            get_ipc_response(
+                &h.main,
+                raw_request(
+                    "attachment_paste",
+                    body,
+                    &[("x-nimw-page", page), ("x-nimw-name", name)],
+                ),
+            )
+            .map(|r| r.deserialize::<Value>().unwrap())
+            .unwrap_err(),
+        )
+    };
+    assert_eq!(refuse(b"<svg/>".to_vec(), "x.svg"), "invalidName");
+    assert_eq!(refuse(Vec::new(), "x.png"), "invalidName");
+    assert_eq!(
+        refuse(
+            vec![0u8; nimw_desktop::attachment_commands::MAX_PASTE_BYTES + 1],
+            "x.png"
+        ),
+        "tooLarge"
+    );
+    let err = call(&h.main, "attachment_paste", json!({ "page": "x.md" })).unwrap_err();
+    assert_eq!(kind(err), "invalidName");
+}
+
+/// M2c §8: only paths seen in a native drop are imported, once each.
+#[test]
+fn m2c_attachment_import_requires_a_native_drop_grant() {
+    let h = harness();
+    let vault = open_fixture(&h, "obsidian-basic");
+    let outside = tempfile::tempdir().unwrap();
+    let dropped = outside.path().join("brief.pdf");
+    let secret = outside.path().join("id_ed25519");
+    std::fs::write(&dropped, b"%PDF").unwrap();
+    std::fs::write(&secret, b"key").unwrap();
+    let window = h.main.as_ref().window();
+    nimw_desktop::drops::on_window_event(
+        &window,
+        &tauri::WindowEvent::DragDrop(tauri::DragDropEvent::Drop {
+            paths: vec![dropped.clone(), outside.path().to_path_buf()],
+            position: tauri::PhysicalPosition::new(10.0, 10.0),
+        }),
+    );
+    let page = "Character Design/rex-draft.md";
+    let results = call(
+        &h.main,
+        "attachment_import",
+        json!({ "page": page, "paths": [dropped, secret, outside.path()] }),
+    )
+    .unwrap();
+    assert_eq!(
+        results[0],
+        json!({ "source": dropped, "ok": { "path": "Character Design/assets/brief.pdf", "link": "brief.pdf", "copied": true } })
+    );
+    assert_eq!(results[1]["err"]["kind"], "notPermitted");
+    assert_eq!(results[2]["err"]["kind"], "notAFile");
+    assert!(
+        !vault
+            .path()
+            .join("Character Design/assets/id_ed25519")
+            .exists()
+    );
+    // A grant is used once.
+    let again = call(
+        &h.main,
+        "attachment_import",
+        json!({ "page": page, "paths": [dropped] }),
+    )
+    .unwrap();
+    assert_eq!(again[0]["err"]["kind"], "notPermitted");
+}
+
+/// M2c §7.4: Rust picks the cover file (a fake picker in tests), imports it
+/// and returns the frontmatter reference; cancelling returns null.
+#[test]
+fn m2c_cover_pick_imports_the_picked_image() {
+    let h = harness();
+    let _vault = open_fixture(&h, "obsidian-basic");
+    let outside = tempfile::tempdir().unwrap();
+    let image = outside.path().join("sky.png");
+    std::fs::write(&image, b"\x89PNG").unwrap();
+    let state = h.app.state::<nimw_desktop::state::AppState>();
+    let picked = image.clone();
+    state.set_cover_picker(Some(Arc::new(move || Some(picked.clone()))));
+    let cover = call(
+        &h.main,
+        "cover_pick",
+        json!({ "page": "Character Design/rex-draft.md" }),
+    )
+    .unwrap();
+    assert_eq!(
+        cover,
+        json!({ "path": "Character Design/assets/sky.png", "reference": "assets/sky.png" })
+    );
+    state.set_cover_picker(Some(Arc::new(|| None)));
+    assert_eq!(
+        call(&h.main, "cover_pick", json!({ "page": "Welcome.md" })).unwrap(),
+        Value::Null
+    );
+}
+
+/// M2c §7.2 + PG-05 over IPC; `page_get` carries `coverY`.
+#[test]
+fn m2c_link_suggest_and_cover_y_over_ipc() {
+    let h = harness();
+    let _vault = open_fixture(&h, "obsidian-basic");
+    let found = call(
+        &h.main,
+        "link_suggest",
+        json!({ "source": "Welcome.md", "query": "gen", "embed": false }),
+    )
+    .unwrap();
+    assert_eq!(
+        found[0],
+        json!({
+            "path": "Character Design/rex-draft.md",
+            "kind": "page",
+            "title": "Generator Rex",
+            "target": "rex-draft"
+        })
+    );
+    let page = call(
+        &h.main,
+        "page_get",
+        json!({ "path": "Character Design/rex-draft.md" }),
+    )
+    .unwrap();
+    assert_eq!(page["coverY"], 40);
+    let welcome = call(&h.main, "page_get", json!({ "path": "Welcome.md" })).unwrap();
+    assert_eq!(welcome["coverY"], Value::Null);
 }

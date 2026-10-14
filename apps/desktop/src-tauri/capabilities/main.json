@@ -1,7 +1,7 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "main",
-  "description": "Main window. Only explicitly listed commands are callable; each milestone adds its own. The dialog plugin is limited to the folder picker; the event plugin only to listen/unlisten (the UI subscribes to vault:* events); the window plugin only to destroy (the UI closes the window itself after saving unsaved pages).",
+  "description": "Main window. Only explicitly listed commands are callable; each milestone adds its own. The dialog plugin is limited to the folder picker (cover images are picked by a dialog Rust opens itself, M2c §8); the event plugin only to listen/unlisten (the UI subscribes to vault:* events); the window plugin only to destroy (the UI closes the window itself after saving unsaved pages).",
   "windows": ["main"],
   "permissions": [
     "allow-app-info",
@@ -26,6 +26,12 @@
     "allow-url-open",
     "allow-file-open-external",
     "allow-fonts-list",
+    "allow-vault-settings-get",
+    "allow-vault-settings-set",
+    "allow-attachment-paste",
+    "allow-attachment-import",
+    "allow-cover-pick",
+    "allow-link-suggest",
     "core:event:allow-listen",
     "core:event:allow-unlisten",
     "core:window:allow-destroy",
