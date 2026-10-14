@@ -9,3 +9,6 @@ docs
 apps/desktop/src-tauri/gen
 apps/desktop/src-tauri/icons
 apps/desktop/src/theme/palettes.css
+
+# Local Claude Code settings and agent worktrees (not project files)
+.claude/
