@@ -142,6 +142,28 @@ describe('incremental re-parse (M2a §7: typing in a 5,000-line note)', () => {
     30_000,
   ); // two full parses + a deep compare of a 5,000-line tree
 
+  it('typing below a `---` rule equals the full parse: the slice starting at the rule is no front matter (final review C2)', () => {
+    const text = 'Intro\n\n---\n\nPara\n\n- a\n- b\n\n> q\n\nEnd\n';
+    const typed = text.replace('Para', 'ParaX');
+    const page = reparse(parsePage(text), text, typed);
+    expect(page.tree.children.map((n) => n.type)).toEqual([
+      'paragraph',
+      'thematicBreak',
+      'paragraph',
+      'list',
+      'blockquote',
+      'paragraph',
+    ]);
+    expect(page).toEqual(parsePage(typed));
+    // A rule further down closing the slice: still no front matter, and
+    // still a local re-parse (the blocks before the slice are reused).
+    const two = 'Intro\n\nP0\n\n---\n\nPara\n\n---\n\nEnd\n';
+    const prev = parsePage(two);
+    const next = reparse(prev, two, two.replace('Para', 'ParaX'));
+    expect(next).toEqual(parsePage(two.replace('Para', 'ParaX')));
+    expect(next.tree.children[0]).toBe(prev.tree.children[0]);
+  });
+
   it('returns the previous model for identical text', () => {
     const page = parsePage('# A\n');
     expect(reparse(page, '# A\n', '# A\n')).toBe(page);

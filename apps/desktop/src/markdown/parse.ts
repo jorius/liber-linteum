@@ -18,6 +18,8 @@ const processor = unified()
   .use(remarkGfm)
   .use(remarkFrontmatter, ['yaml'])
   .use(remarkContainerDirectives);
+/** For text that can't hold front matter: a slice of a page past its start. */
+const noFrontmatter = unified().use(remarkParse).use(remarkGfm).use(remarkContainerDirectives);
 
 /** Parents whose text is never scanned for extensions. */
 const OPAQUE = new Set(['link', 'linkReference', 'image', 'imageReference']);
@@ -130,9 +132,11 @@ function collectTags(tree: Root, fmTags: string[]): string[] {
   return out;
 }
 
-/** remark + our block and inline transforms, without comment masking. */
-export function parseTree(src: string, loc = locator(src)): Root {
-  const tree = processor.parse(src) as Root;
+/** remark + our block and inline transforms, without comment masking.
+ *  `frontmatter: false` for a slice that doesn't start the page: a `---`
+ *  first there is a rule (final review C2). */
+export function parseTree(src: string, loc = locator(src), frontmatter = true): Root {
+  const tree = (frontmatter ? processor : noFrontmatter).parse(src) as Root;
   transformBlocks(tree, src, loc);
   transformInline(tree, src, loc);
   return tree;

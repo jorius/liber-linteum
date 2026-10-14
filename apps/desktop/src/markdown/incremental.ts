@@ -124,7 +124,9 @@ export function reparse(prev: ParsedPage, prevText: string, text: string): Parse
   ) {
     return parsePage(text);
   }
-  const part = parseTree(slice).children;
+  // A slice past the page's start can't hold front matter: a `---` first
+  // in it is a rule (final review C2).
+  const part = parseTree(slice, undefined, sliceStart === 0).children;
   const before = blocks.slice(0, first);
   const after = blocks.slice(last + 1);
   // Lists separated only by blank lines merge: let the full parse decide.
