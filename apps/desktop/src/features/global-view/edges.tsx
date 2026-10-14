@@ -118,8 +118,15 @@ const EdgeLabel = memo(function EdgeLabel({
   title,
 }: EndsProps & { text: string; title: string | null }) {
   const { s, t } = line(from, to);
+  // The layer ignores the pointer; a label with a title takes it, so the
+  // tooltip shows, and is `nopan`, so pressing on it doesn't pan.
   return (
-    <text x={(s.x + t.x) / 2} y={(s.y + t.y) / 2} data-gv-count="">
+    <text
+      x={(s.x + t.x) / 2}
+      y={(s.y + t.y) / 2}
+      className={title ? `${styles.titled} nopan` : undefined}
+      data-gv-count=""
+    >
       {title && <title>{title}</title>}
       {text}
     </text>

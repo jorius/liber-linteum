@@ -133,6 +133,27 @@ describe('Global View edges (M3a §6, final review I2)', () => {
     expect(counts).not.toContain(3);
   });
 
+  it('a long manual label shows its full text on hover, without panning (final review m4)', async () => {
+    const long = 'inspired by the very long relationship label';
+    level0 = { cards: [card('A'), card('B')], centre: null };
+    edges = [
+      edge('A', 'B', { kind: 'manual', aggregated: false, directed: true, label: long }),
+      edge('A', 'C', { count: 5 }),
+    ];
+    level0.cards.push(card('C'));
+    render(<GlobalView />);
+    await waitFor(() => expect(drawn('[data-gv-count]')).toHaveLength(2));
+    const [manual, count] = drawn('[data-gv-count]');
+    expect(manual!.querySelector('title')).toHaveTextContent(long);
+    expect(manual!.lastChild).toHaveTextContent('inspired by the very lo…');
+    // The layer ignores the pointer; a label with a title must take it (for
+    // the tooltip) and not start a pan.
+    expect(getComputedStyle(manual!).pointerEvents).toBe('all');
+    expect(manual).toHaveClass('nopan');
+    expect(getComputedStyle(count!).pointerEvents).toBe('none');
+    expect(count!.querySelector('title')).toBeNull();
+  });
+
   it('no note while every edge is drawn', async () => {
     level0 = { cards: [card('A'), card('B')], centre: null };
     edges = [edge('A', 'B', { count: 4 })];

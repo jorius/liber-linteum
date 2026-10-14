@@ -190,6 +190,11 @@
   dominant-baseline: central;
 }
 
+.edgeLabels .titled {
+  pointer-events: all;
+  cursor: default;
+}
+
 /* Shown when only the strongest aggregated edges are drawn (edges.tsx). */
 .capNote {
   position: absolute;
