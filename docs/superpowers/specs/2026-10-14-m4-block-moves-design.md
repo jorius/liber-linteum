@@ -166,12 +166,12 @@ These override the sections above where they conflict.
    - **Hover:** it shows only the deepest block under the pointer. A whole list shows its own gutter from its margin (outside its items) and is always reachable by keyboard.
    - **Buttons:** at rest a gutter is just the grip. Its buttons open while it's hovered or holds the keyboard (React state; WebKit before 15.4 and jsdom ignore `:hover` rules for this).
    - **Keyboard:** one tab stop; ↑/↓ go from block to block; Enter picks a block up (the first place after it is preselected); Tab or Escape cancels.
-   - **Anchors:** HTML blocks render inside `div[data-nimw="html"]` carrying their source range, so they have a gutter. Blocks of an embedded note never get one, because their offsets are the other note's.
+   - **Anchors:** the first element an HTML block renders carries the block's source range, so it has a gutter. Nothing is wrapped: a `<details>` opened in one block still holds the Markdown blocks after it, as in M3b (final review I1). A block that renders no element (a comment, a closing tag) has no gutter. Blocks of an embedded note never get one, because their offsets are the other note's.
 6. **The pane after a move:** it renders at once, without the 150 ms typing delay. A gutter key that arrives while the pane still lags the editor does nothing, and a pick-up made on blocks that have since changed is cancelled. The e2e test found this: keys pressed right after a move acted on the old blocks.
 7. **Pointer drag:** the nearest slot is chosen by |dy| + 0.3·|dx| for list slots, so pointing further right picks a deeper level.
 8. **The hint bar:** dismissing it is remembered in `localStorage` (try/catch), not in settings. Losing it shows the hint once more.
 9. **The block model** is cached per editor document and re-parsed incrementally. The first move in a large note opened in Source pays a full parse (~1.5 s in jsdom at 200 KB). Later moves take ~10 ms. Making the top-level slots linear time (they were O(n²)) brought a list item's move from ~110 ms to well under 100 ms.
-10. **Live Preview's "HTML renders nothing" check** (M2c §7.7) looks through the new HTML wrapper.
+10. **Live Preview's "HTML renders nothing" check** (M2c §7.7) is M3b's again: there is no HTML wrapper to look through (final review I1).
 11. **Safari 15:** M4 code avoids `Array.prototype.at`.
 12. **Tests:** the fake disk now resolves a wiki target to a page it holds, so embeds render in jsdom.
 

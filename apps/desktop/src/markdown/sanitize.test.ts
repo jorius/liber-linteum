@@ -1,4 +1,4 @@
-import type { Element, Root } from 'hast';
+import type { Element, Root, RootContent } from 'hast';
 import { describe, expect, it } from 'vitest';
 import { parsePage } from './parse';
 import { PALETTE, toSafeHast, vaultJoin } from './sanitize';
@@ -20,6 +20,18 @@ function elements(tree: Root): Element[] {
 const render = (src: string, sourcePath = 'Notes/page.md') =>
   toSafeHast(parsePage(src), { sourcePath });
 const html = (src: string) => JSON.stringify(render(src));
+
+/** The tree as tags, properties and text, source ranges aside. */
+function shape(n: Root | RootContent): string {
+  if (n.type === 'text') return n.value.replace(/\n/g, '\\n');
+  if (n.type === 'root') return n.children.map(shape).join('');
+  if (n.type !== 'element') return `[${n.type}]`;
+  const props = Object.entries(n.properties)
+    .filter(([k]) => !k.startsWith('dataSource'))
+    .map(([k, v]) => ` ${k}=${JSON.stringify(v)}`)
+    .join('');
+  return `<${n.tagName}${props}>${n.children.map(shape).join('')}</${n.tagName}>`;
+}
 
 describe('sanitizer (M2a §2.4, P4)', () => {
   it('strips scripts, handlers, javascript: URLs, style, iframes and forms', () => {
@@ -139,16 +151,50 @@ describe('extension nodes become marked elements', () => {
     expect(h.properties.id).toBe('title');
   });
 
-  it('M4: an HTML block sits in a wrapper that carries its source range (the drag gutter needs one)', () => {
+  it('M4: an HTML block’s first element carries the block’s source range (the drag gutter’s anchor), with no wrapper', () => {
     const src = 'Before\n\n<div class="x">raw <b>html</b></div>\n\n<!-- note -->\n\nAfter\n';
-    const wrappers = elements(render(src)).filter((e) => e.properties.dataNimw === 'html');
+    const tree = render(src);
+    const ranged = elements(tree).filter((e) => e.properties.dataSourceStart !== undefined);
     expect(
-      wrappers.map((w) =>
-        src.slice(Number(w.properties.dataSourceStart), Number(w.properties.dataSourceEnd)),
-      ),
-    ).toEqual(['<div class="x">raw <b>html</b></div>', '<!-- note -->']);
-    // The HTML itself still renders inside it.
-    expect(JSON.stringify(wrappers[0])).toContain('"tagName":"b"');
+      ranged.map((e) => [
+        e.tagName,
+        src.slice(Number(e.properties.dataSourceStart), Number(e.properties.dataSourceEnd)),
+      ]),
+    ).toEqual([
+      ['p', 'Before'],
+      ['div', '<div class="x">raw <b>html</b></div>'],
+      ['p', 'After'],
+    ]);
+    // The comment renders nothing, so it has no anchor; the tree is M3b's.
+    expect(shape(tree)).toBe('<p>Before</p>\\n<div>raw <b>html</b></div>\\n\\n<p>After</p>');
+  });
+
+  it('final review I1: HTML split across blocks renders as at M3b — <details> holds the Markdown after it', () => {
+    // The expected shapes are c307c86's (M3b) output for the same notes.
+    expect(
+      shape(render('<details>\n<summary>More</summary>\n\nHidden *text*\n\n</details>\n')),
+    ).toBe('<details>\\n<summary>More</summary>\\n<p>Hidden <em>text</em></p>\\n</details>');
+    expect(
+      shape(render('<details open>\n<summary>S</summary>\n\n- a\n- b\n\n</details>\n\nAfter\n')),
+    ).toBe(
+      '<details open=true>\\n<summary>S</summary>\\n<ul>\\n<li>a</li>\\n<li>b</li>\\n</ul>\\n</details>\\n<p>After</p>',
+    );
+    expect(shape(render('<div align="center">\n\n![[img.png]]\n\n</div>\n'))).toBe(
+      '<div>\\n<p><span dataNimw="embed" dataTarget="img.png"></span></p>\\n</div>',
+    );
+    // The opening block's element is the gutter's anchor; the Markdown inside
+    // keeps its own.
+    const src = '<details>\n<summary>More</summary>\n\nHidden\n\n</details>\n';
+    const ranged = elements(render(src)).filter((e) => e.properties.dataSourceStart !== undefined);
+    expect(
+      ranged.map((e) => [
+        e.tagName,
+        src.slice(Number(e.properties.dataSourceStart), Number(e.properties.dataSourceEnd)),
+      ]),
+    ).toEqual([
+      ['details', '<details>\n<summary>More</summary>'],
+      ['p', 'Hidden'],
+    ]);
   });
 
   it('frontmatter is not rendered', () => {

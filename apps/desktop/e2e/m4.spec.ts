@@ -121,6 +121,19 @@ test('keyboard only: ↓ to the next block, Alt+↑ moves it, Enter picks a bloc
   await expect.poll(() => source(page)).toBe('P1\n\nP3\n\nP2');
 });
 
+test('final review I1: a <details> block still folds the Markdown after it, and has a gutter', async ({
+  page,
+}) => {
+  const pane = await open(
+    page,
+    '<details>\n<summary>More</summary>\n\nHidden *text*\n\n</details>\n\nAfter\n',
+  );
+  await expect(pane.locator('details > p')).toHaveText('Hidden text');
+  await expect(pane.getByText('Hidden')).toBeHidden();
+  await pane.locator('summary').hover();
+  await expect(page.getByRole('button', { name: 'Drag to reorder: HTML block' })).toBeVisible();
+});
+
 for (const theme of ['light', 'dark']) {
   test(`axe-clean with a block gutter open (${theme})`, async ({ page }) => {
     const pane = await open(page, '# T\n\nP1\n\n- a\n- b\n', { theme });

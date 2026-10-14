@@ -46,7 +46,7 @@ const TAGS: Record<Unit['kind'], RegExp> = {
   code: /^PRE$/,
   table: /^TABLE$/,
   tableRow: /^TR$/,
-  html: /^DIV$/,
+  html: /./,
   columns: /^DIV$/,
   rule: /^HR$/,
   other: /./,

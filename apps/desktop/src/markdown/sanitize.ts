@@ -317,32 +317,67 @@ function addHeadingIds(tree: Root) {
   walk(tree);
 }
 
-/** HTML blocks (raw at the top level) in a `div` carrying their source
- *  range: the HTML parsed from them has no position, and the block gutter
- *  (M4 §4) needs an element to sit next to. */
-function wrapHtmlBlocks(root: Root) {
-  root.children = root.children.map((c) => {
-    if (c.type !== 'raw' || !c.position) return c;
-    return el(
-      'div',
-      {
-        dataNimw: 'html',
-        dataSourceStart: c.position.start.offset,
-        dataSourceEnd: c.position.end.offset,
-      },
-      [c as unknown as ElementContent],
-    );
-  });
+/** The source ranges of the HTML blocks (raw at the top level), in order. */
+function htmlBlocks(root: Root): [number, number][] {
+  const out: [number, number][] = [];
+  for (const c of root.children) {
+    const at = c.position;
+    if (c.type === 'raw' && at?.start.offset !== undefined && at.end.offset !== undefined) {
+      out.push([at.start.offset, at.end.offset]);
+    }
+  }
+  return out;
 }
+
+/** Gives the first element each HTML block renders its block's source range:
+ *  the block gutter's anchor (M4 §4). The elements are left where the HTML
+ *  put them — a `<details>` opened in one block still holds the Markdown
+ *  blocks after it (final review I1). A block that renders no element (a
+ *  comment, a closing tag) has no anchor. */
+function markHtmlBlocks(root: Root, blocks: [number, number][]) {
+  if (!blocks.length) return;
+  const marked = new Set<number>();
+  /** The block whose range holds `at` (binary search: blocks are sorted). */
+  const blockAt = (at: number) => {
+    let lo = 0;
+    let hi = blocks.length - 1;
+    while (lo <= hi) {
+      const mid = (lo + hi) >> 1;
+      if (blocks[mid][1] <= at) lo = mid + 1;
+      else if (blocks[mid][0] > at) hi = mid - 1;
+      else return mid;
+    }
+    return -1;
+  };
+  const walk = (n: Root | Element) => {
+    for (const c of n.children) {
+      if (c.type !== 'element') continue;
+      const at = c.position?.start.offset;
+      const k = at === undefined || c.properties.dataSourceStart !== undefined ? -1 : blockAt(at);
+      if (k >= 0 && !marked.has(k)) {
+        marked.add(k);
+        c.properties.dataSourceStart = blocks[k][0];
+        c.properties.dataSourceEnd = blocks[k][1];
+      }
+      walk(c);
+    }
+  };
+  walk(root);
+}
+
+/** What `raw` needs to keep source positions on the elements it parses from
+ *  HTML (it reads the file only for the root's own position). */
+const POSITIONS = { file: { toString: () => '' } } as unknown as Parameters<typeof raw>[1];
 
 /** The page as a sanitized hast tree, ready for React rendering. */
 export function toSafeHast(page: ParsedPage, ctx: RenderContext): Root {
   const hast = toHast(page.tree, { allowDangerousHtml: true, handlers }) as Root;
-  wrapHtmlBlocks(hast);
   markSourceRanges(hast);
-  const parsed = raw(hast) as Root;
+  const blocks = htmlBlocks(hast);
+  const parsed = raw(hast, POSITIONS) as Root;
   const clean = sanitize(parsed, schema) as Root;
   applyUrlPolicy(clean, ctx);
+  markHtmlBlocks(clean, blocks);
   addHeadingIds(clean);
   return clean;
 }
