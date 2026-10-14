@@ -1,0 +1,114 @@
+// M4 in the built UI, in Chromium and WebKit (≈ WKWebView): dragging blocks
+// in the Split pane, keyboard moves, undo, and axe with a gutter showing.
+import { readFileSync } from 'node:fs';
+import { expect, test, type Locator, type Page } from '@playwright/test';
+import { installIpcMock } from './ipcMock';
+
+const AXE = readFileSync(new URL('../node_modules/axe-core/axe.min.js', import.meta.url), 'utf8');
+
+async function open(page: Page, text: string, settings: Record<string, unknown> = {}) {
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await page.addInitScript(installIpcMock, {
+    pages: { 'M.md': text },
+    editorMode: 'split',
+    settings,
+    remoteCover: false,
+  });
+  await page.goto('/');
+  await page.getByRole('button', { name: /^vault/ }).click();
+  await page.getByRole('treeitem', { name: 'M' }).click();
+  const pane = page.getByRole('region', { name: 'Preview' });
+  await expect(pane.locator('[data-source-start]').first()).toBeVisible();
+  return pane;
+}
+
+/** The source as the editor shows it (the Split's left side). */
+const source = (page: Page) =>
+  page.locator('.cm-content').evaluate((el) =>
+    [...el.querySelectorAll('.cm-line')]
+      .map((l) => l.textContent)
+      .join('\n')
+      .trimEnd(),
+  );
+
+/** Drags the grip of the block `from` to the point (x, y) of the page. */
+async function drag(page: Page, from: Locator, name: string, x: number, y: number) {
+  await from.hover();
+  const grip = page.getByRole('button', { name: `Drag to reorder: ${name}` });
+  const g = (await grip.boundingBox())!;
+  await page.mouse.move(g.x + g.width / 2, g.y + g.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(x, y, { steps: 8 });
+  await expect(page.locator('[data-drop-line]')).toBeVisible();
+  await page.mouse.up();
+}
+
+test('acceptance: P3 dragged above P1 reads P3, P1, P2; one undo restores the order', async ({
+  page,
+}) => {
+  const pane = await open(page, 'P1 *one*\n\nP2\n\nP3 **three**\n');
+  const p1 = (await pane.getByText('P1').boundingBox())!;
+  await drag(page, pane.getByText('P3'), 'P3 three', p1.x + 40, p1.y + 2);
+  await expect.poll(() => source(page)).toBe('P3 **three**\n\nP1 *one*\n\nP2');
+  await expect(page.getByRole('status').filter({ hasText: 'Moved P3 three.' })).toBeAttached();
+  await page.locator('.cm-content').click();
+  await page.keyboard.press('ControlOrMeta+z');
+  await expect.poll(() => source(page)).toBe('P1 *one*\n\nP2\n\nP3 **three**');
+});
+
+test('acceptance: a heading dragged below the next section takes its paragraphs along', async ({
+  page,
+}) => {
+  const pane = await open(page, '## A\n\nA1\n\nA2\n\n## B\n\nB1\n');
+  const b1 = (await pane.getByText('B1').boundingBox())!;
+  await drag(page, pane.getByRole('heading', { name: 'A' }), 'A', b1.x + 40, b1.y + b1.height + 6);
+  await expect.poll(() => source(page)).toBe('## B\n\nB1\n\n## A\n\nA1\n\nA2');
+});
+
+test('a list item dropped right of an item’s text nests under it', async ({ page }) => {
+  const pane = await open(page, '- a\n- b\n- c\n');
+  const a = (await pane.locator('li', { hasText: 'a' }).first().boundingBox())!;
+  await drag(page, pane.locator('li', { hasText: 'c' }), 'c', a.x + 60, a.y + a.height - 1);
+  await expect.poll(() => source(page)).toBe('- a\n  - c\n- b');
+});
+
+test('keyboard only: ↓ to the next block, Alt+↑ moves it, Enter picks a block up and drops it', async ({
+  page,
+}) => {
+  const pane = await open(page, 'P1\n\nP2\n\nP3\n');
+  await page.getByRole('button', { name: 'Drag to reorder: P1' }).focus();
+  await page.keyboard.press('ArrowDown');
+  await expect(page.getByRole('button', { name: 'Drag to reorder: P2' })).toBeFocused();
+  await page.keyboard.press('Alt+ArrowUp');
+  await expect.poll(() => source(page)).toBe('P2\n\nP1\n\nP3');
+  // The pane shows the move (keys wait for it), and P2's grip keeps the keyboard.
+  await expect(pane.locator('[data-source-start]').first()).toHaveText('P2');
+  await expect(page.getByRole('button', { name: 'Drag to reorder: P2' })).toBeFocused();
+  await page.keyboard.press('Enter');
+  await page.keyboard.press('ArrowDown');
+  await page.keyboard.press('Enter');
+  await expect.poll(() => source(page)).toBe('P1\n\nP3\n\nP2');
+});
+
+for (const theme of ['light', 'dark']) {
+  test(`axe-clean with a block gutter open (${theme})`, async ({ page }) => {
+    const pane = await open(page, '# T\n\nP1\n\n- a\n- b\n', { theme });
+    await pane.locator('li', { hasText: 'b' }).hover();
+    await page.getByRole('group', { name: 'b' }).hover();
+    await page.evaluate(AXE);
+    const violations = await page.evaluate(async () => {
+      const { axe } = window as unknown as {
+        axe: {
+          run: (
+            el: Element,
+            o: object,
+          ) => Promise<{ violations: { id: string; nodes: { target: string[] }[] }[] }>;
+        };
+      };
+      const region = document.querySelector('[role="region"][aria-label="Preview"]')!;
+      const res = await axe.run(region, { resultTypes: ['violations'] });
+      return res.violations.map((v) => `${v.id}: ${v.nodes.map((n) => n.target.join(' '))}`);
+    });
+    expect(violations).toEqual([]);
+  });
+}
