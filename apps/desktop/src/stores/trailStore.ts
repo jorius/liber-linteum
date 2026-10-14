@@ -39,7 +39,7 @@ export interface PruneOptions {
 function prune(list: TrailEntry[], gone: string, { exists, current }: PruneOptions): TrailEntry[] {
   const kept = list.filter((x) => remap(x.path, gone, gone) === null || exists?.(x.path));
   const out = kept.filter((x, i) => !same(kept[i - 1], x));
-  while (current && out.at(-1)?.path === current) out.pop();
+  while (current && out.length && out[out.length - 1].path === current) out.pop();
   return out;
 }
 
@@ -51,14 +51,14 @@ export const useTrailStore = create<TrailState>((set, get) => ({
   followed: (from) => set((s) => ({ back: [...s.back, from], forward: [] })),
   goBack: (current) => {
     const { back, forward } = get();
-    const to = back.at(-1);
+    const to = back[back.length - 1] as TrailEntry | undefined;
     if (!to) return null;
     set({ back: back.slice(0, -1), forward: [...forward, current] });
     return to;
   },
   goForward: (current) => {
     const { back, forward } = get();
-    const to = forward.at(-1);
+    const to = forward[forward.length - 1] as TrailEntry | undefined;
     if (!to) return null;
     set({ back: [...back, current], forward: forward.slice(0, -1) });
     return to;

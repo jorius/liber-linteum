@@ -172,7 +172,7 @@ These override the sections above where they conflict.
 8. **The hint bar:** dismissing it is remembered in `localStorage` (try/catch), not in settings. Losing it shows the hint once more.
 9. **The block model** is cached per editor document and re-parsed incrementally. The first move in a large note opened in Source pays a full parse (~1.5 s in jsdom at 200 KB). Later moves take ~10 ms. Making the top-level slots linear time (they were O(n²)) brought a list item's move from ~110 ms to well under 100 ms.
 10. **Live Preview's "HTML renders nothing" check** (M2c §7.7) is M3b's again: there is no HTML wrapper to look through (final review I1).
-11. **Safari 15:** M4 code avoids `Array.prototype.at`. (Final review M7: the move path still reached it through `blocks.ts` and `incremental.ts`; both are fixed, and a test scans the move path for APIs newer than Safari 15.0. Other code outside the move path is swept separately.)
+11. **Safari 15:** the app's TypeScript uses no API newer than Safari 15.0. The build lowers syntax but polyfills nothing, so `.at()`, `Object.hasOwn`, `structuredClone`, `findLast` and the like would throw on 15.0–15.3. `src/jsCompat.test.ts` guards this (final review M7). Its pending list holds `markdown/incremental.ts` until the re-parse fix that removes its `.at()` lands.
 12. **Tests:** the fake disk now resolves a wiki target to a page it holds, so embeds render in jsdom.
 
 ## 11. Amendments from the final review: the move engine and its guard
