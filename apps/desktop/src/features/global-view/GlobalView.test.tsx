@@ -35,9 +35,13 @@ function card(path: string, kind: GvCard['kind'] = 'page', extra: Partial<GvCard
 }
 
 const LEVELS: Record<string, GvLevel> = {
-  '': { cards: [card('A', 'project'), card('B', 'project'), card('root.md')], centre: null },
+  '': {
+    cards: [card('A', 'project'), card('B', 'project'), card('C', 'project'), card('root.md')],
+    centre: null,
+  },
   A: { cards: [card('A/a.md'), card('A/b.md')], centre: null },
   B: { cards: [], centre: null },
+  C: { cards: [card('C/c.md')], centre: null },
   'page:A/a.md': {
     cards: [
       card('A/a.md', 'page', { title: 'Generator Rex', relation: 'centre' }),
@@ -139,6 +143,18 @@ describe('Global View screen (M3a §5, §6)', () => {
     await waitFor(async () => expect(document.activeElement).toBe(await cardButton('a')));
     await userEvent.keyboard('{Escape}');
     await waitFor(async () => expect(document.activeElement).toBe(await cardButton('A')));
+  });
+
+  it('GV-18: Escape puts the keyboard back on the card that opened the level (final review m13)', async () => {
+    render(<GlobalView />);
+    // The level arrives with the keyboard on its first card.
+    await waitFor(async () => expect(document.activeElement).toBe(await cardButton('A')));
+    await userEvent.keyboard('{ArrowRight}{ArrowRight}');
+    expect(document.activeElement).toBe(await cardButton('C'));
+    await userEvent.keyboard('{Enter}');
+    await waitFor(async () => expect(document.activeElement).toBe(await cardButton('c')));
+    await userEvent.keyboard('{Escape}');
+    await waitFor(async () => expect(document.activeElement).toBe(await cardButton('C')));
   });
 
   it('GV-13/21/32: mode, edge toggles and Reset layout', async () => {

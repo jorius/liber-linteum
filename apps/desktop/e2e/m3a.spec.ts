@@ -136,9 +136,9 @@ test('keyboard only: arrows move, Enter opens, Escape goes back, Shift+Enter edi
   await expect(card(page, 'Beta')).toBeFocused();
   await page.keyboard.press('Enter');
   await expect(card(page, 'Three')).toBeFocused();
+  // Back on the card that opened the level (final review m13).
   await page.keyboard.press('Escape');
-  await expect(card(page, 'Alpha')).toBeFocused();
-  await page.keyboard.press('ArrowRight');
+  await expect(card(page, 'Beta')).toBeFocused();
   await page.keyboard.press('ArrowRight');
   await expect(card(page, 'Welcome')).toBeFocused();
   await page.keyboard.press('Shift+Enter');

@@ -104,7 +104,8 @@ interface GvState {
   /** A single click: the next level (Drill-down; none for a page level's
    *  own page) or expand / collapse. */
   open: (card: GvCard) => Promise<void>;
-  /** Breadcrumb: back to `stack[i]`. */
+  /** Breadcrumb: back to `stack[i]`, focus on the card that opened the
+   *  level after it. */
   back: (i: number) => Promise<void>;
   /** Escape (M3a §5): one level up, or collapse `path` in Expand. */
   up: (path: string | null) => Promise<void>;
@@ -285,7 +286,12 @@ export const useGvStore = create<GvState>((set, get) => {
       return get().load();
     },
     back: async (i) => {
-      set({ stack: get().stack.slice(0, Math.max(1, i + 1)), expanded: [], focus: null });
+      const stack = get().stack.slice(0, Math.max(1, i + 1));
+      // A level is opened from the card of the same path: the keyboard goes
+      // back to it (final review m13).
+      const left = get().stack[stack.length];
+      const focus = left && left.kind !== 'vault' ? left.path : null;
+      set({ stack, expanded: [], focus });
       return get().load();
     },
     up: async (path) => {
