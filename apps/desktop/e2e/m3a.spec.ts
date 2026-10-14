@@ -11,9 +11,14 @@ const PAGES = {
   'Welcome.md': '# Welcome\n\nStart here.\n',
 };
 
-async function globalView(page: Page, settings: Record<string, unknown> = {}, latencyMs = 0) {
+async function globalView(
+  page: Page,
+  settings: Record<string, unknown> = {},
+  latencyMs = 0,
+  pages: Record<string, string> = PAGES,
+) {
   await page.addInitScript(installIpcMock, {
-    pages: { ...PAGES },
+    pages: { ...pages },
     editorMode: 'livePreview',
     settings,
     remoteCover: false,
@@ -185,4 +190,41 @@ test('a double click lands in the editor with the keyboard (final review I4)', a
   await card(page, 'One').dblclick();
   await expect(page.getByRole('textbox', { name: 'Page title' })).toHaveValue('One');
   await expect(page.locator('.cm-content')).toBeFocused();
+});
+
+/** Level 0 and Alpha have two cards each, so after drilling into Alpha its
+ *  first card stands where Alpha stood (the reviewer's probe). */
+const TWO_BY_TWO = {
+  'Alpha/One.md': '# One\n\nSee [[Two]].\n',
+  'Alpha/Two.md': '# Two\n',
+  'Welcome.md': '# Welcome\n',
+};
+
+/** Two presses at one spot, `gapMs` apart, that the OS counts as a double
+ *  click (macOS allows about 0.5 s): the first drills in after 240 ms. */
+async function slowDoubleClick(page: Page, name: string, gapMs: number) {
+  const target = card(page, name);
+  await target.click({ trial: true }); // waits until the card stands still
+  const box = (await target.boundingBox())!;
+  await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
+  await page.waitForTimeout(gapMs);
+  await page.mouse.down({ clickCount: 2 });
+  await page.mouse.up({ clickCount: 2 });
+}
+
+test('a slow double click on a folder leaves it open once; the card now under the pointer stays shut (final review I5)', async ({
+  page,
+}) => {
+  await globalView(page, {}, 0, TWO_BY_TWO);
+  await slowDoubleClick(page, 'Alpha', 350);
+  await page.waitForTimeout(400); // past the single-click wait of the second press
+  await expect(crumbs(page).getByText('Alpha')).toHaveAttribute('aria-current', 'page');
+  await expect(card(page, 'One')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Edit' })).toHaveAttribute('aria-pressed', 'false');
+});
+
+test('a slow double click on a page opens that page (final review I5)', async ({ page }) => {
+  await globalView(page, {}, 0, TWO_BY_TWO);
+  await slowDoubleClick(page, 'Welcome', 350);
+  await expect(page.getByRole('textbox', { name: 'Page title' })).toHaveValue('Welcome');
 });

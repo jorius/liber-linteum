@@ -8,7 +8,14 @@ import {
   type Node,
   type NodeProps,
 } from '@xyflow/react';
-import { useEffect, useMemo, useRef, type KeyboardEvent } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  type KeyboardEvent,
+  type MouseEvent,
+} from 'react';
 import { useTranslation } from 'react-i18next';
 import type { GlobalViewEdges, GvCard } from '../../ipc';
 import { Card } from './Card';
@@ -98,6 +105,36 @@ export function Canvas({ mode, toggles, width, onOpen, onOpenEditor }: CanvasPro
   const flow = useReactFlow();
   const wrapper = useRef<HTMLDivElement>(null);
 
+  // A slow double click (final review I5): its first click's wait runs out
+  // and the next level opens, so the second press lands on whatever card
+  // now stands under the pointer. The OS still counts it as the second click
+  // (`detail` 2): it belongs to the card first clicked, not to that one.
+  const firstClick = useRef<{ card: GvCard; opened: boolean } | null>(null);
+  const open = useCallback(
+    (card: GvCard) => {
+      if (firstClick.current?.card.path === card.path) firstClick.current.opened = true;
+      onOpen(card);
+    },
+    [onOpen],
+  );
+  const onClickCapture = (e: MouseEvent) => {
+    if (e.detail <= 1) {
+      const path = (e.target as HTMLElement).closest<HTMLElement>('[data-gv-card]')?.dataset.gvCard;
+      const card = canvas.cards.find((c) => c.path === path);
+      firstClick.current = card ? { card, opened: false } : null;
+    } else if (firstClick.current?.opened) {
+      e.stopPropagation(); // no single click on the card under the pointer
+    }
+  };
+  const onDoubleClickCapture = (e: MouseEvent) => {
+    const first = firstClick.current;
+    if (!first?.opened) return; // a quick double click: the card handles it
+    e.stopPropagation();
+    firstClick.current = null;
+    // Its next level is open already; what's left is its page, if any.
+    if (first.card.kind === 'page' || first.card.indexPage) onOpenEditor(first.card);
+  };
+
   const positions = useMemo(() => {
     let auto: Map<string, XY>;
     if (mode === 'expand') auto = columnsLayout(canvas.roots, canvas.children);
@@ -178,11 +215,11 @@ export function Canvas({ mode, toggles, width, onOpen, onOpenEditor }: CanvasPro
           open: canvas.centre === card.path || expandedPaths.has(card.path),
           focusable: card.path === tabStop,
           connections: connections(card.path),
-          onOpen,
+          onOpen: open,
           onOpenEditor,
         },
       })),
-    [canvas, positions, expandedPaths, tabStop, connections, onOpen, onOpenEditor],
+    [canvas, positions, expandedPaths, tabStop, connections, open, onOpenEditor],
   );
   const [nodes, setNodes, onNodesChange] = useNodesState<CardNode>(computed);
   useEffect(() => setNodes(computed), [computed, setNodes]);
@@ -244,7 +281,13 @@ export function Canvas({ mode, toggles, width, onOpen, onOpenEditor }: CanvasPro
   };
 
   return (
-    <div ref={wrapper} className={styles.canvas} onKeyDown={onKeyDown}>
+    <div
+      ref={wrapper}
+      className={styles.canvas}
+      onKeyDown={onKeyDown}
+      onClickCapture={onClickCapture}
+      onDoubleClickCapture={onDoubleClickCapture}
+    >
       <ReactFlow<CardNode, GvFlowEdge>
         nodes={nodes}
         edges={flowEdges}

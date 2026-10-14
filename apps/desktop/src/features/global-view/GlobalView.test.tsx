@@ -1,4 +1,4 @@
-import { act, render, screen, waitFor, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import axe from 'axe-core';
 import { afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
@@ -36,7 +36,12 @@ function card(path: string, kind: GvCard['kind'] = 'page', extra: Partial<GvCard
 
 const LEVELS: Record<string, GvLevel> = {
   '': {
-    cards: [card('A', 'project'), card('B', 'project'), card('C', 'project'), card('root.md')],
+    cards: [
+      card('A', 'project', { indexPage: 'A/b.md' }),
+      card('B', 'project'),
+      card('C', 'project'),
+      card('root.md'),
+    ],
     centre: null,
   },
   A: { cards: [card('A/a.md'), card('A/b.md')], centre: null },
@@ -263,5 +268,32 @@ describe('keyboard focus after leaving a level (final review I4)', () => {
     again.unmount();
     expect(usePageStore.getState().editorFocus).toBe(false);
     act(() => usePageStore.getState().clearTitleFocus());
+  });
+});
+
+describe('a slow double click (final review I5)', () => {
+  /** The first click drills in after 240 ms; the second press of the same
+   *  double click (the OS still counts it) lands on the new level's card. */
+  async function slowDoubleClick(name: string, landsOn: string) {
+    fireEvent.click(await cardButton(name), { detail: 1 });
+    const next = await cardButton(landsOn);
+    fireEvent.click(next, { detail: 2 });
+    fireEvent.dblClick(next, { detail: 2 });
+  }
+
+  it('opens the card double-clicked (its index note), not the card now under the pointer', async () => {
+    render(<GlobalView />);
+    await slowDoubleClick('A', 'a');
+    await waitFor(() => expect(usePageStore.getState().path).toBe('A/b.md'));
+    expect(useUiStore.getState().screen).toBe('edit');
+  });
+
+  it('on a folder without an index note, leaves it drilled in once', async () => {
+    render(<GlobalView />);
+    await slowDoubleClick('C', 'c');
+    await new Promise((r) => setTimeout(r, 400)); // past a single click's wait
+    expect(useGvStore.getState().stack).toEqual([{ kind: 'vault' }, { kind: 'folder', path: 'C' }]);
+    expect(usePageStore.getState().path).toBeNull();
+    expect(useUiStore.getState().screen).toBe('global');
   });
 });
