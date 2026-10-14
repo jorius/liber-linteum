@@ -153,3 +153,25 @@ test('zero network requests: the Global View', async ({ page }) => {
   expect(csp).toEqual([]);
   expect(outside).toEqual([]);
 });
+
+// M3b: connecting cards, the relationships dialog and an index-note pick
+// load nothing from outside either.
+test('zero network requests: relationships in the Global View', async ({ page }) => {
+  const { outside, problems } = await openRemotePage(page, 'livePreview');
+  await page.getByRole('button', { name: 'Global view' }).click();
+  await page.getByRole('button', { name: 'Connections of Other' }).click();
+  await page.getByRole('menuitem', { name: 'Connect to…' }).click();
+  await page.getByRole('button', { name: 'Remote references', exact: true }).click();
+  await expect(page.locator('[data-gv-edge="manual"]')).toHaveCount(1);
+  await page.locator('[data-gv-hit]').click({ force: true });
+  await expect(page.getByRole('dialog')).toBeVisible();
+  await page.getByRole('dialog').getByRole('button', { name: 'Close' }).click();
+  await page.waitForLoadState('networkidle');
+  await page.waitForTimeout(300);
+  const csp = await page.evaluate(
+    () => (window as unknown as { __nimwCspViolations: string[] }).__nimwCspViolations,
+  );
+  expect(problems).toEqual([]);
+  expect(csp).toEqual([]);
+  expect(outside).toEqual([]);
+});

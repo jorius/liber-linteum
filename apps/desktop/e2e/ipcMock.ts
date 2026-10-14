@@ -53,13 +53,29 @@ export function installIpcMock({
     truncated: false,
     binary: false,
   });
-  /** Pages a page links to (`[[name]]`, resolved by file name). */
+  /** The page `[[name]]` resolves to (by file name, or by path). */
+  const resolveName = (name: string) =>
+    Object.keys(pages).find(
+      (p) => p.replace(/\.md$/, '') === name || p.replace(/\.md$/, '').split('/').pop() === name,
+    );
+  const FRONT = /^---\n[\s\S]*?\n---(?:\n|$)/;
+  /** Pages a page's text links to (`[[name]]`; the frontmatter is not text). */
   const linksOf = (path: string): string[] =>
-    [...(pages[path] ?? '').matchAll(/\[\[([^\]|#]+)/g)]
-      .map((m) =>
-        Object.keys(pages).find((p) => p.replace(/\.md$/, '').split('/').pop() === m[1].trim()),
-      )
+    [...(pages[path] ?? '').replace(FRONT, '').matchAll(/\[\[([^\]|#]+)/g)]
+      .map((m) => resolveName(m[1].trim()))
       .filter((p): p is string => !!p);
+  /** M3b: a page's relationships — the frontmatter lines naming `[[name]]`
+   *  (string or { link, label, directed } items, one per line). */
+  const relatedOf = (path: string) =>
+    ((pages[path] ?? '').match(FRONT)?.[0] ?? '').split('\n').flatMap((line) => {
+      const m = /\[\[([^\]|#]+)/.exec(line);
+      const target = m ? resolveName(m[1].trim()) : undefined;
+      if (!target) return [];
+      const label = /label: ([^,}]+)/.exec(line)?.[1].trim() ?? null;
+      return [{ target, label, directed: /directed: true/.test(line) }];
+    });
+  /** M3b: index-note picks (folder → page). */
+  const picks: Record<string, string> = {};
   /** A Global View card for a page or folder (M3a §8). */
   const gvCard = (path: string, kind: string, relation: string | null) => {
     const text = pages[path] ?? '';
@@ -86,7 +102,8 @@ export function installIpcMock({
           : '',
       hasImage: false,
       hasAudio: false,
-      indexPage: null,
+      indexPage: kind === 'page' ? null : (picks[path] ?? null),
+      indexFrom: kind === 'page' ? null : picks[path] ? 'picked' : null,
       pages:
         kind === 'page'
           ? 0
@@ -246,23 +263,56 @@ export function installIpcMock({
         }
         return null;
       };
-      const edges = new Map<
-        string,
-        { from: string; to: string; count: number; aggregated: boolean }
-      >();
+      type E = {
+        from: string;
+        to: string;
+        kind: string;
+        count: number;
+        aggregated: boolean;
+        directed: boolean;
+        label: string | null;
+      };
+      const edges = new Map<string, E>();
+      const add = (
+        src: string,
+        target: string,
+        kind: string,
+        directed = false,
+        label = null as string | null,
+      ) => {
+        const x = lift(src);
+        const y = lift(target);
+        if (!x || !y || x === y) return;
+        const [from, to] = directed ? [x, y] : x < y ? [x, y] : [y, x];
+        const key = `${kind}|${[x, y].sort().join('|')}`;
+        const e = edges.get(key) ?? {
+          from,
+          to,
+          kind,
+          count: 0,
+          aggregated: false,
+          directed: false,
+          label: null,
+        };
+        e.count++;
+        e.aggregated ||= x !== src || y !== target;
+        if (directed) Object.assign(e, { directed, from, to });
+        e.label ??= label;
+        edges.set(key, e);
+      };
       for (const src of Object.keys(pages)) {
-        for (const target of linksOf(src)) {
-          const x = lift(src);
-          const y = lift(target);
-          if (!x || !y || x === y) continue;
-          const [from, to] = x < y ? [x, y] : [y, x];
-          const e = edges.get(`${from}|${to}`) ?? { from, to, count: 0, aggregated: false };
-          e.count++;
-          e.aggregated ||= x !== src || y !== target;
-          edges.set(`${from}|${to}`, e);
-        }
+        for (const target of linksOf(src)) add(src, target, 'link');
+        for (const r of relatedOf(src)) add(src, r.target, 'manual', r.directed, r.label);
       }
-      return [...edges.values()].map((e) => ({ ...e, kind: 'link', directed: false, label: null }));
+      return [...edges.values()];
+    },
+    // ---- M3b: relationship targets and index-note picks ----
+    link_target: (a) => (a.target as string).replace(/\.md$/, '').split('/').pop(),
+    index_pick_set: (a) => {
+      const folder = a.folder as string;
+      if (a.page) picks[folder] = a.page as string;
+      else delete picks[folder];
+      return gvCard(folder, folder.includes('/') ? 'folder' : 'project', null);
     },
     layout_get: (a) => {
       const all = JSON.parse(localStorage.getItem('nimw-e2e-layout') ?? '{}');

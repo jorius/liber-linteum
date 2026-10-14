@@ -2,6 +2,7 @@
 cover: https://remote.example/cover.png
 subtitle: Every way a page can reference the network
 ---
+
 # Remote references
 
 ![md image](https://remote.example/a.png)
@@ -48,9 +49,9 @@ subtitle: Every way a page can reference the network
 :::
 ::::
 
-| a | b |
-|---|---|
-| ![cell](https://remote.example/u.png) | x |
+| a                                     | b   |
+| ------------------------------------- | --- |
+| ![cell](https://remote.example/u.png) | x   |
 
 ![[Other]]
 
