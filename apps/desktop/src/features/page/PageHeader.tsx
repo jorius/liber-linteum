@@ -10,6 +10,7 @@ import { Breadcrumb } from './Breadcrumb';
 import { Cover } from './Cover';
 import { ModeToggle } from './ModeToggle';
 import { NoteTitle } from './NoteTitle';
+import { RelatedChips } from './RelatedChips';
 import styles from './PageView.module.css';
 
 /** The header band (M4b §1): first row, the back arrow and breadcrumb, then
@@ -88,6 +89,7 @@ export function PageHeader({ page, mode }: { page: Page; mode: EditorMode }) {
                 <span>{t('page.meta', { links: page.links, backlinks: page.backlinks })}</span>
                 {large && mode === 'livePreview' && <span>{t('editor.largeNote')}</span>}
               </p>
+              <RelatedChips page={page} editable={editable} />
               <NoteTitle page={page} />
             </div>
             {controls}
