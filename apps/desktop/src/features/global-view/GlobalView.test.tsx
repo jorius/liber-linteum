@@ -38,6 +38,17 @@ const LEVELS: Record<string, GvLevel> = {
   '': { cards: [card('A', 'project'), card('B', 'project'), card('root.md')], centre: null },
   A: { cards: [card('A/a.md'), card('A/b.md')], centre: null },
   B: { cards: [], centre: null },
+  'page:A/a.md': {
+    cards: [
+      card('A/a.md', 'page', { title: 'Generator Rex', relation: 'centre' }),
+      card('root.md', 'page', { title: 'Sparda', relation: 'out' }),
+    ],
+    centre: 'A/a.md',
+  },
+  'page:root.md': {
+    cards: [card('root.md', 'page', { title: 'Sparda', relation: 'centre' })],
+    centre: 'root.md',
+  },
 };
 
 let calls: [string, Record<string, unknown>][];
@@ -167,6 +178,20 @@ describe('Global View screen (M3a §5, §6)', () => {
     render(<GlobalView />);
     await userEvent.click(await cardButton('B'));
     expect(await screen.findByText('Empty folder.')).toBeInTheDocument();
+  });
+
+  it('GV-14: earlier page crumbs keep their page title (final review m1)', async () => {
+    render(<GlobalView />);
+    await cardButton('A');
+    await act(() => useGvStore.getState().open(card('A', 'project')));
+    await act(() => useGvStore.getState().open(card('A/a.md', 'page', { title: 'Generator Rex' })));
+    await act(() => useGvStore.getState().open(card('root.md', 'page', { title: 'Sparda' })));
+    const nav = screen.getByRole('navigation', { name: 'Global View path' });
+    expect(
+      within(nav)
+        .getAllByRole('listitem')
+        .map((li) => li.textContent),
+    ).toEqual(['Vault', 'A', 'Generator Rex', 'Sparda']);
   });
 
   it('NFR-10: no axe violations', async () => {

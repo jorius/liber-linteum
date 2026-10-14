@@ -18,7 +18,7 @@ const TOGGLES: { key: keyof GlobalViewEdges; kind: GvEdgeKind; aggregated: boole
 export function Toolbar() {
   const { t } = useTranslation();
   const stack = useGvStore((s) => s.stack);
-  const levels = useGvStore((s) => s.levels);
+  const titles = useGvStore((s) => s.titles);
   const settings = useSettingsStore((s) => s.settings);
   const update = useSettingsStore((s) => s.update);
   const mode = settings.globalViewMode;
@@ -27,8 +27,7 @@ export function Toolbar() {
   const crumbLabel = (ref: GvLevelRef) => {
     if (ref.kind === 'vault') return t('gv.vault');
     if (ref.kind === 'folder') return nameOf(ref.path);
-    const centre = levels[levelKey(ref)]?.cards.find((c) => c.path === ref.path);
-    return centre?.title ?? nameOf(ref.path).replace(/\.md$/i, '');
+    return titles[ref.path] ?? nameOf(ref.path).replace(/\.md$/i, '');
   };
   // Expand canvases show only their root level in the breadcrumb (M3a §5).
   const crumbs = stack;

@@ -85,6 +85,9 @@ interface GvState {
   /** Expand in place: the cards expanded, in the order they were opened. */
   expanded: GvLevelRef[];
   levels: Record<string, GvLevel>;
+  /** Titles of the page levels opened, by path: their breadcrumb labels
+   *  (final review m1). */
+  titles: Record<string, string>;
   canvas: Canvas;
   /** Layout key of the level `canvas` was loaded for (the stack changes
    *  first, the canvas when the level arrives). */
@@ -199,6 +202,7 @@ export const useGvStore = create<GvState>((set, get) => {
     stack: [{ kind: 'vault' }],
     expanded: [],
     levels: {},
+    titles: {},
     canvas: EMPTY_CANVAS,
     shownKey: null,
     edges: [],
@@ -246,10 +250,12 @@ export const useGvStore = create<GvState>((set, get) => {
       const focus = get().focus;
       const key = canvasKey(m, root);
       shownAt = { stack, expanded };
+      const centre = canvas.cards.find((c) => c.path === canvas.centre);
       set({
         stack,
         expanded,
         levels,
+        titles: centre ? { ...get().titles, [centre.path]: centre.title } : get().titles,
         canvas,
         shownKey: key,
         // A layout or edge read that fails (or answers nothing) just means
@@ -264,7 +270,8 @@ export const useGvStore = create<GvState>((set, get) => {
       if (mode() === 'drill') {
         // The page this level is about: already open (final review m2).
         if (card.path === get().canvas.centre) return;
-        set({ stack: [...get().stack, nextLevel(card)], focus: null });
+        const titles = card.kind === 'page' ? { ...get().titles, [card.path]: card.title } : null;
+        set({ stack: [...get().stack, nextLevel(card)], focus: null, ...(titles && { titles }) });
         return get().load();
       }
       const expanded = get().expanded;
@@ -349,6 +356,7 @@ export const useGvStore = create<GvState>((set, get) => {
         stack: [{ kind: 'vault' }],
         expanded: [],
         levels: {},
+        titles: {},
         canvas: EMPTY_CANVAS,
         shownKey: null,
         edges: [],
