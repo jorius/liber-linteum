@@ -278,3 +278,38 @@ Values come from the prototype (`.card`, lines 64-79 and 291-312), expressed as 
 7. **A page level includes the page itself** as the centre card, with neighbours placed left (in) and right (out).
 8. **The connect handle is hidden** until M3b, rather than shown disabled.
 9. **The single-click delay is 240 ms,** taken from the prototype, so a double click never triggers drill-down first.
+
+## 13. Amendments from planning (plan `docs/superpowers/plans/2026-10-14-m3a-global-view.md`, replayed end-to-end)
+
+These override the sections above where they conflict.
+
+1. **Dependency:** `@xyflow/react` **12.12.0** (released 2026-09-24, the newest the pnpm release-age gate accepts), pinned exactly. It brings `@xyflow/system` 0.0.83 and its own `zustand` 4.5.7.
+2. **Frozen prototypes:** Tauri's `freezePrototype` stops d3-color (React Flow → d3-zoom) from loading: its `define()` assigns `prototype.constructor` on a plain object. `apps/desktop/scripts/freezeSafe.ts`, a Vite transform matched by file path and exact text, rewrites that one assignment to `Object.defineProperty`, and `tests/freezeSafe.test.ts` proves both the failure and the fix. Without it the whole UI fails to start; the e2e mock freezes the prototype like Tauri does.
+3. **Edges** (§6, §8) are computed from the links that **start** inside a shown card, with one indexed range query per visible card (`Index::page_links_from`). A link starting elsewhere can't become an edge. Release timings on 10k notes: a 200-card level plus its edges ~2 ms (a full scan took 83 ms); level 0, which reads every link, ~90 ms.
+4. **`related:`:** only the list form (`related:\n  - "[[X]]"`) is indexed, as before M3a; a scalar `related: "[[X]]"` is not. Tests use the list form; parity with the TS reader is left for later.
+5. **External folder moves** (another program) arrive from the watcher as per-file renames, so pinned card entries follow but a moved folder's own level key does not. In-app renames remap keys and entries.
+6. **Screen switching** (§2):
+   - opening a page from anywhere, the explorer included, shows Edit;
+   - tooltips show no ⌘ symbols (there is no precedent, and ⌘ is wrong off macOS); the buttons carry `aria-keyshortcuts="Meta+1 Control+1"` / `"Meta+2 Control+2"`;
+   - ⌘1 / ⌘2 also accept the physical digit where digits need ⇧ (French);
+   - `shell.globalLater` is removed.
+7. **Cards** (§4):
+   - the folder-summary cover uses `--color-accent-soft` behind accent text, where accent-on-soft ≥ 4.5 is already guaranteed, instead of `--color-code-bg`;
+   - cards have a fixed 240 × 300 size passed to React Flow, so a change of card data (e.g. focus) never re-measures and hides them;
+   - the group name is "<title>, <kind>" with the kind translated.
+8. **Edge colours and strokes** (§6):
+   - `--color-canvas`, `--color-card-border`, `--color-edge-link` (accent) and `--color-edge-tree` (muted) are derived per palette, custom accents included;
+   - `--color-edge-manual` is fixed per mode (`#b4501a` light, `#e8935a` dark);
+   - the kinds also differ by width or dash: link 2 px solid, aggregated link 2.5 px dotted, parent/child 1.5 px dashed, manual 3 px solid, aggregated manual 3 px long-dashed;
+   - every edge is ≥ 3:1 on the canvas in every palette and mode (tested).
+9. **Card descriptions:** the connections text reads "Linked with N cards. M relationships." Link edges are undirected card pairs, so "links to / linked from" can't be told apart.
+10. **Zoom buttons** are the app's own (translated labels), not React Flow's `Controls`. The React Flow attribution badge is hidden (`proOptions.hideAttribution`, MIT); credit belongs in About and README.
+11. **Breadcrumb in Expand** is the drill stack, whose last entry is the expand canvas's root level.
+12. **Loading:** an edge or layout read that fails, or answers nothing, means no edges or pins; the cards still show. The store records the key of the level the canvas holds (`shownKey`); the canvas fits the view and moves the keyboard to the new level's first card once per loaded level. (Found in e2e: the breadcrumb changes before the level arrives, and a fit per node update moved cards between the two presses of a double click.)
+13. **New entry** creates the page with `entry_create_page` directly: `vaultStore.createPage` would start the explorer's inline rename and take the focus. The page opens with a one-shot `pageStore.requestTitleFocus(path)`, which `PageTitle` consumes by focusing and selecting the name.
+14. **jsdom:** React Flow tests use `src/test/reactFlow.ts` (`ResizeObserver` entries with `contentRect`, `DOMMatrixReadOnly`, sized nodes). axe runs without colour contrast there (jsdom has no CSS), and contrast is covered by `palettes.test.ts`.
+15. **E2E:**
+    - the IPC mock answers `gv_children` / `gv_edges` from its pages and keeps layouts in `localStorage`, so a reload keeps them;
+    - WebKit moves a dragged card less than the pointer, so the drag test asserts that the card moved and that the position persists, not the distance;
+    - the keyboard test waits on focus, not on time.
+16. **Safari 15 scan of the built bundle:** React Flow adds one `structuredClone`, in its click-to-connect path, which M3a disables (`connectOnClick={false}`, no connectable handles); M3b must guard it before turning connections on. The bundle's three regex lookbehinds (markdown, built inside `try`) and six `color-mix()` uses (sidebar and backdrop hovers) predate M3a.
