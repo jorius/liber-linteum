@@ -11,7 +11,8 @@ import {
   useMemo,
   useRef,
   useState,
-  type KeyboardEvent,
+  type KeyboardEvent as ReactKeyboardEvent,
+  type PointerEvent as ReactPointerEvent,
   type RefObject,
 } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -173,6 +174,19 @@ export function BlockGutter({
   const focusNext = useRef(false);
   /** After a move: the offset the moved block starts at in the new text. */
   const movedAt = useRef<number | null>(null);
+  /** A pointer drag in progress (M4 §4): which block, and where it would land. */
+  const [dragging, setDragging] = useState<{
+    id: number;
+    slot: Slot | null;
+    x: number;
+    y: number;
+  } | null>(null);
+  // What the window listeners of a drag read.
+  const live = useRef<{
+    model: BlockModel | null;
+    anchors: Map<number, HTMLElement>;
+    move: (id: number, slot: Slot | null, lineOnly?: boolean) => void;
+  }>({ model, anchors, move: () => undefined });
 
   // The rendered elements of the version shown (the pane commits first).
   useLayoutEffect(() => {
@@ -252,6 +266,93 @@ export function BlockGutter({
     setStatus(t('editor.blocks.moved', { block: label }));
   };
 
+  live.current = { model, anchors, move };
+
+  /** The slot nearest to the pointer: by height, and for list levels also by
+   *  how far right the pointer is. */
+  const nearest = (id: number, lineOnly: boolean, x: number, y: number): Slot | null => {
+    const { model: m, anchors: a } = live.current;
+    const p = pane.current;
+    if (!m || !p) return null;
+    const pr = p.getBoundingClientRect();
+    const cx = x - pr.left + p.scrollLeft;
+    const cy = y - pr.top + p.scrollTop;
+    let best: { slot: Slot; d: number } | null = null;
+    for (const slot of slotsFor(m, m.units[id], lineOnly)) {
+      const line = slotLine(p, m, slot, a);
+      if (!line) continue;
+      const nested = slot.scope === 'item' || slot.scope === 'child';
+      const d = Math.abs(cy - line.top) + (nested ? 0.3 * Math.abs(cx - line.left) : 0);
+      if (!best || d < best.d) best = { slot, d };
+    }
+    return best?.slot ?? null;
+  };
+
+  /** Pressing a grip: past 4 px it's a drag; Escape cancels; the drop moves
+   *  the block (Alt held: a heading without its section). */
+  const startDrag = (e: ReactPointerEvent, id: number) => {
+    if (e.button !== 0 || !live.current.model) return;
+    const unit = live.current.model.units[id];
+    const from = { x: e.clientX, y: e.clientY };
+    let started = false;
+    let last: { slot: Slot | null; lineOnly: boolean } = { slot: null, lineOnly: false };
+    let frame = 0;
+    let lastY = e.clientY;
+    (e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId);
+    const scroll = () => {
+      const p = pane.current;
+      frame = 0;
+      if (!p || !started) return;
+      const r = p.getBoundingClientRect();
+      const edge = 40;
+      const speed =
+        lastY < r.top + edge
+          ? -(r.top + edge - lastY) / 3
+          : lastY > r.bottom - edge
+            ? (lastY - (r.bottom - edge)) / 3
+            : 0;
+      if (speed) {
+        p.scrollTop += speed;
+        frame = requestAnimationFrame(scroll);
+      }
+    };
+    const onMove = (ev: PointerEvent) => {
+      if (!started && Math.hypot(ev.clientX - from.x, ev.clientY - from.y) < 4) return;
+      started = true;
+      lastY = ev.clientY;
+      const lineOnly = ev.altKey && unit.kind === 'heading';
+      last = { slot: nearest(id, lineOnly, ev.clientX, ev.clientY), lineOnly };
+      setDragging({ id, slot: last.slot, x: ev.clientX, y: ev.clientY });
+      if (!frame) frame = requestAnimationFrame(scroll);
+    };
+    const stop = () => {
+      window.removeEventListener('pointermove', onMove);
+      window.removeEventListener('pointerup', onUp);
+      window.removeEventListener('keydown', onEscape);
+      if (frame) cancelAnimationFrame(frame);
+      setDragging(null);
+    };
+    const onUp = (ev: PointerEvent) => {
+      stop();
+      if (!started) return;
+      const lineOnly = ev.altKey && unit.kind === 'heading';
+      const slot =
+        lineOnly === last.lineOnly ? last.slot : nearest(id, lineOnly, ev.clientX, ev.clientY);
+      live.current.move(id, slot, lineOnly);
+    };
+    const onEscape = (ev: KeyboardEvent) => {
+      if (ev.key !== 'Escape') return;
+      ev.preventDefault();
+      started = false;
+      stop();
+      // The release that follows drops nothing: its listener is gone.
+      setStatus(t('editor.blocks.cancelled'));
+    };
+    window.addEventListener('pointermove', onMove);
+    window.addEventListener('pointerup', onUp);
+    window.addEventListener('keydown', onEscape);
+  };
+
   const describe = (slot: Slot): string => {
     switch (slot.scope) {
       case 'top':
@@ -271,7 +372,7 @@ export function BlockGutter({
     }
   };
 
-  const onKey = (e: KeyboardEvent, id: number) => {
+  const onKey = (e: ReactKeyboardEvent, id: number) => {
     if (!model) return;
     const unit = model.units[id];
     if (picking) {
@@ -338,7 +439,8 @@ export function BlockGutter({
       ...(picking ? [picking.unit] : []),
     ]),
   ];
-  const drop = picking ? slotLine(p, model, picking.slots[picking.index], anchors) : null;
+  const dropSlot = picking ? picking.slots[picking.index] : (dragging?.slot ?? null);
+  const drop = dropSlot ? slotLine(p, model, dropSlot, anchors) : null;
 
   return (
     <div ref={layer} className={styles.layer}>
@@ -351,7 +453,16 @@ export function BlockGutter({
       {flash !== null && anchors.get(flash) && (
         <div className={styles.flash} style={placeOf(anchors.get(flash)!)} aria-hidden="true" />
       )}
-      {drop && <div className={styles.drop} style={drop} aria-hidden="true" />}
+      {drop && <div className={styles.drop} style={drop} aria-hidden="true" data-drop-line="" />}
+      {dragging && (
+        <div
+          className={styles.ghost}
+          style={{ left: dragging.x + 12, top: dragging.y + 8 }}
+          aria-hidden="true"
+        >
+          {name(dragging.id)}
+        </div>
+      )}
       {visible.map((id) => {
         const el = anchors.get(id);
         if (!el) return null;
@@ -401,6 +512,7 @@ export function BlockGutter({
               aria-keyshortcuts="Alt+ArrowUp Alt+ArrowDown Enter"
               onFocus={() => setCurrent(id)}
               onKeyDown={(e) => onKey(e, id)}
+              onPointerDown={(e) => startDrag(e, id)}
             >
               <svg
                 width="12"

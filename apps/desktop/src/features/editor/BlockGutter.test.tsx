@@ -116,3 +116,105 @@ describe('the block gutter in the Split pane (M4 §4)', () => {
     expect(violations).toEqual([]);
   });
 });
+
+/** jsdom has no layout: blocks 20 px tall, 30 px apart, items 24 px in. */
+function layout(pane: HTMLElement) {
+  pane.getBoundingClientRect = () => new DOMRect(0, 0, 600, 400);
+  let y = 0;
+  for (const el of pane.querySelectorAll<HTMLElement>('[data-source-start]')) {
+    if (el.tagName === 'P' && el.closest('li')) continue;
+    const top = y;
+    const left = el.tagName === 'LI' ? 40 : 16;
+    el.getBoundingClientRect = () => new DOMRect(left, top, 500, 20);
+    y += 30;
+  }
+}
+const pointer = (
+  target: EventTarget,
+  type: string,
+  x: number,
+  y: number,
+  init: PointerEventInit = {},
+) =>
+  act(() => {
+    target.dispatchEvent(
+      new PointerEvent(type, {
+        bubbles: true,
+        cancelable: true,
+        clientX: x,
+        clientY: y,
+        button: 0,
+        ...init,
+      }),
+    );
+  });
+
+describe('dragging a block (M4 §4)', () => {
+  it('acceptance: drag P3 above P1, and the source follows', async () => {
+    const pane = await split('P1\n\nP2\n\nP3\n');
+    layout(pane);
+    await hover(block(pane, 'P3'));
+    const g = grip('P3');
+    await pointer(g, 'pointerdown', 4, 61);
+    await pointer(window, 'pointermove', 4, 30);
+    await pointer(window, 'pointermove', 4, 2);
+    expect(document.querySelector('[data-drop-line]')).not.toBeNull();
+    await pointer(window, 'pointerup', 4, 2);
+    expect(source()).toBe('P3\n\nP1\n\nP2\n');
+    expect(status()).toBe('Moved P3.');
+    expect(document.querySelector('[data-drop-line]')).toBeNull();
+  });
+
+  it('Escape cancels a drag; a click without a drag moves nothing', async () => {
+    const pane = await split('P1\n\nP2\n\nP3\n');
+    layout(pane);
+    await hover(block(pane, 'P3'));
+    await pointer(grip('P3'), 'pointerdown', 4, 61);
+    await pointer(window, 'pointermove', 4, 2);
+    await act(() => fireEvent.keyDown(window, { key: 'Escape' }));
+    expect(document.querySelector('[data-drop-line]')).toBeNull();
+    await pointer(window, 'pointerup', 4, 2);
+    expect(source()).toBe('P1\n\nP2\n\nP3\n');
+    expect(status()).toBe('Move cancelled.');
+    await pointer(grip('P3'), 'pointerdown', 4, 61);
+    await pointer(window, 'pointerup', 5, 62);
+    expect(source()).toBe('P1\n\nP2\n\nP3\n');
+  });
+
+  it('a list item goes to the level under the pointer', async () => {
+    const pane = await split('- a\n- b\n- c\n');
+    layout(pane);
+    await hover(block(pane, 'c'));
+    await pointer(grip('c'), 'pointerdown', 20, 91);
+    // Just under `a`, right of its text column: nested under it.
+    await pointer(window, 'pointermove', 70, 52);
+    await pointer(window, 'pointerup', 70, 52);
+    expect(source()).toBe('- a\n  - c\n- b\n');
+  });
+
+  it('dragging near the bottom edge scrolls the pane', async () => {
+    const pane = await split('P1\n\nP2\n\nP3\n');
+    layout(pane);
+    let top = 0;
+    Object.defineProperty(pane, 'scrollTop', {
+      configurable: true,
+      get: () => top,
+      set: (v: number) => (top = v),
+    });
+    await hover(block(pane, 'P1'));
+    await pointer(grip('P1'), 'pointerdown', 4, 1);
+    await pointer(window, 'pointermove', 4, 395);
+    await vi.waitFor(() => expect(top).toBeGreaterThan(20));
+    await pointer(window, 'pointerup', 4, 395);
+  });
+
+  it('Alt held at the drop moves a heading without its section', async () => {
+    const pane = await split('# A\n\npa\n\n# B\n\npb\n');
+    layout(pane);
+    await hover(block(pane, 'A'));
+    await pointer(grip('A'), 'pointerdown', 4, 1);
+    await pointer(window, 'pointermove', 4, 115, { altKey: true });
+    await pointer(window, 'pointerup', 4, 115, { altKey: true });
+    expect(source()).toBe('pa\n\n# B\n\npb\n\n# A\n');
+  });
+});
