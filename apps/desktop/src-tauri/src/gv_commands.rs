@@ -1,7 +1,7 @@
 //! M3a §8: the Global View — levels and their cards, edges between visible
 //! cards, pinned card positions. Thin wrappers over `nimw-session`.
 
-use crate::dto::{GvEdgeDto, GvLevelDto, GvLevelResultDto};
+use crate::dto::{GvCardDto, GvEdgeDto, GvLevelDto, GvLevelResultDto};
 use crate::error::{CmdResult, CommandError, ErrorKind};
 use crate::state::AppState;
 use crate::vault_commands::blocking;
@@ -100,6 +100,54 @@ pub async fn layout_set<R: Runtime>(
 ) -> CmdResult<()> {
     blocking(app, move |app| {
         layout_set_impl(&app.state::<AppState>(), level, positions)
+    })
+    .await
+}
+
+pub(crate) fn link_target_impl(
+    state: &AppState,
+    source: String,
+    target: String,
+) -> CmdResult<String> {
+    Ok(state
+        .session()?
+        .link_target(&VaultPath::new(&source)?, &VaultPath::new(&target)?)?)
+}
+
+pub(crate) fn index_pick_set_impl(
+    state: &AppState,
+    folder: String,
+    page: Option<String>,
+) -> CmdResult<GvCardDto> {
+    let page = page.as_deref().map(VaultPath::new).transpose()?;
+    Ok(state
+        .session()?
+        .index_pick_set(&VaultPath::new(&folder)?, page.as_ref())?
+        .into())
+}
+
+/// M3b §6: the shortest wiki target from `source` to the vault path `target`.
+#[tauri::command]
+pub async fn link_target<R: Runtime>(
+    app: AppHandle<R>,
+    source: String,
+    target: String,
+) -> CmdResult<String> {
+    blocking(app, move |app| {
+        link_target_impl(&app.state::<AppState>(), source, target)
+    })
+    .await
+}
+
+/// M3b §4: picks (or clears, `page: null`) a folder's index note.
+#[tauri::command]
+pub async fn index_pick_set<R: Runtime>(
+    app: AppHandle<R>,
+    folder: String,
+    page: Option<String>,
+) -> CmdResult<GvCardDto> {
+    blocking(app, move |app| {
+        index_pick_set_impl(&app.state::<AppState>(), folder, page)
     })
     .await
 }

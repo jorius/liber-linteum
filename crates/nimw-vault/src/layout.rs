@@ -169,6 +169,37 @@ impl Vault {
         })
     }
 
+    /// Index-note picks (`.nimw/vault.json` `indexPicks`) follow a batch of
+    /// renames, folder keys and page values alike (M3b §4); one write, and
+    /// none when nothing moved.
+    pub fn remap_index_picks_many(&self, renames: &[(String, String)]) -> Result<()> {
+        if renames.is_empty() {
+            return Ok(());
+        }
+        let moves: HashMap<&str, &str> = renames
+            .iter()
+            .map(|(from, to)| (from.as_str(), to.as_str()))
+            .collect();
+        self.update_json_object(crate::vault::NIMW_JSON, false, |map| {
+            let Some(picks) = map
+                .get_mut("indexPicks")
+                .and_then(serde_json::Value::as_object_mut)
+            else {
+                return;
+            };
+            for (folder, page) in std::mem::take(picks) {
+                let page = match page {
+                    serde_json::Value::String(p) => {
+                        serde_json::Value::String(remap(&p, &moves).unwrap_or(p))
+                    }
+                    other => other,
+                };
+                let folder = remap(&folder, &moves).unwrap_or(folder);
+                picks.insert(folder, page);
+            }
+        })
+    }
+
     /// True when `path` names something on disk (`""`: the vault).
     fn path_exists(&self, path: &str) -> bool {
         path.is_empty()

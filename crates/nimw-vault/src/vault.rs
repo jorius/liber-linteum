@@ -205,6 +205,33 @@ impl Vault {
         nimw.index_picks
     }
 
+    /// Picks (`Some`) or clears (`None`) `folder`'s index note in
+    /// `.nimw/vault.json` (M3b §4), keeping every other key. Clearing a pick
+    /// that isn't there writes nothing, and a vault without the file gets one
+    /// only for a pick (VLT-02).
+    pub fn set_index_pick(&self, folder: &str, page: Option<&str>) -> Result<()> {
+        self.update_json_object(NIMW_JSON, page.is_some(), |map| {
+            let picks = map
+                .entry("indexPicks")
+                .or_insert_with(|| serde_json::Value::Object(Default::default()));
+            if !picks.is_object() {
+                *picks = serde_json::Value::Object(Default::default());
+            }
+            let picks = picks.as_object_mut().expect("an object");
+            match page {
+                Some(page) => {
+                    picks.insert(folder.to_string(), page.into());
+                }
+                None => {
+                    picks.remove(folder);
+                }
+            }
+            if picks.is_empty() {
+                map.remove("indexPicks");
+            }
+        })
+    }
+
     /// Non-fatal configuration problems found while opening.
     pub fn warnings(&self) -> &[String] {
         &self.warnings

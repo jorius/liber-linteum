@@ -194,11 +194,15 @@ pub(crate) fn parse(src: &str, yaml: Range<usize>) -> Frontmatter {
                 }
             }
             Some("related") => {
-                if let Node::Seq(items) = value {
-                    for item in items {
-                        if let Some(link) = related_link(item, &locate) {
-                            fm.links.push(link);
-                        }
+                // A list of relationships, or one written without the list
+                // (M3b §5: parity with the TS reader).
+                let items: &[Node] = match value {
+                    Node::Seq(items) => items,
+                    single => std::slice::from_ref(single),
+                };
+                for item in items {
+                    if let Some(link) = related_link(item, &locate) {
+                        fm.links.push(link);
                     }
                 }
             }
@@ -316,6 +320,20 @@ mod tests {
         assert_eq!(game.label.as_deref(), Some("playable version"));
         assert!(game.directed);
         assert!(!f.links[0].directed);
+    }
+
+    #[test]
+    fn m3b_a_scalar_related_counts_as_a_one_item_list() {
+        let one = fm("---\nrelated: \"[[Beta]]\"\n---\n");
+        assert_eq!(one.links.len(), 1);
+        assert_eq!(one.links[0].target, "Beta");
+        assert!(!one.links[0].directed);
+        let map = fm("---\nrelated: { link: \"[[Gamma]]\", label: why, directed: true }\n---\n");
+        assert_eq!(map.links.len(), 1);
+        assert_eq!(map.links[0].target, "Gamma");
+        assert_eq!(map.links[0].label.as_deref(), Some("why"));
+        assert!(map.links[0].directed);
+        assert!(fm("---\nrelated: not a link\n---\n").links.is_empty());
     }
 
     #[test]

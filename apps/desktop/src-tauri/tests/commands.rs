@@ -46,6 +46,8 @@ const COMMANDS: &[&str] = &[
     "gv_edges",
     "layout_get",
     "layout_set",
+    "link_target",
+    "index_pick_set",
 ];
 
 struct Harness {
@@ -1180,4 +1182,75 @@ fn m3a_layout_get_set_over_ipc() {
         call(&h.main, "layout_get", json!({ "level": "" })).unwrap(),
         json!({})
     );
+}
+
+/// M3b §6: the wiki target a relationship writes, and index-note picks, over
+/// IPC; a pick answers the folder's card, and only visible paths are taken.
+#[test]
+fn m3b_link_target_and_index_pick_set_over_ipc() {
+    let h = harness();
+    let vault = open_fixture(&h, "obsidian-basic");
+    assert_eq!(
+        call(
+            &h.main,
+            "link_target",
+            json!({ "source": "Welcome.md", "target": "Character Design/DMC/Sparda.md" })
+        )
+        .unwrap(),
+        json!("Sparda")
+    );
+    assert_eq!(
+        kind(
+            call(
+                &h.main,
+                "link_target",
+                json!({ "source": "Welcome.md", "target": "nope.md" })
+            )
+            .unwrap_err()
+        ),
+        "notFound"
+    );
+
+    assert!(!vault.path().join(".nimw").exists(), "VLT-02");
+    let card = call(
+        &h.main,
+        "index_pick_set",
+        json!({ "folder": "Character Design", "page": "Character Design/My characters.md" }),
+    )
+    .unwrap();
+    assert_eq!(card["path"], "Character Design");
+    assert_eq!(card["indexPage"], "Character Design/My characters.md");
+    assert_eq!(card["indexFrom"], "picked");
+    let json: Value = serde_json::from_str(
+        &std::fs::read_to_string(vault.path().join(".nimw/vault.json")).unwrap(),
+    )
+    .unwrap();
+    assert_eq!(
+        json["indexPicks"]["Character Design"],
+        "Character Design/My characters.md"
+    );
+    let cleared = call(
+        &h.main,
+        "index_pick_set",
+        json!({ "folder": "Character Design", "page": null }),
+    )
+    .unwrap();
+    assert_eq!(cleared["indexPage"], Value::Null);
+
+    for (folder, page) in [
+        (".obsidian", ".obsidian/app.json"),
+        ("Character Design", "Welcome.md"),
+        ("Character Design", "Character Design/DMC/Sparda.md"),
+        ("Character Design", "../x.md"),
+    ] {
+        assert!(
+            call(
+                &h.main,
+                "index_pick_set",
+                json!({ "folder": folder, "page": page })
+            )
+            .is_err(),
+            "{folder} ← {page}"
+        );
+    }
 }

@@ -112,6 +112,8 @@ pub fn configure<R: tauri::Runtime>(
         gv_commands::gv_edges,
         gv_commands::layout_get,
         gv_commands::layout_set,
+        gv_commands::link_target,
+        gv_commands::index_pick_set,
     ])
 }
 

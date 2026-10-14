@@ -305,6 +305,10 @@ export interface GvCard {
   hasAudio: boolean;
   /** Folders: the page previewed on the card. */
   indexPage: string | null;
+  /** Folders: which GV-02 rule chose `indexPage` (M3b §4); a pick is offered
+   *  unless it is `named` or `index`. The backend always sends it; optional
+   *  only so card fixtures written before it needn't list it. */
+  indexFrom?: 'named' | 'index' | 'picked' | 'only' | null;
   pages: number;
   folders: number;
   childTitles: string[];
@@ -398,6 +402,12 @@ export const layoutGet = (level: string) =>
   call<Record<string, CardPosition>>('layout_get', { level });
 export const layoutSet = (level: string, positions: Record<string, CardPosition>) =>
   call<void>('layout_set', { level, positions });
+/** M3b §6: the shortest wiki target from `source` to the vault path `target`. */
+export const linkTarget = (source: string, target: string) =>
+  call<string>('link_target', { source, target });
+/** M3b §4: picks (or clears, `null`) a folder's index note; answers its card. */
+export const indexPickSet = (folder: string, page: string | null) =>
+  call<GvCard>('index_pick_set', { folder, page });
 export const vaultSettingsGet = () => call<VaultSettings>('vault_settings_get');
 export const vaultSettingsSet = (patch: VaultSettingsPatch) =>
   call<VaultSettings>('vault_settings_set', { patch });

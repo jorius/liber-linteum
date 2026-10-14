@@ -2,7 +2,8 @@
 //! cards (index notes, folder summaries, covers), edges and layouts.
 
 use nimw_session::{
-    CardKind, EdgeKind, GvCard, GvEdge, GvLevel, Relation, SessionEvent, VaultSession,
+    CardKind, EdgeKind, GvCard, GvEdge, GvLevel, IndexFrom, Relation, SessionError, SessionEvent,
+    VaultSession,
 };
 use nimw_vault::VaultPath;
 use std::path::Path;
@@ -526,4 +527,146 @@ fn m3a_an_external_move_of_1000_pinned_notes_writes_the_layout_once() {
     assert!(pinned.keys().all(|k| k.starts_with("B/")), "{pinned:?}");
     eprintln!("external move of {N} pinned notes, watcher batch: {took:?}");
     assert!(took < std::time::Duration::from_secs(1), "{took:?}");
+}
+
+/// M3b §4: which GV-02 rule chose a folder's index note — a pick is offered
+/// only where rules 1–2 (named like the folder, `index.md`) give nothing.
+#[test]
+fn m3b_index_from_tells_which_rule_chose_the_index_note() {
+    let dir = vault();
+    let (_c, s) = open(dir.path());
+    let level = s.gv_children(&GvLevel::Vault).unwrap();
+    assert_eq!(
+        card(&level.cards, "Alpha").index_from,
+        Some(IndexFrom::Named)
+    );
+    assert_eq!(card(&level.cards, "Beta").index_from, Some(IndexFrom::Only));
+    assert_eq!(
+        card(&level.cards, "Gamma").index_from,
+        Some(IndexFrom::Picked)
+    );
+    assert_eq!(card(&level.cards, "Delta").index_from, None);
+    assert_eq!(card(&level.cards, "Welcome.md").index_from, None);
+    let alpha = s.gv_children(&GvLevel::Folder(vp("Alpha"))).unwrap();
+    assert_eq!(
+        card(&alpha.cards, "Alpha/Sub").index_from,
+        Some(IndexFrom::Index)
+    );
+}
+
+/// M3b §4, §6: picking a folder's index note writes `.nimw/vault.json`
+/// (other keys kept) and answers the folder's new card; clearing removes it.
+#[test]
+fn m3b_index_pick_set_writes_the_pick_and_answers_the_card() {
+    let dir = vault();
+    std::fs::write(
+        dir.path().join(".nimw/vault.json"),
+        r#"{"version":1,"exclude":["Private/**"],"indexPicks":{"Gamma":"Gamma/b.md"},"future":{"x":1}}"#,
+    )
+    .unwrap();
+    let (_c, s) = open(dir.path());
+    let card = s
+        .index_pick_set(&vp("Delta"), Some(&vp("Delta/x.md")))
+        .unwrap();
+    assert_eq!(card.path, "Delta");
+    assert_eq!(card.kind, CardKind::Project);
+    assert_eq!(card.index_page.as_deref(), Some("Delta/x.md"));
+    assert_eq!(card.index_from, Some(IndexFrom::Picked));
+    let json: serde_json::Value = serde_json::from_str(
+        &std::fs::read_to_string(dir.path().join(".nimw/vault.json")).unwrap(),
+    )
+    .unwrap();
+    assert_eq!(json["indexPicks"]["Delta"], "Delta/x.md");
+    assert_eq!(json["indexPicks"]["Gamma"], "Gamma/b.md");
+    assert_eq!(json["exclude"][0], "Private/**");
+    assert_eq!(json["future"]["x"], 1);
+
+    let cleared = s.index_pick_set(&vp("Delta"), None).unwrap();
+    assert_eq!(cleared.index_page, None);
+    let json: serde_json::Value = serde_json::from_str(
+        &std::fs::read_to_string(dir.path().join(".nimw/vault.json")).unwrap(),
+    )
+    .unwrap();
+    assert!(json["indexPicks"].get("Delta").is_none());
+
+    // Only a visible folder, and a page directly inside it.
+    for (folder, page) in [
+        ("Delta", "Delta/Inner/i.md"),
+        ("Delta", "Alpha/note.md"),
+        ("Delta", "Delta/attachments/pic.png"),
+        ("Nope", "Nope/a.md"),
+        ("Welcome.md", "Welcome.md"),
+    ] {
+        assert!(
+            s.index_pick_set(&vp(folder), Some(&vp(page))).is_err(),
+            "{folder} ← {page}"
+        );
+    }
+}
+
+/// A vault with no `.nimw/` gets one only when something is picked (VLT-02).
+#[test]
+fn m3b_a_pick_creates_vault_json_lazily() {
+    let dir = vault();
+    std::fs::remove_dir_all(dir.path().join(".nimw")).unwrap();
+    let (_c, s) = open(dir.path());
+    s.index_pick_set(&vp("Delta"), None).unwrap();
+    assert!(
+        !dir.path().join(".nimw").exists(),
+        "clearing nothing writes nothing"
+    );
+    s.index_pick_set(&vp("Delta"), Some(&vp("Delta/y.md")))
+        .unwrap();
+    assert!(dir.path().join(".nimw/vault.json").exists());
+}
+
+/// M3b §4: picks follow renames of the folder and of the page.
+#[test]
+fn m3b_index_picks_follow_renames() {
+    let dir = vault();
+    let (_c, s) = open(dir.path());
+    s.rename(&vp("Gamma"), &vp("Gamma 2"), false).unwrap();
+    assert_eq!(
+        s.vault().index_picks().get("Gamma 2").map(String::as_str),
+        Some("Gamma 2/b.md")
+    );
+    s.rename(&vp("Gamma 2/b.md"), &vp("Gamma 2/home.md"), false)
+        .unwrap();
+    assert_eq!(
+        s.vault().index_picks().get("Gamma 2").map(String::as_str),
+        Some("Gamma 2/home.md")
+    );
+    let level = s.gv_children(&GvLevel::Vault).unwrap();
+    assert_eq!(
+        card(&level.cards, "Gamma 2").index_page.as_deref(),
+        Some("Gamma 2/home.md")
+    );
+}
+
+/// M3b §6: the wiki target a relationship writes — the shortest unique one.
+#[test]
+fn m3b_link_target_is_the_shortest_unique_wiki_target() {
+    let dir = vault();
+    write(dir.path(), "Beta/note.md", "# Another note\n");
+    let (_c, s) = open(dir.path());
+    assert_eq!(
+        s.link_target(&vp("Welcome.md"), &vp("zeta.md")).unwrap(),
+        "zeta"
+    );
+    // Two `note` pages: `[[note]]` resolves to the first by path order, so
+    // the other one needs its folder (as `link_suggest` writes it).
+    assert_eq!(
+        s.link_target(&vp("Welcome.md"), &vp("Alpha/note.md"))
+            .unwrap(),
+        "note"
+    );
+    assert_eq!(
+        s.link_target(&vp("Welcome.md"), &vp("Beta/note.md"))
+            .unwrap(),
+        "Beta/note"
+    );
+    assert!(matches!(
+        s.link_target(&vp("Welcome.md"), &vp("missing.md")),
+        Err(SessionError::NotIndexed(_))
+    ));
 }
