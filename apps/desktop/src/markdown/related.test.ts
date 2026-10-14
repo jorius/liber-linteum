@@ -90,6 +90,43 @@ describe('appending a relationship (M3b §2, §5)', () => {
     expect(appendRelated('---\nx: &a [1]\nrelated: *a\n---\n', 'A')).toEqual({ ok: false });
     expect(appendRelated('---\r\nrelated: []\r\n---\r\n', 'A')).toEqual({ ok: false });
   });
+
+  it('a comment after a single value or a flow list stays on the key’s line (final review m1)', () => {
+    const one = '---\nrelated: "[[A]]"  # main link\nz: 1\n---\nB\n';
+    expect(apply(one, appendRelated(one, 'C'))).toBe(
+      '---\nrelated: # main link\n  - "[[A]]"\n  - "[[C]]"\nz: 1\n---\nB\n',
+    );
+    const flow = '---\nrelated: ["[[A]]", "[[B]]"] # keep me\nz: 1\n---\nB\n';
+    expect(apply(flow, appendRelated(flow, 'C'))).toBe(
+      '---\nrelated: # keep me\n  - "[[A]]"\n  - "[[B]]"\n  - "[[C]]"\nz: 1\n---\nB\n',
+    );
+    expect(apply(flow, removeRelated(flow, 0))).toBe(
+      '---\nrelated: # keep me\n  - "[[B]]"\nz: 1\n---\nB\n',
+    );
+    expect(apply(flow, updateRelated(flow, 1, { label: 'x', directed: false }))).toBe(
+      '---\nrelated: # keep me\n  - "[[A]]"\n  - { link: "[[B]]", label: x }\nz: 1\n---\nB\n',
+    );
+    const before = '---\nrelated: # mine\n  ["[[A]]"]\n---\n';
+    expect(apply(before, appendRelated(before, 'C'))).toBe(
+      '---\nrelated: # mine\n  - "[[A]]"\n  - "[[C]]"\n---\n',
+    );
+    const empty = '---\nrelated: # none yet\nz: 1\n---\n';
+    expect(apply(empty, appendRelated(empty, 'C'))).toBe(
+      '---\nrelated: # none yet\n  - "[[C]]"\nz: 1\n---\n',
+    );
+  });
+
+  it('a comment inside a multi-line flow list is refused rather than dropped (final review m1)', () => {
+    const text = '---\nrelated: [\n  "[[A]]", # first\n  "[[B]]"\n]\nz: 1\n---\nB\n';
+    expect(appendRelated(text, 'C')).toEqual({ ok: false });
+    expect(removeRelated(text, 1)).toEqual({ ok: false });
+    expect(updateRelated(text, 1, { label: 'x', directed: false })).toEqual({ ok: false });
+    // Without comments, it is rewritten as a block list.
+    const plain = '---\nrelated: [\n  "[[A]]",\n  "[[B]]"\n]\nz: 1\n---\nB\n';
+    expect(apply(plain, appendRelated(plain, 'C'))).toBe(
+      '---\nrelated:\n  - "[[A]]"\n  - "[[B]]"\n  - "[[C]]"\nz: 1\n---\nB\n',
+    );
+  });
 });
 
 describe('editing and deleting a relationship (M3b §3, §5)', () => {
@@ -246,6 +283,11 @@ describe('sweep: every relationship edit reads back exactly or is refused', () =
     '---\nrelated:\n  - { link: "[[A]]", label: 2024, kind: parent }\n  - "[[B]]"\n---\n',
     '---\nrelated:\n  - label: first\n    link: "[[A]]"\n    directed: true\n---\n',
     '---\nrelated:\n  - {\n      link: "[[A]]", # c\n      label: x,\n      color: red\n    }\n---\n',
+    // Final review m1: comments around a rewritten value.
+    '---\nrelated: "[[A]]"  # main link\nz: 1\n---\n',
+    '---\nrelated: ["[[A]]", "[[B]]"] # keep me\n---\n',
+    '---\nrelated: [\n  "[[A]]", # first\n  "[[B]]"\n]\n---\n',
+    '---\nrelated: # mine\n  ["[[A]]"]  # and mine\n---\n',
   ];
   /** An item without its label and arrow (a string item: its link). */
   const rest = (item: unknown) =>
@@ -277,6 +319,11 @@ describe('sweep: every relationship edit reads back exactly or is refused', () =
       expect(parsePage(out).frontmatter?.error, name).toBeUndefined();
       const body = (t: string) => t.replace(/^---\n[\s\S]*?\n?---(?:\n|$)/, '');
       expect(body(out), name).toBe(body(text));
+      if (!name.startsWith('remove')) {
+        // Comments are kept (final review m1).
+        const comments = (t: string) => t.match(/(?<=^|\s)#[^\n]*/gm) ?? [];
+        for (const c of comments(text)) expect(comments(out), name).toContain(c);
+      }
       if (name.endsWith(' 0') && !name.startsWith('remove')) {
         // An edit changes the label and arrow only (final review I1).
         expect(list(out).map(rest), name).toEqual(list(text).map(rest));

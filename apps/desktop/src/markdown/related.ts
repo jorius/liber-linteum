@@ -9,8 +9,8 @@ import {
   isScalar,
   isSeq,
   parseDocument,
+  Parser,
   stringify,
-  visit,
   type Pair,
   type YAMLMap,
 } from 'yaml';
@@ -156,15 +156,38 @@ function editRelated(
   return { ok: true, change: { from: innerFrom, to: innerTo, insert: next } };
 }
 
+/** The comments (`# …`) that start in `src` between `from` and `to`. */
+function commentsIn(src: string, from: number, to: number): string[] {
+  const out: string[] = [];
+  const walk = (token: unknown): void => {
+    if (Array.isArray(token)) token.forEach(walk);
+    else if (token && typeof token === 'object') {
+      const t = token as { type?: string; offset?: number; source?: string };
+      if (t.type === 'comment' && typeof t.offset === 'number') {
+        if (t.offset >= from && t.offset < to) out.push(t.source ?? '');
+      } else Object.values(token).forEach(walk);
+    }
+  };
+  for (const token of new Parser().parse(src)) walk(token);
+  return out;
+}
+
 /** The `related:` pair as a block list of `items` (source text each), from
- *  the key to the end of its value's line. */
-function rewritePair(src: string, pair: Pair, indent: string, items: string[]): string {
+ *  the key to the end of its value's line. A comment on those lines (after
+ *  the key or after the value) stays, on the key's line, as M2c's
+ *  `setFrontmatter` keeps one; more (e.g. inside a multi-line flow list)
+ *  can't be kept, so `null` refuses (final review m1). */
+function rewritePair(src: string, pair: Pair, indent: string, items: string[]): string | null {
   const k = pair.key as { range: Range };
   const v = pair.value as { range?: Range } | null;
   const end = lineEnd(src, v?.range?.[1] ?? k.range[1]);
   const from = lineStart(src, k.range[0]);
+  const comments = commentsIn(src, from, end);
+  if (comments.length > 1) return null;
+  if (v?.range && commentsIn(src, v.range[0], v.range[1]).length) return null;
+  const comment = comments.length ? ` ${comments[0].trim()}` : '';
   const body = items.length
-    ? `${indent}related:\n${items.map((i) => `${indent}  - ${i}\n`).join('')}`
+    ? `${indent}related:${comment}\n${items.map((i) => `${indent}  - ${i}\n`).join('')}`
     : '';
   return src.slice(0, from) + body + src.slice(end);
 }
@@ -221,16 +244,6 @@ function pairYaml(key: string, value: unknown): string {
   return stringify({ [key]: value }, { collectionStyle: 'flow', lineWidth: 0 })
     .replace(/\n$/, '')
     .slice(2, -2);
-}
-
-/** Whether a node holds a comment anywhere inside. */
-function hasComments(node: unknown): boolean {
-  let found = false;
-  visit(node as Parameters<typeof visit>[0], (_key, n) => {
-    const c = n as { comment?: string | null; commentBefore?: string | null } | null;
-    if (c?.comment || c?.commentBefore) found = true;
-  });
-  return found;
 }
 
 /** What one map item's `label` and `directed` pairs become: `undefined`
@@ -360,9 +373,7 @@ export function updateRelated(text: string, index: number, change: RelatedChange
       (k) => mapChange[k] != null && !keys.includes(k),
     );
     // A comment inside the map would go with it.
-    const commented =
-      pairs.some((p) => hasComments(p.key) || hasComments(p.value)) ||
-      (!node.flow && Boolean(node.comment || node.commentBefore));
+    const commented = commentsIn(src, r[0], end).length > 0;
     if (kept.length === 1 && kept[0] === 'link' && !adds.length && !commented) {
       collapsed = true;
       return [
