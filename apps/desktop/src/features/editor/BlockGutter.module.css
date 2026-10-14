@@ -18,13 +18,16 @@
 }
 
 /* The block with the keyboard keeps a gutter for its tab stop, shown only
-   while it has the keyboard. */
+   while it has the keyboard. Until then the pointer goes through it (final
+   review M8). */
 .idle {
   opacity: 0;
+  pointer-events: none;
 }
 
 .idle:focus-within {
   opacity: 1;
+  pointer-events: auto;
 }
 
 .extra {

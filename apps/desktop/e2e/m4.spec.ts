@@ -80,6 +80,25 @@ test('a block’s grip can be reached with the pointer: its gutter stays while t
   await expect(page.getByRole('button', { name: 'Move up' })).toBeVisible();
 });
 
+test('final review M8: the first block’s hidden tab-stop gutter can’t be grabbed until it has the keyboard', async ({
+  page,
+}) => {
+  const pane = await open(page, 'P1\n\nP2\n\nP3\n');
+  await pane.getByText('P3').hover();
+  // P1's gutter is there for Tab, unseen: the pointer goes through it.
+  const grip = page.getByRole('button', { name: 'Drag to reorder: P1' });
+  const g = (await grip.boundingBox())!;
+  const hit = () =>
+    page.evaluate(
+      ([x, y]) => !!document.elementFromPoint(x, y)?.closest('[data-grip]'),
+      [g.x + g.width / 2, g.y + g.height / 2],
+    );
+  expect(await hit()).toBe(false);
+  // With the keyboard, it shows and takes the pointer.
+  await grip.focus();
+  expect(await hit()).toBe(true);
+});
+
 test('acceptance: a heading dragged below the next section takes its paragraphs along', async ({
   page,
 }) => {
