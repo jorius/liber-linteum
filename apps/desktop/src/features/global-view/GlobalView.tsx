@@ -67,6 +67,10 @@ export function GlobalView() {
     if (lost || area.current?.contains(active)) emptyNote.current?.focus();
   }, [loaded, empty, shownKey]);
 
+  // Connect mode ends with the view (⌘1, a page opened elsewhere; final
+  // review m8).
+  useEffect(() => () => useGvStore.getState().cancelConnect(), []);
+
   // Load on show; re-read when the vault or a saved page changes.
   useEffect(() => {
     void useGvStore.getState().load();

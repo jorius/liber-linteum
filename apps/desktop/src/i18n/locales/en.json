@@ -293,6 +293,7 @@
       "connecting": "Connecting",
       "pick": "Pick the card to connect: {name} → ?",
       "noIndex": "{name} has no index note. Pick one first.",
+      "samePage": "{a} and {b} stand for the same page: it can’t be related to itself.",
       "created": "Relationship created.",
       "of": "Relationships of {name}",
       "between": "Relationships between {a} and {b}",

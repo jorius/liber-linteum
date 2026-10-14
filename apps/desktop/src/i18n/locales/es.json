@@ -293,6 +293,7 @@
       "connecting": "Conectando",
       "pick": "Elige la tarjeta que conectar: {name} → ?",
       "noIndex": "{name} no tiene nota índice. Elige una primero.",
+      "samePage": "{a} y {b} representan la misma página: no se puede relacionar consigo misma.",
       "created": "Relación creada.",
       "of": "Relaciones de {name}",
       "between": "Relaciones entre {a} y {b}",

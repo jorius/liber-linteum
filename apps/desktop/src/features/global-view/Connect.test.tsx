@@ -4,7 +4,7 @@
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { GvCard, GvLevel, GvLevelRef } from '../../ipc';
+import type { GvCard, GvEdge, GvLevel, GvLevelRef } from '../../ipc';
 import { clearMocks } from '../../ipc/testing';
 import { resetEditorStore } from '../../stores/editorStore';
 import { DEFAULT_SETTINGS, useSettingsStore } from '../../stores/settingsStore';
@@ -60,9 +60,11 @@ const LEVELS: Record<string, GvLevel> = {
 
 let disk: FakeDisk;
 let edgeReads = 0;
+let edges: GvEdge[] = [];
 
 beforeEach(() => {
   edgeReads = 0;
+  edges = [];
   useSettingsStore.setState({ settings: { ...DEFAULT_SETTINGS } });
   useGvStore.getState().reset();
   useUiStore.setState({ screen: 'global', dialog: null });
@@ -77,7 +79,7 @@ beforeEach(() => {
       },
       gv_edges: () => {
         edgeReads++;
-        return [];
+        return edges;
       },
       layout_get: () => ({}),
       link_target: (a) => String(a.target).replace(/\.md$/, ''),
@@ -231,6 +233,114 @@ describe('connecting two cards (M3b §2)', () => {
       folder: 'Gamma',
       current: 'Gamma/b.md',
     });
+  });
+});
+
+describe('connect-mode corner cases (final review m8)', () => {
+  const connecting = () => useGvStore.getState().connectFrom !== null;
+
+  it('a folder and its index note’s own card are the same page: connect mode stays on, and says so', async () => {
+    const level = LEVELS[''];
+    LEVELS[''] = { ...level, cards: [...level.cards, card('Gamma/b.md', { title: 'Gamma B' })] };
+    try {
+      render(<GlobalView />);
+      await startConnect('Gamma');
+      fireEvent.click(await press('Gamma/b.md'));
+      const note = 'Gamma and Gamma B stand for the same page: it can’t be related to itself.';
+      await waitFor(() =>
+        expect(useToastStore.getState().toasts.map((t) => t.message)).toContain(note),
+      );
+      expect(useToastStore.getState().toasts.find((t) => t.message === note)?.tone).toBe('info');
+      expect(connecting()).toBe(true);
+      expect(screen.getByRole('status', { name: 'Connecting' })).toBeVisible();
+      // A drag says so too.
+      useToastStore.getState().clear();
+      await act(() => useGvStore.getState().connectByDrag('Gamma/b.md', 'Gamma'));
+      expect(useToastStore.getState().toasts.map((t) => t.message)).toEqual([
+        'Gamma B and Gamma stand for the same page: it can’t be related to itself.',
+      ]);
+      expect(disk.writes()).toEqual([]);
+    } finally {
+      LEVELS[''] = level;
+    }
+  });
+
+  it('a slow double click on the target only connects: the page doesn’t open', async () => {
+    render(<GlobalView />);
+    await startConnect('A');
+    fireEvent.click(await press('B.md'), { detail: 1 });
+    // The single click's wait runs out: that completes the connection.
+    await waitFor(() => expect(disk.files.get('A.md')).toContain('"[[B]]"'));
+    fireEvent.click(await press('B.md'), { detail: 2 });
+    fireEvent.dblClick(await press('B.md'), { detail: 2 });
+    await act(() => new Promise((r) => setTimeout(r, SINGLE_CLICK_MS + 20)));
+    expect(useUiStore.getState().screen).toBe('global');
+    expect(disk.calls.map(([cmd]) => cmd)).not.toContain('page_get');
+  });
+
+  it('a click on a relationship edge leaves connect mode and opens its dialog', async () => {
+    disk.files.set('A.md', '---\nrelated:\n  - "[[B]]"\n---\n# A\n');
+    edges = [
+      {
+        from: 'A.md',
+        to: 'B.md',
+        kind: 'manual',
+        aggregated: false,
+        directed: false,
+        count: 1,
+        label: null,
+      },
+    ];
+    render(<GlobalView />);
+    await startConnect('A');
+    const hit = await waitFor(() => {
+      const el = document.querySelector('[data-gv-hit]');
+      if (!el) throw new Error('no edge yet');
+      return el;
+    });
+    fireEvent.click(hit);
+    expect(connecting()).toBe(false);
+    expect(useUiStore.getState().dialog).toEqual({
+      type: 'relations',
+      page: 'A.md',
+      other: 'B.md',
+    });
+  });
+
+  it('a re-read of the level keeps connect mode and the keyboard where they are', async () => {
+    render(<GlobalView />);
+    await startConnect('A');
+    (await press('B.md')).focus();
+    // Each read answers new card objects.
+    const level = LEVELS[''];
+    LEVELS[''] = structuredClone(level);
+    try {
+      await act(() => useGvStore.getState().load());
+    } finally {
+      LEVELS[''] = level;
+    }
+    expect(connecting()).toBe(true);
+    expect(await press('B.md')).toHaveFocus();
+  });
+
+  it('leaving the Global View (⌘1) or the source card’s level ends connect mode', async () => {
+    const view = render(<GlobalView />);
+    await startConnect('A');
+    view.unmount();
+    expect(connecting()).toBe(false);
+
+    render(<GlobalView />);
+    await startConnect('B');
+    // B is gone from the level when it's read again (deleted, moved away).
+    const level = LEVELS[''];
+    LEVELS[''] = { ...level, cards: level.cards.filter((c) => c.path !== 'B.md') };
+    try {
+      await act(() => useGvStore.getState().load());
+      expect(connecting()).toBe(false);
+      expect(screen.queryByRole('status', { name: 'Connecting' })).not.toBeInTheDocument();
+    } finally {
+      LEVELS[''] = level;
+    }
   });
 });
 

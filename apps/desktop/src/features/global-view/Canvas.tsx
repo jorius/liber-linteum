@@ -115,8 +115,10 @@ export function Canvas({ mode, toggles, width, onOpen, onOpenEditor }: CanvasPro
   // A slow double click (final review I5): its first click's wait runs out
   // and the next level opens, so the second press lands on whatever card
   // now stands under the pointer. The OS still counts it as the second click
-  // (`detail` 2): it belongs to the card first clicked, not to that one.
-  const firstClick = useRef<{ card: GvCard; opened: boolean } | null>(null);
+  // (`detail` 2): it belongs to the card first clicked, not to that one. In
+  // connect mode the first click picked the card: that's all it does (M3b
+  // final review m8).
+  const firstClick = useRef<{ card: GvCard; opened: boolean; connecting: boolean } | null>(null);
   const open = useCallback(
     (card: GvCard) => {
       if (firstClick.current?.card.path === card.path) firstClick.current.opened = true;
@@ -128,7 +130,7 @@ export function Canvas({ mode, toggles, width, onOpen, onOpenEditor }: CanvasPro
     if (e.detail <= 1) {
       const path = (e.target as HTMLElement).closest<HTMLElement>('[data-gv-card]')?.dataset.gvCard;
       const card = canvas.cards.find((c) => c.path === path);
-      firstClick.current = card ? { card, opened: false } : null;
+      firstClick.current = card ? { card, opened: false, connecting: connectFrom !== null } : null;
     } else if (firstClick.current?.opened) {
       e.stopPropagation(); // no single click on the card under the pointer
     }
@@ -138,6 +140,7 @@ export function Canvas({ mode, toggles, width, onOpen, onOpenEditor }: CanvasPro
     if (!first?.opened) return; // a quick double click: the card handles it
     e.stopPropagation();
     firstClick.current = null;
+    if (first.connecting) return;
     // Its next level is open already; what's left is its page, if any.
     if (first.card.kind === 'page' || first.card.indexPage) onOpenEditor(first.card);
   };
@@ -225,11 +228,13 @@ export function Canvas({ mode, toggles, width, onOpen, onOpenEditor }: CanvasPro
     },
     [t],
   );
-  const openRelations = useCallback(
-    (page: string, other: string) =>
-      useUiStore.getState().openDialog({ type: 'relations', page, other }),
-    [],
-  );
+  /** A click on a relationship's edge: its dialog. In connect mode it isn't
+   *  a card picked, so it leaves connect mode first, like a click on the
+   *  background (final review m8). */
+  const openRelations = useCallback((page: string, other: string) => {
+    useGvStore.getState().cancelConnect();
+    useUiStore.getState().openDialog({ type: 'relations', page, other });
+  }, []);
 
   const tabStop = focus ?? canvas.centre ?? canvas.cards[0]?.path ?? null;
   const computed = useMemo<CardNode[]>(

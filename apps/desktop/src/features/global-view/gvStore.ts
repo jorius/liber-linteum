@@ -255,13 +255,24 @@ export const useGvStore = create<GvState>((set, get) => {
     return true;
   }
 
+  /** Two cards standing for the same page (a folder and its index note's
+   *  own card) can't be related: a polite note says why (final review m8). */
+  function samePage(a: GvCard, b: GvCard): boolean {
+    const page = pageOf(a);
+    if (!page || page !== pageOf(b)) return false;
+    useToastStore.getState().push({
+      message: i18next.t('gv.relations.samePage', { a: a.title, b: b.title }),
+      tone: 'info',
+    });
+    return true;
+  }
+
   /** Relates the pages `from` and `to` stand for: a new relationship (the
    *  edges are re-read), or the dialog of the one that exists. */
   async function relateCards(from: GvCard, to: GvCard) {
-    if (needsIndex(from) || needsIndex(to)) return;
+    if (needsIndex(from) || needsIndex(to) || samePage(from, to)) return;
     const source = pageOf(from)!;
     const target = pageOf(to)!;
-    if (source === target) return;
     const res = await relate(source, target);
     if (res.status === 'created') {
       useToastStore.getState().push({ message: i18next.t('gv.relations.created'), tone: 'info' });
@@ -322,6 +333,8 @@ export const useGvStore = create<GvState>((set, get) => {
       if (mine !== seq) return;
       const shown = new Set(canvas.cards.map((c) => c.path));
       const focus = get().focus;
+      // Connect mode ends with its source card's level (final review m8).
+      const from = get().connectFrom;
       const key = canvasKey(m, root);
       shownAt = { stack, expanded };
       const centre = canvas.cards.find((c) => c.path === canvas.centre);
@@ -337,6 +350,9 @@ export const useGvStore = create<GvState>((set, get) => {
         edges: edges.ok && Array.isArray(edges.value) ? edges.value : [],
         pinned: { ...(pinned.ok && pinned.value ? pinned.value : {}), ...unsaved(key) },
         focus: focus && shown.has(focus) ? focus : null,
+        // Kept as is otherwise: a new object would move the keyboard back to
+        // it (Canvas puts it on the source card when connect mode starts).
+        connectFrom: from && shown.has(from.path) ? from : null,
         loaded: true,
       });
     },
@@ -434,7 +450,8 @@ export const useGvStore = create<GvState>((set, get) => {
     cancelConnect: () => set({ connectFrom: null }),
     completeConnect: async (target) => {
       const from = get().connectFrom;
-      if (!from || target.path === from.path) return;
+      // Itself, or the same page: connect mode simply stays on (§2).
+      if (!from || target.path === from.path || samePage(from, target)) return;
       set({ connectFrom: null });
       await relateCards(from, target);
     },
