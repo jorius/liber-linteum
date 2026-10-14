@@ -119,7 +119,8 @@
     },
     "saveStatus": "Save status",
     "unsavedBlocks": "Unsaved changes in “{name}” couldn’t be written, so the vault stays open.",
-    "unsavedKeepsWindow": "Unsaved changes in “{name}” couldn’t be written, so the window stays open. Close it again to quit without them."
+    "unsavedKeepsWindow": "Unsaved changes in “{name}” couldn’t be written, so the window stays open. Close it again to quit without them.",
+    "copying": "Copying files…"
   },
   "preview": {
     "remoteBlocked": "Remote image blocked (privacy)",
@@ -246,5 +247,9 @@
     "positionValue": "{value}% from the top",
     "remote": "Remote cover not loaded (privacy)",
     "missing": "Cover image not found"
+  },
+  "attach": {
+    "dropOnText": "Drop files onto the page’s text to attach them",
+    "someFailed": "Some files weren’t attached"
   }
 }

@@ -12,6 +12,7 @@ import { useSettingsStore } from '../../stores/settingsStore';
 import { Preview } from '../preview/Preview';
 import styles from './Editor.module.css';
 import { followLinkAtCursor, livePreview, pagePath } from './livePreview';
+import { attachmentHandlers } from './attachments';
 import { activeFormats, editorKeymap, type ActiveFormat } from './format';
 import type { PageDoc } from './pageDoc';
 import { blockForOffset, offsetAtTop, topIn } from './scrollSync';
@@ -193,6 +194,8 @@ function createState(d: PageDoc, mode: EditorMode, label: string, numbers: boole
       theme,
       labelSlot.of(labelled(label)),
       modeSlot.of(modeExtensions(mode)),
+      // Pasted images and dropped files (M2c §5).
+      attachmentHandlers(),
       gutterSlot.of(gutter(numbers)),
       // Autosave also when the editor loses focus (M2a §3.3).
       EditorView.domEventHandlers({

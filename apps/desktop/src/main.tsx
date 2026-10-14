@@ -6,6 +6,7 @@ import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { App } from './app/App';
 import { detectLanguage, initI18n } from './i18n';
+import { installFileDropIfTauri } from './features/editor/attachments';
 import { installQuitGuardIfTauri } from './stores/editorStore';
 import { installMenuTogglesIfTauri } from './stores/menuToggles';
 import { installMenuNavigationIfTauri } from './stores/navigate';
@@ -21,6 +22,7 @@ void initI18n(detectLanguage(navigator.languages))
     installQuitGuardIfTauri();
     installMenuNavigationIfTauri();
     installMenuTogglesIfTauri();
+    installFileDropIfTauri();
     createRoot(document.getElementById('root')!).render(
       <StrictMode>
         <App />

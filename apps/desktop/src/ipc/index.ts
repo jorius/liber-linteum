@@ -3,6 +3,7 @@
 import { invoke, isTauri } from '@tauri-apps/api/core';
 import { listen, type UnlistenFn } from '@tauri-apps/api/event';
 import { open } from '@tauri-apps/plugin-dialog';
+import { getCurrentWebview } from '@tauri-apps/api/webview';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 
 export interface AppInfo {
@@ -345,6 +346,29 @@ export const onMenuToggle = (cb: (key: string) => void): Promise<UnlistenFn> =>
   listen<string>('menu:toggle', (e) => cb(e.payload));
 export const onVaultWarning = (cb: (p: WarningPayload) => void): Promise<UnlistenFn> =>
   listen<WarningPayload>('vault:warning', (e) => cb(e.payload));
+
+/** A native file drag over the window (M2c §5.2). `x`/`y` are physical
+ *  pixels from the webview's top-left corner. */
+export interface DragDropPayload {
+  type: 'enter' | 'over' | 'drop' | 'leave';
+  paths?: string[];
+  x?: number;
+  y?: number;
+}
+
+/** Files dragged from the OS onto the window. */
+export const onDragDrop = (cb: (e: DragDropPayload) => void): Promise<UnlistenFn> =>
+  getCurrentWebview().onDragDropEvent((e) => {
+    const p = e.payload;
+    if (p.type === 'leave') cb({ type: 'leave' });
+    else
+      cb({
+        type: p.type,
+        paths: 'paths' in p ? p.paths : undefined,
+        x: p.position.x,
+        y: p.position.y,
+      });
+  });
 
 /** Runs `handler` (e.g. flushing unsaved pages) before the main window closes;
  *  the window is destroyed once it resolves `true` and stays open on `false`. */

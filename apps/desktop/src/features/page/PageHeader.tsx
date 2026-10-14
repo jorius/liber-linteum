@@ -18,6 +18,7 @@ import styles from './PageView.module.css';
 export function PageHeader({ page, mode }: { page: Page; mode: EditorMode }) {
   const { t } = useTranslation();
   const status = useEditorStore((s) => s.status);
+  const copying = useEditorStore((s) => s.copying > 0);
   const hasDoc = useEditorStore((s) => s.doc !== null);
   const large = useEditorStore((s) => s.large);
   const toolbar = useSettingsStore((s) => s.settings.toolbar);
@@ -43,7 +44,7 @@ export function PageHeader({ page, mode }: { page: Page; mode: EditorMode }) {
         <div className={styles.controls}>
           {hasDoc && (
             <span role="status" aria-label={t('editor.saveStatus')} className={styles.status}>
-              {t(`editor.${status}`)}
+              {copying ? t('editor.copying') : t(`editor.${status}`)}
             </span>
           )}
           {hasDoc && (

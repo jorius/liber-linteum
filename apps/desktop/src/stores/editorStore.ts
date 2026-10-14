@@ -25,6 +25,8 @@ interface EditorState {
   large: boolean;
   /** Why the requested page can't be edited (e.g. `binary`). */
   error: CommandError | null;
+  /** Pastes/drops being saved into the vault (M2c §5): the status says so. */
+  copying: number;
   open: (path: string) => Promise<void>;
   /** Saves and closes the current page. */
   close: () => Promise<void>;
@@ -106,11 +108,12 @@ export function resetEditorStore() {
   seq++;
   docs.forEach((d) => d.dispose());
   docs.clear();
-  useEditorStore.setState({ ...IDLE });
+  useEditorStore.setState({ ...IDLE, copying: 0 });
 }
 
 export const useEditorStore = create<EditorState>((set, get) => ({
   ...IDLE,
+  copying: 0,
   editFrontmatter: async (patch) => {
     const doc = get().doc;
     if (!doc) return false;

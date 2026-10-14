@@ -119,7 +119,8 @@
     },
     "saveStatus": "Estado de guardado",
     "unsavedBlocks": "Los cambios sin guardar en «{name}» no se pudieron escribir, así que la bóveda sigue abierta.",
-    "unsavedKeepsWindow": "Los cambios sin guardar en «{name}» no se pudieron escribir, así que la ventana sigue abierta. Ciérrala otra vez para salir sin ellos."
+    "unsavedKeepsWindow": "Los cambios sin guardar en «{name}» no se pudieron escribir, así que la ventana sigue abierta. Ciérrala otra vez para salir sin ellos.",
+    "copying": "Copiando archivos…"
   },
   "preview": {
     "remoteBlocked": "Imagen remota bloqueada (privacidad)",
@@ -246,5 +247,9 @@
     "positionValue": "{value} % desde arriba",
     "remote": "Portada remota no cargada (privacidad)",
     "missing": "No se encuentra la imagen de portada"
+  },
+  "attach": {
+    "dropOnText": "Suelta los archivos sobre el texto de la página para adjuntarlos",
+    "someFailed": "Algunos archivos no se adjuntaron"
   }
 }
