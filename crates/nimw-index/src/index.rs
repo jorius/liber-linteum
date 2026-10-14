@@ -1,4 +1,6 @@
-use crate::rows::{FileKind, FileRow, LinkRow, PageRow, Stat, TreeNode, ext_of, split_path};
+use crate::rows::{
+    FileKind, FileRow, LinkCandidate, LinkRow, PageRow, Stat, TreeNode, ext_of, split_path,
+};
 use crate::schema::{SCHEMA, SCHEMA_VERSION};
 use nimw_markdown::{FileSet, LinkKind, PageMeta, Tag, link_key, name_key, resolve};
 use rusqlite::{Connection, OptionalExtension, Row, params};
@@ -207,6 +209,23 @@ impl Index {
             )
         });
         Ok(nodes)
+    }
+
+    /// Every page and attachment with its title (pages) and mtime (M2c §7.2).
+    pub fn link_candidates(&self) -> Result<Vec<LinkCandidate>> {
+        let mut stmt = self.conn.prepare(
+            "SELECT f.path, f.kind, p.title, f.mtime_ns FROM files f \
+             LEFT JOIN pages p ON p.path = f.path WHERE f.kind != 'folder'",
+        )?;
+        let rows = stmt.query_map([], |r| {
+            Ok(LinkCandidate {
+                path: r.get(0)?,
+                kind: FileKind::parse(&r.get::<_, String>(1)?),
+                title: r.get(2)?,
+                mtime_ns: r.get(3)?,
+            })
+        })?;
+        Ok(rows.collect::<rusqlite::Result<Vec<_>>>()?)
     }
 
     pub fn page(&self, path: &str) -> Result<Option<PageRow>> {

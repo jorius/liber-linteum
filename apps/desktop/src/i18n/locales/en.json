@@ -35,6 +35,9 @@
     "watch": "Watching the vault for changes failed.",
     "binary": "This file isn't valid UTF-8 text.",
     "invalidUrl": "That link can't be opened.",
+    "notPermitted": "That isn't allowed here.",
+    "notAFile": "Folders can't be attached.",
+    "tooLarge": "That file is too large to paste.",
     "io": "Something went wrong: {message}"
   },
   "toasts": {

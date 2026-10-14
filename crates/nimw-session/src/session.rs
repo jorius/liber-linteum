@@ -384,7 +384,7 @@ pub(crate) fn clamp_ns(ns: i128) -> i64 {
 /// Characters that cannot appear in a file or folder name created by the app:
 /// path separators, characters that break `[[wikilinks]]` (`#`, `|`, `^`, `[`,
 /// `]`) and characters Windows/macOS forbid or mangle (Obsidian's rule set).
-const FORBIDDEN_NAME_CHARS: &[char] = &[
+pub(crate) const FORBIDDEN_NAME_CHARS: &[char] = &[
     '/', '\\', '#', '|', '^', '[', ']', ':', '*', '"', '<', '>', '?',
 ];
 

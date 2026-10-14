@@ -22,6 +22,13 @@ pub enum ErrorKind {
     Binary,
     /// A URL or link kind the app refuses to open.
     InvalidUrl,
+    /// Refused by a rule: attachments set by Obsidian, a path no native drop
+    /// granted (M2c §8).
+    NotPermitted,
+    /// A dropped path that isn't a regular file (a folder).
+    NotAFile,
+    /// A pasted file over the size cap (M2c §7.3).
+    TooLarge,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
@@ -83,6 +90,10 @@ impl From<SessionError> for CommandError {
                 CommandError::new(ErrorKind::InvalidName, format!("invalid name: {n}"))
             }
             SessionError::UnsafeRewrite(m) => CommandError::new(ErrorKind::UnsafeRewrite, m),
+            SessionError::NotPermitted(m) => CommandError::new(ErrorKind::NotPermitted, m),
+            SessionError::NotAFile(p) => {
+                CommandError::new(ErrorKind::NotAFile, format!("not a file: {p}"))
+            }
         }
     }
 }

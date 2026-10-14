@@ -35,6 +35,9 @@
     "watch": "Falló la vigilancia de cambios en la bóveda.",
     "binary": "Este archivo no es texto UTF-8 válido.",
     "invalidUrl": "Ese enlace no se puede abrir.",
+    "notPermitted": "Eso no está permitido aquí.",
+    "notAFile": "Las carpetas no se pueden adjuntar.",
+    "tooLarge": "Ese archivo es demasiado grande para pegarlo.",
     "io": "Algo salió mal: {message}"
   },
   "toasts": {

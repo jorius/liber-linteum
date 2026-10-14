@@ -2631,6 +2631,7 @@ name = "nimw-session"
 version = "0.1.0"
 dependencies = [
  "criterion",
+ "dunce",
  "nimw-index",
  "nimw-markdown",
  "nimw-testkit",

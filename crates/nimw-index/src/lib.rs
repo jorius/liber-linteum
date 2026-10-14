@@ -6,7 +6,7 @@ mod rows;
 mod schema;
 
 pub use index::{Index, IndexError, Result, Tx};
-pub use rows::{FileKind, FileRow, LinkRow, PageRow, Stat, TreeNode};
+pub use rows::{FileKind, FileRow, LinkCandidate, LinkRow, PageRow, Stat, TreeNode};
 pub use schema::SCHEMA_VERSION;
 
 use sha2::{Digest, Sha256};

@@ -55,6 +55,19 @@ fn session_and_vault_errors_map_to_kinds() {
         kind(SessionError::UnsafeRewrite("x".into())),
         ErrorKind::UnsafeRewrite
     );
+    // M2c: rules of the vault (attachments set by Obsidian) and dropped folders.
+    assert_eq!(
+        kind(SessionError::NotPermitted("x".into())),
+        ErrorKind::NotPermitted
+    );
+    assert_eq!(
+        kind(SessionError::NotAFile("/tmp/dir".into())),
+        ErrorKind::NotAFile
+    );
+    assert_eq!(
+        serde_json::to_value(CommandError::new(ErrorKind::TooLarge, "x")).unwrap()["kind"],
+        "tooLarge"
+    );
     let io = std::io::Error::other("disk");
     assert_eq!(
         kind(SessionError::Vault(VaultError::Io {

@@ -31,6 +31,9 @@ export type ErrorKind =
   | 'watch'
   | 'binary'
   | 'invalidUrl'
+  | 'notPermitted'
+  | 'notAFile'
+  | 'tooLarge'
   | 'io';
 
 export interface CommandError {
