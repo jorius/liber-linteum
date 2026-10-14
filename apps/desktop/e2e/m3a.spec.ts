@@ -89,6 +89,32 @@ test('a dragged card keeps its place after a reload (GV-31); Reset layout restor
   await expect.poll(transform).not.toBe(pinned);
 });
 
+test('a drag is saved under its own level even when the breadcrumb is clicked at once (final review I1)', async ({
+  page,
+}) => {
+  await globalView(page);
+  await card(page, 'Alpha').click();
+  await expect(card(page, 'One')).toBeVisible();
+  const grip = page.locator('.react-flow__node[data-id="Alpha/One.md"] .gv-grip');
+  const at = (await grip.boundingBox())!;
+  await page.mouse.move(at.x + at.width / 2, at.y + at.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(at.x + 120, at.y + 160, { steps: 8 });
+  await page.mouse.up();
+  // Back to the vault before the 300 ms save.
+  await crumbs(page).getByRole('button', { name: 'Vault' }).click();
+  await expect(card(page, 'Beta')).toBeVisible();
+  await expect
+    .poll(() =>
+      page.evaluate(() => JSON.parse(localStorage.getItem('nimw-e2e-layout') ?? '{}') as object),
+    )
+    .toHaveProperty(['Alpha', 'Alpha/One.md']);
+  const layout = await page.evaluate(
+    () => JSON.parse(localStorage.getItem('nimw-e2e-layout') ?? '{}') as Record<string, object>,
+  );
+  expect(layout[''] ?? {}).not.toHaveProperty(['Alpha/One.md']);
+});
+
 test('links from inside folders draw one aggregated edge; its toggle hides it', async ({
   page,
 }) => {

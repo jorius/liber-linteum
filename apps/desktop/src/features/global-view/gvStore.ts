@@ -111,6 +111,32 @@ interface GvState {
 const mode = (): GlobalViewMode => useSettingsStore.getState().settings.globalViewMode;
 let seq = 0;
 let pinTimer: ReturnType<typeof setTimeout> | null = null;
+type Positions = Record<string, CardPosition>;
+/** A drag waiting for its save: the key of the canvas it was made on and
+ *  that canvas's pins, taken at the drag (final review I1) — a reload or a
+ *  new level never drops it or files it under another key. */
+let pending: { key: string; positions: Positions } | null = null;
+/** Saves sent and not yet answered, by key: a read of that level may still
+ *  come back without them. */
+const inFlight = new Map<string, Positions>();
+
+/** Sends the waiting drag now. */
+function flushPins() {
+  if (pinTimer) clearTimeout(pinTimer);
+  pinTimer = null;
+  const save = pending;
+  pending = null;
+  if (!save) return;
+  inFlight.set(save.key, save.positions);
+  void layoutSet(save.key, save.positions).then(() => {
+    if (inFlight.get(save.key) === save.positions) inFlight.delete(save.key);
+  });
+}
+
+/** Pins of `key` not yet on disk (sent, or still waiting). */
+function unsaved(key: string): Positions {
+  return { ...inFlight.get(key), ...(pending?.key === key ? pending.positions : {}) };
+}
 
 export const useGvStore = create<GvState>((set, get) => {
   /** Cards `path` added, and theirs, recursively (Expand). */
@@ -128,15 +154,6 @@ export const useGvStore = create<GvState>((set, get) => {
     return out;
   }
 
-  function savePins() {
-    pinTimer = null;
-    const { stack, canvas, pinned } = get();
-    const shown = new Set(canvas.cards.map((c) => c.path));
-    // Entries for cards no longer on the canvas are pruned here (M3a §7).
-    const kept = Object.fromEntries(Object.entries(pinned).filter(([p]) => shown.has(p)));
-    void layoutSet(canvasKey(mode(), stack[stack.length - 1]), kept);
-  }
-
   return {
     stack: [{ kind: 'vault' }],
     expanded: [],
@@ -148,6 +165,7 @@ export const useGvStore = create<GvState>((set, get) => {
     focus: null,
     loaded: false,
     load: async () => {
+      flushPins();
       const mine = ++seq;
       const m = mode();
       let stack = get().stack;
@@ -182,16 +200,17 @@ export const useGvStore = create<GvState>((set, get) => {
       if (mine !== seq) return;
       const shown = new Set(canvas.cards.map((c) => c.path));
       const focus = get().focus;
+      const key = canvasKey(m, root);
       set({
         stack,
         expanded,
         levels,
         canvas,
-        shownKey: canvasKey(m, root),
+        shownKey: key,
         // A layout or edge read that fails (or answers nothing) just means
         // none: the canvas still shows.
         edges: edges.ok && Array.isArray(edges.value) ? edges.value : [],
-        pinned: pinned.ok && pinned.value ? pinned.value : {},
+        pinned: { ...(pinned.ok && pinned.value ? pinned.value : {}), ...unsaved(key) },
         focus: focus && shown.has(focus) ? focus : null,
         loaded: true,
       });
@@ -239,22 +258,41 @@ export const useGvStore = create<GvState>((set, get) => {
       return root.kind === 'folder' ? root.path : parent(root.path);
     },
     pin: (path, at) => {
-      set({ pinned: { ...get().pinned, [path]: at } });
+      const { shownKey: key, canvas } = get();
+      if (key === null) return;
+      const pinned = { ...get().pinned, [path]: at };
+      set({ pinned });
+      if (pending && pending.key !== key) flushPins();
+      // Entries for cards no longer on the canvas are pruned here (M3a §7).
+      const shown = new Set(canvas.cards.map((c) => c.path));
+      pending = {
+        key,
+        positions: Object.fromEntries(Object.entries(pinned).filter(([p]) => shown.has(p))),
+      };
       if (pinTimer) clearTimeout(pinTimer);
-      pinTimer = setTimeout(savePins, PIN_SAVE_MS);
+      pinTimer = setTimeout(flushPins, PIN_SAVE_MS);
     },
     resetLayout: async () => {
-      if (pinTimer) clearTimeout(pinTimer);
-      pinTimer = null;
+      const { stack, shownKey } = get();
+      const key = shownKey ?? canvasKey(mode(), stack[stack.length - 1]);
+      // A drag on this canvas still waiting is superseded; one on another
+      // canvas is saved first.
+      if (pending?.key === key) {
+        if (pinTimer) clearTimeout(pinTimer);
+        pinTimer = null;
+        pending = null;
+      } else flushPins();
+      inFlight.delete(key);
       set({ pinned: {} });
-      const { stack } = get();
-      await layoutSet(canvasKey(mode(), stack[stack.length - 1]), {});
+      await layoutSet(key, {});
     },
     setFocus: (focus) => set({ focus }),
     reset: () => {
       seq++;
       if (pinTimer) clearTimeout(pinTimer);
       pinTimer = null;
+      pending = null;
+      inFlight.clear();
       set({
         stack: [{ kind: 'vault' }],
         expanded: [],

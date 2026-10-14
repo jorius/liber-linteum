@@ -1,8 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { GvCard, GvLevel, GvLevelRef } from '../../ipc';
+import type { CardPosition, GvCard, GvLevel, GvLevelRef } from '../../ipc';
 import { clearMocks, mockIPC } from '../../ipc/testing';
 import { DEFAULT_SETTINGS, useSettingsStore } from '../../stores/settingsStore';
-import { buildCanvas, canvasKey, levelKey, useGvStore } from './gvStore';
+import { buildCanvas, canvasKey, levelKey, PIN_SAVE_MS, useGvStore } from './gvStore';
 
 /** A card with defaults; folders get a `kind` of project/folder. */
 function card(path: string, kind: GvCard['kind'] = 'page', extra: Partial<GvCard> = {}): GvCard {
@@ -44,10 +44,13 @@ const LEVELS: Record<string, GvLevel> = {
 
 let calls: [string, Record<string, unknown>][];
 let levels: Record<string, GvLevel>;
+/** `layout.json` levels, as `layout_set` left them. */
+let stored: Record<string, Record<string, CardPosition>>;
 
 beforeEach(() => {
   calls = [];
   levels = { ...LEVELS };
+  stored = {};
   useSettingsStore.setState({ settings: { ...DEFAULT_SETTINGS } });
   useGvStore.getState().reset();
   mockIPC((cmd, raw) => {
@@ -60,7 +63,8 @@ beforeEach(() => {
       return found;
     }
     if (cmd === 'gv_edges') return [];
-    if (cmd === 'layout_get') return {};
+    if (cmd === 'layout_get') return stored[args.level as string] ?? {};
+    if (cmd === 'layout_set') stored[args.level as string] = args.positions as never;
     return null;
   });
 });
@@ -199,6 +203,81 @@ describe('Global View store (M3a §5)', () => {
     release();
     await first;
     expect(paths()).toEqual(['B/q.md']);
+  });
+});
+
+const sets = () => calls.filter(([c]) => c === 'layout_set').map(([, a]) => a);
+
+describe('pinned positions vs. reloads and navigation (GV-31, final review I1)', () => {
+  it('a reload of the canvas inside the save window keeps the drag and saves it', async () => {
+    vi.useFakeTimers();
+    await useGvStore.getState().load();
+    useGvStore.getState().pin('A', { x: 500, y: 500 });
+    // A vault event or an autosave reloads the level before the 300 ms save.
+    await useGvStore.getState().load();
+    expect(useGvStore.getState().pinned).toEqual({ A: { x: 500, y: 500 } });
+    await vi.advanceTimersByTimeAsync(PIN_SAVE_MS);
+    expect(stored['']).toEqual({ A: { x: 500, y: 500 } });
+  });
+
+  it('navigating inside the save window saves the drag under the level it was made on', async () => {
+    vi.useFakeTimers();
+    await useGvStore.getState().load();
+    useGvStore.getState().pin('A', { x: 500, y: 500 });
+    await useGvStore.getState().open(card('B', 'project'));
+    await vi.advanceTimersByTimeAsync(PIN_SAVE_MS);
+    expect(sets()).toEqual([{ level: '', positions: { A: { x: 500, y: 500 } } }]);
+    expect(useGvStore.getState().pinned, 'B has none of level 0').toEqual({});
+    await useGvStore.getState().back(0);
+    expect(useGvStore.getState().pinned).toEqual({ A: { x: 500, y: 500 } });
+  });
+
+  it('a mode switch inside the save window saves the drag under the old canvas only', async () => {
+    vi.useFakeTimers();
+    stored['expand:'] = { B: { x: 9, y: 9 } };
+    await useGvStore.getState().load();
+    useGvStore.getState().pin('A', { x: 500, y: 500 });
+    mode('expand');
+    await useGvStore.getState().modeChanged();
+    await vi.advanceTimersByTimeAsync(PIN_SAVE_MS);
+    expect(stored['']).toEqual({ A: { x: 500, y: 500 } });
+    expect(stored['expand:']).toEqual({ B: { x: 9, y: 9 } });
+    expect(useGvStore.getState().pinned).toEqual({ B: { x: 9, y: 9 } });
+  });
+
+  it('a reload that reads the layout before the save lands still shows the drag', async () => {
+    vi.useFakeTimers();
+    let land: () => void = () => undefined;
+    mockIPC(async (cmd, raw) => {
+      const args = (raw ?? {}) as Record<string, unknown>;
+      calls.push([cmd, args]);
+      if (cmd === 'gv_children') return levels[levelKey(args.level as GvLevelRef)];
+      if (cmd === 'gv_edges') return [];
+      if (cmd === 'layout_get') return stored[args.level as string] ?? {};
+      if (cmd === 'layout_set') {
+        // The write is still on its way when the level is read again.
+        await new Promise<void>((r) => (land = r));
+        stored[args.level as string] = args.positions as never;
+      }
+      return null;
+    });
+    await useGvStore.getState().load();
+    useGvStore.getState().pin('A', { x: 500, y: 500 });
+    await vi.advanceTimersByTimeAsync(PIN_SAVE_MS);
+    expect(sets()).toHaveLength(1);
+    await useGvStore.getState().load();
+    expect(useGvStore.getState().pinned).toEqual({ A: { x: 500, y: 500 } });
+    land();
+  });
+
+  it('a drag made while the next level loads stays with the canvas it was made on', async () => {
+    vi.useFakeTimers();
+    await useGvStore.getState().load();
+    const opening = useGvStore.getState().open(card('B', 'project'));
+    useGvStore.getState().pin('A', { x: 1, y: 2 }); // level 0 is still shown
+    await opening;
+    await vi.advanceTimersByTimeAsync(PIN_SAVE_MS);
+    expect(sets()).toEqual([{ level: '', positions: { A: { x: 1, y: 2 } } }]);
   });
 });
 
