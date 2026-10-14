@@ -1,15 +1,36 @@
 // M4b in the built UI, in Chromium and WebKit (≈ WKWebView): the feedback
 // round — a compact header band with the cover as its background, the page
-// title in the top bar, and the pickers and chips that came with it.
+// title in the top bar, and the pickers and chips that came with it — all
+// without a single request leaving the machine. (Add cover going straight
+// into reposition is checked in m2c.spec.ts.)
 import { expect, test, type Page } from '@playwright/test';
 import { installIpcMock } from './ipcMock';
 
+const LONG = Array.from({ length: 120 }, (_, i) => `Line ${i + 1} of the long page.`).join('\n\n');
 const PAGES = {
   'A.md': '# Alpha\n\nhello world\n\nSee [[B]].\n',
   'B.md': '# Beta\n\nThe second page.\n',
+  'Long.md': `# Long\n\n${LONG}\n`,
 };
 
+/** Requests that would leave the machine (the test server is 127.0.0.1). */
+async function watchNetwork(page: Page) {
+  const outside: string[] = [];
+  page.on('request', (r) => {
+    const url = new URL(r.url());
+    const local =
+      (url.protocol === 'http:' && url.hostname === '127.0.0.1') ||
+      url.protocol === 'data:' ||
+      url.protocol === 'nimw-asset:' ||
+      url.hostname === 'nimw-asset.localhost';
+    if (!local) outside.push(r.url());
+  });
+  await page.route(/^https?:\/\/(?!127\.0\.0\.1|nimw-asset\.localhost)/, (route) => route.abort());
+  return outside;
+}
+
 async function open(page: Page, name: string, opts: { remoteCover?: boolean } = {}) {
+  const outside = await watchNetwork(page);
   await page.addInitScript(installIpcMock, {
     pages: { ...PAGES },
     editorMode: 'livePreview',
@@ -19,13 +40,32 @@ async function open(page: Page, name: string, opts: { remoteCover?: boolean } = 
   await page.getByRole('button', { name: /^vault/ }).click();
   await page.getByRole('treeitem', { name, exact: true }).click();
   await expect(page.getByRole('textbox', { name: 'Page title' })).toHaveValue(name);
+  return outside;
 }
+
+/** Nothing left the machine, and the CSP blocked nothing (M2a §7). */
+async function stayedLocal(page: Page, outside: string[]) {
+  await page.waitForLoadState('networkidle');
+  expect(outside).toEqual([]);
+  expect(
+    await page.evaluate(
+      () => (window as unknown as { __nimwCspViolations: string[] }).__nimwCspViolations,
+    ),
+  ).toEqual([]);
+}
+
+const lastWrite = (page: Page, path?: string) =>
+  page.evaluate((path) => {
+    const writes =
+      (window as unknown as { __nimwWrites?: { path: string; text: string }[] }).__nimwWrites ?? [];
+    return writes.filter((w) => !path || w.path === path).at(-1)?.text ?? null;
+  }, path);
 
 test.use({ viewport: { width: 1280, height: 900 } });
 
 test('M4b §1: with a cover, the text starts in the top 35% of the window', async ({ page }) => {
   // Pages without a `cover:` get a (blocked) remote one: the band shows at full height.
-  await open(page, 'A', { remoteCover: true });
+  const outside = await open(page, 'A', { remoteCover: true });
   await expect(page.locator('[data-band="cover"]')).toBeVisible();
   const top = await page.locator('.cm-content').evaluate((el) => el.getBoundingClientRect().top);
   expect(top / 900).toBeLessThan(0.35);
@@ -33,4 +73,104 @@ test('M4b §1: with a cover, the text starts in the top 35% of the window', asyn
   const bar = page.getByRole('banner');
   await expect(bar.getByRole('textbox', { name: 'Page title' })).toHaveValue('A');
   await expect(bar.getByRole('button', { name: 'Edit' })).toBeVisible();
+  await stayedLocal(page, outside);
+});
+
+test('M4b §1: the title and subtitle are edited in the top bar', async ({ page }) => {
+  const outside = await open(page, 'B');
+  const bar = page.getByRole('banner');
+  const title = bar.getByRole('textbox', { name: 'Page title' });
+  await title.fill('Beta notes');
+  await title.press('Enter');
+  await expect
+    .poll(() =>
+      page.evaluate(() => (window as unknown as { __nimwRenames?: unknown[] }).__nimwRenames),
+    )
+    .toEqual([{ from: 'B.md', to: 'Beta notes.md' }]);
+  await expect(title).toHaveValue('Beta notes');
+  const subtitle = bar.getByRole('textbox', { name: 'Subtitle' });
+  await subtitle.fill('Second thoughts');
+  await page.waitForTimeout(100); // CodeMirror's interaction delay
+  await subtitle.press('Enter');
+  await expect
+    .poll(() => lastWrite(page, 'Beta notes.md'))
+    .toMatch(/^---\nsubtitle: Second thoughts\n---\n# Beta/);
+  await stayedLocal(page, outside);
+});
+
+test('M4b §4: the ⌘K picker follows the text as it scrolls, and stays in the window', async ({
+  page,
+}) => {
+  const outside = await open(page, 'Long');
+  const line = page.locator('.cm-line', { hasText: 'Line 8 of the long page.' });
+  await line.dblclick({ position: { x: 20, y: 5 } });
+  await page.keyboard.press('ControlOrMeta+k');
+  const input = page.getByRole('combobox', { name: 'Link to…' });
+  await expect(input).toBeFocused();
+  const picker = input.locator('..');
+  const box = async () => (await picker.boundingBox())!;
+  // Under the selected line (or above it, near the bottom of the window).
+  const lineBox = (await line.boundingBox())!;
+  const first = await box();
+  expect(
+    Math.abs(first.y - (lineBox.y + lineBox.height)) < 40 ||
+      Math.abs(first.y + first.height - lineBox.y) < 40,
+  ).toBe(true);
+  // The text scrolls up: the picker goes with it.
+  await page.mouse.move(1180, 700);
+  await page.mouse.wheel(0, 200);
+  await expect.poll(async () => (await box()).y).toBeLessThan(first.y - 100);
+  // Far away: it stays inside the window, open.
+  // CodeMirror keeps the selected line drawn, now far above the window.
+  await page.mouse.wheel(0, 6000);
+  await expect.poll(async () => (await line.boundingBox())?.y ?? 0).toBeLessThan(-500);
+  await expect
+    .poll(async () => {
+      const b = await box();
+      return b.y >= 8 && b.y + b.height <= 900 - 8 + 0.5 && b.x >= 8;
+    })
+    .toBe(true);
+  await expect(input).toBeFocused();
+  await stayedLocal(page, outside);
+});
+
+test('M4b §6: a Related chip is added through the picker, opens its page, and is removed', async ({
+  page,
+}) => {
+  const outside = await open(page, 'A');
+  await page.getByRole('button', { name: 'Add a related page' }).click();
+  const input = page.getByRole('combobox', { name: 'Related page' });
+  await expect(input).toBeFocused();
+  await input.fill('beta');
+  await expect(page.getByRole('listbox', { name: 'Pages' }).getByRole('option')).toHaveCount(1);
+  await input.press('Enter');
+  await expect
+    .poll(() => lastWrite(page, 'A.md'))
+    .toBe('---\nrelated:\n  - "[[B]]"\n---\n# Alpha\n\nhello world\n\nSee [[B]].\n');
+  const related = page.getByRole('list', { name: 'Related pages' });
+  await related.getByRole('button', { name: 'B', exact: true }).click();
+  await expect(page.getByRole('textbox', { name: 'Page title' })).toHaveValue('B');
+  await page.getByRole('button', { name: 'Back to A' }).click();
+  await expect(page.getByRole('textbox', { name: 'Page title' })).toHaveValue('A');
+  await related.getByRole('button', { name: 'Remove the relationship to B' }).click();
+  await expect.poll(() => lastWrite(page, 'A.md')).not.toContain('[[B]]"');
+  await expect(related.getByRole('listitem')).toHaveCount(0);
+  await stayedLocal(page, outside);
+});
+
+test('M4b §6: Connect cards picks the card to connect from, then the other', async ({ page }) => {
+  const outside = await open(page, 'A');
+  await page.getByRole('button', { name: 'Global view' }).click();
+  const connect = page.getByRole('button', { name: 'Connect cards' });
+  await connect.click();
+  await expect(connect).toHaveAttribute('aria-pressed', 'true');
+  const status = page.getByRole('status', { name: 'Connecting' });
+  await expect(status).toContainText('Click the card to connect from');
+  await page.getByRole('button', { name: 'Alpha', exact: true }).click();
+  await expect(status).toContainText('Pick the card to connect: Alpha → ?');
+  await page.getByRole('button', { name: 'Long', exact: true }).click();
+  await expect.poll(() => lastWrite(page, 'A.md')).toContain('related:\n  - "[[Long]]"');
+  await expect(page.locator('[data-gv-edge="manual"]')).toHaveCount(1);
+  await expect(connect).toHaveAttribute('aria-pressed', 'false');
+  await stayedLocal(page, outside);
 });
