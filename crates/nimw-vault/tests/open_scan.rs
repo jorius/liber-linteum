@@ -16,7 +16,7 @@ fn vlt_01_open_reads_obsidian_attachment_setting() {
     let vault = Vault::open(&fixture_path("obsidian-basic")).unwrap();
     assert_eq!(
         vault.attachment_policy(),
-        &AttachmentPolicy::Subfolder("assets".into())
+        AttachmentPolicy::Subfolder("assets".into())
     );
     assert!(vault.warnings().is_empty(), "{:?}", vault.warnings());
 }
@@ -75,7 +75,11 @@ fn vlt_05_exclude_globs_and_bad_config_are_handled() {
     let p = paths(&vault);
     assert!(!p.iter().any(|x| x.starts_with("Game Design")), "{p:?}");
     assert!(!p.iter().any(|x| x.ends_with(".mp3")));
-    assert_eq!(vault.attachment_policy(), &AttachmentPolicy::SameAsNote);
+    // M2c §5.3: Obsidian's `./assets` wins over NIMW's `same`.
+    assert_eq!(
+        vault.attachment_policy(),
+        AttachmentPolicy::Subfolder("assets".into())
+    );
     assert_eq!(
         vault.warnings().len(),
         1,
@@ -88,7 +92,7 @@ fn vlt_05_exclude_globs_and_bad_config_are_handled() {
     assert!(vault.warnings()[0].contains(".nimw/vault.json"));
     assert_eq!(
         vault.attachment_policy(),
-        &AttachmentPolicy::Subfolder("assets".into())
+        AttachmentPolicy::Subfolder("assets".into())
     );
 }
 

@@ -2,7 +2,7 @@ use crate::error::{Result, VaultError, io_err};
 use crate::hash::Hash;
 use crate::path::VaultPath;
 use crate::vault::Vault;
-use std::io::Write;
+use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
 
@@ -125,6 +125,86 @@ impl Vault {
             });
         }
         Ok(Hash::of(content))
+    }
+
+    /// Creates `dir` and any missing parents; returns the folders it created,
+    /// outermost first. An existing non-folder on the way is `AlreadyExists`.
+    pub fn create_dir_all(&self, dir: &VaultPath) -> Result<Vec<VaultPath>> {
+        let mut created = Vec::new();
+        if dir.is_root() {
+            return Ok(created);
+        }
+        let mut current = VaultPath::root();
+        for part in dir.as_str().split('/') {
+            current = current.join(part)?;
+            let full = self.fs_path(&current)?;
+            match full.metadata() {
+                Ok(meta) if meta.is_dir() => continue,
+                Ok(_) => return Err(VaultError::AlreadyExists(current.to_string())),
+                Err(_) => {
+                    std::fs::create_dir(&full).map_err(|e| io_err(current.as_str(), e))?;
+                    created.push(current.clone());
+                }
+            }
+        }
+        Ok(created)
+    }
+
+    /// Copies the outside file `src` to `dest`, streamed through a hidden temp
+    /// file and renamed into place (M2c §7.1). Create-only: `AlreadyExists` if
+    /// `dest` exists, `NotFound` if its folder doesn't.
+    pub fn import_file(&self, src: &Path, dest: &VaultPath) -> Result<Hash> {
+        if dest.is_root() {
+            return Err(VaultError::OutsideVault(
+                "cannot write the vault root".into(),
+            ));
+        }
+        let target = self.fs_path(dest)?;
+        if target.symlink_metadata().is_ok() {
+            return Err(VaultError::AlreadyExists(dest.to_string()));
+        }
+        let parent = target.parent().expect("non-root path has a parent");
+        if !parent.is_dir() {
+            return Err(VaultError::NotFound(
+                dest.parent().map(|p| p.to_string()).unwrap_or_default(),
+            ));
+        }
+        let tmp = parent.join(format!(
+            ".{}{}{}-{}",
+            dest.file_name(),
+            TMP_MARKER,
+            std::process::id(),
+            TMP_COUNTER.fetch_add(1, Ordering::Relaxed)
+        ));
+        let result = (|| -> std::io::Result<Hash> {
+            let mut input = std::fs::File::open(src)?;
+            let mut out = std::fs::OpenOptions::new()
+                .write(true)
+                .create_new(true)
+                .open(&tmp)?;
+            let mut hasher = blake3::Hasher::new();
+            let mut buf = vec![0u8; 64 * 1024];
+            loop {
+                let n = input.read(&mut buf)?;
+                if n == 0 {
+                    break;
+                }
+                hasher.update(&buf[..n]);
+                out.write_all(&buf[..n])?;
+            }
+            out.sync_all()?;
+            drop(out);
+            if target.symlink_metadata().is_ok() {
+                return Err(std::io::ErrorKind::AlreadyExists.into());
+            }
+            std::fs::rename(&tmp, &target)?;
+            sync_dir(parent);
+            Ok(Hash::from_bytes(*hasher.finalize().as_bytes()))
+        })();
+        result.map_err(|e| {
+            let _ = std::fs::remove_file(&tmp);
+            io_err(dest.as_str(), e)
+        })
     }
 
     /// Creates one folder; the parent must exist.

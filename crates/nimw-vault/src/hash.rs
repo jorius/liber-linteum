@@ -9,6 +9,10 @@ impl Hash {
         Hash(*blake3::hash(bytes).as_bytes())
     }
 
+    pub(crate) fn from_bytes(bytes: [u8; 32]) -> Hash {
+        Hash(bytes)
+    }
+
     pub fn to_hex(&self) -> String {
         self.0.iter().map(|b| format!("{b:02x}")).collect()
     }
