@@ -290,7 +290,8 @@
   },
   "attach": {
     "dropOnText": "Drop files onto the page’s text to attach them",
-    "someFailed": "Some files weren’t attached"
+    "someFailed": "Some files weren’t attached",
+    "cantPaste": "This image can’t be pasted. Save it as PNG or JPEG first."
   },
   "linkComplete": {
     "search": "Search: {query}",
