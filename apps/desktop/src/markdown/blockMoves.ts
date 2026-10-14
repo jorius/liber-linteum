@@ -284,7 +284,8 @@ function itemMove(
     target = model.units[l.top];
     into = slot.list;
     loose = looseList(slot.list);
-    const ref = slot.before ?? l.items.filter((id) => id !== unit.id).at(-1)!;
+    const others = l.items.filter((id) => id !== unit.id);
+    const ref = slot.before ?? others[others.length - 1];
     indent = /^[ \t]*/.exec(lineText(model.units[ref].from))![0];
     insertAt = slot.before !== null ? spanIn(target, slot.before)[0] : spanIn(target, ref)[1] + 1;
     marker = l.ordered ? `1${l.marker}` : l.marker;

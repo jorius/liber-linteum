@@ -132,13 +132,15 @@ function slotLine(
     }
     case 'item': {
       if (slot.before !== null) return before(slot.before);
-      return after(model.lists[slot.list].items.at(-1)!);
+      const items = model.lists[slot.list].items;
+      return after(items[items.length - 1]);
     }
     case 'child':
       return after(slot.of, 24);
     case 'row': {
       if (slot.before !== null) return before(slot.before);
-      return after(model.tables[slot.table].rows.at(-1)!);
+      const rows = model.tables[slot.table].rows;
+      return after(rows[rows.length - 1]);
     }
   }
 }
