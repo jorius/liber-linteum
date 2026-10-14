@@ -57,6 +57,9 @@ interface EditorState {
    *  text change; saved at once. `null` when the page has no live document
    *  (the caller writes the file). `false` (with the toast) when refused. */
   editPage: (path: string, edit: (text: string) => FrontmatterEdit) => Promise<boolean | null>;
+  /** The text of `path`'s live document (the current page or a background
+   *  one), as `editPage` would edit it; `null` without one (final review m7). */
+  liveText: (path: string) => string | null;
 }
 
 /** Every page with a live document: the current one plus pages switched away
@@ -100,11 +103,14 @@ const hooks: PageDocHooks = {
   },
 };
 
+/** A live document's text: its view's when it has one. */
+const textOf = (doc: PageDoc) => viewOf(doc)?.state.doc.toString() ?? doc.text;
+
 /** A frontmatter edit of a live document: through its view when it has one
  *  (undoable), else its text; saved at once. Refused: toast, `false`. */
 async function applyEdit(doc: PageDoc, edit: (text: string) => FrontmatterEdit): Promise<boolean> {
   const view = viewOf(doc);
-  const text = view ? view.state.doc.toString() : doc.text;
+  const text = textOf(doc);
   const res = edit(text);
   if (!res.ok) {
     useToastStore.getState().push({ message: i18next.t('page.frontmatterInvalid'), tone: 'error' });
@@ -151,6 +157,10 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   editPage: async (path, edit) => {
     const doc = get().doc?.path === path ? get().doc : docs.get(path);
     return doc ? applyEdit(doc, edit) : null;
+  },
+  liveText: (path) => {
+    const doc = get().doc?.path === path ? get().doc : docs.get(path);
+    return doc ? textOf(doc) : null;
   },
   open: async (path) => {
     const prev = get().doc;

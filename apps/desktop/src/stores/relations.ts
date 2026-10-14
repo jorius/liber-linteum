@@ -37,10 +37,11 @@ type Edit = (text: string) => FrontmatterEdit | typeof STALE;
 const toast = (message: string) => useToastStore.getState().push({ message, tone: 'error' });
 const pageName = (path: string) => nameOf(path).replace(/\.md$/i, '');
 
-/** The page's text: its live editor document's, else the file's (LF). */
+/** The page's text: its live editor document's (the current page or one
+ *  open in the background, final review m7), else the file's (LF). */
 async function textOf(page: string): Promise<string | null> {
-  const { doc } = useEditorStore.getState();
-  if (doc?.path === page) return doc.text;
+  const live = useEditorStore.getState().liveText(page);
+  if (live !== null) return live;
   const res = await pageRead(page);
   return res.ok ? toLf(res.value.text) : null;
 }
@@ -104,6 +105,10 @@ async function editRelations(page: string, edit: Edit): Promise<boolean> {
   return false;
 }
 
+/** Wiki targets name the same page whatever their case or Unicode form. */
+const sameTarget = (a: string, b: string) =>
+  a.normalize('NFC').toLowerCase() === b.normalize('NFC').toLowerCase();
+
 /** Relates `source` to the page `target` (M3b §2): a new `related:` item,
  *  unless one already points there. */
 export async function relate(source: string, target: string): Promise<RelateResult> {
@@ -114,7 +119,16 @@ export async function relate(source: string, target: string): Promise<RelateResu
     toast(errorMessage(link.error));
     return { status: 'failed' };
   }
-  const ok = await editRelations(source, (text) => appendRelated(text, link.value));
+  // Checked again on the text the item is appended to: another connect may
+  // have written it meanwhile (final review m7).
+  let found: number | null = null;
+  const ok = await editRelations(source, (text) => {
+    const same = readRelated(text).find((e) => sameTarget(e.target, link.value));
+    if (!same) return appendRelated(text, link.value);
+    found = same.index;
+    return { ok: true, change: null };
+  });
+  if (found !== null) return { status: 'exists', index: found };
   return ok ? { status: 'created' } : { status: 'failed' };
 }
 

@@ -134,6 +134,28 @@ describe('relationships written to pages (M3b §5)', () => {
     expect(disk.writes()).toHaveLength(writes);
   });
 
+  it('two quick connects to the same page write one relationship (final review m7)', async () => {
+    const disk = fakeDisk({ 'A.md': '# A\n', 'B.md': '# B\n' }, extra);
+    const results = await Promise.all([relate('A.md', 'B.md'), relate('A.md', 'B.md')]);
+    expect(results.map((r) => r.status).sort()).toEqual(['created', 'exists']);
+    expect(disk.files.get('A.md')).toBe('---\nrelated:\n  - "[[B]]"\n---\n# A\n');
+  });
+
+  it('a page open in the background is read from its live text (final review m7)', async () => {
+    const disk = fakeDisk({ 'A.md': '# A\n', 'B.md': '# B\n', 'C.md': '# C\n' }, extra);
+    await act(() => editor().open('A.md'));
+    disk.failWrites(1000);
+    expect((await relate('A.md', 'B.md')).status).toBe('created');
+    // Switched away while its save keeps failing: A stays a live document.
+    await act(() => editor().open('C.md'));
+    expect(disk.files.get('A.md')).toBe('# A\n');
+    expect((await relationsOf('A.md')).map((r) => r.path)).toEqual(['B.md']);
+    expect(await relate('A.md', 'B.md')).toEqual({ status: 'exists', index: 0 });
+    disk.failWrites(0);
+    await act(() => editor().flushAll());
+    expect(disk.files.get('A.md')).toBe('---\nrelated:\n  - "[[B]]"\n---\n# A\n');
+  });
+
   it('turning on an arrow keeps the item’s other keys and its number label (final review I1)', async () => {
     const disk = fakeDisk(
       { 'A.md': '---\nrelated:\n  - { link: "[[B]]", label: 2024, kind: parent }\n---\n# A\n' },
