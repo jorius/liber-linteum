@@ -279,6 +279,11 @@
   },
   "gv": {
     "region": "Vista global",
+    "canvas": "Tarjetas de la vista global",
+    "a11y": {
+      "keys": "Las flechas mueven entre tarjetas. Intro abre el siguiente nivel, Mayúsculas+Intro abre la página en el editor y Escape vuelve al nivel anterior.",
+      "edges": "Las líneas entre tarjetas muestran sus enlaces y relaciones; la descripción de cada tarjeta los enumera."
+    },
     "vault": "Bóveda",
     "kind": {
       "project": "Proyecto",

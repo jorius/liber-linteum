@@ -279,6 +279,11 @@
   },
   "gv": {
     "region": "Global View",
+    "canvas": "Global View cards",
+    "a11y": {
+      "keys": "Arrow keys move between cards. Enter opens the next level, Shift+Enter opens the page in the editor, Escape goes back up.",
+      "edges": "Lines between cards show their links and relationships; each card's description lists them."
+    },
     "vault": "Vault",
     "kind": {
       "project": "Project",

@@ -57,6 +57,8 @@ function CardNodeView({ data }: NodeProps<CardNode>) {
 }
 
 const nodeTypes = { card: CardNodeView };
+/** React Flow's id: its hidden descriptions are `react-flow__node-desc-<id>`. */
+const FLOW_ID = 'gv-flow';
 const KEYS: Record<string, Direction> = {
   ArrowLeft: 'left',
   ArrowRight: 'right',
@@ -190,6 +192,10 @@ export function Canvas({ mode, toggles, width, onOpen, onOpenEditor }: CanvasPro
         width: CARD_W,
         height: CARD_H,
         style: { width: CARD_W, height: CARD_H },
+        // React Flow marks its node wrapper aria-roledescription="node"
+        // (English, and on a div with no role); the card inside is the
+        // named group (final review m5).
+        domAttributes: { 'aria-roledescription': undefined },
         data: {
           card,
           open: canvas.centre === card.path || expandedPaths.has(card.path),
@@ -200,6 +206,14 @@ export function Canvas({ mode, toggles, width, onOpen, onOpenEditor }: CanvasPro
         },
       })),
     [canvas, positions, expandedPaths, tabStop, connections, open, onOpenEditor],
+  );
+  const ariaLabelConfig = useMemo(
+    () => ({
+      'node.a11yDescription.default': t('gv.a11y.keys'),
+      'node.a11yDescription.keyboardDisabled': t('gv.a11y.keys'),
+      'edge.a11yDescription.default': t('gv.a11y.edges'),
+    }),
+    [t],
   );
   const [nodes, setNodes, onNodesChange] = useNodesState<CardNode>(computed);
   useEffect(() => setNodes(computed), [computed, setNodes]);
@@ -269,6 +283,12 @@ export function Canvas({ mode, toggles, width, onOpen, onOpenEditor }: CanvasPro
       onDoubleClickCapture={onDoubleClickCapture}
     >
       <ReactFlow<CardNode>
+        // React Flow's wrapper is role="application": named, and described by
+        // its own (translated) keyboard help (final review m5).
+        id={FLOW_ID}
+        aria-label={t('gv.canvas')}
+        aria-describedby={`react-flow__node-desc-${FLOW_ID}`}
+        ariaLabelConfig={ariaLabelConfig}
         nodes={nodes}
         nodeTypes={nodeTypes}
         onNodesChange={onNodesChange}
