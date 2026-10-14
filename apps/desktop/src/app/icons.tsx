@@ -134,7 +134,6 @@ export function NewPageIcon() {
   );
 }
 
-/** Global View card handle (drag to move). */
 /** Connect / relationships (the prototype's chain link). */
 export function LinkIcon() {
   return (
@@ -144,6 +143,7 @@ export function LinkIcon() {
   );
 }
 
+/** Global View card handle (drag to move). */
 export function GripIcon() {
   return (
     <svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true" fill="currentColor">
