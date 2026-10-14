@@ -83,6 +83,34 @@ describe('relationships dialog (M3b §3)', () => {
     ).toBeChecked();
   });
 
+  it('a save or delete refused because the list changed on disk re-reads it (§10.7, final review m5)', async () => {
+    const disk = fakeDisk(
+      { 'A.md': '---\nrelated:\n  - "[[B]]"\n  - "[[C]]"\n---\n', 'B.md': '', 'C.md': '' },
+      extra,
+    );
+    render(<RelationsDialog page="A.md" onClose={vi.fn()} />);
+    const b = await screen.findByRole('group', { name: 'A → B' });
+    // Another app takes B out (C moves up) while the dialog is open.
+    disk.files.set('A.md', '---\nrelated:\n  - "[[C]]"\n  - "[[D]]"\n---\n');
+    await userEvent.type(within(b).getByRole('textbox', { name: 'Label' }), 'x');
+    await userEvent.click(within(b).getByRole('button', { name: 'Save' }));
+    await screen.findByRole('group', { name: 'A → D' });
+    expect(screen.queryByRole('group', { name: 'A → B' })).not.toBeInTheDocument();
+    expect(disk.writes()).toEqual([]);
+    // The row the keyboard was on is gone: it stays in the dialog.
+    expect(screen.getByRole('dialog')).toContainElement(document.activeElement as HTMLElement);
+
+    disk.files.set('A.md', '---\nrelated:\n  - "[[D]]"\n---\n');
+    const c = screen.getByRole('group', { name: 'A → C' });
+    await userEvent.click(within(c).getByRole('button', { name: 'Delete relationship' }));
+    await waitFor(() =>
+      expect(screen.queryByRole('group', { name: 'A → C' })).not.toBeInTheDocument(),
+    );
+    expect(screen.getByRole('group', { name: 'A → D' })).toBeVisible();
+    expect(disk.writes()).toEqual([]);
+    expect(screen.getByRole('dialog')).toContainElement(document.activeElement as HTMLElement);
+  });
+
   it('a page without any says how to add one; no axe violations', async () => {
     fakeDisk({ 'A.md': '# A\n' }, extra);
     render(<RelationsDialog page="A.md" onClose={vi.fn()} />);

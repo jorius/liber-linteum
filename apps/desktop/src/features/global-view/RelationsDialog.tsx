@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { relationsOf, removeRelation, updateRelation, type Relation } from '../../stores/relations';
 import { nameOf } from '../../stores/tree';
@@ -44,6 +44,15 @@ export function RelationsDialog({
     void reload();
   }, [reload]);
 
+  // A re-read (after a delete, or an edit refused because the list moved)
+  // can take away the row the keyboard was on: it stays in the dialog.
+  useLayoutEffect(() => {
+    const dialog = list.current?.closest<HTMLElement>('[role="dialog"]');
+    if (dialog && !dialog.contains(document.activeElement)) {
+      dialog.querySelector<HTMLElement>('input, button')?.focus();
+    }
+  }, [rows]);
+
   const changed = async () => {
     await reload();
     if (useGvStore.getState().loaded) void useGvStore.getState().load();
@@ -66,14 +75,6 @@ export function RelationsDialog({
               key={`${r.source}:${r.index}:${r.link}`}
               relation={r}
               onChanged={changed}
-              onDeleted={async () => {
-                await changed();
-                // The row's buttons are gone: keep the keyboard in the dialog.
-                list.current
-                  ?.closest<HTMLElement>('[role="dialog"]')
-                  ?.querySelector<HTMLElement>('input, button')
-                  ?.focus();
-              }}
             />
           ))
         )}
@@ -90,11 +91,9 @@ export function RelationsDialog({
 function RelationRow({
   relation,
   onChanged,
-  onDeleted,
 }: {
   relation: Relation;
   onChanged: () => Promise<void>;
-  onDeleted: () => Promise<void>;
 }) {
   const { t } = useTranslation();
   const [label, setLabel] = useState(relation.label ?? '');
@@ -103,17 +102,19 @@ function RelationRow({
   const target = relation.path ? pageName(relation.path) : relation.target;
   const dirty = label.trim() !== (relation.label ?? '') || directed !== relation.directed;
 
+  // Re-read whether or not the change went through: one refused because the
+  // list moved shows the list as it is now (§10.7, final review m5).
   const save = async () => {
     setBusy(true);
-    if (await updateRelation(relation, { label: label.trim() || null, directed })) {
-      await onChanged();
-    }
+    await updateRelation(relation, { label: label.trim() || null, directed });
+    await onChanged();
     setBusy(false);
   };
   const remove = async () => {
     setBusy(true);
-    if (await removeRelation(relation)) await onDeleted();
-    else setBusy(false);
+    await removeRelation(relation);
+    await onChanged();
+    setBusy(false);
   };
 
   return (
