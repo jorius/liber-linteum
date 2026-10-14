@@ -1,7 +1,9 @@
 //! M3a §3, §4, §8: Global View levels (vault, folder, page neighbourhood),
 //! cards (index notes, folder summaries, covers), edges and layouts.
 
-use nimw_session::{CardKind, GvCard, GvLevel, Relation, SessionEvent, VaultSession};
+use nimw_session::{
+    CardKind, EdgeKind, GvCard, GvEdge, GvLevel, Relation, SessionEvent, VaultSession,
+};
 use nimw_vault::VaultPath;
 use std::path::Path;
 
@@ -33,15 +35,15 @@ fn vault() -> tempfile::TempDir {
         "Alpha/Alpha.md",
         "---\nsubtitle: The first project\n---\n# Alpha home\n\nAll about alpha.\n",
     );
-    write(
-        r,
-        "Alpha/note.md",
-        "---\nrelated: \"[[Welcome]]\"\n---\n# A note\n",
-    );
+    write(r, "Alpha/note.md", "# A note\n");
     write(r, "Alpha/Sub/index.md", "# Sub index\n");
     write(r, "Alpha/Sub/deep.md", "# Deep\n");
     write(r, "Beta/only.md", "# Only page\n\nSee [[Welcome]].\n");
-    write(r, "Gamma/a.md", "# Gamma A\n");
+    write(
+        r,
+        "Gamma/a.md",
+        "---\nrelated:\n  - \"[[Welcome]]\"\n---\n# Gamma A\n",
+    );
     write(
         r,
         "Gamma/b.md",
@@ -176,11 +178,12 @@ fn gv_16_page_level_is_the_page_and_its_neighbourhood() {
     assert_eq!(level.cards[0].path, "Welcome.md", "the centre comes first");
     // Links out; an undirected `related:` pointing here goes right too.
     assert_eq!(rel("Alpha/note.md"), Some(Relation::Out));
+    assert_eq!(rel("Gamma/a.md"), Some(Relation::Out));
     assert_eq!(rel("zeta.md"), Some(Relation::Both));
     assert_eq!(rel("Beta/only.md"), Some(Relation::In));
     // A directed relationship towards this page comes in.
     assert_eq!(rel("Delta/y.md"), Some(Relation::In));
-    assert_eq!(level.cards.len(), 5, "no image card, no duplicates");
+    assert_eq!(level.cards.len(), 6, "no image card, no duplicates");
     assert!(level.cards.iter().all(|c| c.kind == CardKind::Page));
 }
 
@@ -216,4 +219,129 @@ fn m3a_an_obsidian_attachment_folder_is_hidden_and_a_fixed_one_too() {
         ],
         "Gamma is now the attachment folder; `attachments` is an ordinary folder"
     );
+}
+
+/// Pages in folders A and B linking across, a relationship with a label and
+/// a direction, an image embed (never an edge) and a link inside A.
+fn linked_vault() -> tempfile::TempDir {
+    let dir = tempfile::tempdir().unwrap();
+    let r = dir.path();
+    write(r, "A/p.md", "# P\n\n[[q]] and [[s]] ![[pic.png]]\n");
+    write(r, "A/r.md", "# R\n\n[[q]] [[p]]\n");
+    write(r, "A/pic.png", "png");
+    write(
+        r,
+        "B/q.md",
+        "---\nrelated:\n  - { link: \"[[root]]\", label: sequel, directed: true }\n---\n# Q\n",
+    );
+    write(r, "B/s.md", "# S\n");
+    write(r, "C/t.md", "# T\n");
+    write(r, "root.md", "---\nrelated:\n  - \"[[t]]\"\n---\n# Root\n");
+    dir
+}
+
+fn visible(list: &[&str]) -> Vec<String> {
+    list.iter().map(|s| s.to_string()).collect()
+}
+
+fn edge<'a>(edges: &'a [GvEdge], a: &str, b: &str, kind: EdgeKind) -> &'a GvEdge {
+    edges
+        .iter()
+        .find(|e| e.kind == kind && ((e.from == a && e.to == b) || (e.from == b && e.to == a)))
+        .unwrap_or_else(|| panic!("no {kind:?} edge {a}–{b} in {edges:?}"))
+}
+
+#[test]
+fn gv_25_links_inside_folders_aggregate_to_one_edge_per_card_pair() {
+    let dir = linked_vault();
+    let (_c, s) = open(dir.path());
+    let edges = s.gv_edges(&visible(&["A", "B", "C", "root.md"])).unwrap();
+    // p→q, p→s and r→q: three links from A into B, one aggregated edge.
+    let ab = edge(&edges, "A", "B", EdgeKind::Link);
+    assert_eq!((ab.count, ab.aggregated, ab.directed), (3, true, false));
+    // The link inside A (r→p) and the image embed draw nothing.
+    assert!(!edges.iter().any(|e| e.from == e.to));
+    // Relationships: B/q.md → root (directed, labelled), root → C/t.md.
+    let manual = edge(&edges, "B", "root.md", EdgeKind::Manual);
+    assert_eq!(
+        (manual.from.as_str(), manual.to.as_str()),
+        ("B", "root.md"),
+        "directed edges keep their orientation"
+    );
+    assert!(manual.directed && manual.aggregated);
+    assert_eq!(manual.label.as_deref(), Some("sequel"));
+    let rc = edge(&edges, "root.md", "C", EdgeKind::Manual);
+    assert!(!rc.directed && rc.label.is_none());
+    assert_eq!(edges.len(), 3, "{edges:?}");
+}
+
+#[test]
+fn gv_20_visible_pages_connect_directly_and_folders_take_the_rest() {
+    let dir = linked_vault();
+    let (_c, s) = open(dir.path());
+    // Expand-like canvas: folder A expanded to show p.md; B stays a card.
+    let edges = s
+        .gv_edges(&visible(&[
+            "A", "A/p.md", "B", "B/q.md", "B/s.md", "root.md",
+        ]))
+        .unwrap();
+    let pq = edge(&edges, "A/p.md", "B/q.md", EdgeKind::Link);
+    assert_eq!((pq.count, pq.aggregated), (1, false));
+    edge(&edges, "A/p.md", "B/s.md", EdgeKind::Link);
+    // r.md isn't visible: its links count for A (r→q → A–q; r→p → A–p).
+    let aq = edge(&edges, "A", "B/q.md", EdgeKind::Link);
+    assert!(aq.aggregated);
+    let ap = edge(&edges, "A", "A/p.md", EdgeKind::Link);
+    assert!(ap.aggregated);
+    let qr = edge(&edges, "B/q.md", "root.md", EdgeKind::Manual);
+    assert!(!qr.aggregated && qr.directed);
+}
+
+#[test]
+fn m3a_no_visible_cards_no_edges() {
+    let dir = linked_vault();
+    let (_c, s) = open(dir.path());
+    assert!(s.gv_edges(&[]).unwrap().is_empty());
+    assert!(s.gv_edges(&visible(&["Nope"])).unwrap().is_empty());
+}
+
+/// NFR-03 (M3a §10): on a 10,000-note vault, a 200-card folder level and its
+/// edges take < 100 ms. Release only:
+/// `cargo test --release -p nimw-session --test global_view -- --ignored`.
+#[test]
+#[ignore = "perf: run in release with --ignored"]
+fn nfr_03_a_200_card_level_and_its_edges_in_under_100_ms() {
+    use nimw_testkit::{VaultShape, generate_vault};
+    let dir = tempfile::tempdir().unwrap();
+    generate_vault(dir.path(), VaultShape::TEN_K, 42);
+    for i in 0..200 {
+        write(
+            dir.path(),
+            &format!("Big/Page {i}.md"),
+            &format!(
+                "# Page {i}\n\n[[Page {}]] [[hub]] [[Note {i}]]\n",
+                (i + 1) % 200
+            ),
+        );
+    }
+    let (_c, s) = open(dir.path());
+    let started = std::time::Instant::now();
+    let level = s.gv_children(&GvLevel::Folder(vp("Big"))).unwrap();
+    let shown: Vec<String> = level.cards.iter().map(|c| c.path.clone()).collect();
+    let edges = s.gv_edges(&shown).unwrap();
+    let took = started.elapsed();
+    assert_eq!(level.cards.len(), 200);
+    assert_eq!(edges.len(), 200, "one ring of links");
+    eprintln!("200-card level + edges: {took:?}");
+    assert!(took < std::time::Duration::from_millis(100), "{took:?}");
+
+    // Level 0 reads every link in the vault (each project is a subtree):
+    // ~90 ms here, inside the 300 ms render budget with room for the UI.
+    let started = std::time::Instant::now();
+    let level = s.gv_children(&GvLevel::Vault).unwrap();
+    let shown: Vec<String> = level.cards.iter().map(|c| c.path.clone()).collect();
+    s.gv_edges(&shown).unwrap();
+    let took = started.elapsed();
+    eprintln!("level 0 ({} cards) + edges: {took:?}", level.cards.len());
+    assert!(took < std::time::Duration::from_millis(150), "{took:?}");
 }

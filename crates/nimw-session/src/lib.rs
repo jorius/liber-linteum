@@ -13,5 +13,7 @@ mod watching;
 pub use attachments::{Attached, LinkSuggestion, cover_reference, sanitize_file_name};
 pub use error::{Result, SessionError};
 pub use events::{IndexReport, RenameOutcome, SessionEvent};
-pub use global_view::{CardKind, GvCard, GvChildren, GvLevel, Relation, SUMMARY_TITLES};
+pub use global_view::{
+    CardKind, EdgeKind, GvCard, GvChildren, GvEdge, GvLevel, MAX_VISIBLE, Relation, SUMMARY_TITLES,
+};
 pub use session::{VaultSession, index_db_path};

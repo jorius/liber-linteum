@@ -300,3 +300,96 @@ fn has_scheme(value: &str) -> bool {
         && chars.all(|c| c.is_ascii_alphanumeric() || matches!(c, '+' | '.' | '-'))
         && scheme.len() > 1
 }
+
+/// Edge kinds drawn from the index (parent/child edges are drawn by the UI).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum EdgeKind {
+    /// Text links and page embeds.
+    Link,
+    /// `related:` relationships (GV-22–24).
+    Manual,
+}
+
+/// One edge between two visible cards (M3a §6).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct GvEdge {
+    /// Undirected edges: the smaller path. Directed ones: the source.
+    pub from: String,
+    pub to: String,
+    pub kind: EdgeKind,
+    /// Links (or relationships) folded into this edge.
+    pub count: u32,
+    /// An end stands for a folder card the link starts or ends inside (GV-25).
+    pub aggregated: bool,
+    /// Manual edges: an entry for this pair is directed (`from` → `to`).
+    pub directed: bool,
+    /// Manual edges: the first label found for this pair.
+    pub label: Option<String>,
+}
+
+/// Most cards one `gv_edges` call may name.
+pub const MAX_VISIBLE: usize = 1000;
+
+impl VaultSession {
+    /// Edges between `visible` cards: every resolved page-to-page link and
+    /// relationship, each end moved to its nearest visible ancestor-or-self,
+    /// one edge per card pair and kind with a count (GV-20, GV-25).
+    pub fn gv_edges(&self, visible: &[String]) -> Result<Vec<GvEdge>> {
+        if visible.is_empty() {
+            return Ok(Vec::new());
+        }
+        let shown: std::collections::HashSet<&str> = visible.iter().map(String::as_str).collect();
+        let lift = |path: &str| -> Option<String> {
+            let mut p = path;
+            loop {
+                if shown.contains(p) {
+                    return Some(p.to_string());
+                }
+                p = &p[..p.rfind('/')?];
+            }
+        };
+        // A link whose source isn't shown (or inside a shown folder) can't
+        // become an edge, so only those are read.
+        let links = self.index().page_links_from(visible)?;
+        let mut edges: BTreeMap<(String, String, EdgeKind), GvEdge> = BTreeMap::new();
+        for l in links {
+            let (Some(a), Some(b)) = (lift(&l.src), lift(&l.target)) else {
+                continue;
+            };
+            if a == b {
+                continue;
+            }
+            let kind = if l.kind == LinkKind::FrontmatterRelated {
+                EdgeKind::Manual
+            } else {
+                EdgeKind::Link
+            };
+            let aggregated = a != l.src || b != l.target;
+            let (lo, hi) = if a < b { (&a, &b) } else { (&b, &a) };
+            let edge = edges
+                .entry((lo.clone(), hi.clone(), kind))
+                .or_insert_with(|| GvEdge {
+                    from: lo.clone(),
+                    to: hi.clone(),
+                    kind,
+                    count: 0,
+                    aggregated: false,
+                    directed: false,
+                    label: None,
+                });
+            edge.count += 1;
+            edge.aggregated |= aggregated;
+            if kind == EdgeKind::Manual {
+                if edge.label.is_none() {
+                    edge.label = l.label.clone().filter(|s| !s.trim().is_empty());
+                }
+                if l.directed && !edge.directed {
+                    edge.directed = true;
+                    edge.from = a.clone();
+                    edge.to = b.clone();
+                }
+            }
+        }
+        Ok(edges.into_values().collect())
+    }
+}

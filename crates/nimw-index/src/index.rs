@@ -81,12 +81,17 @@ fn card_row(r: &Row<'_>) -> rusqlite::Result<CardRow> {
 const PAGE_LINK_KINDS: &str = "('wiki', 'embed', 'markdown', 'related')";
 
 fn page_link(r: &Row<'_>) -> rusqlite::Result<PageLink> {
+    page_link_at(r, 0)
+}
+
+/// A `PageLink` from the five columns starting at `at`.
+fn page_link_at(r: &Row<'_>, at: usize) -> rusqlite::Result<PageLink> {
     Ok(PageLink {
-        src: r.get(0)?,
-        target: r.get(1)?,
-        kind: LinkKind::parse(&r.get::<_, String>(2)?).unwrap_or(LinkKind::Wiki),
-        label: r.get(3)?,
-        directed: r.get(4)?,
+        src: r.get(at)?,
+        target: r.get(at + 1)?,
+        kind: LinkKind::parse(&r.get::<_, String>(at + 2)?).unwrap_or(LinkKind::Wiki),
+        label: r.get(at + 3)?,
+        directed: r.get(at + 4)?,
     })
 }
 
@@ -274,16 +279,30 @@ impl Index {
         Ok(stmt.query_row([path], card_row).optional()?)
     }
 
-    /// Every resolved link between two pages (M3a §6).
-    pub fn page_links(&self) -> Result<Vec<PageLink>> {
+    /// Resolved links between two pages that start at one of `paths` or
+    /// inside it (folders), each once, in index order (M3a §6): one indexed
+    /// range query per path, so a level costs what it shows, not the vault.
+    pub fn page_links_from(&self, paths: &[String]) -> Result<Vec<PageLink>> {
+        let mut found: std::collections::BTreeMap<i64, PageLink> =
+            std::collections::BTreeMap::new();
         let mut stmt = self.conn.prepare_cached(&format!(
-            "SELECT l.src, l.target_path, l.kind, l.label, l.directed FROM links l \
+            "SELECT l.id, l.src, l.target_path, l.kind, l.label, l.directed FROM links l \
              JOIN files t ON t.path = l.target_path \
-             WHERE t.kind = 'page' AND l.kind IN {PAGE_LINK_KINDS} ORDER BY l.src, l.start"
+             WHERE t.kind = 'page' AND l.kind IN {PAGE_LINK_KINDS} \
+             AND (l.src = ?1 OR (l.src >= ?2 AND l.src < ?3))"
         ))?;
-        Ok(stmt
-            .query_map([], page_link)?
-            .collect::<rusqlite::Result<Vec<_>>>()?)
+        for path in paths {
+            // Everything inside `path/`: '/' + 1 is '0'.
+            let rows = stmt
+                .query_map(params![path, format!("{path}/"), format!("{path}0")], |r| {
+                    Ok((r.get::<_, i64>(0)?, page_link_at(r, 1)?))
+                })?;
+            for row in rows {
+                let (id, link) = row?;
+                found.entry(id).or_insert(link);
+            }
+        }
+        Ok(found.into_values().collect())
     }
 
     /// Resolved page-to-page links from or to `path` (a page's neighbourhood).
