@@ -318,3 +318,18 @@ These override the sections above where they conflict.
     - WebKit moves a dragged card less than the pointer, so the drag test asserts that the card moved and that the position persists, not the distance;
     - the keyboard test waits on focus, not on time.
 16. **Safari 15 scan of the built bundle:** React Flow adds one `structuredClone`, in its click-to-connect path, which M3a disables (`connectOnClick={false}`, no connectable handles); M3b must guard it before turning connections on. The bundle's three regex lookbehinds (markdown, built inside `try`) and six `color-mix()` uses (sidebar and backdrop hovers) predate M3a.
+17. **Edges are one SVG layer, and aggregated edges are capped** (final review I2; overrides §6's and §9's React Flow `edgeTypes`):
+    - **Why:** level 0 of the 10k reference vault (`VaultShape::TEN_K`) has 94 project cards and ~2,200 aggregated pairs, nearly all with a count. As React Flow edges (an `<svg>`, store subscriptions and an HTML count label per edge) they took 1.5–2.5 s to show in WebKit, against NFR-03's 300 ms. Most of what was left after removing the HTML labels was WebKit stroking dotted lines: thousands of sub-pixel dashes per line at fit zoom.
+    - **Drawing:** `edges.tsx` `EdgeLayer` draws every edge in one `aria-hidden` `<svg>` in React Flow's viewport (a `ViewportPortal`, `z-index: -1`, so under the cards). One `<g>` per style carries colour, width and dash; each edge is a `<path data-gv-edge>`, directed manual edges add a `data-gv-arrow` path. Counts and manual labels are SVG `<text data-gv-count>` with a surface-coloured halo (`paint-order: stroke`), on top of all lines; a manual label keeps its full text in a `<title>`. Positions come from React Flow's store (`s.nodes`), so edges appear with their cards and follow a drag, and a card that stays put keeps its position object, so only a moved card's edges redraw. React Flow gets no `edges` prop, and cards no hidden handles (M3b adds its connect handles).
+    - **Dash patterns** grow when zoomed out (`dashScale`: ×√2 steps, never below the §13.8 patterns at zoom ≥ 1), keeping a dotted line's on-screen rhythm.
+    - **Cap:** at most `MAX_AGGREGATED` = 500 aggregated edges per canvas, the highest counts first (ties keep `gv_edges` order). Direct links and parent/child edges are never capped. When edges are left out, the canvas says so: "Showing the 500 strongest of 2,632 links from inside folders." (top left, `gv.edgesCapped`). At 1,000 the 200-card case still fitted on the reference Mac (240 ms in WebKit) but left little room for a slower 2022 laptop.
+    - **Measured** (built UI, IPC mock answering `gv_edges` directly, click on "Global view" until cards and edges are in the DOM plus one frame; Apple-silicon Mac; first / later opens):
+
+      | Canvas | Before (Chromium · WebKit) | After (Chromium · WebKit) |
+      |---|---|---|
+      | 94 cards, 2,632 aggregated edges | 473 / 400 · 1,484 / 1,200 ms | 105 / 77 · 155 / 83 ms |
+      | 200 cards, 3,400 aggregated edges | 584 / 560 · 2,622 / 2,200 ms | 133 / 100 · 188 / 125 ms |
+      | the same, toggling "Links from inside folders" | 55–210 · 290–860 ms | 40–50 · 30–75 ms |
+      | 200 cards, no edges (floor) | 169 / 72 · 210 / 145 ms | 138 / 102 · 159 / 92 ms |
+
+    - **Pinned by:** `GlobalView.edges.test.tsx` (counts are SVG text, 3,160 edges make one layer and no React Flow edge, the cap and its note), `edges.test.ts` (`strongest`, `dashScale`), and the opt-in timing probe `e2e/m3a-perf.spec.ts` (`NIMW_PERF=1`, both engines, asserts < 300 ms; not in CI, where runner speed varies).

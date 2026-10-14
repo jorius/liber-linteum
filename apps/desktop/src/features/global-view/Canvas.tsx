@@ -1,13 +1,5 @@
 import '@xyflow/react/dist/base.css';
-import {
-  Handle,
-  Position,
-  ReactFlow,
-  useNodesState,
-  useReactFlow,
-  type Node,
-  type NodeProps,
-} from '@xyflow/react';
+import { ReactFlow, useNodesState, useReactFlow, type Node, type NodeProps } from '@xyflow/react';
 import {
   useCallback,
   useEffect,
@@ -19,7 +11,7 @@ import {
 import { useTranslation } from 'react-i18next';
 import type { GlobalViewEdges, GvCard } from '../../ipc';
 import { Card } from './Card';
-import { GvFlowEdgeView, type GvFlowEdge } from './edges';
+import { EdgeLayer, MAX_AGGREGATED, strongest, type DrawnEdge } from './edges';
 import { useGvStore } from './gvStore';
 import {
   CARD_H,
@@ -45,18 +37,12 @@ interface CardData extends Record<string, unknown> {
 
 type CardNode = Node<CardData, 'card'>;
 
-/** A card as a React Flow node; hidden handles let edges attach (they are
- *  drawn border to border, see edges.tsx). */
+/** A card as a React Flow node. Edges need no handles: EdgeLayer draws
+ *  them border to border (edges.tsx). */
 function CardNodeView({ data }: NodeProps<CardNode>) {
   const setFocus = useGvStore((s) => s.setFocus);
   return (
     <>
-      <Handle
-        type="target"
-        position={Position.Top}
-        isConnectable={false}
-        className={styles.handle}
-      />
       <Card
         card={data.card}
         open={data.open}
@@ -66,18 +52,11 @@ function CardNodeView({ data }: NodeProps<CardNode>) {
         onOpenEditor={() => data.onOpenEditor(data.card)}
         onFocus={() => setFocus(data.card.path)}
       />
-      <Handle
-        type="source"
-        position={Position.Bottom}
-        isConnectable={false}
-        className={styles.handle}
-      />
     </>
   );
 }
 
 const nodeTypes = { card: CardNodeView };
-const edgeTypes = { gv: GvFlowEdgeView };
 const KEYS: Record<string, Direction> = {
   ArrowLeft: 'left',
   ArrowRight: 'right',
@@ -148,8 +127,9 @@ export function Canvas({ mode, toggles, width, onOpen, onOpenEditor }: CanvasPro
     [expanded],
   );
 
-  const flowEdges = useMemo<GvFlowEdge[]>(() => {
-    const out: GvFlowEdge[] = [];
+  // Edges are drawn by EdgeLayer, not React Flow (final review I2).
+  const drawn = useMemo(() => {
+    const out: DrawnEdge[] = [];
     for (const e of edges) {
       const shown = e.kind === 'link' ? toggles.links : toggles.manual;
       if (!shown || (e.aggregated && !toggles.aggregated)) continue;
@@ -157,14 +137,11 @@ export function Canvas({ mode, toggles, width, onOpen, onOpenEditor }: CanvasPro
         id: `${e.kind}:${e.from}→${e.to}`,
         source: e.from,
         target: e.to,
-        type: 'gv',
-        data: {
-          kind: e.kind,
-          aggregated: e.aggregated,
-          directed: e.directed,
-          count: e.count,
-          label: e.label,
-        },
+        kind: e.kind,
+        aggregated: e.aggregated,
+        directed: e.directed,
+        count: e.count,
+        label: e.label,
       });
     }
     if (toggles.tree) {
@@ -174,13 +151,16 @@ export function Canvas({ mode, toggles, width, onOpen, onOpenEditor }: CanvasPro
             id: `tree:${parent}→${kid}`,
             source: parent,
             target: kid,
-            type: 'gv',
-            data: { kind: 'tree', aggregated: false, directed: false, count: 1, label: null },
+            kind: 'tree',
+            aggregated: false,
+            directed: false,
+            count: 1,
+            label: null,
           });
         }
       }
     }
-    return out;
+    return strongest(out);
   }, [edges, toggles, canvas.children]);
 
   const connections = useMemo(() => {
@@ -288,11 +268,9 @@ export function Canvas({ mode, toggles, width, onOpen, onOpenEditor }: CanvasPro
       onClickCapture={onClickCapture}
       onDoubleClickCapture={onDoubleClickCapture}
     >
-      <ReactFlow<CardNode, GvFlowEdge>
+      <ReactFlow<CardNode>
         nodes={nodes}
-        edges={flowEdges}
         nodeTypes={nodeTypes}
-        edgeTypes={edgeTypes}
         onNodesChange={onNodesChange}
         onNodeDragStop={(_, node) => useGvStore.getState().pin(node.id, node.position)}
         nodesConnectable={false}
@@ -305,7 +283,14 @@ export function Canvas({ mode, toggles, width, onOpen, onOpenEditor }: CanvasPro
         minZoom={0.25}
         maxZoom={2}
         proOptions={{ hideAttribution: true }}
-      />
+      >
+        <EdgeLayer edges={drawn.edges} />
+      </ReactFlow>
+      {drawn.hidden > 0 && (
+        <p className={styles.capNote}>
+          {t('gv.edgesCapped', { shown: MAX_AGGREGATED, total: drawn.aggregated })}
+        </p>
+      )}
       <div className={styles.zoom} role="group" aria-label={t('gv.zoom')}>
         <button type="button" onClick={() => void flow.zoomIn()} aria-label={t('gv.zoomIn')}>
           +

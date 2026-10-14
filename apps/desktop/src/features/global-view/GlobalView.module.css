@@ -153,21 +153,56 @@
   background-size: 18px 18px;
 }
 
-.handle {
-  opacity: 0;
+/* The edge layer (edges.tsx): in the viewport, under the cards. Each style
+   group sets `color`, width and dash; its lines inherit them. */
+.edges {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 1px;
+  height: 1px;
+  overflow: visible;
+  z-index: -1;
   pointer-events: none;
 }
 
-.edgeLabel {
+.edges path {
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+}
+
+.edges .edgeArrow {
+  fill: currentColor;
+  stroke: none;
+}
+
+/* Counts and manual labels: text with a surface-coloured halo, so it reads
+   over the lines it sits on. */
+.edgeLabels text {
+  font: 600 11px var(--font-body);
+  fill: var(--color-text-body);
+  stroke: var(--color-surface);
+  stroke-width: 4px;
+  stroke-linejoin: round;
+  paint-order: stroke;
+  text-anchor: middle;
+  dominant-baseline: central;
+}
+
+/* Shown when only the strongest aggregated edges are drawn (edges.tsx). */
+.capNote {
   position: absolute;
-  pointer-events: none;
-  padding: 1px 6px;
+  left: 16px;
+  top: 12px;
+  z-index: 5;
+  margin: 0;
+  padding: 4px 10px;
+  border: 1px solid var(--color-border);
   border-radius: var(--radius-pill);
   background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  font: 600 11px var(--font-body);
-  color: var(--color-text-body);
-  white-space: nowrap;
+  font: 500 12px var(--font-body);
+  color: var(--color-text-muted);
 }
 
 .zoom {

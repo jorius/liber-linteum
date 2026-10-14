@@ -306,6 +306,7 @@
       "manual": "Manual",
       "aggregated": "Links from inside folders"
     },
+    "edgesCapped": "Showing the {shown, number} strongest of {total, number} links from inside folders.",
     "reset": "Reset layout",
     "layoutSaveFailed": "Card positions couldn't be saved. {error}",
     "empty": "Empty folder.",
