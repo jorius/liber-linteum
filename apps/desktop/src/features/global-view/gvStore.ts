@@ -80,6 +80,9 @@ interface GvState {
   expanded: GvLevelRef[];
   levels: Record<string, GvLevel>;
   canvas: Canvas;
+  /** Layout key of the level `canvas` was loaded for (the stack changes
+   *  first, the canvas when the level arrives). */
+  shownKey: string | null;
   edges: GvEdge[];
   /** Pinned positions of the current canvas. */
   pinned: Record<string, CardPosition>;
@@ -139,6 +142,7 @@ export const useGvStore = create<GvState>((set, get) => {
     expanded: [],
     levels: {},
     canvas: EMPTY_CANVAS,
+    shownKey: null,
     edges: [],
     pinned: {},
     focus: null,
@@ -183,6 +187,7 @@ export const useGvStore = create<GvState>((set, get) => {
         expanded,
         levels,
         canvas,
+        shownKey: canvasKey(m, root),
         // A layout or edge read that fails (or answers nothing) just means
         // none: the canvas still shows.
         edges: edges.ok && Array.isArray(edges.value) ? edges.value : [],
@@ -255,6 +260,7 @@ export const useGvStore = create<GvState>((set, get) => {
         expanded: [],
         levels: {},
         canvas: EMPTY_CANVAS,
+        shownKey: null,
         edges: [],
         pinned: {},
         focus: null,

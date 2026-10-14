@@ -12,7 +12,7 @@ import { useToastStore } from '../../stores/toastStore';
 import { nextFreeName } from '../../stores/tree';
 import { useVaultStore } from '../../stores/vaultStore';
 import { Canvas } from './Canvas';
-import { canvasKey, useGvStore } from './gvStore';
+import { useGvStore } from './gvStore';
 import { Toolbar } from './Toolbar';
 import styles from './GlobalView.module.css';
 
@@ -24,7 +24,6 @@ export function GlobalView() {
   const { t } = useTranslation();
   const mode = useSettingsStore((s) => s.settings.globalViewMode);
   const toggles = useSettingsStore((s) => s.settings.globalViewEdges);
-  const stack = useGvStore((s) => s.stack);
   const loaded = useGvStore((s) => s.loaded);
   const empty = useGvStore((s) => s.canvas.cards.length === 0);
   const area = useRef<HTMLDivElement>(null);
@@ -95,7 +94,6 @@ export function GlobalView() {
       <div ref={area} className={styles.area}>
         <ReactFlowProvider>
           <Canvas
-            canvasKey={canvasKey(mode, stack[stack.length - 1])}
             mode={mode}
             toggles={toggles}
             width={width}

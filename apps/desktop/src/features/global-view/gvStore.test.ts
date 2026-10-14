@@ -166,6 +166,19 @@ describe('Global View store (M3a §5)', () => {
     expect(useGvStore.getState().pinned).toEqual({});
   });
 
+  it('shownKey names the level the canvas holds: the breadcrumb moves first, the key when the level arrives', async () => {
+    await useGvStore.getState().load();
+    expect(useGvStore.getState().shownKey).toBe('');
+    const opening = useGvStore.getState().open(card('A', 'project'));
+    expect(useGvStore.getState().stack.at(-1)).toEqual({ kind: 'folder', path: 'A' });
+    expect(useGvStore.getState().shownKey, 'still the vault while A loads').toBe('');
+    await opening;
+    expect(useGvStore.getState().shownKey).toBe('A');
+    mode('expand');
+    await useGvStore.getState().modeChanged();
+    expect(useGvStore.getState().shownKey).toBe('expand:A');
+  });
+
   it('a slower, older load never overwrites a newer one', async () => {
     let release: () => void = () => undefined;
     const held = new Promise<void>((r) => (release = r));

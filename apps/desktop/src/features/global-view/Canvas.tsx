@@ -3,7 +3,6 @@ import {
   Handle,
   Position,
   ReactFlow,
-  useNodesInitialized,
   useNodesState,
   useReactFlow,
   type Node,
@@ -80,8 +79,6 @@ const KEYS: Record<string, Direction> = {
 };
 
 export interface CanvasProps {
-  /** Layout key of what is shown; a new key fits the view again. */
-  canvasKey: string;
   mode: 'drill' | 'expand';
   toggles: GlobalViewEdges;
   width: number;
@@ -91,7 +88,7 @@ export interface CanvasProps {
 
 /** The Global View canvas (M3a §6, §7): cards placed by the level's layout
  *  (pinned positions win), edges per the toggles, pan and zoom. */
-export function Canvas({ canvasKey, mode, toggles, width, onOpen, onOpenEditor }: CanvasProps) {
+export function Canvas({ mode, toggles, width, onOpen, onOpenEditor }: CanvasProps) {
   const { t } = useTranslation();
   const canvas = useGvStore((s) => s.canvas);
   const edges = useGvStore((s) => s.edges);
@@ -170,6 +167,11 @@ export function Canvas({ canvasKey, mode, toggles, width, onOpen, onOpenEditor }
         dragHandle: '.gv-grip',
         selectable: false,
         focusable: false,
+        // Known size: React Flow needn't measure (and hide) a card again each
+        // time its data changes — a hidden card drops focus and the second
+        // click of a double click (found in WebKit e2e).
+        width: CARD_W,
+        height: CARD_H,
         style: { width: CARD_W, height: CARD_H },
         data: {
           card,
@@ -185,11 +187,18 @@ export function Canvas({ canvasKey, mode, toggles, width, onOpen, onOpenEditor }
   const [nodes, setNodes, onNodesChange] = useNodesState<CardNode>(computed);
   useEffect(() => setNodes(computed), [computed, setNodes]);
 
-  // A new level: fit it in view, and keep the keyboard on a card when the
-  // card that opened it is gone (it unmounted, focus fell to the page).
-  const initialized = useNodesInitialized();
+  // A level just loaded: fit it in view and keep the keyboard on a card when
+  // the one that opened it is gone (it unmounted, focus fell to the page).
+  // Once per loaded level, keyed by what the store loaded (the breadcrumb
+  // changes before the level arrives) — a refresh of the same level, or nodes
+  // updated for focus, must not move the view.
+  const shownKey = useGvStore((s) => s.shownKey);
+  const fitted = useRef<string | null>(null);
   useEffect(() => {
-    if (!initialized) return;
+    if (shownKey === null || fitted.current === shownKey) return;
+    const ids = canvas.cards.map((c) => c.path);
+    if (nodes.length !== ids.length || nodes.some((n, i) => n.id !== ids[i])) return;
+    fitted.current = shownKey;
     void flow.fitView({ padding: 0.12, maxZoom: 1, duration: 0 });
     const active = document.activeElement;
     if (active === document.body || (active && wrapper.current?.contains(active))) {
@@ -197,7 +206,7 @@ export function Canvas({ canvasKey, mode, toggles, width, onOpen, onOpenEditor }
       if (first) focusCard(first);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [canvasKey, initialized]);
+  }, [shownKey, nodes, canvas]);
 
   /** Moves the keyboard to a card: at once when it is on screen, else after
    *  the next render (a level that just loaded). */
