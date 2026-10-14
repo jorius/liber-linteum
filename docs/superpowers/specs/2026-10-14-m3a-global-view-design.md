@@ -1,0 +1,280 @@
+# M3a — Global View (browse, layout, edges): Design
+
+**Status:** written on 2026-10-14 without Jose's review. He asked to "carry on with everything that's missing" and review features in bulk later.
+- **Grounding:** product spec §6 (all GV items DECIDED), architecture §3.1 and §4.4, and the clickable prototype (`design/prototype/Main.dc.html`, screen `global`). All three are binding.
+- **Judgement calls** where none of them settles a question are listed in §12, for review.
+
+**Split:** M3 is split in two.
+- **M3a (this document):** the Global View screen, cards, levels, Drill-down / Expand, edges (text links, parent/child, manual read-only, aggregated), layout with persisted positions, pan and zoom, New entry, and keyboard use.
+- **M3b:** creating, labelling, directing and deleting manual relationships (GV-22–24) and picking a folder's index note (GV-02's "page the user picked").
+
+---
+
+## 1. Goal and success criteria
+
+See the vault as a map of cards and move through it level by level, without opening files.
+
+All acceptance criteria of product spec §6 pass, except the manual-relationship creation flows (M3b):
+1. **Projects at level 0:** a vault with projects A, B and C shows three project cards at level 0.
+2. **Drill-down:** a single click on A shows only A's children, and the breadcrumb reads "Vault › A".
+3. **Expand:** a single click on A puts A's children beside A, while B and C stay visible.
+4. **Persistence:** a card moved by hand stays where it was put after a restart.
+5. **Aggregation:** a page in A linking to a page in B gives one A–B edge with count 1 at level 0, when "Links from inside folders" is on.
+6. **Index note:** folder `DMC` containing `DMC.md` previews `DMC.md` on its card.
+
+**Non-negotiables:**
+- no network;
+- every command async via `blocking()`, with a real-ACL test;
+- i18n en + es; axe-clean; WCAG AA in light and dark across all palettes; full keyboard operation (NFR-10);
+- Safari 15 floor;
+- performance: a level of ≤ 200 cards renders in < 300 ms at 10k notes (NFR-03);
+- only open levels are mounted (NFR-02);
+- opening a vault writes nothing: `.nimw/layout.json` is created on the first card move.
+
+## 2. Screen and switching (`stores/uiStore.ts`, `TopBar.tsx`, `AppShell.tsx`)
+
+- **Screen state:** `uiStore.screen: 'edit' | 'global'`, `'edit'` on vault open. The top bar's Edit · Global view group becomes a real segmented control (`aria-pressed`), and the "arrives in M3" hint is removed.
+- **Shortcuts:** ⌘1 shows Edit and ⌘2 shows the Global View (Ctrl on other platforms). The page handles them, as with ⌘[ / ⌘]. View → Editor and View → Global View menu items emit `menu:screen` with no accelerator (the M2b §11.3 rule).
+- **Switching:**
+  - Edit → Global returns to the last level shown in this session (level 0 the first time).
+  - Global → Edit shows the current page, with the editor state kept: the editor stays mounted but hidden, so text, selection and undo survive.
+  - Opening a page from the Global View switches to Edit.
+- **Layout:** the explorer sidebar stays visible in both screens. The Global View replaces the page area (`main`).
+
+## 3. Levels (`gv_children`, `features/global-view/levels.ts`)
+
+A **level** is what one click opens.
+
+| Level | Cards |
+|---|---|
+| **Vault (level 0, GV-10)** | top-level folders (kind `project`), then pages in the vault root |
+| **Folder or project** | its direct subfolders (`folder`), then its pages (`page`) |
+| **Page (GV-16)** | the page itself (centred), plus its neighbourhood: pages it links to, pages linking to it (backlinks) and pages related to it through `related:` in either direction |
+
+- **Order:** within a group, cards are sorted by `name_key`, so the ordering is accent- and case-insensitive, like the explorer.
+- **Never cards:**
+  - non-page files;
+  - attachment folders (VLT-05; see §3.1);
+  - excluded or hidden paths, which never reach the index.
+- **Neighbourhood links** count only when resolved to a page. They cover wiki and Markdown links and `related` entries. Embeds of pages count as links; cover links do not.
+- **Duplicates** collapse to one card: a page that both links to and is linked by the centre page appears once.
+
+### 3.1 Attachment folders
+
+A folder is an attachment folder when the current `AttachmentPolicy` (M2c §5.3) names it:
+- `Subfolder(name)`: every folder with that name (case-insensitive) is one;
+- `Folder(path)`: only that folder is one;
+- `VaultRoot` and `SameAsNote` name no folder.
+
+Attachment folders still show in the explorer.
+
+### 3.2 Index note (GV-02)
+
+A folder's index note is the first match of:
+1. `<folder>/<folder name>.md` (case-insensitive name match);
+2. `<folder>/index.md`;
+3. `vault.json.indexPicks[folder]` (read only in M3a; picked in M3b);
+4. the folder's only page, when the folder contains exactly one page and no subfolders.
+
+Without an index note, the card is a **folder summary** (§4).
+
+## 4. Cards (`features/global-view/Card.tsx`)
+
+Values come from the prototype (`.card`, lines 64-79 and 291-312), expressed as theme tokens. New tokens are added where the prototype colour has none (`--color-card-border`, `--color-canvas`), for all palettes and both modes, with contrast checked by the M2b palette tests.
+
+- **Size and frame:** 240 × 300 px, `--radius-md` corners, `--shadow-card`, 1 px border.
+  - The card that opened the current level, or an expanded card, gets a 2 px accent ring.
+- **Header row:**
+  - **Kind label:** 10.5 px uppercase, letter-spacing .07em, muted. It reads "PROJECT", "FOLDER" or "PAGE"; a folder previewing an index note reads "FOLDER · <folder name>" (GV-03).
+  - **Move handle:** a 36 × 36 grip, the React Flow drag handle.
+  - **Connect handle:** a 36 × 36 button, inert in M3a; it is hidden until M3b.
+- **Cover area (96 px):**
+  - **With a cover:** the image (`object-fit: cover`, `object-position: 50% <cover-y>%`), alt "".
+  - **Remote cover:** a placeholder reading "Remote cover not loaded".
+  - **Page without a cover:** "No cover" on `--color-surface-subtle` with a dashed bottom border.
+  - **Folder summary:** a folder icon and "N pages · M folders" on `--color-code-bg`, in accent text.
+  - For a folder with an index note, the cover is the index note's.
+- **Text:**
+  - **Title:** Display font, 19 px, 700, accent, at most 2 lines.
+  - **Subtitle:** 12 px, muted, 1 line. For a folder summary it is the folder's name.
+  - **Excerpt:** 12 px / 1.45, clamped to 3 lines; the index excerpt (≤ 200 chars). For a folder summary it is the first child titles joined with " · ".
+- **Footer:** image and audio icons when `has_image` / `has_audio` are set (each with an accessible label), and a **See all** pill button.
+  - See all opens the page, or the folder's index note, in the editor.
+  - A folder without an index note drills into it instead.
+- **Accessibility:**
+  - Each card is a `group` named after its title and kind ("Generator Rex, page").
+  - Its focusable surface is one button-like element (`role="button"`, `aria-describedby` → subtitle + excerpt).
+  - Visible focus: a 2 px accent outline, offset −2 px.
+
+## 5. Navigation (`features/global-view/GlobalView.tsx`, `gvStore.ts`)
+
+- **Clicks:**
+  - **Single click** (GV-11) opens the next level for that card.
+  - **Double click** (GV-12) opens the page, or the folder's index note, in the editor; a folder without one drills in.
+  - A single click waits 240 ms, as in the prototype, so a double click never also drills.
+- **Keyboard (GV-18):**
+  - the arrow keys move focus to the nearest card in that direction, by card centre and angle (roving tabindex; React Flow's own keyboard node-moving is disabled);
+  - Enter = single click, Shift+Enter = double click;
+  - Escape goes back one breadcrumb level in Drill-down, or collapses the focused expanded card in Expand.
+- **Mode (GV-13):**
+  - a segmented control, Drill-down | Expand in place;
+  - one global setting, `globalViewMode: 'drill' | 'expand'` in `settings.json`, default `drill`.
+- **Drill-down (GV-14):**
+  - the canvas shows one level;
+  - the **breadcrumb** is the stack of opened levels ("Vault › Character Design › Generator Rex"), and each crumb goes back to its level;
+  - page levels show the page title as their crumb.
+- **Expand in place (GV-15):**
+  - a single click adds the card's next level beside it, in the column to its right;
+  - a second single click on an expanded card collapses it, along with everything expanded from it;
+  - cards already on the canvas aren't duplicated: edges point to the existing card;
+  - the breadcrumb shows only the root level of the expand canvas;
+  - switching mode keeps the current root level.
+- **New entry (GV-17):**
+  - a floating "New entry" button, bottom right, as in the prototype;
+  - it creates `Untitled` (or `Untitled 1`, …) in the folder of the current level, with `vaultStore.createPage`:
+    - vault root at level 0;
+    - the folder itself at a folder level;
+    - the page's folder at a page level;
+    - in Expand, the focused card's folder, else the root level's;
+  - it then switches to Edit with the title field focused and selected, ready to rename (M2b title editing).
+- **Empty level:** shows "Empty folder." plus New entry.
+
+## 6. Edges (`gv_edges`, `features/global-view/edges.tsx`)
+
+- **Kinds** (prototype colours become tokens):
+
+| Kind | Style |
+|---|---|
+| Text link | solid, `--color-edge-link` |
+| Parent / child | dashed, `--color-edge-tree` |
+| Manual | solid, `--color-edge-manual` |
+| Aggregated link | dotted, link colour |
+| Aggregated manual | dashed, manual colour |
+
+- **Manual edges:**
+  - an arrow appears only when `directed`;
+  - the label is drawn at the edge midpoint (≤ 24 chars shown, full text in a `title`).
+- **Aggregated edges:** a count badge when the count is greater than 1.
+- **Parent/child edges** join an expanded card to the children it opened (Expand mode). In Drill-down they connect a page level's centre card to nothing (the parent is in the breadcrumb).
+- **Text-link and manual edges** come from `gv_edges(visible)`, computed in Rust over all resolved `wiki`, `markdown`, `embed` (page targets) and `related` links:
+  - both ends of every link are mapped to the **nearest visible ancestor-or-self** (GV-25);
+  - a pair whose ends map to two different visible cards becomes one edge per (pair, kind), with a count;
+  - an edge is **aggregated** when either end was mapped to an ancestor folder card rather than itself;
+  - direction counts for manual `directed` only; links are undirected for drawing.
+- **Toggles (GV-21):** four chips, "Text links", "Parent / child", "Manual" and "Links from inside folders", each with a style swatch.
+  - They are `aria-pressed` buttons, default on, persisted as `globalViewEdges` in `settings.json`.
+  - "Links from inside folders" hides aggregated edges of both kinds.
+- **Edge accessibility:** edges are decorative for screen readers. Each card's description lists its connections ("Links to 3 cards, linked from 1"), so the information isn't visual-only.
+
+## 7. Layout (`features/global-view/layout.ts`, `layout_get` / `layout_set`)
+
+- **Deterministic layouts,** matching the prototype:
+  - **Grid** (vault and folder levels, Drill-down): cells of 300 × 370 from (48, 48), with as many columns as fit the canvas width (at least 1).
+  - **Columns** (Expand): each expansion fills the column to the right of its parent card (x = 48 + depth × 310), with rows allocated in depth-first order (y = 48 + row × 340) and the parent kept level with its first child.
+  - **Neighbourhood** (page level, Drill-down): backlinks on the left, the page in the centre and outgoing links on the right, each column vertically centred on the page. Related pages go left or right by direction (undirected ones go right), and a page that is both linked and linking goes right.
+- **Pinned positions (GV-31):**
+  - dragging a card by its move handle pins it;
+  - pinned positions are saved per **level key** in `.nimw/layout.json` (arch §3.1), with an atomic write that preserves unknown keys, debounced 300 ms after a drag ends;
+  - level keys: `""` (vault), `<folderPath>`, `page:<path>`, and `expand:<rootKey>` for Expand canvases;
+  - unpinned cards follow the deterministic layout.
+- **Reset layout (GV-32)** removes the current level key's entries.
+- **Renames:** moves and renames remap the layout keys and entries by path prefix, in Rust, at the session's single rename choke point and in the watcher's rename handling. Deleted paths drop out lazily: entries for paths not on the canvas are ignored, then pruned on the next save of that level.
+- **Pan and zoom (GV-33):**
+  - React Flow handles wheel and pinch zoom (0.25–2×) and dragging the background to pan;
+  - zoom-in, zoom-out and fit buttons have accessible names;
+  - each level change fits the view, unless the level has pinned positions, in which case it restores them and fits.
+- **Canvas background:** `--color-canvas` with the `--color-bg-dots` 18 px dot grid already used by Welcome.
+
+## 8. Backend (`apps/desktop/src-tauri/src/gv_commands.rs`, `crates/nimw-session/src/global_view.rs`)
+
+**Rules for all commands:** async via `blocking()`; registered in `build.rs`, `generate_handler!`, capabilities and the test COMMANDS list; each with a real-ACL test.
+
+- **`gv_children(level: { kind: "vault" } | { kind: "folder", path } | { kind: "page", path }) -> GvLevel { cards: Vec<GvCard>, centre: Option<String> }`**
+  - `GvCard`:
+    - `{ path, kind: "project"|"folder"|"page", title, subtitle, cover: Option<String>, coverRemote: bool, coverY: Option<u8>, excerpt, hasImage, hasAudio }`;
+    - for folders also `indexPage: Option<String>`, `pages: u32`, `folders: u32`, `childTitles: Vec<String>` (≤ 5);
+    - page levels also `relation: "centre"|"in"|"out"|"both"` per card.
+  - `cover` is the resolved vault path (path-style resolution, as the page header does), or `None` when missing or remote.
+  - One SQL pass per level: children by `parent`, a left join on `pages`, counts via `GROUP BY parent`.
+- **`gv_edges(visible: Vec<String>) -> Vec<GvEdge { from, to, kind: "link"|"manual", count, aggregated, directed, label: Option<String> }>`**
+  - `visible` is at most 1,000 paths.
+  - It scans the resolved links once (an indexed query on `target_path IS NOT NULL`), maps ends with a prefix lookup over the visible folders (sorted, binary search), and aggregates in a `HashMap`.
+  - A manual edge's label is the first label found for that pair; `directed` is true when any entry for that pair is directed in that orientation.
+- **`layout_get(level: String) -> HashMap<String, {x, y}>` and `layout_set(level, positions)`**
+  - `.nimw/layout.json` holds `{ "version": 1, "levels": { … } }`. It is created lazily and written atomically.
+  - An empty map removes the level.
+- **`VaultSession::rename`** and the watcher's rename path call `layout_remap(from, to)` (prefix remap for keys and entries). They do nothing when no `layout.json` exists.
+- **Settings:** `globalViewMode` (`"drill"` default) and `globalViewEdges` (`{ links, tree, manual, aggregated }`, all `true`), each lenient per field (M1/M2b pattern).
+- **The DTO for `PageDto`** is unchanged. Cards come only from `gv_children`.
+
+## 9. Frontend structure (`apps/desktop/src/features/global-view/`)
+
+- **`GlobalView.tsx`:** the screen; the toolbar (breadcrumb, mode, toggles, Reset layout) plus the canvas.
+- **`gvStore.ts`** (zustand) holds:
+  - the mode;
+  - the drill stack, or the expand tree;
+  - loaded levels (`Map<levelKey, GvLevel>`);
+  - edges;
+  - pinned positions;
+  - focus.
+- **`Canvas.tsx`:** `@xyflow/react` `ReactFlow` with:
+  - `nodeTypes = { card }` and `edgeTypes = { link, tree, manual }`;
+  - `nodesDraggable` with `dragHandle=".gv-grip"`;
+  - `nodesConnectable={false}` (M3b turns it on);
+  - `disableKeyboardA11y`, because §5 handles the keyboard;
+  - `proOptions.hideAttribution`. The MIT licence allows this; the attribution is credited in About and README instead.
+- **`layout.ts`:** pure functions for the three layouts plus pinned overrides. They are unit-tested.
+- **`Card.tsx`, `edges.tsx`, `Breadcrumb.tsx`, `EdgeToggles.tsx`.**
+- **Refresh:**
+  - the visible levels and edges are re-fetched, debounced 150 ms, when `vaultStore` nodes change (`refreshTree`), when a page save lands (`editorStore` hash) and on settings changes to the attachment policy;
+  - cards removed from the vault disappear;
+  - a level whose folder was deleted falls back to its nearest existing ancestor, or to the vault.
+- **Dependency:** `@xyflow/react` (MIT), the newest version the pnpm 12 release-age gate allows, pinned exactly; its CSS is imported locally. No other new dependency: §7 replaces the architecture's elkjs (§12.1).
+
+## 10. Testing
+
+- **Rust:**
+  - `gv_children` for all three levels, including ordering, attachment folders, the index-note rules 1–4, counts and covers (resolved, remote, missing);
+  - `gv_edges`: aggregation (the product acceptance A–B count case), aggregated flags, manual label and direction, the visible-set cap;
+  - `layout_get` / `set`: lazy creation, unknown-key preservation, remap on rename (in-app and watcher);
+  - settings fields: defaults and lenient parsing.
+  - A perf test: 10k pages with a 200-child folder, `gv_children` + `gv_edges` < 100 ms in release mode (ignored in debug, like M1's perf test).
+- **ACL:** every new command allowed from main, denied elsewhere.
+- **TS:**
+  - `layout.ts` (grid, columns, neighbourhood, pinned override);
+  - `gvStore` (drill stack, expand and collapse, no duplicates, mode switch, refresh fallback);
+  - keyboard navigation geometry;
+  - Card (kinds, placeholders, a11y, axe in light and dark);
+  - toolbar (toggles persisted, axe);
+  - TopBar switching; the editor kept mounted (undo survives Edit → Global → Edit).
+- **E2E (Chromium + WebKit):**
+  - level 0 → drill → breadcrumb back;
+  - expand and collapse;
+  - double click opens the editor;
+  - drag a card, reload, and the position is kept;
+  - edge toggles;
+  - keyboard only: arrows, Enter, Shift+Enter;
+  - zero-network with the Global View open.
+- **Real window:** trackpad pan and pinch; dragging; a large vault feel; the WKWebView rendering of React Flow.
+
+## 11. Out of scope (M3b and later)
+
+- creating, labelling and deleting relationships;
+- picking a folder's index note;
+- a minimap;
+- search inside the Global View (M5);
+- card context menus;
+- dragging cards into folders (moving files);
+- multi-select.
+
+## 12. Decisions taken for Jose (to review in bulk)
+
+1. **No elkjs:** deterministic grid, column and neighbourhood layouts matching the prototype replace the architecture's elkjs worker. They avoid a large GWT-compiled dependency under `freezePrototype` and the CSP, and they give predictable, testable layouts. A layered auto-layout could still be added later behind the same `layout.ts` interface.
+2. **Edit and Global View share one window:** the editor stays mounted while the Global View shows, so switching never loses undo or selection. Shortcuts are ⌘1 and ⌘2, plus View-menu items.
+3. **The breadcrumb is the stack of opened levels** (click history), not the folder path. Page levels need this, because a neighbourhood isn't a folder.
+4. **Edge toggles and the view mode are global settings** (`settings.json`). GV-13 asks for that for the mode, and the toggles follow suit.
+5. **"See all"** = double click: it opens in the editor, and a folder without an index note drills in. That's the prototype's behaviour, except that the prototype's "no index note" toast became a drill-in.
+6. **New entry** creates "Untitled" and jumps to the editor with the title selected for renaming.
+7. **A page level includes the page itself** as the centre card, with neighbours placed left (in) and right (out).
+8. **The connect handle is hidden** until M3b, rather than shown disabled.
+9. **The single-click delay is 240 ms,** taken from the prototype, so a double click never triggers drill-down first.
