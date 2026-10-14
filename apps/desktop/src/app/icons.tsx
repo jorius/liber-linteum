@@ -117,6 +117,14 @@ export function WidthIcon() {
   );
 }
 
+export function OutlineIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true" {...stroke}>
+      <path d="M4 6h16M8 12h12M12 18h8" />
+    </svg>
+  );
+}
+
 export function CloseIcon() {
   return (
     <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true" {...stroke}>

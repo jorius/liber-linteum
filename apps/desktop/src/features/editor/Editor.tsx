@@ -26,7 +26,9 @@ import { setLanguagePickerOpener } from './languagePickerOpen';
 import { LinkPicker } from './LinkPicker';
 import { setLinkPickerOpener } from './linkPickerOpen';
 import type { PageDoc } from './pageDoc';
+import { Outline } from './Outline';
 import { blockForOffset, offsetAtTop, topIn } from './scrollSync';
+import { notifyViewUpdate } from './viewUpdates';
 import { Toolbar } from './Toolbar';
 import { hideView, pageDocOf, showView, storedState, storeState } from './views';
 import { toggleTaskIn } from './widgets';
@@ -242,6 +244,7 @@ function createState(d: PageDoc, mode: EditorMode, label: string, numbers: boole
         },
       }),
       EditorView.updateListener.of((u) => {
+        notifyViewUpdate(u);
         if (u.docChanged || u.selectionSet || syntaxTree(u.startState) !== syntaxTree(u.state)) {
           toolbarOf.get(u.view)?.(u.state);
         }
@@ -284,6 +287,7 @@ export function Editor({ doc, mode, label }: EditorProps) {
   }, []);
   const showToolbar = useSettingsStore((s) => s.settings.toolbar);
   const showNumbers = useSettingsStore((s) => s.settings.lineNumbers);
+  const showOutline = useSettingsStore((s) => s.settings.outline);
   const [toolbarView, setToolbarView] = useState<EditorView | null>(null);
   const [picker, setPicker] = useState(false);
   const [langPicker, setLangPicker] = useState<{ at: number; anchor: HTMLElement } | null>(null);
@@ -428,24 +432,27 @@ export function Editor({ doc, mode, label }: EditorProps) {
         />
       )}
       {split && <SplitHint />}
-      <div className={split ? styles.split : styles.single}>
-        <div
-          ref={host}
-          data-width={width}
-          className={`${mode === 'livePreview' ? styles.live : styles.source} ${width === 'full' ? styles.full : ''}`}
-        />
-        {split && (
-          <div ref={pane} className={styles.pane} role="region" aria-label={t('editor.preview')}>
-            {toolbarView && <BlockGutter view={toolbarView} pane={pane} shown={shown} />}
-            <Preview
-              text={text}
-              path={doc.path}
-              onToggleTask={toggleTask}
-              onRendered={onRendered}
-              delay={renderNow ? 0 : undefined}
-            />
-          </div>
-        )}
+      <div className={styles.body}>
+        <div className={split ? styles.split : styles.single}>
+          <div
+            ref={host}
+            data-width={width}
+            className={`${mode === 'livePreview' ? styles.live : styles.source} ${width === 'full' ? styles.full : ''}`}
+          />
+          {split && (
+            <div ref={pane} className={styles.pane} role="region" aria-label={t('editor.preview')}>
+              {toolbarView && <BlockGutter view={toolbarView} pane={pane} shown={shown} />}
+              <Preview
+                text={text}
+                path={doc.path}
+                onToggleTask={toggleTask}
+                onRendered={onRendered}
+                delay={renderNow ? 0 : undefined}
+              />
+            </div>
+          )}
+        </div>
+        {showOutline && toolbarView && <Outline view={toolbarView} text={text} />}
       </div>
     </div>
   );

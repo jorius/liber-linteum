@@ -433,5 +433,13 @@
     "label": "Diagram: {first}",
     "failed": "Diagram that couldn't be drawn",
     "newerMacos": "This diagram needs a newer macOS."
+  },
+  "outline": {
+    "title": "Outline",
+    "toggle": "Outline",
+    "show": "Show the outline",
+    "hide": "Hide the outline",
+    "empty": "No headings yet.",
+    "resize": "Outline width"
   }
 }

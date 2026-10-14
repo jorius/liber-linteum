@@ -1,5 +1,5 @@
 import { EditorView } from '@codemirror/view';
-import { act, render, screen, waitFor } from '@testing-library/react';
+import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import axe from 'axe-core';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -116,6 +116,21 @@ describe('PageView (M2a §5)', () => {
     await waitFor(() => expect(screen.queryByRole('toolbar')).not.toBeInTheDocument());
     expect(toggle).toHaveAttribute('aria-pressed', 'false');
     expect(toggle).toHaveAttribute('title', 'Show the formatting toolbar');
+  });
+
+  it('M4b part 2 §5: the Outline button shows the outline beside the editor', async () => {
+    const disk = fakeDisk({ 'A.md': '# A\n\n## B\n' });
+    render(<PageScreen />);
+    await open('A.md');
+    const toggle = screen.getByRole('button', { name: 'Outline' });
+    expect(toggle).toHaveAttribute('aria-pressed', 'false');
+    expect(toggle).toHaveAttribute('title', 'Show the outline');
+    expect(screen.queryByRole('tree', { name: 'Outline' })).not.toBeInTheDocument();
+    await userEvent.click(toggle);
+    expect(disk.calls).toContainEqual(['settings_set', { patch: { outline: true } }]);
+    const tree = await screen.findByRole('tree', { name: 'Outline' });
+    expect(within(tree).getAllByRole('treeitem')).toHaveLength(2);
+    expect(toggle).toHaveAttribute('aria-pressed', 'true');
   });
 
   it('M4b part 2 §1: the Full width button widens this page and remembers it', async () => {

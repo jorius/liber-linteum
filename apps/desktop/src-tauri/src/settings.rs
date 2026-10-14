@@ -250,6 +250,8 @@ pub struct Settings {
     pub global_view_edges: GlobalViewEdges,
     /// Readable measure or full width, app-wide (M4b part 2 §1).
     pub page_width: PageWidth,
+    /// Outline panel shown beside the editor (M4b part 2 §5).
+    pub outline: bool,
     pub recent_vaults: Vec<RecentVault>,
     /// Keys this build does not know (written by a newer version); kept on save.
     #[serde(flatten)]
@@ -275,6 +277,7 @@ impl Default for Settings {
             global_view_mode: GlobalViewMode::Drill,
             global_view_edges: GlobalViewEdges::default(),
             page_width: PageWidth::Readable,
+            outline: false,
             recent_vaults: Vec::new(),
             extra: serde_json::Map::new(),
         }
@@ -300,6 +303,7 @@ pub struct SettingsPatch {
     pub global_view_mode: Option<GlobalViewMode>,
     pub global_view_edges: Option<GlobalViewEdges>,
     pub page_width: Option<PageWidth>,
+    pub outline: Option<bool>,
 }
 
 /// A recent vault as shown on the welcome screen.
@@ -358,6 +362,7 @@ fn parse_lenient(text: &str) -> Result<(Settings, Vec<String>), serde_json::Erro
     field!("globalViewMode", global_view_mode);
     field!("globalViewEdges", global_view_edges);
     field!("pageWidth", page_width);
+    field!("outline", outline);
     match map.remove("recentVaults") {
         None => {}
         Some(Value::Array(items)) => {
@@ -488,6 +493,9 @@ impl SettingsStore {
         }
         if let Some(v) = patch.page_width {
             next.page_width = v;
+        }
+        if let Some(v) = patch.outline {
+            next.outline = v;
         }
         self.save(&next)?;
         *s = next.clone();

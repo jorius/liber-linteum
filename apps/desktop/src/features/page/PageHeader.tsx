@@ -1,5 +1,5 @@
 import { useTranslation } from 'react-i18next';
-import { FormatIcon, WidthIcon } from '../../app/icons';
+import { FormatIcon, OutlineIcon, WidthIcon } from '../../app/icons';
 import type { EditorMode, Page } from '../../ipc';
 import { useEditorStore } from '../../stores/editorStore';
 import { goBack } from '../../stores/navigate';
@@ -26,6 +26,7 @@ export function PageHeader({ page, mode }: { page: Page; mode: EditorMode }) {
   const hasDoc = useEditorStore((s) => s.doc !== null);
   const large = useEditorStore((s) => s.large);
   const toolbar = useSettingsStore((s) => s.settings.toolbar);
+  const outline = useSettingsStore((s) => s.settings.outline);
   const previous = useTrailStore((s) => s.back[s.back.length - 1] ?? null);
   const editable = useEditorStore((s) => s.doc !== null && s.path === page.path);
   const backName = previous ? nameOf(previous.path).replace(/\.md$/i, '') : '';
@@ -83,6 +84,18 @@ export function PageHeader({ page, mode }: { page: Page; mode: EditorMode }) {
                   onClick={() => void usePageWidthStore.getState().toggle(page.path)}
                 >
                   <WidthIcon />
+                </button>
+              )}
+              {hasDoc && (
+                <button
+                  type="button"
+                  className={styles.toolbarToggle}
+                  aria-pressed={outline}
+                  aria-label={t('outline.toggle')}
+                  title={t(outline ? 'outline.hide' : 'outline.show')}
+                  onClick={() => void useSettingsStore.getState().update({ outline: !outline })}
+                >
+                  <OutlineIcon />
                 </button>
               )}
               <ModeToggle mode={mode} />

@@ -27,6 +27,7 @@ export const DEFAULT_SETTINGS: Settings = {
   toolbar: true,
   lineNumbers: false,
   pageWidth: 'readable',
+  outline: false,
   globalViewMode: 'drill',
   globalViewEdges: { links: true, tree: true, manual: true, aggregated: true },
 };

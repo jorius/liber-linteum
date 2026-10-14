@@ -390,3 +390,31 @@ fn m4b2_page_width_setting_default_persist_and_reset() {
     assert_eq!(s.theme, Theme::Dark);
     assert!(warning.unwrap().contains("pageWidth"));
 }
+
+/// M4b part 2 §5: the outline panel's state is remembered app-wide (off by
+/// default); a wrong value falls back to off with a warning.
+#[test]
+fn m4b2_outline_setting_default_persist_and_reset() {
+    let dir = tempfile::tempdir().unwrap();
+    let s = store(dir.path());
+    assert!(!s.get().0.outline);
+    s.update(SettingsPatch {
+        outline: Some(true),
+        ..Default::default()
+    })
+    .unwrap();
+    let saved: serde_json::Value =
+        serde_json::from_str(&std::fs::read_to_string(dir.path().join("settings.json")).unwrap())
+            .unwrap();
+    assert_eq!(saved["outline"], true);
+    assert!(store(dir.path()).get().0.outline);
+    std::fs::write(
+        dir.path().join("settings.json"),
+        r#"{"outline":"yes","theme":"dark"}"#,
+    )
+    .unwrap();
+    let (s, warning) = store(dir.path()).get();
+    assert!(!s.outline);
+    assert_eq!(s.theme, Theme::Dark);
+    assert!(warning.unwrap().contains("outline"));
+}

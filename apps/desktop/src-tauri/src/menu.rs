@@ -28,8 +28,10 @@ pub const NAVIGATE_EVENT: &str = "menu:navigate";
 /// Ids of View → Toggle Formatting Toolbar / Toggle Line Numbers.
 pub const TOOLBAR_ID: &str = "nimw-toggle-toolbar";
 pub const LINE_NUMBERS_ID: &str = "nimw-toggle-line-numbers";
-/// Event telling the page to flip a setting; payload `"toolbar"` or
-/// `"lineNumbers"` (the settings key).
+/// Id of View → Toggle Outline (M4b part 2 §5).
+pub const OUTLINE_ID: &str = "nimw-toggle-outline";
+/// Event telling the page to flip a setting; payload `"toolbar"`,
+/// `"lineNumbers"` or `"outline"` (the settings key).
 pub const TOGGLE_EVENT: &str = "menu:toggle";
 /// Ids of View → Editor / Global View (M3a §2).
 pub const EDITOR_ID: &str = "nimw-screen-edit";
@@ -43,7 +45,7 @@ pub const SCREEN_EVENT: &str = "menu:screen";
 /// editing shortcuts through it); View (Editor, Global View — no
 /// accelerators: the page handles ⌘1 / ⌘2; Back, Forward along the link trail —
 /// no accelerators: the page handles ⌘[ / ⌘] itself, which also works where
-/// there is no app menu; the formatting toolbar and line-number toggles —
+/// there is no app menu; the formatting toolbar, line-number and outline toggles —
 /// plain items, the page owns the settings; full screen); Window (Minimize,
 /// Zoom, Close Window).
 pub fn app_menu<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
@@ -113,6 +115,7 @@ pub fn app_menu<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
         true,
         None::<&str>,
     )?;
+    let outline = MenuItem::with_id(app, OUTLINE_ID, "Toggle Outline", true, None::<&str>)?;
     let view = Submenu::with_items(
         app,
         "View",
@@ -126,6 +129,7 @@ pub fn app_menu<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
             &PredefinedMenuItem::separator(app)?,
             &toolbar,
             &line_numbers,
+            &outline,
             &PredefinedMenuItem::separator(app)?,
             &PredefinedMenuItem::fullscreen(app, None)?,
         ],
@@ -168,6 +172,8 @@ pub fn on_menu_event<R: Runtime>(app: &AppHandle<R>, event: MenuEvent) {
         let _ = app.emit(TOGGLE_EVENT, "toolbar");
     } else if id == LINE_NUMBERS_ID {
         let _ = app.emit(TOGGLE_EVENT, "lineNumbers");
+    } else if id == OUTLINE_ID {
+        let _ = app.emit(TOGGLE_EVENT, "outline");
     }
 }
 

@@ -30,7 +30,14 @@ describe('View menu toggles (M2b feedback round)', () => {
     await vi.waitFor(() => expect(useSettingsStore.getState().settings.lineNumbers).toBe(true));
     await emit('menu:toggle', 'toolbar');
     await vi.waitFor(() => expect(useSettingsStore.getState().settings.toolbar).toBe(true));
-    expect(patches).toEqual([{ toolbar: false }, { lineNumbers: true }, { toolbar: true }]);
+    await emit('menu:toggle', 'outline');
+    await vi.waitFor(() => expect(useSettingsStore.getState().settings.outline).toBe(true));
+    expect(patches).toEqual([
+      { toolbar: false },
+      { lineNumbers: true },
+      { toolbar: true },
+      { outline: true },
+    ]);
     stop();
   });
 

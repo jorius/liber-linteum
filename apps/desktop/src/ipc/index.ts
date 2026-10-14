@@ -174,6 +174,8 @@ export interface Settings {
   globalViewEdges: GlobalViewEdges;
   /** Readable measure or full width, app-wide (M4b part 2 §1). */
   pageWidth: PageWidth;
+  /** Outline panel shown beside the editor (M4b part 2 §5). */
+  outline: boolean;
 }
 
 export type PageWidth = 'readable' | 'full';
@@ -205,6 +207,7 @@ export interface SettingsPatch {
   globalViewMode?: GlobalViewMode;
   globalViewEdges?: GlobalViewEdges;
   pageWidth?: PageWidth;
+  outline?: boolean;
 }
 
 export interface SettingsResponse {

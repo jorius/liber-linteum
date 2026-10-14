@@ -433,5 +433,13 @@
     "label": "Diagrama: {first}",
     "failed": "Diagrama que no se pudo dibujar",
     "newerMacos": "Este diagrama necesita una versión más reciente de macOS."
+  },
+  "outline": {
+    "title": "Esquema",
+    "toggle": "Esquema",
+    "show": "Mostrar el esquema",
+    "hide": "Ocultar el esquema",
+    "empty": "Aún no hay encabezados.",
+    "resize": "Ancho del esquema"
   }
 }

@@ -1,5 +1,6 @@
-import { useEffect, useState, useSyncExternalStore } from 'react';
+import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useMediaQuery } from '../../app/useMediaQuery';
 import { useSettingsStore } from '../../stores/settingsStore';
 import styles from './Preview.module.css';
 
@@ -46,25 +47,13 @@ function themeVariables(): Record<string, string> {
   };
 }
 
-/** Whether the system is in dark mode, which the "system" theme follows. */
-const darkQuery = () =>
-  typeof window.matchMedia === 'function'
-    ? window.matchMedia('(prefers-color-scheme: dark)')
-    : null;
-function subscribeDark(onChange: () => void): () => void {
-  const query = darkQuery();
-  query?.addEventListener('change', onChange);
-  return () => query?.removeEventListener('change', onChange);
-}
-const systemDark = () => darkQuery()?.matches ?? false;
-
 /** A ```mermaid fence drawn as a diagram (M4b part 2 §4): loaded lazily,
  *  `securityLevel: "strict"` (labels sanitized, no click handlers), themed
  *  from the palette and redrawn when it changes, cached by theme + source.
  *  A failure shows the source and Mermaid's message. */
 export function MermaidView({ source }: { source: string }) {
   const { t } = useTranslation();
-  const dark = useSyncExternalStore(subscribeDark, systemDark);
+  const dark = useMediaQuery('(prefers-color-scheme: dark)');
   const theme = useSettingsStore(
     (s) => `${s.settings.palette}|${s.settings.accentColor}|${s.settings.theme}`,
   );
