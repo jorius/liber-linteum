@@ -362,3 +362,31 @@ fn m3a_global_view_settings_default_persist_and_reset() {
     assert_eq!(s.theme, Theme::Dark);
     assert!(warning.unwrap().contains("globalViewMode"));
 }
+
+/// M4b part 2 §1: the app-wide page width, readable by default, persisted,
+/// and reset on its own when unreadable.
+#[test]
+fn m4b2_page_width_setting_default_persist_and_reset() {
+    use nimw_desktop::settings::PageWidth;
+    let dir = tempfile::tempdir().unwrap();
+    let s = store(dir.path());
+    assert_eq!(s.get().0.page_width, PageWidth::Readable);
+    s.update(SettingsPatch {
+        page_width: Some(PageWidth::Full),
+        ..Default::default()
+    })
+    .unwrap();
+    let saved: serde_json::Value =
+        serde_json::from_str(&std::fs::read_to_string(dir.path().join("settings.json")).unwrap())
+            .unwrap();
+    assert_eq!(saved["pageWidth"], "full");
+    std::fs::write(
+        dir.path().join("settings.json"),
+        r#"{"pageWidth":"wide","theme":"dark"}"#,
+    )
+    .unwrap();
+    let (s, warning) = store(dir.path()).get();
+    assert_eq!(s.page_width, PageWidth::Readable);
+    assert_eq!(s.theme, Theme::Dark);
+    assert!(warning.unwrap().contains("pageWidth"));
+}

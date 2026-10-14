@@ -36,6 +36,12 @@
   padding-right: 40px;
 }
 
+/* Full page width (M4b part 2 §1): the text spans the editor. */
+.live.full :global(.cm-content) {
+  flex: 1 1 auto;
+  max-width: none;
+}
+
 .source :global(.cm-content) {
   padding-left: 24px;
   padding-right: 24px;

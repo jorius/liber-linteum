@@ -48,6 +48,7 @@ const COMMANDS: &[&str] = &[
     "layout_set",
     "link_target",
     "index_pick_set",
+    "page_width_set",
 ];
 
 struct Harness {
@@ -720,7 +721,9 @@ fn m2c_vault_settings_round_trip_over_ipc() {
         json!({
             "attachments": { "mode": "subfolder", "path": "attachments" },
             "obsidian": null,
-            "overrideObsidian": false
+            "overrideObsidian": false,
+            "pageWidth": null,
+            "pageWidths": {}
         })
     );
     let saved = call(
@@ -1298,4 +1301,72 @@ fn m3b_link_target_and_index_pick_set_over_ipc() {
             "{folder} ← {page}"
         );
     }
+}
+
+/// M4b part 2 §1: a page's own width and the vault's default live in
+/// `.nimw/vault.json`; the page entry follows a rename; only visible pages.
+#[test]
+fn m4b2_page_width_over_ipc() {
+    let h = harness();
+    let vault = open_fixture(&h, "obsidian-basic");
+    let got = call(&h.main, "vault_settings_get", json!({})).unwrap();
+    assert_eq!(got["pageWidth"], serde_json::Value::Null);
+    assert_eq!(got["pageWidths"], json!({}));
+    let saved = call(
+        &h.main,
+        "page_width_set",
+        json!({ "path": "Welcome.md", "width": "full" }),
+    )
+    .unwrap();
+    assert_eq!(saved["pageWidths"], json!({ "Welcome.md": "full" }));
+    let saved = call(
+        &h.main,
+        "vault_settings_set",
+        json!({ "patch": { "pageWidth": "readable" } }),
+    )
+    .unwrap();
+    assert_eq!(saved["pageWidth"], "readable");
+    // The page entry follows an in-app rename.
+    call(
+        &h.main,
+        "entry_rename",
+        json!({ "from": "Welcome.md", "to": "Hello.md" }),
+    )
+    .unwrap();
+    let got = call(&h.main, "vault_settings_get", json!({})).unwrap();
+    assert_eq!(got["pageWidths"], json!({ "Hello.md": "full" }));
+    // Clearing: the page entry and the vault default.
+    call(
+        &h.main,
+        "page_width_set",
+        json!({ "path": "Hello.md", "width": null }),
+    )
+    .unwrap();
+    let got = call(
+        &h.main,
+        "vault_settings_set",
+        json!({ "patch": { "pageWidth": "default" } }),
+    )
+    .unwrap();
+    assert_eq!(got["pageWidth"], serde_json::Value::Null);
+    assert_eq!(got["pageWidths"], json!({}));
+    // Only visible, indexed pages; a bad width is refused.
+    for path in [".obsidian/x.md", "Missing.md"] {
+        let err = call(
+            &h.main,
+            "page_width_set",
+            json!({ "path": path, "width": "full" }),
+        )
+        .unwrap_err();
+        assert_eq!(kind(err), "notFound", "{path}");
+    }
+    assert!(
+        call(
+            &h.main,
+            "page_width_set",
+            json!({ "path": "Hello.md", "width": "huge" })
+        )
+        .is_err()
+    );
+    assert!(vault.path().join(".nimw/vault.json").exists());
 }

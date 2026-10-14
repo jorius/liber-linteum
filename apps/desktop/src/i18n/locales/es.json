@@ -105,7 +105,10 @@
     "frontmatterInvalid": "NIMW no puede cambiar con seguridad el frontmatter de esta nota. Edítalo en el modo Código.",
     "titleInNote": "Título en la nota: {title}",
     "subtitleLabel": "Subtítulo",
-    "subtitlePlaceholder": "Añade un subtítulo"
+    "subtitlePlaceholder": "Añade un subtítulo",
+    "fullWidth": "Ancho completo",
+    "fullWidthOn": "Usar todo el ancho en esta página",
+    "fullWidthOff": "Usar el ancho de lectura en esta página"
   },
   "editor": {
     "conflictCopy": "Alguien más cambió esta página — su versión se guardó como «{name}»",
@@ -255,7 +258,10 @@
     "fontSize": "Tamaño del texto",
     "fontSizePx": "{px} px",
     "toolbar": "Mostrar la barra de formato",
-    "lineNumbers": "Mostrar los números de línea"
+    "lineNumbers": "Mostrar los números de línea",
+    "pageWidth": "Ancho de página",
+    "pageWidthReadable": "De lectura",
+    "pageWidthFull": "Ancho completo"
   },
   "toolbar": {
     "label": "Formato",
@@ -328,7 +334,9 @@
     "obsidianRoot": "la raíz de la bóveda",
     "obsidianSame": "la carpeta de la página",
     "obsidianSubfolder": "la carpeta «{name}» junto a la página",
-    "obsidianFolder": "la carpeta «{name}»"
+    "obsidianFolder": "la carpeta «{name}»",
+    "pageWidth": "Ancho de página en esta bóveda",
+    "pageWidthDefault": "Usar el ajuste de la app"
   },
   "gv": {
     "indexPick": {

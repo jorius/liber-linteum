@@ -147,6 +147,8 @@ describe('Settings dialog (M2b §4, §5, §7)', () => {
         { lineNumbers: true },
       ]),
     );
+    await userEvent.selectOptions(screen.getByRole('combobox', { name: 'Page width' }), 'full');
+    await waitFor(() => expect(patches.at(-1)).toEqual({ pageWidth: 'full' }));
     expect(document.documentElement.style.getPropertyValue('--font-source')).toContain('"Menlo"');
   });
 
@@ -166,8 +168,10 @@ describe('Settings → This vault (M2c §5.4)', () => {
   let obsidian: string | null;
   let overrideObsidian: boolean;
   let stored: { mode: string; path: string };
+  let vaultWidth: string | null;
 
   beforeEach(() => {
+    vaultWidth = null;
     vaultPatches = [];
     obsidian = null;
     overrideObsidian = false;
@@ -175,13 +179,25 @@ describe('Settings → This vault (M2c §5.4)', () => {
     useVaultStore.setState({ info: { name: 'Vault', root: '/v', report: {} as never } });
     mockIPC((cmd, raw) => {
       const args = (raw ?? {}) as Record<string, unknown>;
-      if (cmd === 'vault_settings_get') return { attachments: stored, obsidian, overrideObsidian };
+      const reply = () => ({
+        attachments: stored,
+        obsidian,
+        overrideObsidian,
+        pageWidth: vaultWidth,
+        pageWidths: {},
+      });
+      if (cmd === 'vault_settings_get') return reply();
       if (cmd === 'vault_settings_set') {
         vaultPatches.push(args.patch);
-        const patch = args.patch as { attachments?: typeof stored; overrideObsidian?: boolean };
+        const patch = args.patch as {
+          attachments?: typeof stored;
+          overrideObsidian?: boolean;
+          pageWidth?: string;
+        };
         if (patch.attachments) stored = patch.attachments;
         if (patch.overrideObsidian !== undefined) overrideObsidian = patch.overrideObsidian;
-        return { attachments: stored, obsidian, overrideObsidian };
+        if (patch.pageWidth) vaultWidth = patch.pageWidth === 'default' ? null : patch.pageWidth;
+        return reply();
       }
       if (cmd === 'fonts_list') return [];
       return null;
@@ -207,6 +223,16 @@ describe('Settings → This vault (M2c §5.4)', () => {
       expect(vaultPatches).toEqual([{ attachments: { mode: 'same', path: '' } }]),
     );
     expect(screen.queryByRole('textbox', { name: 'Subfolder name' })).not.toBeInTheDocument();
+  });
+
+  it('M4b part 2 §1: the vault can set its own page width or use the app setting', async () => {
+    open();
+    const width = await screen.findByRole('combobox', { name: 'Page width for this vault' });
+    await waitFor(() => expect(width).toHaveValue('default'));
+    await userEvent.selectOptions(width, 'full');
+    await waitFor(() => expect(vaultPatches).toEqual([{ pageWidth: 'full' }]));
+    await userEvent.selectOptions(width, 'default');
+    await waitFor(() => expect(vaultPatches.at(-1)).toEqual({ pageWidth: 'default' }));
   });
 
   it('a folder is saved on Enter; an unusable name is explained and not saved', async () => {

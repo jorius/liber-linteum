@@ -108,6 +108,15 @@ export function FormatIcon() {
   );
 }
 
+/** Full page width: arrows pointing to both edges. */
+export function WidthIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true" {...stroke}>
+      <path d="M3 12h18M7 8l-4 4 4 4M17 8l4 4-4 4" />
+    </svg>
+  );
+}
+
 export function CloseIcon() {
   return (
     <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true" {...stroke}>

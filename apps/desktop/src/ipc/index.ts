@@ -172,7 +172,11 @@ export interface Settings {
   globalViewMode: GlobalViewMode;
   /** Global View: edge kinds shown (M3a §6). */
   globalViewEdges: GlobalViewEdges;
+  /** Readable measure or full width, app-wide (M4b part 2 §1). */
+  pageWidth: PageWidth;
 }
+
+export type PageWidth = 'readable' | 'full';
 
 export type GlobalViewMode = 'drill' | 'expand';
 
@@ -200,6 +204,7 @@ export interface SettingsPatch {
   lineNumbers?: boolean;
   globalViewMode?: GlobalViewMode;
   globalViewEdges?: GlobalViewEdges;
+  pageWidth?: PageWidth;
 }
 
 export interface SettingsResponse {
@@ -279,11 +284,17 @@ export interface VaultSettings {
   obsidian: string | null;
   /** NIMW's place wins over Obsidian's (M4b §5). */
   overrideObsidian: boolean;
+  /** The vault's default page width (`null`: the app's; M4b part 2 §1). */
+  pageWidth: PageWidth | null;
+  /** Pages with their own width. */
+  pageWidths: Record<string, PageWidth>;
 }
 
 export interface VaultSettingsPatch {
   attachments?: { mode: AttachmentMode; path: string };
   overrideObsidian?: boolean;
+  /** `'default'` clears the vault's own width. */
+  pageWidth?: PageWidth | 'default';
 }
 
 /** What one Global View click opens (M3a §3). */
@@ -414,6 +425,9 @@ export const indexPickSet = (folder: string, page: string | null) =>
 export const vaultSettingsGet = () => call<VaultSettings>('vault_settings_get');
 export const vaultSettingsSet = (patch: VaultSettingsPatch) =>
   call<VaultSettings>('vault_settings_set', { patch });
+/** A page's own width (`null` clears it; M4b part 2 §1). */
+export const pageWidthSet = (path: string, width: PageWidth | null) =>
+  call<VaultSettings>('page_width_set', { path, width });
 
 /** URL of a vault file for <img>/<audio> through the `nimw-asset:` protocol
  *  (M2a §2.5); WebView2 on Windows reaches custom protocols over http. */

@@ -1,7 +1,7 @@
 import { useEffect, useId, useState, type KeyboardEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { SUPPORTED_LANGUAGES } from '../../i18n';
-import { fontsList, PALETTE_IDS, type PaletteChoice, type Theme } from '../../ipc';
+import { fontsList, PALETTE_IDS, type PaletteChoice, type Theme, type PageWidth } from '../../ipc';
 import { useSettingsStore } from '../../stores/settingsStore';
 import { useVaultStore } from '../../stores/vaultStore';
 import { contrast } from '../../theme/color';
@@ -121,6 +121,17 @@ export function SettingsDialog({ onClose }: { onClose: () => void }) {
                 {t('settings.fontSizePx', { px })}
               </option>
             ))}
+          </select>
+        </label>
+        <label className={styles.field}>
+          <span>{t('settings.pageWidth')}</span>
+          <select
+            className={styles.select}
+            value={settings.pageWidth}
+            onChange={(e) => void update({ pageWidth: e.target.value as PageWidth })}
+          >
+            <option value="readable">{t('settings.pageWidthReadable')}</option>
+            <option value="full">{t('settings.pageWidthFull')}</option>
           </select>
         </label>
         <label className={styles.check}>

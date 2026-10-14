@@ -11,7 +11,7 @@ use crate::error::{CmdResult, CommandError, ErrorKind};
 use crate::state::AppState;
 use crate::vault_commands::blocking;
 use nimw_session::{VaultSession, cover_reference};
-use nimw_vault::{EntryKind, VaultPath};
+use nimw_vault::{EntryKind, PageWidth, VaultPath};
 use percent_encoding::percent_decode_str;
 use std::path::PathBuf;
 use tauri::ipc::{InvokeBody, Request};
@@ -186,7 +186,9 @@ pub(crate) fn link_suggest_impl(
 }
 
 pub(crate) fn vault_settings_get_impl(state: &AppState) -> CmdResult<VaultSettingsDto> {
-    let config = state.session()?.attachment_settings();
+    let session = state.session()?;
+    let config = session.attachment_settings();
+    let widths = session.vault().page_widths();
     Ok(VaultSettingsDto {
         attachments: AttachmentsDto {
             mode: config.mode,
@@ -194,7 +196,31 @@ pub(crate) fn vault_settings_get_impl(state: &AppState) -> CmdResult<VaultSettin
         },
         obsidian: config.obsidian,
         override_obsidian: config.override_obsidian,
+        page_width: widths.vault,
+        page_widths: widths.pages,
     })
+}
+
+/// `"readable"` / `"full"` / `None`; anything else is refused.
+fn width_of(value: Option<&str>) -> CmdResult<Option<PageWidth>> {
+    match value {
+        None | Some("default") => Ok(None),
+        Some("readable") => Ok(Some(PageWidth::Readable)),
+        Some("full") => Ok(Some(PageWidth::Full)),
+        Some(other) => Err(invalid(format!("unknown page width {other:?}"))),
+    }
+}
+
+pub(crate) fn page_width_set_impl(
+    state: &AppState,
+    path: String,
+    width: Option<String>,
+) -> CmdResult<VaultSettingsDto> {
+    let session = state.session()?;
+    let width = width_of(width.as_deref())?;
+    let page = visible_page(&session, &path)?;
+    session.vault().set_page_width(page.as_str(), width)?;
+    vault_settings_get_impl(state)
 }
 
 pub(crate) fn vault_settings_set_impl(
@@ -202,6 +228,11 @@ pub(crate) fn vault_settings_set_impl(
     patch: VaultSettingsPatch,
 ) -> CmdResult<VaultSettingsDto> {
     let session = state.session()?;
+    if let Some(width) = patch.page_width.as_deref() {
+        session
+            .vault()
+            .set_vault_page_width(width_of(Some(width))?)?;
+    }
     match patch.attachments {
         Some(a) => session.set_attachment_settings(&a.mode, &a.path, patch.override_obsidian)?,
         None => {
@@ -273,6 +304,18 @@ pub async fn vault_settings_set<R: Runtime>(
 ) -> CmdResult<VaultSettingsDto> {
     blocking(app, move |app| {
         vault_settings_set_impl(&app.state::<AppState>(), patch)
+    })
+    .await
+}
+
+#[tauri::command]
+pub async fn page_width_set<R: Runtime>(
+    app: AppHandle<R>,
+    path: String,
+    width: Option<String>,
+) -> CmdResult<VaultSettingsDto> {
+    blocking(app, move |app| {
+        page_width_set_impl(&app.state::<AppState>(), path, width)
     })
     .await
 }

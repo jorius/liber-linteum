@@ -259,7 +259,7 @@ fn levels_of(
 /// `path` moved by the nearest rename at or above it: a `from` equal to
 /// `path`, or to one of its folders (whole components only, so `Alpha` never
 /// touches `Alphabet`), is replaced by its `to`.
-fn remap(path: &str, moves: &HashMap<&str, &str>) -> Option<String> {
+pub(crate) fn remap(path: &str, moves: &HashMap<&str, &str>) -> Option<String> {
     let mut prefix = path;
     loop {
         if let Some(to) = moves.get(prefix) {

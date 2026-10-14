@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-page-width-set"
+description = "Enables the page_width_set command without any pre-configured scope."
+commands.allow = ["page_width_set"]
+
+[[permission]]
+identifier = "deny-page-width-set"
+description = "Denies the page_width_set command without any pre-configured scope."
+commands.deny = ["page_width_set"]

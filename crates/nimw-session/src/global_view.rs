@@ -482,7 +482,9 @@ impl VaultSession {
     pub(crate) fn follow_layout(&self, renames: &[(String, String)]) {
         // Index-note picks follow too (M3b §4).
         let picks = self.vault.remap_index_picks_many(renames);
-        if let Err(e) = self.vault.remap_layout_many(renames).and(picks) {
+        // Page widths follow too (M4b part 2 §1).
+        let widths = self.vault.remap_page_widths_many(renames);
+        if let Err(e) = self.vault.remap_layout_many(renames).and(picks).and(widths) {
             let what = match renames {
                 [(from, to)] => format!("{from} → {to}"),
                 _ => format!("{} renamed entries", renames.len()),

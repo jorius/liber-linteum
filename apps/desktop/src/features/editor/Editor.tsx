@@ -9,6 +9,7 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react
 import { useTranslation } from 'react-i18next';
 import type { EditorMode } from '../../ipc';
 import { usePageStore } from '../../stores/pageStore';
+import { usePageWidth } from '../../stores/pageWidthStore';
 import { useSettingsStore } from '../../stores/settingsStore';
 import { useUiStore } from '../../stores/uiStore';
 import { Preview } from '../preview/Preview';
@@ -230,6 +231,7 @@ export interface EditorProps {
 
 /** The page editor: Live Preview, Source, or Split (Source + rendered pane). */
 export function Editor({ doc, mode, label }: EditorProps) {
+  const width = usePageWidth(doc.path);
   const { t } = useTranslation();
   const host = useRef<HTMLDivElement>(null);
   const pane = useRef<HTMLDivElement>(null);
@@ -379,7 +381,11 @@ export function Editor({ doc, mode, label }: EditorProps) {
       {picker && toolbarView && <LinkPicker view={toolbarView} onClose={() => setPicker(false)} />}
       {split && <SplitHint />}
       <div className={split ? styles.split : styles.single}>
-        <div ref={host} className={mode === 'livePreview' ? styles.live : styles.source} />
+        <div
+          ref={host}
+          data-width={width}
+          className={`${mode === 'livePreview' ? styles.live : styles.source} ${width === 'full' ? styles.full : ''}`}
+        />
         {split && (
           <div ref={pane} className={styles.pane} role="region" aria-label={t('editor.preview')}>
             {toolbarView && <BlockGutter view={toolbarView} pane={pane} shown={shown} />}

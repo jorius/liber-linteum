@@ -118,6 +118,41 @@ describe('PageView (M2a §5)', () => {
     expect(toggle).toHaveAttribute('title', 'Show the formatting toolbar');
   });
 
+  it('M4b part 2 §1: the Full width button widens this page and remembers it', async () => {
+    let widths: Record<string, string> = {};
+    const settings = () => ({
+      attachments: { mode: 'subfolder', path: 'attachments' },
+      obsidian: null,
+      overrideObsidian: false,
+      pageWidth: null,
+      pageWidths: widths,
+    });
+    fakeDisk(
+      { 'A.md': '# A\n\nbody\n' },
+      {
+        vault_settings_get: settings,
+        page_width_set: (args) => {
+          const { path, width } = args as unknown as { path: string; width: string | null };
+          widths = width ? { ...widths, [path]: width } : {};
+          return settings();
+        },
+      },
+    );
+    render(<PageScreen />);
+    await open('A.md');
+    const host = () => document.querySelector('.cm-editor')!.parentElement!;
+    const toggle = screen.getByRole('button', { name: 'Full width' });
+    expect(toggle).toHaveAttribute('aria-pressed', 'false');
+    expect(host().dataset.width).toBe('readable');
+    await userEvent.click(toggle);
+    await waitFor(() => expect(toggle).toHaveAttribute('aria-pressed', 'true'));
+    expect(widths).toEqual({ 'A.md': 'full' });
+    expect(host().dataset.width).toBe('full');
+    await userEvent.click(toggle);
+    await waitFor(() => expect(toggle).toHaveAttribute('aria-pressed', 'false'));
+    expect(widths).toEqual({});
+  });
+
   it('save status: Saved → Saving… → Saved; failures say "Unsaved — retrying"', async () => {
     const disk = fakeDisk({ 'A.md': '# A\n' });
     render(<PageScreen />);

@@ -105,7 +105,10 @@
     "titleInNote": "Title in the note: {title}",
     "frontmatterInvalid": "NIMW can’t safely change this note’s frontmatter. Edit it in Source mode.",
     "subtitleLabel": "Subtitle",
-    "subtitlePlaceholder": "Add a subtitle"
+    "subtitlePlaceholder": "Add a subtitle",
+    "fullWidth": "Full width",
+    "fullWidthOn": "Use the full width for this page",
+    "fullWidthOff": "Use the readable width for this page"
   },
   "editor": {
     "conflictCopy": "Someone else changed this page — their version was saved as “{name}”",
@@ -255,7 +258,10 @@
     "fontSize": "Text size",
     "fontSizePx": "{px} px",
     "toolbar": "Show the formatting toolbar",
-    "lineNumbers": "Show line numbers"
+    "lineNumbers": "Show line numbers",
+    "pageWidth": "Page width",
+    "pageWidthReadable": "Readable",
+    "pageWidthFull": "Full width"
   },
   "toolbar": {
     "label": "Formatting",
@@ -328,7 +334,9 @@
     "obsidianRoot": "the vault root",
     "obsidianSame": "the page’s folder",
     "obsidianSubfolder": "the “{name}” folder next to the page",
-    "obsidianFolder": "the “{name}” folder"
+    "obsidianFolder": "the “{name}” folder",
+    "pageWidth": "Page width for this vault",
+    "pageWidthDefault": "Use the app setting"
   },
   "gv": {
     "indexPick": {

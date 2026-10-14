@@ -3,6 +3,7 @@ import { useEffect, useId, useRef, useState, type KeyboardEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { vaultSettingsGet, vaultSettingsSet, type AttachmentMode } from '../../ipc';
 import { errorMessage } from '../../stores/messages';
+import { usePageWidthStore } from '../../stores/pageWidthStore';
 import { validateName } from '../explorer/nameRules';
 import styles from './Dialogs.module.css';
 
@@ -30,6 +31,8 @@ export function VaultSettingsSection() {
   const [path, setPath] = useState('attachments');
   const [obsidian, setObsidian] = useState<string | null>(null);
   const [own, setOwn] = useState(false);
+  const vaultWidth = usePageWidthStore((s) => s.vault);
+  const widthId = useId();
   const [loaded, setLoaded] = useState(false);
   const [error, setError] = useState<string | null>(null);
   // What `.nimw/vault.json` holds (as loaded, then as last saved): saving the
@@ -176,6 +179,24 @@ export function VaultSettingsSection() {
         </p>
       )}
       {locked && <p className={styles.hint}>{t('vault.obsidianHint')}</p>}
+      <label className={styles.field} htmlFor={widthId}>
+        <span>{t('vault.pageWidth')}</span>
+        <select
+          id={widthId}
+          className={styles.select}
+          value={vaultWidth ?? 'default'}
+          disabled={!loaded}
+          onChange={(e) =>
+            void usePageWidthStore
+              .getState()
+              .setVault(e.target.value as 'readable' | 'full' | 'default')
+          }
+        >
+          <option value="default">{t('vault.pageWidthDefault')}</option>
+          <option value="readable">{t('settings.pageWidthReadable')}</option>
+          <option value="full">{t('settings.pageWidthFull')}</option>
+        </select>
+      </label>
     </section>
   );
 }

@@ -1,9 +1,10 @@
 import { useTranslation } from 'react-i18next';
-import { FormatIcon } from '../../app/icons';
+import { FormatIcon, WidthIcon } from '../../app/icons';
 import type { EditorMode, Page } from '../../ipc';
 import { useEditorStore } from '../../stores/editorStore';
 import { goBack } from '../../stores/navigate';
 import { useSettingsStore } from '../../stores/settingsStore';
+import { usePageWidth, usePageWidthStore } from '../../stores/pageWidthStore';
 import { useTrailStore } from '../../stores/trailStore';
 import { nameOf } from '../../stores/tree';
 import { Breadcrumb } from './Breadcrumb';
@@ -28,6 +29,7 @@ export function PageHeader({ page, mode }: { page: Page; mode: EditorMode }) {
   const previous = useTrailStore((s) => s.back[s.back.length - 1] ?? null);
   const editable = useEditorStore((s) => s.doc !== null && s.path === page.path);
   const backName = previous ? nameOf(previous.path).replace(/\.md$/i, '') : '';
+  const full = usePageWidth(page.path) === 'full';
   return (
     <Cover page={page} editable={editable}>
       {({ addCover, controls }) => (
@@ -69,6 +71,18 @@ export function PageHeader({ page, mode }: { page: Page; mode: EditorMode }) {
                 >
                   <FormatIcon />
                   <span aria-hidden="true">{t('toolbar.short')}</span>
+                </button>
+              )}
+              {hasDoc && (
+                <button
+                  type="button"
+                  className={styles.toolbarToggle}
+                  aria-pressed={full}
+                  aria-label={t('page.fullWidth')}
+                  title={t(full ? 'page.fullWidthOff' : 'page.fullWidthOn')}
+                  onClick={() => void usePageWidthStore.getState().toggle(page.path)}
+                >
+                  <WidthIcon />
                 </button>
               )}
               <ModeToggle mode={mode} />

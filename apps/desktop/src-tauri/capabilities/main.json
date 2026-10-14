@@ -38,6 +38,7 @@
     "allow-layout-set",
     "allow-link-target",
     "allow-index-pick-set",
+    "allow-page-width-set",
     "core:event:allow-listen",
     "core:event:allow-unlisten",
     "core:window:allow-destroy",
