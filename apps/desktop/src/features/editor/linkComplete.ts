@@ -160,27 +160,34 @@ export async function linkSource(context: CompletionContext): Promise<Completion
   };
 }
 
-const theme = EditorView.baseTheme({
+// A scoped theme (not a base theme) with selectors more specific than
+// @codemirror/autocomplete's own, which sets a monospace font on the list.
+const theme = EditorView.theme({
   '.cm-tooltip.cm-tooltip-autocomplete': {
     background: 'var(--color-surface)',
     border: '1px solid var(--color-border-strong)',
     borderRadius: 'var(--radius-md)',
-    boxShadow: '0 8px 24px rgb(0 0 0 / 0.12)',
-    fontFamily: 'var(--font-body)',
-    fontSize: '13.5px',
+    boxShadow: '0 8px 24px rgb(0 0 0 / 0.14)',
     overflow: 'hidden',
   },
-  '.cm-tooltip-autocomplete > ul > li': { padding: '4px 10px', color: 'var(--color-text)' },
-  '.cm-tooltip-autocomplete > ul > li[aria-selected]': {
+  '.cm-tooltip.cm-tooltip-autocomplete > ul': {
+    fontFamily: 'var(--font-body)',
+    fontSize: '13.5px',
+    maxHeight: '16em',
+  },
+  '.cm-tooltip.cm-tooltip-autocomplete > ul > li': {
+    padding: '4px 10px',
+    color: 'var(--color-text)',
+  },
+  '.cm-tooltip.cm-tooltip-autocomplete > ul > li[aria-selected]': {
     background: 'var(--color-accent-soft)',
     color: 'var(--color-text-strong)',
   },
-  '.cm-completionDetail': {
+  '.cm-tooltip.cm-tooltip-autocomplete .cm-completionDetail': {
     marginLeft: '10px',
     fontStyle: 'normal',
     color: 'var(--color-text-muted)',
   },
-  '.cm-completionIcon': { display: 'none' },
 });
 
 /** `[[` autocomplete for every editor mode; Tab accepts like Enter. */
