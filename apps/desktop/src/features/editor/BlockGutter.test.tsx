@@ -18,13 +18,17 @@ const source = () => viewOf().state.doc.toString();
 
 /** The page in Split mode, once the pane shows it. */
 async function split(text: string) {
-  fakeDisk({ 'B.md': text });
+  return (await splitView(text)).pane;
+}
+/** The same, with what it takes to show something else in the editor. */
+async function splitView(text: string, others: Record<string, string> = {}) {
+  fakeDisk({ 'B.md': text, ...others });
   const res = await PageDoc.load('B.md', hooks);
   if (!res.ok) throw new Error(res.error.message);
-  render(<Editor doc={res.value} mode="split" label="B" />);
+  const shown = render(<Editor doc={res.value} mode="split" label="B" />);
   const pane = await screen.findByRole('region', { name: 'Preview' });
   await vi.waitFor(() => expect(pane.querySelector('[data-source-start]')).not.toBeNull());
-  return pane;
+  return { pane, doc: res.value, rerender: shown.rerender };
 }
 /** The rendered block whose text is `text` (deepest match). */
 const block = (pane: HTMLElement, text: string) =>
@@ -206,6 +210,8 @@ const pointer = (
         clientX: x,
         clientY: y,
         button: 0,
+        // The primary button is down until it's released.
+        buttons: type === 'pointerup' ? 0 : 1,
         ...init,
       }),
     );
@@ -287,6 +293,111 @@ const lastToast = () => {
   return toasts.length ? toasts[toasts.length - 1].message : null;
 };
 const CHANGED = 'That block changed, so it wasn’t moved. Try again.';
+
+describe('a drag ends with its pointer (final review M2)', () => {
+  it('blocks removed while one is hovered: the gutter keeps working', async () => {
+    const pane = await split('P1\n\nP2\n\nP3\n');
+    await hover(block(pane, 'P3'));
+    expect(screen.getByRole('group', { name: 'P3' })).toBeInTheDocument();
+    act(() => viewOf().dispatch({ changes: { from: 0, to: 8 } }));
+    await wait(200);
+    expect(pane.querySelector('[data-source-start]')!.textContent).toBe('P3');
+    await hover(block(pane, 'P3'));
+    expect(screen.getByRole('group', { name: 'P3' })).toBeInTheDocument();
+  });
+
+  /** P3 picked up and held above P1, with the drop line showing. */
+  async function holding() {
+    const view = await splitView('P1\n\nP2\n\nP3\n', { 'O.md': 'Other\n\nP3\n' });
+    layout(view.pane);
+    await hover(block(view.pane, 'P3'));
+    const g = grip('P3');
+    await pointer(g, 'pointerdown', 4, 61);
+    await pointer(window, 'pointermove', 4, 2);
+    expect(document.querySelector('[data-drop-line]')).not.toBeNull();
+    return { ...view, grip: g };
+  }
+  const cancelled = async () => {
+    expect(document.querySelector('[data-drop-line]')).toBeNull();
+    expect(status()).toBe('Move cancelled.');
+    // The release that follows drops nothing.
+    await pointer(window, 'pointerup', 4, 2);
+    expect(source()).toBe('P1\n\nP2\n\nP3\n');
+  };
+
+  it('the browser taking the pointer (pointercancel) cancels it', async () => {
+    await holding();
+    await pointer(window, 'pointercancel', 4, 2);
+    await cancelled();
+  });
+
+  it('losing the pointer capture without a release cancels it', async () => {
+    const { grip: g } = await holding();
+    await act(() => g.dispatchEvent(new PointerEvent('lostpointercapture', { bubbles: true })));
+    await cancelled();
+  });
+
+  it('a release that never arrived: the next move with no button down cancels it', async () => {
+    await holding();
+    await pointer(window, 'pointermove', 4, 30, { buttons: 0 });
+    await cancelled();
+  });
+
+  it('a release that never arrived: the next press anywhere cancels it, and its click drops nothing', async () => {
+    await holding();
+    await pointer(document.body, 'pointerdown', 4, 2);
+    await cancelled();
+  });
+
+  it('the window losing focus cancels it', async () => {
+    await holding();
+    await act(() => window.dispatchEvent(new FocusEvent('blur')));
+    await cancelled();
+  });
+
+  it('leaving Split mid-drag removes its listeners', async () => {
+    const { pane, doc, rerender } = await splitView('P1\n\nP2\n\nP3\n');
+    layout(pane);
+    await hover(block(pane, 'P3'));
+    const added = vi.spyOn(window, 'addEventListener');
+    const removed = vi.spyOn(window, 'removeEventListener');
+    await pointer(grip('P3'), 'pointerdown', 4, 61);
+    await pointer(window, 'pointermove', 4, 2);
+    const drag = added.mock.calls.map(([type, fn]) => [type, fn]);
+    expect(drag.map(([type]) => type)).toContain('pointerup');
+    rerender(<Editor doc={doc} mode="source" label="B" />);
+    const gone = removed.mock.calls.map(([type, fn]) => [type, fn]);
+    for (const [type, fn] of drag) {
+      expect(
+        gone.some(([t, f]) => t === type && f === fn),
+        String(type),
+      ).toBe(true);
+    }
+    added.mockRestore();
+    removed.mockRestore();
+  });
+
+  it('another page shown mid-drag: the drop moves nothing there', async () => {
+    const { rerender } = await holding();
+    const other = await PageDoc.load('O.md', hooks);
+    if (!other.ok) throw new Error(other.error.message);
+    rerender(<Editor doc={other.value} mode="split" label="O" />);
+    await wait(200);
+    await pointer(window, 'pointermove', 4, 2);
+    await pointer(window, 'pointerup', 4, 2);
+    expect(source()).toBe('Other\n\nP3\n');
+  });
+
+  it('Escape cancels it without reaching anything else', async () => {
+    await holding();
+    const elsewhere = vi.fn();
+    document.addEventListener('keydown', elsewhere);
+    await act(() => fireEvent.keyDown(document.body, { key: 'Escape' }));
+    document.removeEventListener('keydown', elsewhere);
+    expect(elsewhere).not.toHaveBeenCalled();
+    await cancelled();
+  });
+});
 
 describe('the block moved is the block picked (final review C2)', () => {
   it('text that changes during a drag: the dragged block is found again in the new text and moves', async () => {

@@ -29,6 +29,7 @@ import {
 import type { ParsedPage } from '../../markdown/types';
 import { useToastStore } from '../../stores/toastStore';
 import { applyMove, modelFor } from './blockCommands';
+import { pageDocOf } from './views';
 import { matcher, type Seen } from './blockMatch';
 import styles from './BlockGutter.module.css';
 
@@ -193,6 +194,9 @@ export function BlockGutter({
     () => (shown && model ? { text: shown.text, model } : null),
     [shown, model],
   );
+  // Each unit's element. Until the layout effect maps a new model, the last
+  // model's map stays (the gutter with the keyboard stays put): an id may be
+  // missing from the new model.
   const [anchors, setAnchors] = useState<Map<number, HTMLElement>>(new Map());
   const [hover, setHover] = useState<number[]>([]);
   const [current, setCurrent] = useState<number | null>(null);
@@ -204,6 +208,9 @@ export function BlockGutter({
   const [, relayout] = useState(0);
   const layer = useRef<HTMLDivElement>(null);
   const focusNext = useRef(false);
+  /** Ends the drag in progress, if any (the gutter unmounting ends it). */
+  const endDrag = useRef<((unmounted?: boolean) => void) | null>(null);
+  useEffect(() => () => endDrag.current?.(true), []);
   /** After a move: the offset the moved block starts at in the new text. */
   const movedAt = useRef<number | null>(null);
   /** A pointer drag in progress (M4 §4): which block, and where it would
@@ -232,9 +239,12 @@ export function BlockGutter({
     () => (model ? model.units.filter((u) => anchors.has(u.id)).map((u) => u.id) : []),
     [model, anchors],
   );
-  const tabStop = current !== null && anchors.has(current) ? current : (order[0] ?? null);
+  const tabStop =
+    current !== null && anchors.has(current) && model?.units[current]
+      ? current
+      : (order[0] ?? null);
   const name = useCallback(
-    (id: number) => (model && shown ? summaryOf(shown.text, model.units[id], t) : ''),
+    (id: number) => (model?.units[id] && shown ? summaryOf(shown.text, model.units[id], t) : ''),
     [model, shown, t],
   );
 
@@ -355,6 +365,11 @@ export function BlockGutter({
   const startDrag = (e: ReactPointerEvent, id: number) => {
     const origin = live.current.seen;
     if (e.button !== 0 || !origin) return;
+    endDrag.current?.();
+    // The page being edited: another page shown mid-drag ends it.
+    const page = view.state.facet(pageDocOf);
+    const handle = e.currentTarget as HTMLElement;
+    const pointerId = e.pointerId;
     const unit = origin.model.units[id];
     const label = summaryOf(origin.text, unit, t);
     const from = { x: e.clientX, y: e.clientY };
@@ -384,7 +399,7 @@ export function BlockGutter({
     };
     let frame = 0;
     let lastY = e.clientY;
-    (e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId);
+    handle.setPointerCapture?.(pointerId);
     const scroll = () => {
       const p = pane.current;
       frame = 0;
@@ -403,6 +418,10 @@ export function BlockGutter({
       }
     };
     const onMove = (ev: PointerEvent) => {
+      if (ev.pointerId !== pointerId) return;
+      // No button down: the release never arrived (an OS gesture, the
+      // window losing focus).
+      if (!(ev.buttons & 1) || view.state.facet(pageDocOf) !== page) return cancel();
       if (!started && Math.hypot(ev.clientX - from.x, ev.clientY - from.y) < 4) return;
       started = true;
       lastY = ev.clientY;
@@ -410,32 +429,57 @@ export function BlockGutter({
       setDragging({ label, slot: last.slot, seen: last.seen, x: ev.clientX, y: ev.clientY });
       if (!frame) frame = requestAnimationFrame(scroll);
     };
-    const stop = () => {
+    /** Ends the drag; `unmounted`: the gutter is gone, nothing to update. */
+    const stop = (unmounted = false) => {
       window.removeEventListener('pointermove', onMove);
       window.removeEventListener('pointerup', onUp);
-      window.removeEventListener('keydown', onEscape);
+      window.removeEventListener('pointercancel', cancel);
+      window.removeEventListener('pointerdown', onPress, true);
+      window.removeEventListener('keydown', onEscape, true);
+      window.removeEventListener('blur', cancel);
+      handle.removeEventListener('lostpointercapture', cancel);
       if (frame) cancelAnimationFrame(frame);
-      setDragging(null);
+      if (endDrag.current === stop) endDrag.current = null;
+      if (!unmounted) setDragging(null);
+    };
+    /** Ends the drag without a drop; the release that follows drops nothing
+     *  (its listener is gone). */
+    const cancel = () => {
+      const was = started;
+      started = false;
+      stop();
+      if (was) setStatus(t('editor.blocks.cancelled'));
     };
     const onUp = (ev: PointerEvent) => {
+      if (ev.pointerId !== pointerId) return;
       stop();
       if (!started) return;
+      if (view.state.facet(pageDocOf) !== page) return setStatus(t('editor.blocks.cancelled'));
       const lineOnly = ev.altKey && unit.kind === 'heading';
       const drop =
         lineOnly === last.lineOnly ? last : slotAtPointer(lineOnly, ev.clientX, ev.clientY);
       live.current.move(origin, id, drop.slot, lineOnly, drop.seen);
     };
+    /** A new press while this one is held: its release was lost. */
+    const onPress = (ev: PointerEvent) => {
+      if (ev.pointerId === pointerId || ev.isPrimary) cancel();
+    };
     const onEscape = (ev: KeyboardEvent) => {
       if (ev.key !== 'Escape') return;
+      // Taken before it reaches anything else (the editor, the app's keys).
       ev.preventDefault();
-      started = false;
-      stop();
-      // The release that follows drops nothing: its listener is gone.
-      setStatus(t('editor.blocks.cancelled'));
+      ev.stopPropagation();
+      started = true;
+      cancel();
     };
     window.addEventListener('pointermove', onMove);
     window.addEventListener('pointerup', onUp);
-    window.addEventListener('keydown', onEscape);
+    window.addEventListener('pointercancel', cancel);
+    window.addEventListener('pointerdown', onPress, true);
+    window.addEventListener('keydown', onEscape, true);
+    window.addEventListener('blur', cancel);
+    handle.addEventListener('lostpointercapture', cancel);
+    endDrag.current = stop;
   };
 
   const describe = (slot: Slot): string => {
@@ -561,9 +605,9 @@ export function BlockGutter({
       )}
       {visible.map((id) => {
         const el = anchors.get(id);
-        if (!el) return null;
-        const at = placeOf(el);
         const unit = model.units[id];
+        if (!el || !unit) return null;
+        const at = placeOf(el);
         const label = name(id);
         const shownNow = hover.includes(id) || picking?.unit === id;
         const button = (key: string, onClick: () => void, glyph: string) => (
