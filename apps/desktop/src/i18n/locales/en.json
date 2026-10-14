@@ -309,6 +309,7 @@
     "reset": "Reset layout",
     "layoutSaveFailed": "Card positions couldn't be saved. {error}",
     "empty": "Empty folder.",
+    "omitted": "{count, plural, one {# more linked page isn’t shown here.} other {# more linked pages aren’t shown here.}}",
     "zoom": "Zoom",
     "zoomIn": "Zoom in",
     "zoomOut": "Zoom out",

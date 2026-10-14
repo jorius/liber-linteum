@@ -206,6 +206,21 @@
   color: var(--color-text-muted);
 }
 
+/* A capped hub page's note (final review m14). */
+.omitted {
+  position: absolute;
+  left: 20px;
+  bottom: 20px;
+  z-index: 5;
+  margin: 0;
+  padding: 6px 12px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-pill);
+  background: var(--color-surface);
+  font: 500 13px var(--font-body);
+  color: var(--color-text-muted);
+}
+
 /* It takes the keyboard on an empty level (final review I4). */
 .empty:focus-visible {
   outline: 2px solid var(--color-focus);

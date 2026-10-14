@@ -309,6 +309,7 @@
     "reset": "Restablecer disposición",
     "layoutSaveFailed": "No se pudieron guardar las posiciones de las tarjetas. {error}",
     "empty": "Carpeta vacía.",
+    "omitted": "{count, plural, one {# página enlazada más no se muestra aquí.} other {# páginas enlazadas más no se muestran aquí.}}",
     "zoom": "Zoom",
     "zoomIn": "Acercar",
     "zoomOut": "Alejar",

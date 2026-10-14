@@ -57,6 +57,7 @@ const LEVELS: Record<string, GvLevel> = {
   'page:root.md': {
     cards: [card('root.md', 'page', { title: 'Sparda', relation: 'centre' })],
     centre: 'root.md',
+    omitted: 104,
   },
 };
 
@@ -194,6 +195,16 @@ describe('Global View screen (M3a §5, §6)', () => {
     await waitFor(() => expect(usePageStore.getState().path).toBe('A/Untitled.md'));
     expect(useUiStore.getState().screen).toBe('edit');
     expect(usePageStore.getState().titleFocus).toEqual({ path: 'A/Untitled.md' });
+  });
+
+  it('a capped hub page says how many linked pages it leaves out (final review m14)', async () => {
+    render(<GlobalView />);
+    await cardButton('A');
+    expect(screen.queryByText(/not shown/)).not.toBeInTheDocument();
+    await act(() => useGvStore.getState().open(card('root.md', 'page', { title: 'Sparda' })));
+    expect(await screen.findByRole('status')).toHaveTextContent(
+      '104 more linked pages aren’t shown here.',
+    );
   });
 
   it('an empty folder says so', async () => {

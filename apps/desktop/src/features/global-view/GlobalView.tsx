@@ -27,6 +27,9 @@ export function GlobalView() {
   const loaded = useGvStore((s) => s.loaded);
   const empty = useGvStore((s) => s.canvas.cards.length === 0);
   const shownKey = useGvStore((s) => s.shownKey);
+  // A hub page's neighbourhood is capped (final review m14): say how many
+  // linked pages the level leaves out.
+  const omitted = useGvStore((s) => (s.shownKey ? (s.levels[s.shownKey]?.omitted ?? 0) : 0));
   const region = useRef<HTMLElement>(null);
   const area = useRef<HTMLDivElement>(null);
   const emptyNote = useRef<HTMLParagraphElement>(null);
@@ -139,6 +142,11 @@ export function GlobalView() {
             }}
           >
             {t('gv.empty')}
+          </p>
+        )}
+        {loaded && omitted > 0 && (
+          <p role="status" className={styles.omitted}>
+            {t('gv.omitted', { count: omitted })}
           </p>
         )}
         <button type="button" className={styles.fab} onClick={() => void newEntry()}>
