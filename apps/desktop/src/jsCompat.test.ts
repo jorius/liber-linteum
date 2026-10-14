@@ -28,7 +28,7 @@ const NEWER: [RegExp, string][] = [
 
 /** Files whose offenders are being fixed elsewhere. Each must still have one
  *  (so the list empties as they're fixed). */
-const PENDING = new Set(['markdown/incremental.ts']);
+const PENDING = new Set<string>();
 
 function sources(dir: string): string[] {
   return readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
