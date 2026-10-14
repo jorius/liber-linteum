@@ -49,6 +49,7 @@ export const openIndexPick = (card: GvCard) =>
     type: 'indexPick',
     folder: card.path,
     current: card.indexFrom === 'picked' ? card.indexPage : null,
+    ...(card.indexFrom === 'only' && card.indexPage ? { only: card.indexPage } : {}),
   });
 
 /** The page a card stands for in a relationship (M3b §2): itself, or a

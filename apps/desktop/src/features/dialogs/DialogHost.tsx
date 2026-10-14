@@ -25,7 +25,14 @@ export function DialogHost() {
     case 'openFile':
       return <OpenFileDialog path={dialog.path} onClose={close} />;
     case 'indexPick':
-      return <IndexPickDialog folder={dialog.folder} current={dialog.current} onClose={close} />;
+      return (
+        <IndexPickDialog
+          folder={dialog.folder}
+          current={dialog.current}
+          only={dialog.only}
+          onClose={close}
+        />
+      );
     case 'relations':
       return <RelationsDialog page={dialog.page} other={dialog.other} onClose={close} />;
   }

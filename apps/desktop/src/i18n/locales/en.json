@@ -282,6 +282,7 @@
     "indexPick": {
       "title": "Index note for {name}",
       "hint": "The page this folder’s card shows in the Global View.",
+      "only": "{page} is this folder’s only page, so its card already uses it. Pick it to keep it when more pages are added.",
       "search": "Find a page",
       "legend": "Index note",
       "none": "No index note",

@@ -282,6 +282,7 @@
     "indexPick": {
       "title": "Nota índice de {name}",
       "hint": "La página que muestra la tarjeta de esta carpeta en la Vista global.",
+      "only": "{page} es la única página de esta carpeta, así que su tarjeta ya la usa. Elígela para conservarla cuando se añadan más páginas.",
       "search": "Buscar una página",
       "legend": "Nota índice",
       "none": "Sin nota índice",

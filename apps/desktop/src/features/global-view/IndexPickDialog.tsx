@@ -14,14 +14,18 @@ const SEARCH_FROM = 10;
 const stem = (path: string) => nameOf(path).replace(/\.md$/i, '');
 
 /** Picks the page a folder's card previews (M3b §4, GV-02 rule 3): one of
- *  the folder's own pages, or none. Saved in `.nimw/vault.json`. */
+ *  the folder's own pages, or none. Saved in `.nimw/vault.json`. A folder
+ *  with a single page (`only`) uses it already (rule 4): it starts chosen,
+ *  and the dialog says so (final review m14). */
 export function IndexPickDialog({
   folder,
   current,
+  only,
   onClose,
 }: {
   folder: string;
   current: string | null;
+  only?: string;
   onClose: () => void;
 }) {
   const { t } = useTranslation();
@@ -34,7 +38,7 @@ export function IndexPickDialog({
         .sort((a, b) => stem(a).localeCompare(stem(b), undefined, { numeric: true })),
     [nodes, folder],
   );
-  const [choice, setChoice] = useState<string | null>(current);
+  const [choice, setChoice] = useState<string | null>(current ?? only ?? null);
   const [query, setQuery] = useState('');
   const [busy, setBusy] = useState(false);
   const shown = query.trim()
@@ -60,6 +64,7 @@ export function IndexPickDialog({
       returnFocus={() => cardButtonFor(folder)}
     >
       <p className={styles.text}>{t('gv.indexPick.hint')}</p>
+      {only && <p className={styles.text}>{t('gv.indexPick.only', { page: stem(only) })}</p>}
       {pages.length > SEARCH_FROM && (
         <label className={styles.field}>
           <span>{t('gv.indexPick.search')}</span>
