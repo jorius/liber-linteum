@@ -100,7 +100,7 @@ function isLoneEmbed(p: Paragraph): boolean {
   return kids.length === 1 && (kids[0].type === ('embed' as string) || kids[0].type === 'image');
 }
 
-function kindOf(node: RootContent): UnitKind {
+export function kindOf(node: RootContent): UnitKind {
   switch (node.type as string) {
     case 'heading':
       return 'heading';
