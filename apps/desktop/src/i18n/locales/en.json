@@ -166,8 +166,10 @@
     },
     "createPage": {
       "title": "Create page “{name}”?",
+      "titleIn": "Create page “{name}” in {folder}/?",
       "where": "It will be created in {folder}.",
-      "confirm": "Create page"
+      "confirm": "Create page",
+      "invalid": "“{name}” can’t be used as a name. {reason}"
     }
   },
   "settings": {
