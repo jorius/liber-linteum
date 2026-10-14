@@ -237,6 +237,9 @@ impl VaultSession {
             index.resolve_from(&files, p)?;
         }
         drop(index);
+        for (from, to) in &renamed {
+            self.follow_layout(from, to);
+        }
         for w in warnings {
             self.emit_warning(w);
         }

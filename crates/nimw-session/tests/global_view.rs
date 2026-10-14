@@ -345,3 +345,47 @@ fn nfr_03_a_200_card_level_and_its_edges_in_under_100_ms() {
     eprintln!("level 0 ({} cards) + edges: {took:?}", level.cards.len());
     assert!(took < std::time::Duration::from_millis(150), "{took:?}");
 }
+
+#[test]
+fn m3a_pinned_positions_follow_in_app_and_external_renames() {
+    use nimw_vault::{CardPosition, WatchEvent};
+    use std::collections::BTreeMap;
+    let dir = vault();
+    let (_c, s) = open(dir.path());
+    let pin = |path: &str| -> BTreeMap<String, CardPosition> {
+        [(path.to_string(), CardPosition { x: 1.0, y: 2.0 })].into()
+    };
+    s.vault().set_layout_level("", &pin("Alpha")).unwrap();
+    s.vault()
+        .set_layout_level("Alpha", &pin("Alpha/note.md"))
+        .unwrap();
+    s.vault()
+        .set_layout_level("", &{
+            let mut m = pin("Alpha");
+            m.extend(pin("zeta.md"));
+            m
+        })
+        .unwrap();
+
+    // In-app: the folder moves, its level key and card entries follow.
+    s.rename(&vp("Alpha"), &vp("Projects A"), false).unwrap();
+    assert!(s.vault().layout_level("").contains_key("Projects A"));
+    assert!(
+        s.vault()
+            .layout_level("Projects A")
+            .contains_key("Projects A/note.md")
+    );
+
+    // Another program renames a page (delete + create with the same content).
+    std::fs::rename(dir.path().join("zeta.md"), dir.path().join("omega.md")).unwrap();
+    s.apply(vec![
+        WatchEvent::Removed(vp("zeta.md")),
+        WatchEvent::Changed(vp("omega.md")),
+    ])
+    .unwrap();
+    let root = s.vault().layout_level("");
+    assert!(
+        root.contains_key("omega.md") && !root.contains_key("zeta.md"),
+        "{root:?}"
+    );
+}

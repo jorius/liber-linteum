@@ -301,6 +301,18 @@ fn has_scheme(value: &str) -> bool {
         && scheme.len() > 1
 }
 
+impl VaultSession {
+    /// Pinned Global View positions follow a rename (M3a §7). The layout is
+    /// a convenience: a failure is reported, never fails the rename.
+    pub(crate) fn follow_layout(&self, from: &str, to: &str) {
+        if let Err(e) = self.vault.remap_layout(from, to) {
+            self.emit(crate::events::SessionEvent::Warning(format!(
+                "Global View layout not updated for {from} → {to}: {e}"
+            )));
+        }
+    }
+}
+
 /// Edge kinds drawn from the index (parent/child edges are drawn by the UI).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum EdgeKind {

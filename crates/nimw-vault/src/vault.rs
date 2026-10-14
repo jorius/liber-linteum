@@ -109,20 +109,42 @@ impl Vault {
         {
             return Err(invalid(&format!("invalid attachment folder {path:?}")));
         }
-        let file = VaultPath::new(NIMW_JSON)?;
+        self.update_json_object(NIMW_JSON, true, |map| {
+            map.insert(
+                "attachments".to_string(),
+                serde_json::json!({ "mode": mode, "path": stored }),
+            );
+        })
+    }
+
+    /// Reads the JSON object at `rel` (under `.nimw/`), lets `edit` change it
+    /// and writes it back atomically (compare-and-swap), keeping every key
+    /// `edit` doesn't touch and adding `"version": 1`. A missing file is
+    /// created only when `create` (VLT-02: `.nimw/` appears on first need);
+    /// a file that isn't a JSON object is never overwritten.
+    pub(crate) fn update_json_object(
+        &self,
+        rel: &str,
+        create: bool,
+        edit: impl FnOnce(&mut serde_json::Map<String, serde_json::Value>),
+    ) -> Result<()> {
+        let file = VaultPath::new(rel)?;
         let (mut map, expected) = match self.read(&file) {
             Ok((bytes, hash)) => match serde_json::from_slice(&bytes) {
                 Ok(serde_json::Value::Object(map)) => (map, Some(hash)),
-                _ => return Err(invalid("not a JSON object; fix or remove it first")),
+                _ => {
+                    return Err(VaultError::InvalidConfig {
+                        file: rel.to_string(),
+                        reason: "not a JSON object; fix or remove it first".to_string(),
+                    });
+                }
             },
-            Err(VaultError::NotFound(_)) => (serde_json::Map::new(), None),
+            Err(VaultError::NotFound(_)) if create => (serde_json::Map::new(), None),
+            Err(VaultError::NotFound(_)) => return Ok(()),
             Err(e) => return Err(e),
         };
         map.entry("version").or_insert(1.into());
-        map.insert(
-            "attachments".to_string(),
-            serde_json::json!({ "mode": mode, "path": stored }),
-        );
+        edit(&mut map);
         let dir = self.fs_path(&VaultPath::new(".nimw")?)?;
         if !dir.is_dir() {
             std::fs::create_dir(&dir).map_err(|e| io_err(".nimw", e))?;
@@ -164,10 +186,10 @@ impl Vault {
     }
 }
 
-const NIMW_JSON: &str = ".nimw/vault.json";
+pub(crate) const NIMW_JSON: &str = ".nimw/vault.json";
 const OBSIDIAN_JSON: &str = ".obsidian/app.json";
 
-fn read_json<T: serde::de::DeserializeOwned + Default>(
+pub(crate) fn read_json<T: serde::de::DeserializeOwned + Default>(
     root: &Path,
     rel: &str,
     warnings: &mut Vec<String>,

@@ -226,6 +226,7 @@ impl VaultSession {
         self.vault.rename(from, to)?;
         self.index()
             .transaction(|tx| tx.rename(from.as_str(), to.as_str()))?;
+        self.follow_layout(from.as_str(), to.as_str());
 
         let mut outcome = RenameOutcome {
             moved: {
