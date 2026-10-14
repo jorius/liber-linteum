@@ -22,7 +22,7 @@ import { useTranslation } from 'react-i18next';
 import type { GlobalViewEdges, GvCard } from '../../ipc';
 import { useUiStore } from '../../stores/uiStore';
 import { Card } from './Card';
-import type { CardMenuItem } from './CardMenu';
+import { closeCardMenus, type CardMenuItem } from './CardMenu';
 import { EdgeLayer, MAX_AGGREGATED, strongest, type DrawnEdge } from './edges';
 import { openIndexPick, pageOf, pickable, useGvStore } from './gvStore';
 import {
@@ -313,6 +313,10 @@ export function Canvas({ mode, toggles, width, onOpen, onOpenEditor }: CanvasPro
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [shownKey, nodes, canvas]);
 
+  // A card's menu is placed once, under its button: another level (or other
+  // cards expanded) moves the cards, so it closes (final review m9).
+  useEffect(() => closeCardMenus(), [shownKey, expanded]);
+
   // Connect mode started from a card's menu: the keyboard goes back to that
   // card, to move on to the target from there (M3b §2).
   useEffect(() => {
@@ -389,6 +393,8 @@ export function Canvas({ mode, toggles, width, onOpen, onOpenEditor }: CanvasPro
         nodesConnectable
         connectOnClick={false}
         onConnectEnd={onConnectEnd}
+        // A pan or zoom moves the cards from under an open menu (m9).
+        onMoveStart={closeCardMenus}
         connectionLineStyle={{ stroke: 'var(--color-edge-manual)', strokeWidth: 3 }}
         onPaneClick={() => useGvStore.getState().cancelConnect()}
         elementsSelectable={false}

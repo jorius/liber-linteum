@@ -6,9 +6,21 @@ export interface CardMenuItem {
   run: () => void;
 }
 
+/** How to close each open menu. */
+const openMenus = new Set<() => void>();
+
+/** Closes the open card menu, if any: the canvas moved under it (a pan, a
+ *  zoom, another level). The keyboard in it goes back to its button. */
+export function closeCardMenus() {
+  for (const close of [...openMenus]) close();
+}
+
 /** A card's connections menu (M3b §3; ARIA menu button pattern): under its
  *  button, in a portal (React Flow's viewport is transformed, which would
- *  move a fixed-position menu with the canvas). Arrow keys, Home and End
+ *  move a fixed-position menu with the canvas) into the landmark region
+ *  that holds the card, the Global View (axe `region`, final review m9).
+ *  Placed once, it closes when the canvas pans, zooms or shows another
+ *  level ({@link closeCardMenus}). Arrow keys, Home and End
  *  move, Escape and Tab close it and give the keyboard back to the button;
  *  a click elsewhere closes it. An item gets the keyboard back to the button
  *  before it runs: a dialog it opens returns there (NFR-10, final review
@@ -32,6 +44,14 @@ export function CardMenu({
   useEffect(() => {
     refs.current[active]?.focus();
   }, [active]);
+
+  useEffect(() => {
+    const close = () => onClose(box.current?.contains(document.activeElement) ?? false);
+    openMenus.add(close);
+    return () => {
+      openMenus.delete(close);
+    };
+  }, [onClose]);
 
   useEffect(() => {
     const onDown = (e: MouseEvent) => {
@@ -80,6 +100,6 @@ export function CardMenu({
         </button>
       ))}
     </div>,
-    document.body,
+    anchor.closest<HTMLElement>('section[aria-label], [role="region"]') ?? document.body,
   );
 }

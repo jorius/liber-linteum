@@ -162,6 +162,41 @@ test('a folder without an index note: pick one, and its card previews it', async
   await expect(page.getByRole('group', { name: 'Beta, project' })).toContainText('Project · Beta');
 });
 
+test('the open card menu is inside the Global View landmark, axe-clean, and closes on zoom (final review m9)', async ({
+  page,
+}) => {
+  await globalView(page);
+  await page.getByRole('button', { name: 'Connections of Welcome' }).click();
+  const menu = page.getByRole('menu', { name: 'Connections of Welcome' });
+  await expect(menu).toBeVisible();
+  await page.evaluate(AXE);
+  const violations = await page.evaluate(async () => {
+    const { axe } = window as unknown as {
+      axe: {
+        run: (
+          el: Element | Document,
+          opts: object,
+        ) => Promise<{ violations: { id: string; nodes: { target: string[] }[] }[] }>;
+      };
+    };
+    const region = document.querySelector('section[aria-label="Global View"]')!;
+    const whole = await axe.run(region, { resultTypes: ['violations'] });
+    // Content outside any landmark is checked on the whole document.
+    const landmarks = await axe.run(document, { runOnly: { type: 'rule', values: ['region'] } });
+    return [...whole.violations, ...landmarks.violations].map(
+      (v) => `${v.id}: ${v.nodes.map((n) => n.target.join(' '))}`,
+    );
+  });
+  expect(violations).toEqual([]);
+
+  // The canvas zooms under the open menu: the menu would no longer sit under
+  // its button, so it closes.
+  const notes = (await card(page, 'Notes').boundingBox())!;
+  await page.mouse.move(notes.x + notes.width / 2, notes.y + notes.height / 2);
+  await page.mouse.wheel(0, 240);
+  await expect(menu).toHaveCount(0);
+});
+
 test('the keyboard comes back to the connect button after Relationships… (NFR-10, final review I2)', async ({
   page,
 }) => {

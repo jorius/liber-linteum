@@ -308,3 +308,24 @@ describe('a slow double click (final review I5)', () => {
     expect(useUiStore.getState().screen).toBe('global');
   });
 });
+
+describe('a card’s connections menu (final review m9)', () => {
+  it('opens inside the Global View region, a landmark', async () => {
+    render(<GlobalView />);
+    await userEvent.click(await cardButton('Connections of root'));
+    expect(screen.getByRole('region', { name: 'Global View' })).toContainElement(
+      screen.getByRole('menu', { name: 'Connections of root' }),
+    );
+  });
+
+  it('closes when the canvas moves to another level', async () => {
+    render(<GlobalView />);
+    await userEvent.click(await cardButton('Connections of root'));
+    expect(screen.getByRole('menu')).toBeInTheDocument();
+    // root.md is the next level's centre card: it stays on the canvas.
+    await act(() => useGvStore.getState().open(card('root.md')));
+    expect(useGvStore.getState().shownKey).toBe('page:root.md');
+    expect(await cardButton('Sparda')).toBeInTheDocument();
+    expect(screen.queryByRole('menu')).not.toBeInTheDocument();
+  });
+});
