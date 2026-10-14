@@ -307,6 +307,7 @@
       "aggregated": "Enlaces desde dentro de carpetas"
     },
     "reset": "Restablecer disposición",
+    "layoutSaveFailed": "No se pudieron guardar las posiciones de las tarjetas. {error}",
     "empty": "Carpeta vacía.",
     "zoom": "Zoom",
     "zoomIn": "Acercar",

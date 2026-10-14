@@ -1,5 +1,6 @@
 // Global View state (M3a §5, §7): the drill-down stack (breadcrumb), the
 // cards expanded in place, the loaded levels, edges and pinned positions.
+import i18next from 'i18next';
 import { create } from 'zustand';
 import {
   gvChildren,
@@ -12,8 +13,11 @@ import {
   type GvEdge,
   type GvLevel,
   type GvLevelRef,
+  type IpcResult,
 } from '../../ipc';
+import { errorMessage } from '../../stores/messages';
 import { useSettingsStore } from '../../stores/settingsStore';
+import { useToastStore } from '../../stores/toastStore';
 import { useVaultStore } from '../../stores/vaultStore';
 
 /** Saving a dragged card waits this long for the next drag (M3a §7). */
@@ -121,6 +125,23 @@ let pending: { key: string; positions: Positions } | null = null;
  *  come back without them. */
 const inFlight = new Map<string, Positions>();
 
+/** A failed save was reported; the next failure is, once one succeeds. */
+let saveFailed = false;
+
+/** Saves run in the background: a failure is toasted once, not per drag
+ *  (final review m8). */
+function reportSave(res: IpcResult<void>) {
+  if (res.ok) {
+    saveFailed = false;
+  } else if (!saveFailed) {
+    saveFailed = true;
+    useToastStore.getState().push({
+      message: i18next.t('gv.layoutSaveFailed', { error: errorMessage(res.error) }),
+      tone: 'error',
+    });
+  }
+}
+
 /** Sends the waiting drag now. */
 function flushPins() {
   if (pinTimer) clearTimeout(pinTimer);
@@ -129,8 +150,9 @@ function flushPins() {
   pending = null;
   if (!save) return;
   inFlight.set(save.key, save.positions);
-  void layoutSet(save.key, save.positions).then(() => {
+  void layoutSet(save.key, save.positions).then((res) => {
     if (inFlight.get(save.key) === save.positions) inFlight.delete(save.key);
+    reportSave(res);
   });
 }
 
@@ -288,7 +310,7 @@ export const useGvStore = create<GvState>((set, get) => {
       } else flushPins();
       inFlight.delete(key);
       set({ pinned: {} });
-      await layoutSet(key, {});
+      reportSave(await layoutSet(key, {}));
     },
     setFocus: (focus) => set({ focus }),
     reset: () => {
@@ -297,6 +319,7 @@ export const useGvStore = create<GvState>((set, get) => {
       pinTimer = null;
       pending = null;
       inFlight.clear();
+      saveFailed = false;
       set({
         stack: [{ kind: 'vault' }],
         expanded: [],

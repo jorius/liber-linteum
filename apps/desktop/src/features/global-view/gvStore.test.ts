@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { CardPosition, GvCard, GvLevel, GvLevelRef } from '../../ipc';
 import { clearMocks, mockIPC } from '../../ipc/testing';
 import { DEFAULT_SETTINGS, useSettingsStore } from '../../stores/settingsStore';
+import { useToastStore } from '../../stores/toastStore';
 import { useVaultStore } from '../../stores/vaultStore';
 import { buildCanvas, canvasKey, levelKey, PIN_SAVE_MS, useGvStore } from './gvStore';
 
@@ -304,6 +305,40 @@ describe('pinned positions of cards not on the canvas (GV-31, final review I6)',
     expect(stored['expand:']).toEqual({ 'A/a.md': { x: 900, y: 900 }, B: { x: 1, y: 1 } });
     await useGvStore.getState().open(card('A', 'project')); // expand again
     expect(useGvStore.getState().pinned['A/a.md']).toEqual({ x: 900, y: 900 });
+  });
+});
+
+describe('failed position saves (final review m8)', () => {
+  it('say so once while they keep failing, and again after a save went through', async () => {
+    vi.useFakeTimers();
+    useToastStore.getState().clear();
+    let fail = true;
+    mockIPC((cmd, raw) => {
+      const args = (raw ?? {}) as Record<string, unknown>;
+      if (cmd === 'gv_children') return levels[levelKey(args.level as GvLevelRef)];
+      if (cmd === 'gv_edges') return [];
+      if (cmd === 'layout_get') return {};
+      if (cmd === 'layout_set' && fail) throw { kind: 'io', message: 'disk full' };
+      return null;
+    });
+    const errors = () => useToastStore.getState().toasts.filter((t) => t.tone === 'error');
+    await useGvStore.getState().load();
+    useGvStore.getState().pin('A', { x: 1, y: 1 });
+    await vi.advanceTimersByTimeAsync(PIN_SAVE_MS);
+    expect(errors().map((t) => t.message)).toEqual([
+      "Card positions couldn't be saved. Something went wrong: disk full",
+    ]);
+    useGvStore.getState().pin('B', { x: 2, y: 2 });
+    await vi.advanceTimersByTimeAsync(PIN_SAVE_MS);
+    expect(errors(), 'not one per drag').toHaveLength(1);
+    fail = false;
+    useGvStore.getState().pin('B', { x: 3, y: 3 });
+    await vi.advanceTimersByTimeAsync(PIN_SAVE_MS);
+    fail = true;
+    useGvStore.getState().pin('B', { x: 4, y: 4 });
+    await vi.advanceTimersByTimeAsync(PIN_SAVE_MS);
+    expect(errors()).toHaveLength(2);
+    useToastStore.getState().clear();
   });
 });
 

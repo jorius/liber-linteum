@@ -307,6 +307,7 @@
       "aggregated": "Links from inside folders"
     },
     "reset": "Reset layout",
+    "layoutSaveFailed": "Card positions couldn't be saved. {error}",
     "empty": "Empty folder.",
     "zoom": "Zoom",
     "zoomIn": "Zoom in",
