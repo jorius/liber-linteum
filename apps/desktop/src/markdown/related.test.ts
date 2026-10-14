@@ -127,6 +127,19 @@ describe('appending a relationship (M3b §2, §5)', () => {
       '---\nrelated:\n  - "[[A]]"\n  - "[[B]]"\n  - "[[C]]"\nz: 1\n---\nB\n',
     );
   });
+
+  it('an explicit null is an empty key (final review m11)', () => {
+    for (const empty of ['~', 'null', 'Null', '!!null ""']) {
+      const text = `---\nrelated: ${empty}\nz: 1\n---\nB\n`;
+      expect(apply(text, appendRelated(text, 'C')), empty).toBe(
+        '---\nrelated:\n  - "[[C]]"\nz: 1\n---\nB\n',
+      );
+    }
+    const commented = '---\nrelated: null # none yet\n---\n';
+    expect(apply(commented, appendRelated(commented, 'C'))).toBe(
+      '---\nrelated: # none yet\n  - "[[C]]"\n---\n',
+    );
+  });
 });
 
 describe('editing and deleting a relationship (M3b §3, §5)', () => {
@@ -283,11 +296,13 @@ describe('sweep: every relationship edit reads back exactly or is refused', () =
     '---\nrelated:\n  - { link: "[[A]]", label: 2024, kind: parent }\n  - "[[B]]"\n---\n',
     '---\nrelated:\n  - label: first\n    link: "[[A]]"\n    directed: true\n---\n',
     '---\nrelated:\n  - {\n      link: "[[A]]", # c\n      label: x,\n      color: red\n    }\n---\n',
-    // Final review m1: comments around a rewritten value.
+    // Final review m1, m11: comments around a rewritten value; explicit nulls.
     '---\nrelated: "[[A]]"  # main link\nz: 1\n---\n',
     '---\nrelated: ["[[A]]", "[[B]]"] # keep me\n---\n',
     '---\nrelated: [\n  "[[A]]", # first\n  "[[B]]"\n]\n---\n',
     '---\nrelated: # mine\n  ["[[A]]"]  # and mine\n---\n',
+    '---\nrelated: ~\n---\n',
+    '---\nrelated: null # none\n---\n',
   ];
   /** An item without its label and arrow (a string item: its link). */
   const rest = (item: unknown) =>

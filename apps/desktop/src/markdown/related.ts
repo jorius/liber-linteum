@@ -196,6 +196,9 @@ function rewritePair(src: string, pair: Pair, indent: string, items: string[]): 
 function itemSources(src: string, pair: Pair): string[] | null {
   const v = pair.value as { range?: Range } | null;
   if (!v || !v.range) return [];
+  // No value (`related:` as templates leave it), `~` or `null`: no item
+  // (final review m11).
+  if (isScalar(pair.value) && pair.value.value === null) return [];
   if (isSeq(pair.value)) {
     const out: string[] = [];
     for (const item of pair.value.items as { range?: Range }[]) {
@@ -207,8 +210,6 @@ function itemSources(src: string, pair: Pair): string[] | null {
     return out;
   }
   const text = src.slice(v.range[0], v.range[1]).trimEnd();
-  // An empty value (`related:` as templates leave it) holds no item.
-  if (!text && isScalar(pair.value) && pair.value.value === null) return [];
   return text && !text.includes('\n') ? [text] : null;
 }
 
