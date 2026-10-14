@@ -96,6 +96,52 @@ fn vlt_05_exclude_globs_and_bad_config_are_handled() {
     );
 }
 
+/// Final review m9: `.nimw/vault.json` is read field by field. A malformed
+/// or future-shaped field (e.g. an `indexPicks` entry that isn't a path)
+/// is reported and ignored on its own; it never takes `exclude` (which
+/// keeps private folders out of the index) or `attachments` with it.
+#[test]
+fn m3a_a_malformed_field_in_vault_json_never_disables_the_excludes() {
+    let dir = tempfile::tempdir().unwrap();
+    for page in ["Private/secret.md", "Notes/a.md"] {
+        let path = dir.path().join(page);
+        std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+        std::fs::write(path, "# page\n").unwrap();
+    }
+    std::fs::create_dir(dir.path().join(".nimw")).unwrap();
+    let open = |json: &str| {
+        std::fs::write(dir.path().join(".nimw/vault.json"), json).unwrap();
+        Vault::open(dir.path()).unwrap()
+    };
+    let hidden = |vault: &Vault| !paths(vault).iter().any(|p| p.ends_with("secret.md"));
+
+    let vault = open(
+        r#"{ "version": 1, "exclude": ["Private/**", 7], "attachments": { "mode": "same" },
+             "indexPicks": { "Notes": "Notes/a.md", "A": null, "B": { "page": "x.md" } } }"#,
+    );
+    assert!(vault.is_excluded("Private/secret.md"));
+    assert!(hidden(&vault), "{:?}", paths(&vault));
+    assert_eq!(vault.attachment_policy(), AttachmentPolicy::SameAsNote);
+    assert_eq!(
+        vault.index_picks(),
+        [("Notes".to_string(), "Notes/a.md".to_string())].into()
+    );
+    let warnings = vault.warnings().join("\n");
+    assert!(
+        warnings.contains("indexPicks") && warnings.contains("exclude"),
+        "{warnings}"
+    );
+
+    let vault =
+        open(r#"{ "exclude": ["Private/**"], "attachments": { "mode": 3 }, "indexPicks": [] }"#);
+    assert!(hidden(&vault), "{:?}", paths(&vault));
+    assert_eq!(vault.attachment_policy(), AttachmentPolicy::default());
+    assert!(vault.index_picks().is_empty());
+
+    let vault = open(r#"{ "exclude": "Private/**", "attachments": "same" }"#);
+    assert!(hidden(&vault), "a single glob is a list of one");
+}
+
 #[test]
 fn vlt_02_open_and_scan_write_nothing() {
     for name in ["obsidian-basic", "ambiguous-names", "edge-cases"] {

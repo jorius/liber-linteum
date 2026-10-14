@@ -35,7 +35,7 @@ impl Vault {
         }
         let mut warnings = Vec::new();
 
-        let nimw: NimwVaultJson = read_json(&root, NIMW_JSON, &mut warnings);
+        let nimw = read_nimw_json(&root, &mut warnings);
         // Read once here only to report a broken file; the attachment policy
         // is re-read on every use (M2c §5.3).
         let _: ObsidianAppJson = read_json(&root, OBSIDIAN_JSON, &mut warnings);
@@ -190,7 +190,7 @@ impl Vault {
     /// usable. Errors read as "not set": `open` already reported them.
     fn attachment_sources(&self) -> (Option<NimwAttachments>, Option<(String, AttachmentPolicy)>) {
         let mut ignored = Vec::new();
-        let nimw: NimwVaultJson = read_json(&self.root, NIMW_JSON, &mut ignored);
+        let nimw = read_nimw_json(&self.root, &mut ignored);
         let obsidian: ObsidianAppJson = read_json(&self.root, OBSIDIAN_JSON, &mut ignored);
         let obsidian = obsidian.attachment_folder_path.and_then(|value| {
             AttachmentPolicy::from_obsidian(&value).map(|policy| (value, policy))
@@ -201,7 +201,7 @@ impl Vault {
     /// `indexPicks` from `.nimw/vault.json` (folder → page; GV-02), re-read on
     /// every call like the attachment policy. Unreadable: none.
     pub fn index_picks(&self) -> std::collections::HashMap<String, String> {
-        let nimw: NimwVaultJson = read_json(&self.root, NIMW_JSON, &mut Vec::new());
+        let nimw = read_nimw_json(&self.root, &mut Vec::new());
         nimw.index_picks
     }
 
@@ -218,6 +218,12 @@ impl Vault {
 
 pub(crate) const NIMW_JSON: &str = ".nimw/vault.json";
 const OBSIDIAN_JSON: &str = ".obsidian/app.json";
+
+/// `.nimw/vault.json`, field by field (final review m9).
+fn read_nimw_json(root: &Path, warnings: &mut Vec<String>) -> NimwVaultJson {
+    let value: serde_json::Value = read_json(root, NIMW_JSON, warnings);
+    NimwVaultJson::from_value(&value, warnings)
+}
 
 pub(crate) fn read_json<T: serde::de::DeserializeOwned + Default>(
     root: &Path,
