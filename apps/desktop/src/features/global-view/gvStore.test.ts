@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { CardPosition, GvCard, GvLevel, GvLevelRef } from '../../ipc';
 import { clearMocks, mockIPC } from '../../ipc/testing';
 import { DEFAULT_SETTINGS, useSettingsStore } from '../../stores/settingsStore';
+import { useVaultStore } from '../../stores/vaultStore';
 import { buildCanvas, canvasKey, levelKey, PIN_SAVE_MS, useGvStore } from './gvStore';
 
 /** A card with defaults; folders get a `kind` of project/folder. */
@@ -71,6 +72,7 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.useRealTimers();
+  useVaultStore.setState({ nodes: [] });
   clearMocks();
 });
 
@@ -278,6 +280,30 @@ describe('pinned positions vs. reloads and navigation (GV-31, final review I1)',
     await opening;
     await vi.advanceTimersByTimeAsync(PIN_SAVE_MS);
     expect(sets()).toEqual([{ level: '', positions: { A: { x: 1, y: 2 } } }]);
+  });
+});
+
+describe('pinned positions of cards not on the canvas (GV-31, final review I6)', () => {
+  it('Expand: a collapsed child keeps its place when another card is dragged; deleted paths drop out', async () => {
+    vi.useFakeTimers();
+    mode('expand');
+    useVaultStore.setState({
+      nodes: ['A', 'A/Sub', 'A/a.md', 'A/b.md', 'B', 'B/q.md', 'root.md'].map((path) => ({
+        path,
+        kind: path.endsWith('.md') ? 'page' : 'folder',
+      })),
+    });
+    stored['expand:'] = { 'gone.md': { x: 7, y: 7 } };
+    await useGvStore.getState().load();
+    await useGvStore.getState().open(card('A', 'project'));
+    useGvStore.getState().pin('A/a.md', { x: 900, y: 900 });
+    await vi.advanceTimersByTimeAsync(PIN_SAVE_MS);
+    await useGvStore.getState().open(card('A', 'project')); // collapse A
+    useGvStore.getState().pin('B', { x: 1, y: 1 });
+    await vi.advanceTimersByTimeAsync(PIN_SAVE_MS);
+    expect(stored['expand:']).toEqual({ 'A/a.md': { x: 900, y: 900 }, B: { x: 1, y: 1 } });
+    await useGvStore.getState().open(card('A', 'project')); // expand again
+    expect(useGvStore.getState().pinned['A/a.md']).toEqual({ x: 900, y: 900 });
   });
 });
 

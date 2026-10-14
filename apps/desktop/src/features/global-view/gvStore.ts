@@ -14,6 +14,7 @@ import {
   type GvLevelRef,
 } from '../../ipc';
 import { useSettingsStore } from '../../stores/settingsStore';
+import { useVaultStore } from '../../stores/vaultStore';
 
 /** Saving a dragged card waits this long for the next drag (M3a §7). */
 export const PIN_SAVE_MS = 300;
@@ -263,11 +264,14 @@ export const useGvStore = create<GvState>((set, get) => {
       const pinned = { ...get().pinned, [path]: at };
       set({ pinned });
       if (pending && pending.key !== key) flushPins();
-      // Entries for cards no longer on the canvas are pruned here (M3a §7).
-      const shown = new Set(canvas.cards.map((c) => c.path));
+      // Entries of deleted paths are pruned here (M3a §7); a card merely off
+      // the canvas (a collapsed child in Expand) keeps its place (final
+      // review I6).
+      const kept = new Set(canvas.cards.map((c) => c.path));
+      for (const n of useVaultStore.getState().nodes) kept.add(n.path);
       pending = {
         key,
-        positions: Object.fromEntries(Object.entries(pinned).filter(([p]) => shown.has(p))),
+        positions: Object.fromEntries(Object.entries(pinned).filter(([p]) => kept.has(p))),
       };
       if (pinTimer) clearTimeout(pinTimer);
       pinTimer = setTimeout(flushPins, PIN_SAVE_MS);
