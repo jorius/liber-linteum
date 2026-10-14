@@ -14,6 +14,7 @@ import styles from './Editor.module.css';
 import { followLinkAtCursor, livePreview, pagePath } from './livePreview';
 import { attachmentHandlers } from './attachments';
 import { activeFormats, editorKeymap, type ActiveFormat } from './format';
+import { linkCompletion } from './linkComplete';
 import type { PageDoc } from './pageDoc';
 import { blockForOffset, offsetAtTop, topIn } from './scrollSync';
 import { Toolbar } from './Toolbar';
@@ -194,8 +195,9 @@ function createState(d: PageDoc, mode: EditorMode, label: string, numbers: boole
       theme,
       labelSlot.of(labelled(label)),
       modeSlot.of(modeExtensions(mode)),
-      // Pasted images and dropped files (M2c §5).
+      // Pasted images and dropped files (M2c §5), `[[` autocomplete (§6).
       attachmentHandlers(),
+      linkCompletion(),
       gutterSlot.of(gutter(numbers)),
       // Autosave also when the editor loses focus (M2a §3.3).
       EditorView.domEventHandlers({

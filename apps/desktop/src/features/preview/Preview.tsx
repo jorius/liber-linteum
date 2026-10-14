@@ -2,6 +2,7 @@ import GithubSlugger from 'github-slugger';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { pageRead } from '../../ipc';
+import { sameHeading } from '../../markdown/headings';
 import { parsePage } from '../../markdown/parse';
 import { toSafeHast } from '../../markdown/sanitize';
 import { sectionOf } from '../../markdown/section';
@@ -65,13 +66,17 @@ function PreviewBody({
   const anchor = usePageStore((s) => (depth === 0 && !embedded ? s.anchor : null));
   const box = useRef<HTMLDivElement>(null);
 
-  // Scroll to the heading a link asked for (by slug or by exact id).
+  // Scroll to the heading a link asked for (by slug, exact id, or the
+  // link-safe heading text completion writes, M2c §6.2).
   useEffect(() => {
     if (!anchor || !box.current) return;
     const slug = new GithubSlugger().slug(anchor.heading);
-    const target = [...box.current.querySelectorAll<HTMLElement>('[id]')].find(
-      (el) => el.id === slug || el.id === anchor.heading,
-    );
+    const ids = [...box.current.querySelectorAll<HTMLElement>('[id]')];
+    const target =
+      ids.find((el) => el.id === slug || el.id === anchor.heading) ??
+      [...box.current.querySelectorAll<HTMLElement>('h1, h2, h3, h4, h5, h6')].find((el) =>
+        sameHeading(el.textContent ?? '', anchor.heading),
+      );
     target?.scrollIntoView?.({ block: 'start' });
   }, [anchor, tree]);
 
