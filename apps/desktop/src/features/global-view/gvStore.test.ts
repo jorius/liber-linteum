@@ -132,6 +132,17 @@ describe('Global View store (M3a §5)', () => {
     expect(useGvStore.getState().expanded).toEqual([]);
   });
 
+  it("a click on a page level's centre card changes nothing (final review m2)", async () => {
+    await useGvStore.getState().load();
+    await useGvStore.getState().open(card('A', 'project'));
+    await useGvStore.getState().open(card('A/a.md'));
+    const before = useGvStore.getState().stack;
+    const reads = calls.length;
+    await useGvStore.getState().open(card('A/a.md'));
+    expect(useGvStore.getState().stack).toBe(before);
+    expect(calls.length, 'no reload').toBe(reads);
+  });
+
   it('a level that no longer exists falls back to the nearest one that does', async () => {
     const gv = useGvStore.getState();
     await gv.load();

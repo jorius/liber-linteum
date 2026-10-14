@@ -97,7 +97,8 @@ interface GvState {
   /** Reads what the canvas shows: levels (falling back from deleted ones),
    *  edges and pinned positions. */
   load: () => Promise<void>;
-  /** A single click: the next level (Drill-down) or expand / collapse. */
+  /** A single click: the next level (Drill-down; none for a page level's
+   *  own page) or expand / collapse. */
   open: (card: GvCard) => Promise<void>;
   /** Breadcrumb: back to `stack[i]`. */
   back: (i: number) => Promise<void>;
@@ -240,6 +241,8 @@ export const useGvStore = create<GvState>((set, get) => {
     },
     open: async (card) => {
       if (mode() === 'drill') {
+        // The page this level is about: already open (final review m2).
+        if (card.path === get().canvas.centre) return;
         set({ stack: [...get().stack, nextLevel(card)], focus: null });
         return get().load();
       }
