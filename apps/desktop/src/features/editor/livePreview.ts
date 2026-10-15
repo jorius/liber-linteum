@@ -312,6 +312,15 @@ const model = StateField.define<Model>({
   provide: (f) => EditorView.decorations.from(f, (m) => m.decos),
 });
 
+/** Live Preview's model of `state`'s page when it is up to date with `text`
+ *  (the outline and the word count read it rather than parse the page again,
+ *  final review M3); `null` without Live Preview or while it lags. Read
+ *  only: the page stays Live Preview's to re-parse. */
+export function livePreviewPage(state: EditorState, text: string): ParsedPage | null {
+  const m = state.field(model, false);
+  return m && !m.stale && m.text === text ? m.page : null;
+}
+
 /** Brings the model up to date now (instead of after the debounce). */
 function refresh(view: EditorView): Model {
   const m = view.state.field(model);

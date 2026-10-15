@@ -62,7 +62,8 @@ export function Outline({ view, text }: { view: EditorView; text: string }) {
     const timer = setTimeout(() => setSource(text), OUTLINE_DEBOUNCE_MS);
     return () => clearTimeout(timer);
   }, [text]);
-  const items = useMemo(() => headingsOf(parsedFor(source), source), [source]);
+  // Live Preview's model when it has this text (final review M3).
+  const items = useMemo(() => headingsOf(parsedFor(source, view.state), source), [source, view]);
   const parents = useMemo(() => parentsOf(items), [items]);
 
   // Sections fold by heading position; a changed outline starts unfolded.
