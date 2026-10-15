@@ -204,7 +204,8 @@ describe('freeze-safe transform in the dev server (a blank window in `pnpm dev`)
   it("skips Vite's pre-bundled deps, which the optimizer already transformed", () => {
     const once = plugin.transform(src, '/x/node_modules/p/i.js')!;
     expect(plugin.transform(once, '/x/apps/desktop/node_modules/.vite/deps/react.js')).toBeNull();
-    expect(plugin.transform(src, '/x/apps/desktop/node_modules/.vite/deps/chunk-AB12.js')).toBeNull();
+    expect(
+      plugin.transform(src, '/x/apps/desktop/node_modules/.vite/deps/chunk-AB12.js'),
+    ).toBeNull();
   });
 });
-
