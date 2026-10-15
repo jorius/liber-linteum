@@ -5,7 +5,7 @@ import { useSettingsStore } from '../../stores/settingsStore';
 import { useUiStore } from '../../stores/uiStore';
 import { DialogHost } from '../dialogs/DialogHost';
 import { ContextMenu, type MenuState } from '../explorer/ContextMenu';
-import { requestDelete } from '../explorer/deleteFlow';
+import { requestTrash } from '../explorer/trashAction';
 import { GlobalView } from '../global-view/GlobalView';
 import { PageView } from '../page/PageView';
 import { ActionButton } from './ActionButton';
@@ -36,7 +36,7 @@ export function AppShell() {
     <div className={styles.shell}>
       {!collapsed && (
         <Sidebar
-          onRequestDelete={requestDelete}
+          onRequestDelete={requestTrash}
           onRequestMenu={(path, anchor) => setMenu({ path, anchor })}
         />
       )}

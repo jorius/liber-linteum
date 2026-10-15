@@ -1,4 +1,5 @@
 import { useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import type { TreeNode } from '../../ipc';
 import { useVaultStore } from '../../stores/vaultStore';
@@ -51,12 +52,20 @@ export function IconButton({
   icon,
   name,
   className,
+  label,
+  glyph,
+  tabIndex,
 }: {
   target: IconTarget;
   icon: string | null | undefined;
   /** What the icon belongs to, for labels. */
   name: string;
   className?: string;
+  /** The button's own name, when "Add icon" / "Change icon" isn't enough. */
+  label?: string;
+  /** Shown instead of the icon (the explorer row's ☺ action). */
+  glyph?: string;
+  tabIndex?: number;
 }) {
   const { t } = useTranslation();
   const button = useRef<HTMLButtonElement>(null);
@@ -76,26 +85,31 @@ export function IconButton({
         type="button"
         className={className ? `${styles.iconButton} ${className}` : styles.iconButton}
         data-empty={icon ? undefined : ''}
-        aria-label={icon ? t('icons.change') : t('icons.add')}
+        aria-label={label ?? (icon ? t('icons.change') : t('icons.add'))}
         aria-haspopup="dialog"
         aria-expanded={open}
-        title={icon ? t('icons.change') : t('icons.add')}
+        title={label ?? (icon ? t('icons.change') : t('icons.add'))}
+        tabIndex={tabIndex}
         onClick={() => setOpen((o) => !o)}
       >
-        <span aria-hidden="true">{icon ?? '☺'}</span>
+        <span aria-hidden="true">{glyph ?? icon ?? '☺'}</span>
       </button>
-      {open && (
-        <EmojiPicker
-          anchor={anchor}
-          label={t('icons.pickFor', { name })}
-          hasIcon={!!icon}
-          onClose={close}
-          onPick={(emoji) => {
-            close();
-            void setIcon(target, emoji);
-          }}
-        />
-      )}
+      {/* In the body, not inside a tree row or a heading; React events still
+          bubble to the button's ancestors. */}
+      {open &&
+        createPortal(
+          <EmojiPicker
+            anchor={anchor}
+            label={t('icons.pickFor', { name })}
+            hasIcon={!!icon}
+            onClose={close}
+            onPick={(emoji) => {
+              close();
+              void setIcon(target, emoji);
+            }}
+          />,
+          document.body,
+        )}
     </>
   );
 }

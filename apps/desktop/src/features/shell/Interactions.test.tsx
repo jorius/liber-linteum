@@ -74,6 +74,7 @@ describe('context menu', () => {
       'New folder',
       'Rename',
       'Move to…',
+      'Icon…',
       'Delete',
     ]);
     expect(items[0]).toHaveFocus();

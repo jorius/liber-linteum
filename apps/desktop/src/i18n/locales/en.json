@@ -70,7 +70,9 @@
       "notAllowed": "{name} can't be moved there.",
       "cancelled": "Move of {name} cancelled."
     },
-    "scratchFolder": "{name}, quick notes, {count, plural, one {# note} other {# notes}}"
+    "scratchFolder": "{name}, quick notes, {count, plural, one {# note} other {# notes}}",
+    "newPageIn": "New page in {name}",
+    "trash": "Move {name} to Trash"
   },
   "opening": {
     "title": "Opening vault…",
@@ -230,7 +232,8 @@
     "newFolder": "New folder",
     "rename": "Rename",
     "move": "Move to…",
-    "delete": "Delete"
+    "delete": "Delete",
+    "icon": "Icon…"
   },
   "dialogs": {
     "cancel": "Cancel",

@@ -70,7 +70,9 @@
       "notAllowed": "{name} no se puede mover ahí.",
       "cancelled": "Se canceló mover {name}."
     },
-    "scratchFolder": "{name}, notas rápidas, {count, plural, one {# nota} other {# notas}}"
+    "scratchFolder": "{name}, notas rápidas, {count, plural, one {# nota} other {# notas}}",
+    "newPageIn": "Nueva página en {name}",
+    "trash": "Mover {name} a la papelera"
   },
   "opening": {
     "title": "Abriendo bóveda…",
@@ -230,7 +232,8 @@
     "newFolder": "Nueva carpeta",
     "rename": "Renombrar",
     "move": "Mover a…",
-    "delete": "Eliminar"
+    "delete": "Eliminar",
+    "icon": "Icono…"
   },
   "dialogs": {
     "cancel": "Cancelar",

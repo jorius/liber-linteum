@@ -181,3 +181,50 @@
   top: -4px;
   border-top: 1px solid var(--color-sidebar-divider);
 }
+
+/* Quick actions (M5b §3): + (folders), ☺, 🗑, shown like "…". */
+.actions {
+  margin-left: auto;
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 1px;
+  opacity: 0;
+}
+
+.row:hover .actions,
+.row:focus .actions,
+.row:focus-within .actions,
+.selected .actions {
+  opacity: 1;
+}
+
+.actions + .more {
+  margin-left: 0;
+}
+
+/* The pinned scratch folder's count gives way to its actions. */
+.row:hover .count {
+  display: none;
+}
+
+.action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: none;
+  color: inherit;
+  font: 600 14px var(--font-body);
+  line-height: 1;
+  padding: 0;
+  cursor: pointer;
+  opacity: 1;
+}
+
+.action:hover {
+  background: var(--color-sidebar-active);
+}

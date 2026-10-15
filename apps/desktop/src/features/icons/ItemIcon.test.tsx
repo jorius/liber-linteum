@@ -35,9 +35,9 @@ describe('icons where names show (M5b §4)', () => {
     render(<ExplorerTree />);
     const row = (name: string) => screen.getByRole('treeitem', { name });
     expect(row('Maps')).toHaveTextContent('🗺️Maps');
-    expect(row('Maps').querySelector('svg')).toBeNull();
+    expect(row('Maps').querySelector(':scope > svg')).toBeNull();
     expect(row('Lore')).toHaveTextContent('🐉Lore');
-    expect(row('Lore').querySelector('svg')).not.toBeNull();
+    expect(row('Lore').querySelector(':scope > svg')).not.toBeNull();
     expect(row('Plain')).toHaveTextContent(/^Plain/);
   });
 
