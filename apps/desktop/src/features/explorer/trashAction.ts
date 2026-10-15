@@ -1,8 +1,13 @@
-import { requestDelete } from './deleteFlow';
+import { useSettingsStore } from '../../stores/settingsStore';
+import { useUiStore } from '../../stores/uiStore';
+import { useVaultStore } from '../../stores/vaultStore';
 
-/** Every way to trash an item from the explorer — the row's 🗑, its menu,
- *  Delete and ⌘⌫ (M5b §3) — goes through here, so the Trash (§5) has one
- *  place to take it over. Today: the delete confirmation, then the trash. */
+/** Move to the vault's Trash (M5b §5.1): with the confirmation dialog, or
+ *  straight away when the `confirmDelete` setting is off. */
 export function requestTrash(path: string) {
-  requestDelete(path);
+  if (useSettingsStore.getState().settings.confirmDelete) {
+    useUiStore.getState().openDialog({ type: 'delete', path });
+  } else {
+    void useVaultStore.getState().trash(path);
+  }
 }

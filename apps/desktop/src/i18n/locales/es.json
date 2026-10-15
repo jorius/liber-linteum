@@ -233,7 +233,8 @@
     "rename": "Renombrar",
     "move": "Mover a…",
     "delete": "Eliminar",
-    "icon": "Icono…"
+    "icon": "Icono…",
+    "archive": "Archivar"
   },
   "dialogs": {
     "cancel": "Cancelar",
@@ -637,7 +638,6 @@
     "project": "Proyecto",
     "tags": "Etiquetas",
     "linksTo": "Enlaza a",
-    "media": "Medios",
     "hasImage": "Con imagen",
     "hasAudio": "Con audio",
     "active": "Activos",
@@ -654,7 +654,9 @@
     "indexing": "Aún se está indexando: puede que falten resultados.",
     "showMore": "Mostrar más",
     "resultsLabel": "Resultados",
-    "failed": "La búsqueda falló: {error}"
+    "failed": "La búsqueda falló: {error}",
+    "archived": "Archivadas",
+    "show": "Mostrar"
   },
   "icons": {
     "pickFor": "Icono de {name}",
@@ -676,5 +678,37 @@
     },
     "addFor": "Añadir un icono a {name}",
     "changeFor": "Cambiar el icono de {name}"
+  },
+  "bin": {
+    "trash": "Papelera",
+    "archived": "Archivado",
+    "trashCount": "{count, plural, one {Papelera, # elemento} other {Papelera, # elementos}}",
+    "archivedCount": "{count, plural, one {Archivado, # elemento} other {Archivado, # elementos}}",
+    "trashNote": "Las páginas, carpetas y adjuntos eliminados quedan aquí, dentro de la bóveda, hasta que los elimines de la bóveda.",
+    "archiveNote": "Las páginas archivadas no aparecen en los archivos, la Vista global ni la búsqueda, y los enlaces a ellas siguen funcionando.",
+    "trashEmpty": "La papelera está vacía.",
+    "archiveEmpty": "No hay nada archivado.",
+    "folder": "Carpeta",
+    "root": "la raíz de la bóveda",
+    "from": "De {folder}",
+    "unknownFrom": "De otra aplicación",
+    "restore": "Restaurar",
+    "restoreName": "Restaurar {name}",
+    "unarchive": "Desarchivar",
+    "unarchiveName": "Desarchivar {name}",
+    "delete": "Eliminar",
+    "deleteName": "Eliminar {name} de la bóveda",
+    "toTrash": "Mover a la papelera",
+    "toTrashName": "Mover {name} a la papelera",
+    "empty": "Vaciar papelera",
+    "deleteTitle": "{count, plural, one {¿Eliminar # elemento de la bóveda?} other {¿Eliminar # elementos de la bóveda?}}",
+    "emptyTitle": "{count, plural, one {¿Vaciar la papelera (# elemento)?} other {¿Vaciar la papelera (# elementos)?}}",
+    "deleteBody": "Los archivos salen de la bóveda y van a la papelera del sistema, donde aún puedes recuperarlos.",
+    "clashTitle": "{name} ya existe",
+    "clashBody": "Hay algo nuevo donde estaba. ¿Conservar ambos, añadiendo un número al restaurado?",
+    "keepBoth": "Conservar ambos",
+    "archivedPage": "Esta página está archivada.",
+    "archivedToast": "Archivado",
+    "undo": "Deshacer"
   }
 }

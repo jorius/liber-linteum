@@ -1,7 +1,8 @@
 import { useTranslation } from 'react-i18next';
-import { LockIcon, NewFolderIcon, NewPageIcon, SidebarIcon } from '../../app/icons';
+import { NewFolderIcon, NewPageIcon, SidebarIcon } from '../../app/icons';
 import { dirFor } from '../../stores/tree';
 import { useVaultStore } from '../../stores/vaultStore';
+import { SidebarFoot } from '../bin/SidebarFoot';
 import { ExplorerDnd } from '../explorer/ExplorerDnd';
 import type { ExplorerTreeProps } from '../explorer/ExplorerTree';
 import { IconButton } from '../icons/ItemIcon';
@@ -9,8 +10,8 @@ import { toggleSidebar } from './shellMenu';
 import { VaultMenu } from './VaultMenu';
 import styles from './Shell.module.css';
 
-/** Left column: the vault's icon and menu, explorer actions, the tree and the
- *  privacy footer. */
+/** Left column: the vault's icon and menu, explorer actions, the tree, and
+ *  the foot (Archived, Trash and the privacy line, M5b §5). */
 export function Sidebar(treeProps: ExplorerTreeProps) {
   const { t } = useTranslation();
   const name = useVaultStore((s) => s.info?.name ?? '');
@@ -69,10 +70,7 @@ export function Sidebar(treeProps: ExplorerTreeProps) {
       <nav className={styles.treeScroll}>
         <ExplorerDnd {...treeProps} />
       </nav>
-      <p className={styles.sideFoot}>
-        <LockIcon />
-        {t('privacy.localOnly')}
-      </p>
+      <SidebarFoot />
     </aside>
   );
 }

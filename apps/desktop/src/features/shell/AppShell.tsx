@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { SidebarIcon } from '../../app/icons';
 import { useSettingsStore } from '../../stores/settingsStore';
 import { useUiStore } from '../../stores/uiStore';
+import { BinView } from '../bin/BinView';
 import { DialogHost } from '../dialogs/DialogHost';
 import { ContextMenu, type MenuState } from '../explorer/ContextMenu';
 import { requestTrash } from '../explorer/trashAction';
@@ -60,6 +61,7 @@ export function AppShell() {
             <PageView />
           </div>
           {current === 'global' && <GlobalView />}
+          {(current === 'trash' || current === 'archive') && <BinView kind={current} />}
         </main>
         <ActionButton />
       </div>

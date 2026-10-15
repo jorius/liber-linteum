@@ -8,7 +8,14 @@ import {
   type ReactNode,
 } from 'react';
 import { useTranslation } from 'react-i18next';
-import { AudioIcon, CloseIcon, ImageIcon, SearchIcon, SmallCloseIcon } from '../../app/icons';
+import {
+  ArchiveIcon,
+  AudioIcon,
+  CloseIcon,
+  ImageIcon,
+  SearchIcon,
+  SmallCloseIcon,
+} from '../../app/icons';
 import { assetUrl, type SearchHit } from '../../ipc';
 import { openPage } from '../../stores/navigate';
 import { useUiStore } from '../../stores/uiStore';
@@ -197,12 +204,19 @@ export function SearchDialog({ onClose }: { onClose: () => void }) {
         return t('search.hasImage');
       case 'hasAudio':
         return t('search.hasAudio');
+      case 'archived':
+        return t('search.archived');
     }
   };
   const chips = activeFilters(filters);
   const showMedia =
     !!facets &&
-    (facets.hasImage > 0 || facets.hasAudio > 0 || filters.hasImage || filters.hasAudio);
+    (facets.hasImage > 0 ||
+      facets.hasAudio > 0 ||
+      facets.archived > 0 ||
+      filters.hasImage ||
+      filters.hasAudio ||
+      filters.archived);
 
   return (
     <Dialog title={t('search.title')} onClose={onClose} wide hideTitle>
@@ -305,7 +319,7 @@ export function SearchDialog({ onClose }: { onClose: () => void }) {
             </Row>
           )}
           {showMedia && (
-            <Row label={t('search.media')}>
+            <Row label={t('search.show')}>
               <Chip
                 pressed={filters.hasImage}
                 count={facets.hasImage}
@@ -321,6 +335,14 @@ export function SearchDialog({ onClose }: { onClose: () => void }) {
               >
                 <AudioIcon />
                 {t('search.hasAudio')}
+              </Chip>
+              <Chip
+                pressed={filters.archived}
+                count={facets.archived}
+                onClick={() => store().setFilters({ archived: !filters.archived })}
+              >
+                <ArchiveIcon />
+                {t('search.archived')}
               </Chip>
             </Row>
           )}

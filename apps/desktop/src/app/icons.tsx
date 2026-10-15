@@ -312,6 +312,15 @@ export function TrashIcon() {
   );
 }
 
+/** A box with a lid (the Archive, M5b §5.3). */
+export function ArchiveIcon() {
+  return (
+    <svg {...small} {...stroke}>
+      <path d="M3 4h18v4H3zM5 8v11a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8M10 12h4" />
+    </svg>
+  );
+}
+
 export function CheckIcon() {
   return (
     <svg {...small} {...stroke}>

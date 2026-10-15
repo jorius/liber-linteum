@@ -75,6 +75,7 @@ describe('context menu', () => {
       'Rename',
       'Move to…',
       'Icon…',
+      'Archive',
       'Delete',
     ]);
     expect(items[0]).toHaveFocus();
@@ -85,6 +86,30 @@ describe('context menu', () => {
     await userEvent.keyboard('{Escape}');
     expect(screen.queryByRole('menu')).not.toBeInTheDocument();
     expect(await axeRun(document.body)).toEqual([]);
+  });
+
+  it('Archive moves the item into the Archive and offers Undo (M5b §5.3)', async () => {
+    const calls = backend({
+      entry_archive: (a) => ({ ...outcome, moved: [[a.path, `.archive/${String(a.path)}`]] }),
+      vault_tree: () => nodes.filter((n) => n.path !== 'Welcome.md'),
+      bin_list: () => ({ trash: [], archive: [] }),
+    });
+    seed();
+    render(<AppShell />);
+    fireEvent.contextMenu(screen.getByRole('treeitem', { name: 'Welcome' }));
+    await userEvent.click(screen.getByRole('menuitem', { name: 'Archive' }));
+    await waitFor(() =>
+      expect(calls.filter(([c]) => c === 'entry_archive')).toEqual([
+        ['entry_archive', { path: 'Welcome.md' }],
+      ]),
+    );
+    await waitFor(() =>
+      expect(screen.queryByRole('treeitem', { name: 'Welcome' })).not.toBeInTheDocument(),
+    );
+    expect(useToastStore.getState().toasts.at(-1)).toMatchObject({
+      message: 'Archived',
+      action: { label: 'Undo' },
+    });
   });
 
   it('right-click opens the menu; Rename starts inline rename', async () => {

@@ -5,6 +5,7 @@ import { useUiStore } from '../../stores/uiStore';
 import { useVaultStore } from '../../stores/vaultStore';
 import { EmojiPicker } from '../icons/EmojiPicker';
 import { setIcon } from '../icons/setIcon';
+import { archiveItem } from '../bin/binActions';
 import { requestTrash } from './trashAction';
 import { displayName } from './TreeRow';
 
@@ -53,6 +54,7 @@ export function ContextMenu({ menu, onClose }: { menu: MenuState; onClose: () =>
     ...(node.kind === 'attachment'
       ? []
       : [[t('menu.icon'), () => setPicking(true)] as [string, () => void]]),
+    [t('menu.archive'), () => void archiveItem(node.path)],
     [t('menu.delete'), () => requestTrash(node.path)],
   ];
 

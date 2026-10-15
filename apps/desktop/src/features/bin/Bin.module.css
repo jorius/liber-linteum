@@ -1,0 +1,147 @@
+/* M5b §5: the sidebar's Archived and Trash rows, their views, and the
+   archived-page banner. Shared tokens only (Safari 15: no color-mix). */
+.foot {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 8px 0 4px;
+  border-top: 1px solid var(--color-sidebar-divider);
+}
+
+.footRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 30px;
+  padding: 5px 8px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: none;
+  color: var(--color-sidebar-text);
+  font: 500 13px var(--font-body);
+  text-align: left;
+  cursor: pointer;
+}
+
+.footRow:hover {
+  background: var(--color-sidebar-hover);
+}
+
+.footRow:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: -2px;
+}
+
+.footRow[aria-current='page'] {
+  background: var(--color-sidebar-selected);
+  color: #fff;
+}
+
+.footName {
+  flex: 1;
+}
+
+.footCount {
+  font-size: 12px;
+  opacity: 0.75;
+}
+
+.privacy {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--color-text-faint);
+  padding: 8px 8px 0;
+  margin: 0;
+}
+
+.view {
+  max-width: 760px;
+  margin: 0 auto;
+  padding: 32px 40px 96px;
+  overflow: auto;
+  height: 100%;
+  box-sizing: border-box;
+}
+
+.head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.title {
+  font: 700 26px var(--font-heading, var(--font-body));
+  margin: 0;
+}
+
+.note {
+  color: var(--color-text-muted);
+  margin: 8px 0 20px;
+}
+
+.list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.item {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  grid-template-areas: 'name actions' 'meta actions';
+  align-items: center;
+  column-gap: 16px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.name {
+  grid-area: name;
+  font-weight: 600;
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.meta {
+  grid-area: meta;
+  color: var(--color-text-muted);
+  font-size: 13px;
+  font-weight: 400;
+}
+
+.name .meta {
+  grid-area: auto;
+}
+
+.actions {
+  grid-area: actions;
+  display: flex;
+  gap: 8px;
+}
+
+.banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin: 0 40px 12px;
+  padding: 10px 14px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-warn-bg);
+  border-color: var(--color-warn-border);
+  color: var(--color-warn-text);
+}
+
+.banner p {
+  margin: 0;
+}

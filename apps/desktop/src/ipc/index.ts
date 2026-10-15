@@ -595,7 +595,8 @@ export const entryCreateFolder = (parent: string, name: string) =>
   call<string>('entry_create_folder', { parent, name });
 export const entryRename = (from: string, to: string) =>
   call<RenameOutcome>('entry_rename', { from, to });
-export const entryTrash = (path: string) => call<void>('entry_trash', { path });
+/** Moves an item into the vault's Trash (M5b §5.1); its path there. */
+export const entryTrash = (path: string) => call<string>('entry_trash', { path });
 export const settingsGet = () => call<SettingsResponse>('settings_get');
 export const settingsSet = (patch: SettingsPatch) => call<Settings>('settings_set', { patch });
 export const vaultsRecent = () => call<RecentVault[]>('vaults_recent');
@@ -729,6 +730,8 @@ export interface SearchQuery {
   linksFrom?: string | null;
   hasImage?: boolean;
   hasAudio?: boolean;
+  /** Include archived pages (M5b §5.3). */
+  archived?: boolean;
   offset?: number;
   /** At most 50; 0 means 50. */
   limit?: number;
@@ -773,6 +776,8 @@ export interface Facets {
   linksFrom: FacetPage | null;
   hasImage: number;
   hasAudio: number;
+  /** Archived matches, included or not. */
+  archived: number;
 }
 
 export interface SearchPage {
@@ -786,6 +791,34 @@ export interface SearchPage {
 }
 
 export const search = (query: SearchQuery) => call<SearchPage>('search', { query });
+
+// ---- the vault's Trash and Archive (M5b §5; mirrors src-tauri/src/bin_commands.rs) ----
+
+export interface BinItem {
+  /** Its path now (`.trash/…` or `.archive/…`). */
+  path: string;
+  /** Where it was; `null` when unrecorded (Obsidian's own trash). */
+  from: string | null;
+  /** When it went in (ms since epoch). */
+  at: number | null;
+  folder: boolean;
+}
+
+export interface BinLists {
+  trash: BinItem[];
+  archive: BinItem[];
+}
+
+export const binList = () => call<BinLists>('bin_list');
+/** Back to where it was; `alreadyExists` unless `keepBoth`. Its path now. */
+export const trashRestore = (path: string, keepBoth: boolean) =>
+  call<string>('trash_restore', { path, keepBoth });
+/** Out of the vault, to the system Trash. */
+export const trashDelete = (paths: string[]) => call<void>('trash_delete', { paths });
+export const trashEmpty = () => call<void>('trash_empty');
+export const entryArchive = (path: string) => call<RenameOutcome>('entry_archive', { path });
+export const archiveRestore = (path: string, keepBoth: boolean) =>
+  call<RenameOutcome>('archive_restore', { path, keepBoth });
 
 /** URL of a vault file for <img>/<audio> through the `nimw-asset:` protocol
  *  (M2a §2.5); WebView2 on Windows reaches custom protocols over http. */

@@ -233,7 +233,8 @@
     "rename": "Rename",
     "move": "Move to…",
     "delete": "Delete",
-    "icon": "Icon…"
+    "icon": "Icon…",
+    "archive": "Archive"
   },
   "dialogs": {
     "cancel": "Cancel",
@@ -637,7 +638,6 @@
     "project": "Project",
     "tags": "Tags",
     "linksTo": "Links to",
-    "media": "Media",
     "hasImage": "Has image",
     "hasAudio": "Has audio",
     "active": "Active",
@@ -654,7 +654,9 @@
     "indexing": "Still indexing: results may be incomplete.",
     "showMore": "Show more",
     "resultsLabel": "Results",
-    "failed": "Search failed: {error}"
+    "failed": "Search failed: {error}",
+    "archived": "Archived",
+    "show": "Show"
   },
   "icons": {
     "pickFor": "Icon for {name}",
@@ -676,5 +678,37 @@
     },
     "addFor": "Add an icon to {name}",
     "changeFor": "Change the icon of {name}"
+  },
+  "bin": {
+    "trash": "Trash",
+    "archived": "Archived",
+    "trashCount": "{count, plural, one {Trash, # item} other {Trash, # items}}",
+    "archivedCount": "{count, plural, one {Archived, # item} other {Archived, # items}}",
+    "trashNote": "Deleted pages, folders and attachments stay here, inside the vault, until you delete them from the vault.",
+    "archiveNote": "Archived pages are hidden from the files, the Global View and search, and links to them keep working.",
+    "trashEmpty": "The Trash is empty.",
+    "archiveEmpty": "Nothing is archived.",
+    "folder": "Folder",
+    "root": "the vault root",
+    "from": "From {folder}",
+    "unknownFrom": "From another app",
+    "restore": "Restore",
+    "restoreName": "Restore {name}",
+    "unarchive": "Unarchive",
+    "unarchiveName": "Unarchive {name}",
+    "delete": "Delete",
+    "deleteName": "Delete {name} from the vault",
+    "toTrash": "Move to Trash",
+    "toTrashName": "Move {name} to Trash",
+    "empty": "Empty Trash",
+    "deleteTitle": "{count, plural, one {Delete # item from the vault?} other {Delete # items from the vault?}}",
+    "emptyTitle": "{count, plural, one {Empty the Trash (# item)?} other {Empty the Trash (# items)?}}",
+    "deleteBody": "The files leave the vault and go to the system Trash, where you can still recover them.",
+    "clashTitle": "{name} already exists",
+    "clashBody": "Something new is where it was. Keep both, with a number added to the restored one?",
+    "keepBoth": "Keep both",
+    "archivedPage": "This page is archived.",
+    "archivedToast": "Archived",
+    "undo": "Undo"
   }
 }

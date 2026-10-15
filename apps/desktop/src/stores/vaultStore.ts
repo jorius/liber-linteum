@@ -6,6 +6,7 @@ import {
   entryCreatePage,
   entryRename,
   entryTrash,
+  trashRestore,
   onVaultChanged,
   onVaultProgress,
   onVaultWarning,
@@ -22,6 +23,7 @@ import {
   type TreeNode,
   type VaultInfo,
 } from '../ipc';
+import { useBinStore } from '../features/bin/binStore';
 import { useEditorStore, warnUnsaved } from './editorStore';
 import { errorMessage } from './messages';
 import { usePageStore } from './pageStore';
@@ -69,7 +71,8 @@ interface VaultState {
     to: string,
     opts?: { quiet?: boolean },
   ) => Promise<IpcResult<RenameOutcome>>;
-  trash: (path: string) => Promise<IpcResult<void>>;
+  /** Moves into the vault's Trash (M5b §5.1); its path there. */
+  trash: (path: string) => Promise<IpcResult<string>>;
   /** What follows a rename done in the backend (`rename`, a quick note's
    *  auto-name, the scratch folder's new name): selection, trail, tree, the
    *  open page and pages whose links changed, and toasts (`quiet`: none for
@@ -292,6 +295,8 @@ export const useVaultStore = create<VaultState>((set, get) => {
       }
       const expanded = new Set([...get().expanded].filter((p) => exists.has(p)));
       set({ nodes, children: childrenByParent(nodes), selected, expanded });
+      // The Trash and Archive change with the tree (M5b §5).
+      void useBinStore.getState().refresh();
     },
     select: (selected) => set({ selected }),
     toggle: (path) => {
@@ -394,7 +399,18 @@ export const useVaultStore = create<VaultState>((set, get) => {
       const selected = get().selected;
       if (selected && remap(selected, path, path)) set({ selected: next });
       await get().refreshTree();
-      toast().push({ message: i18next.t('toasts.trashed') });
+      const inner = res.value;
+      toast().push({
+        message: i18next.t('toasts.trashed'),
+        action: {
+          label: i18next.t('bin.undo'),
+          run: () =>
+            void trashRestore(inner, false).then((back) => {
+              if (!back.ok) toast().push({ message: errorMessage(back.error), tone: 'error' });
+              return get().refreshTree();
+            }),
+        },
+      });
       return res;
     },
   };

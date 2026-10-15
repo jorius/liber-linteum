@@ -39,6 +39,7 @@ const FACETS = {
   linksFrom: null,
   hasImage: 1,
   hasAudio: 0,
+  archived: 2,
 };
 
 let queries: SearchQuery[];
@@ -200,11 +201,19 @@ describe('Search dialog (M5 §4)', () => {
     );
     expect(lastQuery()).toMatchObject({ linksTo: 'Lore/Smaug.md' });
     await userEvent.click(
-      within(screen.getByRole('group', { name: 'Media' })).getByRole('button', {
+      within(screen.getByRole('group', { name: 'Show' })).getByRole('button', {
         name: /Has image/,
       }),
     );
     expect(lastQuery()).toMatchObject({ tags: ['lore'], hasImage: true });
+    // M5b §5.3: archived pages only when asked for, counted either way.
+    expect(lastQuery().archived).toBe(false);
+    const archived = within(screen.getByRole('group', { name: 'Show' })).getByRole('button', {
+      name: /Archived/,
+    });
+    expect(archived).toHaveTextContent('2');
+    await userEvent.click(archived);
+    expect(lastQuery()).toMatchObject({ hasImage: true, archived: true });
   });
 
   it('active filters show as removable chips; Clear all and Backspace remove them', async () => {
