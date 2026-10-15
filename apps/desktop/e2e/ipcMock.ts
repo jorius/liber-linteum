@@ -52,6 +52,7 @@ export function installIpcMock({
     cover:
       front(pages[path] ?? '').cover ?? (remoteCover ? 'https://remote.example/cover.png' : null),
     coverY: front(pages[path] ?? '')['cover-y'] ? Number(front(pages[path])['cover-y']) : null,
+    coverX: front(pages[path] ?? '')['cover-x'] ? Number(front(pages[path])['cover-x']) : null,
     tags: [],
     links: 0,
     backlinks: 0,
@@ -98,6 +99,8 @@ export function installIpcMock({
       cover: remote || !cover ? null : files.has(cover) ? cover : null,
       coverRemote: remote,
       coverY: null,
+      coverX: front(text)['cover-x'] ? Number(front(text)['cover-x']) : null,
+      coverSide: kind === 'page' ? (sides()[path] ?? 'top') : 'top',
       excerpt:
         kind === 'page'
           ? text
@@ -148,12 +151,24 @@ export function installIpcMock({
       return {};
     }
   };
+  /** M4b part 3 §3: side covers and strip widths, kept like the heights. */
+  const stored = <T>(key: string): Record<string, T> => {
+    try {
+      return JSON.parse(sessionStorage.getItem(key) ?? '{}') as Record<string, T>;
+    } catch {
+      return {};
+    }
+  };
+  const sides = () => stored<string>('nimwMockSides');
+  const coverWidths = () => stored<number>('nimwMockCoverWidths');
   const vaultSettings = () => ({
     attachments: { mode: 'subfolder', path: 'attachments' },
     obsidian: null,
     pageWidth: null,
     pageWidths: widths(),
     coverHeights: heights(),
+    coverSides: sides(),
+    coverWidths: coverWidths(),
   });
   const handlers: Record<string, (a: Args, options?: unknown) => unknown> = {
     app_info: () => ({ name: 'Notes In My Way', version: '0.0.0-e2e' }),

@@ -47,11 +47,13 @@ function tagsOf(text: string): string[] {
 function headerOf(text: string) {
   const data = parsePage(text).frontmatter?.data ?? {};
   const str = (v: unknown) => (typeof v === 'string' && v.trim() ? v : null);
-  const y = data['cover-y'];
+  const percent = (v: unknown) =>
+    typeof v === 'number' ? Math.min(100, Math.max(0, Math.round(v))) : null;
   return {
     subtitle: str(data.subtitle),
     cover: str(data.cover),
-    coverY: typeof y === 'number' ? Math.min(100, Math.max(0, Math.round(y))) : null,
+    coverY: percent(data['cover-y']),
+    coverX: percent(data['cover-x']),
   };
 }
 

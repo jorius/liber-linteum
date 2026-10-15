@@ -17,6 +17,7 @@ pub fn parse_page(source: &str, file_stem: &str) -> PageMeta {
         meta.subtitle = fm.subtitle;
         meta.cover = fm.cover;
         meta.cover_y = fm.cover_y;
+        meta.cover_x = fm.cover_x;
         meta.tags = fm.tags;
         meta.links = fm.links;
         meta.frontmatter_error = fm.error;

@@ -16,6 +16,8 @@ function card(path: string, kind: GvCard['kind'] = 'page', extra: Partial<GvCard
     cover: null,
     coverRemote: false,
     coverY: null,
+    coverX: null,
+    coverSide: 'top',
     excerpt: '',
     hasImage: false,
     hasAudio: false,

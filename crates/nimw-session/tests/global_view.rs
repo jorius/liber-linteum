@@ -62,7 +62,7 @@ fn vault() -> tempfile::TempDir {
     write(
         r,
         "Welcome.md",
-        "---\ncover: attachments/w.png\ncover-y: 30\n---\n# Welcome\n\nStart at [[note]] or [[zeta]]. ![[w.png]]\n",
+        "---\ncover: attachments/w.png\ncover-y: 30\ncover-x: 70\n---\n# Welcome\n\nStart at [[note]] or [[zeta]]. ![[w.png]]\n",
     );
     write(
         r,
@@ -153,6 +153,7 @@ fn m3a_covers_are_resolved_remote_ones_flagged_missing_ones_dropped() {
     let welcome = card(&cards, "Welcome.md");
     assert_eq!(welcome.cover.as_deref(), Some("attachments/w.png"));
     assert_eq!(welcome.cover_y, Some(30));
+    assert_eq!(welcome.cover_x, Some(70));
     assert!(!welcome.cover_remote);
     assert!(welcome.has_image);
     let zeta = card(&cards, "zeta.md");

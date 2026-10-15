@@ -20,6 +20,7 @@ CREATE TABLE pages (
     subtitle TEXT,
     cover TEXT,
     cover_y INTEGER,
+    cover_x INTEGER,
     excerpt TEXT NOT NULL,
     has_image INTEGER NOT NULL,
     has_audio INTEGER NOT NULL,

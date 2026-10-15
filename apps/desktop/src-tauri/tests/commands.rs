@@ -971,6 +971,7 @@ fn m2c_link_suggest_and_cover_y_over_ipc() {
     )
     .unwrap();
     assert_eq!(page["coverY"], 40);
+    assert_eq!(page["coverX"], Value::Null);
     let welcome = call(&h.main, "page_get", json!({ "path": "Welcome.md" })).unwrap();
     assert_eq!(welcome["coverY"], Value::Null);
 }
@@ -1128,6 +1129,8 @@ fn m3a_gv_children_over_ipc() {
     let rex = &chars["cards"][2];
     assert_eq!(rex["cover"], "Character Design/assets/rex-cover.png");
     assert_eq!(rex["coverY"], 40);
+    assert_eq!(rex["coverX"], Value::Null);
+    assert_eq!(rex["coverSide"], "top");
     assert_eq!(rex["coverRemote"], false);
     assert_eq!(rex["subtitle"], "Hero redesign · v3");
     assert_eq!(rex["hasImage"], true);

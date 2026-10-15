@@ -6,7 +6,7 @@ use crate::error::{Result, SessionError};
 use crate::session::VaultSession;
 use nimw_index::{CardRow, FileKind, Index, PageLink};
 use nimw_markdown::{LinkKind, name_key};
-use nimw_vault::{AttachmentPolicy, VaultPath};
+use nimw_vault::{AttachmentPolicy, CoverSide, VaultPath};
 use std::collections::{BTreeMap, HashMap};
 
 /// What one click opens (M3a §3).
@@ -64,6 +64,10 @@ pub struct GvCard {
     pub cover: Option<String>,
     pub cover_remote: bool,
     pub cover_y: Option<u8>,
+    /// `cover-x` (0–100), the horizontal focus (M4b part 3 §3).
+    pub cover_x: Option<u8>,
+    /// Where the cover sits (`.nimw/vault.json` `coverSides`; §3).
+    pub cover_side: CoverSide,
     pub excerpt: String,
     pub has_image: bool,
     pub has_audio: bool,
@@ -255,6 +259,8 @@ impl Ctx<'_> {
                 cover: None,
                 cover_remote: false,
                 cover_y: None,
+                cover_x: None,
+                cover_side: CoverSide::Top,
                 excerpt: child_titles.join(" · "),
                 has_image: false,
                 has_audio: false,
@@ -346,6 +352,8 @@ fn page_card(row: &CardRow, relation: Option<Relation>) -> GvCard {
         cover: if remote { None } else { row.cover_path.clone() },
         cover_remote: remote,
         cover_y: row.cover_y,
+        cover_x: row.cover_x,
+        cover_side: CoverSide::Top,
         excerpt: row.excerpt.clone().unwrap_or_default(),
         has_image: row.has_image,
         has_audio: row.has_audio,

@@ -25,6 +25,8 @@ function card(path: string, kind: GvCard['kind'] = 'project'): GvCard {
     cover: null,
     coverRemote: false,
     coverY: null,
+    coverX: null,
+    coverSide: 'top',
     excerpt: '',
     hasImage: false,
     hasAudio: false,

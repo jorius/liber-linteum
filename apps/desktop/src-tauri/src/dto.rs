@@ -53,6 +53,10 @@ pub struct PageDto {
     /// Frontmatter `cover-y` (0–100), M2c §4.
     #[serde(rename = "coverY")]
     pub cover_y: Option<u8>,
+    /// Frontmatter `cover-x` (0–100), a side cover's horizontal focus (M4b
+    /// part 3 §3).
+    #[serde(rename = "coverX")]
+    pub cover_x: Option<u8>,
     pub tags: Vec<String>,
     pub links: usize,
     pub backlinks: usize,
@@ -199,6 +203,10 @@ pub struct GvCardDto {
     pub cover: Option<String>,
     pub cover_remote: bool,
     pub cover_y: Option<u8>,
+    /// `cover-x` (0–100; M4b part 3 §3).
+    pub cover_x: Option<u8>,
+    /// `"top" | "left" | "right"` (M4b part 3 §3).
+    pub cover_side: &'static str,
     pub excerpt: String,
     pub has_image: bool,
     pub has_audio: bool,
@@ -227,6 +235,8 @@ impl From<nimw_session::GvCard> for GvCardDto {
             cover: c.cover,
             cover_remote: c.cover_remote,
             cover_y: c.cover_y,
+            cover_x: c.cover_x,
+            cover_side: c.cover_side.as_str(),
             excerpt: c.excerpt,
             has_image: c.has_image,
             has_audio: c.has_audio,

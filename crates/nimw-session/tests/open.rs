@@ -78,6 +78,7 @@ fn pg_01_04_05_obsidian_basic_is_indexed_and_resolved() {
     assert_eq!(rex.title, "Generator Rex");
     assert_eq!(rex.subtitle.as_deref(), Some("Hero redesign · v3"));
     assert_eq!(rex.cover_y, Some(40));
+    assert_eq!(rex.cover_x, None);
     assert!(rex.has_image && rex.has_audio);
     assert_eq!(
         rex.tags.iter().map(|t| t.text.as_str()).collect::<Vec<_>>(),

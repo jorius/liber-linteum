@@ -9,6 +9,8 @@ use yaml_rust2::scanner::{Marker, TScalarStyle};
 pub(crate) struct Frontmatter {
     pub subtitle: Option<String>,
     pub cover_y: Option<u8>,
+    /// `cover-x` (0–100): a side cover's horizontal focus (M4b part 3 §3).
+    pub cover_x: Option<u8>,
     pub tags: Vec<Tag>,
     pub links: Vec<LinkRef>,
     pub cover: Option<String>,
@@ -167,12 +169,8 @@ pub(crate) fn parse(src: &str, yaml: Range<usize>) -> Frontmatter {
                     fm.cover = value.as_scalar().map(str::to_string);
                 }
             }
-            Some("cover-y") => {
-                fm.cover_y = value
-                    .as_scalar()
-                    .and_then(|s| s.trim().parse::<f64>().ok())
-                    .map(|n| n.clamp(0.0, 100.0).round() as u8);
-            }
+            Some("cover-y") => fm.cover_y = percent(value),
+            Some("cover-x") => fm.cover_x = percent(value),
             Some("tags") => {
                 let raw: Vec<String> = match value {
                     Node::Seq(items) => items
@@ -210,6 +208,14 @@ pub(crate) fn parse(src: &str, yaml: Range<usize>) -> Frontmatter {
         }
     }
     fm
+}
+
+/// `cover-y` / `cover-x`: a number, clamped to 0–100 and rounded.
+fn percent(value: &Node) -> Option<u8> {
+    value
+        .as_scalar()
+        .and_then(|s| s.trim().parse::<f64>().ok())
+        .map(|n| n.clamp(0.0, 100.0).round() as u8)
 }
 
 /// Finds a scalar's value and its absolute byte range in the source.
@@ -284,6 +290,17 @@ mod tests {
         assert_eq!(cover.kind, LinkKind::FrontmatterCover);
         assert_eq!(&src[cover.range.clone()], "assets/rex cover.png");
         assert_eq!(fm("---\ncover-y: abc\n---\n").cover_y, None);
+    }
+
+    /// M4b part 3 §3: a side cover's horizontal focus, read like `cover-y`.
+    #[test]
+    fn cover_x_is_read_like_cover_y() {
+        assert_eq!(fm("---\ncover-x: 30\n---\n").cover_x, Some(30));
+        assert_eq!(fm("---\ncover-x: 12.6\n---\n").cover_x, Some(13));
+        assert_eq!(fm("---\ncover-x: -5\n---\n").cover_x, Some(0));
+        assert_eq!(fm("---\ncover-x: 140\n---\n").cover_x, Some(100));
+        assert_eq!(fm("---\ncover-x: left\n---\n").cover_x, None);
+        assert_eq!(fm("---\ncover-y: 20\n---\n").cover_x, None);
     }
 
     #[test]

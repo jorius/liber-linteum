@@ -107,6 +107,9 @@ export interface Page {
   cover: string | null;
   /** Frontmatter `cover-y` (0–100), `null` when absent (M2c §4). */
   coverY: number | null;
+  /** Frontmatter `cover-x` (0–100), a side cover's horizontal focus, `null`
+   *  when absent (M4b part 3 §3). */
+  coverX: number | null;
   tags: string[];
   links: number;
   backlinks: number;
@@ -182,6 +185,8 @@ export interface Settings {
 }
 
 export type PageWidth = 'readable' | 'full';
+/** Where a page's cover sits (M4b part 3 §3). */
+export type CoverSide = 'top' | 'left' | 'right';
 
 export type GlobalViewMode = 'drill' | 'expand';
 
@@ -323,6 +328,10 @@ export interface GvCard {
   cover: string | null;
   coverRemote: boolean;
   coverY: number | null;
+  /** `cover-x` (0–100), `null` when absent (M4b part 3 §3). */
+  coverX: number | null;
+  /** Where the cover sits: the header band or a strip beside the text (§3). */
+  coverSide: CoverSide;
   excerpt: string;
   hasImage: boolean;
   hasAudio: boolean;
