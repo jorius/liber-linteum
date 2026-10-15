@@ -52,6 +52,22 @@ impl Vault {
     where
         F: Fn(Vec<WatchEvent>) + Send + 'static,
     {
+        self.watch_with(RecursiveMode::Recursive, callback)
+    }
+
+    /// [`Vault::watch`] for the root folder's own entries only, never the
+    /// folders below it (M4c §3: a file opened on its own watches its folder).
+    pub fn watch_folder<F>(&self, callback: F) -> Result<Watcher>
+    where
+        F: Fn(Vec<WatchEvent>) + Send + 'static,
+    {
+        self.watch_with(RecursiveMode::NonRecursive, callback)
+    }
+
+    fn watch_with<F>(&self, mode: RecursiveMode, callback: F) -> Result<Watcher>
+    where
+        F: Fn(Vec<WatchEvent>) + Send + 'static,
+    {
         let filter = PathFilter {
             root: self.root.clone(),
             excludes: self.excludes.clone(),
@@ -62,7 +78,7 @@ impl Vault {
         })
         .map_err(|e| VaultError::Watch(e.to_string()))?;
         watcher
-            .watch(&self.root, RecursiveMode::Recursive)
+            .watch(&self.root, mode)
             .map_err(|e| VaultError::Watch(e.to_string()))?;
         std::thread::Builder::new()
             .name("nimw-watch".into())

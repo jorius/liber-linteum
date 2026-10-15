@@ -90,3 +90,28 @@ fn review_focus_burst_of_changes_is_delivered_without_loss() {
         "every file reported, or Overflow"
     );
 }
+
+/// M4c §3: a single-file window watches only its file's folder, not the
+/// folders below it (a file in the home folder must not watch all of it).
+#[test]
+fn watch_folder_reports_only_the_folders_own_files() {
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::create_dir(dir.path().join("sub")).unwrap();
+    let vault = Vault::open(dir.path()).unwrap();
+    let seen: Seen = Arc::new(Mutex::new(Vec::new()));
+    let sink = seen.clone();
+    let _w = vault
+        .watch_folder(move |batch| sink.lock().unwrap().extend(batch))
+        .unwrap();
+    std::thread::sleep(Duration::from_millis(300));
+    std::fs::write(dir.path().join("sub/b.md"), "below").unwrap();
+    std::fs::write(dir.path().join("a.md"), "here").unwrap();
+    assert!(saw(&seen, WatchEvent::Changed(vp("a.md"))));
+    std::thread::sleep(Duration::from_millis(600));
+    let below = seen
+        .lock()
+        .unwrap()
+        .iter()
+        .any(|e| matches!(e, WatchEvent::Changed(p) | WatchEvent::Removed(p) if p.as_str().starts_with("sub/")));
+    assert!(!below, "{:?}", seen.lock().unwrap());
+}
