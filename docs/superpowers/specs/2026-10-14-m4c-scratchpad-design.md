@@ -145,3 +145,34 @@ These override §2, §4 and §5 where they conflict. Plan: `docs/superpowers/pla
 17. **Changing the global Scratchpad's location** (Settings → Files → Change…) points to the new folder; existing notes stay. An open Scratchpad keeps its "Quick notes" label until it is closed.
 18. **A missing Scratchpad folder** is created again on open. If that fails (an unplugged drive), the error is shown with the first-use dialog, to choose another folder.
 19. **The global Scratchpad is named "Quick notes"** wherever the vault name shows (sidebar, breadcrumb, explorer), in the language active when it opened. In the recent list it has its own icon.
+
+## 8. Amendments from planning — Single-file windows
+
+Plan: `docs/superpowers/plans/2026-10-15-m4c-single-files.md`. These override §3–§5 where they conflict.
+
+### Opening
+
+1. **Open File… is ⌘⇧O, not ⌘O.** ⌘O already opens a folder as a vault (product spec §3.5). The macOS menu gets a **File** menu with Open File…; elsewhere the page handles Ctrl+⇧O; the Welcome screen gets **Open a file**.
+2. **File associations are macOS-only** (`tauri.macos.conf.json`: `.md`/`.markdown` and `.txt`, role Editor, rank Alternate). The Windows installer's association macro makes the app the default for the extension (it would take `.txt` from Notepad), so on Windows a file reaches the app through "Open with → Choose another app", which passes its path on the command line. Linux file associations wait for M8 packaging.
+3. **Which files open on their own:** `.md` and `.markdown` as Markdown; every name the text view opens (M4b part 2 §6) as text. Anything else (images, PDFs, programs) never gets a window; Open File… names the picks it couldn't open.
+4. **A second launch on Windows and Linux** hands its paths over through `tauri-plugin-single-instance` 2.5 (target-gated; registered in `run()` only, never in tests). macOS sends them to the running app itself (`RunEvent::Opened`).
+5. **Launched by opening a file, the main window still opens** (Welcome or the last screen) beside the file's window.
+
+### The window
+
+6. **The window's world is its folder.** Assets, link resolution and read-only reads of other notes (embeds, heading completion) reach the folder and the folders below it; never above it (`../`), never hidden names, never symlinks out. Markdown links follow the same rule as `[[wikilinks]]` (depth ≤ 3 for name search; a path below the folder resolves at any depth).
+7. **Files outside the folder** (absolute paths, `file:` URLs, `../`): not shown in a single-file window (M4b part 3 §9's allow-list lives in a vault's index).
+8. **Following a link:** a note or text file in the folder opens in its own window (the heading isn't kept); a document or media file opens in its default app (the M4b part 3 allow-list, no confirmation dialog); a missing page says so (no vault to create it in).
+9. **No attachments:** pasting images, dropping files and the Attach button are off; `[[` suggestions are empty.
+10. **Width is the window's own**, for as long as it is open (no `.nimw/vault.json` to keep it in). Reset to default and the default's own width clear it.
+11. **Rename:** the title field edits the name; the extension and the folder stay; names refused in a vault are refused here.
+12. **Outside changes:** the watcher is non-recursive (`Vault::watch_folder`). Deleted with unsaved text → the text is kept with **Save again** (writes the file again where it was). Deleted with nothing unsaved → "This file was deleted or moved" with **Close window**. Rewritten outside as something the app can't edit, with unsaved text → **Save a copy** (`<stem> (conflict).<ext>` next to it). A rename outside reads as a deletion.
+13. **Conflict copies** are written next to the file, create-only — the one file a window writes besides its own.
+14. **"Open in its vault"** saves, hands `{root, page}` to the main window (an event; a main window created for it reads them from its address), and closes the file window, so one file never has two editors.
+15. **Settings:** the window has Settings (no vault section) and writes app settings (mode, Format, outline are app settings). Every window shows a change made in any window (`settings:changed`).
+16. **Menu items act on the focused window only** (Rust `emit_to` the focused window, the page listens for its own label): sent to every window, a toggle flipped the setting once per window.
+
+### Security
+
+17. **`capabilities/file.json`** (`file-*`): the file commands, `settings_get`/`settings_set`, `fonts_list`, `url_open`, `app_info`, event listen/unlisten and window destroy. Vault commands are denied there and the file commands (but `file_open_dialog`) in `main`; real-ACL tests cover both. A `file-*` window without a grant reaches no file (`notPermitted`).
+18. **`settings_set` is allowed in file windows** (beyond §4's "settings reads"): the band's controls are app settings. Cost: a compromised file page could change app settings, as a compromised main window can.
