@@ -235,4 +235,31 @@ The menu button is `aria-haspopup="menu"`, `aria-expanded`, named "Page width", 
 
 ## Execution record
 
-FILL as tasks complete.
+Run on `feat/m4b3-wide`, with worktree base 9f9651b. Every step's command was run and its output read.
+
+| Task | Commit | Red seen | Green |
+|---|---|---|---|
+| 1 + 2 (one commit: they share `tests/settings.rs`) | 52d2407 | `page_width` test: no variant `Wide`; settings test: no `WideElements` | `page_width` 6/6, settings 17/17, `commands m4b2_page_width` 1/1 |
+| 3 + 4 (one commit: removing `toggle` breaks the header until the menu exists) | b894da3 | store 4 fail; the menu's 3 fail | page, text-view and store tests 32/32 (axe inside) |
+| 5 | 4819a89 | 2 fail | SettingsDialog 19/19 |
+| 6 | 48e41b0 | 3 fail | preview folder 37/37 |
+| 7 | 3ef21e3 | kinds and `--nimw-ch` all null or empty; host attributes missing | editor folder 242/242, `cssCompat` and `jsCompat` 8/8 |
+| 8 | bc3e5fd | first e2e run: line numbers (the table covered the gutter) and an axe scope issue | `m4b3-wide` 18/18 in Chromium and WebKit |
+| 9 | docs commit | — | full gate (below) |
+
+### What changed from the plan as written
+
+- **Task 7:**
+  - The widget kinds are named after the settings keys (`tables`, `maths`, `diagrams`, `images`), not singular.
+  - Code and raw lines carry `data-wide-src` (`code`, `tables`, `diagrams`, `maths`), not only a class.
+- **Task 8 changed Task 7's geometry.** `wideMax(scroller, gutter, padding)` became `wideExtents({ textLeft, textRight, leftBound, rightBound }) → { m, r }`.
+  - The host gets `--nimw-wide-m` and `--nimw-wide-r` in place of `--nimw-wide-max`.
+  - A block widget is a frame (`m` past the text on both sides) whose content is centred by auto margins.
+  - Why: with line numbers, the gutter sits beside the measure.
+  - See spec §6.6–6.8.
+- **Task 8, other changes:**
+  - The axe check is scoped to the menu and its button (spec §6.13).
+  - `m4b2.spec.ts` follows the menu.
+  - `playwright.config.ts` reads `NIMW_E2E_PORT`.
+  - An extra e2e checks long code lines with Code blocks on, and that a click and a typed character land at the line's end.
+- **Formatting:** prettier formatted three test files after the first gate run.

@@ -12,9 +12,9 @@ describe('wide elements box (M4b part 3)', () => {
 
   it('with line numbers beside the measure, keeps the text’s left edge and grows right', () => {
     // A 48 px gutter beside the measure: text 284–964, nothing free on the left.
-    expect(wideExtents({ textLeft: 284, textRight: 964, leftBound: 284, rightBound: 1160 })).toEqual(
-      { m: 0, r: 196 },
-    );
+    expect(
+      wideExtents({ textLeft: 284, textRight: 964, leftBound: 284, rightBound: 1160 }),
+    ).toEqual({ m: 0, r: 196 });
   });
 
   it('never reaches a negative distance in a cramped editor', () => {

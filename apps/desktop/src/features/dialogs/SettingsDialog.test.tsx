@@ -165,9 +165,13 @@ describe('Settings dialog (M2b §4, §5, §7)', () => {
     const group = screen.getByRole('group', { name: 'Wide elements' });
     expect(within(group).getByText('Used when a page’s width is Wide elements.')).toBeVisible();
     const boxes = within(group).getAllByRole('checkbox');
-    expect(boxes.map((b) => b.getAttribute('aria-label') ?? b.parentElement!.textContent)).toEqual(
-      ['Tables', 'Code blocks', 'Diagrams', 'Images', 'Maths blocks'],
-    );
+    expect(boxes.map((b) => b.getAttribute('aria-label') ?? b.parentElement!.textContent)).toEqual([
+      'Tables',
+      'Code blocks',
+      'Diagrams',
+      'Images',
+      'Maths blocks',
+    ]);
     expect(boxes.map((b) => (b as HTMLInputElement).checked)).toEqual([
       true,
       false,

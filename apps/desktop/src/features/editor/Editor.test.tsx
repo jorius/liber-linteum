@@ -426,9 +426,7 @@ describe('wide elements (M4b part 3)', () => {
     );
     expect(host()).not.toHaveAttribute('data-wide-tables');
     expect(host()).toHaveAttribute('data-wide-code', '');
-    act(() =>
-      useSettingsStore.setState({ settings: { ...DEFAULT_SETTINGS, pageWidth: 'full' } }),
-    );
+    act(() => useSettingsStore.setState({ settings: { ...DEFAULT_SETTINGS, pageWidth: 'full' } }));
     expect(host().dataset.width).toBe('full');
     for (const kind of ['tables', 'code', 'diagrams', 'images', 'maths']) {
       expect(host()).not.toHaveAttribute(`data-wide-${kind}`);
