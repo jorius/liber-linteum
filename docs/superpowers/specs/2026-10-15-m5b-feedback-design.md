@@ -319,3 +319,47 @@ These override §3 and §4 where they conflict.
 
 13. **The vault's ☺** replaces the app mark beside the vault name (`Sidebar`), which §2.4 drops anyway.
 14. **The page's icon button** sits in `PageHeading`, before the title. When Stream A moves the title into the page header, the button moves with it.
+## 13. Amendments — Stream C (Trash and Archive)
+
+These override §5 where they conflict.
+
+### Where things live
+
+1. **`.archive` is the one hidden folder the vault reads.**
+   - `nimw_vault::is_hidden_path` treats a path as hidden when any component is hidden, except a leading `.archive`. Scan, stat, the watcher, `visible_fs_path` and the `nimw-asset` check all use it, so archived pages are indexed and their images are served.
+   - `.trash`, `.nimw`, `.obsidian` and `.archive/.x` stay hidden.
+   - `is_archived(path)` names the Archive and everything in it.
+2. **No schema bump.** "Archived" is the path prefix `.archive/`, read at query time:
+   - `VaultSession::tree` drops archived paths;
+   - the Global View leaves them out of the root and of a page's neighbours;
+   - search excludes them unless `archived: true`.
+3. **Records** (`.nimw/trash.json`, `.nimw/archive.json`) are `{"items": {"<path now>": {"from", "at"}}}`. Each is written *before* the move and dropped if the move fails.
+   - The lists ignore records whose item is gone (deleted outside the app, or a crash before the move); they're filtered in memory, not rewritten.
+   - Trash entries with no record (Obsidian's own `.trash`, or a crash after the move) show "From another app" and restore to the vault root.
+   - Pages put into `.archive` by hand are listed one by one, and come back to their path minus `.archive/`.
+
+### Behaviour
+
+4. **Trash keeps the item's name, not its path:** `.trash/Old.md`, then `.trash/Old 1.md`. A folder goes as one item. Widths, cover sizes and Global View positions *follow* the item into `.trash` and back (the rename remap), and are forgotten only on Delete from vault.
+   - Ruling: a trashed quick note stops being auto-named, as with any rename.
+5. **Refused for both bins:** the vault root, hidden paths, `.archive` itself, and **the vault's scratch folder**. Its setting would otherwise follow it into `.trash`. Pages inside the scratch folder can be trashed and archived.
+   - Ruling: the scratch folder can't be trashed. The cost: someone who wants it gone must rename it in Settings first, or delete it in Finder.
+6. **Archive is a move into `.archive/<its path>`**, done by the rename machinery with links rewritten when `rewriteLinks` is on.
+   - In practice almost nothing is rewritten: `[[Old]]` and `[[P/Old]]` both still resolve to `.archive/P/Old.md`, because a path link matches a path's end, as Obsidian reads it.
+   - A clash in the Archive takes the next free name.
+   - Unarchive moves the item back, removes the Archive folders it leaves empty, and gives `AlreadyExists` (or, with "Keep both", a numbered name) when something new took its place.
+7. **Restore from the Trash** recreates missing folders and re-indexes through the watcher's own `apply([Changed])`, so links resolve again at once. An item that was archived before it was trashed is restored into the Archive and recorded there again.
+8. **Delete from vault and Empty Trash** send the item to the OS trash through the existing `trash_via`. Tests inject a plain removal and never touch the real trash.
+9. **Undo:** the trash toast's Undo restores; the archive toast's Undo unarchives.
+10. **Entry points:**
+    - Archive is in the row menu, before Delete.
+    - The archived banner sits at the top of an archived page (in the page header's children), with Unarchive.
+    - Ruling: there is no page-header menu yet, so the spec's "the page's header menu" entry waits for Stream A's header. The cost: one extra click path missing.
+11. **Search:** the MEDIA row is now **SHOW**, with Has image, Has audio and **Archived**. Its count is the archived matches with the exclusion lifted. `.archive` is never a project chip. An archived-included search without text isn't "Recent".
+12. **Commands**, all main-window only and denied in `file-*` windows: `bin_list`, `trash_restore(path, keepBoth)`, `trash_delete(paths)`, `trash_empty`, `entry_archive(path)` and `archive_restore(path, keepBoth)`. `entry_trash` now returns the item's path in `.trash`.
+13. **The sidebar foot** (`features/bin/SidebarFoot.tsx`) replaces the old privacy foot. It holds Archived, then Trash, each with a count and `aria-current` on its open view, then the privacy line. The views are the screens `trash` and `archive` (`uiStore.Screen`), shown by `BinView` in place of the editor.
+
+### Deferred
+
+- On a case-insensitive disk with a vault at the home folder, `.trash` is the macOS user Trash (`~/.Trash`). The Trash view would list the whole system Trash. This is not handled.
+- Huge Trash folders are listed whole on every tree refresh.

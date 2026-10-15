@@ -17,7 +17,8 @@ export const useBinStore = create<BinState>((set) => ({
   refresh: async () => {
     const mine = ++seq;
     const res = await binList();
-    if (mine !== seq || !res.ok) return; // a newer refresh won, or no vault
+    // A newer refresh won, no vault, or nothing answered (a mocked backend).
+    if (mine !== seq || !res.ok || !res.value) return;
     set({ trash: res.value.trash, archive: res.value.archive });
   },
   reset: () => {
