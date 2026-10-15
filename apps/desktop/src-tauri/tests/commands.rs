@@ -1950,7 +1950,8 @@ fn m4b3_outside_files_over_ipc() {
         json!({ "source": "a.md", "targets": [
             { "kind": "embed", "target": pic },
             { "kind": "wiki", "target": "b" },
-            { "kind": "embed", "target": other },
+            // As a `file:` URL: a bare `/…` is the vault root first (I1).
+            { "kind": "embed", "target": if cfg!(windows) { other.clone() } else { format!("file://{other}") } },
             { "kind": "embed", "target": unc },
         ] }),
     )

@@ -205,8 +205,16 @@ impl VaultSession {
             let listed = self.external_allowed(&path)?;
             let network = self.on_network(&path);
             let ask_first = network && !self.network_loaded(&path);
+            let exists = listed && !ask_first && checked_file(&path).is_ok();
+            // A leading `/` is the vault root first (Obsidian): it names the
+            // disk only when a saved page links a file that is there (final
+            // review I1); otherwise it's the vault's own missing link.
+            if !exists && target.trim_start().starts_with('/') {
+                out.push(None);
+                continue;
+            }
             out.push(Some(ExternalFile {
-                exists: listed && !ask_first && checked_file(&path).is_ok(),
+                exists,
                 listed,
                 network,
                 ask_first,
@@ -403,8 +411,11 @@ pub(crate) mod tests {
         let outside = dunce::canonicalize(w.base.path()).unwrap().join("x.png");
         std::fs::write(&outside, b"\x89PNG").unwrap();
         let before = probes();
-        let got = ext(&w, LinkKind::Embed, outside.to_str().unwrap()).unwrap();
+        let url = file_url(outside.to_str().unwrap());
+        let got = ext(&w, LinkKind::Embed, &url).unwrap();
         assert!(!got.listed && !got.exists && !got.network, "{got:?}");
+        // A leading `/` (vault root first) isn't looked up either.
+        assert_eq!(ext(&w, LinkKind::Embed, outside.to_str().unwrap()), None);
         assert_eq!(probes(), before);
     }
 

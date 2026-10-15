@@ -74,6 +74,30 @@ const file = (path: string, over: Partial<ExternalFile> = {}): ExternalFile => (
 const unloaded = (path: string): ExternalFile =>
   file(path, { exists: false, network: true, askFirst: true });
 
+describe('a leading / with no linked file on disk is a vault link (final review I1)', () => {
+  // Rust answers `null`: the vault's own missing link, as before §9.
+  it('[[/…]] and [x](/…) offer Create page; ![[/…]] says Not found', async () => {
+    show('[[/Projects/New idea]]\n\n![[/Assets/gone.png]]\n\n[x](/Notes/Missing.md)\n');
+    expect(await screen.findByText('Not found: /Assets/gone.png')).toBeInTheDocument();
+    const wiki = screen.getByText('/Projects/New idea');
+    await waitFor(() => expect(wiki.closest('a')).toHaveAttribute('data-state', 'unresolved'));
+    await userEvent.click(wiki);
+    expect(useUiStore.getState().dialog).toEqual({
+      type: 'createPage',
+      source: 'Notes/Page.md',
+      target: '/Projects/New idea',
+    });
+    useUiStore.setState({ dialog: null });
+    await userEvent.click(screen.getByText('x'));
+    expect(useUiStore.getState().dialog).toEqual({
+      type: 'createPage',
+      source: 'Notes/Page.md',
+      target: 'Notes/Missing.md',
+    });
+    expect(screen.queryByText(/Not found: \/Projects/)).toBeNull();
+  });
+});
+
 describe('network files wait for the user (final review C1)', () => {
   const UNC = '\\\\nas\\share\\x.png';
 

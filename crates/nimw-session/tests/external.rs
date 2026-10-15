@@ -77,9 +77,10 @@ fn s(p: &Path) -> String {
 fn an_outside_file_is_listed_once_an_indexed_page_links_it() {
     let w = World::new();
     let pic = s(&w.outside("Pics/x.png"));
+    let url = file_url(&pic);
     // Not looked up on disk until a saved page links it (no existence
     // oracle; final review C1).
-    let before = w.external(LinkKind::Embed, &pic).unwrap();
+    let before = w.external(LinkKind::Embed, &url).unwrap();
     assert_eq!(
         before,
         ExternalFile {
@@ -94,8 +95,8 @@ fn an_outside_file_is_listed_once_an_indexed_page_links_it() {
         w.s.external_file(&pic),
         Err(SessionError::NotPermitted(_))
     ));
-    w.write(&format!("# A\n\n![[{pic}]]\n"));
-    let after = w.external(LinkKind::Embed, &pic).unwrap();
+    w.write(&format!("# A\n\n![[{url}]]\n"));
+    let after = w.external(LinkKind::Embed, &url).unwrap();
     assert!(after.listed && after.exists);
     assert_eq!(w.s.external_file(&pic).unwrap(), PathBuf::from(&pic));
     // Unlinked again: refused again.
@@ -147,8 +148,9 @@ fn vault_targets_are_not_external() {
 fn hidden_components_are_refused_even_when_linked() {
     let w = World::new();
     let key = s(&w.outside("Pics/.secret/key.png"));
-    w.write(&format!("# A\n\n![[{key}]]\n"));
-    let got = w.external(LinkKind::Embed, &key).unwrap();
+    let url = file_url(&key);
+    w.write(&format!("# A\n\n![[{url}]]\n"));
+    let got = w.external(LinkKind::Embed, &url).unwrap();
     assert!(got.listed && !got.exists, "{got:?}");
     assert!(matches!(
         w.s.external_file(&key),
@@ -163,8 +165,9 @@ fn a_symlink_into_a_hidden_folder_is_refused() {
     let link = w.outside("Pics/innocent.png");
     std::os::unix::fs::symlink(w.outside("Pics/.secret/key.png"), &link).unwrap();
     let link = s(&link);
-    w.write(&format!("# A\n\n![[{link}]]\n"));
-    assert!(!w.external(LinkKind::Embed, &link).unwrap().exists);
+    let url = file_url(&link);
+    w.write(&format!("# A\n\n![[{url}]]\n"));
+    assert!(!w.external(LinkKind::Embed, &url).unwrap().exists);
     assert!(matches!(
         w.s.external_file(&link),
         Err(SessionError::NotPermitted(_))
@@ -176,13 +179,14 @@ fn folders_and_missing_files_are_not_served() {
     let w = World::new();
     let folder = s(&w.outside("Pics/folder"));
     let missing = s(&w.outside("Pics/gone.png"));
-    w.write(&format!("# A\n\n![[{folder}]] ![[{missing}]]\n"));
-    assert!(!w.external(LinkKind::Embed, &folder).unwrap().exists);
+    let (folder_url, missing_url) = (file_url(&folder), file_url(&missing));
+    w.write(&format!("# A\n\n![[{folder_url}]] ![[{missing_url}]]\n"));
+    assert!(!w.external(LinkKind::Embed, &folder_url).unwrap().exists);
     assert!(matches!(
         w.s.external_file(&folder),
         Err(SessionError::NotAFile(_))
     ));
-    let gone = w.external(LinkKind::Embed, &missing).unwrap();
+    let gone = w.external(LinkKind::Embed, &missing_url).unwrap();
     assert!(gone.listed && !gone.exists);
     assert!(matches!(
         w.s.external_file(&missing),
@@ -208,19 +212,49 @@ fn dot_dot_is_resolved_in_the_link_and_refused_in_a_request() {
 #[test]
 fn paths_of_the_other_os_are_never_read() {
     let w = World::new();
-    let other = if cfg!(windows) {
-        "/Users/jose/x.png"
+    let (target, other) = if cfg!(windows) {
+        ("file:///Users/jose/x.png", "/Users/jose/x.png")
     } else {
-        r"C:\Pics\x.png"
+        (r"C:\Pics\x.png", r"C:\Pics\x.png")
     };
-    w.write(&format!("# A\n\n![[{other}]]\n"));
-    let got = w.external(LinkKind::Embed, other).unwrap();
+    w.write(&format!("# A\n\n![[{target}]]\n"));
+    let got = w.external(LinkKind::Embed, target).unwrap();
     assert_eq!(got.path, other);
     assert!(got.listed && !got.exists);
     assert!(matches!(
         w.s.external_file(other),
         Err(SessionError::Vault(VaultError::NotFound(_)))
     ));
+}
+
+/// Final review I1: a leading `/` is the vault root first (Obsidian); it names
+/// a file on disk only when a saved page links one that is there. Otherwise
+/// the link is the vault's own missing link (Create page, "Not found").
+#[test]
+fn a_leading_slash_is_a_vault_path_unless_a_linked_file_is_there() {
+    let w = World::new();
+    w.write("# A\n\n[[/Projects/New idea]] [x](/Notes/Missing.md) ![[/Assets/gone.png]]\n");
+    assert_eq!(w.external(LinkKind::Wiki, "/Projects/New idea"), None);
+    assert_eq!(w.external(LinkKind::Markdown, "/Notes/Missing.md"), None);
+    assert_eq!(w.external(LinkKind::Embed, "/Assets/gone.png"), None);
+    // A `file:` URL always names the disk, there or not.
+    let gone = file_url(&s(&w.outside("Pics/gone.png")));
+    w.write(&format!("# A\n\n![[{gone}]]\n"));
+    let got = w.external(LinkKind::Embed, &gone).unwrap();
+    assert!(got.listed && !got.exists, "{got:?}");
+}
+
+/// The same, for a POSIX path that is on disk: only once a saved page links
+/// it (no existence oracle) does it name the file.
+#[cfg(unix)]
+#[test]
+fn a_leading_slash_names_a_linked_file_that_is_there() {
+    let w = World::new();
+    let pic = s(&w.outside("Pics/x.png"));
+    assert_eq!(w.external(LinkKind::Embed, &pic), None, "not linked yet");
+    w.write(&format!("# A\n\n![[{pic}]]\n"));
+    let got = w.external(LinkKind::Embed, &pic).unwrap();
+    assert!(got.listed && got.exists, "{got:?}");
 }
 
 #[test]

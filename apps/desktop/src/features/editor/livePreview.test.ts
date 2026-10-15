@@ -238,6 +238,52 @@ describe('links to files outside the vault (M4b part 3 §9)', () => {
     expect(followLinkAtCursor(v)).toBe(true);
     await vi.waitFor(() => expect(useUiStore.getState().dialog?.type).toBe('openFile'));
   });
+
+  it('final review I1: [[/Projects/New idea]] with nothing on disk offers Create page', async () => {
+    useUiStore.setState({ dialog: null });
+    mockIPC((cmd, raw) => {
+      const n = ((raw as { targets?: unknown[] })?.targets ?? []).length;
+      if (cmd === 'links_resolve' || cmd === 'links_external') return Array(n).fill(null);
+      return null;
+    });
+    const v = editor('See [[/Projects/New idea]] now\n', 8);
+    expect(followLinkAtCursor(v)).toBe(true);
+    await vi.waitFor(() =>
+      expect(useUiStore.getState().dialog).toMatchObject({
+        type: 'createPage',
+        target: '/Projects/New idea',
+      }),
+    );
+  });
+
+  it('final review C1: a link to a network file asks before anything loads it', async () => {
+    useUiStore.setState({ dialog: null });
+    const unc = '\\\\nas\\share\\x.pdf';
+    mockIPC((cmd, raw) => {
+      const n = ((raw as { targets?: unknown[] })?.targets ?? []).length;
+      if (cmd === 'links_resolve') return Array(n).fill(null);
+      if (cmd === 'links_external') {
+        return Array(n).fill({
+          path: unc,
+          exists: false,
+          listed: true,
+          network: true,
+          askFirst: true,
+        });
+      }
+      return null;
+    });
+    const v = editor(`Read [[${unc}]] now\n`, 8);
+    expect(followLinkAtCursor(v)).toBe(true);
+    await vi.waitFor(() =>
+      expect(useUiStore.getState().dialog).toEqual({
+        type: 'openFile',
+        path: unc,
+        external: true,
+        network: true,
+      }),
+    );
+  });
 });
 
 describe('raw HTML blocks (M2c §7.7)', () => {
