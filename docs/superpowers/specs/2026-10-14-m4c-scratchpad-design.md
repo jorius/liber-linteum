@@ -210,3 +210,30 @@ A fresh-context Opus review of `ba67c0a..2a8bd14`, focused on security. It found
 - **m7:** link resolution in a huge folder (`~`, `C:\`) walks every directory to depth 3; only files are capped.
 - **m8:** files named on the command line that can't open are dropped silently.
 - **The review's note on settings:** `settings_get` and the `settings:changed` broadcast give file windows the recent-vault and Scratchpad paths. A trimmed settings DTO for `file-*` windows is a later hardening step.
+
+## 10. Final review — Scratchpad
+
+The fresh-context review of the Scratchpad half (and the integration) found no Critical issues, 4 Important and 11 Minor. Everything below was fixed with a test that failed first, except the three deferred items.
+
+### Fixed
+
+1. **I1, quick-note names never take a linked name.** A first line naming another page ("Groceries" while `Shopping/Groceries.md` exists) used to win link resolution and rewrite other notes' links quietly. The name is now deduped against every file's link name in the vault, so it becomes `Groceries 1`. The links-updated toast is only skipped when no other note was touched.
+2. **I2, a flag is trusted only for a note the index saw unchanged.** At open, flags of notes created, modified or removed since the last session are dropped, and a fresh index (another machine) drops them all. Removed files also lose their page widths and cover sizes.
+   - **Ruling:** the review suggested recording a file identity (inode, birth time). That can't work here: CAS writes replace the file on every save, so both change each time. "Unchanged since the index last saw it" is the identity instead. Cost if wrong: a quick note edited in Obsidian between sessions stops following its first line.
+   - **Ruling:** the old list form of `autoNamed` needs no migration; it is read as before, and the open-time rule above clears what can't be trusted.
+3. **I3, a rename being typed is never reset.** No auto-rename runs while a title or explorer rename is open, or when focus moves to the title. The title keeps its draft while focused, and renaming one entry no longer closes another entry's inline rename.
+4. **I4, a case-only scratch folder change renames the folder** instead of adopting it on a case-insensitive disk.
+5. **M1:** switching pages before the save still names the note left.
+6. **M2:** renaming the scratch folder from Settings keeps its notes named after their first line.
+7. **M3:** names are cut by grapheme (and at 200 bytes), so a flag or an accent is never halved; bidi controls, zero-width spaces, the soft hyphen and the BOM are dropped; names compare in NFC.
+8. **M4:** the scratch folder refuses Windows device names and a trailing dot.
+9. **M5:** File → New Quick Note waits, like ⌘⇧N, while a dialog is open.
+10. **M7:** a single-file window's Settings has no quick-notes location row.
+11. **M9:** a vault opened as the Scratchpad stays the Scratchpad for the session, so Change… doesn't misfile new notes into `<old>/Scratchpad/`.
+12. **M11:** the setup dialog's folder is a named group, not a labelled `<code>`.
+
+### Deferred
+
+- **M6:** ⌘⇧N does nothing on macOS when only file windows are open (no main window to receive it).
+- **M8:** the "Quick notes" recent entry is disabled when its folder is missing, though opening would recreate it.
+- **M10:** recreating a missing Scratchpad folder can rebuild an unmounted mount point under `$HOME` on Linux.
