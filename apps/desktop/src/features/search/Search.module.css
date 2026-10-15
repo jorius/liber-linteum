@@ -56,6 +56,9 @@
   flex-direction: column;
   gap: 8px;
   padding: 10px 20px;
+  /* A short window keeps room for the results (M5b §7.1). */
+  max-height: 40vh;
+  overflow-y: auto;
 }
 
 .row {
@@ -82,7 +85,8 @@
 }
 
 .chip,
-.activeChip {
+.activeChip,
+.moreChip {
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -100,7 +104,8 @@
 }
 
 .chip:hover,
-.activeChip:hover {
+.activeChip:hover,
+.moreChip:hover {
   border-color: var(--color-accent);
 }
 
@@ -113,6 +118,11 @@
 .activeChip {
   background: var(--color-accent-soft);
   color: var(--color-text-strong);
+}
+
+.moreChip {
+  border-style: dashed;
+  color: var(--color-text-muted);
 }
 
 .count {
@@ -169,6 +179,13 @@
   list-style: none;
   margin: 0;
   padding: 0 0 8px;
+}
+
+/* The results are the one region that takes the rest and scrolls. */
+.status ~ .list {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
 }
 
 .hit {

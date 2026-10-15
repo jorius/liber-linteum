@@ -1,6 +1,8 @@
 import {
+  Children,
   useEffect,
   useId,
+  useLayoutEffect,
   useRef,
   useState,
   type ChangeEvent,
@@ -44,14 +46,77 @@ function Marked({ parts }: { parts: TextPart[] }) {
   );
 }
 
+/** Lines of chips a row shows before "+N more" (M5b §7.1). */
+const ROW_LINES = 2;
+
+/** The distinct line tops of a box's children, in order. */
+function lineTops(box: HTMLElement): number[] {
+  return [...new Set([...box.children].map((c) => (c as HTMLElement).offsetTop))].sort(
+    (a, b) => a - b,
+  );
+}
+
+/** A labelled group of chips that keeps to two lines; "+N more" shows the
+ *  rest. A pressed chip is never hidden. */
 function Row({ label, children }: { label: string; children: ReactNode }) {
+  const { t } = useTranslation();
   const id = useId();
+  const box = useRef<HTMLDivElement>(null);
+  const items = Children.toArray(children);
+  const [open, setOpen] = useState(false);
+  // How many chips show; null = all of them (also while measuring).
+  const [shown, setShown] = useState<number | null>(null);
+  const [width, setWidth] = useState(0);
+  const keys = items.map((c) => (c as { key?: unknown }).key).join('|');
+
+  useEffect(() => {
+    const el = box.current;
+    if (!el || typeof ResizeObserver === 'undefined') return;
+    const ro = new ResizeObserver(() => setWidth(el.clientWidth));
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+  // A new set of chips or a new width is measured again from all of them.
+  useLayoutEffect(() => setShown(null), [keys, width]);
+  useLayoutEffect(() => {
+    const el = box.current;
+    if (!el || open) return;
+    const tops = lineTops(el);
+    if (tops.length <= ROW_LINES) return;
+    const kids = [...el.children] as HTMLElement[];
+    if (shown === null) {
+      const cut = kids.findIndex((k) => k.offsetTop >= tops[ROW_LINES]!);
+      // One chip less leaves room for "+N more" on the last line.
+      const next = Math.max(1, cut - 1);
+      const pressedLater = kids.slice(next).some((k) => k.getAttribute('aria-pressed') === 'true');
+      if (pressedLater) setOpen(true);
+      else setShown(next);
+    } else if (shown > 1) {
+      // "+N more" itself wrapped to a third line: hide one more chip.
+      setShown(shown - 1);
+    }
+  }, [shown, open, keys, width]);
+
+  const visible = open || shown === null ? items : items.slice(0, shown);
+  const hidden = items.length - visible.length;
   return (
     <div className={styles.row} role="group" aria-labelledby={id}>
       <span id={id} className={styles.rowLabel}>
         {label}
       </span>
-      <div className={styles.chips}>{children}</div>
+      <div ref={box} className={styles.chips}>
+        {visible}
+        {hidden > 0 && (
+          <button
+            type="button"
+            className={styles.moreChip}
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={() => setOpen(true)}
+          >
+            {t('search.moreChips', { count: hidden })}
+          </button>
+        )}
+      </div>
     </div>
   );
 }

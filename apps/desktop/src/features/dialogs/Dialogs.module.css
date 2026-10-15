@@ -23,11 +23,17 @@
   gap: 14px;
 }
 
-/* Search (M5 §4). */
+/* Search (M5 §4). Its own regions scroll (M5b §7.1): the box never does,
+   so no engine can shrink the filters under the results. */
 .wide {
   width: min(780px, calc(100% - 32px));
   padding: 0;
   gap: 0;
+  overflow: hidden;
+}
+
+.wide > * {
+  flex: none;
 }
 
 .srOnly {

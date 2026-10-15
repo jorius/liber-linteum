@@ -642,6 +642,7 @@
     "hasAudio": "Con audio",
     "active": "Activos",
     "clearAll": "Limpiar todo",
+    "moreChips": "+{count} más",
     "chipProject": "Proyecto: {name}",
     "chipFolder": "En: {name}",
     "chipLinksTo": "Enlaza a: {name}",
