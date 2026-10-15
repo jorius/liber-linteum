@@ -7,7 +7,11 @@ import { languages } from '@codemirror/language-data';
 import type { Element, ElementContent, Root } from 'hast';
 import { common, createLowlight } from 'lowlight';
 
-const lowlight = createLowlight(common);
+// One grammar at a time, by name: lowlight's map form (`createLowlight(common)`)
+// calls `Object.hasOwn`, which WKWebView only has from Safari 15.4, and it ran
+// as the bundle loaded — a blank window on macOS 12.0–12.2 (final review C1).
+const lowlight = createLowlight();
+for (const [name, grammar] of Object.entries(common)) lowlight.register(name, grammar);
 
 /** Fences drawn as something else (maths, diagrams), never as code. */
 export const NOT_CODE = new Set(['mermaid', 'math']);
@@ -55,8 +59,13 @@ export function highlightCode(root: Root | Element) {
         child.properties.dataLang = lang;
         const grammar = grammarFor(lang);
         if (grammar) {
-          const tree = lowlight.highlight(grammar, code.children.map(textOf).join(''));
-          code.children = tree.children as ElementContent[];
+          try {
+            const tree = lowlight.highlight(grammar, code.children.map(textOf).join(''));
+            code.children = tree.children as ElementContent[];
+          } catch {
+            // A grammar this WebKit can't run (its patterns compile on first
+            // use) leaves the code plain, never a broken page.
+          }
         }
       }
       continue;
