@@ -117,13 +117,11 @@ fn windows_path(s: &str) -> Option<DiskPath> {
         && (bytes[2] == b'\\' || bytes[2] == b'/')
     {
         (s[..2].to_string(), &s[3..])
-    } else if let Some(after) = s.strip_prefix(r"\\") {
-        let mut parts = after.splitn(3, is_sep);
+    } else {
+        let mut parts = s.strip_prefix(r"\\")?.splitn(3, is_sep);
         let server = parts.next().filter(|p| !p.is_empty())?;
         let share = parts.next().filter(|p| !p.is_empty())?;
         (format!(r"\\{server}\{share}"), parts.next().unwrap_or(""))
-    } else {
-        return None;
     };
     let parts = normalize(rest.split(is_sep));
     if parts.is_empty() {

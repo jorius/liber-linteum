@@ -456,3 +456,56 @@ Built in three streams in parallel, each with its own plan, worktree and signed 
   - It still titles pages by their first `# ` anywhere (Stream B's §1 fixes the app, not the mock).
 - **M3a's e2e:** the screen switch's "Edit" lookups are now exact, because page cards hold "Edit {title}" buttons.
 
+## 15. Amendments from planning (Stream C: §7, §8, §9)
+
+### Paths outside the vault (§9)
+
+- **Absolute paths are always outside files**, even when they point inside the vault (`![](file:///…/Vault/Assets/x.png)`, which the "absolute" link format writes):
+  - they are served through the allow-list;
+  - they don't count as backlinks or Global View links;
+  - renames don't rewrite them, which matches how Obsidian treats `file:` links.
+  - Resolving them as vault files would have meant root-aware resolution and rename rewriting in a fourth syntax. Cost if wrong: an absolute link to a vault image doesn't show in its page's link counts.
+- **What "hidden" means:**
+  - any path component starting with `.`, lexically or after symlinks; requests spelled with `.`/`..` are refused too;
+  - a vault kept under a hidden folder can't be linked by absolute path (relative and wiki links are unaffected).
+- **The other OS's paths:** a Windows path is never read on macOS (and a POSIX path never on Windows). It shows "Not found: <path>", never a file relative to the working directory.
+- **Only body links name outside files** (wiki, embed, Markdown, Markdown image): a `cover:` or `related:` can't.
+- **Raw HTML can't reach outside files:**
+  - the sanitizer marks Markdown links and images (`data-external`) before raw HTML is parsed;
+  - the index doesn't see raw HTML's links, so they could never be shown.
+- **The allow-list lookup:**
+  - goes through `target_key`, now split on `\` too;
+  - a wiki `file:` URL is keyed %-decoded;
+  - index schema 2 (the same bump as Stream B's).
+- **The reserved prefix is `/.external/<one %-encoded segment>`.**
+  - A vault path with a hidden component is never served, so it can't collide with a vault file.
+  - A raw `/` after the prefix is malformed (403).
+- **UNC paths in Markdown destinations** lose a backslash to CommonMark's `\\` escape. UNC is recognised in wiki links and `file://server/share/…` URLs.
+- **"Loading…" until saved.**
+  - A link becomes showable only once a saved page holds it.
+  - The preview asks again when the page's saved hash or the vault's files change, so an image typed into a note shows "Loading…" until the autosave, never a broken image.
+- **Plain links:**
+  - a link to an outside file opens after the same confirmation as vault files (with the full path shown);
+  - "Show in Finder/Explorer" needs no confirmation;
+  - programs and scripts are refused (`check_openable`).
+
+### The Attach button (§7)
+
+- **`file_pick(page)` takes the page.** The command can't run with empty arguments (the real-ACL test calls every command with `{}`).
+- **It returns `path`, `name`, `url` and `inVault`.** The picks are granted to `attachment_import` like drops (two minutes, once).
+- **Filters on macOS:** the dialog shows no filters there, because rfd 0.16 joins every filter into one list of allowed types, which would hide "All files".
+- **What a link writes:** "Link to where it is" writes `![](url)` for media and PDFs and `[name](url)` for other files (as drop does with `![[…]]`/`[[…]]`).
+- **The button's place:** after Link in the Format bar's inline group.
+
+### Link format (§8)
+
+- **"Full path in the vault" and "Relative to the note"** are kept only when they find the file again; otherwise the shortest name is used. A relative link gets `./` when an exact vault path would win.
+- **"Absolute path on disk"** writes the shortest wiki link as a fallback in `link`, plus `url`. The UI writes `![](url)` (or `[name](url)`).
+- **Obsidian's setting:**
+  - the select offers "Use Obsidian's setting" while Obsidian has one;
+  - the hint names it;
+  - an example line shows what new links look like.
+- **Captions:**
+  - they show on embedded images, audio and file cards, and on Markdown images;
+  - Copy path uses the code block's Copy feedback (label and live region);
+  - Windows separators follow the Windows UA (WebView2).
