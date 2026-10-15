@@ -869,7 +869,7 @@ span.relatedOpen {
   box-sizing: border-box;
   width: 100%;
   max-width: 760px;
-  margin: 18px auto 4px;
+  margin: 8px auto 0;
   padding: 0 40px;
 }
 

@@ -3,6 +3,7 @@
 // escapes the readable measure while the text keeps it; Full is unchanged.
 import { readFileSync } from 'node:fs';
 import { expect, test, type Page } from '@playwright/test';
+import { openSettings } from './shell';
 import { installIpcMock } from './ipcMock';
 
 const AXE = readFileSync(new URL('../node_modules/axe-core/axe.min.js', import.meta.url), 'utf8');
@@ -187,7 +188,7 @@ test('Wide elements: Tables unticked in Settings brings the table back to the me
 }) => {
   await open(page, 'Ranks', { pageWidth: 'wide' });
   await expect.poll(async () => (await geometry(page)).widget).toBeGreaterThan(800);
-  await page.getByRole('button', { name: 'Settings' }).click();
+  await openSettings(page);
   await page
     .getByRole('group', { name: 'Wide elements' })
     .getByRole('checkbox', { name: 'Tables' })

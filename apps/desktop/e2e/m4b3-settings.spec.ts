@@ -3,6 +3,7 @@
 // Chromium and WebKit (≈ WKWebView, which leaves a clicked checkbox
 // unfocused, so focus sits on nothing when Escape is pressed).
 import { expect, test, type Page } from '@playwright/test';
+import { openSettings } from './shell';
 import { installIpcMock } from './ipcMock';
 
 async function open(page: Page) {
@@ -24,7 +25,7 @@ async function open(page: Page) {
 test('Escape closes Settings even when nothing in it has focus', async ({ page }) => {
   const errors = await open(page);
   const dialog = page.getByRole('dialog', { name: 'Settings' });
-  await page.getByRole('button', { name: 'Settings' }).click();
+  await openSettings(page);
   await dialog.getByRole('checkbox', { name: 'Show line numbers' }).check();
   // As after a click in WKWebView: focus on nothing.
   await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
@@ -39,7 +40,7 @@ test('a click outside closes Settings and saves the accent typed but not confirm
 }) => {
   const errors = await open(page);
   const dialog = page.getByRole('dialog', { name: 'Settings' });
-  await page.getByRole('button', { name: 'Settings' }).click();
+  await openSettings(page);
   // A press inside released outside is a selection or a drag, not a close.
   const box = (await dialog.boundingBox())!;
   await page.mouse.move(box.x + box.width / 2, box.y + 20);
@@ -54,7 +55,7 @@ test('a click outside closes Settings and saves the accent typed but not confirm
   await page.mouse.click(4, 4);
   await expect(dialog).toBeHidden();
 
-  await page.getByRole('button', { name: 'Settings' }).click();
+  await openSettings(page);
   await expect(dialog.getByRole('textbox', { name: 'Accent colour (hex)' })).toHaveValue('#123456');
   expect(errors).toEqual([]);
 });

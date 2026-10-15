@@ -96,6 +96,17 @@ describe('PageDoc with auto save off (M5b §6)', () => {
     expect(doc.status).toBe('saved');
   });
 
+  it('leaving the editor (blur) writes nothing; auto save on, it saves', async () => {
+    const disk = fakeDisk({ 'A.md': 'one\n' });
+    const doc = await load('A.md');
+    doc.edit('one\ntwo');
+    await doc.autoFlush();
+    expect(disk.writes()).toEqual([]);
+    useSettingsStore.setState({ settings: DEFAULT_SETTINGS });
+    await doc.autoFlush();
+    expect(disk.writes()).toEqual([{ path: 'A.md', text: 'one\ntwo' }]);
+  });
+
   it('merges a change made outside in memory only', async () => {
     const disk = fakeDisk({ 'A.md': 'one\ntwo\nthree\n' });
     const doc = await load('A.md');

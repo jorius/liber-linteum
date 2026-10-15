@@ -23,6 +23,7 @@ export function VaultMenu({ name, leading }: { name: string; leading?: ReactNode
         className={styles.brand}
         aria-haspopup="menu"
         aria-expanded={open}
+        data-vault-menu
         title={name}
         onClick={() => setOpen((o) => !o)}
         onKeyDown={(e) => {

@@ -246,7 +246,7 @@ const followers = [
   // Autosave also when the editor loses focus (M2a §3.3).
   EditorView.domEventHandlers({
     blur: (_e, v) => {
-      void v.state.facet(pageDocOf)?.flush();
+      void v.state.facet(pageDocOf)?.autoFlush();
     },
   }),
   EditorView.updateListener.of((u) => {

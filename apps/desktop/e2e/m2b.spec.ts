@@ -1,6 +1,7 @@
 // M2b in the built UI, in Chromium and WebKit (≈ WKWebView): the formatting
 // toolbar, renaming from the title, the link trail and switching palettes.
 import { expect, test, type Page } from '@playwright/test';
+import { openSettings } from './shell';
 import { installIpcMock } from './ipcMock';
 
 const PAGES = {
@@ -92,25 +93,9 @@ test('a table or callout in Live Preview has no blank lines above it', async ({ 
   }
 });
 
-test('the Edit · Global view group matches the settings and close buttons', async ({ page }) => {
-  await open(page, 'A');
-  const look = (el: Element) => {
-    const c = getComputedStyle(el);
-    return {
-      height: Math.round(el.getBoundingClientRect().height),
-      border: `${c.borderTopWidth} ${c.borderTopStyle} ${c.borderTopColor}`,
-      radius: c.borderTopLeftRadius,
-      background: c.backgroundColor,
-    };
-  };
-  const group = await page.getByRole('group', { name: 'View' }).evaluate(look);
-  const settings = await page.getByRole('button', { name: 'Settings' }).evaluate(look);
-  expect(group).toEqual(settings);
-});
-
 test('a palette from Settings applies at once', async ({ page }) => {
   await open(page, 'A');
-  await page.getByRole('button', { name: 'Settings' }).click();
+  await openSettings(page);
   await page.getByRole('radio', { name: 'Graphite' }).click();
   await expect(page.locator('html')).toHaveAttribute('data-palette', 'graphite');
   await expect

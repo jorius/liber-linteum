@@ -5,6 +5,7 @@
 import { readFileSync } from 'node:fs';
 import { crc32, deflateSync } from 'node:zlib';
 import { expect, test, type Page } from '@playwright/test';
+import { showGlobalView } from './shell';
 import { installIpcMock } from './ipcMock';
 
 /** WebView2's user agent: the app reaches vault files over
@@ -67,7 +68,7 @@ async function globalView(
   });
   await page.goto('/');
   await page.getByRole('button', { name: /^vault/ }).click();
-  await page.getByRole('button', { name: 'Global view' }).click();
+  await showGlobalView(page);
   await expect(page.getByRole('region', { name: 'Global View' })).toBeVisible();
 }
 
@@ -188,7 +189,7 @@ test('§5: parent/child lines are elbows, folder links carry a count chip, hover
   });
   await page.goto('/');
   await page.getByRole('button', { name: /^vault/ }).click();
-  await page.getByRole('button', { name: 'Global view' }).click();
+  await showGlobalView(page);
   await page.getByRole('button', { name: 'Alpha', exact: true }).click();
   await expect(page.locator('[data-gv-edge="tree"]')).toHaveCount(2);
   for (const d of await page
@@ -257,7 +258,7 @@ async function atomsOfRex(page: Page, settings: Record<string, unknown> = {}) {
   });
   await page.goto('/');
   await page.getByRole('button', { name: /^vault/ }).click();
-  await page.getByRole('button', { name: 'Global view' }).click();
+  await showGlobalView(page);
   await page.getByRole('button', { name: 'See atoms of Rex' }).click();
   await expect(page.getByRole('application', { name: 'Atoms of Rex' })).toBeVisible();
 }

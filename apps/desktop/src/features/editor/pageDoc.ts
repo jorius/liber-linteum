@@ -140,6 +140,12 @@ export class PageDoc {
     return this.enqueue(() => this.save());
   }
 
+  /** Saves now only when auto save is on (the editor losing focus, M2a
+   *  §3.3); with it off nothing is written until ⌘S (M5b §6). */
+  autoFlush(): Promise<void> {
+    return autoSave() ? this.flush() : Promise.resolve();
+  }
+
   /** The file changed on disk: reload or merge (M2a §3.3). */
   sync(): Promise<void> {
     return this.enqueue(async () => {

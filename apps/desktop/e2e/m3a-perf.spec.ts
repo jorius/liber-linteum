@@ -5,6 +5,7 @@
 // playwright test m3a-perf (after `vite build`). Reference numbers are in
 // the M3a spec, §13.
 import { expect, test, type Page } from '@playwright/test';
+import { showEditor, showGlobalView } from './shell';
 import { installIpcMock } from './ipcMock';
 
 test.skip(!process.env.NIMW_PERF, 'timing probe: set NIMW_PERF=1 to run it');
@@ -66,7 +67,7 @@ for (const [cards, partners] of [
     const opens: number[] = [];
     for (let run = 0; run < 3; run++) {
       const t0 = await page.evaluate(() => performance.now());
-      await page.getByRole('button', { name: 'Global view' }).click();
+      await showGlobalView(page);
       await page.waitForFunction(
         (n) =>
           document.querySelectorAll('[data-gv-card]').length > n &&
@@ -75,7 +76,7 @@ for (const [cards, partners] of [
         { polling: 'raf' },
       );
       opens.push((await now(page)) - t0);
-      await page.getByRole('button', { name: 'Edit', exact: true }).click();
+      await showEditor(page);
     }
     console.log(test.info().project.name, `${cards} cards: ${opens.map(Math.round)} ms`);
     expect(Math.max(...opens)).toBeLessThan(300);

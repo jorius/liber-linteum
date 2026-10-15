@@ -4,10 +4,12 @@
 // without a single request leaving the machine. (Add cover going straight
 // into reposition is checked in m2c.spec.ts.)
 import { expect, test, type Page } from '@playwright/test';
+import { showGlobalView } from './shell';
 import { installIpcMock } from './ipcMock';
 
 const LONG = Array.from({ length: 120 }, (_, i) => `Line ${i + 1} of the long page.`).join('\n\n');
-const SUBTITLE = 'A subtitle that runs on well past the room the top bar has for it, and then on';
+const SUBTITLE =
+  'A subtitle that runs on well past the room the page has for it, and then on, and on again past the measure of the text, which is wide';
 const PAGES = {
   'A.md': '# Alpha\n\nhello world\n\nSee [[B]].\n',
   'B.md': '# Beta\n\nThe second page.\n',
@@ -77,10 +79,10 @@ test('M4b §1: with a cover, the text starts in the top 35% of the window', asyn
   await expect(page.locator('[data-band="cover"]')).toBeVisible();
   const top = await page.locator('.cm-content').evaluate((el) => el.getBoundingClientRect().top);
   expect(top / 900).toBeLessThan(0.35);
-  // The title and subtitle are in the top bar, beside Edit · Global view.
-  const bar = page.getByRole('banner');
+  // The title is in the page (M5b §2.3); the floating button is on screen.
+  const bar = page.getByRole('region', { name: 'Page' });
   await expect(bar.getByRole('textbox', { name: 'Page title' })).toHaveValue('A');
-  await expect(bar.getByRole('button', { name: 'Edit' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Actions', exact: true })).toBeVisible();
   await stayedLocal(page, outside);
 });
 
@@ -109,12 +111,14 @@ for (const px of [200, 132]) {
   });
 }
 
-test('final review M9: a subtitle too long for the top bar ends in an ellipsis, whole on hover', async ({
+test('final review M9: a subtitle too long for the page ends in an ellipsis, whole on hover', async ({
   page,
 }) => {
   const outside = await open(page, 'Sub');
   await page.setViewportSize({ width: 900, height: 900 });
-  const subtitle = page.getByRole('banner').getByRole('textbox', { name: 'Subtitle' });
+  const subtitle = page
+    .getByRole('region', { name: 'Page' })
+    .getByRole('textbox', { name: 'Subtitle' });
   await expect(subtitle).toHaveValue(SUBTITLE);
   await expect(subtitle).toHaveAttribute('title', SUBTITLE);
   const cut = await subtitle.evaluate((el) => ({
@@ -125,9 +129,9 @@ test('final review M9: a subtitle too long for the top bar ends in an ellipsis, 
   await stayedLocal(page, outside);
 });
 
-test('M4b §1: the title and subtitle are edited in the top bar', async ({ page }) => {
+test('M5b §2.3: the title and subtitle are edited in the page', async ({ page }) => {
   const outside = await open(page, 'B');
-  const bar = page.getByRole('banner');
+  const bar = page.getByRole('region', { name: 'Page' });
   const title = bar.getByRole('textbox', { name: 'Page title' });
   await title.fill('Beta notes');
   await title.press('Enter');
@@ -211,7 +215,7 @@ test('M4b §6: a Related chip is added through the picker, opens its page, and i
 
 test('M4b §6: Connect cards picks the card to connect from, then the other', async ({ page }) => {
   const outside = await open(page, 'A');
-  await page.getByRole('button', { name: 'Global view' }).click();
+  await showGlobalView(page);
   const connect = page.getByRole('button', { name: 'Connect cards' });
   await connect.click();
   await expect(connect).toHaveAttribute('aria-pressed', 'true');
@@ -227,18 +231,19 @@ test('M4b §6: Connect cards picks the card to connect from, then the other', as
 });
 
 for (const width of [1280, 900]) {
-  test(`review focus: a very long title is cut short in the top bar at ${width} px; Edit · Global view stay whole`, async ({
+  test(`review focus: a very long title stays within the page at ${width} px; the floating button stays on screen`, async ({
     page,
   }) => {
     await page.setViewportSize({ width, height: 900 });
     const name = 'A very long page name '.repeat(6).trim();
     const outside = await open(page, name);
-    const bar = page.getByRole('banner');
+    const bar = page.getByRole('region', { name: 'Page' });
     const title = (await bar.getByRole('textbox', { name: 'Page title' }).boundingBox())!;
-    const edit = (await bar.getByRole('button', { name: 'Edit' }).boundingBox())!;
-    const gv = (await bar.getByRole('button', { name: 'Global view' }).boundingBox())!;
-    expect(title.x + title.width).toBeLessThanOrEqual(edit.x);
-    expect(gv.x + gv.width).toBeLessThanOrEqual(width);
+    const actions = (await page
+      .getByRole('button', { name: 'Actions', exact: true })
+      .boundingBox())!;
+    expect(title.x + title.width).toBeLessThanOrEqual(width);
+    expect(actions.x + actions.width).toBeLessThanOrEqual(width);
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(
       width,
     );
