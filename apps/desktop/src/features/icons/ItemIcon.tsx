@@ -45,8 +45,8 @@ export function ItemIcon({
 }
 
 /** A page's, folder's or the vault's icon as a button that opens the emoji
- *  picker. Without an icon it reads "Add icon" (shown on hover or focus by
- *  the caller's styles via `data-empty`). */
+ *  picker, named after what it belongs to ("Add an icon to Lore"). Without an
+ *  icon it shows a faint ☺ (`data-empty`). */
 export function IconButton({
   target,
   icon,
@@ -85,10 +85,10 @@ export function IconButton({
         type="button"
         className={className ? `${styles.iconButton} ${className}` : styles.iconButton}
         data-empty={icon ? undefined : ''}
-        aria-label={label ?? (icon ? t('icons.change') : t('icons.add'))}
+        aria-label={label ?? t(icon ? 'icons.changeFor' : 'icons.addFor', { name })}
         aria-haspopup="dialog"
         aria-expanded={open}
-        title={label ?? (icon ? t('icons.change') : t('icons.add'))}
+        title={label ?? t(icon ? 'icons.changeFor' : 'icons.addFor', { name })}
         tabIndex={tabIndex}
         onClick={() => setOpen((o) => !o)}
       >

@@ -658,8 +658,6 @@
   },
   "icons": {
     "pickFor": "Icono de {name}",
-    "add": "Añadir icono",
-    "change": "Cambiar icono",
     "remove": "Quitar icono",
     "search": "Buscar emoji",
     "grid": "Emoji",
@@ -675,6 +673,8 @@
       "objects": "Objetos",
       "symbols": "Símbolos",
       "flags": "Banderas"
-    }
+    },
+    "addFor": "Añadir un icono a {name}",
+    "changeFor": "Cambiar el icono de {name}"
   }
 }

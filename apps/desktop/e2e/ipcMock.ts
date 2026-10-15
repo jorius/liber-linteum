@@ -10,6 +10,7 @@ export function installIpcMock({
   coverSides = {},
   outside = {},
   filePicks = [],
+  folders = [],
 }: {
   pages: Record<string, string>;
   editorMode: string;
@@ -35,6 +36,8 @@ export function installIpcMock({
   >;
   /** M4b part 3 §7: what the Attach button's file dialog picks. */
   filePicks?: { path: string; name: string; url: string; inVault: string | null }[];
+  /** M5b: folders the tree lists (besides those quick notes create). */
+  folders?: string[];
 }) {
   type Args = Record<string, unknown>;
   const w = window as unknown as Record<string, unknown>;
@@ -201,6 +204,7 @@ export function installIpcMock({
   const autoNamed = new Set<string>();
   /** Folders quick notes created (the mock's tree lists no other folders). */
   const madeFolders = new Set<string>();
+  const folderIcons: Record<string, string> = {};
   const scratchDir = () => (inScratchpad ? '' : 'Scratchpad');
   const join = (dir: string, name: string) => (dir ? `${dir}/${name}` : name);
   const freeName = (dir: string, stem: string, self?: string) => {
@@ -248,12 +252,28 @@ export function installIpcMock({
       },
     }),
     vault_tree: () => [
-      ...[...madeFolders].map((path) => ({ path, kind: 'folder' })),
-      ...Object.keys(pages).map((path) => ({
+      ...[...new Set([...folders, ...madeFolders])].map((path) => ({
         path,
-        kind: /\.md$/i.test(path) ? 'page' : 'attachment',
+        kind: 'folder',
+        ...(folderIcons[path] ? { icon: folderIcons[path] } : {}),
       })),
+      ...Object.keys(pages).map((path) => {
+        // M5b §4: a page's frontmatter emoji, as the index reads it.
+        const icon = /^---\n(?:[^\n]*\n)*?icon: (\S+)\n/.exec(pages[path] ?? '')?.[1];
+        return {
+          path,
+          kind: /\.md$/i.test(path) ? 'page' : 'attachment',
+          ...(icon ? { icon } : {}),
+        };
+      }),
     ],
+    // ---- M5b §4: folder and vault icons ----
+    folder_icon_set: (a) => {
+      if (a.icon) folderIcons[a.path as string] = a.icon as string;
+      else delete folderIcons[a.path as string];
+      return null;
+    },
+    vault_icon_set: () => null,
     page_get: (a) => page(a.path as string),
     page_read: (a) => ({ text: pages[a.path as string], hash: 'h' }),
     page_write: (a) => {

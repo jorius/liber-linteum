@@ -49,7 +49,7 @@ describe('icons where names show (M5b §4)', () => {
 
   it('the sidebar shows the vault’s emoji as a button that opens the picker', async () => {
     render(<Sidebar />);
-    const button = screen.getByRole('button', { name: 'Change icon' });
+    const button = screen.getByRole('button', { name: 'Change the icon of Dark Galaxy' });
     expect(button).toHaveTextContent('🌌');
     await userEvent.click(button);
     expect(await screen.findByRole('dialog', { name: 'Icon for Dark Galaxy' })).toBeInTheDocument();
@@ -60,7 +60,7 @@ describe('icons where names show (M5b §4)', () => {
   it('a vault with no icon offers Add icon', () => {
     act(() => useVaultStore.setState({ info: { name: 'V', root: '/v', report: {} as never } }));
     render(<Sidebar />);
-    expect(screen.getByRole('button', { name: 'Add icon' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Add an icon to V' })).toBeInTheDocument();
   });
 
   it('recent vaults show their emoji', async () => {

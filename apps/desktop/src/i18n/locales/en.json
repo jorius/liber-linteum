@@ -658,8 +658,6 @@
   },
   "icons": {
     "pickFor": "Icon for {name}",
-    "add": "Add icon",
-    "change": "Change icon",
     "remove": "Remove icon",
     "search": "Search emoji",
     "grid": "Emoji",
@@ -675,6 +673,8 @@
       "objects": "Objects",
       "symbols": "Symbols",
       "flags": "Flags"
-    }
+    },
+    "addFor": "Add an icon to {name}",
+    "changeFor": "Change the icon of {name}"
   }
 }

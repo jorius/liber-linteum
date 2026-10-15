@@ -275,3 +275,47 @@ These rulings come from planning the shell. Each lists its cost if wrong.
     They are file operations the user started. Cost: an edit the user meant to discard is kept if they then do one of these.
 13. **The floating button shows ⌘F for Search.** Stream D makes ⌘F the search shortcut. Until D lands, ⌘⇧F still opens search, and the label is ahead by one stream.
 14. **Leaving the editor (blur) no longer saves when auto save is off.** The e2e test found this: blur called `flush`.
+## 12. Amendments — Stream B (row actions and icons)
+
+These override §3 and §4 where they conflict.
+
+### Where icons come from
+
+1. **One source.** Every explorer `TreeNode` carries its icon.
+   - **Pages:** frontmatter `icon:`, indexed as `pages.icon`. **Index schema 4**, with the usual rebuild on open. Stream C uses 5 if it needs a bump.
+   - **Folders:** `.nimw/vault.json` `folderIcons`.
+   - **The vault:** `VaultInfo.icon` and `RecentVault.icon`, read from `.nimw/vault.json` `icon`.
+
+   Breadcrumbs, Global View cards, search hits, the `[[` list and the page header look icons up by path in the tree. `GvCard`, `SearchHit` and `Page` are unchanged.
+2. **Validation.** Rust's `nimw_markdown::is_icon` decides: one grapheme, at most 32 bytes, and a pictographic character, a keycap or a flag. Symbols that render as text (© with no VS16) are refused. An invalid `icon:` or `folderIcons` value is ignored on read and refused on write (`invalidName`).
+   - shortcut: the pictographic ranges are kept by hand, not the UCD property.
+3. **Commands:** `folder_icon_set(path, icon|null)` and `vault_icon_set(icon|null)`, in the main window only and refused in `file-*` windows. Page icons need no command: they are written like `related:`, through the open document or a compare-and-swap write. A new icon shows on its row immediately, before the save is indexed.
+4. **Placement:**
+   - a page's emoji replaces its glyph in the tree;
+   - a folder's follows its chevron;
+   - attachments take no icon.
+
+### The picker
+
+5. **Data:**
+   - Unicode `emoji-test.txt` plus CLDR annotations in en and es, generated once by `scripts/gen-emoji.ts` (`pnpm gen:emoji <folder>`).
+   - Contents: 1,812 emoji, fully qualified, up to **Emoji 13.1** (Windows 10 draws later ones as boxes), with no skin tones. Each has its name and up to 4 keywords per language.
+   - Size: 178 KB, 52 KB gzipped, in its own chunk loaded when the picker first opens.
+   - Licence: Unicode License v3, recorded in `THIRD-PARTY-NOTICES.md`.
+6. **Search:**
+   - it ignores case and accents and matches English and Spanish;
+   - exact names come first, then name matches, then keyword matches ("dragon" gives 🐉 before 🐲).
+7. **Recent picks** are kept in `localStorage`. It is a per-viewer convenience, and the picker works without it.
+8. **Rendering:** the picker is portalled to `<body>`, never inside a tree row or a heading.
+
+### Names and keyboard
+
+9. **Button names are unique:** "Add an icon to Lore" or "Change the icon of Lore". A row's ☺ is "Icon for Lore". A generic "Add icon" would repeat for the vault, the page and every row.
+10. **Keyboard parity for icons:** the row's … menu gains **Icon…**, which replaces the menu with the picker at the same place. The row actions themselves aren't tab stops, as §3 says.
+11. **Narrow sidebars:** the "below 220 px only …" rule is dropped. The sidebar is a fixed 270 px, and Stream A's collapse hides it rather than narrowing it.
+12. **Trash:** 🗑, the menu's Delete, and Delete / ⌘⌫ / Backspace all call `requestTrash(path)` (`features/explorer/trashAction.ts`). For now that is the existing confirmation, then the OS trash; Stream C reroutes it.
+
+### Merging with Stream A
+
+13. **The vault's ☺** replaces the app mark beside the vault name (`Sidebar`), which §2.4 drops anyway.
+14. **The page's icon button** sits in `PageHeading`, before the title. When Stream A moves the title into the page header, the button moves with it.

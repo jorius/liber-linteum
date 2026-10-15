@@ -57,7 +57,7 @@ describe('setting an icon (M5b §4)', () => {
     await act(() => useVaultStore.getState().refreshTree());
     render(<PageScreen />);
     await act(() => usePageStore.getState().load('A.md'));
-    const button = await screen.findByRole('button', { name: 'Change icon' });
+    const button = await screen.findByRole('button', { name: 'Change the icon of A' });
     expect(button).toHaveTextContent('🚀');
     await userEvent.click(button);
     await userEvent.type(await screen.findByRole('searchbox', { name: 'Search emoji' }), 'dragon');
