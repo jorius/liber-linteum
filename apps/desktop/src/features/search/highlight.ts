@@ -1,8 +1,9 @@
 // Search text helpers (M5 §4): words split and folded as the index reads
 // them, title highlights, filter words typed in the field, path trails.
 
-/** Letters and digits: what the index's tokenizer keeps. */
-const WORD = /[\p{L}\p{N}]+/gu;
+/** Letters and digits, with the combining marks inside a word: what the
+ *  index's tokenizer keeps (decomposed `Cancio\u0301n` is one word). */
+const WORD = /[\p{L}\p{N}][\p{L}\p{N}\p{M}]*/gu;
 
 /** Accent- and case-insensitive key (`Canción` → `cancion`). */
 export function fold(s: string): string {
@@ -44,6 +45,8 @@ export function highlightParts(text: string, words: string[]): TextPart[] {
       covered += fold(ch).length;
       end += ch.length;
     }
+    // Accents that follow the last marked letter stay with it.
+    while (end < token.length && /\p{M}/u.test(token[end])) end++;
     push(text.slice(at, start), false);
     push(token.slice(0, end), true);
     at = start + end;
@@ -76,6 +79,11 @@ export function takeFilterWord(
   const value = (quoted ?? bare ?? '').trim();
   if (!value) return null;
   return { rest, filter: { kind: prefix.toLowerCase() as FilterWordKind, value } };
+}
+
+/** A tag's identity, as the index keys it: NFC, then lower case. */
+export function tagKey(tag: string): string {
+  return tag.normalize('NFC').toLowerCase();
 }
 
 /** `Lore/Dragons/Smaug.md` → `Lore › Dragons › Smaug.md`. */

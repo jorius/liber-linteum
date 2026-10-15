@@ -139,4 +139,32 @@ describe('search store (M5 §4)', () => {
     expect(useSearchStore.getState().error).toBeTruthy();
     expect(useSearchStore.getState().loading).toBe(false);
   });
+
+  it('Show more asks once while a page is loading (final review M6)', async () => {
+    let release!: () => void;
+    answer = (q) => {
+      if (!q.offset) return { ...page(['p1.md']), total: 3 };
+      return new Promise((r) => (release = () => r(page([`more${q.offset}.md`]))));
+    };
+    useSearchStore.setState({ text: 'p' });
+    await useSearchStore.getState().refresh();
+    const first = useSearchStore.getState().showMore();
+    const second = useSearchStore.getState().showMore();
+    expect(useSearchStore.getState().loadingMore).toBe(true);
+    release();
+    await Promise.all([first, second]);
+    expect(queries.filter((q) => q.offset)).toHaveLength(1);
+    expect(useSearchStore.getState().extra.map((h) => h.path)).toEqual(['more1.md']);
+    expect(useSearchStore.getState().loadingMore).toBe(false);
+  });
+
+  it('says when its answer is behind the text (final review I2)', async () => {
+    vi.useFakeTimers();
+    await useSearchStore.getState().refresh();
+    expect(useSearchStore.getState().stale()).toBe(false);
+    useSearchStore.getState().setText('smaug');
+    expect(useSearchStore.getState().stale()).toBe(true);
+    await vi.advanceTimersByTimeAsync(DEBOUNCE_MS);
+    expect(useSearchStore.getState().stale()).toBe(false);
+  });
 });

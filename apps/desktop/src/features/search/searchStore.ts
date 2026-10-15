@@ -65,7 +65,12 @@ interface SearchState {
   /** Hits loaded by Show more, after `page.results`. */
   extra: SearchHit[];
   loading: boolean;
+  /** Show more is fetching the next page. */
+  loadingMore: boolean;
   error: string | null;
+  /** The shown answer is behind the text or filters: a search is waiting
+   *  for typing to settle, or running. */
+  stale: () => boolean;
   /** The text changed: searches once typing settles. */
   setText: (text: string) => void;
   /** Filters changed: searches now. */
@@ -97,7 +102,7 @@ export const useSearchStore = create<SearchState>((set, get) => {
   const run = async () => {
     cancelTimer();
     const mine = ++seq;
-    set({ loading: true });
+    set({ loading: true, loadingMore: false });
     const res = await search(query());
     if (mine !== seq) return;
     if (res.ok) set({ page: res.value, extra: [], loading: false, error: null });
@@ -109,7 +114,9 @@ export const useSearchStore = create<SearchState>((set, get) => {
     page: null,
     extra: [],
     loading: false,
+    loadingMore: false,
     error: null,
+    stale: () => timer !== null || get().loading,
     setText: (text) => {
       set({ text });
       cancelTimer();
@@ -135,12 +142,14 @@ export const useSearchStore = create<SearchState>((set, get) => {
       return true;
     },
     showMore: async () => {
-      const { page, extra } = get();
-      if (!page || page.recent) return;
+      const { page, extra, loadingMore } = get();
+      if (!page || page.recent || loadingMore) return;
       const mine = seq;
+      set({ loadingMore: true });
       const res = await search(query(page.results.length + extra.length));
-      if (mine !== seq || !res.ok) return;
-      set({ extra: [...get().extra, ...res.value.results] });
+      if (mine !== seq) return;
+      set({ loadingMore: false });
+      if (res.ok) set({ extra: [...get().extra, ...res.value.results] });
     },
     refresh: run,
     reset: () => {
@@ -152,6 +161,7 @@ export const useSearchStore = create<SearchState>((set, get) => {
         page: null,
         extra: [],
         loading: false,
+        loadingMore: false,
         error: null,
       });
     },

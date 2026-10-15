@@ -125,6 +125,28 @@ describe('Search dialog (M5 §4)', () => {
     expect(useUiStore.getState().dialog).toBeNull();
   });
 
+  it('Enter right after typing opens a hit of the text typed, never an older one (final review I2)', async () => {
+    const field = openDialog();
+    await screen.findByRole('option', { name: /Recent/ });
+    // Paste and press Enter before the debounce fires.
+    fireEvent.change(field, { target: { value: 'drag' } });
+    fireEvent.keyDown(field, { key: 'Enter' });
+    await waitFor(() => expect(opened).toEqual(['Lore/Canción del dragón.md']));
+  });
+
+  it('a tag written decomposed counts as the same chip (final review M2)', async () => {
+    reply = (q) => ({
+      ...defaultReply(q),
+      facets: { ...FACETS, tags: [{ value: 'cancio\u0301n', count: 1 }] },
+    });
+    const field = openDialog();
+    await userEvent.type(field, '#canción ');
+    const chip = await screen.findByRole('button', { name: /#cancio\u0301n/ });
+    expect(chip).toHaveAttribute('aria-pressed', 'true');
+    await userEvent.click(chip);
+    expect(lastQuery().tags).toEqual([]);
+  });
+
   it('Shift+Enter shows the page level in the Global View', async () => {
     const showPage = vi.fn(async () => undefined);
     useGvStore.setState({ showPage });

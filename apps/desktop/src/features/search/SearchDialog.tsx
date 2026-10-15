@@ -14,7 +14,14 @@ import { openPage } from '../../stores/navigate';
 import { useUiStore } from '../../stores/uiStore';
 import { Dialog } from '../dialogs/Dialog';
 import { useGvStore } from '../global-view/gvStore';
-import { highlightParts, pathTrail, queryWords, takeFilterWord, type TextPart } from './highlight';
+import {
+  highlightParts,
+  pathTrail,
+  queryWords,
+  tagKey,
+  takeFilterWord,
+  type TextPart,
+} from './highlight';
 import { activeFilters, useSearchStore, type ActiveFilter } from './searchStore';
 import styles from './Search.module.css';
 
@@ -77,6 +84,7 @@ export function SearchDialog({ onClose }: { onClose: () => void }) {
   const page = useSearchStore((s) => s.page);
   const extra = useSearchStore((s) => s.extra);
   const error = useSearchStore((s) => s.error);
+  const loadingMore = useSearchStore((s) => s.loadingMore);
   const input = useRef<HTMLInputElement>(null);
   const listId = useId();
   const [active, setActive] = useState(0);
@@ -111,7 +119,7 @@ export function SearchDialog({ onClose }: { onClose: () => void }) {
   const addFilter = (kind: 'tag' | 'in' | 'to' | 'from', value: string) => {
     const f = store().filters;
     if (kind === 'tag') {
-      const has = f.tags.some((x) => x.toLowerCase() === value.toLowerCase());
+      const has = f.tags.some((x) => tagKey(x) === tagKey(value));
       store().setFilters({ tags: has ? f.tags : [...f.tags, value] });
     } else if (kind === 'in') store().setFilters({ folder: value });
     else if (kind === 'to') store().setFilters({ linksTo: value });
@@ -146,6 +154,15 @@ export function SearchDialog({ onClose }: { onClose: () => void }) {
       if (taken) {
         store().setText(taken.rest);
         addFilter(taken.filter.kind, taken.filter.value);
+      } else if (store().stale()) {
+        // The hits shown answer older text: search now, open its first hit.
+        const global = e.shiftKey;
+        void store()
+          .refresh()
+          .then(() => {
+            const first = store().page?.results[0];
+            if (first && !store().stale()) open(first, global);
+          });
       } else if (hits[active]) open(hits[active], e.shiftKey);
     } else if (e.key === 'Escape' && text) {
       // The first Escape clears; the dialog closes on the next.
@@ -159,7 +176,7 @@ export function SearchDialog({ onClose }: { onClose: () => void }) {
 
   const facets = page?.facets;
   const words = queryWords(text);
-  const tagOn = (v: string) => filters.tags.some((x) => x.toLowerCase() === v.toLowerCase());
+  const tagOn = (v: string) => filters.tags.some((x) => tagKey(x) === tagKey(v));
   const chipLabel = (c: ActiveFilter): string => {
     switch (c.kind) {
       case 'project':
@@ -261,7 +278,7 @@ export function SearchDialog({ onClose }: { onClose: () => void }) {
                   onClick={() =>
                     store().setFilters({
                       tags: tagOn(tag.value)
-                        ? filters.tags.filter((x) => x.toLowerCase() !== tag.value.toLowerCase())
+                        ? filters.tags.filter((x) => tagKey(x) !== tagKey(tag.value))
                         : [...filters.tags, tag.value],
                     })
                   }
@@ -403,7 +420,12 @@ export function SearchDialog({ onClose }: { onClose: () => void }) {
       </ul>
       {page && hits.length === 0 && <p className={styles.none}>{t('search.none')}</p>}
       {page && !page.recent && hits.length < page.total && (
-        <button type="button" className={styles.more} onClick={() => void store().showMore()}>
+        <button
+          type="button"
+          className={styles.more}
+          disabled={loadingMore}
+          onClick={() => void store().showMore()}
+        >
           {t('search.showMore')}
         </button>
       )}

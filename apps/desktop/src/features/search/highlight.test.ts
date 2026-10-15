@@ -65,4 +65,18 @@ describe('search text helpers (M5 §4)', () => {
     expect(pathTrail('Lore/Dragons/Smaug.md')).toBe('Lore › Dragons › Smaug.md');
     expect(pathTrail('Root.md')).toBe('Root.md');
   });
+
+  it('marks a decomposed word whole, its accents with it (final review M1)', () => {
+    const nfd = 'Una Cancio\u0301n triste';
+    expect(highlightParts(nfd, queryWords('cancion'))).toEqual([
+      { text: 'Una ', hit: false },
+      { text: 'Cancio\u0301n', hit: true },
+      { text: ' triste', hit: false },
+    ]);
+    // A prefix ending on an accented letter keeps its mark inside the <mark>.
+    expect(highlightParts('Cancio\u0301n', queryWords('cancio'))[0]).toEqual({
+      text: 'Cancio\u0301',
+      hit: true,
+    });
+  });
 });
