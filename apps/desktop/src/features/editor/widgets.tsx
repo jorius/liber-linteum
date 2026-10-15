@@ -2,6 +2,7 @@ import { WidgetType, type EditorView } from '@codemirror/view';
 import i18next from 'i18next';
 import { languageName } from '../../markdown/codeHighlight';
 import { renderMath } from '../preview/MathView';
+import { announce } from './announce';
 import { openLanguagePicker } from './languagePickerOpen';
 import { createRoot, type Root } from 'react-dom/client';
 import { toggleTask } from '../../markdown/tasks';
@@ -96,13 +97,20 @@ export class CheckboxWidget extends WidgetType {
   }
 }
 
-/** Copies `text` and says so on `button` for a moment (M4b part 2 §2). */
+/** Copies `text` and says so on `button` for a moment (M4b part 2 §2), and
+ *  to screen readers; a copy that fails says that (final review M7). */
 export function copyWithFeedback(text: string, label: HTMLElement): void {
-  const done = () => {
-    label.textContent = i18next.t('code.copied');
+  const say = (key: 'code.copied' | 'code.copyFailed') => {
+    label.textContent = i18next.t(key);
+    announce(i18next.t(key), true);
     setTimeout(() => (label.textContent = i18next.t('code.copy')), 1500);
   };
-  void navigator.clipboard?.writeText(text).then(done, () => undefined);
+  const clipboard = navigator.clipboard;
+  if (!clipboard) return say('code.copyFailed');
+  void clipboard.writeText(text).then(
+    () => say('code.copied'),
+    () => say('code.copyFailed'),
+  );
 }
 
 /** A fenced code block's language badge and Copy button (M4b part 2 §2),

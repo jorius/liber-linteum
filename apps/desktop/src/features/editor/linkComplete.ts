@@ -19,6 +19,7 @@ import { linkSuggest, linksResolve, pageRead, type LinkSuggestion } from '../../
 import { headingLinkText } from '../../markdown/headings';
 import { parsePage } from '../../markdown/parse';
 import { text as nodeText } from '../../markdown/section';
+import { announce } from './announce';
 import { pagePath } from './livePreview';
 
 export type LinkQuery =
@@ -146,25 +147,13 @@ const SEARCH_ICON =
   'stroke-width="2.2" stroke-linecap="round" aria-hidden="true">' +
   '<circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg>';
 
-/** The polite live region that reads the count out (the search line is part
- *  of the list's visuals, so it is hidden from screen readers). */
-function announce(text: string) {
-  let region = document.querySelector<HTMLElement>('[data-nimw-complete-status]');
-  if (!region) {
-    region = document.createElement('div');
-    region.setAttribute('data-nimw-complete-status', '');
-    region.setAttribute('role', 'status');
-    region.className = 'nimw-sr-only';
-    document.body.appendChild(region);
-  }
-  region.textContent = text;
-}
-
 /** The list's first line (M4b §4): what was typed, or a hint, and how many
  *  match; it stays at the top while the list scrolls. */
 function searchSection(query: string, count: number): CompletionSection {
   const typed = query.trim();
   const matches = i18next.t('linkComplete.matches', { count });
+  // Read out politely: the line itself is part of the list's visuals, hidden
+  // from screen readers.
   announce(typed ? i18next.t('linkComplete.matchesFor', { count, query: typed }) : matches);
   return {
     name: 'search',

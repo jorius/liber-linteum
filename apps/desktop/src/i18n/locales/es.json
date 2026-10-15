@@ -434,6 +434,7 @@
     "plain": "Texto sin formato",
     "copy": "Copiar",
     "copied": "Copiado",
+    "copyFailed": "No se pudo copiar",
     "copyCode": "Copiar el código",
     "languageLabel": "Lenguaje: {name}",
     "pickLanguage": "Lenguaje del código",

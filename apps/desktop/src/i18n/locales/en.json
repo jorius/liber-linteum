@@ -434,6 +434,7 @@
     "plain": "Plain text",
     "copy": "Copy",
     "copied": "Copied",
+    "copyFailed": "Couldn’t copy",
     "copyCode": "Copy code",
     "languageLabel": "Language: {name}",
     "pickLanguage": "Code language",

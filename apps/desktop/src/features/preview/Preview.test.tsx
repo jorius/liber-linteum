@@ -341,7 +341,22 @@ describe('Preview: copying code (M4b part 2 §2)', () => {
     show('```py\nprint(1)\n```\n');
     await userEvent.click(await screen.findByRole('button', { name: 'Copy code' }));
     expect(writeText).toHaveBeenCalledWith('print(1)\n');
-    expect(await screen.findByText('Copied')).toBeInTheDocument();
+    await vi.waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Copy code' })).toHaveTextContent('Copied'),
+    );
+  });
+
+  it('final review M7: screen readers hear it copied, or that it couldn’t', async () => {
+    const writeText = vi.fn(() => Promise.resolve());
+    Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true });
+    show('```py\nprint(1)\n```\n');
+    const said = () => screen.queryAllByRole('status').map((s) => s.textContent?.trim());
+    await userEvent.click(await screen.findByRole('button', { name: 'Copy code' }));
+    await waitFor(() => expect(said()).toContain('Copied'));
+    writeText.mockImplementationOnce(() => Promise.reject(new Error('denied')));
+    await userEvent.click(screen.getByRole('button', { name: 'Copy code' }));
+    await waitFor(() => expect(said()).toContain('Couldn’t copy'));
+    expect(screen.getByRole('button', { name: 'Copy code' })).toHaveTextContent('Couldn’t copy');
   });
 });
 

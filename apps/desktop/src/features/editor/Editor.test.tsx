@@ -371,6 +371,8 @@ describe('code block badge and language picker (M4b part 2 §2)', () => {
     expect(await screen.findByRole('button', { name: 'Language: Plain text' })).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Copy code' }));
     expect(writeText).toHaveBeenCalledWith('plain text\nline 2');
-    expect(await screen.findByText('Copied')).toBeInTheDocument();
+    await vi.waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Copy code' })).toHaveTextContent('Copied'),
+    );
   });
 });

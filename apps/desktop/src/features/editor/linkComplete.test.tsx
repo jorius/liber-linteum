@@ -212,9 +212,7 @@ describe('the search line and debounce (M4b §4)', () => {
     expect(line).toHaveAttribute('aria-hidden', 'true');
     // Read out politely instead (the line is part of the list's visuals).
     await vi.waitFor(() =>
-      expect(document.querySelector('[data-nimw-complete-status]')).toHaveTextContent(
-        '2 matches for “gen”',
-      ),
+      expect(document.querySelector('[data-nimw-status]')).toHaveTextContent('2 matches for “gen”'),
     );
   });
 
