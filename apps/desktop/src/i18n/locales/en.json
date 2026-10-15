@@ -472,7 +472,39 @@
     "zoomOut": "Zoom out",
     "fit": "Fit to screen",
     "connections": "{links, plural, =0 {No links.} one {Linked with # card.} other {Linked with # cards.}} {manual, plural, =0 {} one {# relationship.} other {# relationships.}}",
-    "newEntry": "New entry"
+    "newEntry": "New entry",
+    "atoms": {
+      "see": "See atoms of {title}",
+      "menu": "See atoms",
+      "crumb": "Atoms",
+      "canvas": "Atoms of {title}",
+      "keys": "Arrow keys move between cards. Enter opens the page at that block, Escape goes back.",
+      "empty": "This page has no blocks yet.",
+      "level": "H{level}",
+      "sectionName": "Heading {level}: {title}",
+      "blocks": "{count, plural, one {# block} other {# blocks}}",
+      "items": "{count, plural, one {# item} other {# items}}",
+      "done": "{done, number} of {count, number} done",
+      "rows": "{count, plural, one {# row} other {# rows}}",
+      "more": "{count, plural, one {# more block} other {# more blocks}}",
+      "moreLabel": "{count, plural, one {# more block: open the page there} other {# more blocks: open the page there}}",
+      "kind": {
+        "paragraph": "Paragraph",
+        "list": "List",
+        "tasks": "Tasks",
+        "quote": "Quote",
+        "callout": "Callout",
+        "code": "Code",
+        "table": "Table",
+        "image": "Image",
+        "audio": "Audio",
+        "file": "File",
+        "note": "Embedded page",
+        "math": "Formula",
+        "diagram": "Diagram",
+        "html": "HTML"
+      }
+    }
   },
   "code": {
     "plain": "Plain text",

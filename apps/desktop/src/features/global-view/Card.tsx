@@ -12,7 +12,7 @@ import { AudioIcon, FolderIcon, GripIcon, ImageIcon, LinkIcon } from '../../app/
 import { assetUrl, type GvCard } from '../../ipc';
 import { nameOf } from '../../stores/tree';
 import { CardMenu, type CardMenuItem } from './CardMenu';
-import { BriefcaseIcon, EditIcon, FolderSmallIcon, PageIcon, StackIcon } from './gvIcons';
+import { AtomIcon, BriefcaseIcon, EditIcon, FolderSmallIcon, PageIcon, StackIcon } from './gvIcons';
 import styles from './Card.module.css';
 
 /** A single click waits this long for a second one (prototype; M3a §5), so
@@ -38,6 +38,8 @@ export interface CardProps {
   onOpen: () => void;
   /** Double click / Shift+Enter / See all: the editor (GV-12). */
   onOpenEditor: () => void;
+  /** See atoms (M4b part 3 §6): a page card's Atoms button; none: none. */
+  onSeeAtoms?: () => void;
   onFocus: () => void;
 }
 
@@ -52,6 +54,7 @@ export function Card({
   wrapConnect = (button) => button,
   onOpen,
   onOpenEditor,
+  onSeeAtoms,
   onFocus,
 }: CardProps) {
   const { t } = useTranslation();
@@ -218,6 +221,18 @@ export function Card({
             <span role="img" aria-label={t('gv.hasAudio')} className={styles.media}>
               <AudioIcon />
             </span>
+          )}
+          {page && onSeeAtoms && (
+            <button
+              type="button"
+              className={styles.atoms}
+              tabIndex={focusable ? 0 : -1}
+              aria-label={t('gv.atoms.see', { title: card.title })}
+              title={t('gv.atoms.see', { title: card.title })}
+              onClick={onSeeAtoms}
+            >
+              <AtomIcon />
+            </button>
           )}
           {/* M4b part 3 §4: a page is edited; a folder's pages are seen. */}
           <button

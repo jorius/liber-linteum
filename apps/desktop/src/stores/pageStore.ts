@@ -14,6 +14,15 @@ export interface Anchor {
   nonce: number;
 }
 
+/** Where the editor puts the cursor and what it flashes (an atom clicked in
+ *  the Global View, M4b part 3 §6): UTF-16 offsets in `path`'s text. */
+export interface Jump {
+  path: string;
+  from: number;
+  to: number;
+  nonce: number;
+}
+
 interface PageState {
   path: string | null;
   page: Page | null;
@@ -32,6 +41,10 @@ interface PageState {
   clearEditorFocus: () => void;
   /** Scrolls the open page to `heading`. */
   reveal: (heading: string | null) => void;
+  /** Consumed once by the editor showing `path`. */
+  jump: Jump | null;
+  requestJump: (path: string, from: number, to: number) => void;
+  clearJump: () => void;
   /** Opens `path` (header data + editor). */
   load: (path: string) => Promise<void>;
   /** Re-reads the header data (title, tags, counts) of the open page. */
@@ -74,6 +87,10 @@ export const usePageStore = create<PageState>((set, get) => ({
   clearEditorFocus: () => set({ editorFocus: false }),
   reveal: (heading) =>
     set({ anchor: heading ? { heading, nonce: (get().anchor?.nonce ?? 0) + 1 } : null }),
+  jump: null,
+  requestJump: (path, from, to) =>
+    set({ jump: { path, from, to, nonce: (get().jump?.nonce ?? 0) + 1 } }),
+  clearJump: () => set({ jump: null }),
   load: async (path) => {
     watchSaves();
     const mine = ++seq;

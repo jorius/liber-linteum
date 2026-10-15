@@ -30,6 +30,7 @@ export function Toolbar() {
   const stack = useGvStore((s) => s.stack);
   const titles = useGvStore((s) => s.titles);
   const connecting = useGvStore((s) => s.connectPick || s.connectFrom !== null);
+  const atoms = useGvStore((s) => s.atoms);
   const settings = useSettingsStore((s) => s.settings);
   const update = useSettingsStore((s) => s.update);
   const mode = settings.globalViewMode;
@@ -44,7 +45,8 @@ export function Toolbar() {
       <nav className={styles.crumbs} aria-label={t('gv.breadcrumb')}>
         <ol>
           {crumbs.map((ref, i) => {
-            const last = i === crumbs.length - 1;
+            // With atoms shown (M4b part 3 §6), every level is a way back.
+            const last = !atoms && i === crumbs.length - 1;
             return (
               <li key={`${i}:${levelKey(ref)}`}>
                 {last ? (
@@ -63,21 +65,43 @@ export function Toolbar() {
               </li>
             );
           })}
+          {atoms && (
+            <>
+              <li>
+                <button
+                  type="button"
+                  className={styles.crumb}
+                  onClick={() => void useGvStore.getState().atomsPageLevel()}
+                >
+                  {atoms.title}
+                </button>
+              </li>
+              <li>
+                <span className={styles.crumbHere} aria-current="page">
+                  {t('gv.atoms.crumb')}
+                </span>
+              </li>
+            </>
+          )}
         </ol>
       </nav>
-      <div className={styles.seg} role="group" aria-label={t('gv.mode')}>
-        {(['drill', 'expand'] as const).map((m) => (
-          <button
-            key={m}
-            type="button"
-            aria-pressed={mode === m}
-            className={mode === m ? styles.segOn : undefined}
-            onClick={() => void update({ globalViewMode: m })}
-          >
-            {t(`gv.${m}`)}
-          </button>
-        ))}
-      </div>
+      {/* The atoms map is read-only and has one layout: no mode, no
+          connecting. */}
+      {!atoms && (
+        <div className={styles.seg} role="group" aria-label={t('gv.mode')}>
+          {(['drill', 'expand'] as const).map((m) => (
+            <button
+              key={m}
+              type="button"
+              aria-pressed={mode === m}
+              className={mode === m ? styles.segOn : undefined}
+              onClick={() => void update({ globalViewMode: m })}
+            >
+              {t(`gv.${m}`)}
+            </button>
+          ))}
+        </div>
+      )}
       <div className={styles.chips} role="group" aria-label={t('gv.edges')}>
         {TOGGLES.map(({ key, kind, aggregated }) => {
           const s = strokeOf(kind, aggregated);
@@ -108,20 +132,22 @@ export function Toolbar() {
           );
         })}
       </div>
-      <button
-        type="button"
-        className={styles.connect}
-        data-gv-connect=""
-        aria-pressed={connecting}
-        onClick={() => {
-          const gv = useGvStore.getState();
-          if (connecting) gv.cancelConnect();
-          else gv.startConnectPick();
-        }}
-      >
-        <LinkIcon />
-        {t('gv.relations.connectCards')}
-      </button>
+      {!atoms && (
+        <button
+          type="button"
+          className={styles.connect}
+          data-gv-connect=""
+          aria-pressed={connecting}
+          onClick={() => {
+            const gv = useGvStore.getState();
+            if (connecting) gv.cancelConnect();
+            else gv.startConnectPick();
+          }}
+        >
+          <LinkIcon />
+          {t('gv.relations.connectCards')}
+        </button>
+      )}
       <button
         type="button"
         className={styles.reset}

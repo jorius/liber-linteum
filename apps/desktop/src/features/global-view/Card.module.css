@@ -289,6 +289,35 @@
   place-items: center;
 }
 
+/* See atoms (M4b part 3 §6): an icon button before Edit. */
+.atoms {
+  margin-left: auto;
+  display: inline-grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-pill);
+  background: var(--color-surface);
+  color: var(--color-accent);
+  cursor: pointer;
+}
+
+.atoms:hover {
+  border-color: var(--color-accent);
+  background: var(--color-accent-soft);
+}
+
+.atoms:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 2px;
+}
+
+.atoms + .seeAll {
+  margin-left: 0;
+}
+
 .seeAll {
   margin-left: auto;
   display: inline-flex;

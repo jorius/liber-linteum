@@ -31,6 +31,8 @@ export interface DrawnEdge {
   directed: boolean;
   count: number;
   label: string | null;
+  /** A parent/child line's routing, when not the layer's (the atoms map). */
+  route?: TreeRoute;
 }
 
 /** Gap between a card's border and its edges' ends (prototype: 5 px). */
@@ -88,8 +90,14 @@ function line(a: Box, b: Box) {
 }
 
 /** Which way a tree grows: Expand in place puts children in the column to
- *  the right (`h`), the atoms map below their section (`v`). */
+ *  the right (`h`), the atoms map its section columns below the page (`v`). */
 export type TreeOrientation = 'h' | 'v';
+/** `l`: children stacked below and indented hang off a trunk down the
+ *  parent's left side (the atoms map's blocks under their section). */
+export type TreeRoute = TreeOrientation | 'l';
+
+/** Where a trunk runs, from the parent's left edge. */
+export const TRUNK = 16;
 
 /** A parent/child line (M4b part 3 §5): orthogonal, out of the parent's side
  *  facing the child and into the child's facing side — right–down–right for
@@ -97,12 +105,15 @@ export type TreeOrientation = 'h' | 'v';
  *  whichever the cards' places allow once dragged). Siblings share the
  *  trunk, so a family reads at a glance among straight links. Overlapping
  *  cards fall back to a straight line. */
-export function elbowPath(a: Box, b: Box, prefer: TreeOrientation = 'h'): string {
+export function elbowPath(a: Box, b: Box, prefer: TreeRoute = 'h'): string {
   const ca = centre(a);
   const cb = centre(b);
+  if (prefer === 'l' && b.x >= a.x + TRUNK + GAP && b.y >= a.y + a.h) {
+    return `M${r(a.x + TRUNK)},${r(a.y + a.h + GAP)}V${r(cb.y)}H${r(b.x - GAP)}`;
+  }
   const apartX = b.x >= a.x + a.w || b.x + b.w <= a.x;
   const apartY = b.y >= a.y + a.h || b.y + b.h <= a.y;
-  if (apartY && (prefer === 'v' || !apartX)) {
+  if (apartY && (prefer !== 'h' || !apartX)) {
     const down = b.y >= a.y + a.h;
     const sy = down ? a.y + a.h + GAP : a.y - GAP;
     const ty = down ? b.y - GAP : b.y + b.h + GAP;
@@ -149,7 +160,7 @@ const EdgeLine = memo(function EdgeLine({
   a: na,
   b: nb,
   ...ends
-}: EndsProps & Ends & { styleKey: string; directed: boolean; orient: TreeOrientation }) {
+}: EndsProps & Ends & { styleKey: string; directed: boolean; orient: TreeRoute }) {
   const [a, b] = boxes(ends);
   if (key === 'tree') {
     return <path d={elbowPath(a, b, orient)} data-gv-edge={key} data-a={na} data-b={nb} />;
@@ -426,7 +437,7 @@ export const EdgeLayer = memo(function EdgeLayer({
                     b={e.target}
                     styleKey={key}
                     directed={e.directed}
-                    orient={tree}
+                    orient={e.route ?? tree}
                   />
                 );
               })}

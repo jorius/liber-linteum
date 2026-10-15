@@ -134,6 +134,11 @@ interface GvState {
   connectFrom: GvCard | null;
   /** "Connect cards" (M4b §6): the next card picked becomes `connectFrom`. */
   connectPick: boolean;
+  /** See atoms (M4b part 3 §6): the page whose atoms the canvas shows
+   *  instead of the level, over the breadcrumb's last level. */
+  atoms: { path: string; title: string } | null;
+  /** Bumped by Reset layout while atoms show: their dragged cards go back. */
+  atomsReset: number;
   loaded: boolean;
   /** Reads what the canvas shows: levels (falling back from deleted ones;
    *  any other failure keeps what is shown), edges and pinned positions. */
@@ -162,6 +167,12 @@ interface GvState {
   completeConnect: (target: GvCard) => Promise<void>;
   /** A drag from `from`'s connect handle dropped on `to` (or on nothing). */
   connectByDrag: (from: string, to: string | null) => Promise<void>;
+  /** See atoms of `path` (a card's button or menu, View → See Atoms). */
+  seeAtoms: (path: string, title: string) => void;
+  /** Back from the atoms to the level, the keyboard on the page's card. */
+  closeAtoms: () => void;
+  /** The atoms' page crumb: its own level (Drill-down), or back. */
+  atomsPageLevel: () => Promise<void>;
   reset: () => void;
 }
 
@@ -294,6 +305,8 @@ export const useGvStore = create<GvState>((set, get) => {
   return {
     connectFrom: null,
     connectPick: false,
+    atoms: null,
+    atomsReset: 0,
     stack: [{ kind: 'vault' }],
     expanded: [],
     levels: {},
@@ -394,7 +407,7 @@ export const useGvStore = create<GvState>((set, get) => {
       return get().load();
     },
     back: async (i) => {
-      set({ connectFrom: null, connectPick: false });
+      set({ connectFrom: null, connectPick: false, atoms: null });
       const stack = get().stack.slice(0, Math.max(1, i + 1));
       // A level is opened from the card of the same path: the keyboard goes
       // back to it (final review m13).
@@ -405,6 +418,7 @@ export const useGvStore = create<GvState>((set, get) => {
     },
     up: async (path) => {
       if (get().connectFrom || get().connectPick) return get().cancelConnect();
+      if (get().atoms) return get().closeAtoms();
       if (mode() === 'expand') {
         const ref = get().expanded.find((r) => r.kind !== 'vault' && r.path === path);
         const card = get().canvas.cards.find((c) => c.path === path);
@@ -446,6 +460,11 @@ export const useGvStore = create<GvState>((set, get) => {
       pinTimer = setTimeout(flushPins, PIN_SAVE_MS);
     },
     resetLayout: async () => {
+      // The atoms' places aren't saved: their dragged cards just go back.
+      if (get().atoms) {
+        set({ atomsReset: get().atomsReset + 1 });
+        return;
+      }
       const { stack, shownKey } = get();
       const key = shownKey ?? canvasKey(mode(), stack[stack.length - 1]);
       // A drag on this canvas still waiting is superseded; one on another
@@ -480,6 +499,35 @@ export const useGvStore = create<GvState>((set, get) => {
       const b = cards.find((c) => c.path === to);
       if (a && b) await relateCards(a, b);
     },
+    seeAtoms: (path, title) =>
+      set({ atoms: { path, title }, connectFrom: null, connectPick: false }),
+    closeAtoms: () => {
+      const atoms = get().atoms;
+      if (!atoms) return;
+      // The page's own card (or the folder card standing for it) takes the
+      // keyboard when the level shows again.
+      const card = get().canvas.cards.find(
+        (c) => c.path === atoms.path || pageOf(c) === atoms.path,
+      );
+      set({ atoms: null, focus: card?.path ?? get().focus });
+    },
+    atomsPageLevel: async () => {
+      const atoms = get().atoms;
+      if (!atoms) return;
+      const { stack } = get();
+      const last = stack[stack.length - 1];
+      if (mode() !== 'drill' || (last.kind === 'page' && last.path === atoms.path)) {
+        get().closeAtoms();
+        return;
+      }
+      set({
+        atoms: null,
+        stack: [...stack, { kind: 'page', path: atoms.path }],
+        titles: { ...get().titles, [atoms.path]: atoms.title },
+        focus: null,
+      });
+      return get().load();
+    },
     reset: () => {
       seq++;
       if (pinTimer) clearTimeout(pinTimer);
@@ -491,6 +539,7 @@ export const useGvStore = create<GvState>((set, get) => {
       set({
         connectFrom: null,
         connectPick: false,
+        atoms: null,
         stack: [{ kind: 'vault' }],
         expanded: [],
         levels: {},

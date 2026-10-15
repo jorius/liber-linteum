@@ -2,6 +2,7 @@
 // WebView2, Windows) and WebKit (≈ WKWebView, macOS): card covers crop to
 // their focus, side-cover strips, pages vs folders, readable edges, and
 // See atoms.
+import { readFileSync } from 'node:fs';
 import { crc32, deflateSync } from 'node:zlib';
 import { expect, test, type Page } from '@playwright/test';
 import { installIpcMock } from './ipcMock';
@@ -224,3 +225,108 @@ test('§5: parent/child lines are elbows, folder links carry a count chip, hover
   await page.mouse.move(2, 2);
   await expect(canvas).not.toHaveAttribute('data-gv-focusing');
 });
+
+const AXE = readFileSync(new URL('../node_modules/axe-core/axe.min.js', import.meta.url), 'utf8');
+
+const REX = [
+  '# Rex',
+  '',
+  'Teen agent, see [[Sparda]].',
+  '',
+  '# Abilities',
+  '',
+  'Builds machines.',
+  '',
+  '```js',
+  'const nanites = 7;',
+  '```',
+  '',
+  '## Weak spots',
+  '',
+  '- water',
+  '- magnets',
+  '',
+].join('\n');
+
+async function atomsOfRex(page: Page, settings: Record<string, unknown> = {}) {
+  await page.addInitScript(installIpcMock, {
+    pages: { 'Rex.md': REX, 'Sparda.md': '# Sparda\n\nA legend.\n' },
+    editorMode: 'livePreview',
+    remoteCover: false,
+    settings,
+  });
+  await page.goto('/');
+  await page.getByRole('button', { name: /^vault/ }).click();
+  await page.getByRole('button', { name: 'Global view' }).click();
+  await page.getByRole('button', { name: 'See atoms of Rex' }).click();
+  await expect(page.getByRole('application', { name: 'Atoms of Rex' })).toBeVisible();
+}
+
+test('§6: See atoms shows a page as sections and blocks; a block opens the editor there', async ({
+  page,
+}) => {
+  await atomsOfRex(page);
+  const map = page.getByRole('application', { name: 'Atoms of Rex' });
+  await expect(map.getByRole('button', { name: 'Heading 1: Abilities' })).toBeVisible();
+  await expect(map.getByRole('button', { name: 'Heading 2: Weak spots' })).toBeVisible();
+  await expect(map.getByRole('button', { name: 'Code · js: const nanites = 7;' })).toBeVisible();
+  await expect(map.getByRole('button', { name: 'List: water, magnets' })).toBeVisible();
+  // The block linking Sparda points at Sparda's card.
+  await expect(map.getByRole('button', { name: 'Sparda', exact: true })).toBeVisible();
+  await expect(page.locator('[data-gv-edge="link"][data-b="Sparda.md"]')).toHaveCount(1);
+  // Blocks hang off a trunk down their section's left side.
+  const trunks = await page
+    .locator('[data-gv-edge="tree"]')
+    .evaluateAll((els) => els.map((el) => el.getAttribute('d')!.replace(/[^MLHV]/g, '')));
+  expect(trunks).toContain('MVH');
+  await expect(
+    page.getByRole('navigation', { name: 'Global View path' }).getByText('Atoms'),
+  ).toHaveAttribute('aria-current', 'page');
+
+  await map.getByRole('button', { name: 'List: water, magnets' }).click();
+  await expect(page.getByRole('textbox', { name: 'Page title' })).toHaveValue('Rex');
+  // The cursor is on the list, its lines flash.
+  await expect(page.locator('.cm-nimw-flash').first()).toContainText('water');
+  const head = await page.evaluate(() => {
+    const sel = window.getSelection();
+    return sel?.anchorNode?.textContent ?? '';
+  });
+  expect(head).toContain('water');
+});
+
+test('§6: Escape goes back to the level with the keyboard on the page card', async ({ page }) => {
+  await atomsOfRex(page);
+  const map = page.getByRole('application', { name: 'Atoms of Rex' });
+  await map.getByRole('button', { name: 'Heading 1: Abilities' }).focus();
+  await page.keyboard.press('ArrowDown');
+  await expect(map.getByRole('button', { name: 'Paragraph: Builds machines.' })).toBeFocused();
+  await page.keyboard.press('Escape');
+  await expect(page.getByRole('button', { name: 'Rex', exact: true })).toBeFocused();
+  await expect(page.getByRole('application', { name: 'Atoms of Rex' })).toHaveCount(0);
+});
+
+for (const theme of ['light', 'dark']) {
+  test(`§6: the atoms map is axe-clean in a real engine (${theme})`, async ({ page }) => {
+    await atomsOfRex(page, { theme });
+    await expect(page.getByRole('button', { name: 'Heading 2: Weak spots' })).toBeVisible();
+    // The pointer off the cards: hovering one dims the others (§5, a
+    // passing state the pointer asked for).
+    await page.mouse.move(1, 1);
+    await expect(page.locator('[data-gv-canvas]')).not.toHaveAttribute('data-gv-focusing');
+    await page.evaluate(AXE);
+    const violations = await page.evaluate(async () => {
+      const { axe } = window as unknown as {
+        axe: {
+          run: (
+            el: Element,
+            opts: object,
+          ) => Promise<{ violations: { id: string; nodes: { target: string[] }[] }[] }>;
+        };
+      };
+      const region = document.querySelector('section[aria-label="Global View"]')!;
+      const res = await axe.run(region, { resultTypes: ['violations'] });
+      return res.violations.map((v) => `${v.id}: ${v.nodes.map((n) => n.target.join(' '))}`);
+    });
+    expect(violations).toEqual([]);
+  });
+}

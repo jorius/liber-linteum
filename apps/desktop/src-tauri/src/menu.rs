@@ -36,8 +36,10 @@ pub const TOGGLE_EVENT: &str = "menu:toggle";
 /// Ids of View → Editor / Global View (M3a §2).
 pub const EDITOR_ID: &str = "nimw-screen-edit";
 pub const GLOBAL_VIEW_ID: &str = "nimw-screen-global";
-/// Event telling the page which screen to show; payload `"edit"` or
-/// `"global"`.
+/// Id of View → See Atoms of This Page (M4b part 3 §6).
+pub const ATOMS_ID: &str = "nimw-see-atoms";
+/// Event telling the page which screen to show; payload `"edit"`,
+/// `"global"`, or `"atoms"` (the open page's atoms in the Global View).
 pub const SCREEN_EVENT: &str = "menu:screen";
 
 /// The app menu: About, Services, Hide, Hide Others, Show All, Quit (ours);
@@ -101,6 +103,7 @@ pub fn app_menu<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
     // No accelerators: the page handles ⌘1 / ⌘2 itself (as ⌘[ / ⌘]).
     let editor = MenuItem::with_id(app, EDITOR_ID, "Editor", true, None::<&str>)?;
     let global_view = MenuItem::with_id(app, GLOBAL_VIEW_ID, "Global View", true, None::<&str>)?;
+    let atoms = MenuItem::with_id(app, ATOMS_ID, "See Atoms of This Page", true, None::<&str>)?;
     let toolbar = MenuItem::with_id(
         app,
         TOOLBAR_ID,
@@ -123,6 +126,7 @@ pub fn app_menu<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
         &[
             &editor,
             &global_view,
+            &atoms,
             &PredefinedMenuItem::separator(app)?,
             &back,
             &forward,
@@ -165,8 +169,12 @@ pub fn on_menu_event<R: Runtime>(app: &AppHandle<R>, event: MenuEvent) {
     } else if id == BACK_ID || id == FORWARD_ID {
         let direction = if id == BACK_ID { "back" } else { "forward" };
         let _ = app.emit(NAVIGATE_EVENT, direction);
-    } else if id == EDITOR_ID || id == GLOBAL_VIEW_ID {
-        let screen = if id == EDITOR_ID { "edit" } else { "global" };
+    } else if id == EDITOR_ID || id == GLOBAL_VIEW_ID || id == ATOMS_ID {
+        let screen = match id {
+            EDITOR_ID => "edit",
+            GLOBAL_VIEW_ID => "global",
+            _ => "atoms",
+        };
         let _ = app.emit(SCREEN_EVENT, screen);
     } else if id == TOOLBAR_ID {
         let _ = app.emit(TOGGLE_EVENT, "toolbar");

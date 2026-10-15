@@ -18,6 +18,7 @@ import { useSettingsStore } from '../../stores/settingsStore';
 import { useToastStore } from '../../stores/toastStore';
 import { nextFreeName } from '../../stores/tree';
 import { useVaultStore } from '../../stores/vaultStore';
+import { AtomsCanvas } from './AtomsCanvas';
 import { Canvas } from './Canvas';
 import { useGvStore } from './gvStore';
 import { Toolbar } from './Toolbar';
@@ -37,6 +38,8 @@ export function GlobalView() {
   const connectFrom = useGvStore((s) => s.connectFrom);
   const connectPick = useGvStore((s) => s.connectPick);
   const connecting = connectPick || connectFrom !== null;
+  // See atoms (M4b part 3 §6): the page's map instead of the level.
+  const atoms = useGvStore((s) => s.atoms);
   // A hub page's neighbourhood is capped (final review m14): say how many
   // linked pages the level leaves out.
   const omitted = useGvStore((s) => (s.shownKey ? (s.levels[s.shownKey]?.omitted ?? 0) : 0));
@@ -191,16 +194,22 @@ export function GlobalView() {
         )}
       </div>
       <div ref={area} className={styles.area}>
-        <ReactFlowProvider>
-          <Canvas
-            mode={mode}
-            toggles={toggles}
-            width={width}
-            onOpen={onOpen}
-            onOpenEditor={onOpenEditor}
-          />
-        </ReactFlowProvider>
-        {loaded && empty && (
+        {atoms ? (
+          <ReactFlowProvider key={`atoms:${atoms.path}`}>
+            <AtomsCanvas path={atoms.path} title={atoms.title} toggles={toggles} />
+          </ReactFlowProvider>
+        ) : (
+          <ReactFlowProvider>
+            <Canvas
+              mode={mode}
+              toggles={toggles}
+              width={width}
+              onOpen={onOpen}
+              onOpenEditor={onOpenEditor}
+            />
+          </ReactFlowProvider>
+        )}
+        {!atoms && loaded && empty && (
           <p
             ref={emptyNote}
             className={styles.empty}
@@ -214,15 +223,17 @@ export function GlobalView() {
             {t('gv.empty')}
           </p>
         )}
-        {loaded && omitted > 0 && (
+        {!atoms && loaded && omitted > 0 && (
           <p role="status" className={styles.omitted}>
             {t('gv.omitted', { count: omitted })}
           </p>
         )}
-        <button type="button" className={styles.fab} onClick={() => void newEntry()}>
-          <PlusIcon />
-          {t('gv.newEntry')}
-        </button>
+        {!atoms && (
+          <button type="button" className={styles.fab} onClick={() => void newEntry()}>
+            <PlusIcon />
+            {t('gv.newEntry')}
+          </button>
+        )}
       </div>
     </section>
   );

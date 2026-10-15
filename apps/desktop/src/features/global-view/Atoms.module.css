@@ -1,0 +1,191 @@
+/* The atoms map's cards (M4b part 3 §6): sections, blocks and "+N more",
+   sized by atoms.ts (ATOM_W × ATOM_H, SECTION_W × SECTION_H, MORE_H). */
+.atom,
+.section,
+.more {
+  position: relative;
+  box-sizing: border-box;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  background: var(--color-surface);
+  border: 1px solid var(--color-card-border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-card);
+  overflow: hidden;
+}
+
+/* A section reads as a heading: the accent on its tinted band. */
+.section {
+  background: var(--color-accent-soft);
+  border-color: var(--color-accent);
+}
+
+.more {
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+  padding: 0 12px;
+  border-style: dashed;
+  font: 600 12px var(--font-body);
+  color: var(--color-text-muted);
+}
+
+.head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 28px;
+  padding: 0 2px 0 10px;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.section .head {
+  border-bottom: 0;
+}
+
+.icon {
+  display: inline-grid;
+  place-items: center;
+  color: var(--color-text-muted);
+}
+
+.section .icon,
+.section .kind {
+  color: var(--color-accent);
+}
+
+.kind {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font: 600 10.5px var(--font-body);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+}
+
+.grip {
+  display: inline-grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: var(--radius-sm);
+  color: var(--color-text-muted);
+  cursor: grab;
+  position: relative;
+  z-index: 1;
+}
+
+.grip:hover {
+  background: var(--color-surface-subtle);
+}
+
+.title {
+  margin: 0;
+  padding: 0 10px;
+  font: 700 15px/1.2 var(--font-display);
+  color: var(--color-accent);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.body {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  padding: 6px 10px;
+}
+
+.text {
+  margin: 0;
+  font: 400 12px/1.4 var(--font-body);
+  color: var(--color-text-body);
+  display: -webkit-box;
+  -webkit-line-clamp: 4;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.lines {
+  margin: 0;
+  padding-left: 16px;
+  font: 400 12px/1.4 var(--font-body);
+  color: var(--color-text-body);
+}
+
+.lines li {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.meta {
+  margin: 2px 0 0;
+  font: 500 11px var(--font-body);
+  color: var(--color-text-muted);
+}
+
+.code {
+  margin: 0;
+  font: 400 11px/1.4 var(--font-mono);
+  color: var(--color-text-body);
+  white-space: pre;
+  overflow: hidden;
+}
+
+/* An image fills its frame, cropped (the frame has a definite size: §2). */
+.thumb {
+  position: absolute;
+  inset: 0;
+}
+
+.thumb img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.math {
+  font-size: 12px;
+  overflow: hidden;
+}
+
+/* A diagram scaled down into the card. */
+.diagram {
+  position: absolute;
+  inset: 4px;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+}
+
+.diagram :global(svg) {
+  max-width: 100%;
+  max-height: 100%;
+  height: auto;
+}
+
+/* The card's button lies over the whole card, under the grip. */
+.press {
+  position: absolute;
+  inset: 0;
+  cursor: pointer;
+}
+
+.press:focus {
+  outline: 2px solid var(--color-focus);
+  outline-offset: -2px;
+}
+
+.press:focus:not(:focus-visible) {
+  outline: none;
+}

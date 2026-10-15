@@ -80,6 +80,15 @@ describe('parent/child routing (M4b part 3 §5)', () => {
     expect(parse(elbowPath(box(0, 800), box(0, 0))).points[0]).toEqual([120, 795]);
   });
 
+  it('blocks stacked under their section hang off a trunk down its left side', () => {
+    const section = box(0, 0, 220, 64);
+    const block = box(32, 80 + 136, 200, 120);
+    expect(elbowPath(section, block, 'l')).toBe('M16,69V276H27');
+    // Dragged beside it, or above it: the elbow those places allow.
+    expect(parse(elbowPath(section, box(400, 0, 200, 64), 'l')).cmds).toBe('MHVH');
+    expect(parse(elbowPath(box(0, 400, 220, 64), box(0, 0, 200, 120), 'l')).cmds).toBe('MVHV');
+  });
+
   it('overlapping cards: a straight line between centres', () => {
     expect(elbowPath(box(0, 0), box(10, 10))).toBe('M120,150L130,160');
   });

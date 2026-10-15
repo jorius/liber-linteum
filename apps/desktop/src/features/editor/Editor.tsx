@@ -25,6 +25,7 @@ import { Preview } from '../preview/Preview';
 import styles from './Editor.module.css';
 import { followLinkAtCursor, livePreview, pagePath } from './livePreview';
 import { attachmentHandlers } from './attachments';
+import { flash, jumpTo } from './flash';
 import { BlockGutter, type Shown } from './BlockGutter';
 import { SplitHint } from './SplitHint';
 import { activeFormats, editorKeymap, type ActiveFormat } from './format';
@@ -311,6 +312,8 @@ function createState(d: PageDoc, mode: EditorMode, label: string, numbers: boole
       linkCompletion(),
       // Cover placements join the undo history (M4b part 3 §3).
       coverSideHistory,
+      // An atom clicked in the Global View flashes here (M4b part 3 §6).
+      flash,
       gutterSlot.of(gutter(numbers)),
       followers,
     ],
@@ -436,6 +439,17 @@ export function Editor({ doc, mode, label }: EditorProps) {
     const active = document.activeElement;
     if (!active || active === document.body) v.focus();
   }, [wantsFocus, screen]);
+
+  // See atoms (M4b part 3 §6): an atom clicked in the Global View puts the
+  // cursor on its block, once its page shows here.
+  const jump = usePageStore((s) => s.jump);
+  useEffect(() => {
+    const v = view.current;
+    if (!jump || !v || screen !== 'edit' || current.current.path !== jump.path) return;
+    usePageStore.getState().clearJump();
+    jumpTo(v, jump.from, jump.to);
+    v.focus();
+  }, [jump, screen, doc]);
 
   // Split: the editor and the rendered pane follow each other's scrolling.
   useEffect(() => {

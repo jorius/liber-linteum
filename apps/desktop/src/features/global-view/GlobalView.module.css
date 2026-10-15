@@ -291,6 +291,16 @@
   color: var(--color-text-muted);
 }
 
+/* An atoms map of a page without blocks (M4b part 3 §6). */
+.atomsEmpty {
+  position: absolute;
+  left: 48px;
+  bottom: 48px;
+  margin: 0;
+  font: 400 15px var(--font-body);
+  color: var(--color-text-muted);
+}
+
 /* It takes the keyboard on an empty level (final review I4). */
 .empty:focus-visible {
   outline: 2px solid var(--color-focus);

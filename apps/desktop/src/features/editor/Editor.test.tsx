@@ -191,6 +191,26 @@ describe('Editor (M2a §3.2–3.3)', () => {
   });
 });
 
+describe('a jump from the Global View (M4b part 3 §6: See atoms)', () => {
+  it('puts the cursor on the atom and flashes it, once, when its page shows', async () => {
+    disk = fakeDisk({ 'A.md': '# A\n\nintro\n\ntarget block\n', 'B.md': 'other\n' });
+    useUiStore.setState({ screen: 'edit' });
+    const b = await load('B.md');
+    const { rerender } = render(<Editor doc={b} mode="livePreview" label="B" />);
+    // Asked for A while B shows: it waits for A.
+    act(() => usePageStore.getState().requestJump('A.md', 12, 24));
+    expect(viewOf().state.selection.main.head).toBe(0);
+    expect(usePageStore.getState().jump).not.toBeNull();
+    const a = await load('A.md');
+    rerender(<Editor doc={a} mode="livePreview" label="A" />);
+    expect(viewOf().state.selection.main.head).toBe(12);
+    expect([...document.querySelectorAll('.cm-nimw-flash')].map((el) => el.textContent)).toEqual([
+      'target block',
+    ]);
+    expect(usePageStore.getState().jump).toBeNull();
+  });
+});
+
 describe('task checkboxes outside the source text (feedback 2026-10-13)', () => {
   it('a click in the Split pane toggles the task in the page', async () => {
     disk = fakeDisk({ 'T.md': '# T\n\n- [ ] a\n' });

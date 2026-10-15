@@ -472,7 +472,39 @@
     "zoomOut": "Alejar",
     "fit": "Ajustar a la pantalla",
     "connections": "{links, plural, =0 {Sin enlaces.} one {Enlazada con # tarjeta.} other {Enlazada con # tarjetas.}} {manual, plural, =0 {} one {# relación.} other {# relaciones.}}",
-    "newEntry": "Nueva entrada"
+    "newEntry": "Nueva entrada",
+    "atoms": {
+      "see": "Ver átomos de {title}",
+      "menu": "Ver átomos",
+      "crumb": "Átomos",
+      "canvas": "Átomos de {title}",
+      "keys": "Las flechas mueven entre tarjetas. Intro abre la página en ese bloque, Escape vuelve atrás.",
+      "empty": "Esta página aún no tiene bloques.",
+      "level": "H{level}",
+      "sectionName": "Encabezado {level}: {title}",
+      "blocks": "{count, plural, one {# bloque} other {# bloques}}",
+      "items": "{count, plural, one {# elemento} other {# elementos}}",
+      "done": "{done, number} de {count, number} hechas",
+      "rows": "{count, plural, one {# fila} other {# filas}}",
+      "more": "{count, plural, one {# bloque más} other {# bloques más}}",
+      "moreLabel": "{count, plural, one {# bloque más: abrir la página ahí} other {# bloques más: abrir la página ahí}}",
+      "kind": {
+        "paragraph": "Párrafo",
+        "list": "Lista",
+        "tasks": "Tareas",
+        "quote": "Cita",
+        "callout": "Aviso",
+        "code": "Código",
+        "table": "Tabla",
+        "image": "Imagen",
+        "audio": "Audio",
+        "file": "Archivo",
+        "note": "Página incrustada",
+        "math": "Fórmula",
+        "diagram": "Diagrama",
+        "html": "HTML"
+      }
+    }
   },
   "code": {
     "plain": "Texto sin formato",
