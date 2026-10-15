@@ -159,7 +159,10 @@ pub fn serve_window(
         return serve(state, uri_path, range);
     }
     match files.get(label) {
-        // `.external/…` is a hidden path there: refused like any other.
+        // Media and documents only: never a key or a config file that sits
+        // beside the note (M4c review I4). `.external/…` is a hidden path
+        // there: refused like any other.
+        Some(_) if mime_for(uri_path) == "application/octet-stream" => AssetResponse::status(403),
         Some(grant) => serve_from(grant.vault(), uri_path, range),
         None => AssetResponse::status(404),
     }
@@ -174,8 +177,12 @@ fn serve_from(vault: &Vault, uri_path: &str, range: Option<&str>) -> AssetRespon
     if path.is_root() || path.as_str().split('/').any(is_hidden_name) {
         return AssetResponse::status(403);
     }
-    // A symlink resolving outside the vault is, for the webview, a file that
-    // doesn't exist (403 stays for requests that are malformed on their face).
+    // A symlink resolving outside the vault, or into a hidden file (or an 8.3
+    // name doing so, M4c review I4) is, for the webview, a file that doesn't
+    // exist (403 stays for requests that are malformed on their face).
+    if vault.visible_fs_path(&path).is_err() {
+        return AssetResponse::status(404);
+    }
     let Ok((bytes, _)) = vault.read(&path) else {
         return AssetResponse::status(404);
     };

@@ -663,3 +663,47 @@ fn m4c_review_m2_a_file_grown_too_large_is_not_read() {
         "tooLarge"
     );
 }
+
+/// M4c review I4: no visible name reaches a hidden file (a symlink; on
+/// Windows an 8.3 name such as `SSH~1`), in a file window or the vault, and
+/// a file window is served media and documents only.
+#[test]
+fn m4c_review_i4_assets_never_resolve_into_hidden_files() {
+    use nimw_desktop::asset::serve_window;
+    use nimw_desktop::state::AppState;
+    let h = harness();
+    let dir = folder(&[(".ssh/id.png", "key"), ("notes.txt", "t"), ("a.png", "a")]);
+    #[cfg(unix)]
+    {
+        std::os::unix::fs::symlink(dir.path().join(".ssh/id.png"), dir.path().join("pic.png"))
+            .unwrap();
+        std::os::unix::fs::symlink(dir.path().join(".ssh"), dir.path().join("keys")).unwrap();
+    }
+    let w = open(&h, &dir.path().join("note.md"));
+    call(
+        &h.main,
+        "vault_open",
+        json!({ "path": dir.path().to_str().unwrap() }),
+    )
+    .unwrap();
+    let state = h.app.state::<AppState>();
+    let files = h.app.state::<FileWindows>();
+    for label in [w.label(), "main"] {
+        let get = |path: &str| serve_window(&state, &files, label, path, None).status;
+        assert_eq!(get("/a.png"), 200, "{label}");
+        #[cfg(unix)]
+        for path in ["/pic.png", "/keys/id.png"] {
+            assert_ne!(get(path), 200, "{label} {path}");
+        }
+    }
+    let get = |path: &str| serve_window(&state, &files, w.label(), path, None).status;
+    assert_ne!(
+        get("/notes.txt"),
+        200,
+        "a file window gets media and documents only"
+    );
+    assert_eq!(
+        serve_window(&state, &files, "main", "/notes.txt", None).status,
+        200
+    );
+}

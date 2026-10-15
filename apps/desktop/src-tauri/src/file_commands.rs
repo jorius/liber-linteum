@@ -16,7 +16,7 @@ use crate::state::AppState;
 use crate::vault_commands::blocking;
 use nimw_markdown::resolve;
 use nimw_session::is_text_content;
-use nimw_vault::{Hash, VaultError, VaultPath, is_hidden_name};
+use nimw_vault::{Hash, Vault, VaultError, VaultPath, is_hidden_name};
 use serde::Serialize;
 use std::path::{Path, PathBuf};
 use tauri::{AppHandle, Emitter, Manager, Runtime, WebviewUrl, WebviewWindowBuilder, Window};
@@ -96,10 +96,11 @@ fn text_for(kind: FileKind, path: &VaultPath, bytes: Vec<u8>) -> CmdResult<Strin
         .map_err(|_| CommandError::new(ErrorKind::Binary, format!("not UTF-8 text: {path}")))
 }
 
-/// A folder-relative path the page names: valid, below the folder, visible.
-fn folder_path(path: &str) -> CmdResult<VaultPath> {
+/// A folder-relative path the page names: valid, below the folder, visible
+/// by its name and by where it resolves (M4c review I4).
+fn folder_path(vault: &Vault, path: &str) -> CmdResult<VaultPath> {
     let vp = VaultPath::new(path)?;
-    if vp.as_str().split('/').any(is_hidden_name) {
+    if vp.as_str().split('/').any(is_hidden_name) || vault.visible_fs_path(&vp).is_err() {
         return Err(not_permitted(format!("hidden: {path}")));
     }
     Ok(vp)
@@ -251,7 +252,7 @@ pub(crate) fn file_links_resolve_impl(
 /// Another note or text file in the folder, read only (an embed, a heading
 /// to complete).
 pub(crate) fn file_note_read_impl(grant: &FileGrant, path: String) -> CmdResult<PageText> {
-    let vp = folder_path(&path)?;
+    let vp = folder_path(grant.vault(), &path)?;
     let kind = file_kind(vp.file_name()).ok_or_else(|| {
         CommandError::new(
             ErrorKind::NotAText,
@@ -281,7 +282,7 @@ pub(crate) fn file_follow_impl<R: Runtime>(
     grant: &FileGrant,
     path: String,
 ) -> CmdResult<Followed> {
-    let vp = folder_path(&path)?;
+    let vp = folder_path(grant.vault(), &path)?;
     match grant.vault().stat(&vp)? {
         Some(entry) if entry.kind == nimw_vault::EntryKind::File => {}
         Some(_) => return Err(CommandError::new(ErrorKind::NotAFile, path)),
