@@ -6,7 +6,7 @@ use crate::error::{CmdResult, CommandError, ConflictInfo, ErrorKind};
 use crate::state::AppState;
 use crate::vault_commands::blocking;
 use nimw_markdown::LinkKind;
-use nimw_session::SessionError;
+use nimw_session::{SessionError, is_text_content};
 use nimw_vault::{Hash, VaultError, VaultPath};
 use serde::{Deserialize, Serialize};
 use std::path::Path;
@@ -35,6 +35,31 @@ fn text_of(bytes: Vec<u8>, path: &VaultPath) -> CmdResult<String> {
         .map_err(|_| CommandError::new(ErrorKind::Binary, format!("not UTF-8 text: {path}")))
 }
 
+/// The reply to a compare-and-swap write that found the file changed: a
+/// `conflict` carrying what is on disk now, for the editor to merge. When that
+/// isn't text the editor can take, `refused` instead, with no text: a lossy
+/// decoding would be merged and written back over every character it lost
+/// (final review I3).
+fn conflict_reply(
+    path: &str,
+    bytes: Vec<u8>,
+    current: Hash,
+    refused: CommandError,
+) -> CommandError {
+    let Ok(text) = String::from_utf8(bytes) else {
+        return refused;
+    };
+    let mut err = CommandError::new(
+        ErrorKind::Conflict,
+        format!("{path} changed on disk since it was opened"),
+    );
+    err.conflict = Some(ConflictInfo {
+        current_text: text,
+        current_hash: current.to_hex(),
+    });
+    err
+}
+
 pub(crate) fn page_read_impl(state: &AppState, path: String) -> CmdResult<PageText> {
     let session = state.session()?;
     let vp = VaultPath::new(&path)?;
@@ -61,15 +86,8 @@ pub(crate) fn page_write_impl(
         }),
         Err(SessionError::Vault(VaultError::Conflict { .. })) => {
             let (bytes, current) = session.vault().read(&vp)?;
-            let mut err = CommandError::new(
-                ErrorKind::Conflict,
-                format!("{path} changed on disk since it was opened"),
-            );
-            err.conflict = Some(ConflictInfo {
-                current_text: String::from_utf8_lossy(&bytes).into_owned(),
-                current_hash: current.to_hex(),
-            });
-            Err(err)
+            let not_utf8 = CommandError::new(ErrorKind::Binary, format!("not UTF-8 text: {path}"));
+            Err(conflict_reply(&path, bytes, current, not_utf8))
         }
         Err(e) => Err(e.into()),
     }
@@ -85,7 +103,8 @@ pub(crate) fn text_read_impl(state: &AppState, path: String) -> CmdResult<PageTe
 }
 
 /// `page_write` for text files (M4b part 2 §6): the same compare-and-swap,
-/// and the same conflict reply carrying what is on disk now.
+/// and the same conflict reply carrying what is on disk now — `notAText` when
+/// that is no longer an eligible text file (final review I3).
 pub(crate) fn text_write_impl(
     state: &AppState,
     path: String,
@@ -102,15 +121,11 @@ pub(crate) fn text_write_impl(
         }),
         Err(SessionError::Vault(VaultError::Conflict { .. })) => {
             let (bytes, current) = session.vault().read(&vp)?;
-            let mut err = CommandError::new(
-                ErrorKind::Conflict,
-                format!("{path} changed on disk since it was opened"),
-            );
-            err.conflict = Some(ConflictInfo {
-                current_text: String::from_utf8_lossy(&bytes).into_owned(),
-                current_hash: current.to_hex(),
-            });
-            Err(err)
+            let not_text = CommandError::from(SessionError::NotAText(path.clone()));
+            if !is_text_content(&bytes) {
+                return Err(not_text);
+            }
+            Err(conflict_reply(&path, bytes, current, not_text))
         }
         Err(e) => Err(e.into()),
     }

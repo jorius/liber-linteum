@@ -8,6 +8,7 @@ import { Editor } from '../editor/Editor';
 import { isTextPath } from '../../stores/textFiles';
 import { PageHeader } from './PageHeader';
 import { TextView } from './TextView';
+import { UnwritableNotice } from './UnwritableNotice';
 import styles from './PageView.module.css';
 
 /** The open page: header and editor (M2a §3, §5). */
@@ -19,6 +20,9 @@ export function PageView() {
   const doc = useEditorStore((s) => s.doc);
   const editorError = useEditorStore((s) => s.error);
   const orphaned = useEditorStore((s) => s.orphaned);
+  // Unsaved text its file can no longer take (final review I3): shown with
+  // its notice, even though the file now reads as binary.
+  const kept = useEditorStore((s) => s.unwritable !== null && s.dirty);
   const mode = useSettingsStore((s) => s.settings.editorMode);
 
   if (state === 'empty') {
@@ -66,11 +70,12 @@ export function PageView() {
       </section>
     );
   }
-  const binary = page.binary || editorError?.kind === 'binary';
+  const binary = !kept && (page.binary || editorError?.kind === 'binary');
   return (
     <section className={styles.page} aria-label={t('page.region')}>
       <PageHeader page={page} mode={mode} />
       {orphanBanner}
+      <UnwritableNotice />
       {binary ? (
         <p className={`${styles.notice} ${styles.inset}`}>{t('page.binary')}</p>
       ) : editorError ? (

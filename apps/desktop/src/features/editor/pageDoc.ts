@@ -11,6 +11,7 @@ import {
 import { isTextPath } from '../../stores/textFiles';
 import { nameOf, parentOf } from '../../stores/tree';
 import { detectEol, fromLf, toLf, type Eol } from './eol';
+import { TEXT_MAX_BYTES } from './limits';
 import { merge3 } from './merge';
 
 /** Autosave delay after the last change (M2a §3.3). */
@@ -18,7 +19,22 @@ export const AUTOSAVE_MS = 500;
 export const RETRY_MIN_MS = 1000;
 export const RETRY_MAX_MS = 30_000;
 
-export type SaveStatus = 'saved' | 'saving' | 'retrying';
+/** `notSaved`: kept, but not being saved (see `PageDoc.unwritable`). */
+export type SaveStatus = 'saved' | 'saving' | 'retrying' | 'notSaved';
+
+/** Why a document's text can't be saved to its file (final review I3):
+ *  - `disk`: the file was rewritten outside as something the app can't edit
+ *    (not UTF-8, a NUL byte, a text file over 2 MB);
+ *  - `text`: the text itself can't be saved as a text file (over 2 MB, a NUL
+ *    character). */
+export type Unwritable = 'disk' | 'text';
+
+/** The backend's refusals of content it can't take as text. */
+const notText = (kind: string) => kind === 'notAText' || kind === 'binary';
+
+/** Whether `text` may be written as a text file (M4b part 2 §6). */
+const fitsTextFile = (text: string) =>
+  !text.includes('\0') && new TextEncoder().encode(text).length <= TEXT_MAX_BYTES;
 
 /** Pages go through `page_*`; text and code files (M4b part 2 §6) through
  *  `text_*`, with the same compare-and-swap and conflict reply. */
@@ -31,6 +47,8 @@ export interface PageDocHooks {
   onChange: (doc: PageDoc) => void;
   /** Overlapping edits: their version was saved as `copy`. */
   onConflictCopy: (doc: PageDoc, copy: string) => void;
+  /** Unsaved text that can no longer be saved to its file (`unwritable`). */
+  onUnwritable?: (doc: PageDoc) => void;
 }
 
 /** One open page: the editor text, the last text known to be on disk (the
@@ -47,6 +65,11 @@ export class PageDoc {
    *  a read): kept, not written back until the file is back (rename followed,
    *  restored) or it is saved as a new page. */
   orphaned = false;
+  /** Can't be saved to its file (final review I3): the text is kept and never
+   *  merged with or written over the file; autosave waits until the file is
+   *  text again (`disk`), the text fits again (`text`), or it is saved as a
+   *  new file. */
+  unwritable: Unwritable | null = null;
   /** Bumped whenever the text changes from outside the editor. */
   revision = 0;
   /** Receives text that changed from outside the editor, synchronously, so a
@@ -88,6 +111,7 @@ export class PageDoc {
 
   get status(): SaveStatus {
     if (this.failing) return 'retrying';
+    if (this.unwritable && this.dirty) return 'notSaved';
     return this.writing || this.dirty ? 'saving' : 'saved';
   }
 
@@ -96,8 +120,10 @@ export class PageDoc {
     if (text === this.text) return;
     const wasDirty = this.dirty;
     this.text = text;
-    if (!this.orphaned) this.schedule(AUTOSAVE_MS);
-    if (wasDirty !== this.dirty) this.hooks.onChange(this);
+    const fits = this.unwritable === 'text' && fitsTextFile(fromLf(text, this.eol));
+    if (fits) this.unwritable = null;
+    if (!this.orphaned && !this.unwritable) this.schedule(AUTOSAVE_MS);
+    if (wasDirty !== this.dirty || fits) this.hooks.onChange(this);
   }
 
   /** Saves now (if there is anything to save); resolves when done. */
@@ -111,11 +137,13 @@ export class PageDoc {
     return this.enqueue(async () => {
       const res = await read(this.path);
       if (res.ok) {
-        const wasOrphaned = this.orphaned;
+        const wasHeld = this.orphaned || this.unwritable === 'disk';
         this.orphaned = false; // it is back (restored, recreated)
+        if (this.unwritable === 'disk') this.unwritable = null; // text again
         await this.reconcile(res.value.text, res.value.hash);
-        if (wasOrphaned) this.resume();
+        if (wasHeld) this.resume();
       } else if (res.error.kind === 'notFound') this.markDeleted();
+      else if (notText(res.error.kind)) this.hold('disk');
     });
   }
 
@@ -153,6 +181,7 @@ export class PageDoc {
     this.base = toLf(fresh.value.text);
     this.hash = fresh.value.hash;
     this.orphaned = false;
+    this.unwritable = null;
     await this.flush();
     return created;
   }
@@ -184,8 +213,20 @@ export class PageDoc {
     this.hooks.onChange(this);
   }
 
+  /** Stops saving and keeps the text (`unwritable`); says so once when there
+   *  is unsaved text to keep. */
+  private hold(why: Unwritable): void {
+    this.cancelTimer();
+    this.failing = false;
+    this.retryDelay = 0;
+    const was = this.unwritable;
+    this.unwritable = why;
+    if (was !== why && this.dirty) this.hooks.onUnwritable?.(this);
+    this.hooks.onChange(this);
+  }
+
   private async save(): Promise<void> {
-    if (!this.dirty || this.orphaned) return;
+    if (!this.dirty || this.orphaned || this.unwritable) return;
     const text = this.text;
     this.writing = true;
     this.hooks.onChange(this);
@@ -199,6 +240,12 @@ export class PageDoc {
       if (this.dirty) this.schedule(AUTOSAVE_MS); // typed while saving
     } else if (res.error.kind === 'conflict' && res.error.currentText !== undefined) {
       await this.reconcile(res.error.currentText, res.error.currentHash ?? '');
+    } else if (notText(res.error.kind)) {
+      // Refused: either this text can't be a text file, or what is on disk now
+      // isn't text the app can merge with (it never gets a lossy copy).
+      const mine = isTextPath(this.path) && !fitsTextFile(fromLf(text, this.eol));
+      this.hold(mine ? 'text' : 'disk');
+      return;
     } else {
       // NotFound too: the file may only have been renamed or atomically
       // replaced, and the watcher event is still on its way. Only the watcher

@@ -241,3 +241,129 @@ describe('PageDoc external changes (M2a §3.3)', () => {
     expect(doc.status).toBe('saved');
   });
 });
+
+describe('final review I3: a file that is no longer text the app can edit', () => {
+  // A NUL byte stands for bytes that aren't UTF-8 (Excel's Windows-1252 CSV).
+  const OUTSIDE = {
+    'Windows-1252': 'Jos\0,Bogot\0\n',
+    'over 2 MB': 'a'.repeat(2 * 1024 * 1024 + 1),
+  };
+  const watch = () => {
+    const held: string[] = [];
+    return {
+      ...hooks(),
+      held,
+      onUnwritable: (d: PageDoc) => held.push(`${d.path}:${d.unwritable}`),
+    };
+  };
+
+  for (const [what, bytes] of Object.entries(OUTSIDE)) {
+    it(`rewritten outside (${what}) with unsaved edits: keeps them, never merges or writes`, async () => {
+      const disk = fakeDisk({ 'data.csv': 'José,Bogotá\n' });
+      const h = watch();
+      const doc = await load('data.csv', h);
+      doc.edit('José,Bogotá\nmine\n');
+      disk.files.set('data.csv', bytes);
+      await doc.sync(); // the watcher's event
+      doc.edit('José,Bogotá\nmine, more\n');
+      await doc.flush();
+      await vi.advanceTimersByTimeAsync(60_000);
+      expect(disk.writes()).toEqual([]);
+      expect(disk.files.get('data.csv')).toBe(bytes);
+      expect(doc.text).toBe('José,Bogotá\nmine, more\n');
+      expect(doc.unwritable).toBe('disk');
+      expect(doc.status).toBe('notSaved');
+      expect(h.held).toEqual(['data.csv:disk']);
+    });
+  }
+
+  it('a save that meets it before the watcher does: the same, and no retry loop', async () => {
+    const disk = fakeDisk({ 'data.csv': 'José,Bogotá\n' });
+    const h = watch();
+    const doc = await load('data.csv', h);
+    doc.edit('José,Bogotá\nmine\n');
+    disk.files.set('data.csv', OUTSIDE['Windows-1252']);
+    await vi.advanceTimersByTimeAsync(AUTOSAVE_MS + 60_000);
+    expect(disk.writes()).toHaveLength(1);
+    expect(disk.files.get('data.csv')).toBe(OUTSIDE['Windows-1252']);
+    expect(doc.unwritable).toBe('disk');
+    expect(doc.status).toBe('notSaved');
+    expect(h.held).toEqual(['data.csv:disk']);
+  });
+
+  it('Save as new file writes the kept text to a new file; autosave resumes there', async () => {
+    const disk = fakeDisk({ 'data.csv': 'José,Bogotá\n' });
+    const doc = await load('data.csv');
+    doc.edit('José,Bogotá\nmine\n');
+    disk.files.set('data.csv', OUTSIDE['Windows-1252']);
+    await doc.sync();
+    const saved = await doc.saveAsNew();
+    if (!saved.ok) throw new Error(saved.error.message);
+    expect(saved.value).not.toBe('data.csv');
+    expect(disk.files.get(saved.value)).toBe('José,Bogotá\nmine\n');
+    expect(doc.unwritable).toBeNull();
+    doc.edit('José,Bogotá\nmine, more\n');
+    await vi.advanceTimersByTimeAsync(AUTOSAVE_MS);
+    expect(disk.files.get(saved.value)).toBe('José,Bogotá\nmine, more\n');
+    expect(disk.files.get('data.csv')).toBe(OUTSIDE['Windows-1252']);
+  });
+
+  it('without unsaved edits there is nothing to keep: no toast; text again, it reloads', async () => {
+    const disk = fakeDisk({ 'data.csv': 'a,b\n' });
+    const h = watch();
+    const doc = await load('data.csv', h);
+    disk.files.set('data.csv', OUTSIDE['Windows-1252']);
+    await doc.sync();
+    expect(doc.unwritable).toBe('disk');
+    expect(doc.dirty).toBe(false);
+    expect(h.held).toEqual([]);
+    disk.files.set('data.csv', 'a,b\nc,d\n'); // saved as UTF-8 again
+    await doc.sync();
+    expect(doc.unwritable).toBeNull();
+    expect(doc.text).toBe('a,b\nc,d\n');
+  });
+
+  it('text again while edits wait: they merge and save', async () => {
+    const disk = fakeDisk({ 'data.csv': 'a\nb\nc\nd\n' });
+    const doc = await load('data.csv');
+    doc.edit('A\nb\nc\nd\n');
+    disk.files.set('data.csv', OUTSIDE['Windows-1252']);
+    await doc.sync();
+    disk.files.set('data.csv', 'a\nb\nc\nD\n');
+    await doc.sync();
+    expect(doc.unwritable).toBeNull();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(disk.files.get('data.csv')).toBe('A\nb\nc\nD\n');
+    expect(doc.status).toBe('saved');
+  });
+
+  it('my own text grown past 2 MB: refused once, kept, no retry loop; shortened, it saves', async () => {
+    const disk = fakeDisk({ 'log.txt': 'one\n' });
+    const h = watch();
+    const doc = await load('log.txt', h);
+    const big = 'x'.repeat(2 * 1024 * 1024 + 1);
+    doc.edit(big);
+    await vi.advanceTimersByTimeAsync(AUTOSAVE_MS + 60_000);
+    expect(disk.writes()).toHaveLength(1);
+    expect(doc.text).toBe(big);
+    expect(doc.unwritable).toBe('text');
+    expect(h.held).toEqual(['log.txt:text']);
+    doc.edit('one\ntwo\n');
+    expect(doc.unwritable).toBeNull();
+    await vi.advanceTimersByTimeAsync(AUTOSAVE_MS);
+    expect(disk.files.get('log.txt')).toBe('one\ntwo\n');
+  });
+
+  it('a page rewritten outside as non-UTF-8: kept the same way, never written', async () => {
+    const disk = fakeDisk({ 'A.md': '# Café\n' });
+    const doc = await load('A.md');
+    doc.edit('# Café\nmine\n');
+    disk.files.set('A.md', '# Caf\0\n');
+    await vi.advanceTimersByTimeAsync(AUTOSAVE_MS); // the save finds it first
+    await doc.sync();
+    await vi.advanceTimersByTimeAsync(60_000);
+    expect(disk.writes()).toHaveLength(1);
+    expect(disk.files.get('A.md')).toBe('# Caf\0\n');
+    expect(doc.unwritable).toBe('disk');
+  });
+});

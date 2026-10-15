@@ -21,6 +21,16 @@ type Extra = Record<string, (args: Record<string, unknown>) => unknown>;
 
 const err = (kind: string, message: string, extra: object = {}) => ({ kind, message, ...extra });
 
+/** What the backend can read as text: a NUL byte stands for bytes that aren't
+ *  UTF-8 (Windows-1252 from Excel); a text file (M4b part 2 §6) is also at
+ *  most 2 MB. Anything else is `notAText` (text files) or `binary` (pages),
+ *  and a refused write's conflict reply carries no text (final review I3). */
+const readable = (cmd: string, text: string) =>
+  !text.includes('\0') &&
+  (!cmd.startsWith('text_') || new TextEncoder().encode(text).length <= 2 * 1024 * 1024);
+const unreadable = (cmd: string, path: string) =>
+  err(cmd.startsWith('text_') ? 'notAText' : 'binary', path);
+
 /** First `# Heading`, else the file name (enough for header tests). */
 const titleOf = (path: string, text: string) =>
   /^# (.+)$/m.exec(text)?.[1] ?? path.slice(path.lastIndexOf('/') + 1).replace(/\.md$/, '');
@@ -58,8 +68,7 @@ export function fakeDisk(initial: Record<string, string>, extra: Extra = {}): Fa
         case 'text_read': {
           const text = files.get(args.path);
           if (text === undefined) throw err('notFound', args.path);
-          // Text files (M4b part 2 §6): a NUL byte stands for "not eligible".
-          if (cmd === 'text_read' && text.includes('\0')) throw err('notAText', args.path);
+          if (!readable(cmd, text)) throw unreadable(cmd, args.path);
           return { text, hash: hashOf(text) };
         }
         case 'page_write':
@@ -69,9 +78,12 @@ export function fakeDisk(initial: Record<string, string>, extra: Extra = {}): Fa
             failing--;
             throw err('io', 'disk full');
           }
+          // Text that would no longer be an eligible text file isn't written.
+          if (cmd === 'text_write' && !readable(cmd, args.text)) throw unreadable(cmd, args.path);
           const current = files.get(args.path);
           if (current === undefined) throw err('notFound', args.path);
           if (hashOf(current) !== args.expectedHash) {
+            if (!readable(cmd, current)) throw unreadable(cmd, args.path);
             throw err('conflict', 'changed', {
               currentText: current,
               currentHash: hashOf(current),
@@ -122,7 +134,7 @@ export function fakeDisk(initial: Record<string, string>, extra: Extra = {}): Fa
             backlinks: 0,
             text,
             truncated: false,
-            binary: false,
+            binary: !readable(cmd, text),
           };
         }
         case 'entry_rename': {

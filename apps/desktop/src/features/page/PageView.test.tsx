@@ -248,6 +248,29 @@ describe('PageView (M2a §5)', () => {
     await waitFor(() => expect(usePageStore.getState().state).toBe('ready'));
   });
 
+  it('final review I3: rewritten outside as non-UTF-8 while edited, the text stays with a notice and Save as new page', async () => {
+    const disk = fakeDisk({ 'A.md': '# Café\n' });
+    render(<PageScreen />);
+    await open('A.md');
+    await type('kept ', 7);
+    disk.files.set('A.md', '# Caf\0\n'); // a NUL stands for bytes that aren't UTF-8
+    await act(() =>
+      usePageStore
+        .getState()
+        .onExternalChange({ created: [], modified: ['A.md'], removed: [], renamed: [] }),
+    );
+    expect(
+      screen.getByText(
+        'This page changed outside Notes In My Way and is no longer text it can edit. ' +
+          'Your unsaved changes are kept here: copy them, or save them as a new page.',
+      ),
+    ).toBeInTheDocument();
+    expect(view().state.doc.toString()).toBe('# Café\nkept ');
+    await userEvent.click(screen.getByRole('button', { name: 'Save as new page' }));
+    await waitFor(() => expect([...disk.files.values()]).toContain('# Café\nkept '));
+    expect(disk.files.get('A.md')).toBe('# Caf\0\n');
+  });
+
   it('C2: the orphan banner shows whenever the page is orphaned, even while it is loaded', async () => {
     fakeDisk({ 'A.md': '# A\n' });
     render(<PageScreen />);

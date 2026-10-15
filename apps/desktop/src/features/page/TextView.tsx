@@ -8,6 +8,7 @@ import { Editor } from '../editor/Editor';
 import { onViewUpdate, useCurrentView } from '../editor/viewUpdates';
 import { Breadcrumb } from './Breadcrumb';
 import styles from './PageView.module.css';
+import { UnwritableNotice } from './UnwritableNotice';
 import { COUNT_DEBOUNCE_MS } from './WordCount';
 
 /** Lines and characters of the file in the editor (in place of words). */
@@ -48,6 +49,10 @@ export function TextView({ path }: { path: string }) {
   const doc = useEditorStore((s) => s.doc);
   const error = useEditorStore((s) => s.error);
   const status = useEditorStore((s) => s.status);
+  // Rewritten outside as something it can't edit, with nothing unsaved to
+  // keep: as if opened now (final review I3), never the stale text.
+  const gone = useEditorStore((s) => s.unwritable === 'disk' && !s.dirty);
+  const notText = gone || error?.kind === 'notAText';
   return (
     <section className={styles.page} aria-label={t('page.region')}>
       <div data-band="plain" className={styles.band}>
@@ -56,7 +61,7 @@ export function TextView({ path }: { path: string }) {
             <div className={`${styles.where} ${styles.pill}`}>
               <Breadcrumb path={path} />
             </div>
-            {doc && (
+            {doc && !notText && (
               <div className={styles.controls}>
                 <span
                   role="status"
@@ -71,12 +76,12 @@ export function TextView({ path }: { path: string }) {
           </div>
         </div>
       </div>
-      {error ? (
+      {error || notText ? (
         <div className={`${styles.orphan}`}>
           <p className={styles.notice}>
-            {error.kind === 'notAText' ? t('page.textOnly') : errorMessage(error)}
+            {error && !notText ? errorMessage(error) : t('page.textOnly')}
           </p>
-          {error.kind === 'notAText' && (
+          {notText && (
             <button
               type="button"
               className="btn btn-secondary"
@@ -87,7 +92,12 @@ export function TextView({ path }: { path: string }) {
           )}
         </div>
       ) : (
-        doc && <Editor doc={doc} mode="source" label={nameOf(path)} />
+        doc && (
+          <>
+            <UnwritableNotice />
+            <Editor doc={doc} mode="source" label={nameOf(path)} />
+          </>
+        )
       )}
     </section>
   );

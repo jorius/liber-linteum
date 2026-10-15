@@ -8,6 +8,7 @@ import { resetEditorStore } from '../../stores/editorStore';
 import { followLink } from '../../stores/links';
 import { usePageStore } from '../../stores/pageStore';
 import { DEFAULT_SETTINGS, useSettingsStore } from '../../stores/settingsStore';
+import { useToastStore } from '../../stores/toastStore';
 import { useUiStore } from '../../stores/uiStore';
 import { resetVaultStore, useVaultStore } from '../../stores/vaultStore';
 import { fakeDisk } from '../../test/fakeDisk';
@@ -24,6 +25,7 @@ beforeEach(() => {
 afterEach(async () => {
   usePageStore.getState().clear();
   resetEditorStore();
+  useToastStore.getState().clear();
   await resetVaultStore();
   vi.useRealTimers();
   clearMocks();
@@ -99,6 +101,50 @@ describe('text and code files (M4b part 2 §6)', () => {
     );
     await waitFor(() => expect(usePageStore.getState().path).toBe('notes.txt'));
     expect(await screen.findByRole('textbox', { name: 'File name' })).toHaveValue('notes');
+  });
+
+  it('final review I3: rewritten outside as non-text while edited, the edits stay with a notice, a toast and Save as new file', async () => {
+    const disk = fakeDisk({ 'data.csv': 'José,Bogotá\n' });
+    render(<PageScreen />);
+    await open('data.csv');
+    act(() => view().dispatch({ changes: { from: 12, insert: 'mine\n' }, userEvent: 'input.type' }));
+    disk.files.set('data.csv', 'Jos\0,Bogot\0\n'); // Excel's Windows-1252 export
+    await act(() =>
+      usePageStore
+        .getState()
+        .onExternalChange({ created: [], modified: ['data.csv'], removed: [], renamed: [] }),
+    );
+    const notice =
+      'This file changed outside Notes In My Way and is no longer plain text it can edit. ' +
+      'Your unsaved changes are kept here: copy them, or save them as a new file.';
+    expect(screen.getByText(notice)).toBeInTheDocument();
+    expect(view().state.doc.toString()).toBe('José,Bogotá\nmine\n');
+    expect(screen.getByRole('status', { name: 'Save status' })).toHaveTextContent('Not saved');
+    expect(useToastStore.getState().toasts.map((t) => t.message)).toContain(
+      '“data.csv” changed outside Notes In My Way and is no longer plain text it can edit. ' +
+        'Your unsaved changes are kept in the app.',
+    );
+    await userEvent.click(screen.getByRole('button', { name: 'Save as new file' }));
+    await waitFor(() =>
+      expect([...disk.files.values()].filter((t) => t === 'José,Bogotá\nmine\n')).toHaveLength(1),
+    );
+    expect(disk.files.get('data.csv')).toBe('Jos\0,Bogot\0\n');
+    expect(screen.queryByText(notice)).not.toBeInTheDocument();
+  });
+
+  it('final review I3: rewritten outside as non-text with nothing unsaved, it opens in its default app', async () => {
+    const disk = fakeDisk({ 'data.csv': 'a,b\n' });
+    render(<PageScreen />);
+    await open('data.csv');
+    disk.files.set('data.csv', 'a,b\0\n');
+    await act(() =>
+      usePageStore
+        .getState()
+        .onExternalChange({ created: [], modified: ['data.csv'], removed: [], renamed: [] }),
+    );
+    expect(screen.getByText('This file opens in its default app.')).toBeInTheDocument();
+    expect(document.querySelector('.cm-editor')).toBeNull();
+    expect(useToastStore.getState().toasts).toEqual([]);
   });
 
   it('NFR-10: no axe violations', async () => {

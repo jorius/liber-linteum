@@ -1473,3 +1473,51 @@ fn m4b2_text_files_keep_their_type_in_recovery_over_ipc() {
     .unwrap_err();
     assert_eq!(kind(err), "notAText");
 }
+
+/// Final review I3: a file rewritten outside as something the app can't edit
+/// (Windows-1252 from Excel, a NUL byte, over 2 MB; a page that isn't UTF-8)
+/// makes a stale write fail as `notAText` / `binary` — never a `conflict`
+/// carrying lossy text the merge would write back over every accent.
+#[test]
+fn final_review_i3_a_conflict_with_a_non_text_file_carries_no_lossy_text() {
+    let h = harness();
+    let vault = tempfile::tempdir().unwrap();
+    std::fs::write(vault.path().join("data.csv"), "José,Bogotá\n").unwrap();
+    std::fs::write(vault.path().join("Page.md"), "# Café\n").unwrap();
+    call(&h.main, "vault_open", json!({ "path": vault.path() })).unwrap();
+    let text_hash = call(&h.main, "text_read", json!({ "path": "data.csv" })).unwrap()["hash"]
+        .as_str()
+        .unwrap()
+        .to_string();
+    let page_hash = call(&h.main, "page_read", json!({ "path": "Page.md" })).unwrap()["hash"]
+        .as_str()
+        .unwrap()
+        .to_string();
+    let big = vec![b'a'; nimw_session::TEXT_MAX_BYTES + 1];
+    let outside: [&[u8]; 3] = [b"Jos\xe9,Bogot\xe1\n", b"Jose\0,Bogota\n", &big];
+    for bytes in outside {
+        std::fs::write(vault.path().join("data.csv"), bytes).unwrap();
+        let err = call(
+            &h.main,
+            "text_write",
+            json!({ "path": "data.csv", "text": "José,Bogotá\nmine\n", "expectedHash": text_hash }),
+        )
+        .unwrap_err();
+        assert_eq!(kind(err.clone()), "notAText", "{err}");
+        assert!(err.get("currentText").is_none(), "{err}");
+        assert_eq!(std::fs::read(vault.path().join("data.csv")).unwrap(), bytes);
+    }
+    std::fs::write(vault.path().join("Page.md"), b"# Caf\xe9\n").unwrap();
+    let err = call(
+        &h.main,
+        "page_write",
+        json!({ "path": "Page.md", "text": "# Café\nmine\n", "expectedHash": page_hash }),
+    )
+    .unwrap_err();
+    assert_eq!(kind(err.clone()), "binary", "{err}");
+    assert!(err.get("currentText").is_none(), "{err}");
+    assert_eq!(
+        std::fs::read(vault.path().join("Page.md")).unwrap(),
+        b"# Caf\xe9\n"
+    );
+}
