@@ -45,6 +45,58 @@ fn m5_search_through_the_session_follows_edits() {
     assert!(!s.search(&SearchQuery::default()).unwrap().indexing);
 }
 
+fn title_of(s: &VaultSession, path: &str) -> String {
+    s.page(&VaultPath::new(path).unwrap())
+        .unwrap()
+        .unwrap()
+        .title
+}
+
+/// Final review I1: a page with no H1 takes its title from its file name, so a
+/// rename must re-title it and search must find it by the new name only.
+#[test]
+fn m5_review_i1_a_renamed_page_is_found_by_its_new_name_only() {
+    let dir = tempfile::tempdir().unwrap();
+    write(dir.path(), "Notes/Old Name.md", "Just text.\n");
+    write(dir.path(), "Notes/Kept.md", "# Heading Title\n\nMore.\n");
+    let (_c, s) = open(dir.path());
+    let vp = |p: &str| VaultPath::new(p).unwrap();
+    s.rename(&vp("Notes/Old Name.md"), &vp("Notes/Fresh.md"), true)
+        .unwrap();
+    assert!(
+        find(&s, "old").is_empty(),
+        "no longer found by the old name"
+    );
+    assert_eq!(find(&s, "fresh"), vec!["Notes/Fresh.md"]);
+    assert_eq!(title_of(&s, "Notes/Fresh.md"), "Fresh");
+    // An H1 title survives a rename, and a folder rename keeps file names.
+    s.rename(&vp("Notes/Kept.md"), &vp("Notes/Moved.md"), true)
+        .unwrap();
+    assert_eq!(title_of(&s, "Notes/Moved.md"), "Heading Title");
+    s.rename(&vp("Notes"), &vp("Archive"), true).unwrap();
+    assert_eq!(title_of(&s, "Archive/Fresh.md"), "Fresh");
+    assert_eq!(find(&s, "archive fresh"), vec!["Archive/Fresh.md"]);
+}
+
+/// Final review I1, the watcher's half: a rename made by another program.
+#[test]
+fn m5_review_i1_an_outside_rename_is_found_by_its_new_name_only() {
+    let dir = tempfile::tempdir().unwrap();
+    write(dir.path(), "Old Name.md", "Just text.\n");
+    let (_c, s) = open(dir.path());
+    let s = std::sync::Arc::new(s);
+    s.start_watching().unwrap();
+    std::thread::sleep(Duration::from_millis(300));
+    std::fs::rename(dir.path().join("Old Name.md"), dir.path().join("Fresh.md")).unwrap();
+    assert!(nimw_testkit::wait_until(Duration::from_secs(5), || find(
+        &s, "fresh"
+    ) == vec![
+        "Fresh.md"
+    ]));
+    assert!(find(&s, "old").is_empty());
+    assert_eq!(title_of(&s, "Fresh.md"), "Fresh");
+}
+
 /// NFR-03 (M5 §6): on the 10,000-note reference vault, `search` p95 < 50 ms
 /// over 200 queries of 1–3 words and filter mixes; the first index, FTS
 /// included, < 30 s; re-indexing a changed page < 100 ms. Release only:

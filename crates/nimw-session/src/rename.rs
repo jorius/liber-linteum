@@ -1,6 +1,7 @@
 use crate::error::{Result, SessionError};
 use crate::events::RenameOutcome;
-use crate::session::{VaultSession, is_page_path, subtree_files, validate_name};
+use crate::events::SessionEvent;
+use crate::session::{VaultSession, is_page_path, subtree_files, validate_name, write_loaded};
 use nimw_markdown::{FileSet, LinkKind, link_key, parse_page, resolve, shortest_unique_target};
 use nimw_vault::{VaultError, VaultPath};
 use percent_encoding::{AsciiSet, CONTROLS, utf8_percent_encode};
@@ -254,6 +255,20 @@ impl VaultSession {
             }
         }
 
+        // A page with no first-line H1 is titled by its file name: re-parse
+        // the pages whose name changed, so the title and search follow
+        // (M5 final review I1). Rewritten files were re-parsed already.
+        for new in plan.moved.iter().filter_map(|(old, new)| {
+            let renamed = is_page_path(new)
+                && VaultPath::new(old).ok()?.stem() != VaultPath::new(new).ok()?.stem()
+                && !outcome.updated_files.contains(new);
+            renamed.then_some(new)
+        }) {
+            if let Err(e) = self.reparse(new) {
+                self.emit(SessionEvent::Warning(format!("{new}: not re-indexed: {e}")));
+            }
+        }
+
         let mut index = self.index();
         let files = index.file_set()?;
         let keys: Vec<String> = plan
@@ -266,6 +281,18 @@ impl VaultSession {
             index.resolve_from(&files, path)?;
         }
         Ok(outcome)
+    }
+
+    /// Reads `path` again and stores its page data.
+    fn reparse(&self, path: &str) -> Result<()> {
+        let Some(entry) = self.vault.stat(&VaultPath::new(path)?)? else {
+            return Ok(());
+        };
+        let mut warnings = Vec::new();
+        if let Some(loaded) = self.load(&entry, None, &mut warnings) {
+            self.index().transaction(|tx| write_loaded(tx, &loaded))?;
+        }
+        Ok(())
     }
 
     /// Rewrites one file's links with compare-and-swap, re-reading and
