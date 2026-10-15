@@ -194,6 +194,29 @@ export function installIpcMock({
     attachmentLinkFormat: linkFormat,
     obsidianLinkFormat: null,
   });
+  // ---- M4c: quick notes (the global Scratchpad and the scratch folder) ----
+  const SCRATCH_DEFAULT = '/Users/e2e/Documents/Notes In My Way/Scratchpad';
+  /** The open vault is the global Scratchpad (its root is the scratch place). */
+  let inScratchpad = false;
+  const autoNamed = new Set<string>();
+  /** Folders quick notes created (the mock's tree lists no other folders). */
+  const madeFolders = new Set<string>();
+  const scratchDir = () => (inScratchpad ? '' : 'Scratchpad');
+  const join = (dir: string, name: string) => (dir ? `${dir}/${name}` : name);
+  const freeName = (dir: string, stem: string, self?: string) => {
+    for (let i = 0; ; i++) {
+      const path = join(dir, i ? `${stem} ${i}.md` : `${stem}.md`);
+      if (path === self || !(path in pages)) return path;
+    }
+  };
+  /** The first line's text, as Rust derives it (enough for the tests). */
+  const stemOf = (text: string) =>
+    (text.split('\n').find((l) => l.trim()) ?? '')
+      .replace(/^#+\s*/, '')
+      .replace(/[/\\#|^[\]:*"<>?]/g, '-')
+      .trim()
+      .slice(0, 60)
+      .trim();
   const handlers: Record<string, (a: Args, options?: unknown) => unknown> = {
     app_info: () => ({ name: 'Notes In My Way', version: '0.0.0-e2e' }),
     settings_get: () => ({ settings }),
@@ -224,11 +247,13 @@ export function installIpcMock({
         durationMs: 1,
       },
     }),
-    vault_tree: () =>
-      Object.keys(pages).map((path) => ({
+    vault_tree: () => [
+      ...[...madeFolders].map((path) => ({ path, kind: 'folder' })),
+      ...Object.keys(pages).map((path) => ({
         path,
         kind: /\.md$/i.test(path) ? 'page' : 'attachment',
       })),
+    ],
     page_get: (a) => page(a.path as string),
     page_read: (a) => ({ text: pages[a.path as string], hash: 'h' }),
     page_write: (a) => {
@@ -479,6 +504,58 @@ export function installIpcMock({
       return null;
     },
     entry_create_folder: (a) => (a.parent ? `${a.parent}/${a.name}` : (a.name as string)),
+    scratchpad_default: () => SCRATCH_DEFAULT,
+    scratchpad_choose: () => null,
+    scratchpad_set: (a) => {
+      settings = { ...settings, scratchpadPath: a.path };
+      return settings;
+    },
+    scratchpad_open: () => {
+      inScratchpad = true;
+      return {
+        name: 'Scratchpad',
+        root: settings.scratchpadPath,
+        scratchpad: true,
+        report: {
+          files: 0,
+          pages: 0,
+          parsed: 0,
+          skippedUnchanged: 0,
+          removed: 0,
+          warnings: [],
+          durationMs: 1,
+        },
+      };
+    },
+    quick_notes_state: () => ({
+      folder: inScratchpad ? null : 'Scratchpad',
+      autoNamed: [...autoNamed],
+    }),
+    quick_note_create: (a) => {
+      const path = freeName(scratchDir(), a.name as string);
+      if (scratchDir()) madeFolders.add(scratchDir());
+      pages[path] = '';
+      autoNamed.add(path);
+      return path;
+    },
+    quick_note_autoname: (a) => {
+      const from = a.path as string;
+      const unchanged = { path: from, autoNamed: autoNamed.has(from), outcome: null };
+      const stem = stemOf(pages[from] ?? '');
+      if (!autoNamed.has(from) || !stem.replace(/-/g, '')) return unchanged;
+      const dir = from.includes('/') ? from.slice(0, from.lastIndexOf('/')) : '';
+      const to = freeName(dir, stem, from);
+      if (to === from) return unchanged;
+      pages[to] = pages[from];
+      delete pages[from];
+      autoNamed.delete(from);
+      autoNamed.add(to);
+      return {
+        path: to,
+        autoNamed: true,
+        outcome: { moved: [[from, to]], updatedFiles: [], updatedLinks: 0, failed: [] },
+      };
+    },
     entry_create_page: (a) => {
       const name = `${a.name}.md`;
       const path = a.dir ? `${a.dir}/${name}` : name;
