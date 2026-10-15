@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { setFileWindow } from '../../ipc';
 import { clearMocks } from '../../ipc/testing';
 import { fakeDisk, hashOf } from '../../test/fakeDisk';
 import { AUTOSAVE_MS, PageDoc, type PageDocHooks } from './pageDoc';
@@ -176,6 +177,51 @@ describe('PageDoc external changes (M2a §3.3)', () => {
     expect(saved).toEqual({ ok: true, value: 'data (conflict).csv' });
     expect(disk.files.get('data (conflict).csv')).toBe('a,b\n1,2\n');
     expect(disk.files.get('data.csv')).toBe('someone else’s\n');
+  });
+
+  it('M4c review m3: in a file window, Save again finding the file back merges into it', async () => {
+    setFileWindow('note.md');
+    try {
+      const disk = fakeDisk(
+        { 'note.md': 'one\n' },
+        {
+          file_read: () => ({
+            text: disk.files.get('note.md'),
+            hash: hashOf(disk.files.get('note.md')!),
+          }),
+          file_write: (a) => {
+            const now = disk.files.get('note.md')!;
+            if (hashOf(now) !== a.expectedHash)
+              throw {
+                kind: 'conflict',
+                message: 'changed',
+                currentText: now,
+                currentHash: hashOf(now),
+              };
+            disk.files.set('note.md', a.text);
+            return { hash: hashOf(a.text) };
+          },
+          file_recreate: () => {
+            if (disk.files.has('note.md')) throw { kind: 'alreadyExists', message: 'note.md' };
+            disk.files.set('note.md', '');
+            return 'note.md';
+          },
+          file_conflict_copy: () => 'note (conflict).md',
+        },
+      );
+      const doc = await load('note.md');
+      doc.edit('one\nmine\n');
+      expect(doc.markDeleted()).toBe(true);
+      disk.files.set('note.md', 'one\n'); // put back before Save again
+      const saved = await doc.saveAsNew();
+      expect(saved).toEqual({ ok: true, value: 'note.md' });
+      expect(doc.path).toBe('note.md');
+      expect(doc.orphaned).toBe(false);
+      expect(disk.files.get('note.md')).toBe('one\nmine\n');
+      expect(disk.calls.map(([c]) => c)).not.toContain('file_conflict_copy');
+    } finally {
+      setFileWindow(null);
+    }
   });
 
   it('deleted while clean: nothing to keep', async () => {

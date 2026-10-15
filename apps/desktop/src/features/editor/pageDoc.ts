@@ -1,6 +1,7 @@
 import {
   entryCreatePage,
   entryCreateText,
+  fileWindowName,
   pageCreateConflictCopy,
   pageRead,
   pageWrite,
@@ -172,6 +173,13 @@ export class PageDoc {
       ? await entryCreateText(dir, nameOf(this.path))
       : await entryCreatePage(dir, nameOf(this.path).replace(/\.md$/i, ''));
     if (!created.ok && created.error.kind === 'alreadyExists') {
+      if (fileWindowName() !== null) {
+        // A single-file window writes its own file only: it is back, so the
+        // text merges into it (M4c review m3), never into a copy it can't write.
+        await this.sync();
+        await this.flush();
+        return { ok: true, value: this.path };
+      }
       created = await pageCreateConflictCopy(this.path, '');
     }
     if (!created.ok) return created;
