@@ -367,7 +367,9 @@ impl VaultSession {
         let heights = self.vault.forget_cover_heights(removed);
         let sides = self.vault.forget_cover_sides(removed);
         let strips = self.vault.forget_cover_widths(removed);
-        if let Err(e) = widths.and(heights).and(sides).and(strips) {
+        // Deleted quick notes stop being named after their first line (M4c).
+        let quick = self.vault.forget_auto_named(removed);
+        if let Err(e) = widths.and(heights).and(sides).and(strips).and(quick) {
             self.emit(SessionEvent::Warning(format!(
                 "Page widths or cover sizes not updated for {} removed entries: {e}",
                 removed.len()

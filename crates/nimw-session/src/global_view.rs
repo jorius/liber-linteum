@@ -518,6 +518,12 @@ impl VaultSession {
         let heights = self.vault.remap_cover_heights_many(renames);
         let sides = self.vault.remap_cover_sides_many(renames);
         let strips = self.vault.remap_cover_widths_many(renames);
+        // Quick notes (M4c §7): a rename that isn't the auto-name's own ends
+        // naming from the first line, and the scratch folder follows a
+        // top-level rename.
+        let froms: Vec<String> = renames.iter().map(|(from, _)| from.clone()).collect();
+        let quick = self.vault.forget_auto_named(&froms);
+        let scratch = self.vault.follow_scratch_folder(renames);
         if let Err(e) = self
             .vault
             .remap_layout_many(renames)
@@ -526,6 +532,8 @@ impl VaultSession {
             .and(heights)
             .and(sides)
             .and(strips)
+            .and(quick)
+            .and(scratch)
         {
             let what = match renames {
                 [(from, to)] => format!("{from} → {to}"),
