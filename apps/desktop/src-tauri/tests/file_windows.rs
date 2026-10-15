@@ -646,3 +646,20 @@ fn m4c_review_i2_a_window_closes_itself_and_no_other() {
         .unwrap();
     assert!(denied(call(&other, "window_close_self", json!({}))));
 }
+
+#[test]
+fn m4c_review_m2_a_file_grown_too_large_is_not_read() {
+    let h = harness();
+    let dir = folder(&[]);
+    let w = open(&h, &dir.path().join("note.md"));
+    std::fs::File::options()
+        .write(true)
+        .open(dir.path().join("note.md"))
+        .unwrap()
+        .set_len(nimw_desktop::file_windows::PAGE_MAX_BYTES + 1)
+        .unwrap();
+    assert_eq!(
+        kind(call(&w, "file_read", json!({})).unwrap_err()),
+        "tooLarge"
+    );
+}

@@ -9,7 +9,7 @@ use crate::editor_commands::{
 };
 use crate::error::{CmdResult, CommandError, ErrorKind};
 use crate::file_windows::{
-    FileGrant, FileKind, FileWindows, file_kind, grant_for, open_file_window,
+    FileGrant, FileKind, FileWindows, check_size, file_kind, grant_for, open_file_window,
 };
 use crate::state::AppState;
 use crate::vault_commands::blocking;
@@ -119,6 +119,9 @@ pub(crate) fn file_info_impl(state: &AppState, grant: &FileGrant) -> CmdResult<F
 
 pub(crate) fn file_read_impl(grant: &FileGrant) -> CmdResult<PageText> {
     let name = grant.name();
+    // It may have grown since it opened: never read a huge file whole (M4c review m2).
+    let len = std::fs::metadata(grant.vault().fs_path(&name)?)?.len();
+    check_size(grant.kind(), len, name.as_str())?;
     let (bytes, hash) = grant.vault().read(&name)?;
     Ok(PageText {
         text: text_for(grant.kind(), &name, bytes)?,
