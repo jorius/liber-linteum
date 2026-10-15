@@ -103,3 +103,34 @@
   font-style: normal;
   line-height: 1;
 }
+
+.iconButton {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: none;
+  color: var(--color-text-muted);
+  line-height: 1;
+  padding: 2px;
+  cursor: pointer;
+}
+
+.iconButton:hover {
+  background: var(--color-accent-soft);
+}
+
+/* No icon yet: a faint smiley, clearer on hover or focus. */
+.iconButton[data-empty] {
+  opacity: 0.45;
+}
+
+.iconButton[data-empty]:hover {
+  opacity: 1;
+}
+
+.iconButton[data-empty]:focus-visible {
+  opacity: 1;
+}

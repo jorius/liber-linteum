@@ -295,3 +295,9 @@
   clip: rect(0 0 0 0);
   white-space: nowrap;
 }
+
+/* The vault's optional emoji (M5b §4), before its name. */
+.vaultIcon {
+  font-size: 20px;
+  color: inherit;
+}

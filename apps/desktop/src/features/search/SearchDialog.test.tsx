@@ -81,7 +81,7 @@ beforeEach(() => {
   reply = defaultReply;
   useSearchStore.getState().reset();
   useUiStore.setState({ dialog: null, screen: 'edit' });
-  useVaultStore.setState({ status: 'open' });
+  useVaultStore.setState({ status: 'open', nodes: [] });
   mockIPC((cmd, raw) => {
     if (cmd !== 'search') return null;
     const q = (raw as { query: SearchQuery }).query;
@@ -100,6 +100,12 @@ function openDialog() {
 const lastQuery = () => queries[queries.length - 1];
 
 describe('Search dialog (M5 §4)', () => {
+  it('shows a hit’s emoji before its title (M5b §4)', async () => {
+    useVaultStore.setState({ nodes: [{ path: 'Recent.md', kind: 'page', icon: '🚀' }] });
+    openDialog();
+    expect(await screen.findByRole('option', { name: /Recent/ })).toHaveTextContent(/🚀Recent/);
+  });
+
   it('opens with the keyboard in the field and shows Recent', async () => {
     const field = openDialog();
     expect(field).toHaveFocus();

@@ -1,8 +1,10 @@
 import { useEditorStore } from '../../stores/editorStore';
 import { usePageStore } from '../../stores/pageStore';
 import { isTextPath } from '../../stores/textFiles';
+import { IconButton, useIcon } from '../icons/ItemIcon';
 import { PageSubtitle } from './PageSubtitle';
 import { PageTitle } from './PageTitle';
+import styles from './PageView.module.css';
 
 /** The open page's title and subtitle, at the top of the page (M5b §2.3;
  *  in the top bar before): both stay editable in place (M2b §2, M2c §3).
@@ -12,11 +14,19 @@ export function PageHeading() {
   const page = usePageStore((s) => s.page);
   const path = usePageStore((s) => s.path);
   const editable = useEditorStore((s) => s.doc !== null && s.path === page?.path);
+  const icon = useIcon(page?.path);
   // A text file: its name, no subtitle (M4b part 2 §6).
   if (state === 'ready' && path && isTextPath(path)) return <PageTitle path={path} />;
   if (state !== 'ready' || !page) return null;
   return (
     <>
+      {/* The page's optional emoji (M5b §4), before its title. */}
+      <IconButton
+        target={{ kind: 'page', path: page.path }}
+        icon={icon}
+        name={page.title}
+        className={styles.pageIcon}
+      />
       <PageTitle path={page.path} />
       <PageSubtitle page={page} editable={editable} />
     </>

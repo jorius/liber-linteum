@@ -1,22 +1,20 @@
-import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { LockIcon, NewFolderIcon, NewPageIcon, SidebarIcon } from '../../app/icons';
 import { dirFor } from '../../stores/tree';
 import { useVaultStore } from '../../stores/vaultStore';
 import { ExplorerDnd } from '../explorer/ExplorerDnd';
 import type { ExplorerTreeProps } from '../explorer/ExplorerTree';
+import { IconButton } from '../icons/ItemIcon';
 import { toggleSidebar } from './shellMenu';
 import { VaultMenu } from './VaultMenu';
 import styles from './Shell.module.css';
 
-/** Left column: the vault menu, explorer actions, the tree and the privacy
- *  footer. `vaultIcon`: the vault's icon before its name (M5b §2.4). */
-export function Sidebar({
-  vaultIcon,
-  ...treeProps
-}: ExplorerTreeProps & { vaultIcon?: ReactNode }) {
+/** Left column: the vault's icon and menu, explorer actions, the tree and the
+ *  privacy footer. */
+export function Sidebar(treeProps: ExplorerTreeProps) {
   const { t } = useTranslation();
   const name = useVaultStore((s) => s.info?.name ?? '');
+  const icon = useVaultStore((s) => s.info?.icon);
   const create = (kind: 'page' | 'folder') => {
     const { nodes, selected, createPage, createFolder } = useVaultStore.getState();
     const dir = dirFor(nodes, selected);
@@ -24,9 +22,16 @@ export function Sidebar({
   };
   return (
     <aside className={styles.side} aria-label={t('shell.files', { name })}>
-      {/* The vault, not the app (M4b §1): no app mark beside it (M5b §2.4). */}
+      {/* The vault, not the app (M4b §1): no app mark beside it (M5b §2.4). Its
+          optional emoji is its own button, so it never opens the vault menu. */}
       <div className={styles.brandRow}>
-        <VaultMenu name={name} leading={vaultIcon} />
+        <IconButton
+          target={{ kind: 'vault' }}
+          icon={icon}
+          name={name}
+          className={styles.vaultIcon}
+        />
+        <VaultMenu name={name} />
         <button
           type="button"
           className={styles.iconButton}

@@ -881,3 +881,9 @@ span.relatedOpen {
 .titleBlock .subtitleInput {
   font-size: 15px;
 }
+
+/* The page's optional emoji (M5b §4), before the title. */
+.pageIcon {
+  font-size: 24px;
+  margin-right: 4px;
+}

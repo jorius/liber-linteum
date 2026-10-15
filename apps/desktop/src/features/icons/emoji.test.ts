@@ -29,6 +29,8 @@ describe('the bundled emoji list (M5b §4)', () => {
     expect(searchEmoji(groups, 'zzzqqq')).toEqual([]);
     // A name match ranks above a keyword match (astronauts have "cohete").
     expect(searchEmoji(groups, 'cohete')[0]).toBe('🚀');
+    // An exact name first ("dragon face" comes earlier in the list).
+    expect(searchEmoji(groups, 'Dragon')[0]).toBe('🐉');
   });
 
   it('keeps recent picks, newest first, without repeats', () => {

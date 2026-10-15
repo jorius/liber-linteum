@@ -14,6 +14,7 @@ import { openPage } from '../../stores/navigate';
 import { useUiStore } from '../../stores/uiStore';
 import { Dialog } from '../dialogs/Dialog';
 import { useGvStore } from '../global-view/gvStore';
+import { ItemIcon, useIcons } from '../icons/ItemIcon';
 import {
   highlightParts,
   pathTrail,
@@ -79,6 +80,7 @@ function Chip({
  *  its level in the Global View; Escape clears the text, then closes. */
 export function SearchDialog({ onClose }: { onClose: () => void }) {
   const { t } = useTranslation();
+  const icons = useIcons();
   const text = useSearchStore((s) => s.text);
   const filters = useSearchStore((s) => s.filters);
   const page = useSearchStore((s) => s.page);
@@ -393,6 +395,7 @@ export function SearchDialog({ onClose }: { onClose: () => void }) {
             </span>
             <span className={styles.body}>
               <span className={styles.title}>
+                <ItemIcon icon={icons.get(hit.path)} />
                 <Marked parts={highlightParts(hit.title, words)} />
               </span>
               <span className={styles.path}>{pathTrail(hit.path)}</span>

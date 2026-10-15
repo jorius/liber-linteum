@@ -11,6 +11,7 @@ import { useTranslation } from 'react-i18next';
 import { AudioIcon, FolderIcon, GripIcon, ImageIcon, LinkIcon } from '../../app/icons';
 import { assetUrl, type GvCard } from '../../ipc';
 import { nameOf } from '../../stores/tree';
+import { ItemIcon, useIcon } from '../icons/ItemIcon';
 import { CardMenu, type CardMenuItem } from './CardMenu';
 import { AtomIcon, BriefcaseIcon, EditIcon, FolderSmallIcon, PageIcon, StackIcon } from './gvIcons';
 import styles from './Card.module.css';
@@ -76,6 +77,7 @@ export function Card({
       : kind;
   const summary = card.kind !== 'page' && !card.indexPage;
   const side = card.coverSide ?? 'top';
+  const icon = useIcon(card.path);
 
   const click = () => {
     if (timer.current) clearTimeout(timer.current);
@@ -188,7 +190,10 @@ export function Card({
           >
             {cover}
           </div>
-          <p className={styles.title}>{card.title}</p>
+          <p className={styles.title}>
+            <ItemIcon icon={icon} />
+            {card.title}
+          </p>
           {card.subtitle && <p className={styles.subtitle}>{card.subtitle}</p>}
           {card.excerpt && <p className={styles.excerpt}>{card.excerpt}</p>}
           <span id={descId} className={styles.srOnly}>

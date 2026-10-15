@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
 import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import { closeVault, openAnotherVault, openSettings } from './shellMenu';
@@ -6,8 +6,8 @@ import styles from './Shell.module.css';
 
 /** The vault's name in the sidebar, as a menu button (M5b §11.1): Settings…,
  *  Open another vault…, Close vault — on every platform, where macOS also has
- *  them in its app menu. `leading`: the vault's icon (Stream B). */
-export function VaultMenu({ name, leading }: { name: string; leading?: ReactNode }) {
+ *  them in its app menu. */
+export function VaultMenu({ name }: { name: string }) {
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const button = useRef<HTMLButtonElement>(null);
@@ -32,7 +32,6 @@ export function VaultMenu({ name, leading }: { name: string; leading?: ReactNode
           setOpen(true);
         }}
       >
-        {leading}
         <span className={styles.brandName}>{name}</span>
       </button>
       {open && button.current && (

@@ -27,21 +27,24 @@ const haystack = (item: EmojiItem) => {
   return h;
 };
 
-/** Emoji whose names or keywords hold every word of `query`; those whose
- *  English or Spanish name holds them come first. */
+/** Emoji whose names or keywords hold every word of `query`: those named
+ *  exactly that come first, then those whose English or Spanish name holds
+ *  the words, then keyword matches. */
 export function searchEmoji(groups: EmojiGroup[], query: string): string[] {
-  const words = fold(query).split(/\s+/).filter(Boolean);
+  const q = fold(query).trim();
+  const words = q.split(/\s+/).filter(Boolean);
   if (!words.length) return [];
-  const named: string[] = [];
-  const others: string[] = [];
+  const tiers: string[][] = [[], [], []];
   for (const g of groups) {
     for (const item of g.items) {
       if (!words.every((w) => haystack(item).includes(w))) continue;
-      const names = fold(`${item[1]} ${item[2]}`);
-      (words.every((w) => names.includes(w)) ? named : others).push(item[0]);
+      const en = fold(item[1]);
+      const es = fold(item[2]);
+      const tier = en === q || es === q ? 0 : words.every((w) => `${en} ${es}`.includes(w)) ? 1 : 2;
+      tiers[tier].push(item[0]);
     }
   }
-  return [...named, ...others];
+  return tiers.flat();
 }
 
 /** The name of `emoji` in `lang` ('es' or English), for labels. */

@@ -2,6 +2,7 @@ import { useDraggable, useDroppable } from '@dnd-kit/core';
 import { forwardRef, useEffect, useId, useRef, useState, type KeyboardEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { TreeNode } from '../../ipc';
+import { ItemIcon } from '../icons/ItemIcon';
 import { QuickNoteIcon } from '../scratchpad/QuickNoteIcon';
 import styles from './Explorer.module.css';
 import { validateName } from './nameRules';
@@ -204,7 +205,14 @@ export const TreeRow = forwardRef<HTMLLIElement, TreeRowProps>(function TreeRow(
       onClick={() => onActivate(node)}
       onFocus={() => onFocusRow(node.path)}
     >
-      <Icon node={node} expanded={expanded} />
+      {/* An optional emoji (M5b §4) stands in for the page glyph, and
+          follows a folder's chevron. */}
+      {node.kind === 'page' && node.icon ? (
+        <ItemIcon icon={node.icon} />
+      ) : (
+        <Icon node={node} expanded={expanded} />
+      )}
+      {node.kind === 'folder' && <ItemIcon icon={node.icon} />}
       {pinnedCount !== undefined && (
         <span className={styles.pinIcon} data-quick-note-icon>
           <QuickNoteIcon size={14} />

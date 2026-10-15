@@ -154,10 +154,16 @@ export function fakeDisk(initial: Record<string, string>, extra: Extra = {}): Fa
           return { moved: [[args.from, args.to]], updatedFiles: [], updatedLinks: 0, failed: [] };
         }
         case 'vault_tree':
-          return [...files.keys()].map((path) => ({
-            path,
-            kind: /\.md$/i.test(path) ? 'page' : 'attachment',
-          }));
+          return [...files.keys()].map((path) => {
+            const page = /\.md$/i.test(path);
+            // A page's frontmatter emoji, as the index reads it (M5b §4).
+            const icon = page ? parsePage(files.get(path)!).frontmatter?.data?.icon : undefined;
+            return {
+              path,
+              kind: page ? 'page' : 'attachment',
+              ...(typeof icon === 'string' ? { icon } : {}),
+            };
+          });
         case 'links_resolve':
           // A wiki target names a page on the disk by its name (enough for
           // embeds in tests); anything else resolves to nothing.

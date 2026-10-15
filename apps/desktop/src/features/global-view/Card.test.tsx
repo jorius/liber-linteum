@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event';
 import axe from 'axe-core';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { GvCard } from '../../ipc';
+import { useVaultStore } from '../../stores/vaultStore';
 import { Card, SINGLE_CLICK_MS } from './Card';
 
 function card(extra: Partial<GvCard> = {}): GvCard {
@@ -48,6 +49,15 @@ function show(c: GvCard, handlers: Partial<Record<'onOpen' | 'onOpenEditor', () 
 afterEach(() => vi.useRealTimers());
 
 describe('Global View card (M3a §4)', () => {
+  it('M5b §4: shows the page’s emoji before its title', () => {
+    useVaultStore.setState({
+      nodes: [{ path: 'Character Design/rex-draft.md', kind: 'page', icon: '🦖' }],
+    });
+    show(card());
+    expect(screen.getByText('Generator Rex').closest('p')).toHaveTextContent('🦖Generator Rex');
+    useVaultStore.setState({ nodes: [] });
+  });
+
   it('a page: kind, cover at its position, text, media icons and a description', () => {
     show(card());
     expect(screen.getByRole('group', { name: 'Generator Rex, page' })).toBeInTheDocument();

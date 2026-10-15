@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { FolderIcon } from '../../app/icons';
 import { vaultsForget, vaultsRecent, type RecentVault } from '../../ipc';
 import { useVaultStore } from '../../stores/vaultStore';
+import { ItemIcon } from '../icons/ItemIcon';
 import { QuickNoteIcon } from '../scratchpad/QuickNoteIcon';
 import styles from './Welcome.module.css';
 
@@ -56,6 +57,8 @@ export function RecentList() {
                     <span data-quick-note-icon>
                       <QuickNoteIcon />
                     </span>
+                  ) : item.icon ? (
+                    <ItemIcon icon={item.icon} />
                   ) : (
                     <FolderIcon />
                   )}

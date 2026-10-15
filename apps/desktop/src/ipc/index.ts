@@ -93,6 +93,8 @@ export interface VaultInfo {
   report: IndexReport;
   /** The global Scratchpad (M4c §2). */
   scratchpad?: boolean;
+  /** The vault's emoji (M5b §4). */
+  icon?: string;
 }
 
 export type NodeKind = 'page' | 'folder' | 'attachment';
@@ -100,6 +102,8 @@ export type NodeKind = 'page' | 'folder' | 'attachment';
 export interface TreeNode {
   path: string;
   kind: NodeKind;
+  /** A page's frontmatter emoji or a folder's (M5b §4). */
+  icon?: string;
 }
 
 export interface Page {
@@ -136,6 +140,8 @@ export interface RecentVault {
   missing: boolean;
   /** The global Scratchpad (M4c §2): shown as "Quick notes". */
   scratchpad?: boolean;
+  /** The vault's emoji (M5b §4). */
+  icon?: string;
 }
 
 export type EditorMode = 'livePreview' | 'source' | 'split';
@@ -683,6 +689,11 @@ export const coverSideSet = (path: string, side: CoverSide) =>
  *  clears it. */
 export const coverWidthSet = (path: string, width: number | null) =>
   call<VaultSettings>('cover_width_set', { path, width });
+/** A folder's emoji (M5b §4); `null` removes it. Page icons are frontmatter. */
+export const folderIconSet = (path: string, icon: string | null) =>
+  call<null>('folder_icon_set', { path, icon });
+/** The vault's own emoji (M5b §4); `null` removes it. */
+export const vaultIconSet = (icon: string | null) => call<null>('vault_icon_set', { icon });
 
 // ---- quick notes (M4c §2, §7) ----
 
