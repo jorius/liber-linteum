@@ -40,6 +40,25 @@ describe('built-in palettes (M2b §4, §10)', () => {
   );
 });
 
+/** M5b §6: the save status reads "Saved" in green and "Unsaved" in red, on
+ *  the header (surface) and on its veiled pill over a cover. */
+describe('save status colours (M5b §6)', () => {
+  it.each(PALETTES.flatMap((p) => (['light', 'dark'] as const).map((m) => [p.id, m] as const)))(
+    '%s %s: success and danger text are readable on the surface',
+    (id, mode) => {
+      const vars = paletteVars(PALETTES.find((p) => p.id === id)!, mode);
+      expect(vars['--color-success'], 'success').toMatch(/^#[0-9a-f]{6}$/);
+      for (const key of ['--color-success', '--color-danger']) {
+        expect(contrast(vars[key], vars['--color-surface']), `${key}`).toBeGreaterThanOrEqual(4.5);
+      }
+    },
+  );
+
+  it('the default tokens define --color-success in both modes', () => {
+    expect(tokensCss.split('--color-success:').length - 1).toBe(3);
+  });
+});
+
 /** Global View colours (M3a §4, §6): plain hex, and every edge kind stands
  *  out from the canvas (WCAG 1.4.11 non-text contrast, 3:1). */
 const GV_TOKENS = [

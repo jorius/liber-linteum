@@ -183,6 +183,7 @@ function FileView({ info }: { info: FileInfo }) {
                   <span
                     role="status"
                     aria-label={t('editor.saveStatus')}
+                    data-status={status}
                     className={`${page.status} ${page.pill}`}
                   >
                     {t(`editor.${status}`)}

@@ -108,6 +108,17 @@
   color: var(--color-text-muted);
 }
 
+/* M5b §6: Saved in green; Unsaved (auto save off) and failures in red. The
+   word always shows too, so colour is never the only signal. */
+.status[data-status='saved'] {
+  color: var(--color-success);
+}
+.status[data-status='unsaved'],
+.status[data-status='retrying'],
+.status[data-status='notSaved'] {
+  color: var(--color-danger);
+}
+
 /* Word count (M4b part 2 §5): digits that don't jiggle while typing. */
 .count {
   font-variant-numeric: tabular-nums;

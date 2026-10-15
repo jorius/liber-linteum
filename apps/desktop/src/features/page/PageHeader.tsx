@@ -52,6 +52,7 @@ export function PageHeader({
                 <span
                   role="status"
                   aria-label={t('editor.saveStatus')}
+                  data-status={status}
                   className={`${styles.status} ${styles.pill}`}
                 >
                   {copying ? t('editor.copying') : t(`editor.${status}`)}

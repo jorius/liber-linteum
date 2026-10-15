@@ -54,6 +54,8 @@ export function paletteVars(p: Palette, mode: 'light' | 'dark'): Record<string, 
     '--color-surface-veil': alpha(t.surface, 0.88),
     '--color-danger': DANGER[mode].bg,
     '--color-danger-contrast': DANGER[mode].text,
+    // M5b §6: "Saved" in green, readable on this palette's header.
+    '--color-success': readableOn(t.surface, 145, 0.14, mode),
     // M4b part 2 §2: syntax colours, readable on this palette's code background.
     ...codeTokens(t.code, t.text, t.muted, mode),
   };

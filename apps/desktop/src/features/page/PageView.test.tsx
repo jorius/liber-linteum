@@ -272,6 +272,24 @@ describe('PageView (M2a §5)', () => {
     expect(status).toHaveTextContent('Saved');
   });
 
+  it('M5b §6: Saved is green, Unsaved red; with auto save off nothing is written until ⌘S', async () => {
+    useSettingsStore.setState({ settings: { ...DEFAULT_SETTINGS, autoSave: false } });
+    const disk = fakeDisk({ 'A.md': '# A\n' });
+    render(<PageScreen />);
+    await open('A.md');
+    vi.useFakeTimers();
+    const status = screen.getByRole('status', { name: 'Save status' });
+    expect(status).toHaveAttribute('data-status', 'saved');
+    await type('x');
+    await act(() => vi.advanceTimersByTimeAsync(5000));
+    expect(status).toHaveTextContent('Unsaved');
+    expect(status).toHaveAttribute('data-status', 'unsaved');
+    expect(disk.writes()).toEqual([]);
+    await act(() => useEditorStore.getState().doc!.flush());
+    expect(status).toHaveTextContent('Saved');
+    expect(disk.writes()).toHaveLength(1);
+  });
+
   it('the header follows an own save (title from the new text)', async () => {
     fakeDisk({ 'A.md': '# Old\n' });
     render(<PageScreen />);

@@ -68,6 +68,7 @@ export function TextView({ path }: { path: string }) {
                 <span
                   role="status"
                   aria-label={t('editor.saveStatus')}
+                  data-status={status}
                   className={`${styles.status} ${styles.pill}`}
                 >
                   {t(`editor.${status}`)}
