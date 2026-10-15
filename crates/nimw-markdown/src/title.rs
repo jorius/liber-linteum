@@ -1,22 +1,23 @@
+use crate::frontmatter;
 use pulldown_cmark::{Event, HeadingLevel, Options, Parser, Tag, TagEnd};
 
 /// Page title (PG-01, revised in M4b part 3 §1): the visible text of an H1
 /// that is the body's first block (after the frontmatter; blank lines and
 /// empty headings don't count), else the file stem, as Obsidian shows it. An
-/// H1 further down is a section heading, never the title.
+/// H1 further down is a section heading, never the title. The body starts
+/// where the app's own frontmatter splitter says (a byte-order mark and any
+/// block it accepts are skipped), not where pulldown-cmark would guess.
 pub fn extract_title(source: &str, file_stem: &str) -> String {
-    let options = Options::ENABLE_YAML_STYLE_METADATA_BLOCKS
-        | Options::ENABLE_TABLES
-        | Options::ENABLE_TASKLISTS
-        | Options::ENABLE_STRIKETHROUGH;
-    let mut in_meta = false;
+    let body = match frontmatter::split(source) {
+        Some((_, start)) => &source[start..],
+        None => &source[frontmatter::text_start(source)..],
+    };
+    let options =
+        Options::ENABLE_TABLES | Options::ENABLE_TASKLISTS | Options::ENABLE_STRIKETHROUGH;
     let mut in_h1 = false;
     let mut text = String::new();
-    for event in Parser::new_ext(source, options) {
+    for event in Parser::new_ext(body, options) {
         match event {
-            Event::Start(Tag::MetadataBlock(_)) => in_meta = true,
-            Event::End(TagEnd::MetadataBlock(_)) => in_meta = false,
-            _ if in_meta => {}
             Event::Start(Tag::Heading {
                 level: HeadingLevel::H1,
                 ..
@@ -87,6 +88,33 @@ mod tests {
             "Rex"
         );
         assert_eq!(extract_title("\n\n   \n# Rex", "draft"), "Rex");
+    }
+
+    /// Final review (Minor 4, re-graded): any block the app's own frontmatter
+    /// splitter accepts is skipped — an empty properties block, or one that
+    /// opens with a blank line.
+    #[test]
+    fn pg_01_an_h1_after_any_frontmatter_the_app_reads_is_the_title() {
+        assert_eq!(extract_title("---\n---\n# Rex\n", "draft"), "Rex");
+        assert_eq!(
+            extract_title("---\n\ntags: [a]\n---\n# Rex\n", "draft"),
+            "Rex"
+        );
+        assert_eq!(
+            extract_title("---\r\ntags: [a]\r\n---\r\n# Rex\r\n", "draft"),
+            "Rex"
+        );
+    }
+
+    /// Windows Notepad saves UTF-8 with a byte-order mark: it is no text.
+    #[test]
+    fn pg_01_a_byte_order_mark_does_not_hide_the_title() {
+        assert_eq!(extract_title("\u{FEFF}# Rex\n\nBody", "draft"), "Rex");
+        assert_eq!(
+            extract_title("\u{FEFF}---\ntags: [a]\n---\n# Rex\n", "draft"),
+            "Rex"
+        );
+        assert_eq!(extract_title("\u{FEFF}Body\n\n# Later", "draft"), "draft");
     }
 
     /// The friend's note "Tipos de comisiones" (Windows test, Mind_PC vault):

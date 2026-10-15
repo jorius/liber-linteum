@@ -17,16 +17,29 @@ pub(crate) struct Frontmatter {
     pub error: Option<String>,
 }
 
-/// Byte range of the YAML between the opening `---` line and the closing
-/// `---`/`...` line, and the byte offset where the body starts.
-pub(crate) fn split(src: &str) -> Option<(Range<usize>, usize)> {
-    let first_len = if src.starts_with("---\n") {
-        4
-    } else if src.starts_with("---\r\n") {
-        5
+/// Where a note's text starts: after a UTF-8 byte-order mark (Windows
+/// Notepad writes one), which is no text.
+pub(crate) fn text_start(src: &str) -> usize {
+    if src.starts_with('\u{FEFF}') {
+        '\u{FEFF}'.len_utf8()
     } else {
-        return None;
-    };
+        0
+    }
+}
+
+/// Byte range of the YAML between the opening `---` line and the closing
+/// `---`/`...` line, and the byte offset where the body starts. A
+/// byte-order mark may come before the opening line.
+pub(crate) fn split(src: &str) -> Option<(Range<usize>, usize)> {
+    let start = text_start(src);
+    let first_len = start
+        + if src[start..].starts_with("---\n") {
+            4
+        } else if src[start..].starts_with("---\r\n") {
+            5
+        } else {
+            return None;
+        };
     let mut pos = first_len;
     while pos <= src.len() {
         let line_end = src[pos..].find('\n').map(|i| pos + i).unwrap_or(src.len());
@@ -276,6 +289,22 @@ mod tests {
         let crlf = "---\r\na: 1\r\n---\r\nbody";
         assert_eq!(&crlf[split(crlf).unwrap().1..], "body");
         assert_eq!(split("---\n---\n").unwrap().0, 4..4);
+    }
+
+    /// Windows Notepad saves UTF-8 with a byte-order mark before `---`; the
+    /// block is still the note's frontmatter (as remark and Obsidian read it),
+    /// with ranges into the text as written.
+    #[test]
+    fn split_reads_frontmatter_after_a_byte_order_mark() {
+        let src = "\u{FEFF}---\ntags: [a]\ncover: c.png\n---\n# Rex\n";
+        let (yaml, body) = split(src).expect("frontmatter after the mark");
+        assert_eq!(&src[yaml.clone()], "tags: [a]\ncover: c.png\n");
+        assert_eq!(&src[body..], "# Rex\n");
+        let f = parse(src, yaml);
+        assert_eq!(f.cover.as_deref(), Some("c.png"));
+        assert_eq!(&src[f.links[0].range.clone()], "c.png");
+        assert_eq!(f.tags[0].key, "a");
+        assert!(split("\u{FEFF}# no frontmatter\n---\n").is_none());
     }
 
     #[test]

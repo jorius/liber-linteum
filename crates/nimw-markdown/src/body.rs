@@ -83,8 +83,17 @@ fn mask_comments(src: &str, comments: &[Range<usize>]) -> String {
 /// indented, inline), HTML blocks/inline HTML, HTML comments and Obsidian
 /// `%% %%` comments are ignored, and so is everything before `body_start` (the
 /// frontmatter, even when pulldown-cmark does not recognise it as a metadata
-/// block — its links come from the YAML).
+/// block — its links come from the YAML). A byte-order mark is no text: it
+/// is read as three spaces, so every offset stays where it was.
 pub(crate) fn extract(src: &str, body_start: usize) -> Body {
+    let unmarked;
+    let src = match src.strip_prefix('\u{FEFF}') {
+        Some(rest) => {
+            unmarked = format!("   {rest}");
+            unmarked.as_str()
+        }
+        None => src,
+    };
     let comments = find_comments(src, body_start);
     if comments.is_empty() {
         extract_unmasked(src, body_start)

@@ -92,6 +92,22 @@ mod tests {
         );
     }
 
+    /// A note saved with a byte-order mark (Windows Notepad): its frontmatter
+    /// still gives the tags, cover and links, and the title and excerpt don't
+    /// see the mark.
+    #[test]
+    fn a_byte_order_mark_is_no_text() {
+        let src = "\u{FEFF}---\ntags: [character]\ncover: c.png\n---\n# Rex\n\nBody [[A]]\n";
+        let m = parse_page(src, "draft");
+        assert_eq!(m.title, "Rex");
+        assert_eq!(m.cover.as_deref(), Some("c.png"));
+        assert_eq!(m.tags[0].key, "character");
+        let got: Vec<_> = m.links.iter().map(|l| &src[l.range.clone()]).collect();
+        assert_eq!(got, vec!["c.png", "A"]);
+        let plain = parse_page("\u{FEFF}Hello there.\n", "p");
+        assert_eq!(plain.excerpt, "Hello there.");
+    }
+
     #[test]
     fn malformed_frontmatter_still_parses_body() {
         let m = parse_page("---\ntags: [unclosed\n---\n# T\n\n[[target]] #ok\n", "x");
