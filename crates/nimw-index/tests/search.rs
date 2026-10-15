@@ -199,3 +199,628 @@ fn m5_an_index_from_schema_2_is_rebuilt_with_search() {
         "with the search tables"
     );
 }
+
+// ---- Task 3: the search query ----
+
+use nimw_index::{FacetCount, FacetPage, SearchPage, SearchQuery};
+
+impl Fixture {
+    /// Adds an attachment (a cover image, a clip).
+    fn attachment(&mut self, path: &str) -> &mut Fixture {
+        self.ix
+            .transaction(|tx| tx.upsert_file(&row(path, FileKind::Attachment, 0)))
+            .unwrap();
+        let files = self.ix.file_set().unwrap();
+        self.ix.resolve_all(&files).unwrap();
+        self
+    }
+
+    fn search(&self, q: SearchQuery) -> SearchPage {
+        self.ix.search(&q).unwrap()
+    }
+
+    fn find(&self, text: &str) -> Vec<String> {
+        paths(&self.search(text_query(text)))
+    }
+}
+
+fn text_query(text: &str) -> SearchQuery {
+    SearchQuery {
+        text: text.into(),
+        ..SearchQuery::default()
+    }
+}
+
+fn paths(page: &SearchPage) -> Vec<String> {
+    page.results.iter().map(|h| h.path.clone()).collect()
+}
+
+fn sorted(mut v: Vec<String>) -> Vec<String> {
+    v.sort();
+    v
+}
+
+fn strs(v: &[&str]) -> Vec<String> {
+    v.iter().map(|s| s.to_string()).collect()
+}
+
+#[test]
+fn m5_metadata_outranks_body_and_title_beats_tag_beats_body() {
+    let mut f = Fixture::new();
+    f.page("Body.md", "# Body\n\nthe dragon sleeps here today\n");
+    f.page("Tagged.md", "# Tagged\n\nsleeps here today #dragon\n");
+    f.page("Titled.md", "# Dragon\n\nsleeps here today now\n");
+    assert_eq!(
+        f.find("dragon"),
+        strs(&["Titled.md", "Tagged.md", "Body.md"])
+    );
+    // A body full of the word still ranks under every metadata match.
+    f.page("Many.md", "# Many\n\ndragon dragon dragon dragon dragon\n");
+    let got = f.find("dragon");
+    let at = |p: &str| got.iter().position(|g| g == p).unwrap();
+    assert!(at("Tagged.md") < at("Many.md"), "{got:?}");
+    assert!(at("Titled.md") < at("Many.md"), "{got:?}");
+}
+
+#[test]
+fn m5_accents_and_prefixes() {
+    let mut f = Fixture::new();
+    f.page("a.md", "# Canción del dragón\n");
+    f.page("b.md", "# cancion\n");
+    let both = strs(&["a.md", "b.md"]);
+    assert_eq!(sorted(f.find("cancion")), both);
+    assert_eq!(sorted(f.find("CANCIÓN")), both);
+    assert_eq!(sorted(f.find("canc")), both);
+    assert_eq!(f.find("drag"), strs(&["a.md"]));
+    assert_eq!(
+        f.find("cancion drag"),
+        strs(&["a.md"]),
+        "every word must match"
+    );
+}
+
+#[test]
+fn m5_phrases_keep_their_order() {
+    let mut f = Fixture::new();
+    f.page("a.md", "# A\n\na red dragon here\n");
+    f.page("b.md", "# B\n\nthe dragon is red\n");
+    assert_eq!(f.find("\"red dragon\""), strs(&["a.md"]));
+    assert_eq!(
+        f.find("\"red drag"),
+        strs(&["a.md"]),
+        "unclosed, last word a prefix"
+    );
+    assert_eq!(sorted(f.find("red dragon")), strs(&["a.md", "b.md"]));
+}
+
+#[test]
+fn m5_operators_are_text() {
+    let mut f = Fixture::new();
+    f.page("a.md", "# A\n\nsand and stone near a cave\n");
+    f.page("b.md", "# B\n\nnothing here\n");
+    for q in [
+        "AND",
+        "OR x",
+        "NOT",
+        "\"",
+        "a\"b",
+        "NEAR(a b)",
+        "^x",
+        "*",
+        "x:y",
+        "(",
+        "-x",
+        ")",
+        "a*b",
+        "title:x",
+        "{body}:x",
+        "\u{301}",
+        "ـ",
+        "\"\"",
+        "'",
+        "\\",
+        "a AND",
+        "NEAR",
+        "\u{903}",
+        "\u{903}\u{903} x",
+    ] {
+        assert!(f.ix.search(&text_query(q)).is_ok(), "{q:?}");
+    }
+    assert_eq!(f.find("AND"), strs(&["a.md"]), "AND is a word");
+    assert_eq!(f.find("NEAR"), strs(&["a.md"]), "NEAR is a word");
+    assert!(
+        f.find("OR nothing").is_empty(),
+        "OR is a word, not an operator"
+    );
+}
+
+#[test]
+fn m5_punctuation_only_is_an_empty_query() {
+    let mut f = Fixture::new();
+    f.page("a.md", "# A\n");
+    for q in ["***", " - ", "\"\"", "  "] {
+        let page = f.search(text_query(q));
+        assert!(page.recent, "{q:?}");
+        assert_eq!(paths(&page), strs(&["a.md"]));
+    }
+}
+
+/// A small vault for the filters (M5 §3, §10.12).
+fn filter_vault() -> Fixture {
+    let mut f = Fixture::new();
+    f.page(
+        "Lore/Places/Erebor.md",
+        "---\ntags: [lore/places]\n---\n# Erebor\n\nThe mountain of [[Smaug]]. ![[map.png]]\n",
+    );
+    f.page(
+        "Lore/Beasts/Smaug.md",
+        "---\ntags: [lore, villain]\n---\n# Smaug\n\nA wyrm. ![[roar.mp3]]\n",
+    );
+    f.page(
+        "Game/Sessions/Session 1.md",
+        "# Session 1\n\nWe met [[Smaug]] near [[Erebor]]. #session\n",
+    );
+    f.page("Game/Notes/Places.md", "# Places\n\nA list. #lore\n");
+    f.page("Game/Places/Inn.md", "# Inn\n\nThe prancing pony.\n");
+    f.page(
+        "Root.md",
+        "# Root\n\nAn outside [file](file:///Users/j/Smaug.md) and [up](../../Smaug.md).\n",
+    );
+    f
+}
+
+fn q() -> SearchQuery {
+    SearchQuery::default()
+}
+
+#[test]
+fn m5_each_filter_alone() {
+    let f = filter_vault();
+    let found = |query: SearchQuery| sorted(paths(&f.search(query)));
+    assert_eq!(
+        found(SearchQuery {
+            project: Some("Lore".into()),
+            ..q()
+        }),
+        strs(&["Lore/Beasts/Smaug.md", "Lore/Places/Erebor.md"])
+    );
+    assert_eq!(
+        found(SearchQuery {
+            folder: Some("Lore/Places".into()),
+            ..q()
+        }),
+        strs(&["Lore/Places/Erebor.md"]),
+        "folder by path"
+    );
+    assert_eq!(
+        found(SearchQuery {
+            folder: Some("places".into()),
+            ..q()
+        }),
+        strs(&["Game/Places/Inn.md", "Lore/Places/Erebor.md"]),
+        "folder by name, every folder so named"
+    );
+    assert_eq!(
+        found(SearchQuery {
+            folder: Some("Game".into()),
+            ..q()
+        }),
+        strs(&[
+            "Game/Notes/Places.md",
+            "Game/Places/Inn.md",
+            "Game/Sessions/Session 1.md"
+        ]),
+        "a folder holds its subfolders' pages"
+    );
+    assert_eq!(
+        found(SearchQuery {
+            tags: strs(&["lore"]),
+            ..q()
+        }),
+        strs(&[
+            "Game/Notes/Places.md",
+            "Lore/Beasts/Smaug.md",
+            "Lore/Places/Erebor.md"
+        ]),
+        "#lore matches lore/places too"
+    );
+    assert_eq!(
+        found(SearchQuery {
+            tags: strs(&["#LORE", "villain"]),
+            ..q()
+        }),
+        strs(&["Lore/Beasts/Smaug.md"]),
+        "every tag, case-insensitive, # optional"
+    );
+    for to in [
+        "Lore/Beasts/Smaug.md",
+        "Smaug",
+        "smaug",
+        "Lore/Beasts/Smaug",
+    ] {
+        assert_eq!(
+            found(SearchQuery {
+                links_to: Some(to.into()),
+                ..q()
+            }),
+            strs(&["Game/Sessions/Session 1.md", "Lore/Places/Erebor.md"]),
+            "links to {to:?} (an outside file named Smaug doesn't count)"
+        );
+    }
+    for from in ["Game/Sessions/Session 1.md", "Session 1"] {
+        assert_eq!(
+            found(SearchQuery {
+                links_from: Some(from.into()),
+                ..q()
+            }),
+            strs(&["Lore/Beasts/Smaug.md", "Lore/Places/Erebor.md"]),
+            "links from {from:?}"
+        );
+    }
+    assert_eq!(
+        found(SearchQuery {
+            has_image: true,
+            ..q()
+        }),
+        strs(&["Lore/Places/Erebor.md"])
+    );
+    assert_eq!(
+        found(SearchQuery {
+            has_audio: true,
+            ..q()
+        }),
+        strs(&["Lore/Beasts/Smaug.md"])
+    );
+}
+
+#[test]
+fn m5_filters_combined() {
+    let f = filter_vault();
+    let found = |query: SearchQuery| sorted(paths(&f.search(query)));
+    assert_eq!(
+        found(SearchQuery {
+            project: Some("Game".into()),
+            tags: strs(&["lore"]),
+            ..q()
+        }),
+        strs(&["Game/Notes/Places.md"])
+    );
+    assert_eq!(
+        found(SearchQuery {
+            text: "met".into(),
+            links_to: Some("Smaug".into()),
+            ..q()
+        }),
+        strs(&["Game/Sessions/Session 1.md"])
+    );
+    assert!(
+        found(SearchQuery {
+            project: Some("Lore".into()),
+            has_image: true,
+            has_audio: true,
+            ..q()
+        })
+        .is_empty(),
+        "both media at once"
+    );
+    assert_eq!(
+        found(SearchQuery {
+            text: "mountain".into(),
+            project: Some("Lore".into()),
+            folder: Some("Places".into()),
+            tags: strs(&["lore"]),
+            links_to: Some("Smaug".into()),
+            has_image: true,
+            ..q()
+        }),
+        strs(&["Lore/Places/Erebor.md"]),
+        "everything at once"
+    );
+}
+
+#[test]
+fn m5_filters_without_text_and_unknown_references() {
+    let f = filter_vault();
+    let page = f.search(SearchQuery {
+        tags: strs(&["lore"]),
+        ..q()
+    });
+    assert!(!page.recent, "filters with no text are not Recent");
+    assert_eq!(
+        paths(&page),
+        strs(&[
+            "Game/Notes/Places.md",
+            "Lore/Beasts/Smaug.md",
+            "Lore/Places/Erebor.md"
+        ]),
+        "newest first"
+    );
+    assert_eq!(page.total, 3);
+
+    let page = f.search(SearchQuery {
+        links_to: Some("Nobody".into()),
+        ..q()
+    });
+    assert_eq!(page.total, 0);
+    let active: Vec<&FacetPage> = page.facets.links_to.iter().filter(|p| p.active).collect();
+    assert_eq!(
+        active,
+        vec![&FacetPage {
+            path: "Nobody".into(),
+            title: "Nobody".into(),
+            count: 0,
+            active: true
+        }],
+        "an unknown page keeps its chip"
+    );
+    let page = f.search(SearchQuery {
+        links_from: Some("Nobody".into()),
+        ..q()
+    });
+    assert_eq!(page.total, 0);
+    assert_eq!(page.facets.links_from.as_ref().map(|p| p.count), Some(0));
+    let page = f.search(SearchQuery {
+        folder: Some("Nowhere".into()),
+        ..q()
+    });
+    assert_eq!(page.total, 0);
+    for blank in ["", "/", "  "] {
+        let page = f.search(SearchQuery {
+            folder: Some(blank.into()),
+            links_to: Some(blank.into()),
+            ..q()
+        });
+        assert!(page.recent, "a blank filter is no filter: {blank:?}");
+    }
+    let page = f.search(SearchQuery {
+        project: Some("Nope".into()),
+        ..q()
+    });
+    assert_eq!(page.total, 0);
+    assert!(
+        page.facets.projects.contains(&FacetCount {
+            value: "Nope".into(),
+            count: 0
+        }),
+        "{:?}",
+        page.facets.projects
+    );
+}
+
+#[test]
+fn m5_facets_count_and_keep_active_filters() {
+    let f = filter_vault();
+    let all = f.search(q());
+    assert_eq!(
+        all.facets.projects,
+        vec![
+            FacetCount {
+                value: "Game".into(),
+                count: 3
+            },
+            FacetCount {
+                value: "Lore".into(),
+                count: 2
+            }
+        ]
+    );
+    let tag = |page: &SearchPage, v: &str| {
+        page.facets
+            .tags
+            .iter()
+            .find(|t| t.value == v)
+            .map(|t| t.count)
+    };
+    assert_eq!(tag(&all, "lore"), Some(2));
+    assert_eq!(tag(&all, "lore/places"), Some(1));
+    assert_eq!(all.facets.links_to[0].path, "Lore/Beasts/Smaug.md");
+    assert_eq!(all.facets.links_to[0].title, "Smaug");
+    assert_eq!(all.facets.links_to[0].count, 2);
+    assert!(!all.facets.links_to[0].active);
+    assert_eq!((all.facets.has_image, all.facets.has_audio), (1, 1));
+
+    // Projects ignore their own filter: you can switch without removing it.
+    let lore = f.search(SearchQuery {
+        project: Some("Lore".into()),
+        ..q()
+    });
+    assert_eq!(lore.total, 2);
+    assert_eq!(lore.facets.projects, all.facets.projects);
+    // Tags drill down within the other filters.
+    assert_eq!(tag(&lore, "session"), None);
+    assert_eq!(tag(&lore, "villain"), Some(1));
+    // Media counts follow the other filters.
+    assert_eq!((lore.facets.has_image, lore.facets.has_audio), (1, 1));
+    let game = f.search(SearchQuery {
+        project: Some("Game".into()),
+        ..q()
+    });
+    assert_eq!((game.facets.has_image, game.facets.has_audio), (0, 0));
+
+    // An active links-to filter stays, marked, with its resolved title.
+    let to = f.search(SearchQuery {
+        links_to: Some("smaug".into()),
+        ..q()
+    });
+    let active: Vec<&FacetPage> = to.facets.links_to.iter().filter(|p| p.active).collect();
+    assert_eq!(active.len(), 1);
+    assert_eq!(active[0].path, "Lore/Beasts/Smaug.md");
+    assert_eq!(active[0].title, "Smaug");
+    let from = f.search(SearchQuery {
+        links_from: Some("Session 1".into()),
+        ..q()
+    });
+    assert_eq!(
+        from.facets.links_from,
+        Some(FacetPage {
+            path: "Game/Sessions/Session 1.md".into(),
+            title: "Session 1".into(),
+            count: 2,
+            active: true
+        })
+    );
+
+    // An active tag with no page keeps its chip.
+    let none = f.search(SearchQuery {
+        tags: strs(&["ghost"]),
+        ..q()
+    });
+    assert_eq!(tag(&none, "ghost"), Some(0));
+}
+
+#[test]
+fn m5_tag_and_link_facets_are_capped() {
+    let mut f = Fixture::new();
+    for i in 0..20 {
+        let tags: String = (0..=i).map(|t| format!(" #t{t:02}")).collect();
+        f.page(&format!("p{i:02}.md"), &format!("# P{i}\n\nx{tags}\n"));
+    }
+    for i in 0..12 {
+        for j in 0..=i {
+            let text = format!("# L{i}-{j}\n\n[[p{i:02}]]\n");
+            f.page(&format!("links/l{i:02}-{j:02}.md"), &text);
+        }
+    }
+    let page = f.search(q());
+    assert_eq!(page.facets.tags.len(), 12);
+    assert_eq!(page.facets.tags[0].value, "t00");
+    assert_eq!(page.facets.tags[0].count, 20);
+    assert_eq!(page.facets.links_to.len(), 8);
+    assert_eq!(page.facets.links_to[0].path, "p11.md");
+    assert_eq!(page.facets.links_to[0].count, 12);
+    let rare = f.search(SearchQuery {
+        tags: strs(&["t19"]),
+        ..q()
+    });
+    assert!(rare.facets.tags.iter().any(|t| t.value == "t19"));
+}
+
+#[test]
+fn m5_snippets_around_the_body_match() {
+    let mut f = Fixture::new();
+    let words: String = (0..60).map(|i| format!("word{i} ")).collect();
+    f.page(
+        "long.md",
+        &format!("# Long\n\n{words} the great WYRM sleeps {words}\n"),
+    );
+    f.page(
+        "titled.md",
+        "---\ntags: [wyrm]\n---\n# Other\n\nnothing to see\n",
+    );
+    let page = f.search(text_query("wyrm"));
+    let hit = |p: &str| page.results.iter().find(|h| h.path == p).unwrap();
+    let snippet = hit("long.md").snippet.clone().expect("a body match");
+    let marked: Vec<&str> = snippet
+        .iter()
+        .filter(|s| s.hit)
+        .map(|s| s.text.as_str())
+        .collect();
+    assert_eq!(marked, vec!["WYRM"]);
+    let text: String = snippet.iter().map(|s| s.text.as_str()).collect();
+    let n = text.split_whitespace().count();
+    assert!((8..=16).contains(&n), "about 12 words: {text:?}");
+    assert!(hit("titled.md").snippet.is_none(), "a metadata-only match");
+    // No text, no snippets.
+    let page = f.search(q());
+    assert!(page.results.iter().all(|h| h.snippet.is_none()));
+}
+
+#[test]
+fn m5_recent_for_an_empty_query() {
+    let mut f = Fixture::new();
+    for i in 0..25 {
+        f.page(&format!("p{i:02}.md"), "# P\n");
+    }
+    let page = f.search(q());
+    assert!(page.recent);
+    assert_eq!(page.results.len(), 20);
+    assert_eq!(page.total, 20);
+    assert_eq!(page.results[0].path, "p24.md", "newest first");
+    let page = f.search(SearchQuery {
+        offset: 40,
+        limit: 5,
+        ..q()
+    });
+    assert_eq!(page.results.len(), 20, "Recent ignores paging");
+}
+
+#[test]
+fn m5_paging_and_limits() {
+    let mut f = Fixture::new();
+    for i in 0..60 {
+        f.page(&format!("p{i:02}.md"), "# P\n\ncommon\n");
+    }
+    let first = f.search(text_query("common"));
+    assert_eq!((first.results.len(), first.total), (50, 60));
+    let rest = f.search(SearchQuery {
+        text: "common".into(),
+        offset: 50,
+        ..q()
+    });
+    assert_eq!((rest.results.len(), rest.total), (10, 60));
+    let mut all = paths(&first);
+    all.extend(paths(&rest));
+    all.sort();
+    all.dedup();
+    assert_eq!(all.len(), 60, "no page twice, none missing");
+    let big = f.search(SearchQuery {
+        text: "common".into(),
+        limit: 500,
+        ..q()
+    });
+    assert_eq!(big.results.len(), 50, "clamped");
+    let small = f.search(SearchQuery {
+        text: "common".into(),
+        limit: 3,
+        ..q()
+    });
+    assert_eq!(small.results.len(), 3);
+}
+
+#[test]
+fn m5_hit_fields() {
+    let mut f = Fixture::new();
+    f.attachment("Deep/pics/c.png");
+    f.page(
+        "Deep/Dragon notes.md",
+        "---\ncover: pics/c.png\ntags: [alpha, dragon/red]\n---\n# The Red One\n\n![[x.png]] ![[y.mp3]] #beta\n",
+    );
+    f.page(
+        "remote.md",
+        "---\ncover: https://example.com/c.png\n---\n# Remote dragon\n",
+    );
+    let page = f.search(text_query("drag"));
+    let hit = page
+        .results
+        .iter()
+        .find(|h| h.path == "Deep/Dragon notes.md")
+        .unwrap();
+    assert_eq!(hit.title, "The Red One");
+    assert_eq!(hit.cover.as_deref(), Some("Deep/pics/c.png"));
+    assert_eq!(
+        hit.tags,
+        strs(&["dragon/red", "alpha", "beta"]),
+        "matching first"
+    );
+    assert!(hit.has_image && hit.has_audio);
+    let remote = page.results.iter().find(|h| h.path == "remote.md").unwrap();
+    assert_eq!(remote.cover, None, "remote covers aren't vault files");
+    let tagged = f.search(SearchQuery {
+        tags: strs(&["beta"]),
+        ..q()
+    });
+    assert_eq!(tagged.results[0].tags[0], "beta", "filter tags first too");
+}
+
+#[test]
+fn m5_scratch_folder_pages_are_ordinary() {
+    let mut f = Fixture::new();
+    f.page(
+        "Scratchpad/Quick note 2026-10-15 14.32.md",
+        "Call Ana about the map\n",
+    );
+    assert_eq!(
+        f.find("ana map"),
+        strs(&["Scratchpad/Quick note 2026-10-15 14.32.md"])
+    );
+}

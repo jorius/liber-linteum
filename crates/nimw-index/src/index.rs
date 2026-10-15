@@ -21,7 +21,7 @@ pub type Result<T> = std::result::Result<T, IndexError>;
 
 /// The SQLite cache of one vault (spec §5). Never touches vault files.
 pub struct Index {
-    conn: Connection,
+    pub(crate) conn: Connection,
 }
 
 impl std::fmt::Debug for Index {
