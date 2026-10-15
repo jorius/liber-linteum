@@ -13,6 +13,7 @@ import { installSeeAtomsMenuIfTauri } from './features/global-view/seeAtomsMenu'
 import { installOpenFile, installOpenInVault } from './features/singleFile/openFile';
 import { SingleFileApp } from './features/singleFile/SingleFileApp';
 import { installFileWatch } from './features/singleFile/singleFileStore';
+import { installSearchMenuIfTauri } from './features/search/searchMenu';
 import { installQuitGuardIfTauri } from './stores/editorStore';
 import { installMenuTogglesIfTauri } from './stores/menuToggles';
 import { installMenuNavigationIfTauri } from './stores/navigate';
@@ -37,6 +38,7 @@ void initI18n(detectLanguage(navigator.languages))
     } else {
       installMenuNavigationIfTauri();
       installSeeAtomsMenuIfTauri();
+      installSearchMenuIfTauri();
       installFileDropIfTauri();
       installOpenInVault();
     }

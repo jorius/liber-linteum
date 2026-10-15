@@ -30,7 +30,15 @@ function screenKey(e: KeyboardEvent): 'edit' | 'global' | null {
   return null;
 }
 
-/** ⌘ (macOS) / Ctrl shortcuts (spec §3.5): ⇧E explorer, O open vault,
+/** ⌘⇧F (Ctrl+Shift+F) Search (M5 §4): the F key, or the physical one on
+ *  layouts without a Latin F. */
+export function isSearchKey(e: KeyboardEvent): boolean {
+  if (!(e.metaKey || e.ctrlKey) || !e.shiftKey || e.altKey) return false;
+  const key = e.key.toLowerCase();
+  return key === 'f' || (!/^[a-z]$/.test(key) && e.code === 'KeyF');
+}
+
+/** ⌘ (macOS) / Ctrl shortcuts (spec §3.5): ⇧F search, ⇧E explorer, O open vault,
  * , settings, N new page ( ⇧N is New Quick Note since M4c §7.9, handled by
  * `ScratchpadHost`), [ / ] back and forward along the
  * link trail (M2b §3), 1 / 2 Edit and Global View (M3a §2). Ignored while a
@@ -52,6 +60,8 @@ export function useGlobalShortcuts(menuOpen: boolean) {
       const screen = screenKey(e);
       if (screen) {
         useUiStore.getState().setScreen(screen);
+      } else if (isSearchKey(e)) {
+        useUiStore.getState().openDialog({ type: 'search' });
       } else if (key === ',') {
         useUiStore.getState().openDialog({ type: 'settings' });
       } else if (key === 'o' && !e.shiftKey) {
