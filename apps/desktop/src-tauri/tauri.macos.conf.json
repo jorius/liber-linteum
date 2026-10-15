@@ -1,0 +1,21 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "bundle": {
+    "fileAssociations": [
+      {
+        "ext": ["md", "markdown"],
+        "name": "Markdown document",
+        "role": "Editor",
+        "rank": "Alternate",
+        "contentTypes": ["net.daringfireball.markdown"]
+      },
+      {
+        "ext": ["txt"],
+        "name": "Plain text document",
+        "role": "Editor",
+        "rank": "Alternate",
+        "contentTypes": ["public.plain-text"]
+      }
+    ]
+  }
+}

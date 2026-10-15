@@ -13,6 +13,7 @@ pub mod gv_commands;
 pub mod menu;
 pub mod navigation;
 pub mod scratchpad_commands;
+pub mod opening;
 pub mod settings;
 pub mod settings_commands;
 pub mod state;
@@ -168,7 +169,31 @@ pub fn configure<R: tauri::Runtime>(
 }
 
 pub fn run() {
-    menu::with_app_menu(configure(tauri::Builder::default(), None))
-        .run(tauri::generate_context!())
-        .expect("error while running Notes In My Way");
+    let builder = tauri::Builder::default();
+    // M4c §3: a second launch (a file opened from Explorer, a command line)
+    // hands its files to this one. Registered first, as the plugin asks;
+    // never in tests (a second app in the test process would exit it).
+    #[cfg(not(target_os = "macos"))]
+    let builder = builder.plugin(tauri_plugin_single_instance::init(|app, args, cwd| {
+        let args: Vec<String> = args.into_iter().skip(1).collect();
+        let cwd = std::path::Path::new(&cwd);
+        opening::open_later(app, opening::paths_from_args(&args, cwd));
+    }));
+    menu::with_app_menu(configure(builder, None))
+        .build(tauri::generate_context!())
+        .expect("error while building Notes In My Way")
+        .run(|app, event| match event {
+            // Files named on the command line that started the app.
+            tauri::RunEvent::Ready => {
+                let args: Vec<String> = std::env::args().skip(1).collect();
+                let cwd = std::env::current_dir().unwrap_or_default();
+                opening::open_later(app, opening::paths_from_args(&args, &cwd));
+            }
+            // Finder's Open With and the Dock (M4c §3).
+            #[cfg(target_os = "macos")]
+            tauri::RunEvent::Opened { urls } => {
+                opening::open_later(app, opening::paths_from_urls(&urls));
+            }
+            _ => {}
+        });
 }

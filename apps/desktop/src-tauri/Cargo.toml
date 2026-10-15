@@ -27,6 +27,11 @@ nimw-session = { path = "../../../crates/nimw-session" }
 nimw-vault = { path = "../../../crates/nimw-vault" }
 nimw-markdown = { path = "../../../crates/nimw-markdown" }
 
+# M4c §3: files opened from Explorer or a command line while the app runs
+# reach the running app (macOS sends them to it itself: `RunEvent::Opened`).
+[target.'cfg(not(target_os = "macos"))'.dependencies]
+tauri-plugin-single-instance.workspace = true
+
 [dev-dependencies]
 tauri = { workspace = true, features = ["test"] }
 tempfile.workspace = true

@@ -27,6 +27,12 @@ fn build_app(tag: &str) -> App<MockRuntime> {
         .expect("failed to build app with the real context")
 }
 
+/// Menu events go to the focused window, else the main one (M4c §3); no
+/// window has focus on the mock runtime.
+fn main_window(handle: &tauri::AppHandle<MockRuntime>) -> tauri::WebviewWindow<MockRuntime> {
+    handle.get_webview_window("main").expect("the main window")
+}
+
 type Entry = (&'static str, String, String);
 
 /// (submenu text, [(item kind, id, text)]) for every top-level submenu.
@@ -135,6 +141,57 @@ fn macos_menu_quit_is_ours_and_the_standard_items_stay() {
         texts("File").iter().any(|t| t == "New Quick Note"),
         "{outline:?}"
     );
+    // M4c §3: File → Open File… (⌘⇧O; ⌘O opens a folder as a vault).
+    assert!(texts("File").contains(&"Open File…".to_string()));
+    let file_at = outline.iter().position(|(t, _)| t == "File").unwrap();
+    let edit_at = outline.iter().position(|(t, _)| t == "Edit").unwrap();
+    assert!(file_at < edit_at, "File comes before Edit: {outline:?}");
+}
+
+/// M4c §3: a menu item acts on one window — the focused one, else the main
+/// one — never on every window (a toggle flipped once per window).
+fn menu_events_reach_one_window_only() {
+    use tauri::Listener;
+    let got: Arc<std::sync::Mutex<Vec<String>>> = Arc::default();
+    let log = got.clone();
+    build_app("one-window").run_return(move |handle, event| {
+        if let RunEvent::Ready = event {
+            let file = tauri::WebviewWindowBuilder::new(handle, "file-1", Default::default())
+                .build()
+                .unwrap();
+            for (window, name) in [(main_window(handle), "main"), (file, "file-1")] {
+                for event in ["menu:open-file", "menu:toggle"] {
+                    let log = log.clone();
+                    window.listen(event, move |e| {
+                        log.lock()
+                            .unwrap()
+                            .push(format!("{name} {event} {}", e.payload()));
+                    });
+                }
+            }
+            for id in [
+                nimw_desktop::menu::OPEN_FILE_ID,
+                nimw_desktop::menu::TOOLBAR_ID,
+            ] {
+                nimw_desktop::menu::on_menu_event(
+                    handle,
+                    MenuEvent {
+                        id: MenuId::new(id),
+                    },
+                );
+            }
+            for window in handle.webview_windows().into_values() {
+                window.close().unwrap();
+            }
+        }
+    });
+    assert_eq!(
+        *got.lock().unwrap(),
+        [
+            "main menu:open-file null".to_string(),
+            "main menu:toggle \"toolbar\"".into()
+        ]
+    );
 }
 
 fn quit_menu_item_requests_the_window_close_like_the_close_button() {
@@ -189,7 +246,7 @@ fn back_and_forward_items_emit_menu_navigate() {
     build_app("navigate").run_return(move |handle, event| {
         if let RunEvent::Ready = event {
             let log = log.clone();
-            handle.listen("menu:navigate", move |e| {
+            main_window(handle).listen("menu:navigate", move |e| {
                 log.lock().unwrap().push(e.payload().to_string());
             });
             for id in [nimw_desktop::menu::BACK_ID, nimw_desktop::menu::FORWARD_ID] {
@@ -220,7 +277,7 @@ fn toggle_items_emit_menu_toggle() {
     build_app("toggle").run_return(move |handle, event| {
         if let RunEvent::Ready = event {
             let log = log.clone();
-            handle.listen("menu:toggle", move |e| {
+            main_window(handle).listen("menu:toggle", move |e| {
                 log.lock().unwrap().push(e.payload().to_string());
             });
             for id in [
@@ -259,7 +316,7 @@ fn screen_items_emit_menu_screen() {
     build_app("screen").run_return(move |handle, event| {
         if let RunEvent::Ready = event {
             let log = log.clone();
-            handle.listen("menu:screen", move |e| {
+            main_window(handle).listen("menu:screen", move |e| {
                 log.lock().unwrap().push(e.payload().to_string());
             });
             for id in [
@@ -300,9 +357,15 @@ fn quick_note_item_emits_menu_quick_note() {
             let log = log.clone();
             // The main window hears it (that is where the page listens).
             let main = handle.get_webview_window("main").expect("main window");
-            main.listen(nimw_desktop::menu::QUICK_NOTE_EVENT, move |e| {
-                log.lock().unwrap().push(e.payload().to_string());
-            });
+            let file = tauri::WebviewWindowBuilder::new(handle, "file-1", Default::default())
+                .build()
+                .unwrap();
+            for (window, name) in [(main, "main"), (file, "file-1")] {
+                let log = log.clone();
+                window.listen(nimw_desktop::menu::QUICK_NOTE_EVENT, move |_| {
+                    log.lock().unwrap().push(name.to_string());
+                });
+            }
             nimw_desktop::menu::on_menu_event(
                 handle,
                 MenuEvent {
@@ -314,7 +377,8 @@ fn quick_note_item_emits_menu_quick_note() {
             }
         }
     });
-    assert_eq!(got.lock().unwrap().len(), 1);
+    // Only the main window, even with a file window open (M4c §2, §3).
+    assert_eq!(*got.lock().unwrap(), ["main".to_string()]);
 }
 
 fn main() {
@@ -333,4 +397,6 @@ fn main() {
     println!("test screen_items_emit_menu_screen ... ok");
     quick_note_item_emits_menu_quick_note();
     println!("test quick_note_item_emits_menu_quick_note ... ok");
+    menu_events_reach_one_window_only();
+    println!("test menu_events_reach_one_window_only ... ok");
 }

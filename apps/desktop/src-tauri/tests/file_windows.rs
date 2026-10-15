@@ -556,3 +556,57 @@ fn a_file_windows_assets_come_from_its_folder_only() {
     assert_eq!(get("file-99", "/img/a.png", None).status, 404);
     assert_eq!(get("main", "/img/a.png", None).status, 404);
 }
+
+#[test]
+fn a_setting_changed_in_one_window_reaches_every_window() {
+    let h = harness();
+    let dir = folder(&[]);
+    let w = open(&h, &dir.path().join("note.md"));
+    let seen: Arc<Mutex<Vec<Value>>> = Arc::default();
+    let sink = seen.clone();
+    h.main.listen("settings:changed", move |e| {
+        sink.lock()
+            .unwrap()
+            .push(serde_json::from_str(e.payload()).unwrap())
+    });
+    call(&w, "settings_set", json!({ "patch": { "toolbar": false } })).unwrap();
+    let got = seen.lock().unwrap();
+    assert_eq!(got.len(), 1);
+    assert_eq!(got[0]["toolbar"], false);
+}
+
+#[test]
+fn the_window_hears_when_its_file_changes_and_only_its_file() {
+    use std::time::Duration;
+    let h = harness();
+    let dir = folder(&[("other.md", "o")]);
+    let w = open(&h, &dir.path().join("note.md"));
+    let seen: Arc<Mutex<Vec<String>>> = Arc::default();
+    let sink = seen.clone();
+    w.listen("file:changed", move |e| {
+        sink.lock().unwrap().push(e.payload().to_string())
+    });
+    std::thread::sleep(Duration::from_millis(300)); // let the backend arm
+    std::fs::write(dir.path().join("other.md"), "changed").unwrap();
+    std::thread::sleep(Duration::from_millis(600));
+    assert!(
+        seen.lock().unwrap().is_empty(),
+        "{:?}",
+        seen.lock().unwrap()
+    );
+    std::fs::write(dir.path().join("note.md"), "changed outside").unwrap();
+    let wait = Duration::from_secs(5);
+    assert!(nimw_testkit::wait_until(wait, || seen
+        .lock()
+        .unwrap()
+        .contains(&r#"{"removed":false}"#.to_string())));
+    // Renamed in the app: the window follows its file under the new name.
+    call(&w, "file_rename", json!({ "newName": "Renamed.md" })).unwrap();
+    std::thread::sleep(Duration::from_millis(600));
+    seen.lock().unwrap().clear();
+    std::fs::remove_file(dir.path().join("Renamed.md")).unwrap();
+    assert!(nimw_testkit::wait_until(wait, || seen
+        .lock()
+        .unwrap()
+        .contains(&r#"{"removed":true}"#.to_string())));
+}

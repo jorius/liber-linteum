@@ -45,6 +45,12 @@ pub const SCREEN_EVENT: &str = "menu:screen";
 pub const QUICK_NOTE_ID: &str = "nimw-quick-note";
 /// Event telling the main window to take a quick note (no payload).
 pub const QUICK_NOTE_EVENT: &str = "menu:quickNote";
+/// Id of File → Open File… (M4c §3).
+pub const OPEN_FILE_ID: &str = "nimw-open-file";
+/// Event asking the page to run Open File… (it shows what couldn't open).
+pub const OPEN_FILE_EVENT: &str = "menu:open-file";
+/// ⌘⇧O: ⌘O already opens a folder as a vault (spec §3.5).
+pub const OPEN_FILE_ACCELERATOR: &str = "CmdOrCtrl+Shift+O";
 
 /// The app menu: About, Services, Hide, Hide Others, Show All, Quit (ours);
 /// File (New Quick Note, ⌘⇧N: from any window, so it carries the
@@ -97,7 +103,15 @@ pub fn app_menu<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
         true,
         Some("CmdOrCtrl+Shift+N"),
     )?;
-    let file = Submenu::with_items(app, "File", true, &[&quick_note])?;
+        // M4c §3: a Markdown, text or code file in a window of its own.
+    let open_file = MenuItem::with_id(
+        app,
+        OPEN_FILE_ID,
+        "Open File…",
+        true,
+        Some(OPEN_FILE_ACCELERATOR),
+    )?;
+    let file = Submenu::with_items(app, "File", true, &[&quick_note, &open_file])?;
     let edit = Submenu::with_items(
         app,
         "Edit",
@@ -182,20 +196,20 @@ pub fn on_menu_event<R: Runtime>(app: &AppHandle<R>, event: MenuEvent) {
         request_quit(app);
     } else if id == BACK_ID || id == FORWARD_ID {
         let direction = if id == BACK_ID { "back" } else { "forward" };
-        let _ = app.emit(NAVIGATE_EVENT, direction);
+        emit_focused(app, NAVIGATE_EVENT, direction);
     } else if id == EDITOR_ID || id == GLOBAL_VIEW_ID || id == ATOMS_ID {
         let screen = match id {
             EDITOR_ID => "edit",
             GLOBAL_VIEW_ID => "global",
             _ => "atoms",
         };
-        let _ = app.emit(SCREEN_EVENT, screen);
+        emit_focused(app, SCREEN_EVENT, screen);
     } else if id == TOOLBAR_ID {
-        let _ = app.emit(TOGGLE_EVENT, "toolbar");
+        emit_focused(app, TOGGLE_EVENT, "toolbar");
     } else if id == LINE_NUMBERS_ID {
-        let _ = app.emit(TOGGLE_EVENT, "lineNumbers");
+        emit_focused(app, TOGGLE_EVENT, "lineNumbers");
     } else if id == OUTLINE_ID {
-        let _ = app.emit(TOGGLE_EVENT, "outline");
+        emit_focused(app, TOGGLE_EVENT, "outline");
     } else if id == QUICK_NOTE_ID {
         // Quick notes are taken in the main window, wherever ⌘⇧N was pressed.
         if let Some(main) = app.get_webview_window("main") {
@@ -204,6 +218,31 @@ pub fn on_menu_event<R: Runtime>(app: &AppHandle<R>, event: MenuEvent) {
             let _ = main.set_focus();
         }
         let _ = app.emit_to("main", QUICK_NOTE_EVENT, ());
+    } else if id == OPEN_FILE_ID {
+        emit_focused(app, OPEN_FILE_EVENT, ());
+    }
+}
+
+/// The window a menu item acts on (M4c §3): the focused one, else the main
+/// window, else any. With several windows, a toggle sent to all of them
+/// flipped the setting once per window.
+pub fn menu_target<R: Runtime>(app: &AppHandle<R>) -> Option<String> {
+    let windows = app.webview_windows();
+    windows
+        .values()
+        .find(|w| w.is_focused().unwrap_or(false))
+        .or_else(|| windows.get("main"))
+        .or_else(|| windows.values().next())
+        .map(|w| w.label().to_string())
+}
+
+fn emit_focused<R: Runtime, S: serde::Serialize + Clone>(
+    app: &AppHandle<R>,
+    event: &str,
+    payload: S,
+) {
+    if let Some(label) = menu_target(app) {
+        let _ = app.emit_to(label.as_str(), event, payload);
     }
 }
 
