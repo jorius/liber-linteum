@@ -2626,6 +2626,7 @@ dependencies = [
  "pulldown-cmark",
  "serde_json",
  "unicode-normalization",
+ "unicode-segmentation",
  "yaml-rust2",
 ]
 

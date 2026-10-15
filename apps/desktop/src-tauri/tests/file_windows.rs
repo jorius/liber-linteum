@@ -97,6 +97,8 @@ const VAULT_COMMANDS: &[&str] = &[
     "external_reveal",
     "external_network_allow",
     "file_pick",
+    "folder_icon_set",
+    "vault_icon_set",
 ];
 
 struct Harness {

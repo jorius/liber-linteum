@@ -62,6 +62,8 @@
     "allow-scratch-folder-set",
     "allow-file-open-dialog",
     "allow-search",
+    "allow-folder-icon-set",
+    "allow-vault-icon-set",
     "core:event:allow-listen",
     "core:event:allow-unlisten",
     "dialog:allow-open"

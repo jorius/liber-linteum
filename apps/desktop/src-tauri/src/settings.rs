@@ -424,6 +424,9 @@ pub struct RecentVaultDto {
     pub missing: bool,
     /// The global Scratchpad (M4c §2): shown as "Quick notes".
     pub scratchpad: bool,
+    /// The vault's emoji (M5b §4), read from its `.nimw/vault.json`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub icon: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
@@ -671,6 +674,8 @@ impl SettingsStore {
                 opened_at: r.opened_at.clone(),
                 missing: !Path::new(&r.path).is_dir(),
                 scratchpad: s.scratchpad_path.as_deref() == Some(r.path.as_str()),
+                icon: nimw_vault::vault_icon_at(Path::new(&r.path))
+                    .filter(|i| nimw_markdown::is_icon(i)),
             })
             .collect()
     }

@@ -70,6 +70,8 @@ const COMMANDS: &[&str] = &[
     "file_open_in_vault",
     "file_open_dialog",
     "search",
+    "folder_icon_set",
+    "vault_icon_set",
 ];
 
 fn main() {

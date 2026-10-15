@@ -10,6 +10,7 @@ pub mod file_commands;
 pub mod file_windows;
 pub mod fonts;
 pub mod gv_commands;
+pub mod icon_commands;
 pub mod menu;
 pub mod navigation;
 pub mod opening;
@@ -169,6 +170,8 @@ pub fn configure<R: tauri::Runtime>(
         file_commands::file_open_in_vault,
         file_commands::file_open_dialog,
         search_commands::search,
+        icon_commands::folder_icon_set,
+        icon_commands::vault_icon_set,
     ])
 }
 

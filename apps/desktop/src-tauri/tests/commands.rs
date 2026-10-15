@@ -63,6 +63,8 @@ const COMMANDS: &[&str] = &[
     "external_network_allow",
     "file_pick",
     "search",
+    "folder_icon_set",
+    "vault_icon_set",
 ];
 
 struct Harness {
@@ -2055,4 +2057,74 @@ fn m4b3_outside_files_over_ipc() {
     // Final review I2: a linked disk image is no document: shown, not opened.
     let err = call(&h.main, "external_open", json!({ "path": iso })).unwrap_err();
     assert_eq!(kind(err), "invalidUrl", "only documents and media open");
+}
+
+/// M5b §4: folder and vault icons over IPC; the tree, vault info and recent
+/// vaults carry them, page icons come from frontmatter; text is refused.
+#[test]
+fn m5b_icons_over_ipc() {
+    let h = harness();
+    let vault = copy_fixture("obsidian-basic");
+    std::fs::write(vault.path().join("Rocket.md"), "---\nicon: 🚀\n---\n# R\n").unwrap();
+    call(&h.main, "vault_open", json!({ "path": vault.path() })).unwrap();
+    call(
+        &h.main,
+        "folder_icon_set",
+        json!({ "path": "Game Design", "icon": "🎮" }),
+    )
+    .unwrap();
+    let tree = call(&h.main, "vault_tree", json!({})).unwrap();
+    let icon = |path: &str| {
+        tree.as_array()
+            .unwrap()
+            .iter()
+            .find(|n| n["path"] == path)
+            .map(|n| n["icon"].clone())
+            .unwrap()
+    };
+    assert_eq!(icon("Game Design"), json!("🎮"));
+    assert_eq!(icon("Rocket.md"), json!("🚀"));
+    assert_eq!(icon("Welcome.md"), Value::Null);
+    call(&h.main, "vault_icon_set", json!({ "icon": "🌌" })).unwrap();
+    let info = call(&h.main, "vault_open", json!({ "path": vault.path() })).unwrap();
+    assert_eq!(info["icon"], "🌌");
+    let recent = call(&h.main, "vaults_recent", json!({})).unwrap();
+    assert_eq!(recent[0]["icon"], "🌌");
+    for bad in ["x", "🚀🚀", ""] {
+        let err = call(&h.main, "vault_icon_set", json!({ "icon": bad })).unwrap_err();
+        assert_eq!(kind(err), "invalidName", "{bad:?}");
+        let err = call(
+            &h.main,
+            "folder_icon_set",
+            json!({ "path": "Game Design", "icon": bad }),
+        )
+        .unwrap_err();
+        assert_eq!(kind(err), "invalidName", "{bad:?}");
+    }
+    for path in ["Welcome.md", "Missing", ".obsidian", "../x"] {
+        assert!(
+            call(
+                &h.main,
+                "folder_icon_set",
+                json!({ "path": path, "icon": "🎮" })
+            )
+            .is_err(),
+            "{path}"
+        );
+    }
+    // Clearing.
+    call(
+        &h.main,
+        "folder_icon_set",
+        json!({ "path": "Game Design", "icon": null }),
+    )
+    .unwrap();
+    call(&h.main, "vault_icon_set", json!({ "icon": null })).unwrap();
+    let tree = call(&h.main, "vault_tree", json!({})).unwrap();
+    assert!(
+        tree.as_array()
+            .unwrap()
+            .iter()
+            .all(|n| n["path"] != "Game Design" || n.get("icon").is_none())
+    );
 }

@@ -71,12 +71,17 @@ pub(crate) fn open_session<R: Runtime>(app: &AppHandle<R>, root: &Path) -> CmdRe
             .warnings
             .push(format!("recent vaults could not be saved: {e}"));
     }
+    let icon = session
+        .vault()
+        .vault_icon()
+        .filter(|i| nimw_markdown::is_icon(i));
     state.set_session(Some(session));
     let scratchpad = state.settings.is_scratchpad(&root);
     state.set_scratchpad_root(scratchpad.then(|| root.clone()));
     Ok(VaultInfo {
         name,
         scratchpad,
+        icon,
         root: root.to_string_lossy().into_owned(),
         report,
     })
@@ -122,13 +127,26 @@ pub(crate) fn vault_close_impl(state: &AppState) {
 }
 
 pub(crate) fn vault_tree_impl(state: &AppState) -> CmdResult<Vec<TreeNodeDto>> {
-    Ok(state
-        .session()?
+    let session = state.session()?;
+    let mut folders = session.vault().folder_icons();
+    Ok(session
         .tree()?
         .into_iter()
-        .map(|n| TreeNodeDto {
-            path: n.path,
-            kind: n.kind.as_str(),
+        .map(|n| {
+            // Pages: the indexed frontmatter emoji; folders: vault.json (M5b §4).
+            let kind = n.kind.as_str();
+            let icon = if kind == "folder" {
+                folders
+                    .remove(&n.path)
+                    .filter(|i| nimw_markdown::is_icon(i))
+            } else {
+                n.icon
+            };
+            TreeNodeDto {
+                path: n.path,
+                kind,
+                icon,
+            }
         })
         .collect())
 }
