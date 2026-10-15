@@ -95,6 +95,35 @@ impl Vault {
         })
     }
 
+    /// Forgets the widths of deleted pages, and of every page inside a deleted
+    /// folder (final review M10: a new page at the same path starts at the
+    /// default); one write, none when nothing was set.
+    pub fn forget_page_widths(&self, removed: &[String]) -> Result<()> {
+        if removed.is_empty() {
+            return Ok(());
+        }
+        let gone = |path: &str| {
+            removed.iter().any(|r| {
+                path == r
+                    || path
+                        .strip_prefix(r.as_str())
+                        .is_some_and(|rest| rest.starts_with('/'))
+            })
+        };
+        self.update_json_object(NIMW_JSON, false, |map| {
+            let Some(pages) = map
+                .get_mut("pageWidths")
+                .and_then(serde_json::Value::as_object_mut)
+            else {
+                return;
+            };
+            pages.retain(|path, _| !gone(path));
+            if pages.is_empty() {
+                map.remove("pageWidths");
+            }
+        })
+    }
+
     /// Page widths follow a batch of renames (files and folders); one write,
     /// none when nothing moved.
     pub fn remap_page_widths_many(&self, renames: &[(String, String)]) -> Result<()> {

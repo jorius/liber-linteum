@@ -42,6 +42,7 @@ impl VaultSession {
     pub fn apply(&self, events: Vec<WatchEvent>) -> Result<()> {
         if events.contains(&WatchEvent::Overflow) {
             let (_, changes) = self.reindex_all()?;
+            self.forget_widths(&changes.removed);
             self.emit_changed(
                 changes.created,
                 changes.modified,
@@ -241,6 +242,8 @@ impl VaultSession {
         // the change is announced so a Global View refresh reads the moved
         // positions.
         self.follow_layout(&renamed);
+        // Deleted pages and folders take their widths with them (final review M10).
+        self.forget_widths(&removed);
         for w in warnings {
             self.emit_warning(w);
         }

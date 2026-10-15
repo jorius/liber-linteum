@@ -1,6 +1,6 @@
 use nimw_session::{SessionEvent, VaultSession};
 use nimw_testkit::{copy_fixture, wait_until};
-use nimw_vault::{VaultPath, WatchEvent};
+use nimw_vault::{PageWidth, VaultPath, WatchEvent};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
@@ -287,4 +287,33 @@ fn vlt_04_watcher_warnings_are_warning_events() {
         !got.iter().any(|e| matches!(e, SessionEvent::Indexed(_))),
         "{got:?}"
     );
+}
+
+/// Final review M10: pages deleted outside the app (one by one, or with their
+/// folder) take their width with them; a rename by another program keeps it.
+#[test]
+fn m4b2_pages_deleted_outside_forget_their_width() {
+    let (dir, _c, s) = unwatched(&[
+        ("A.md", "# a"),
+        ("F/B.md", "# b"),
+        ("Kept.md", "# kept"),
+        ("Moved.md", "# moved"),
+    ]);
+    for page in ["A.md", "F/B.md", "Kept.md", "Moved.md"] {
+        s.vault()
+            .set_page_width(page, Some(PageWidth::Full))
+            .unwrap();
+    }
+    std::fs::remove_file(dir.path().join("A.md")).unwrap();
+    std::fs::remove_dir_all(dir.path().join("F")).unwrap();
+    std::fs::rename(dir.path().join("Moved.md"), dir.path().join("Renamed.md")).unwrap();
+    s.apply(vec![
+        WatchEvent::Removed(vp("A.md")),
+        WatchEvent::Removed(vp("F")),
+        WatchEvent::Removed(vp("Moved.md")),
+        WatchEvent::Changed(vp("Renamed.md")),
+    ])
+    .unwrap();
+    let pages: Vec<String> = s.vault().page_widths().pages.into_keys().collect();
+    assert_eq!(pages, ["Kept.md", "Renamed.md"]);
 }

@@ -98,3 +98,34 @@ fn m4b2_a_malformed_width_hides_only_itself() {
     assert!(!widths.pages.contains_key("B.md"));
     assert!(vault.is_excluded("Private/x.md"), "excludes still apply");
 }
+
+/// Final review M10: a deleted page's width doesn't outlive it (a new page at
+/// the same path starts at the default); a deleted folder takes its pages'.
+#[test]
+fn m4b2_widths_of_deleted_pages_and_folders_are_forgotten() {
+    let (dir, vault) = fresh();
+    for (path, width) in [
+        ("Notes/A.md", PageWidth::Full),
+        ("Notes/Sub/B.md", PageWidth::Readable),
+        ("Notes2/C.md", PageWidth::Full),
+        ("D.md", PageWidth::Full),
+    ] {
+        vault.set_page_width(path, Some(width)).unwrap();
+    }
+    vault
+        .forget_page_widths(&["Notes".to_string(), "D.md".to_string()])
+        .unwrap();
+    let widths = vault.page_widths();
+    assert_eq!(
+        widths.pages.into_iter().collect::<Vec<_>>(),
+        vec![("Notes2/C.md".to_string(), PageWidth::Full)]
+    );
+    vault
+        .forget_page_widths(&["Notes2/C.md".to_string()])
+        .unwrap();
+    assert!(file(&dir).get("pageWidths").is_none());
+    // Nothing to forget writes nothing (VLT-02).
+    let (bare, vault) = fresh();
+    vault.forget_page_widths(&["A.md".to_string()]).unwrap();
+    assert!(!bare.path().join(".nimw").exists());
+}
