@@ -503,6 +503,103 @@ export function installIpcMock({
       localStorage.setItem('nimw-e2e-layout', JSON.stringify(all));
       return null;
     },
+    // ---- M5: search over `pages` (folded word prefixes, the filters, a
+    // snippet), close enough to the index for the UI's flows ----
+    search: (a) => {
+      const q = a.query as {
+        text?: string;
+        project?: string | null;
+        tags?: string[];
+        linksTo?: string | null;
+        hasImage?: boolean;
+        offset?: number;
+      };
+      const fold = (s: string) => s.normalize('NFD').replace(/\p{M}/gu, '').toLowerCase();
+      const tokens = (s: string) => (s.match(/[\p{L}\p{N}]+/gu) ?? []).map(fold);
+      const words = tokens(q.text ?? '');
+      const tagsOf = (path: string) => {
+        const text = pages[path] ?? '';
+        const fm = (front(text).tags ?? '').replace(/[[\]]/g, '').split(',');
+        const body = [...text.replace(FRONT, '').matchAll(/(?:^|\s)#([\p{L}\p{N}_/-]+)/gu)].map(
+          (m) => m[1],
+        );
+        return [...new Set([...fm, ...body].map((t) => t.trim()).filter(Boolean))];
+      };
+      const image = (path: string) =>
+        /!\[[^\]]*\]\([^)]+\.(png|jpe?g|gif|webp|svg)\)|!\[\[[^\]]+\.(png|jpe?g|gif|webp|svg)\]\]/i.test(
+          pages[path] ?? '',
+        );
+      const to = q.linksTo ? (resolveName(q.linksTo.replace(/\.md$/, '')) ?? q.linksTo) : null;
+      const matches = Object.keys(pages)
+        .filter((p) => /\.md$/i.test(p))
+        .filter((path) => {
+          const body = (pages[path] ?? '').replace(FRONT, '');
+          const hay = tokens(
+            [
+              titleOf(path, pages[path] ?? ''),
+              path.replace(/\.md$/, ''),
+              tagsOf(path).join(' '),
+              body,
+            ].join(' '),
+          );
+          return words.every((w) => hay.some((t) => t.startsWith(w)));
+        })
+        .filter((p) => !q.project || p.startsWith(`${q.project}/`))
+        .filter((p) =>
+          (q.tags ?? []).every((t) =>
+            tagsOf(p).some((x) => x.toLowerCase() === t.toLowerCase().replace(/^#/, '')),
+          ),
+        )
+        .filter((p) => !to || linksOf(p).includes(to))
+        .filter((p) => !q.hasImage || image(p));
+      const recent = !words.length && !q.project && !q.tags?.length && !to && !q.hasImage;
+      const shown = matches.slice(q.offset ?? 0, (q.offset ?? 0) + (recent ? 20 : 50));
+      const snippet = (path: string) => {
+        if (!words.length) return null;
+        const body = (pages[path] ?? '').replace(FRONT, '').replace(/^#.*$/m, '');
+        const runs = body.split(/([\p{L}\p{N}]+)/u);
+        const at = runs.findIndex((r) => words.some((w) => fold(r).startsWith(w)));
+        if (at < 0) return null;
+        const part = (r: string[]) => r.join('').replace(/\s+/g, ' ');
+        return [
+          { text: part(runs.slice(Math.max(0, at - 6), at)), hit: false },
+          { text: runs[at], hit: true },
+          { text: part(runs.slice(at + 1, at + 8)), hit: false },
+        ].filter((x) => x.text);
+      };
+      const count = (values: string[]) => {
+        const m = new Map<string, number>();
+        for (const v of values) m.set(v, (m.get(v) ?? 0) + 1);
+        return [...m].map(([value, n]) => ({ value, count: n }));
+      };
+      return {
+        results: shown.map((path) => ({
+          path,
+          title: titleOf(path, pages[path] ?? ''),
+          cover: null,
+          tags: tagsOf(path),
+          hasImage: image(path),
+          hasAudio: false,
+          snippet: snippet(path),
+        })),
+        total: recent ? shown.length : matches.length,
+        facets: {
+          projects: count(matches.filter((p) => p.includes('/')).map((p) => p.split('/')[0])),
+          tags: count(matches.flatMap(tagsOf)),
+          linksTo: count(matches.flatMap(linksOf)).map(({ value, count: n }) => ({
+            path: value,
+            title: titleOf(value, pages[value] ?? ''),
+            count: n,
+            active: value === to,
+          })),
+          linksFrom: null,
+          hasImage: matches.filter(image).length,
+          hasAudio: 0,
+        },
+        recent,
+        indexing: false,
+      };
+    },
     entry_create_folder: (a) => (a.parent ? `${a.parent}/${a.name}` : (a.name as string)),
     scratchpad_default: () => SCRATCH_DEFAULT,
     scratchpad_choose: () => null,
