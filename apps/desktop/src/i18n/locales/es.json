@@ -182,6 +182,14 @@
       },
       "hint": "Arrastra los bloques en la vista previa para reordenarlos; el Markdown de la izquierda los sigue.",
       "dismissHint": "Cerrar la sugerencia"
+    },
+    "attach": {
+      "title": "{count, plural, one {Adjuntar # archivo} other {Adjuntar # archivos}}",
+      "more": "{count, plural, one {y # más} other {y # más}}",
+      "explain": "Las copias viajan con la bóveda y se abren en Obsidian. Los enlaces dejan el archivo donde está.",
+      "copy": "Copiar a la bóveda",
+      "link": "Enlazar donde está",
+      "cancel": "Cancelar"
     }
   },
   "preview": {
@@ -193,7 +201,17 @@
     "open": "Abrir",
     "cycle": "La nota incrustada vuelve a esta página",
     "loading": "Cargando…",
-    "renderFailed": "No se pudo mostrar esta página. El texto está a salvo en el editor."
+    "renderFailed": "No se pudo mostrar esta página. El texto está a salvo en el editor.",
+    "external": {
+      "notFound": "No encontrado: {path}",
+      "open": "Abrir",
+      "revealMac": "Mostrar en Finder",
+      "revealWindows": "Mostrar en el Explorador",
+      "revealOther": "Mostrar en la carpeta",
+      "location": "Ubicación en el disco",
+      "copyPath": "Copiar ruta",
+      "copied": "Copiado"
+    }
   },
   "menu": {
     "label": "Acciones para {name}",
@@ -294,7 +312,20 @@
     "coverHeightMedium": "Mediana ({px} px)",
     "coverHeightLarge": "Grande ({px} px)",
     "coverHeightExtraLarge": "Muy grande ({px} px)",
-    "coverHeightPx": "{px} px"
+    "coverHeightPx": "{px} px",
+    "links": {
+      "label": "Formato de enlace para adjuntos nuevos",
+      "formats": {
+        "shortest": "Nombre más corto",
+        "vault": "Ruta completa en la bóveda",
+        "relative": "Relativa a la nota",
+        "absolute": "Ruta absoluta en el disco"
+      },
+      "example": "Los adjuntos nuevos se escriben como {example}",
+      "obsidian": "Sigue la configuración de Obsidian ({format}). Elige un formato para usar el tuyo.",
+      "useObsidian": "Usar la configuración de Obsidian",
+      "showPaths": "Mostrar dónde están los adjuntos en el disco"
+    }
   },
   "toolbar": {
     "label": "Formato",
@@ -315,7 +346,8 @@
     "toggle": "Barra de formato",
     "short": "Formato",
     "show": "Mostrar la barra de formato",
-    "hide": "Ocultar la barra de formato"
+    "hide": "Ocultar la barra de formato",
+    "attach": "Adjuntar un archivo o imagen…"
   },
   "trail": {
     "back": "Volver a {name}"

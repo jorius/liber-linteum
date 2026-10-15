@@ -247,3 +247,45 @@
   color: var(--color-text-muted);
   font-size: 12px;
 }
+
+/* Copy or link the files picked with Attach (M4b part 3 §7), at the cursor. */
+.attachChoice {
+  position: fixed;
+  z-index: 20;
+  box-sizing: border-box;
+  width: 360px;
+  max-width: calc(100vw - 32px);
+  padding: 12px 14px;
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  box-shadow: 0 8px 24px rgb(0 0 0 / 0.14);
+  color: var(--color-text);
+  font: 14px var(--font-body);
+}
+
+.attachTitle {
+  margin: 0 0 6px;
+  font-weight: 600;
+  color: var(--color-text-strong);
+}
+
+.attachFiles {
+  margin: 0 0 8px;
+  padding: 0 0 0 18px;
+  color: var(--color-text-body);
+  overflow-wrap: anywhere;
+}
+
+.attachExplain {
+  margin: 0 0 12px;
+  color: var(--color-text-muted);
+  font-size: 13px;
+}
+
+.attachButtons {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}

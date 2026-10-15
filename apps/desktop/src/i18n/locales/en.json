@@ -182,6 +182,14 @@
       },
       "hint": "Drag blocks in the preview to reorder them; the Markdown on the left follows.",
       "dismissHint": "Dismiss the hint"
+    },
+    "attach": {
+      "title": "{count, plural, one {Attach # file} other {Attach # files}}",
+      "more": "{count, plural, one {and # more} other {and # more}}",
+      "explain": "Copies travel with the vault and open in Obsidian. Links keep the file where it is.",
+      "copy": "Copy into the vault",
+      "link": "Link to where it is",
+      "cancel": "Cancel"
     }
   },
   "preview": {
@@ -193,7 +201,17 @@
     "open": "Open",
     "cycle": "Embedded note refers back to this page",
     "loading": "Loading…",
-    "renderFailed": "This page couldn’t be shown. The text is safe in the editor."
+    "renderFailed": "This page couldn’t be shown. The text is safe in the editor.",
+    "external": {
+      "notFound": "Not found: {path}",
+      "open": "Open",
+      "revealMac": "Show in Finder",
+      "revealWindows": "Show in Explorer",
+      "revealOther": "Show in folder",
+      "location": "Location on disk",
+      "copyPath": "Copy path",
+      "copied": "Copied"
+    }
   },
   "menu": {
     "label": "Actions for {name}",
@@ -294,7 +312,20 @@
     "coverHeightMedium": "Medium ({px} px)",
     "coverHeightLarge": "Large ({px} px)",
     "coverHeightExtraLarge": "Extra large ({px} px)",
-    "coverHeightPx": "{px} px"
+    "coverHeightPx": "{px} px",
+    "links": {
+      "label": "Link format for new attachments",
+      "formats": {
+        "shortest": "Shortest name",
+        "vault": "Full path in the vault",
+        "relative": "Relative to the note",
+        "absolute": "Absolute path on disk"
+      },
+      "example": "New attachments are written as {example}",
+      "obsidian": "Following Obsidian’s setting ({format}). Choose a format to use your own.",
+      "useObsidian": "Use Obsidian’s setting",
+      "showPaths": "Show where attachments are on disk"
+    }
   },
   "toolbar": {
     "label": "Formatting",
@@ -315,7 +346,8 @@
     "toggle": "Formatting toolbar",
     "short": "Format",
     "show": "Show the formatting toolbar",
-    "hide": "Hide the formatting toolbar"
+    "hide": "Hide the formatting toolbar",
+    "attach": "Attach a file or image…"
   },
   "trail": {
     "back": "Back to {name}"

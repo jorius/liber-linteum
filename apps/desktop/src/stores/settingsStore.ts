@@ -30,6 +30,7 @@ export const DEFAULT_SETTINGS: Settings = {
   wideElements: { tables: true, code: false, diagrams: true, images: false, maths: false },
   outline: false,
   coverHeight: 200,
+  showAttachmentPaths: false,
   globalViewMode: 'drill',
   globalViewEdges: { links: true, tree: true, manual: true, aggregated: true },
 };

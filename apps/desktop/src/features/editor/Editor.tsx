@@ -14,7 +14,7 @@ import { tagHighlighter, tags } from '@lezer/highlight';
 import { diffIndices } from 'node-diff3';
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import type { EditorMode } from '../../ipc';
+import type { EditorMode, PickedFile } from '../../ipc';
 import { usePageStore } from '../../stores/pageStore';
 import { usePageWidth, useWideElements } from '../../stores/pageWidthStore';
 import { isTextPath } from '../../stores/textFiles';
@@ -35,6 +35,8 @@ import { LanguagePicker } from './LanguagePicker';
 import { setLanguagePickerOpener } from './languagePickerOpen';
 import { LinkPicker } from './LinkPicker';
 import { setLinkPickerOpener } from './linkPickerOpen';
+import { setAttachChooser } from './attachOpen';
+import { AttachChoice } from './AttachChoice';
 import type { PageDoc } from './pageDoc';
 import { Outline } from './Outline';
 import { blockForOffset, offsetAtTop, topIn } from './scrollSync';
@@ -350,6 +352,7 @@ export function Editor({ doc, mode, label }: EditorProps) {
   const showOutline = useSettingsStore((s) => s.settings.outline);
   const [toolbarView, setToolbarView] = useState<EditorView | null>(null);
   const [picker, setPicker] = useState(false);
+  const [attach, setAttach] = useState<PickedFile[] | null>(null);
   const [langPicker, setLangPicker] = useState<{ at: number; anchor: HTMLElement } | null>(null);
   const [active, setActive] = useState<Set<ActiveFormat>>(() => new Set());
   const showFormats = useCallback((state: EditorState) => {
@@ -369,6 +372,7 @@ export function Editor({ doc, mode, label }: EditorProps) {
     toolbarOf.set(v, showFormats);
     setToolbarView(v);
     setLinkPickerOpener(v, () => setPicker(true));
+    setAttachChooser(v, setAttach);
     setLanguagePickerOpener(v, (at, anchor) => setLangPicker({ at, anchor }));
     showFormats(v.state);
     setCurrentView(v);
@@ -381,6 +385,7 @@ export function Editor({ doc, mode, label }: EditorProps) {
       paneOf.delete(v);
       toolbarOf.delete(v);
       setLinkPickerOpener(v, null);
+      setAttachChooser(v, null);
       setLanguagePickerOpener(v, null);
       v.destroy();
       view.current = null;
@@ -538,6 +543,9 @@ export function Editor({ doc, mode, label }: EditorProps) {
     <div className={styles.frame}>
       {showToolbar && !textFile && toolbarView && <Toolbar view={toolbarView} active={active} />}
       {picker && toolbarView && <LinkPicker view={toolbarView} onClose={() => setPicker(false)} />}
+      {attach && toolbarView && (
+        <AttachChoice view={toolbarView} files={attach} onClose={() => setAttach(null)} />
+      )}
       {langPicker && toolbarView && (
         <LanguagePicker
           view={toolbarView}

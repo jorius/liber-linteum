@@ -16,6 +16,7 @@ import {
   attachmentPaste,
   isTauri,
   onDragDrop,
+  type Attached,
   type CommandError,
   type DragDropPayload,
 } from '../../ipc';
@@ -76,12 +77,27 @@ export function pastedName(at: Date, type: string): string | null {
   return `Pasted image ${stamp}.${ext}`;
 }
 
+const embedded = (name: string) => {
+  const dot = name.lastIndexOf('.');
+  return dot > 0 && EMBEDDED.has(name.slice(dot + 1).toLowerCase());
+};
+
 /** The text inserted for a saved file whose wiki target is `link`. */
 export function embedFor(link: string): string {
-  const name = link.slice(link.lastIndexOf('/') + 1);
-  const dot = name.lastIndexOf('.');
-  const ext = dot > 0 ? name.slice(dot + 1).toLowerCase() : '';
-  return EMBEDDED.has(ext) ? `![[${link}]]` : `[[${link}]]`;
+  return embedded(link.slice(link.lastIndexOf('/') + 1)) ? `![[${link}]]` : `[[${link}]]`;
+}
+
+/** A file named by its `file:` URL (M4b part 3 §7, §8): `![](url)` for media
+ *  and PDFs, `[name](url)` for the rest — the form Obsidian opens too. */
+export function fileLinkFor(name: string, url: string): string {
+  if (embedded(name)) return `![](${url})`;
+  return `[${name.replace(/[[\]\r\n]/g, ' ')}](${url})`;
+}
+
+/** What to insert for a saved attachment: its file: URL in the absolute link
+ *  format, else its wiki embed or link. */
+export function markupFor(a: Attached): string {
+  return a.url ? fileLinkFor(a.link.slice(a.link.lastIndexOf('/') + 1), a.url) : embedFor(a.link);
 }
 
 // ---- drop caret and pending insertion points ----
@@ -237,7 +253,7 @@ async function pasteImages(view: EditorView, files: File[]) {
       }
       const name = pastedName(new Date(), PASTE_TYPES[pasted.type] ? pasted.type : 'image/png')!;
       const res = await attachmentPaste(page, name, new Uint8Array(await file.arrayBuffer()));
-      if (res.ok) inserted.push(embedFor(res.value.link));
+      if (res.ok) inserted.push(markupFor(res.value));
       else useToastStore.getState().push({ message: errorMessage(res.error), tone: 'error' });
     }
   } finally {
@@ -315,7 +331,7 @@ async function dropFiles(origin: Origin, id: number, paths: string[]) {
     useToastStore.getState().push({ message: errorMessage(res.error), tone: 'error' });
     return;
   }
-  const links = res.value.flatMap((r) => (r.ok ? [embedFor(r.ok.link)] : []));
+  const links = res.value.flatMap((r) => (r.ok ? [markupFor(r.ok)] : []));
   const failed = res.value.flatMap((r) => (r.err ? [failureLine(r.source, r.err)] : []));
   const text = links.join('\n');
   land(origin, (state) => {
@@ -336,6 +352,25 @@ async function dropFiles(origin: Origin, id: number, paths: string[]) {
       tone: 'error',
     });
   }
+}
+
+/** Imports `paths` (granted by a drop or the Attach dialog) for the page in
+ *  `view` and inserts them at the cursor, one per line (M4b part 3 §7). */
+export function attachPaths(view: EditorView, paths: string[]): void {
+  const id = ++drops;
+  view.dispatch({ effects: addPending.of({ id, pos: view.state.selection.main.head }) });
+  void dropFiles(originOf(view), id, paths);
+}
+
+/** Inserts `text` at the cursor (replacing the selection) as one undo step. */
+export function insertAtCursor(view: EditorView, text: string): void {
+  const { from, to } = view.state.selection.main;
+  view.dispatch({
+    changes: { from, to, insert: text },
+    selection: { anchor: from + text.length },
+    scrollIntoView: true,
+    userEvent: 'input.attach',
+  });
 }
 
 let caretView: EditorView | null = null;
