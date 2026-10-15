@@ -176,7 +176,7 @@ pub fn run() {
     // never in tests (a second app in the test process would exit it).
     #[cfg(not(target_os = "macos"))]
     let builder = builder.plugin(tauri_plugin_single_instance::init(|app, args, cwd| {
-        let args: Vec<String> = args.into_iter().skip(1).collect();
+        let args: Vec<std::ffi::OsString> = args.into_iter().skip(1).map(Into::into).collect();
         let cwd = std::path::Path::new(&cwd);
         opening::open_later(app, opening::paths_from_args(&args, cwd));
     }));
@@ -186,7 +186,7 @@ pub fn run() {
         .run(|app, event| match event {
             // Files named on the command line that started the app.
             tauri::RunEvent::Ready => {
-                let args: Vec<String> = std::env::args().skip(1).collect();
+                let args: Vec<std::ffi::OsString> = std::env::args_os().skip(1).collect();
                 let cwd = std::env::current_dir().unwrap_or_default();
                 opening::open_later(app, opening::paths_from_args(&args, &cwd));
             }

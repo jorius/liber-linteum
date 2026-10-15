@@ -5,6 +5,7 @@
 
 use crate::file_commands::open_paths;
 use crate::file_windows::file_kind;
+use std::ffi::OsString;
 use std::path::{Path, PathBuf};
 use tauri::{AppHandle, Runtime};
 
@@ -12,9 +13,11 @@ use tauri::{AppHandle, Runtime};
 /// (`-x`, `--x`, macOS's `-psn_…`) are skipped, relative paths are joined
 /// to `cwd`, and only names the app opens on their own are kept (whether
 /// they exist is checked when they open).
-pub fn paths_from_args(args: &[String], cwd: &Path) -> Vec<PathBuf> {
+pub fn paths_from_args(args: &[OsString], cwd: &Path) -> Vec<PathBuf> {
+    // OS strings: a file name that isn't UTF-8 (Linux) must not crash the
+    // launch (M4c review m1); the name check below skips it.
     args.iter()
-        .filter(|a| !a.starts_with('-'))
+        .filter(|a| !a.as_encoded_bytes().starts_with(b"-"))
         .map(|a| {
             let p = PathBuf::from(a);
             if p.is_absolute() { p } else { cwd.join(p) }
@@ -56,7 +59,7 @@ mod tests {
     #[test]
     fn command_lines_name_notes_and_text_files() {
         let cwd = Path::new("/home/me/notes");
-        let args: Vec<String> = [
+        let args: Vec<std::ffi::OsString> = [
             "-psn_0_12345",
             "--flag",
             "today.md",
@@ -65,7 +68,7 @@ mod tests {
             "sub/code.rs",
         ]
         .iter()
-        .map(|s| s.to_string())
+        .map(|s| s.into())
         .collect();
         assert_eq!(
             paths_from_args(&args, cwd),
@@ -74,6 +77,19 @@ mod tests {
                 PathBuf::from("/abs/list.txt"),
                 PathBuf::from("/home/me/notes/sub/code.rs"),
             ]
+        );
+    }
+
+    #[test]
+    fn m4c_review_m1_a_name_that_is_not_utf8_is_skipped_not_a_crash() {
+        use std::os::unix::ffi::OsStrExt;
+        let args = [
+            std::ffi::OsStr::from_bytes(b"caf\xe9.md").to_os_string(),
+            "ok.md".into(),
+        ];
+        assert_eq!(
+            paths_from_args(&args, Path::new("/n")),
+            [PathBuf::from("/n/ok.md")]
         );
     }
 
