@@ -361,3 +361,98 @@ Built in three streams in parallel, each with its own plan, worktree and signed 
   - TS `coverSide`/`coverX` are required on `GvCard`, so Global View card fixtures carry them.
 - **Vault settings:** `vault_settings_get` and every reply built from it carry `coverSides` (`{ path: "left" | "right" }`) and `coverWidths`. A hand-written `"top"` entry is ignored.
 - **i18n:** the strings live in the existing `cover.*` namespace (`cover.placement`, `cover.placeTop|Left|Right`, `cover.width`, `cover.positionBoth`, `cover.sideNotSaved`, `cover.widthNotSaved`).
+
+## 14. Amendments from planning (Stream A — Global View)
+
+### Card covers (§2) and side strips on cards (§3)
+
+**Cause, confirmed:**
+- A Chromium e2e with WebView2's user agent (vault files over `http://nimw-asset.localhost`, served by the test) failed with the card image at 238 × 1190 inside its 96 px frame. WebKit passed.
+- With the fix, the frame is a definite box and the image fills it absolutely, so `object-position` crops it.
+- The editor's header band is Stream B's to audit.
+
+**Side covers on cards:**
+- The card's body becomes a two-column grid with the 96 px strip spanning its rows; `object-position` is `cover-x% cover-y%`.
+- A side placement without an image keeps the top placeholder ("No cover").
+
+### Pages and folders (§4)
+
+- The icons live in the feature (`global-view/gvIcons.tsx`), so `app/icons.tsx` isn't touched by three streams at once.
+- The folder tab is a sibling of the card, because the card clips its own box.
+- The second sheet is drawn with box-shadows, kept under the open and connecting rings.
+- The folder head's kind label is accent on accent-soft, a pairing already guaranteed ≥ 4.5:1 and now pinned in the Global View token test.
+
+### Edges (§5)
+
+**Lines:**
+- **Links stay straight lines.** The table's "curve" described nothing that was there. The shape difference comes from parent/child lines becoming orthogonal elbows; straight links are also cheaper to draw and to label.
+- **No arrowheads on links.** `GvEdge` carries no direction for links: Rust aggregates them as undirected pairs. Arrowheads stay on directed relationships. Giving links a direction would change Rust's edge aggregation (not Stream A's).
+- **Elbows follow the layout:**
+  - right–down–right where a tree grows sideways (Expand in place);
+  - down–across–down where it grows down (the atoms map's sections);
+  - a **trunk** down the parent's left side for blocks stacked and indented under it (`route: 'l'`).
+  - Dragged cards get whichever elbow their places allow, and overlapping cards a straight line.
+
+**Chips:**
+- The text reads "N links" or "N relationships" (ICU plural). A relationship's label and its count are joined with " · ".
+- Each chip is a `<rect>` pill under the existing SVG text. The NFR-03 probe still passes: WebKit, 200 cards and 3,400 aggregated edges, 144–242 ms.
+
+**Focus mode:**
+- Keyboard focus lights a card only when the keyboard moved there inside the canvas (arrow keys, Tab). A card focused for you, such as a level that just loaded, doesn't light: the view would arrive dimmed.
+- The dimmed cards (55%) are a passing state the pointer or keyboard asked for. axe runs with the pointer off the cards.
+
+**Legend:** the edge toggles already showed a sample per kind; they now draw each line as it looks, an elbow for parent/child.
+
+### See atoms (§6)
+
+**Entry points:**
+- The Atoms button is on page cards only.
+- **See atoms** in the card menu works for any card that stands for a page, folders included through their index note.
+- View → See Atoms of This Page:
+  - is `menu:screen` with the payload `"atoms"`;
+  - is answered by `global-view/seeAtomsMenu.ts`, because the stores layer must not import the feature;
+  - does nothing without an open Markdown page.
+
+**Atoms:**
+- A paragraph made only of embeds or images gives one image atom per embed (the friend's runs of `![[Pasted image …]]`).
+- `::::columns` containers are flattened. HTML blocks get an atom. Frontmatter, rules and definitions are skipped. Audio also covers `ogg` and `flac`.
+- Lists and tables are named by their first items or column names.
+
+**Sizes:**
+- an atom is 200 × 120, a section 220 × 64, and "+N more" 200 × 56;
+- the page's own card and linked or related cards stay 240 × 300.
+
+**Linked pages:**
+- They come from the page level (`gv_children` of the page), so only pages that level holds appear (its 200-neighbour cap).
+- A page that only links *to* this one isn't shown.
+- Relationships come from `gv_edges`.
+
+**Clicks:**
+- A single click on a linked page's card shows *its* atoms (the map navigates). Edit or a double click opens it.
+- The page's own card does nothing on a click (it is already here); its Edit opens it.
+
+**Breadcrumb:**
+- While atoms show, every level crumb is a way back.
+- The page crumb opens the page's own level in Drill-down; in Expand it just goes back.
+- Escape goes back with the keyboard on the page's card.
+
+**Jump:**
+- `pageStore.jump` is consumed once by the editor showing that path.
+- The cursor goes to the block's start, scrolled to the middle.
+- Offsets past a text that changed since are clamped.
+- The flash is a line decoration (`cm-nimw-flash`, accent-soft) that lasts 1 s.
+
+**Rendering:**
+- React Flow's visible-only rendering applies past 150 cards. Smaller maps render every card, which jsdom tests also rely on (it can't measure).
+- Formulas and diagrams use the preview's `MathView` and `MermaidView`, scaled into the card.
+- The atoms map reads the live text (unsaved edits included) and re-reads on saves and vault changes.
+
+### Tests and data
+
+- **`GvCard`:** `coverSide` and `coverX` are required in TypeScript, as specified. Card fixtures set `top` / `null`.
+- **The e2e mock:**
+  - takes a `coverSides` option;
+  - reads `cover-y` and `cover-x` from frontmatter.
+  - It still titles pages by their first `# ` anywhere (Stream B's §1 fixes the app, not the mock).
+- **M3a's e2e:** the screen switch's "Edit" lookups are now exact, because page cards hold "Edit {title}" buttons.
+
