@@ -146,3 +146,69 @@ Planned for a later batch (product spec §13, 2026-10-14); nothing is built in M
 - line-number gutters in the rendered pane;
 - running code;
 - version history.
+
+## 10. Amendments from planning
+
+The plan (`docs/superpowers/plans/2026-10-14-m4b-part2.md`) was replayed end to end on a scratch clone. These rulings and deviations came out of it.
+
+### Page width (§1)
+
+1. **"Full" changes Live Preview's measure only.** The Split pane already spans its half of the window.
+2. **There is no separate "Reset to default" item.** Toggling a page back to the vault or app default clears its entry, so the page follows the default again. The vault's own setting is cleared with "Use the app setting" (`pageWidth: "default"` in the patch).
+
+### Code (§2)
+
+3. **Tokens are generated per palette** by an OKLCH lightness search to ≥ 4.6:1 on `--color-code-bg`. `--code-variable` is the text colour, and `--code-punct` the muted colour where that is readable.
+4. **The editor colours tokens through classes** (`cm-nimw-code-*`), so a few Markdown tags take token colours too, such as a link title as a string.
+5. **The fence id written by the picker** is the language's shortest language-data alias, or else its name in lower case (so Python is written `python`; language-data has no `py` alias). "Plain text" clears the id. The picker is its own combobox; the shared `PickerPopup` is a page search.
+
+### Maths (§3)
+
+6. **The dependencies are `remark-math@6.0.0`** (which carries `micromark-extension-math` and `mdast-util-math`) and **`katex@0.18.9`**. `0.18.10` was too new for the release-age gate.
+7. **The "$ followed by a space" rule** is applied as: inline maths whose content starts or ends with white space reverts to text, as in Obsidian.
+8. **The incremental re-parse already treated `$$` as non-local.** A test now pins it for maths.
+
+### Mermaid (§4)
+
+9. **Mermaid is `11.17.2`** (stable 11.x). It uses `flowchart.htmlLabels: false`, and `suppressErrorRendering: true` so that its own error drawing doesn't land at the end of `<body>`. Any leftover render node is removed.
+10. **The cache key** includes the OS mode while the theme is "system", so a diagram redraws when macOS switches between light and dark.
+11. **The Safari 15.0–15.3 message** shows when a render fails on a WebKit without `structuredClone`, `Array.prototype.at` or `Object.hasOwn`.
+12. **Frozen prototypes: `freezeSafe` is now general.**
+    - **Why:** Mermaid's tree has a long tail of code that assigns names `Object.prototype` defines: dayjs (`valueOf`/`toString`, which broke every diagram), d3-format (gantt), the vscode-jsonrpc copy in `@mermaid-js/parser`, layout-base, and cytoscape's `Object.assign` mixins (mindmap, architecture).
+    - **What it does:** the transform parses every `node_modules` file that could need it, using Vite's oxc parser. It rewrites `obj.name = v` to `__nimwOwn(obj, "name").name = v`, and reads of `Object.assign` to `__nimwAssign`. Strings and comments are never touched.
+    - **Semantics:** the helper defines an own writable, enumerable property only when the inherited one is a read-only data property, so behaviour is unchanged elsewhere.
+    - **What it replaces:** the M3a d3-color rule.
+    - **Not covered:** computed keys (`obj[k] = v`), for cost.
+    - **Proof:** an e2e test draws all 22 diagram kinds under the frozen prototype, in Chromium and WebKit, offline.
+13. **d3 now sits in a pre-bundle chunk shared by React Flow and Mermaid**, so the dev pre-bundle test scans the chunks too.
+
+### Outline and word count (§5)
+
+14. **Outline:**
+    - It is a flat ARIA tree (`aria-level`, `aria-setsize`, `aria-posinset`).
+    - Folded sections unfold when the number of headings changes.
+    - Its width is kept per machine (`localStorage`).
+    - A scroll within 250 ms of a cursor move keeps the cursor's heading marked.
+    - Click and Enter put the keyboard in the editor.
+    - Escape closes the panel only while it overlays the editor.
+    - Headings inside quotes, callouts and lists aren't listed.
+15. **Word count:**
+    - "CJK" means Han, Hiragana and Katakana; Hangul is spaced, so it is counted by spaces.
+    - A token counts only if it holds a letter or digit.
+    - Characters count runs of white space as one space.
+    - A partly selected word counts.
+    - The text view shows lines and characters only.
+16. **The header band's controls wrap in a narrow window.** Saved, the word count and the Outline button had widened the page at 900 px.
+
+### Text files (§6)
+
+17. **Line numbers are always on in the text view.** The line-numbers setting applies to pages.
+18. **Renaming a text file keeps its extension**, which shows after the name field ("File name").
+19. **`.gitignore` and `.editorconfig` are eligible by name, but the vault index skips hidden files**, so they don't appear in the explorer.
+20. **The Global View has no text-file cards** (they stay out, as before), so there is nothing to route there.
+21. **A text file that can't be read as text** (`notAText`) shows "This file opens in its default app." with an **Open in default app** button (the existing confirmation).
+
+### Testing (§8)
+
+22. **The e2e IPC mock keeps page widths in `sessionStorage`**, so the reload test sees them.
+23. **The new axe e2e test turns off `label-content-name-mismatch`.** The rule flags the pre-existing **Format** button (named "Formatting toolbar"), which is outside this milestone.
