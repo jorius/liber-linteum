@@ -2,7 +2,7 @@ import type { Element, ElementContent, Properties, Root } from 'hast';
 import type { TFunction } from 'i18next';
 import { createElement, type MouseEvent, type ReactNode } from 'react';
 import { assetUrl } from '../../ipc';
-import { followLink } from '../../stores/links';
+import { followLink, followOutside } from '../../stores/links';
 import { Callout } from './Callout';
 import { MathView } from './MathView';
 import { MermaidView } from './MermaidView';
@@ -14,7 +14,6 @@ import type { Resolve } from './useResolved';
 import type { ExternalLookup } from './useExternal';
 import { safeDecode } from '../../markdown/decode';
 import { looksExternal } from '../../markdown/externalPath';
-import { useToastStore } from '../../stores/toastStore';
 import { ExternalEmbed, WithDiskPath } from './ExternalFile';
 
 export interface RenderCtx {
@@ -91,7 +90,7 @@ function pageLink(e: Element, key: number, ctx: RenderCtx): ReactNode {
     resolved === undefined
       ? 'pending'
       : outside
-        ? outside.exists
+        ? outside.exists || outside.askFirst
           ? 'resolved'
           : 'unresolved'
         : resolved === null
@@ -107,15 +106,8 @@ function pageLink(e: Element, key: number, ctx: RenderCtx): ReactNode {
       title={outside ? outside.path : undefined}
       onClick={click(() => {
         if (resolved === undefined) return;
-        if (outside) {
-          if (outside.exists) followLink({ type: 'externalFile', path: outside.path });
-          else {
-            useToastStore.getState().push({
-              message: ctx.t('preview.external.notFound', { path: outside.path }),
-              tone: 'error',
-            });
-          }
-        } else if (!target && heading) followLink({ type: 'anchor', heading });
+        if (outside) followOutside(outside);
+        else if (!target && heading) followLink({ type: 'anchor', heading });
         else if (target || !marked) {
           followLink({ type: 'page', kind, target, heading, resolved, source: ctx.path });
         }

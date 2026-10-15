@@ -209,7 +209,10 @@
       "revealWindows": "Mostrar en el Explorador",
       "revealOther": "Mostrar en la carpeta",
       "location": "Ubicación en el disco",
-      "copyPath": "Copiar ruta"
+      "copyPath": "Copiar ruta",
+      "network": "Archivo en la red: {path}",
+      "networkNote": "Cargarlo conecta con “{server}”.",
+      "loadNetwork": "Cargar desde la red"
     }
   },
   "menu": {
@@ -242,7 +245,8 @@
     },
     "openFile": {
       "title": "¿Abrir «{name}» en su app predeterminada?",
-      "confirm": "Abrir"
+      "confirm": "Abrir",
+      "network": "Abrirlo conecta con “{server}”."
     },
     "createPage": {
       "title": "¿Crear la página «{name}»?",

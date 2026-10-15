@@ -77,13 +77,17 @@ fn s(p: &Path) -> String {
 fn an_outside_file_is_listed_once_an_indexed_page_links_it() {
     let w = World::new();
     let pic = s(&w.outside("Pics/x.png"));
+    // Not looked up on disk until a saved page links it (no existence
+    // oracle; final review C1).
     let before = w.external(LinkKind::Embed, &pic).unwrap();
     assert_eq!(
         before,
         ExternalFile {
             path: pic.clone(),
-            exists: true,
-            listed: false
+            exists: false,
+            listed: false,
+            network: false,
+            ask_first: false,
         }
     );
     assert!(matches!(
@@ -91,7 +95,8 @@ fn an_outside_file_is_listed_once_an_indexed_page_links_it() {
         Err(SessionError::NotPermitted(_))
     ));
     w.write(&format!("# A\n\n![[{pic}]]\n"));
-    assert!(w.external(LinkKind::Embed, &pic).unwrap().listed);
+    let after = w.external(LinkKind::Embed, &pic).unwrap();
+    assert!(after.listed && after.exists);
     assert_eq!(w.s.external_file(&pic).unwrap(), PathBuf::from(&pic));
     // Unlinked again: refused again.
     w.write("# A\n");

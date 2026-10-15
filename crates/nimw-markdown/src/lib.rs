@@ -10,7 +10,7 @@ mod title;
 mod types;
 mod wikilink;
 
-pub use external::{DiskPath, ExternalTarget, external_target};
+pub use external::{DiskPath, ExternalTarget, external_target, network_server};
 pub use page::parse_page;
 pub use resolve::{FileSet, link_key, name_key, normalize_join, resolve, shortest_unique_target};
 pub use title::extract_title;

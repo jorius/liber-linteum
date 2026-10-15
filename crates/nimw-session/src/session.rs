@@ -21,6 +21,9 @@ pub struct VaultSession {
     pub(crate) index: Mutex<Index>,
     pub(crate) sink: Sink,
     pub(crate) watcher: Mutex<Option<Watcher>>,
+    /// Network files the user chose to load this session (M4b part 3, final
+    /// review C1): nothing else on another computer is ever touched.
+    pub(crate) network_ok: Mutex<HashSet<String>>,
 }
 
 impl std::fmt::Debug for VaultSession {
@@ -67,6 +70,7 @@ impl VaultSession {
             index: Mutex::new(index),
             sink: Arc::new(sink),
             watcher: Mutex::new(None),
+            network_ok: Mutex::new(HashSet::new()),
         };
         let (report, _) = session.reindex_all()?;
         Ok((session, report))

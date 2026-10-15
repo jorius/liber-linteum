@@ -23,7 +23,14 @@ export function DialogHost() {
     case 'openExternal':
       return <OpenExternalDialog url={dialog.url} onClose={close} />;
     case 'openFile':
-      return <OpenFileDialog path={dialog.path} external={dialog.external} onClose={close} />;
+      return (
+        <OpenFileDialog
+          path={dialog.path}
+          external={dialog.external}
+          network={dialog.network}
+          onClose={close}
+        />
+      );
     case 'indexPick':
       return (
         <IndexPickDialog

@@ -22,7 +22,10 @@ export function installIpcMock({
   /** M4b part 3 §3: pages whose cover is a side strip (`.nimw/vault.json`). */
   coverSides?: Record<string, 'left' | 'right'>;
   /** M4b part 3 §9: what `links_external` says about each target. */
-  outside?: Record<string, { path: string; exists: boolean; listed: boolean }>;
+  outside?: Record<
+    string,
+    { path: string; exists: boolean; listed: boolean; network?: boolean; askFirst?: boolean }
+  >;
   /** M4b part 3 §7: what the Attach button's file dialog picks. */
   filePicks?: { path: string; name: string; url: string; inVault: string | null }[];
 }) {
@@ -306,9 +309,19 @@ export function installIpcMock({
     },
     // ---- M4b part 3: files outside the vault (§9) and the Attach button (§7) ----
     links_external: (a) =>
-      (a.targets as { kind: string; target: string }[]).map(
-        ({ target }) => outside[target] ?? null,
-      ),
+      (a.targets as { kind: string; target: string }[]).map(({ target }) => {
+        const f = outside[target];
+        return f ? { network: false, askFirst: false, ...f } : null;
+      }),
+    // Final review C1: the user loads a network file; it is found from then on.
+    external_network_allow: (a) => {
+      ((w.__nimwNetworkLoads ??= []) as unknown[]).push(a.path);
+      for (const [target, f] of Object.entries(outside)) {
+        if (f.path === a.path) outside[target] = { ...f, askFirst: false, exists: true };
+      }
+      const f = Object.values(outside).find((o) => o.path === a.path);
+      return { network: true, askFirst: false, ...f };
+    },
     file_pick: () => filePicks,
     external_open: (a) => {
       ((w.__nimwExternalOpens ??= []) as unknown[]).push(a.path);

@@ -13,7 +13,12 @@ const PAGES = {
   'A.md': '# Alpha\n\nhello world\n',
   'Pics.md':
     '# Pics\n\n![[attachments/sky.png]]\n\n![[/Users/j/pic.png]]\n\n![[D:\\Docs\\gone.pdf]]\n',
+  'Net.md': '# Net\n\n![[\\\\nas\\share\\x.png]]\n',
 };
+
+/** A file on another computer, as `links_external` reports it before and
+ *  after the user loads it (final review C1). */
+const NAS = '\\\\nas\\share\\x.png';
 
 const pick = (name: string) => ({
   path: `/Users/u/${name}`,
@@ -49,6 +54,7 @@ async function open(page: Page, name: string, settings: Record<string, unknown> 
     outside: {
       '/Users/j/pic.png': { path: '/Users/j/pic.png', exists: true, listed: true },
       'D:\\Docs\\gone.pdf': { path: 'D:\\Docs\\gone.pdf', exists: false, listed: true },
+      [NAS]: { path: NAS, exists: false, listed: true, network: true, askFirst: true },
     },
     filePicks: [pick('my pic.png'), pick('notes.zip')],
   });
@@ -179,5 +185,32 @@ test('§9 outside files and §8 where attachments are on disk', async ({ page })
     await page.emulateMedia({ colorScheme: scheme });
     expect(await axeViolations(page, 'main'), scheme).toEqual([]);
   }
+  await stayedLocal(page, outside);
+});
+
+test('§9 a network file waits for the user, then loads (final review C1)', async ({ page }) => {
+  const outside = await open(page, 'Net');
+  await expect(page.getByText(`Network file: ${NAS}`).last()).toBeVisible();
+  await expect(page.getByText('Loading it connects to “nas”.').last()).toBeVisible();
+  await expect(page.getByRole('img', { name: NAS })).toHaveCount(0);
+  for (const scheme of ['light', 'dark'] as const) {
+    await page.emulateMedia({ colorScheme: scheme });
+    expect(await axeViolations(page, 'main'), scheme).toEqual([]);
+  }
+  expect(
+    await page.evaluate(
+      () => (window as unknown as { __nimwNetworkLoads?: string[] }).__nimwNetworkLoads,
+    ),
+  ).toBeUndefined();
+  await page.getByRole('button', { name: 'Load from network' }).last().click();
+  await expect(page.getByRole('img', { name: NAS }).last()).toHaveAttribute(
+    'src',
+    /nimw-asset.*\/\.external\/%5C%5Cnas%5Cshare%5Cx\.png$/,
+  );
+  expect(
+    await page.evaluate(
+      () => (window as unknown as { __nimwNetworkLoads?: string[] }).__nimwNetworkLoads,
+    ),
+  ).toEqual([NAS]);
   await stayedLocal(page, outside);
 });

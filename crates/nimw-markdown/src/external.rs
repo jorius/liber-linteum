@@ -73,6 +73,46 @@ pub fn external_target(kind: LinkKind, target: &str, source: &str) -> Option<Ext
     }
 }
 
+/// The computer a network path names: `\\server\share\…` (SMB or WebDAV;
+/// also spelled `\\?\UNC\server\…`) or `/net/host/…` (macOS's automounter).
+/// Merely looking such a path up connects to that computer — on Windows with
+/// the user's credentials (final review C1) — so callers ask the user first.
+pub fn network_server(path: &str) -> Option<&str> {
+    fn first(rest: &str) -> Option<&str> {
+        rest.split(['\\', '/']).next().filter(|s| !s.is_empty())
+    }
+    if let Some(after) = path.strip_prefix(r"\\") {
+        let long_unc = after
+            .get(..6)
+            .is_some_and(|head| head.eq_ignore_ascii_case(r"?\UNC\"));
+        return first(if long_unc { &after[6..] } else { after });
+    }
+    let after = path.strip_prefix('/')?;
+    let (top, rest) = after.split_once('/')?;
+    top.eq_ignore_ascii_case("net")
+        .then(|| first(rest))
+        .flatten()
+}
+
+/// A Windows reserved device name (`CON`, `NUL`, `COM1`…, with any
+/// extension): in every folder it names a device, not a file.
+fn reserved_device(part: &str) -> bool {
+    let stem = part
+        .split('.')
+        .next()
+        .unwrap_or("")
+        .trim_end_matches([' ', ':'])
+        .to_ascii_uppercase();
+    let numbered = |prefix: &str| {
+        stem.len() == 4 && stem.starts_with(prefix) && matches!(stem.as_bytes()[3], b'1'..=b'9')
+    };
+    matches!(
+        stem.as_str(),
+        "CON" | "PRN" | "AUX" | "NUL" | "CONIN$" | "CONOUT$"
+    ) || numbered("COM")
+        || numbered("LPT")
+}
+
 /// The rest of a `file:` URL (the scheme is case-insensitive).
 fn strip_file_scheme(target: &str) -> Option<&str> {
     let head = target.get(..5)?;
@@ -107,7 +147,9 @@ fn file_url_path(rest: &str) -> Option<DiskPath> {
 }
 
 /// `D:\…`, `D:/…` or `\\server\share\…`, normalised with backslashes; `None`
-/// for anything else (a drive-relative `D:x` too) or a bare root.
+/// for anything else (a drive-relative `D:x` too), a bare root, a device
+/// namespace (`\\.\pipe\…`, `\\?\GLOBALROOT\…`) or a reserved device name.
+/// The long forms `\\?\D:\…` and `\\?\UNC\server\…` are their short paths.
 fn windows_path(s: &str) -> Option<DiskPath> {
     let is_sep = |c: char| c == '\\' || c == '/';
     let bytes = s.as_bytes();
@@ -121,10 +163,25 @@ fn windows_path(s: &str) -> Option<DiskPath> {
         let mut parts = s.strip_prefix(r"\\")?.splitn(3, is_sep);
         let server = parts.next().filter(|p| !p.is_empty())?;
         let share = parts.next().filter(|p| !p.is_empty())?;
-        (format!(r"\\{server}\{share}"), parts.next().unwrap_or(""))
+        let rest = parts.next().unwrap_or("");
+        match server {
+            "." => return None,
+            "?" => {
+                let b = share.as_bytes();
+                if b.len() == 2 && b[0].is_ascii_alphabetic() && b[1] == b':' {
+                    return windows_path(&format!(r"{share}\{rest}"));
+                }
+                if share.eq_ignore_ascii_case("UNC") {
+                    return windows_path(&format!(r"\\{rest}"));
+                }
+                return None;
+            }
+            _ => {}
+        }
+        (format!(r"\\{server}\{share}"), rest)
     };
     let parts = normalize(rest.split(is_sep));
-    if parts.is_empty() {
+    if parts.is_empty() || parts.iter().any(|p| reserved_device(p)) {
         return None;
     }
     Some(DiskPath::Windows(format!(r"{root}\{}", parts.join(r"\"))))
@@ -300,6 +357,57 @@ mod tests {
             external_target(Markdown, "../Vault/x.png", "a.md"),
             above(1, &["Vault", "x.png"])
         );
+    }
+
+    #[test]
+    fn device_namespaces_and_reserved_names_are_never_paths() {
+        // Opening one of these reaches a device or a pipe, not a file (final
+        // review C1): never a link target.
+        for t in [
+            r"\\.\pipe\name",
+            r"\\.\C:\x.png",
+            r"\\?\GLOBALROOT\Device\x",
+            r"\\?\Volume{1234}\x.png",
+            "file://./pipe/x",
+            "file://?/GLOBALROOT/x",
+            r"C:\x\CON",
+            r"C:\x\com1.txt",
+            r"D:\aux.png",
+            r"\\server\share\nul",
+            r"D:\Docs\LPT9.log",
+        ] {
+            assert_eq!(external_target(Embed, t, "a.md"), None, "{t}");
+        }
+        // The long-path forms of a drive and of a share are those paths.
+        assert_eq!(
+            external_target(Embed, r"\\?\C:\Docs\x.pdf", "a.md"),
+            win(r"C:\Docs\x.pdf")
+        );
+        assert_eq!(
+            external_target(Embed, r"\\?\UNC\server\share\x.pdf", "a.md"),
+            win(r"\\server\share\x.pdf")
+        );
+        // Names that only start like a device are files.
+        assert_eq!(
+            external_target(Embed, r"C:\x\console.png", "a.md"),
+            win(r"C:\x\console.png")
+        );
+        assert_eq!(
+            external_target(Embed, r"C:\x\COM10.txt", "a.md"),
+            win(r"C:\x\COM10.txt")
+        );
+    }
+
+    #[test]
+    fn network_servers() {
+        assert_eq!(network_server(r"\\Server\share\x.pdf"), Some("Server"));
+        assert_eq!(network_server(r"\\?\UNC\nas\share\x"), Some("nas"));
+        assert_eq!(network_server("/net/host/x.png"), Some("host"));
+        assert_eq!(network_server("/NET/host/x.png"), Some("host"));
+        assert_eq!(network_server(r"D:\Docs\x.pdf"), None);
+        assert_eq!(network_server("/Users/jose/x.png"), None);
+        assert_eq!(network_server("/net"), None);
+        assert_eq!(network_server("/network/x"), None);
     }
 
     #[test]

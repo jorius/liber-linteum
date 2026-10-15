@@ -299,6 +299,11 @@ export interface ExternalFile {
   exists: boolean;
   /** Linked from a saved page of the vault: the app may show or open it. */
   listed: boolean;
+  /** On another computer (`\\server\…`, `/net/host/…`). */
+  network: boolean;
+  /** A network file the user hasn't loaded yet: nothing has touched it, and
+   *  nothing will until they choose to (final review C1). */
+  askFirst: boolean;
 }
 
 /** A file chosen with the Attach button's dialog (M4b part 3 §7). */
@@ -476,6 +481,10 @@ export const linksExternal = (source: string, targets: LinkTarget[]) =>
   call<(ExternalFile | null)[]>('links_external', { source, targets });
 /** Opens a linked outside file in its default app (programs are refused). */
 export const externalOpen = (path: string) => call<void>('external_open', { path });
+/** The user loads a linked network file (final review C1): from now on,
+ *  this session, it is looked up, shown and opened like any outside file. */
+export const externalNetworkAllow = (path: string) =>
+  call<ExternalFile>('external_network_allow', { path });
 /** Shows a linked outside file in Finder / Explorer. */
 export const externalReveal = (path: string) => call<void>('external_reveal', { path });
 /** The Attach button's file dialog (Rust side); `[]` when cancelled. */

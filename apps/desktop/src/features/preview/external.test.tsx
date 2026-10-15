@@ -35,6 +35,14 @@ beforeEach(() => {
       });
     }
     if (cmd === 'links_external') return targets.map(({ target }) => outside[target] ?? null);
+    if (cmd === 'external_network_allow') {
+      // Loaded: from now on it is looked up (and, here, found).
+      const path = args.path as string;
+      for (const [target, f] of Object.entries(outside)) {
+        if (f.path === path) outside[target] = { ...f, askFirst: false, exists: true };
+      }
+      return { ...file(path), network: true };
+    }
     return null;
   });
 });
@@ -57,7 +65,48 @@ const file = (path: string, over: Partial<ExternalFile> = {}): ExternalFile => (
   path,
   exists: true,
   listed: true,
+  network: false,
+  askFirst: false,
   ...over,
+});
+
+/** A network file nobody has loaded yet: nothing has touched it. */
+const unloaded = (path: string): ExternalFile =>
+  file(path, { exists: false, network: true, askFirst: true });
+
+describe('network files wait for the user (final review C1)', () => {
+  const UNC = '\\\\nas\\share\\x.png';
+
+  it('a network embed shows a card, connects nowhere, and loads on click', async () => {
+    outside[UNC] = unloaded(UNC);
+    show(`![[${UNC}]]\n`);
+    expect(await screen.findByText(`Network file: ${UNC}`)).toBeInTheDocument();
+    expect(screen.getByText('Loading it connects to “nas”.')).toBeInTheDocument();
+    expect(screen.queryByRole('img')).toBeNull();
+    expect(calls.some(([c]) => c === 'external_network_allow')).toBe(false);
+    await userEvent.click(screen.getByRole('button', { name: 'Load from network' }));
+    expect(calls).toContainEqual(['external_network_allow', { path: UNC }]);
+    expect(await screen.findByRole('img', { name: UNC })).toHaveAttribute(
+      'src',
+      externalAssetUrl(UNC),
+    );
+  });
+
+  it('a link to a network file asks first, then loads and opens it', async () => {
+    const doc = '\\\\nas\\share\\doc.pdf';
+    outside[doc] = unloaded(doc);
+    show(`Read [[${doc}|the doc]].\n`);
+    const link = await screen.findByText('the doc');
+    await waitFor(() => expect(link.closest('a')).toHaveAttribute('data-state', 'resolved'));
+    await userEvent.click(link);
+    const dialog = screen.getByRole('dialog', { name: 'Open “doc.pdf” in its default app?' });
+    expect(dialog.textContent).toContain('Opening it connects to “nas”.');
+    expect(calls.some(([c]) => c === 'external_network_allow')).toBe(false);
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Open' }));
+    await waitFor(() => expect(calls.some(([c]) => c === 'external_open')).toBe(true));
+    const order = calls.map(([c]) => c).filter((c) => c.startsWith('external_'));
+    expect(order).toEqual(['external_network_allow', 'external_open']);
+  });
 });
 
 describe('outside files in the preview (M4b part 3 §9)', () => {

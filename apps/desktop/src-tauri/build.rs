@@ -45,6 +45,7 @@ const COMMANDS: &[&str] = &[
     "links_external",
     "external_open",
     "external_reveal",
+    "external_network_allow",
     "file_pick",
 ];
 

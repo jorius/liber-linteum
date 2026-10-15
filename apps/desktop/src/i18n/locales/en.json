@@ -209,7 +209,10 @@
       "revealWindows": "Show in Explorer",
       "revealOther": "Show in folder",
       "location": "Location on disk",
-      "copyPath": "Copy path"
+      "copyPath": "Copy path",
+      "network": "Network file: {path}",
+      "networkNote": "Loading it connects to “{server}”.",
+      "loadNetwork": "Load from network"
     }
   },
   "menu": {
@@ -242,7 +245,8 @@
     },
     "openFile": {
       "title": "Open “{name}” in its default app?",
-      "confirm": "Open"
+      "confirm": "Open",
+      "network": "Opening it connects to “{server}”."
     },
     "createPage": {
       "title": "Create page “{name}”?",

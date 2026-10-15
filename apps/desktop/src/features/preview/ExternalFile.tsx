@@ -1,9 +1,15 @@
 import { useRef, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { externalAssetUrl, externalReveal, type ExternalFile } from '../../ipc';
-import { diskPathOf, onWindows } from '../../markdown/externalPath';
+import {
+  externalAssetUrl,
+  externalNetworkAllow,
+  externalReveal,
+  type ExternalFile,
+} from '../../ipc';
+import { diskPathOf, networkServer, onWindows } from '../../markdown/externalPath';
 import { followLink } from '../../stores/links';
 import { errorMessage } from '../../stores/messages';
+import { useOutsideStore } from '../../stores/outsideStore';
 import { useSettingsStore } from '../../stores/settingsStore';
 import { useToastStore } from '../../stores/toastStore';
 import { useVaultStore } from '../../stores/vaultStore';
@@ -66,10 +72,36 @@ export function WithDiskPath({
   );
 }
 
+/** A file on another computer nobody has loaded yet (final review C1): its
+ *  path and a button; nothing connects anywhere until it is pressed. */
+function NetworkCard({ path }: { path: string }) {
+  const { t } = useTranslation();
+  const load = async () => {
+    const res = await externalNetworkAllow(path);
+    if (!res.ok) {
+      useToastStore.getState().push({ message: errorMessage(res.error), tone: 'error' });
+      return;
+    }
+    useOutsideStore.getState().loaded();
+  };
+  return (
+    <span className={`${styles.card} ${styles.networkCard}`} title={path}>
+      <span>{t('preview.external.network', { path })}</span>
+      <span className={styles.cardNote}>
+        {t('preview.external.networkNote', { server: networkServer(path) })}
+      </span>
+      <button type="button" className={styles.cardButton} onClick={() => void load()}>
+        {t('preview.external.loadNetwork')}
+      </button>
+    </span>
+  );
+}
+
 /** An embed or image naming a file outside the vault (M4b part 3 §9), as
  *  `links_external` describes it: shown once a saved page links it
- *  ("Loading…" until then), "Not found" with its path when it isn't there,
- *  else a file card with Open (after asking) and Show in Finder/Explorer. */
+ *  ("Loading…" until then), a "Network file" card until the user loads one
+ *  on another computer, "Not found" with its path when it isn't there, else
+ *  a file card with Open (after asking) and Show in Finder/Explorer. */
 export function ExternalEmbed({
   file,
   alt,
@@ -82,12 +114,13 @@ export function ExternalEmbed({
   height?: number;
 }) {
   const { t } = useTranslation();
+  if (!file.listed) return <span className={styles.pending}>{t('preview.loading')}</span>;
+  if (file.askFirst) return <NetworkCard path={file.path} />;
   if (!file.exists) {
     return (
       <span className={styles.card}>{t('preview.external.notFound', { path: file.path })}</span>
     );
   }
-  if (!file.listed) return <span className={styles.pending}>{t('preview.loading')}</span>;
   let body: ReactNode;
   if (IMAGE.test(file.path)) {
     body = (

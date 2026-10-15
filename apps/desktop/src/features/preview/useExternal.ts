@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { linksExternal, type ExternalFile, type LinkKind, type LinkTarget } from '../../ipc';
 import { looksExternal } from '../../markdown/externalPath';
 import { useEditorStore } from '../../stores/editorStore';
+import { useOutsideStore } from '../../stores/outsideStore';
 import { useVaultStore } from '../../stores/vaultStore';
 
 /** `kind` + `target` → the outside file it names, `null` (a vault target) or
@@ -39,13 +40,14 @@ export function externalTargets(tree: Root): LinkTarget[] {
 }
 
 /** Asks Rust about the tree's outside targets; again when the vault's files
- *  change or the page is saved (a link becomes showable once a saved page
- *  holds it). */
+ *  change, the page is saved (a link becomes showable once a saved page
+ *  holds it) or the user loads a network file. */
 export function useExternal(source: string, tree: Root): ExternalLookup {
   const targets = useMemo(() => externalTargets(tree), [tree]);
   const key = targets.map(keyOf).join('\u0001');
   const nodes = useVaultStore((s) => s.nodes);
   const saved = useEditorStore((s) => (s.path === source ? s.hash : null));
+  const loads = useOutsideStore((s) => s.loads);
   const [result, setResult] = useState<Map<string, ExternalFile | null>>(() => new Map());
   useEffect(() => {
     let live = true;
@@ -57,9 +59,10 @@ export function useExternal(source: string, tree: Root): ExternalLookup {
     return () => {
       live = false;
     };
-    // `key` stands for `targets`; `nodes` and `saved` ask again.
+    // `key` stands for `targets`; `nodes`, `saved` and `loads` (a network
+    // file loaded) ask again.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [source, key, nodes, saved]);
+  }, [source, key, nodes, saved, loads]);
   return useCallback(
     (kind, target) => {
       const k = keyOf({ kind, target });

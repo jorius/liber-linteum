@@ -48,6 +48,7 @@
     "allow-links-external",
     "allow-external-open",
     "allow-external-reveal",
+    "allow-external-network-allow",
     "allow-file-pick",
     "core:event:allow-listen",
     "core:event:allow-unlisten",

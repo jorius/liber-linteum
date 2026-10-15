@@ -16,17 +16,15 @@ import {
   type DecorationSet,
   type ViewUpdate,
 } from '@codemirror/view';
-import i18next from 'i18next';
 import type { Heading, Image, Link, ListItem, Node, Parent, RootContent } from 'mdast';
 import { linksExternal, linksResolve, type LinkKind, type WideElements } from '../../ipc';
 import { isFileTarget, looksExternal } from '../../markdown/externalPath';
-import { useToastStore } from '../../stores/toastStore';
 import { reparse } from '../../markdown/incremental';
 import { parsePage } from '../../markdown/parse';
 import { toSafeHast, vaultJoin } from '../../markdown/sanitize';
 import type { Embed, ParsedPage, WikiLink } from '../../markdown/types';
 import { rangeOf } from '../../markdown/walk';
-import { followLink } from '../../stores/links';
+import { followLink, followOutside as followOutsideFile } from '../../stores/links';
 import { CheckboxWidget, CodeBadgeWidget, InlineMathWidget, PreviewWidget } from './widgets';
 import { widestLine } from './wideBox';
 
@@ -404,13 +402,7 @@ async function followOutside(kind: LinkKind, target: string, source: string): Pr
   const res = await linksExternal(source, [{ kind, target }]);
   const outside = res.ok ? res.value[0] : null;
   if (!outside) return false;
-  if (outside.exists) followLink({ type: 'externalFile', path: outside.path });
-  else {
-    useToastStore.getState().push({
-      message: i18next.t('preview.external.notFound', { path: outside.path }),
-      tone: 'error',
-    });
-  }
+  followOutsideFile(outside);
   return true;
 }
 

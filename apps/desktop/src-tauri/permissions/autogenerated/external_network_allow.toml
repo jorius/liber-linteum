@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-external-network-allow"
+description = "Enables the external_network_allow command without any pre-configured scope."
+commands.allow = ["external_network_allow"]
+
+[[permission]]
+identifier = "deny-external-network-allow"
+description = "Denies the external_network_allow command without any pre-configured scope."
+commands.deny = ["external_network_allow"]

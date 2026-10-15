@@ -18,12 +18,30 @@ use tauri_plugin_opener::OpenerExt;
 
 /// `links_external`: an outside file a link names.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct ExternalFileDto {
     /// Absolute, in its OS's form.
     pub path: String,
+    /// Looked up only for a listed path the app may reach.
     pub exists: bool,
     /// Linked from an indexed page: the app may show or open it.
     pub listed: bool,
+    /// On another computer (`\\server\…`, `/net/host/…`).
+    pub network: bool,
+    /// A network file the user hasn't loaded: nothing touched it yet.
+    pub ask_first: bool,
+}
+
+impl From<nimw_session::ExternalFile> for ExternalFileDto {
+    fn from(f: nimw_session::ExternalFile) -> Self {
+        ExternalFileDto {
+            path: f.path,
+            exists: f.exists,
+            listed: f.listed,
+            network: f.network,
+            ask_first: f.ask_first,
+        }
+    }
 }
 
 /// `file_pick`: one file chosen in the dialog.
@@ -64,14 +82,17 @@ pub(crate) fn links_external_impl(
     Ok(session
         .externals(&VaultPath::new(&source)?, &parsed)?
         .into_iter()
-        .map(|f| {
-            f.map(|f| ExternalFileDto {
-                path: f.path,
-                exists: f.exists,
-                listed: f.listed,
-            })
-        })
+        .map(|f| f.map(ExternalFileDto::from))
         .collect())
+}
+
+/// The user clicked "Load from network" on a network file's card (final
+/// review C1): from now on, this session, it is looked up and served.
+pub(crate) fn external_network_allow_impl(
+    state: &AppState,
+    path: String,
+) -> CmdResult<ExternalFileDto> {
+    Ok(state.session()?.allow_network(&path)?.into())
 }
 
 pub(crate) fn external_open_impl<R: Runtime>(app: &AppHandle<R>, path: String) -> CmdResult<()> {
@@ -152,6 +173,17 @@ pub async fn external_open<R: Runtime>(app: AppHandle<R>, path: String) -> CmdRe
 #[tauri::command]
 pub async fn external_reveal<R: Runtime>(app: AppHandle<R>, path: String) -> CmdResult<()> {
     blocking(app, move |app| external_reveal_impl(&app, path)).await
+}
+
+#[tauri::command]
+pub async fn external_network_allow<R: Runtime>(
+    app: AppHandle<R>,
+    path: String,
+) -> CmdResult<ExternalFileDto> {
+    blocking(app, move |app| {
+        external_network_allow_impl(&app.state::<AppState>(), path)
+    })
+    .await
 }
 
 #[tauri::command]

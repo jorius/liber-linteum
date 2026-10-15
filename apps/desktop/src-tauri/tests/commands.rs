@@ -58,6 +58,7 @@ const COMMANDS: &[&str] = &[
     "links_external",
     "external_open",
     "external_reveal",
+    "external_network_allow",
     "file_pick",
 ];
 
@@ -1930,9 +1931,10 @@ fn m4b3_outside_files_over_ipc() {
     let script = pics.join("run.sh").to_str().unwrap().to_string();
     let other = pics.join("other.pdf").to_str().unwrap().to_string();
     std::fs::create_dir_all(base.path().join("Vault")).unwrap();
+    let unc = r"\\nas.example\share\x.png";
     std::fs::write(
         base.path().join("Vault/a.md"),
-        format!("# A\n\n![[{pic}]] [[{script}]] [[b]]\n"),
+        format!("# A\n\n![[{pic}]] [[{script}]] [[b]] ![[{unc}]]\n"),
     )
     .unwrap();
     std::fs::write(base.path().join("Vault/b.md"), "# B\n").unwrap();
@@ -1949,16 +1951,36 @@ fn m4b3_outside_files_over_ipc() {
             { "kind": "embed", "target": pic },
             { "kind": "wiki", "target": "b" },
             { "kind": "embed", "target": other },
+            { "kind": "embed", "target": unc },
         ] }),
     )
     .unwrap();
+    // An unlinked file isn't looked up; a network file waits for the user
+    // (final review C1).
     assert_eq!(
         got,
         json!([
-            { "path": pic, "exists": true, "listed": true },
+            { "path": pic, "exists": true, "listed": true, "network": false, "askFirst": false },
             null,
-            { "path": other, "exists": true, "listed": false },
+            { "path": other, "exists": false, "listed": false, "network": false, "askFirst": false },
+            { "path": unc, "exists": false, "listed": true, "network": true, "askFirst": true },
         ])
+    );
+    for cmd in ["external_open", "external_reveal"] {
+        let err = call(&h.main, cmd, json!({ "path": unc })).unwrap_err();
+        assert_eq!(kind(err), "notPermitted", "{cmd}: not loaded yet");
+    }
+    let err = call(&h.main, "external_network_allow", json!({ "path": other })).unwrap_err();
+    assert_eq!(
+        kind(err),
+        "notPermitted",
+        "only a linked path can be loaded"
+    );
+    // Loaded: looked up from now on (nas.example is nowhere, so it's missing).
+    let loaded = call(&h.main, "external_network_allow", json!({ "path": unc })).unwrap();
+    assert_eq!(
+        loaded,
+        json!({ "path": unc, "exists": false, "listed": true, "network": true, "askFirst": false })
     );
     for cmd in ["external_open", "external_reveal"] {
         let err = call(&h.main, cmd, json!({ "path": other })).unwrap_err();

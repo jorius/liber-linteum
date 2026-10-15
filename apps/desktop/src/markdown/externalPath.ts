@@ -16,6 +16,15 @@ export function looksExternal(target: string): boolean {
   return isFileTarget(t) || t.startsWith('/') || t.startsWith('./') || t.startsWith('../');
 }
 
+/** The computer a network path is on (`\\server\…` → `server`, `/net/host/…`
+ *  → `host`), as Rust's `network_server` reads it; `''` when it names none. */
+export function networkServer(path: string): string {
+  const unc = /^\\\\(?:\?\\UNC\\)?([^\\/]+)/i.exec(path);
+  if (unc) return unc[1];
+  const net = /^\/net\/([^/]+)/i.exec(path);
+  return net ? net[1] : '';
+}
+
 /** Where the vault file `path` is on disk, with the OS's separators. */
 export function diskPathOf(root: string, path: string, windows: boolean): string {
   const sep = windows ? '\\' : '/';
