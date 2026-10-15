@@ -652,5 +652,26 @@
     "showMore": "Show more",
     "resultsLabel": "Results",
     "failed": "Search failed: {error}"
+  },
+  "icons": {
+    "pickFor": "Icon for {name}",
+    "add": "Add icon",
+    "change": "Change icon",
+    "remove": "Remove icon",
+    "search": "Search emoji",
+    "grid": "Emoji",
+    "recent": "Recent",
+    "none": "No emoji found",
+    "groups": {
+      "smileys-emotion": "Smileys & emotion",
+      "people-body": "People & body",
+      "animals-nature": "Animals & nature",
+      "food-drink": "Food & drink",
+      "travel-places": "Travel & places",
+      "activities": "Activities",
+      "objects": "Objects",
+      "symbols": "Symbols",
+      "flags": "Flags"
+    }
   }
 }

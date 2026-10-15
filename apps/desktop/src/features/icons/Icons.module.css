@@ -1,0 +1,105 @@
+/* Optional emoji icons (M5b §4). */
+
+.picker {
+  position: fixed;
+  z-index: 40;
+  width: 320px;
+  max-width: calc(100vw - 32px);
+  padding: 8px;
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-panel);
+}
+
+.pickerHead {
+  display: flex;
+  gap: 6px;
+}
+
+.search {
+  flex: 1;
+  min-width: 0;
+  box-sizing: border-box;
+  padding: 6px 8px;
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--color-bg);
+  color: var(--color-text);
+  font: 400 14px var(--font-body);
+}
+
+.remove {
+  flex: none;
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-sm);
+  background: none;
+  color: var(--color-text);
+  font: 500 13px var(--font-body);
+  padding: 4px 8px;
+  cursor: pointer;
+}
+
+.tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px;
+  margin: 6px 0;
+}
+
+.tab {
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: none;
+  font-size: 16px;
+  line-height: 1;
+  padding: 4px;
+  cursor: pointer;
+}
+
+.tab[aria-pressed='true'] {
+  background: var(--color-accent-soft);
+}
+
+.grid {
+  max-height: 240px;
+  overflow-y: auto;
+}
+
+.row {
+  display: grid;
+  grid-template-columns: repeat(8, 1fr);
+}
+
+.cell {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 34px;
+  border-radius: var(--radius-sm);
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.cell:hover {
+  background: var(--color-accent-soft);
+}
+
+.cell:focus-visible {
+  background: var(--color-accent-soft);
+}
+
+.none {
+  margin: 12px 4px;
+  color: var(--color-text-muted);
+  font: 400 13px var(--font-body);
+}
+
+/* An icon before a name: the emoji at the text's size. */
+.icon {
+  flex: none;
+  display: inline-block;
+  font-style: normal;
+  line-height: 1;
+}
