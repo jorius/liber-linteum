@@ -130,6 +130,33 @@ test('Readable: a table that cannot fit scrolls sideways in a focusable box', as
   expect(scrolls).toBe(true);
 });
 
+// Final review I3: a press on the box itself (its scrollbar, on WebView2 or
+// with "always show scroll bars") used to move the cursor into the table, so
+// the widget turned into its Markdown source and the bar couldn't be dragged.
+test("Live Preview: pressing a wide table's scrollbar scrolls it and keeps it rendered", async ({
+  page,
+}) => {
+  await open(page, 'Long');
+  const region = page.getByRole('region', { name: 'Table, scrolls sideways' });
+  await expect(region).toBeVisible();
+  const bar = await region.evaluate((el) => (el as HTMLElement).offsetHeight - el.clientHeight);
+  if (bar > 0) {
+    // A classic scrollbar: drag its thumb sideways.
+    const box = (await region.boundingBox())!;
+    const y = box.y + box.height - bar / 2;
+    await page.mouse.move(box.x + 8, y);
+    await page.mouse.down();
+    await page.mouse.move(box.x + 240, y, { steps: 6 });
+    await page.mouse.up();
+    await expect.poll(() => region.evaluate((el) => el.scrollLeft)).toBeGreaterThan(0);
+  } else {
+    // Overlay scrollbars: the bar's press lands on the box, as here.
+    await region.dispatchEvent('mousedown', { button: 0 });
+  }
+  await expect(page.locator('.cm-nimw-widget table')).toBeVisible();
+  await expect(page.locator('.cm-line', { hasText: '| --- |' })).toHaveCount(0);
+});
+
 test('Wide elements: the table spans the editor while the text keeps the measure', async ({
   page,
 }) => {

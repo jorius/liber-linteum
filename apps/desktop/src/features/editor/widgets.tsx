@@ -40,7 +40,11 @@ export class PreviewWidget extends WidgetType {
     dom.className = 'cm-nimw-widget';
     if (this.kind) dom.dataset.wideKind = this.kind;
     dom.addEventListener('mousedown', (e) => {
-      if ((e.target as HTMLElement).closest('a, button, input, audio, video, summary')) return;
+      const target = e.target as HTMLElement;
+      if (target.closest('a, button, input, audio, video, summary')) return;
+      // A press on a table's scroll box itself, not a cell, is on its
+      // scrollbar: the box scrolls and the table stays (final review I3).
+      if (target.matches('[data-table-scroll]')) return;
       e.preventDefault();
       view.dispatch({ selection: { anchor: view.posAtDOM(dom) } });
       view.focus();
