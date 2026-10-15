@@ -6,6 +6,7 @@ use crate::index::{Index, Result};
 use nimw_markdown::{LinkKind, Tag, resolve};
 use rusqlite::types::Value;
 use rusqlite::{OptionalExtension, params, params_from_iter};
+use unicode_normalization::char::is_combining_mark;
 
 /// Hits per page of results.
 pub const MAX_LIMIT: u32 = 50;
@@ -110,8 +111,19 @@ pub struct FtsText {
     pub words: Vec<String>,
 }
 
+/// A letter or digit, or a combining mark inside a word (FTS5 keeps marks in
+/// tokens, so decomposed `Cancio\u{301}n` is one word).
+fn word_char(c: char) -> bool {
+    c.is_alphanumeric() || is_combining_mark(c)
+}
+
+/// Holds a character FTS5 indexes: a word of marks only (`\u{93e}`) would be
+/// an empty phrase that matches nothing (final review M3).
+// shortcut: alphanumeric minus marks approximates unicode61's L*/N*; symbols
+// such as `Ⓐ` slip through, upgrade with a general-category table if it bites.
 fn searchable(w: &str) -> bool {
-    w.chars().any(char::is_alphanumeric)
+    w.chars()
+        .any(|c| c.is_alphanumeric() && !is_combining_mark(c))
 }
 
 /// A quoted FTS5 string: whatever it holds is text, never syntax.
@@ -122,6 +134,12 @@ fn quote(s: &str) -> String {
 /// Words and `"quoted phrases"` (an unclosed quote runs to the end); `None`
 /// when no word holds a letter or digit (an empty query).
 pub fn fts_query(text: &str) -> Option<FtsText> {
+    // A pasted NUL or other control character splits words (final review M3).
+    let text: String = text
+        .chars()
+        .map(|c| if c.is_control() { ' ' } else { c })
+        .collect();
+    let text = text.as_str();
     let mut terms: Vec<String> = Vec::new();
     let mut words: Vec<String> = Vec::new();
     let mut add = |chunk: &str, terms: &mut Vec<String>| {
@@ -131,7 +149,7 @@ pub fn fts_query(text: &str) -> Option<FtsText> {
         }
         for w in &ws {
             words.extend(
-                w.split(|c: char| !c.is_alphanumeric())
+                w.split(|c: char| !word_char(c))
                     .filter(|t| !t.is_empty())
                     .map(fold),
             );
@@ -283,7 +301,9 @@ impl Index {
             filters.push(page_filter(
                 Dim::LinksTo,
                 r,
-                "EXISTS (SELECT 1 FROM links l WHERE l.src = p.path AND l.target_path = ?)",
+                // A page's link to itself doesn't count, as in the facet (review M4).
+                "EXISTS (SELECT 1 FROM links l WHERE l.src = p.path AND l.target_path = ? \
+                 AND l.src != l.target_path)",
             ));
         }
         if let Some(r) = &from {
@@ -773,26 +793,40 @@ fn unresolved(raw: &str) -> FacetPage {
 /// About [`SNIPPET_WORDS`] words of `body` around the first word that a
 /// (folded) query word starts, matching words marked; `…` where it was cut.
 fn snippet_of(body: &str, words: &[String]) -> Option<Vec<SnippetPart>> {
-    let mut tokens: Vec<(usize, usize)> = Vec::new();
-    let mut start: Option<usize> = None;
-    for (i, c) in body.char_indices() {
-        match (c.is_alphanumeric(), start) {
-            (true, None) => start = Some(i),
-            (false, Some(s)) => {
-                tokens.push((s, i));
-                start = None;
-            }
-            _ => {}
-        }
-    }
-    if let Some(s) = start {
-        tokens.push((s, body.len()));
-    }
+    let mut chars = body.char_indices().peekable();
+    let mut next_token = || {
+        while chars.next_if(|&(_, c)| !word_char(c)).is_some() {}
+        let (a, _) = *chars.peek()?;
+        while chars.next_if(|&(_, c)| word_char(c)).is_some() {}
+        Some((a, chars.peek().map_or(body.len(), |&(i, _)| i)))
+    };
     let hit = |&(a, b): &(usize, usize)| {
         let folded = fold(&body[a..b]);
         words.iter().any(|w| folded.starts_with(w.as_str()))
     };
-    let first = tokens.iter().position(hit)?;
+    // Only a window of tokens is kept: before the first match, the last
+    // SNIPPET_WORDS; after it, its context plus one (final review M7).
+    let mut tokens: std::collections::VecDeque<(usize, usize)> = Default::default();
+    let mut cut_before = false;
+    let mut first = None;
+    while let Some(t) = next_token() {
+        match first {
+            None => {
+                if tokens.len() == SNIPPET_WORDS {
+                    tokens.pop_front();
+                    cut_before = true;
+                }
+                tokens.push_back(t);
+                if hit(&t) {
+                    first = Some(tokens.len() - 1);
+                }
+            }
+            Some(f) if tokens.len() > f + SNIPPET_WORDS => break,
+            Some(_) => tokens.push_back(t),
+        }
+    }
+    let first = first?;
+    let tokens = Vec::from(tokens);
     let from = first
         .saturating_sub(SNIPPET_WORDS / 3)
         .min(tokens.len().saturating_sub(SNIPPET_WORDS));
@@ -806,7 +840,7 @@ fn snippet_of(body: &str, words: &[String]) -> Option<Vec<SnippetPart>> {
             _ => parts.push(SnippetPart { text, hit }),
         }
     };
-    if from > 0 {
+    if from > 0 || cut_before {
         push("…", false);
     }
     let mut at = tokens[from].0;

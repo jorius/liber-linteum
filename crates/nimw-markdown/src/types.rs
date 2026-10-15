@@ -1,4 +1,5 @@
 use std::ops::Range;
+use unicode_normalization::UnicodeNormalization;
 
 /// Everything the index needs from one Markdown page.
 #[derive(Debug, Clone, Default, PartialEq)]
@@ -34,7 +35,8 @@ impl Tag {
     pub fn new(text: &str) -> Tag {
         Tag {
             text: text.to_string(),
-            key: text.to_lowercase(),
+            // NFC, so a tag typed composed matches one saved decomposed (M5 review M2).
+            key: text.nfc().collect::<String>().to_lowercase(),
         }
     }
 }

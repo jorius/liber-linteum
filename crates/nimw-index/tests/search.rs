@@ -864,3 +864,89 @@ fn m5_facets_on_many_matches_keep_exact_counts() {
     assert_eq!(page.facets.links_to[0].path, "Target.md");
     assert_eq!(page.facets.links_to[0].count, 286, "pages, not links");
 }
+
+/// Final review M1: decomposed text (NFD, common in vaults from macOS) gets
+/// its snippet and its whole accented word marked.
+#[test]
+fn m5_review_m1_decomposed_words_get_a_snippet() {
+    let mut f = Fixture::new();
+    f.page("n.md", "# N\n\nUna Cancio\u{301}n triste.\n");
+    let page = f.search(text_query("cancion"));
+    let snippet = page.results[0].snippet.clone().expect("a body snippet");
+    let marked: Vec<&str> = snippet
+        .iter()
+        .filter(|s| s.hit)
+        .map(|s| s.text.as_str())
+        .collect();
+    assert_eq!(marked, vec!["Cancio\u{301}n"]);
+}
+
+/// Final review M2: a tag matches whether it was written composed or
+/// decomposed, and shows as one facet chip.
+#[test]
+fn m5_review_m2_tags_ignore_the_unicode_form() {
+    let mut f = Fixture::new();
+    f.page("a.md", "---\ntags: [cancio\u{301}n]\n---\n# A\n");
+    f.page("b.md", "---\ntags: [canci\u{f3}n]\n---\n# B\n");
+    let page = f.search(SearchQuery {
+        tags: strs(&["canci\u{f3}n"]),
+        ..q()
+    });
+    assert_eq!(sorted(paths(&page)), vec!["a.md", "b.md"]);
+    let page = f.search(SearchQuery {
+        tags: strs(&["cancio\u{301}n"]),
+        ..q()
+    });
+    assert_eq!(paths(&page).len(), 2);
+    assert_eq!(f.search(q()).facets.tags.len(), 1, "one chip");
+}
+
+/// Final review M3: control characters split words, and a word holding no
+/// letter or digit that FTS5 indexes is ignored instead of emptying the result.
+#[test]
+fn m5_review_m3_odd_words_never_empty_the_result() {
+    let mut f = Fixture::new();
+    f.page("foo.md", "# Foo\n\nbar here\n");
+    assert_eq!(f.find("foo\u{0}bar"), vec!["foo.md"]);
+    assert_eq!(f.find("foo \u{93e}"), vec!["foo.md"]);
+    assert_eq!(f.find("foo \u{301}"), vec!["foo.md"]);
+}
+
+/// Final review M4: a page linking to itself is not among the pages linking
+/// to it, in the results or in the chip's count.
+#[test]
+fn m5_review_m4_self_links_count_the_same_in_filter_and_facet() {
+    let mut f = Fixture::new();
+    f.page("S.md", "# S\n\nSee [[S]].\n");
+    f.page("A.md", "# A\n\nSee [[S]].\n");
+    let page = f.search(SearchQuery {
+        links_to: Some("S".into()),
+        ..q()
+    });
+    assert_eq!(paths(&page), vec!["A.md"]);
+    let chip = page
+        .facets
+        .links_to
+        .iter()
+        .find(|c| c.path == "S.md")
+        .unwrap();
+    assert_eq!(chip.count, page.total);
+}
+
+/// Final review M7: a match deep in a long note still gets its snippet, cut
+/// on both sides.
+#[test]
+fn m5_review_m7_a_late_match_in_a_long_note() {
+    let mut f = Fixture::new();
+    let words: String = (0..5000).map(|i| format!("w{i} ")).collect();
+    f.page("long.md", &format!("# L\n\n{words} the WYRM {words}\n"));
+    let snippet = f.search(text_query("wyrm")).results[0]
+        .snippet
+        .clone()
+        .unwrap();
+    let text: String = snippet.iter().map(|s| s.text.as_str()).collect();
+    assert!(text.starts_with('…') && text.ends_with('…'), "{text:?}");
+    assert!(text.contains("w4999  the WYRM w0"), "{text:?}");
+    let n = text.split_whitespace().count();
+    assert!((8..=16).contains(&n), "{text:?}");
+}
