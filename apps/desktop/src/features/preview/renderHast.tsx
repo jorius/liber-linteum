@@ -8,6 +8,7 @@ import { MathView } from './MathView';
 import { MermaidView } from './MermaidView';
 import { CodeBlock } from './CodeBlock';
 import { Embed } from './Embed';
+import { TableScroll } from './TableScroll';
 import styles from './Preview.module.css';
 import type { Resolve } from './useResolved';
 import { safeDecode } from '../../markdown/decode';
@@ -188,6 +189,13 @@ function renderElement(e: Element, key: number, ctx: RenderCtx): ReactNode {
           {renderChildren(e, ctx)}
         </span>
       );
+  }
+  if (e.tagName === 'table') {
+    return (
+      <TableScroll key={key}>
+        {createElement('table', reactProps(p), renderChildren(e, ctx))}
+      </TableScroll>
+    );
   }
   if (e.tagName === 'pre' && p.dataLang === 'mermaid') {
     return <MermaidView key={key} source={hastText(e).replace(/\n$/, '')} />;

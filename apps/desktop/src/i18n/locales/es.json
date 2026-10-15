@@ -185,6 +185,7 @@
     }
   },
   "preview": {
+    "tableScroll": "Tabla, se desplaza de lado",
     "remoteBlocked": "Imagen remota bloqueada (privacidad)",
     "notFound": "No encontrado: {target}",
     "createPage": "Crear página",
