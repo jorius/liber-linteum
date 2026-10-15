@@ -267,3 +267,11 @@ These rulings come from planning the shell. Each lists its cost if wrong.
 8. **The window title is set through a new `window_title_set` command,** acting on the calling window. There is no window plugin (M4c review I2). It shows "Page — Vault" in the editor, "Global View — Vault" in Global View, and "Vault" otherwise. File windows keep their own title.
 9. **The Global View's heading** ("Global view · level") lived in the top bar. Its own breadcrumb already names the level, so the heading goes.
 10. **The sidebar collapse** keeps the reopen button at the top left of the main area. On macOS that sits below the traffic lights, because the native title bar stays.
+11. **The title and subtitle sit just below the cover band,** at the top of the text's column. They don't overlap the cover as in Notion: any cover image would sit behind the text. Cost: low; this is a styling change.
+12. **With auto save off, some file operations still write the page's text first:**
+    - header edits (cover, subtitle, related) save at once, as before;
+    - moving or trashing a page writes its text before the file moves.
+
+    They are file operations the user started. Cost: an edit the user meant to discard is kept if they then do one of these.
+13. **The floating button shows ⌘F for Search.** Stream D makes ⌘F the search shortcut. Until D lands, ⌘⇧F still opens search, and the label is ahead by one stream.
+14. **Leaving the editor (blur) no longer saves when auto save is off.** The e2e test found this: blur called `flush`.
