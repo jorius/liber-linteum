@@ -15,7 +15,8 @@
     "noRecent": "No recent vaults yet.",
     "notionLater": "Notion import arrives in a later milestone.",
     "forget": "Remove {name} from recent",
-    "missing": "Folder not found"
+    "missing": "Folder not found",
+    "quickNote": "Take a quick note"
   },
   "languages": {
     "en": "English",
@@ -574,6 +575,13 @@
     "lines": "{lines, plural, one {# line} other {# lines}} · {chars, plural, one {# character} other {# characters}}"
   },
   "scratchpad": {
-    "title": "Quick notes"
+    "title": "Quick notes",
+    "noteName": "Quick note {stamp}",
+    "setupTitle": "Where should quick notes live?",
+    "setupBody": "Quick notes are Markdown files in a folder of your own. It opens like any vault, as \"Quick notes\".",
+    "setupHint": "You can change it later in Settings → Files. Notes already taken stay where they are.",
+    "folder": "Folder",
+    "chooseFolder": "Choose folder…",
+    "create": "Create"
   }
 }

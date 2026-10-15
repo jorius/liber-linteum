@@ -15,7 +15,8 @@
     "noRecent": "Aún no hay bóvedas recientes.",
     "notionLater": "La importación de Notion llega en un hito posterior.",
     "forget": "Quitar {name} de recientes",
-    "missing": "Carpeta no encontrada"
+    "missing": "Carpeta no encontrada",
+    "quickNote": "Tomar una nota rápida"
   },
   "languages": {
     "en": "English",
@@ -574,6 +575,13 @@
     "lines": "{lines, plural, one {# línea} other {# líneas}} · {chars, plural, one {# carácter} other {# caracteres}}"
   },
   "scratchpad": {
-    "title": "Notas rápidas"
+    "title": "Notas rápidas",
+    "noteName": "Nota rápida {stamp}",
+    "setupTitle": "¿Dónde guardar las notas rápidas?",
+    "setupBody": "Las notas rápidas son archivos Markdown en una carpeta tuya. Se abre como cualquier bóveda, como «Notas rápidas».",
+    "setupHint": "Puedes cambiarla más tarde en Ajustes → Archivos. Las notas ya tomadas se quedan donde están.",
+    "folder": "Carpeta",
+    "chooseFolder": "Elegir carpeta…",
+    "create": "Crear"
   }
 }

@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event';
 import axe from 'axe-core';
 import { afterEach, describe, expect, it } from 'vitest';
 import { clearMocks, mockIPC } from '../../ipc/testing';
+import { useUiStore } from '../../stores/uiStore';
 import { resetVaultStore, useVaultStore } from '../../stores/vaultStore';
 import { Welcome } from './Welcome';
 
@@ -144,5 +145,13 @@ describe('Welcome screen', () => {
     await screen.findByRole('list', { name: 'Recent' });
     const results = await axe.run(container, { rules: { 'color-contrast': { enabled: false } } });
     expect(results.violations).toEqual([]);
+  });
+
+  it('M4c §2: Take a quick note asks where quick notes live the first time', async () => {
+    backend({ vaults_recent: () => [] });
+    render(<Welcome version={null} />);
+    await userEvent.click(screen.getByRole('button', { name: 'Take a quick note' }));
+    expect(useUiStore.getState().dialog).toEqual({ type: 'scratchpadSetup', then: 'quickNote' });
+    useUiStore.setState({ dialog: null });
   });
 });

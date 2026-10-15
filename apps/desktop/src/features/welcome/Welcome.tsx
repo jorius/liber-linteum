@@ -4,6 +4,8 @@ import { SUPPORTED_LANGUAGES, type Language } from '../../i18n';
 import { pickFolder } from '../../ipc';
 import { useSettingsStore } from '../../stores/settingsStore';
 import { useVaultStore } from '../../stores/vaultStore';
+import { newQuickNote } from '../scratchpad/quickNote';
+import { QuickNoteIcon } from '../scratchpad/QuickNoteIcon';
 import { RecentList } from './RecentList';
 import styles from './Welcome.module.css';
 
@@ -62,6 +64,10 @@ export function Welcome({ version }: WelcomeProps) {
         </div>
 
         <div className={styles.actions}>
+          <button type="button" className={styles.button} onClick={() => void newQuickNote()}>
+            <QuickNoteIcon />
+            {t('welcome.quickNote')}
+          </button>
           <button
             type="button"
             className={`${styles.button} ${styles.primary}`}

@@ -16,6 +16,10 @@ export type DialogState =
   /** A folder's index note (M3b §4); `current`: the page picked now;
    *  `only`: the folder's single page, its index note already (GV-02 rule 4). */
   | { type: 'indexPick'; folder: string; current: string | null; only?: string }
+  /** "Where should quick notes live?" (M4c §2); `then: 'quickNote'` takes
+   *  the quick note that asked. Rendered by `ScratchpadHost` (it also shows
+   *  on the Welcome screen). */
+  | { type: 'scratchpadSetup'; then: 'quickNote' | 'none' }
   | null;
 
 /** Which screen the open vault shows (M3a §2). */
