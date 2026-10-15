@@ -2,11 +2,9 @@ import { useTranslation } from 'react-i18next';
 import { FormatIcon, OutlineIcon, WidthIcon } from '../../app/icons';
 import type { EditorMode, Page } from '../../ipc';
 import { useEditorStore } from '../../stores/editorStore';
-import { goBack } from '../../stores/navigate';
 import { useSettingsStore } from '../../stores/settingsStore';
 import { usePageWidth, usePageWidthStore } from '../../stores/pageWidthStore';
-import { useTrailStore } from '../../stores/trailStore';
-import { nameOf } from '../../stores/tree';
+import { BackArrow } from './BackArrow';
 import { Breadcrumb } from './Breadcrumb';
 import { Cover } from './Cover';
 import { ModeToggle } from './ModeToggle';
@@ -28,9 +26,7 @@ export function PageHeader({ page, mode }: { page: Page; mode: EditorMode }) {
   const large = useEditorStore((s) => s.large);
   const toolbar = useSettingsStore((s) => s.settings.toolbar);
   const outline = useSettingsStore((s) => s.settings.outline);
-  const previous = useTrailStore((s) => s.back[s.back.length - 1] ?? null);
   const editable = useEditorStore((s) => s.doc !== null && s.path === page.path);
-  const backName = previous ? nameOf(previous.path).replace(/\.md$/i, '') : '';
   const full = usePageWidth(page.path) === 'full';
   return (
     <Cover page={page} editable={editable}>
@@ -38,17 +34,7 @@ export function PageHeader({ page, mode }: { page: Page; mode: EditorMode }) {
         <>
           <div className={styles.bar}>
             <div className={`${styles.where} ${styles.pill}`}>
-              {previous && (
-                <button
-                  type="button"
-                  className={styles.back}
-                  aria-label={t('trail.back', { name: backName })}
-                  title={t('trail.back', { name: backName })}
-                  onClick={() => void goBack()}
-                >
-                  <span aria-hidden="true">←</span>
-                </button>
-              )}
+              <BackArrow />
               <Breadcrumb path={page.path} />
             </div>
             <div className={styles.controls}>

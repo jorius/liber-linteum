@@ -6,6 +6,7 @@ import { nameOf } from '../../stores/tree';
 import { useUiStore } from '../../stores/uiStore';
 import { Editor } from '../editor/Editor';
 import { onViewUpdate, useCurrentView } from '../editor/viewUpdates';
+import { BackArrow } from './BackArrow';
 import { Breadcrumb } from './Breadcrumb';
 import styles from './PageView.module.css';
 import { UnwritableNotice } from './UnwritableNotice';
@@ -59,6 +60,7 @@ export function TextView({ path }: { path: string }) {
         <div className={styles.bandRows}>
           <div className={styles.bar}>
             <div className={`${styles.where} ${styles.pill}`}>
+              <BackArrow />
               <Breadcrumb path={path} />
             </div>
             {doc && !notText && (

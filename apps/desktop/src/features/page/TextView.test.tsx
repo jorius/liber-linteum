@@ -117,6 +117,9 @@ describe('text and code files (M4b part 2 §6)', () => {
     );
     await waitFor(() => expect(usePageStore.getState().path).toBe('notes.txt'));
     expect(await screen.findByRole('textbox', { name: 'File name' })).toHaveValue('notes');
+    // The back arrow returns along the link trail, as from a page (final review M9).
+    await userEvent.click(screen.getByRole('button', { name: 'Back to A' }));
+    await waitFor(() => expect(usePageStore.getState().path).toBe('A.md'));
   });
 
   it('final review I3: rewritten outside as non-text while edited, the edits stay with a notice, a toast and Save as new file', async () => {
