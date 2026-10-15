@@ -60,10 +60,13 @@ pub struct PickedFileDto {
     pub in_vault: Option<String>,
 }
 
-/// Dialog filters by kind (§7). macOS joins every filter into one list of
-/// allowed types (rfd 0.16), so there a filter would hide "All files":
-/// the panel shows everything instead.
+/// Dialog filters by kind (§7), "All files" first: Windows and GTK select
+/// the first filter, which hid PDFs and documents behind "Images" (final
+/// review m7). macOS joins every filter into one list of allowed types (rfd
+/// 0.16), so there a filter would hide "All files": the panel shows
+/// everything instead.
 const FILTERS: &[(&str, &[&str])] = &[
+    ("All files", &["*"]),
     (
         "Images",
         &[
@@ -72,8 +75,12 @@ const FILTERS: &[(&str, &[&str])] = &[
     ),
     ("Audio", &["mp3", "m4a", "wav", "ogg", "flac"]),
     ("Documents", &["pdf"]),
-    ("All files", &["*"]),
 ];
+
+/// The filters the file dialog offers on this kind of host.
+fn dialog_filters(macos: bool) -> &'static [(&'static str, &'static [&'static str])] {
+    if macos { &[] } else { FILTERS }
+}
 
 pub(crate) fn links_external_impl(
     state: &AppState,
@@ -142,10 +149,8 @@ pub(crate) fn file_pick_impl<R: Runtime>(
         Some(pick) => pick(),
         None => {
             let mut dialog = app.dialog().file();
-            if !cfg!(target_os = "macos") {
-                for (name, extensions) in FILTERS {
-                    dialog = dialog.add_filter(*name, extensions);
-                }
+            for (name, extensions) in dialog_filters(cfg!(target_os = "macos")) {
+                dialog = dialog.add_filter(*name, extensions);
             }
             dialog
                 .blocking_pick_files()
@@ -173,6 +178,18 @@ pub(crate) fn file_pick_impl<R: Runtime>(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn the_file_dialog_starts_on_all_files() {
+        // Final review m7: Windows (and GTK) select the first filter, which
+        // hid PDFs and documents behind "Images".
+        let windows = dialog_filters(false);
+        assert_eq!(windows[0], ("All files", &["*"][..]));
+        let names: Vec<_> = windows.iter().map(|(n, _)| *n).collect();
+        assert_eq!(names, ["All files", "Images", "Audio", "Documents"]);
+        // macOS joins every filter into one list of types: none at all there.
+        assert!(dialog_filters(true).is_empty());
+    }
 
     #[test]
     fn outside_files_open_only_as_documents_or_media() {
