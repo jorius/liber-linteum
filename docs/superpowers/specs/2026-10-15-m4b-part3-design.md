@@ -509,3 +509,71 @@ Built in three streams in parallel, each with its own plan, worktree and signed 
   - they show on embedded images, audio and file cards, and on Markdown images;
   - Copy path uses the code block's Copy feedback (label and live region);
   - Windows separators follow the Windows UA (WebView2).
+
+## 16. Amendments from the final review (Stream C: §7, §8, §9)
+
+The final review of the files-and-links work found one Critical, three Important and ten Minor issues. These decisions change §9 and §15 where they differ.
+
+### Network files are never touched until the user loads them (C1, Critical)
+
+- **The problem:** rendering a note that links `\\host\share\x.png` or `file://host/…` looked the path up on disk at once. On Windows that is an SMB connection to that host with the user's credentials (NTLM), with no click (the class of Outlook's CVE-2023-23397). §9's "cards check that the file exists each time they render" demanded it.
+- **What changes in §9:**
+  - **Network paths:** a UNC path or `file://host/` URL, and on macOS a `/net/host/…` path (the automounter), whose server isn't the vault's own, is a **network file**. `links_external` reports it `network: true`, `askFirst: true`, `exists: false` and makes no filesystem call at all: no existence check, no `canonicalize`, no serving, no opening.
+  - **The card:** an embed shows "Network file: \\server\share\x.pdf", "Loading it connects to “server”." and a **Load from network** button.
+  - **A link:** clicking one opens the usual open-file confirmation, with "Opening it connects to “server”." added. Confirming loads it, then opens it.
+  - **Loading:** `external_network_allow(path)` (new command, real-ACL tested) accepts only a path a saved page links. It marks it loaded for the session (`VaultSession`, so a vault switch forgets it), then checks it as usual. Serving, opening and revealing refuse a network path until it is loaded.
+  - **The vault's own server:** a share on the server the vault itself lives on (a vault on `\\nas\notes`) isn't "another computer", so links there work without asking.
+- **Device namespaces:** `\\.\…` (pipes, devices), `\\?\…` other than `\\?\X:\…` and `\\?\UNC\…` (e.g. `\\?\GLOBALROOT`, volume GUIDs), and the reserved device names in any folder (`CON`, `PRN`, `AUX`, `NUL`, `CONIN$`, `CONOUT$`, `COM1–9`, `LPT1–9`, with any extension) are never link targets. `\\?\X:\…` and `\\?\UNC\server\…` are read as their short forms.
+- **No existence oracle:** `exists` is looked up only for a path a saved page links (and, on the network, only once loaded). An unlinked target reports `exists: false`.
+- **Raw HTML (m2, re-graded as part of C1):** raw HTML can't carry its own `data-external`. The pipeline seals the values it sets with a per-render secret before raw HTML is parsed; after sanitizing, only sealed values are kept.
+- **Tests:**
+  - the session's own unit tests count filesystem look-ups and prove that none happen for network, device or unlisted targets;
+  - the classification tests run on every host;
+  - the preview's card and link flows, and an e2e for the card in Chromium and WebKit.
+
+### A leading `/` with nothing there is the vault's own link (I1)
+
+`[[/Projects/New idea]]`, `[x](/Notes/Missing.md)` and `![[/Assets/gone.png]]` with no vault file showed "Not found: /…" and lost Create page. On Windows this happened always, since a POSIX path never exists there.
+
+A leading `/` (not a `file:` URL) now names the disk only when a saved page links a file that is there. Otherwise `links_external` answers `null`, and the preview, Live Preview and embeds take the vault's missing-link path (Create page, "Not found") as before §9. `file:` URLs, drive paths and UNC paths always name the disk.
+
+### Only documents and media open from a note (I2)
+
+`external_open` relied on M3's list of program types, which misses many Windows types that run code or leak credentials when opened. It now opens an outside file only when both the name asked for and the file it really is (symlinks, short names and trailing dots resolved) have one of these types (the last extension decides, case-insensitively):
+
+| Kind | Types |
+|---|---|
+| Documents | pdf, txt, md, markdown, csv, tsv, json, rtf, odt, ods, odp, odg, doc, docx, xls, xlsx, ppt, pptx, pages, numbers, key, epub |
+| Images | png, jpg, jpeg, gif, webp, avif, bmp, tif, tiff, heic, heif |
+| Audio | mp3, m4a, wav, ogg, oga, flac, aac, aif, aiff, opus |
+| Video | mp4, m4v, mov, webm, mkv, avi |
+
+Everything else is only shown in Finder/Explorer, including web pages, SVG, macro-enabled Office files, disk images, help files and consoles.
+
+- **Links report `openable`.**
+- **The file card:** shows **Open** only for an openable file; otherwise it says "Not opened from notes: this kind of file can run programs." beside Show in Finder/Explorer.
+- **A click on a link** to a file that isn't openable shows it in its folder with a toast saying so.
+- **Checks kept:** M3's `check_openable` still runs (regular file, no program by name, no extensionless executable).
+- **Vault files:** unchanged (`file_open_external`).
+
+### The file dialog starts on All files (m7)
+
+Windows and GTK select the first filter, so "All files" now comes first (then Images, Audio, Documents). macOS still gets no filters.
+
+### Ruling: no index schema bump for §9 (I3)
+
+The reviewer asked for schema 3 in case a schema-2 build had reached the tester. None has: the tester's Windows build and Jose's dev runs used schema 1, so the next build rebuilds every index once anyway. Schema 2 covers §1, §3 and §9 together. Cost if wrong: one stale index on a machine that ran an unreleased build, fixed by editing the affected notes or deleting the index cache.
+
+### Deferred (Minor)
+
+- **m1:** a file name containing a literal `%XX`, linked through a Markdown `file:` URL, is decoded twice and never loads.
+- **m3:** "hidden" means a name starting with `.`. Windows' hidden attribute (`AppData`) and macOS's hidden flag (`~/Library`) aren't checked; the content security policy still keeps the bytes from the page.
+- **m4:** outside files (and audio range requests) are read whole.
+- **m5:** a gap between checking a file and reading it (a local attacker swapping in a FIFO).
+- **m6:** the Attach popup:
+  - doesn't close on an outside click and has no focus trap;
+  - the import grant expires after two minutes;
+  - mixed in-vault and outside picks are two undo steps.
+- **m8:** a `\\?\D:\` long-path vault root makes a `file://?/…` URL.
+- **m9:** the comment on `URL_PATH` says other UTF-8 stays as written; it is percent-encoded.
+- **m10:** the tooltip reads "Attach a file or image…", not the spec's "Insert a file or image…".
