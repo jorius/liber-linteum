@@ -4,6 +4,7 @@
 mod index;
 mod rows;
 mod schema;
+mod text;
 
 pub use index::{Index, IndexError, Result, Tx};
 pub use rows::{
