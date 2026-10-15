@@ -9,6 +9,7 @@ mod external;
 mod global_view;
 mod quick_notes;
 mod rename;
+mod search;
 mod session;
 mod text_files;
 mod watching;
@@ -20,6 +21,9 @@ pub use external::{ExternalFile, file_url, opens_from_notes};
 pub use global_view::{
     CardKind, EdgeKind, GvCard, GvChildren, GvEdge, GvLevel, IndexFrom, MAX_NEIGHBOURS,
     MAX_VISIBLE, Relation, SUMMARY_TITLES,
+};
+pub use nimw_index::{
+    FacetCount, FacetPage, Facets, SearchHit, SearchPage, SearchQuery, SnippetPart,
 };
 pub use quick_notes::{AutoName, MAX_QUICK_NAME, quick_note_stem};
 pub use session::{VaultSession, index_db_path};

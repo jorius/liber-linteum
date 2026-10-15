@@ -824,3 +824,43 @@ fn m5_scratch_folder_pages_are_ordinary() {
         strs(&["Scratchpad/Quick note 2026-10-15 14.32.md"])
     );
 }
+
+/// Many matches: the leading tags and pages are found in a sample, but
+/// their counts are exact.
+#[test]
+fn m5_facets_on_many_matches_keep_exact_counts() {
+    let mut ix = Index::open_in_memory().unwrap();
+    ix.transaction(|tx| {
+        tx.upsert_file(&row("Target.md", FileKind::Page, 0))?;
+        tx.upsert_page("Target.md", &parse_page("# Target\n", "Target"))?;
+        for i in 0..2000 {
+            let path = format!("p{i:04}.md");
+            let mut text = format!("# P{i}\n\ncommon words #common");
+            if i % 20 == 0 {
+                text.push_str(" #rare");
+            }
+            if i % 7 == 0 {
+                text.push_str(" [[Target]] [[Target]]");
+            }
+            tx.upsert_file(&row(&path, FileKind::Page, i))?;
+            tx.upsert_page(&path, &parse_page(&text, "p"))?;
+        }
+        Ok(())
+    })
+    .unwrap();
+    let files = ix.file_set().unwrap();
+    ix.resolve_all(&files).unwrap();
+    let page = ix.search(&text_query("common")).unwrap();
+    assert_eq!(page.total, 2000);
+    let tag = |v: &str| {
+        page.facets
+            .tags
+            .iter()
+            .find(|t| t.value == v)
+            .map(|t| t.count)
+    };
+    assert_eq!(tag("common"), Some(2000));
+    assert_eq!(tag("rare"), Some(100));
+    assert_eq!(page.facets.links_to[0].path, "Target.md");
+    assert_eq!(page.facets.links_to[0].count, 286, "pages, not links");
+}

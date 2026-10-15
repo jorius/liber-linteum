@@ -6,7 +6,7 @@ use nimw_vault::{Entry, EntryKind, Hash, Vault, VaultPath, Watcher, is_hidden_na
 use rayon::prelude::*;
 use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
-use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex, MutexGuard};
 use std::time::Instant;
 
@@ -24,6 +24,8 @@ pub struct VaultSession {
     /// Network files the user chose to load this session (M4b part 3, final
     /// review C1): nothing else on another computer is ever touched.
     pub(crate) network_ok: Mutex<HashSet<String>>,
+    /// A full re-index is running (M5 §10.15: search says so).
+    pub(crate) indexing: AtomicBool,
 }
 
 impl std::fmt::Debug for VaultSession {
@@ -71,6 +73,7 @@ impl VaultSession {
             sink: Arc::new(sink),
             watcher: Mutex::new(None),
             network_ok: Mutex::new(HashSet::new()),
+            indexing: AtomicBool::new(false),
         };
         let (report, changes) = session.reindex_all()?;
         session.forget_page_sizes(&changes.removed);
@@ -106,6 +109,13 @@ impl VaultSession {
     /// Full incremental pass (open and watcher overflow). Returns the report and
     /// the created/modified/removed paths.
     pub(crate) fn reindex_all(&self) -> Result<(IndexReport, Changes)> {
+        self.indexing.store(true, Ordering::Relaxed);
+        let out = self.reindex_all_inner();
+        self.indexing.store(false, Ordering::Relaxed);
+        out
+    }
+
+    fn reindex_all_inner(&self) -> Result<(IndexReport, Changes)> {
         let started = Instant::now();
         let scan = self.vault.scan()?;
         let mut report = IndexReport {

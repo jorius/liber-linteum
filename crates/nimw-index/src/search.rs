@@ -14,6 +14,11 @@ pub const RECENT: u32 = 20;
 const TOP_PROJECTS: usize = 20;
 const TOP_TAGS: usize = 12;
 const TOP_LINKS: usize = 8;
+/// Matches above this many are sampled to find the leading tags and pages
+/// (their counts stay exact; NFR-03).
+const SAMPLE: i64 = 1500;
+/// Candidates read per facet entry shown, from the sample.
+const LEAD: usize = 3;
 /// bm25 weights: title, name, folders, tags, links, body (§2).
 const WEIGHTS: &str = "10.0, 8.0, 5.0, 6.0, 4.0, 1.0";
 const META_COLUMNS: &str = "{title name folders tags links}";
@@ -313,34 +318,64 @@ impl Index {
             }
             None => "pages p JOIN files f ON f.path = p.path",
         };
-        let order = if text.is_some() {
-            "h.meta DESC, h.score, length(p.path), f.mtime_ns DESC, p.path"
+        let scored = if text.is_some() {
+            "h.meta, h.score"
         } else {
-            "f.mtime_ns DESC, p.path"
+            "0, 0"
         };
+        let (cond, params) = where_sql(&filters, None);
+        // Every match once, in a temp table: the count, the page of results
+        // and most facets read it instead of joining again (NFR-03).
+        self.conn.execute_batch(
+            "CREATE TEMP TABLE IF NOT EXISTS nimw_match (path TEXT PRIMARY KEY, \
+             meta INTEGER NOT NULL, score REAL NOT NULL, mtime INTEGER NOT NULL, \
+             has_image INTEGER NOT NULL, has_audio INTEGER NOT NULL); \
+             DELETE FROM temp.nimw_match;",
+        )?;
+        self.conn.execute(
+            &format!(
+                "INSERT INTO temp.nimw_match \
+                 SELECT p.path, {scored}, f.mtime_ns, p.has_image, p.has_audio \
+                 FROM {base} WHERE {cond}"
+            ),
+            params_from_iter(params.iter()),
+        )?;
+        let total: i64 = self
+            .conn
+            .query_row("SELECT count(*) FROM temp.nimw_match", [], |r| r.get(0))?;
         let (limit, offset) = if recent {
             (RECENT, 0)
+        } else if q.limit == 0 {
+            (MAX_LIMIT, q.offset)
         } else {
-            let limit = if q.limit == 0 {
-                MAX_LIMIT
-            } else {
-                q.limit.min(MAX_LIMIT)
-            };
-            (limit, q.offset)
+            (q.limit.min(MAX_LIMIT), q.offset)
         };
-        let (cond, mut params) = where_sql(&filters, None);
-        let total = self.count(base, &cond, &params)?;
-        let total = if recent { total.min(RECENT) } else { total };
-
-        params.push(Value::Integer(limit.into()));
-        params.push(Value::Integer(offset.into()));
-        let mut stmt = self.conn.prepare(&format!(
-            "SELECT p.path, p.title, \
-             (SELECT l.target_path FROM links l WHERE l.src = p.path AND l.kind = 'cover' LIMIT 1), \
-             p.has_image, p.has_audio FROM {base} WHERE {cond} ORDER BY {order} LIMIT ? OFFSET ?"
-        ))?;
-        let rows = stmt
-            .query_map(params_from_iter(params), |r| {
+        let total = if recent {
+            (total as u32).min(RECENT)
+        } else {
+            total as u32
+        };
+        let order = if text.is_some() {
+            "meta DESC, score, length(path), mtime DESC, path"
+        } else {
+            "mtime DESC, path"
+        };
+        let paths = self
+            .conn
+            .prepare_cached(&format!(
+                "SELECT path FROM temp.nimw_match ORDER BY {order} LIMIT ?1 OFFSET ?2"
+            ))?
+            .query_map(params![limit, offset], |r| r.get::<_, String>(0))?
+            .collect::<rusqlite::Result<Vec<_>>>()?;
+        let words = text.as_ref().map(|t| t.words.as_slice()).unwrap_or(&[]);
+        let mut results = Vec::with_capacity(paths.len());
+        for path in paths {
+            let mut hit = self.conn.prepare_cached(
+                "SELECT p.path, p.title, \
+                 (SELECT l.target_path FROM links l WHERE l.src = p.path AND l.kind = 'cover' LIMIT 1), \
+                 p.has_image, p.has_audio FROM pages p WHERE p.path = ?1",
+            )?
+            .query_row([&path], |r| {
                 Ok(SearchHit {
                     path: r.get(0)?,
                     title: r.get(1)?,
@@ -350,11 +385,7 @@ impl Index {
                     tags: Vec::new(),
                     snippet: None,
                 })
-            })?
-            .collect::<rusqlite::Result<Vec<_>>>()?;
-        let words = text.as_ref().map(|t| t.words.as_slice()).unwrap_or(&[]);
-        let mut results = Vec::with_capacity(rows.len());
-        for mut hit in rows {
+            })?;
             hit.tags = self.hit_tags(&hit.path, words, &tags)?;
             if let Some(t) = &text {
                 hit.snippet = self.snippet(&hit.path, &t.any)?;
@@ -399,15 +430,6 @@ impl Index {
                 format!("{META_COLUMNS} : ({})", text.any)
             ])?;
         Ok(())
-    }
-
-    fn count(&self, base: &str, cond: &str, params: &[Value]) -> Result<u32> {
-        let n: i64 = self.conn.query_row(
-            &format!("SELECT count(*) FROM {base} WHERE {cond}"),
-            params_from_iter(params.iter()),
-            |r| r.get(0),
-        )?;
-        Ok(n as u32)
     }
 
     /// Folders whose path is `value`, or whose name folds like it.
@@ -501,13 +523,72 @@ impl Index {
     fn snippet(&self, path: &str, any: &str) -> Result<Option<Vec<SnippetPart>>> {
         let found: Option<String> = self
             .conn
-            .prepare_cached(
-                "SELECT snippet(fts, 5, char(1), char(2), '…', 12) FROM fts \
-                 WHERE fts MATCH ?1 AND rowid = (SELECT rowid FROM page_text WHERE path = ?2)",
-            )?
-            .query_row(params![format!("{{body}} : ({any})"), path], |r| r.get(0))
-            .optional()?;
+            .prepare_cached("SELECT rowid FROM page_text WHERE path = ?1")?
+            .query_row([path], |r| r.get::<_, i64>(0))
+            .optional()?
+            .map(|rowid| {
+                // A plain rowid (not a subquery) lets FTS5 seek to the row.
+                self.conn
+                    .prepare_cached(
+                        "SELECT snippet(fts, 5, char(1), char(2), '…', 12) FROM fts \
+                         WHERE fts MATCH ?1 AND rowid = ?2",
+                    )?
+                    .query_row(params![format!("{{body}} : ({any})"), rowid], |r| r.get(0))
+                    .optional()
+            })
+            .transpose()?
+            .flatten();
         Ok(found.and_then(|s| snippet_parts(&s)))
+    }
+
+    /// The matches with every filter but `dim`'s, as a temp table: the
+    /// materialized matches when `dim` has no active filter, else
+    /// `nimw_except`, filled now (one facet at a time uses it). Also its size.
+    fn matches_except(
+        &self,
+        base: &str,
+        filters: &[Filter],
+        dim: Dim,
+    ) -> Result<(&'static str, i64)> {
+        let table = if filters.iter().all(|f| f.dim != dim) {
+            "temp.nimw_match"
+        } else {
+            let (cond, params) = where_sql(filters, Some(dim));
+            self.conn.execute_batch(
+                "CREATE TEMP TABLE IF NOT EXISTS nimw_except (path TEXT PRIMARY KEY, \
+                 has_image INTEGER NOT NULL, has_audio INTEGER NOT NULL); \
+                 DELETE FROM temp.nimw_except;",
+            )?;
+            self.conn.execute(
+                &format!(
+                    "INSERT INTO temp.nimw_except \
+                     SELECT p.path, p.has_image, p.has_audio FROM {base} WHERE {cond}"
+                ),
+                params_from_iter(params.iter()),
+            )?;
+            "temp.nimw_except"
+        };
+        let n: i64 = self
+            .conn
+            .query_row(&format!("SELECT count(*) FROM {table}"), [], |r| r.get(0))?;
+        Ok((table, n))
+    }
+
+    /// `table`, or an even sample of about [`SAMPLE`] of its rows when it is
+    /// larger: which tags and pages lead is read from it, their counts from
+    /// all the matches.
+    fn sampled(table: &str, n: i64) -> String {
+        if n <= SAMPLE {
+            table.to_string()
+        } else {
+            let step = (n + SAMPLE - 1) / SAMPLE;
+            // Rows scattered by an LCG's high bits, so a pattern in the
+            // vault (every 20th page tagged) doesn't alias with the step.
+            format!(
+                "(SELECT path FROM {table} \
+                 WHERE ((rowid * 1103515245 + 12345) / 65536) % {step} = 0)"
+            )
+        }
     }
 
     #[allow(clippy::too_many_arguments)]
@@ -523,14 +604,14 @@ impl Index {
     ) -> Result<Facets> {
         let mut facets = Facets::default();
 
-        let (cond, params) = where_sql(filters, Some(Dim::Project));
-        let mut stmt = self.conn.prepare(&format!(
-            "SELECT substr(p.path, 1, instr(p.path, '/') - 1) AS proj, count(*) AS n \
-             FROM {base} WHERE instr(p.path, '/') > 0 AND {cond} \
+        let (src, _) = self.matches_except(base, filters, Dim::Project)?;
+        let mut stmt = self.conn.prepare_cached(&format!(
+            "SELECT substr(m.path, 1, instr(m.path, '/') - 1) AS proj, count(*) AS n \
+             FROM {src} m WHERE instr(m.path, '/') > 0 \
              GROUP BY proj ORDER BY n DESC, proj LIMIT {TOP_PROJECTS}"
         ))?;
         facets.projects = stmt
-            .query_map(params_from_iter(params.iter()), |r| {
+            .query_map([], |r| {
                 Ok(FacetCount {
                     value: r.get(0)?,
                     count: r.get::<_, i64>(1)? as u32,
@@ -540,35 +621,61 @@ impl Index {
         if let Some(p) = project
             && !facets.projects.iter().any(|f| f.value == p)
         {
-            let (sql, mut own) = under(p);
-            let mut all = params.clone();
-            all.append(&mut own);
-            let count = self.count(base, &format!("{cond} AND {sql}"), &all)?;
+            let (_, range) = under(p);
+            let n: i64 = self.conn.query_row(
+                &format!("SELECT count(*) FROM {src} m WHERE m.path >= ? AND m.path < ?"),
+                params_from_iter(range.iter()),
+                |r| r.get(0),
+            )?;
             facets.projects.push(FacetCount {
                 value: p.to_string(),
-                count,
+                count: n as u32,
             });
         }
 
-        let (cond, params) = where_sql(filters, None);
-        let mut stmt = self.conn.prepare(&format!(
-            "SELECT t.tag_key, min(t.tag), count(DISTINCT p.path) AS n \
-             FROM {base} JOIN tags t ON t.path = p.path WHERE {cond} \
-             GROUP BY t.tag_key ORDER BY n DESC, t.tag_key LIMIT {TOP_TAGS}"
-        ))?;
-        let rows = stmt
-            .query_map(params_from_iter(params.iter()), |r| {
-                Ok((
-                    r.get::<_, String>(0)?,
-                    FacetCount {
-                        value: r.get(1)?,
-                        count: r.get::<_, i64>(2)? as u32,
-                    },
-                ))
-            })?
+        // Tags drill down: every filter applies.
+        let n: i64 = self
+            .conn
+            .query_row("SELECT count(*) FROM temp.nimw_match", [], |r| r.get(0))?;
+        let sample = Self::sampled("temp.nimw_match", n);
+        // CROSS JOIN keeps the matches as the outer loop.
+        let lead = self
+            .conn
+            .prepare_cached(&format!(
+                "SELECT t.tag_key FROM {sample} m CROSS JOIN tags t ON t.path = m.path \
+                 GROUP BY t.tag_key ORDER BY count(*) DESC, t.tag_key LIMIT {}",
+                TOP_TAGS * LEAD
+            ))?
+            .query_map([], |r| r.get::<_, String>(0))?
             .collect::<rusqlite::Result<Vec<_>>>()?;
-        let keys: Vec<String> = rows.iter().map(|(k, _)| k.clone()).collect();
-        facets.tags = rows.into_iter().map(|(_, f)| f).collect();
+        let mut counted = Vec::new();
+        for key in lead {
+            let (tag, count): (String, i64) = self
+                .conn
+                .prepare_cached(
+                    // A join (key lookups), not `IN (SELECT …)`, which
+                    // would copy the matches again for every tag.
+                    "SELECT min(t.tag), count(*) FROM tags t \
+                     CROSS JOIN temp.nimw_match m ON m.path = t.path WHERE t.tag_key = ?1",
+                )?
+                .query_row([&key], |r| {
+                    Ok((
+                        r.get::<_, Option<String>>(0)?.unwrap_or_default(),
+                        r.get(1)?,
+                    ))
+                })?;
+            counted.push((
+                key,
+                FacetCount {
+                    value: tag,
+                    count: count as u32,
+                },
+            ));
+        }
+        counted.sort_by(|a, b| b.1.count.cmp(&a.1.count).then_with(|| a.0.cmp(&b.0)));
+        counted.truncate(TOP_TAGS);
+        let keys: Vec<String> = counted.iter().map(|(k, _)| k.clone()).collect();
+        facets.tags = counted.into_iter().map(|(_, f)| f).collect();
         for t in tags {
             let value = t.trim().trim_start_matches('#');
             if !value.is_empty() && !keys.contains(&tag_key(value)) {
@@ -580,27 +687,46 @@ impl Index {
             }
         }
 
-        let (cond, params) = where_sql(filters, Some(Dim::LinksTo));
-        let mut stmt = self.conn.prepare(&format!(
-            "SELECT l.target_path, count(DISTINCT p.path) AS n FROM {base} \
-             JOIN links l ON l.src = p.path JOIN files tf ON tf.path = l.target_path \
-             WHERE tf.kind = 'page' AND l.target_path != p.path AND {cond} \
-             GROUP BY l.target_path ORDER BY n DESC, l.target_path LIMIT {TOP_LINKS}"
-        ))?;
-        let rows = stmt
-            .query_map(params_from_iter(params.iter()), |r| {
-                Ok((r.get::<_, String>(0)?, r.get::<_, i64>(1)? as u32))
-            })?
+        // Links to: the leading targets in (a sample of) the matches, then
+        // each one's exact count; a page linking twice counts once.
+        let (src, n) = self.matches_except(base, filters, Dim::LinksTo)?;
+        let sample = Self::sampled(src, n);
+        let lead = self
+            .conn
+            .prepare_cached(&format!(
+                "SELECT l.target_path FROM {sample} m CROSS JOIN links l ON l.src = m.path \
+                 WHERE l.target_path IS NOT NULL AND l.target_path != m.path \
+                 AND l.target_path LIKE '%.md' \
+                 GROUP BY l.target_path ORDER BY count(DISTINCT m.path) DESC, l.target_path \
+                 LIMIT {}",
+                TOP_LINKS * LEAD
+            ))?
+            .query_map([], |r| r.get::<_, String>(0))?
             .collect::<rusqlite::Result<Vec<_>>>()?;
-        for (path, count) in rows {
-            let title = self.page_title(&path)?.unwrap_or_else(|| path.clone());
-            facets.links_to.push(FacetPage {
+        let mut counted = Vec::new();
+        for path in lead {
+            // Pages only (a `.md` that isn't UTF-8 is an attachment).
+            let Some(title) = self.page_title(&path)? else {
+                continue;
+            };
+            let count: i64 = self
+                .conn
+                .prepare_cached(&format!(
+                    "SELECT count(DISTINCT l.src) FROM links l \
+                     CROSS JOIN {src} m ON m.path = l.src \
+                     WHERE l.target_path = ?1 AND l.src != ?1"
+                ))?
+                .query_row([&path], |r| r.get(0))?;
+            counted.push(FacetPage {
                 path,
                 title,
-                count,
+                count: count as u32,
                 active: false,
             });
         }
+        counted.sort_by(|a, b| b.count.cmp(&a.count).then_with(|| a.path.cmp(&b.path)));
+        counted.truncate(TOP_LINKS);
+        facets.links_to = counted;
         if let Some((raw, resolved)) = to {
             match resolved {
                 Some((path, title)) => match facets.links_to.iter_mut().find(|f| &f.path == path) {
@@ -625,13 +751,22 @@ impl Index {
             None => unresolved(raw),
         });
 
-        for (dim, column) in [(Dim::Image, "p.has_image"), (Dim::Audio, "p.has_audio")] {
-            let (cond, params) = where_sql(filters, Some(dim));
-            let n = self.count(base, &format!("{column} AND {cond}"), &params)?;
-            if dim == Dim::Image {
-                facets.has_image = n;
+        for dim in [Dim::Image, Dim::Audio] {
+            let (src, _) = self.matches_except(base, filters, dim)?;
+            let column = if dim == Dim::Image {
+                "has_image"
             } else {
-                facets.has_audio = n;
+                "has_audio"
+            };
+            let n: i64 = self.conn.query_row(
+                &format!("SELECT count(*) FROM {src} WHERE {column}"),
+                [],
+                |r| r.get(0),
+            )?;
+            if dim == Dim::Image {
+                facets.has_image = n as u32;
+            } else {
+                facets.has_audio = n as u32;
             }
         }
         Ok(facets)
