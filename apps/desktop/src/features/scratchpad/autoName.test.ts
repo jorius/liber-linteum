@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { clearMocks, mockIPC } from '../../ipc/testing';
 import { useEditorStore } from '../../stores/editorStore';
+import { useToastStore } from '../../stores/toastStore';
 import { resetVaultStore, useVaultStore } from '../../stores/vaultStore';
 import { AUTO_NAME_IDLE_MS, installAutoName } from './autoName';
 import { useScratchpadStore } from './scratchpadStore';
@@ -170,5 +171,66 @@ describe('naming from the first line while typing (M4c §7.15)', () => {
     await vi.advanceTimersByTimeAsync(AFTER_SAVE + 10);
     expect(autonames(calls)).toHaveLength(1);
     expect(useScratchpadStore.getState().autoNamed.has('Scratchpad/Q.md')).toBe(true);
+  });
+});
+
+describe('final review fixes (M4c)', () => {
+  it('I1: other notes rewritten are reported; the note alone stays quiet', async () => {
+    const toasts = () => useToastStore.getState().toasts;
+    const answer = (updatedFiles: string[]) => () => ({
+      path: 'Scratchpad/Trip.md',
+      autoNamed: true,
+      outcome: {
+        moved: [['Scratchpad/Q.md', 'Scratchpad/Trip.md']],
+        updatedFiles,
+        updatedLinks: updatedFiles.length,
+        failed: [],
+      },
+    });
+    useToastStore.getState().clear();
+    backend({ quick_note_autoname: answer(['Scratchpad/Trip.md']), vault_tree: () => [] });
+    typing('Scratchpad/Q.md');
+    saved('Scratchpad/Q.md');
+    await vi.advanceTimersByTimeAsync(AFTER_SAVE + 10);
+    expect(toasts()).toEqual([]);
+    useScratchpadStore.setState({ autoNamed: new Set(['Scratchpad/Q.md']) });
+    backend({ quick_note_autoname: answer(['Home.md']), vault_tree: () => [] });
+    typing('Scratchpad/Q.md');
+    saved('Scratchpad/Q.md');
+    await vi.advanceTimersByTimeAsync(AFTER_SAVE + 10);
+    expect(toasts().at(-1)?.message).toMatch(/link/i);
+  });
+
+  it('M1: switching pages before the save still names the note left', async () => {
+    const calls = backend({ quick_note_autoname: unchanged });
+    typing('Scratchpad/Q.md');
+    useEditorStore.setState({ path: 'Other.md', dirty: false });
+    await vi.advanceTimersByTimeAsync(10);
+    expect(autonames(calls)).toEqual(['Scratchpad/Q.md']);
+  });
+
+  it('I3: no rename while a rename is open, or when focus goes to the title', async () => {
+    const calls = backend({ quick_note_autoname: unchanged });
+    useVaultStore.setState({ renaming: 'Notes/X.md' });
+    typing('Scratchpad/Q.md');
+    saved('Scratchpad/Q.md');
+    await vi.advanceTimersByTimeAsync(AFTER_SAVE + 10);
+    expect(autonames(calls)).toEqual([]);
+    useVaultStore.setState({ renaming: null });
+
+    const editor = document.createElement('div');
+    editor.className = 'cm-editor';
+    const content = document.createElement('div');
+    content.tabIndex = 0;
+    editor.append(content);
+    const title = document.createElement('input');
+    title.dataset.pageTitle = '';
+    document.body.append(editor, title);
+    typing('Scratchpad/Q.md');
+    content.dispatchEvent(new FocusEvent('focusout', { bubbles: true, relatedTarget: title }));
+    await vi.advanceTimersByTimeAsync(10);
+    expect(autonames(calls)).toEqual([]);
+    editor.remove();
+    title.remove();
   });
 });

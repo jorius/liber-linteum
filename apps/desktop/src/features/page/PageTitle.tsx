@@ -41,6 +41,9 @@ export function PageTitle({
   const errorId = useId();
   const input = useRef<HTMLInputElement>(null);
   useEffect(() => {
+    // A rename from elsewhere (a quick note named after its first line)
+    // mustn't reset a name being typed (M4c final review I3).
+    if (document.activeElement === input.current) return;
     setDraft(stem);
     setError(null);
   }, [stem]);
@@ -107,6 +110,7 @@ export function PageTitle({
       <h1 className={styles.title}>
         <input
           ref={input}
+          data-page-title
           className={styles.titleInput}
           aria-label={t(text ? 'page.fileNameLabel' : 'page.titleLabel')}
           aria-invalid={error !== null}

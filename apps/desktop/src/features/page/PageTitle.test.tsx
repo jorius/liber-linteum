@@ -215,3 +215,20 @@ describe('editable title (M2b §2)', () => {
     expect(violations).toEqual([]);
   });
 });
+
+describe('a rename landing while the title is being edited (M4c final review I3)', () => {
+  it('keeps what is being typed', async () => {
+    const disk = fakeDisk({ 'Q.md': 'Groceries\n' });
+    render(<PageScreen />);
+    await open('Q.md');
+    await userEvent.click(title());
+    await userEvent.clear(title());
+    await userEvent.type(title(), 'My na');
+    // The quick note is renamed after its first line meanwhile.
+    disk.files.set('Groceries.md', disk.files.get('Q.md')!);
+    disk.files.delete('Q.md');
+    await act(() => usePageStore.getState().follow('Q.md', 'Groceries.md'));
+    expect(title()).toHaveFocus();
+    expect(title()).toHaveValue('My na');
+  });
+});

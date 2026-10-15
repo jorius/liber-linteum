@@ -350,11 +350,12 @@ export const useVaultStore = create<VaultState>((set, get) => {
       return res;
     },
     applyRename: async (from, to, out, opts) => {
-      const { selected, expanded } = get();
+      const { selected, expanded, renaming } = get();
       set({
         selected: selected ? (remap(selected, from, to) ?? selected) : selected,
         expanded: new Set([...expanded].map((p) => remap(p, from, to) ?? p)),
-        renaming: null,
+        // Another entry's rename stays open (M4c final review I3).
+        renaming: renaming && remap(renaming, from, to) === null ? renaming : null,
       });
       useTrailStore.getState().renamed(from, to);
       get().expand(parentOf(to));

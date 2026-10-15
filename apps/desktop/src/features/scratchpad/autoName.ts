@@ -19,6 +19,12 @@ export function installAutoName(): () => void {
 
   const flagged = (path: string | null): path is string =>
     path !== null && useScratchpadStore.getState().autoNamed.has(path);
+  // A rename the user has open (title or explorer) wins: renaming under
+  // it would reset what they type (final review I3).
+  const isTitle = (el: unknown) =>
+    el instanceof Element && el.closest('[data-page-title]') !== null;
+  const renameOpen = () =>
+    useVaultStore.getState().renaming !== null || isTitle(document.activeElement);
   const cancel = () => {
     if (timer) clearTimeout(timer);
     timer = null;
@@ -26,7 +32,7 @@ export function installAutoName(): () => void {
 
   const run = async (path: string) => {
     cancel();
-    if (!flagged(path)) return;
+    if (!flagged(path) || renameOpen()) return;
     if (running) {
       again = true;
       return;
@@ -41,7 +47,9 @@ export function installAutoName(): () => void {
       if (!autoNamed) store.drop(path);
       else if (to !== path && outcome) {
         store.moved(path, to);
-        await useVaultStore.getState().applyRename(path, to, outcome, { quiet: true });
+        // Quiet only when no other note was touched (final review I1).
+        const quiet = outcome.updatedFiles.every((f) => f === to);
+        await useVaultStore.getState().applyRename(path, to, outcome, { quiet });
       }
     } finally {
       running = false;
@@ -56,8 +64,9 @@ export function installAutoName(): () => void {
 
   const unsubscribe = useEditorStore.subscribe((s, prev) => {
     if (s.path !== prev.path) {
-      // Another page: the one left is named now if it was waiting.
-      if (timer && prev.path) void run(prev.path);
+      // Another page: the one left is named now if it was waiting, or was
+      // still unsaved (run saves it first; final review M1).
+      if (flagged(prev.path) && (timer || prev.dirty)) void run(prev.path);
       cancel();
       return;
     }
@@ -75,6 +84,7 @@ export function installAutoName(): () => void {
   const onFocusOut = (e: FocusEvent) => {
     const editor = (e.target as Element | null)?.closest?.('.cm-editor');
     if (!editor || (e.relatedTarget instanceof Node && editor.contains(e.relatedTarget))) return;
+    if (isTitle(e.relatedTarget)) return; // naming it by hand
     const { path, dirty } = useEditorStore.getState();
     if (flagged(path) && (timer || dirty)) void run(path);
   };
