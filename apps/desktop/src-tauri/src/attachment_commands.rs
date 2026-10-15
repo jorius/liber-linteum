@@ -209,11 +209,12 @@ pub(crate) fn vault_settings_get_impl(state: &AppState) -> CmdResult<VaultSettin
     })
 }
 
-/// `"readable"` / `"full"` / `None`; anything else is refused.
+/// `"readable"` / `"wide"` / `"full"` / `None`; anything else is refused.
 fn width_of(value: Option<&str>) -> CmdResult<Option<PageWidth>> {
     match value {
         None | Some("default") => Ok(None),
         Some("readable") => Ok(Some(PageWidth::Readable)),
+        Some("wide") => Ok(Some(PageWidth::Wide)),
         Some("full") => Ok(Some(PageWidth::Full)),
         Some(other) => Err(invalid(format!("unknown page width {other:?}"))),
     }

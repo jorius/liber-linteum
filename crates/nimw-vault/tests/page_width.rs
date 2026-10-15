@@ -129,3 +129,17 @@ fn m4b2_widths_of_deleted_pages_and_folders_are_forgotten() {
     vault.forget_page_widths(&["A.md".to_string()]).unwrap();
     assert!(!bare.path().join(".nimw").exists());
 }
+
+/// M4b part 3 (wide elements §2): `wide` is a third width, at both levels.
+#[test]
+fn m4b3_wide_round_trips_at_page_and_vault_level() {
+    let (dir, vault) = fresh();
+    vault.set_page_width("A.md", Some(PageWidth::Wide)).unwrap();
+    vault.set_vault_page_width(Some(PageWidth::Wide)).unwrap();
+    let widths = vault.page_widths();
+    assert_eq!(widths.vault, Some(PageWidth::Wide));
+    assert_eq!(widths.pages.get("A.md"), Some(&PageWidth::Wide));
+    let json = file(&dir);
+    assert_eq!(json["pageWidths"]["A.md"], "wide");
+    assert_eq!(json["pageWidth"], "wide");
+}

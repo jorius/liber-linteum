@@ -1338,6 +1338,27 @@ fn m4b2_page_width_over_ipc() {
     )
     .unwrap();
     assert_eq!(saved["pageWidth"], "readable");
+    // M4b part 3 (wide elements §2): `wide` at both levels.
+    let saved = call(
+        &h.main,
+        "page_width_set",
+        json!({ "path": "Welcome.md", "width": "wide" }),
+    )
+    .unwrap();
+    assert_eq!(saved["pageWidths"], json!({ "Welcome.md": "wide" }));
+    let saved = call(
+        &h.main,
+        "vault_settings_set",
+        json!({ "patch": { "pageWidth": "wide" } }),
+    )
+    .unwrap();
+    assert_eq!(saved["pageWidth"], "wide");
+    call(
+        &h.main,
+        "page_width_set",
+        json!({ "path": "Welcome.md", "width": "full" }),
+    )
+    .unwrap();
     // The page entry follows an in-app rename.
     call(
         &h.main,
