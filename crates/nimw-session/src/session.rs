@@ -355,15 +355,17 @@ impl VaultSession {
         Ok(())
     }
 
-    /// Deleted pages and folders take their page widths (final review M10)
-    /// and cover heights with them. A convenience: a failure is reported,
-    /// never fails the deletion.
+    /// Deleted pages and folders take their page widths (final review M10),
+    /// cover heights, cover sides and strip widths (M4b part 3 §3) with them.
+    /// A convenience: a failure is reported, never fails the deletion.
     pub(crate) fn forget_page_sizes(&self, removed: &[String]) {
         let widths = self.vault.forget_page_widths(removed);
         let heights = self.vault.forget_cover_heights(removed);
-        if let Err(e) = widths.and(heights) {
+        let sides = self.vault.forget_cover_sides(removed);
+        let strips = self.vault.forget_cover_widths(removed);
+        if let Err(e) = widths.and(heights).and(sides).and(strips) {
             self.emit(SessionEvent::Warning(format!(
-                "Page widths or cover heights not updated for {} removed entries: {e}",
+                "Page widths or cover sizes not updated for {} removed entries: {e}",
                 removed.len()
             )));
         }

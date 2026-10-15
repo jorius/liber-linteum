@@ -302,6 +302,10 @@ export interface VaultSettings {
   pageWidths: Record<string, PageWidth>;
   /** Pages with their own cover height in px (cover resize). */
   coverHeights: Record<string, number>;
+  /** Pages whose cover sits beside the text (M4b part 3 §3). */
+  coverSides: Record<string, 'left' | 'right'>;
+  /** Side covers' own strip widths in px (§3). */
+  coverWidths: Record<string, number>;
 }
 
 export interface VaultSettingsPatch {
@@ -456,6 +460,13 @@ export const pageWidthSet = (path: string, width: PageWidth | null) =>
 /** A page's cover height in px (Rust clamps it to 132–2000); `null` clears it. */
 export const coverHeightSet = (path: string, height: number | null) =>
   call<VaultSettings>('cover_height_set', { path, height });
+/** Where a page's cover sits (`top` clears it; M4b part 3 §3). */
+export const coverSideSet = (path: string, side: CoverSide) =>
+  call<VaultSettings>('cover_side_set', { path, side });
+/** A side cover's strip width in px (Rust clamps it to 160–2000); `null`
+ *  clears it. */
+export const coverWidthSet = (path: string, width: number | null) =>
+  call<VaultSettings>('cover_width_set', { path, width });
 
 /** URL of a vault file for <img>/<audio> through the `nimw-asset:` protocol
  *  (M2a §2.5); WebView2 on Windows reaches custom protocols over http. */

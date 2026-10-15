@@ -320,7 +320,19 @@
     "height": "Cover height",
     "heightValue": "{px} px",
     "resizeHint": "Drag to resize the cover; double-click to reset it",
-    "heightNotSaved": "Cover height not saved: {reason}"
+    "heightNotSaved": "Cover height not saved: {reason}",
+    "placement": "Cover placement",
+    "top": "Top",
+    "left": "Left",
+    "right": "Right",
+    "placeTop": "Cover on top",
+    "placeLeft": "Cover on the left",
+    "placeRight": "Cover on the right",
+    "positionBoth": "{x}% from the left, {y}% from the top",
+    "width": "Cover width",
+    "widthValue": "{px} px",
+    "sideNotSaved": "Cover placement not saved: {reason}",
+    "widthNotSaved": "Cover width not saved: {reason}"
   },
   "attach": {
     "dropOnText": "Drop files onto the page’s text to attach them",

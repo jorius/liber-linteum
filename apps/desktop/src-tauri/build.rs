@@ -40,6 +40,8 @@ const COMMANDS: &[&str] = &[
     "text_write",
     "entry_create_text",
     "cover_height_set",
+    "cover_side_set",
+    "cover_width_set",
 ];
 
 fn main() {

@@ -320,7 +320,19 @@
     "height": "Altura de la portada",
     "heightValue": "{px} px",
     "resizeHint": "Arrastra para cambiar la altura de la portada; doble clic para restablecerla",
-    "heightNotSaved": "No se guardó la altura de la portada: {reason}"
+    "heightNotSaved": "No se guardó la altura de la portada: {reason}",
+    "placement": "Ubicación de la portada",
+    "top": "Arriba",
+    "left": "Izquierda",
+    "right": "Derecha",
+    "placeTop": "Portada arriba",
+    "placeLeft": "Portada a la izquierda",
+    "placeRight": "Portada a la derecha",
+    "positionBoth": "{x} % desde la izquierda, {y} % desde arriba",
+    "width": "Ancho de la portada",
+    "widthValue": "{px} px",
+    "sideNotSaved": "No se guardó la ubicación de la portada: {reason}",
+    "widthNotSaved": "No se guardó el ancho de la portada: {reason}"
   },
   "attach": {
     "dropOnText": "Suelta los archivos sobre el texto de la página para adjuntarlos",

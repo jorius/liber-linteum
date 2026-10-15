@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-cover-side-set"
+description = "Enables the cover_side_set command without any pre-configured scope."
+commands.allow = ["cover_side_set"]
+
+[[permission]]
+identifier = "deny-cover-side-set"
+description = "Denies the cover_side_set command without any pre-configured scope."
+commands.deny = ["cover_side_set"]

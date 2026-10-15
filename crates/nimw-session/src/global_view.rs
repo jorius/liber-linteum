@@ -101,9 +101,29 @@ pub const SUMMARY_TITLES: usize = 5;
 /// cards than `gv_edges` accepts ([`MAX_VISIBLE`]).
 pub const MAX_NEIGHBOURS: usize = 200;
 
+/// A card's cover placement (M4b part 3 §3): its page's, or for a folder
+/// card the index note's it previews.
+fn place_cover(sides: &BTreeMap<String, CoverSide>, card: &mut GvCard) {
+    let page = match card.kind {
+        CardKind::Page => Some(&card.path),
+        CardKind::Folder | CardKind::Project => card.index_page.as_ref(),
+    };
+    card.cover_side = page.and_then(|p| sides.get(p)).copied().unwrap_or_default();
+}
+
 impl VaultSession {
-    /// The cards of one Global View level (M3a §3).
+    /// The cards of one Global View level (M3a §3), with their cover
+    /// placements (M4b part 3 §3).
     pub fn gv_children(&self, level: &GvLevel) -> Result<GvChildren> {
+        let mut out = self.level_cards(level)?;
+        let sides = self.vault.cover_sides();
+        for card in &mut out.cards {
+            place_cover(&sides, card);
+        }
+        Ok(out)
+    }
+
+    fn level_cards(&self, level: &GvLevel) -> Result<GvChildren> {
         let policy = self.vault.attachment_policy();
         let picks = self.vault.index_picks();
         let index = self.index();
@@ -320,7 +340,9 @@ impl VaultSession {
         } else {
             CardKind::Project
         };
-        ctx.folder_card(&row, kind)
+        let mut card = ctx.folder_card(&row, kind)?;
+        place_cover(&self.vault.cover_sides(), &mut card);
+        Ok(card)
     }
 
     /// The wiki target a relationship from `source` to `target` writes: the
@@ -490,15 +512,20 @@ impl VaultSession {
     pub(crate) fn follow_layout(&self, renames: &[(String, String)]) {
         // Index-note picks follow too (M3b §4).
         let picks = self.vault.remap_index_picks_many(renames);
-        // Page widths follow too (M4b part 2 §1), and cover heights.
+        // Page widths follow too (M4b part 2 §1), and cover heights, sides
+        // and strip widths (part 3 §3).
         let widths = self.vault.remap_page_widths_many(renames);
         let heights = self.vault.remap_cover_heights_many(renames);
+        let sides = self.vault.remap_cover_sides_many(renames);
+        let strips = self.vault.remap_cover_widths_many(renames);
         if let Err(e) = self
             .vault
             .remap_layout_many(renames)
             .and(picks)
             .and(widths)
             .and(heights)
+            .and(sides)
+            .and(strips)
         {
             let what = match renames {
                 [(from, to)] => format!("{from} → {to}"),

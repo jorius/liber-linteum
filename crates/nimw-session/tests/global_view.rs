@@ -5,7 +5,7 @@ use nimw_session::{
     CardKind, EdgeKind, GvCard, GvEdge, GvLevel, IndexFrom, Relation, SessionError, SessionEvent,
     VaultSession,
 };
-use nimw_vault::VaultPath;
+use nimw_vault::{CoverSide, VaultPath};
 use std::path::Path;
 
 fn vp(s: &str) -> VaultPath {
@@ -167,6 +167,34 @@ fn m3a_covers_are_resolved_remote_ones_flagged_missing_ones_dropped() {
         ["Delta/Inner", "Delta/x.md", "Delta/y.md"],
         "the attachments folder is not a card"
     );
+}
+
+/// M4b part 3 §3: cards carry their page's cover placement (`coverSides`),
+/// a folder card its index note's; pages without an entry sit on top.
+#[test]
+fn cards_carry_the_cover_side_of_their_page() {
+    let dir = vault();
+    let (_c, s) = open(dir.path());
+    s.vault()
+        .set_cover_side("Welcome.md", CoverSide::Left)
+        .unwrap();
+    s.vault()
+        .set_cover_side("Alpha/Alpha.md", CoverSide::Right)
+        .unwrap();
+    let cards = s.gv_children(&GvLevel::Vault).unwrap().cards;
+    assert_eq!(card(&cards, "Welcome.md").cover_side, CoverSide::Left);
+    assert_eq!(card(&cards, "zeta.md").cover_side, CoverSide::Top);
+    assert_eq!(card(&cards, "Alpha").cover_side, CoverSide::Right);
+    assert_eq!(card(&cards, "Beta").cover_side, CoverSide::Top);
+    let page = s.gv_children(&GvLevel::Page(vp("Welcome.md"))).unwrap();
+    assert_eq!(card(&page.cards, "Welcome.md").cover_side, CoverSide::Left);
+    s.vault()
+        .set_cover_side("Delta/x.md", CoverSide::Right)
+        .unwrap();
+    let picked = s
+        .index_pick_set(&vp("Delta"), Some(&vp("Delta/x.md")))
+        .unwrap();
+    assert_eq!(picked.cover_side, CoverSide::Right);
 }
 
 #[test]

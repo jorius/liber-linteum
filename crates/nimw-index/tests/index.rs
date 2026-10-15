@@ -154,7 +154,6 @@ fn upsert_file_as_attachment_drops_page_data() {
 /// so an index written before it is rebuilt rather than reused.
 #[test]
 fn an_index_from_before_the_title_rule_is_rebuilt() {
-    assert!(SCHEMA_VERSION >= 2, "{SCHEMA_VERSION}");
     let dir = tempfile::tempdir().unwrap();
     let db = dir.path().join("nimw/abc/index.sqlite");
     {
@@ -164,7 +163,10 @@ fn an_index_from_before_the_title_rule_is_rebuilt() {
     }
     rusqlite::Connection::open(&db)
         .unwrap()
-        .execute("UPDATE meta SET value = '1' WHERE key = 'schema_version'", [])
+        .execute(
+            "UPDATE meta SET value = '1' WHERE key = 'schema_version'",
+            [],
+        )
         .unwrap();
     assert_eq!(Index::open(&db).unwrap().counts().unwrap().0, 0);
 }

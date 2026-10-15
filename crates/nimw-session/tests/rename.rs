@@ -1,6 +1,6 @@
 use nimw_session::{SessionError, SessionEvent, VaultSession};
 use nimw_testkit::{copy_fixture, snapshot};
-use nimw_vault::VaultPath;
+use nimw_vault::{CoverSide, VaultPath};
 
 fn vp(s: &str) -> VaultPath {
     VaultPath::new(s).unwrap()
@@ -418,5 +418,32 @@ fn cover_heights_follow_in_app_renames_and_folder_moves() {
             ("Design/Game 1.md".to_string(), 360),
             ("Hello.md".to_string(), 280),
         ]
+    );
+}
+
+/// M4b part 3 §3: a page's cover placement and strip width follow an in-app
+/// rename, and a folder move takes its pages' with them.
+#[test]
+fn cover_sides_and_widths_follow_in_app_renames_and_folder_moves() {
+    let (_dir, _c, s) = session("obsidian-basic");
+    s.vault()
+        .set_cover_side("Welcome.md", CoverSide::Left)
+        .unwrap();
+    s.vault().set_cover_width("Welcome.md", Some(320)).unwrap();
+    s.vault()
+        .set_cover_side("Game Design/Game 1.md", CoverSide::Right)
+        .unwrap();
+    s.rename(&vp("Welcome.md"), &vp("Hello.md"), true).unwrap();
+    s.rename(&vp("Game Design"), &vp("Design"), true).unwrap();
+    assert_eq!(
+        s.vault().cover_sides().into_iter().collect::<Vec<_>>(),
+        vec![
+            ("Design/Game 1.md".to_string(), CoverSide::Right),
+            ("Hello.md".to_string(), CoverSide::Left),
+        ]
+    );
+    assert_eq!(
+        s.vault().cover_widths().into_iter().collect::<Vec<_>>(),
+        vec![("Hello.md".to_string(), 320)]
     );
 }

@@ -261,6 +261,24 @@ export function installIpcMock({
       ((w.__nimwCoverHeights ??= []) as unknown[]).push({ path: a.path, height });
       return vaultSettings();
     },
+    // M4b part 3 §3: placements (`top` clears) and strip widths (clamped
+    // like Rust, 160–2000), kept across a reload.
+    cover_side_set: (a) => {
+      const next = { ...sides() };
+      if (a.side === 'top') delete next[a.path as string];
+      else next[a.path as string] = a.side as string;
+      sessionStorage.setItem('nimwMockSides', JSON.stringify(next));
+      ((w.__nimwCoverSides ??= []) as unknown[]).push({ path: a.path, side: a.side });
+      return vaultSettings();
+    },
+    cover_width_set: (a) => {
+      const next = { ...coverWidths() };
+      const width = a.width as number | null;
+      if (width === null) delete next[a.path as string];
+      else next[a.path as string] = Math.min(2000, Math.max(160, Math.round(width)));
+      sessionStorage.setItem('nimwMockCoverWidths', JSON.stringify(next));
+      return vaultSettings();
+    },
     vault_settings_set: (a) => (a.patch as { attachments: unknown }) ?? null,
     attachment_paste: (_a, options) => {
       const headers = (options as { headers?: Record<string, string> })?.headers ?? {};

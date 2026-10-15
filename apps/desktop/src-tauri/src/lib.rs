@@ -119,6 +119,8 @@ pub fn configure<R: tauri::Runtime>(
         editor_commands::text_write,
         vault_commands::entry_create_text,
         attachment_commands::cover_height_set,
+        attachment_commands::cover_side_set,
+        attachment_commands::cover_width_set,
     ])
 }
 

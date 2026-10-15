@@ -171,6 +171,10 @@ pub struct VaultSettingsDto {
     pub page_widths: std::collections::BTreeMap<String, nimw_vault::PageWidth>,
     /// Pages with their own cover height in px (cover resize).
     pub cover_heights: std::collections::BTreeMap<String, u32>,
+    /// Pages whose cover sits beside the text: `"left" | "right"` (M4b part 3 §3).
+    pub cover_sides: std::collections::BTreeMap<String, &'static str>,
+    /// Side covers' own strip widths in px (§3).
+    pub cover_widths: std::collections::BTreeMap<String, u32>,
 }
 
 #[derive(Debug, Clone, serde::Deserialize)]

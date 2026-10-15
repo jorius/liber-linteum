@@ -53,6 +53,8 @@ const COMMANDS: &[&str] = &[
     "text_write",
     "entry_create_text",
     "cover_height_set",
+    "cover_side_set",
+    "cover_width_set",
 ];
 
 struct Harness {
@@ -728,7 +730,9 @@ fn m2c_vault_settings_round_trip_over_ipc() {
             "overrideObsidian": false,
             "pageWidth": null,
             "pageWidths": {},
-            "coverHeights": {}
+            "coverHeights": {},
+            "coverSides": {},
+            "coverWidths": {}
         })
     );
     let saved = call(
@@ -1491,6 +1495,145 @@ fn cover_height_set_is_allowed_from_main_only() {
     )
     .unwrap_err();
     assert!(denied.to_string().contains("not allowed"), "{denied}");
+}
+
+/// M4b part 3 §3: a page's cover placement (`coverSides`) and strip width
+/// (`coverWidths`) live in `.nimw/vault.json`, never in the note; `top`
+/// clears the placement, widths are clamped to 160–2000 px; both follow an
+/// in-app rename; only visible, indexed pages; Global View cards carry the
+/// placement.
+#[test]
+fn cover_side_and_width_over_ipc() {
+    let h = harness();
+    let vault = open_fixture(&h, "obsidian-basic");
+    let before = std::fs::read(vault.path().join("Welcome.md")).unwrap();
+    let got = call(&h.main, "vault_settings_get", json!({})).unwrap();
+    assert_eq!(got["coverSides"], json!({}));
+    assert_eq!(got["coverWidths"], json!({}));
+    let saved = call(
+        &h.main,
+        "cover_side_set",
+        json!({ "path": "Welcome.md", "side": "left" }),
+    )
+    .unwrap();
+    assert_eq!(saved["coverSides"], json!({ "Welcome.md": "left" }));
+    let level = call(
+        &h.main,
+        "gv_children",
+        json!({ "level": { "kind": "vault" } }),
+    )
+    .unwrap();
+    let welcome = level["cards"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|c| c["path"] == "Welcome.md")
+        .unwrap();
+    assert_eq!(welcome["coverSide"], "left");
+    let saved = call(
+        &h.main,
+        "cover_width_set",
+        json!({ "path": "Welcome.md", "width": 300.4 }),
+    )
+    .unwrap();
+    assert_eq!(saved["coverWidths"], json!({ "Welcome.md": 300 }));
+    for (width, kept) in [(10, 160), (99_999, 2000)] {
+        let saved = call(
+            &h.main,
+            "cover_width_set",
+            json!({ "path": "Welcome.md", "width": width }),
+        )
+        .unwrap();
+        assert_eq!(saved["coverWidths"]["Welcome.md"], kept, "{width}");
+    }
+    assert_eq!(
+        std::fs::read(vault.path().join("Welcome.md")).unwrap(),
+        before,
+        "the note itself is never written"
+    );
+    call(
+        &h.main,
+        "entry_rename",
+        json!({ "from": "Welcome.md", "to": "Hello.md" }),
+    )
+    .unwrap();
+    let got = call(&h.main, "vault_settings_get", json!({})).unwrap();
+    assert_eq!(got["coverSides"], json!({ "Hello.md": "left" }));
+    assert_eq!(got["coverWidths"], json!({ "Hello.md": 2000 }));
+    // `top` clears the placement, `null` the width.
+    let got = call(
+        &h.main,
+        "cover_side_set",
+        json!({ "path": "Hello.md", "side": "top" }),
+    )
+    .unwrap();
+    assert_eq!(got["coverSides"], json!({}));
+    let got = call(
+        &h.main,
+        "cover_width_set",
+        json!({ "path": "Hello.md", "width": null }),
+    )
+    .unwrap();
+    assert_eq!(got["coverWidths"], json!({}));
+    // Only visible, indexed pages; unknown sides and non-numbers are refused.
+    for path in [".obsidian/x.md", "Missing.md", "../x.md"] {
+        assert!(
+            call(
+                &h.main,
+                "cover_side_set",
+                json!({ "path": path, "side": "left" })
+            )
+            .is_err(),
+            "{path}"
+        );
+        assert!(
+            call(
+                &h.main,
+                "cover_width_set",
+                json!({ "path": path, "width": 300 })
+            )
+            .is_err(),
+            "{path}"
+        );
+    }
+    let err = call(
+        &h.main,
+        "cover_side_set",
+        json!({ "path": "Hello.md", "side": "diagonal" }),
+    )
+    .unwrap_err();
+    assert_eq!(kind(err), "invalidName");
+    assert!(
+        call(
+            &h.main,
+            "cover_width_set",
+            json!({ "path": "Hello.md", "width": "wide" })
+        )
+        .is_err()
+    );
+}
+
+/// M4b part 3 §3: both commands are in the main window's capability and
+/// nowhere else (the real ACL from `capabilities/main.json`).
+#[test]
+fn cover_side_and_width_set_are_allowed_from_main_only() {
+    let h = harness();
+    let other = WebviewWindowBuilder::new(&h.app, "other", Default::default())
+        .build()
+        .unwrap();
+    for (cmd, args) in [
+        ("cover_side_set", json!({ "path": "A.md", "side": "left" })),
+        ("cover_width_set", json!({ "path": "A.md", "width": 300 })),
+    ] {
+        let main = call(&h.main, cmd, args.clone()).unwrap_err();
+        assert!(!main.to_string().contains("not allowed"), "{cmd}: {main}");
+        assert_eq!(kind(main), "noVault", "{cmd}");
+        let denied = call(&other, cmd, args).unwrap_err();
+        assert!(
+            denied.to_string().contains("not allowed"),
+            "{cmd}: {denied}"
+        );
+    }
 }
 
 /// M4b part 2 §6: text files over IPC — read, compare-and-swap write with the

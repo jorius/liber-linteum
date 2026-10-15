@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-cover-width-set"
+description = "Enables the cover_width_set command without any pre-configured scope."
+commands.allow = ["cover_width_set"]
+
+[[permission]]
+identifier = "deny-cover-width-set"
+description = "Denies the cover_width_set command without any pre-configured scope."
+commands.deny = ["cover_width_set"]

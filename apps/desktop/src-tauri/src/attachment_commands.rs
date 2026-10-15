@@ -11,7 +11,7 @@ use crate::error::{CmdResult, CommandError, ErrorKind};
 use crate::state::AppState;
 use crate::vault_commands::blocking;
 use nimw_session::{VaultSession, cover_reference};
-use nimw_vault::{EntryKind, PageWidth, VaultPath};
+use nimw_vault::{CoverSide, EntryKind, PageWidth, VaultPath};
 use percent_encoding::percent_decode_str;
 use std::path::PathBuf;
 use tauri::ipc::{InvokeBody, Request};
@@ -199,6 +199,13 @@ pub(crate) fn vault_settings_get_impl(state: &AppState) -> CmdResult<VaultSettin
         page_width: widths.vault,
         page_widths: widths.pages,
         cover_heights: session.vault().cover_heights(),
+        cover_sides: session
+            .vault()
+            .cover_sides()
+            .into_iter()
+            .map(|(path, side)| (path, side.as_str()))
+            .collect(),
+        cover_widths: session.vault().cover_widths(),
     })
 }
 
@@ -243,6 +250,47 @@ pub(crate) fn cover_height_set_impl(
     let height = height_of(height)?;
     let page = visible_page(&session, &path)?;
     session.vault().set_cover_height(page.as_str(), height)?;
+    vault_settings_get_impl(state)
+}
+
+/// `"top"` / `"left"` / `"right"`; anything else is refused.
+fn side_of(value: &str) -> CmdResult<CoverSide> {
+    match value {
+        "top" => Ok(CoverSide::Top),
+        "left" => Ok(CoverSide::Left),
+        "right" => Ok(CoverSide::Right),
+        other => Err(invalid(format!("unknown cover side {other:?}"))),
+    }
+}
+
+/// M4b part 3 §3: where a page's cover sits; `top` clears the entry.
+pub(crate) fn cover_side_set_impl(
+    state: &AppState,
+    path: String,
+    side: String,
+) -> CmdResult<VaultSettingsDto> {
+    let session = state.session()?;
+    let side = side_of(&side)?;
+    let page = visible_page(&session, &path)?;
+    session.vault().set_cover_side(page.as_str(), side)?;
+    vault_settings_get_impl(state)
+}
+
+/// M4b part 3 §3: a side cover's strip width in px (a drag gives fractions,
+/// rounded; the vault clamps it to 160–2000); `None` clears it.
+pub(crate) fn cover_width_set_impl(
+    state: &AppState,
+    path: String,
+    width: Option<f64>,
+) -> CmdResult<VaultSettingsDto> {
+    let session = state.session()?;
+    let width = match width {
+        None => None,
+        Some(px) if px.is_finite() => Some(px.round().clamp(0.0, f64::from(u32::MAX)) as u32),
+        Some(px) => return Err(invalid(format!("not a cover width: {px}"))),
+    };
+    let page = visible_page(&session, &path)?;
+    session.vault().set_cover_width(page.as_str(), width)?;
     vault_settings_get_impl(state)
 }
 
@@ -339,6 +387,30 @@ pub async fn page_width_set<R: Runtime>(
 ) -> CmdResult<VaultSettingsDto> {
     blocking(app, move |app| {
         page_width_set_impl(&app.state::<AppState>(), path, width)
+    })
+    .await
+}
+
+#[tauri::command]
+pub async fn cover_side_set<R: Runtime>(
+    app: AppHandle<R>,
+    path: String,
+    side: String,
+) -> CmdResult<VaultSettingsDto> {
+    blocking(app, move |app| {
+        cover_side_set_impl(&app.state::<AppState>(), path, side)
+    })
+    .await
+}
+
+#[tauri::command]
+pub async fn cover_width_set<R: Runtime>(
+    app: AppHandle<R>,
+    path: String,
+    width: Option<f64>,
+) -> CmdResult<VaultSettingsDto> {
+    blocking(app, move |app| {
+        cover_width_set_impl(&app.state::<AppState>(), path, width)
     })
     .await
 }
