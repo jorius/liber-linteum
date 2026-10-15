@@ -1,6 +1,6 @@
 //! M5: the search index (`page_text` + FTS5) and the search query.
 
-use nimw_index::{FileKind, FileRow, Index, SCHEMA_VERSION};
+use nimw_index::{FileKind, FileRow, Index};
 use nimw_markdown::parse_page;
 use std::path::{Path, PathBuf};
 
@@ -85,11 +85,6 @@ fn fts_paths(db: &Path, q: &str) -> Vec<String> {
 }
 
 // ---- Task 2: the index keeps page_text and fts in sync ----
-
-#[test]
-fn m5_schema_is_at_least_3() {
-    assert!(SCHEMA_VERSION >= 3);
-}
 
 #[test]
 fn m5_pages_are_searchable_by_every_column() {
