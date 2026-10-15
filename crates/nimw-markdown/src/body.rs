@@ -175,7 +175,7 @@ fn extract_unmasked(src: &str, body_start: usize) -> Body {
         tags_in(text, &mut body.tags);
     }
     body.links.sort_by_key(|l| l.range.start);
-    body.excerpt = excerpt(src, &excerpt_regions);
+    body.excerpt = excerpt(src, &without(&excerpt_regions, &display_maths(src)));
     body
 }
 
@@ -305,7 +305,6 @@ fn excerpt(src: &str, regions: &[Range<usize>]) -> String {
         words.push_str(&rendered.replace('\\', ""));
     }
     let collapsed = words.split_whitespace().collect::<Vec<_>>().join(" ");
-    let collapsed = without_display_maths(&collapsed);
     if collapsed.chars().count() <= EXCERPT_CHARS {
         collapsed
     } else {
@@ -314,20 +313,35 @@ fn excerpt(src: &str, regions: &[Range<usize>]) -> String {
     }
 }
 
-/// `text` without its `$$ … $$` spans (M4b part 2 §3), spaces re-collapsed;
-/// an unclosed `$$` is kept as written.
-fn without_display_maths(text: &str) -> String {
-    let mut out = String::new();
-    let mut rest = text;
-    while let Some(open) = rest.find("$$") {
-        let Some(close) = rest[open + 2..].find("$$") else {
-            break;
-        };
-        out.push_str(&rest[..open]);
-        rest = &rest[open + 2 + close + 2..];
+/// `regions` with the parts inside `cut` (sorted, disjoint) taken out.
+fn without(regions: &[Range<usize>], cut: &[Range<usize>]) -> Vec<Range<usize>> {
+    let mut out = Vec::new();
+    for r in regions {
+        let mut start = r.start;
+        for c in cut.iter().filter(|c| c.start < r.end && c.end > r.start) {
+            if c.start > start {
+                out.push(start..c.start);
+            }
+            start = start.max(c.end);
+        }
+        if start < r.end {
+            out.push(start..r.end);
+        }
     }
-    out.push_str(rest);
-    out.split_whitespace().collect::<Vec<_>>().join(" ")
+    out
+}
+
+/// Byte ranges of display maths (`$$ … $$`, M4b part 2 §3), as pulldown-cmark
+/// reads it: never inside code, and not from escaped dollars (final review
+/// M8). Excerpts leave these out.
+fn display_maths(src: &str) -> Vec<Range<usize>> {
+    if !src.contains("$$") {
+        return Vec::new();
+    }
+    Parser::new_ext(src, OPTIONS.union(Options::ENABLE_MATH))
+        .into_offset_iter()
+        .filter_map(|(event, range)| matches!(event, Event::DisplayMath(_)).then_some(range))
+        .collect()
 }
 
 #[cfg(test)]
@@ -483,5 +497,19 @@ mod tests {
     fn excerpt_drops_display_maths() {
         let b = extract("# T\n\nBefore\n\n$$\nE = mc^2\n$$\n\nAfter $x$ too", 0);
         assert_eq!(b.excerpt, "Before After $x$ too");
+        let b = extract("# T\n\nInline $$x^2$$ display, and $$\na + b\n$$ more.", 0);
+        assert_eq!(b.excerpt, "Inline display, and more.");
+    }
+
+    /// Final review M8: only real display maths is dropped — not the text
+    /// between two `$$` that are code or escaped.
+    #[test]
+    fn excerpt_keeps_text_between_dollar_pairs_that_are_not_maths() {
+        let b = extract("# T\n\nUse `$$` here and `$$` there.", 0);
+        assert_eq!(b.excerpt, "Use here and there.");
+        let b = extract("# T\n\nLiteral \\$\\$ signs \\$\\$ stay.", 0);
+        assert_eq!(b.excerpt, "Literal $$ signs $$ stay.");
+        let b = extract("# T\n\n```\n$$\n```\n\nKept $$ open", 0);
+        assert_eq!(b.excerpt, "Kept $$ open");
     }
 }
