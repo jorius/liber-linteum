@@ -39,7 +39,7 @@ function backend(info: FileInfo, text: string) {
       case 'file_follow':
         return 'window';
       case 'file_open_in_vault':
-      case 'plugin:window|destroy':
+      case 'window_close_self':
         return null;
       case 'settings_set':
         return { ...DEFAULT_SETTINGS, ...(a.patch as object) };
@@ -154,10 +154,10 @@ describe('M4c single-file window', () => {
       'This file is in your vault “Notes”.',
     );
     await userEvent.click(screen.getByRole('button', { name: 'Open in its vault' }));
-    await waitFor(() => expect(calls.map(([c]) => c)).toContain('plugin:window|destroy'));
+    await waitFor(() => expect(calls.map(([c]) => c)).toContain('window_close_self'));
     const order = calls.map(([c]) => c);
     expect(order.indexOf('file_open_in_vault')).toBeLessThan(
-      order.indexOf('plugin:window|destroy'),
+      order.indexOf('window_close_self'),
     );
   });
 });

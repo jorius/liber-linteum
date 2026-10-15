@@ -19,6 +19,18 @@ pub fn app_info() -> AppInfo {
     build_app_info()
 }
 
+/// Closes the calling window, and only it (M4c review I2): the window
+/// plugin's `destroy` takes any label, so a page could close another window
+/// past its save-on-close. The page saves first, as before.
+#[tauri::command]
+pub async fn window_close_self<R: tauri::Runtime>(
+    window: tauri::WebviewWindow<R>,
+) -> crate::error::CmdResult<()> {
+    window
+        .destroy()
+        .map_err(|e| crate::error::CommandError::new(crate::error::ErrorKind::Io, e.to_string()))
+}
+
 #[cfg(test)]
 mod tests {
     use super::build_app_info;

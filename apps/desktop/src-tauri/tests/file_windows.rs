@@ -619,3 +619,30 @@ fn the_window_hears_when_its_file_changes_and_only_its_file() {
         .unwrap()
         .contains(&r#"{"removed":true}"#.to_string())));
 }
+
+#[test]
+fn m4c_review_i2_a_window_closes_itself_and_no_other() {
+    let h = harness();
+    let dir = folder(&[]);
+    let w = open(&h, &dir.path().join("note.md"));
+    let denied = |r: Result<Value, Value>| r.is_err_and(|e| e.to_string().contains("not allowed"));
+    // The window plugin takes any label: neither window may use it.
+    assert!(denied(call(
+        &w,
+        "plugin:window|destroy",
+        json!({ "label": "main" })
+    )));
+    assert!(denied(call(
+        &h.main,
+        "plugin:window|destroy",
+        json!({ "label": "file-1" })
+    )));
+    assert!(h.app.get_webview_window("main").is_some());
+    // Its own close: the command acts on the calling window, whatever the
+    // page sends (the mock runtime doesn't carry the destroy out).
+    call(&w, "window_close_self", json!({ "label": "main" })).unwrap();
+    let other = WebviewWindowBuilder::new(&h.app, "other", Default::default())
+        .build()
+        .unwrap();
+    assert!(denied(call(&other, "window_close_self", json!({}))));
+}

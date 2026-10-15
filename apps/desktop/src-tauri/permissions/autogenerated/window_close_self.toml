@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-window-close-self"
+description = "Enables the window_close_self command without any pre-configured scope."
+commands.allow = ["window_close_self"]
+
+[[permission]]
+identifier = "deny-window-close-self"
+description = "Denies the window_close_self command without any pre-configured scope."
+commands.deny = ["window_close_self"]

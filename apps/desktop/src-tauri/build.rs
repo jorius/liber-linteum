@@ -2,6 +2,7 @@
 /// permission in `capabilities/main.json` (kebab-case).
 const COMMANDS: &[&str] = &[
     "app_info",
+    "window_close_self",
     "vault_open",
     "vault_create",
     "vault_close",

@@ -1,7 +1,7 @@
 // The only module allowed to talk to the Rust backend. Every backend
 // capability the UI uses is a typed function here (M1b spec §3.2).
 import { invoke, isTauri } from '@tauri-apps/api/core';
-import { listen, type UnlistenFn } from '@tauri-apps/api/event';
+import { listen, TauriEvent, type UnlistenFn } from '@tauri-apps/api/event';
 import { open } from '@tauri-apps/plugin-dialog';
 import { getCurrentWebview } from '@tauri-apps/api/webview';
 import { getCurrentWindow } from '@tauri-apps/api/window';
@@ -551,8 +551,9 @@ export const fileFollow = (path: string) => call<'window' | 'opened'>('file_foll
 export const fileOpenInVault = () => call<void>('file_open_in_vault');
 /** File → Open File…: answers the names it couldn't open. */
 export const fileOpenDialog = () => call<string[]>('file_open_dialog');
-/** Closes this window without asking (its pages are saved first). */
-export const destroyWindow = () => ipcCall(() => getCurrentWindow().destroy());
+/** Closes this window without asking (its pages are saved first). Not the
+ *  window plugin's `destroy`, which takes any window's label (M4c review I2). */
+export const destroyWindow = () => call<void>('window_close_self');
 
 export const vaultOpen = (path: string) => call<VaultInfo>('vault_open', { path });
 export const vaultCreate = (path: string) => call<VaultInfo>('vault_create', { path });
@@ -776,8 +777,10 @@ export const onDragDrop = (cb: (e: DragDropPayload) => void): Promise<UnlistenFn
 /** Runs `handler` (e.g. flushing unsaved pages) before the main window closes;
  *  the window is destroyed once it resolves `true` and stays open on `false`. */
 export const onCloseRequested = (handler: () => Promise<boolean>): Promise<UnlistenFn> =>
-  getCurrentWindow().onCloseRequested(async (event) => {
-    if (!(await handler())) event.preventDefault();
+  // As `Window.onCloseRequested`, closing through `window_close_self` (M4c
+  // review I2); listening at all is what keeps the window open meanwhile.
+  getCurrentWindow().listen(TauriEvent.WINDOW_CLOSE_REQUESTED, async () => {
+    if (await handler()) await destroyWindow();
   });
 
 // ---- native folder picker (dialog plugin, folder selection only) ----

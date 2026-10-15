@@ -104,7 +104,7 @@ for (const theme of ['light', 'dark']) {
     await page.getByRole('button', { name: 'Open in its vault' }).click();
     await expect
       .poll(async () => (await calls(page)).map(([c]) => c))
-      .toContain('plugin:window|destroy');
+      .toContain('window_close_self');
     expect(errors).toEqual([]);
   });
 }
