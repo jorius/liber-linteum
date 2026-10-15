@@ -44,6 +44,15 @@ const SHARED: &[&str] = &[
 /// The main window's commands (as `build.rs` lists them).
 const VAULT_COMMANDS: &[&str] = &[
     "vault_open",
+    // M4c §2: quick notes are taken in the main window only.
+    "scratchpad_default",
+    "scratchpad_choose",
+    "scratchpad_set",
+    "scratchpad_open",
+    "quick_note_create",
+    "quick_note_autoname",
+    "quick_notes_state",
+    "scratch_folder_set",
     "vault_create",
     "vault_close",
     "vault_tree",

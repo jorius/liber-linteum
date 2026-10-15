@@ -22,7 +22,6 @@ fontdb.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 thiserror.workspace = true
-dunce.workspace = true
 nimw-session = { path = "../../../crates/nimw-session" }
 nimw-vault = { path = "../../../crates/nimw-vault" }
 nimw-markdown = { path = "../../../crates/nimw-markdown" }

@@ -103,7 +103,7 @@ pub fn app_menu<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
         true,
         Some("CmdOrCtrl+Shift+N"),
     )?;
-        // M4c §3: a Markdown, text or code file in a window of its own.
+    // M4c §3: a Markdown, text or code file in a window of its own.
     let open_file = MenuItem::with_id(
         app,
         OPEN_FILE_ID,

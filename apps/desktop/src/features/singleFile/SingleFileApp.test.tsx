@@ -63,6 +63,15 @@ afterEach(() => {
 });
 
 describe('M4c single-file window', () => {
+  it('⌘⇧N in a file window takes no quick note there (the main window does, via the menu)', async () => {
+    const calls = backend(PAGE, '# Hello\n');
+    render(<SingleFileApp />);
+    await screen.findByRole('textbox', { name: 'Page title' });
+    await userEvent.keyboard('{Meta>}{Shift>}n{/Shift}{/Meta}');
+    await new Promise((r) => setTimeout(r, 20));
+    expect(calls.filter(([c]) => /quick_note|scratchpad/.test(c))).toEqual([]);
+  });
+
   it('shows the file: its name, subtitle, the compact band and the editor; no vault features', async () => {
     backend(PAGE, '---\nsubtitle: Draft\n---\n# Hello\n');
     const { container } = render(<SingleFileApp />);
