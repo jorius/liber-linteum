@@ -105,6 +105,22 @@ describe('Global View card (M3a §4)', () => {
     expect(screen.getByRole('group', { name: 'Generator Rex, folder' })).toBeInTheDocument();
   });
 
+  it('M4b part 3 §3: a side cover is a strip on that side, focused in both axes', () => {
+    const { unmount } = show(card({ coverSide: 'left', coverX: 20, coverY: 70 }));
+    expect(document.querySelector('[data-cover-side]')).toHaveAttribute('data-cover-side', 'left');
+    expect(document.querySelector('img')!.style.objectPosition).toBe('20% 70%');
+    unmount();
+    show(card({ coverSide: 'right', coverX: null, coverY: null }));
+    expect(document.querySelector('[data-cover-side]')).toHaveAttribute('data-cover-side', 'right');
+    expect(document.querySelector('img')!.style.objectPosition).toBe('50% 50%');
+  });
+
+  it('M4b part 3 §3: a side placement without an image keeps the top placeholder', () => {
+    show(card({ cover: null, coverSide: 'left' }));
+    expect(document.querySelector('[data-cover-side]')).toBeNull();
+    expect(screen.getByText('No cover')).toBeInTheDocument();
+  });
+
   it('placeholders: no cover, and a remote cover that is never loaded', () => {
     const { unmount } = show(card({ cover: null }));
     expect(screen.getByText('No cover')).toBeInTheDocument();

@@ -7,6 +7,7 @@ export function installIpcMock({
   settings: overrides = {},
   remoteCover = true,
   files: vaultFiles = [],
+  coverSides = {},
 }: {
   pages: Record<string, string>;
   editorMode: string;
@@ -16,6 +17,8 @@ export function installIpcMock({
   remoteCover?: boolean;
   /** Vault files other than pages from the start (e.g. a cover image). */
   files?: string[];
+  /** M4b part 3 §3: pages whose cover is a side strip (`.nimw/vault.json`). */
+  coverSides?: Record<string, 'left' | 'right'>;
 }) {
   type Args = Record<string, unknown>;
   const w = window as unknown as Record<string, unknown>;
@@ -98,9 +101,10 @@ export function installIpcMock({
       subtitle: kind === 'page' ? (front(text).subtitle ?? null) : name,
       cover: remote || !cover ? null : files.has(cover) ? cover : null,
       coverRemote: remote,
-      coverY: null,
+      coverY: front(text)['cover-y'] ? Number(front(text)['cover-y']) : null,
+      // M4b part 3 §3: a side strip, focused in both axes (seeded, or set over IPC).
       coverX: front(text)['cover-x'] ? Number(front(text)['cover-x']) : null,
-      coverSide: kind === 'page' ? (sides()[path] ?? 'top') : 'top',
+      coverSide: kind === 'page' ? (sides()[path] ?? coverSides[path] ?? 'top') : 'top',
       excerpt:
         kind === 'page'
           ? text

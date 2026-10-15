@@ -71,6 +71,7 @@ export function Card({
       ? t('gv.kindWithName', { kind, name: nameOf(card.path) })
       : kind;
   const summary = card.kind !== 'page' && !card.indexPage;
+  const side = card.coverSide ?? 'top';
 
   const click = () => {
     if (timer.current) clearTimeout(timer.current);
@@ -101,7 +102,7 @@ export function Card({
         alt=""
         loading="lazy"
         draggable={false}
-        style={{ objectPosition: `50% ${card.coverY ?? 50}%` }}
+        style={{ objectPosition: `${card.coverX ?? 50}% ${card.coverY ?? 50}%` }}
       />
     );
   } else if (summary) {
@@ -159,7 +160,11 @@ export function Card({
           />
         )}
       </div>
-      <div className={styles.hit}>
+      <div
+        className={styles.hit}
+        // A side cover (M4b part 3 §3): a strip on that side, the text beside it.
+        data-cover-side={card.cover && side !== 'top' ? side : undefined}
+      >
         <div
           className={`${styles.cover} ${card.cover ? '' : summary ? styles.coverFolder : styles.coverNone}`}
         >
