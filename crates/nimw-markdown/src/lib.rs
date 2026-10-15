@@ -5,6 +5,7 @@ mod body;
 mod external;
 mod first_line;
 mod frontmatter;
+mod icon;
 mod page;
 mod resolve;
 mod title;
@@ -13,6 +14,7 @@ mod wikilink;
 
 pub use external::{DiskPath, ExternalTarget, external_target, network_server};
 pub use first_line::first_line_text;
+pub use icon::is_icon;
 pub use page::parse_page;
 pub use resolve::{FileSet, link_key, name_key, normalize_join, resolve, shortest_unique_target};
 pub use title::extract_title;

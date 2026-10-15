@@ -14,6 +14,8 @@ pub(crate) struct Frontmatter {
     pub tags: Vec<Tag>,
     pub links: Vec<LinkRef>,
     pub cover: Option<String>,
+    /// `icon:` when it is an emoji (M5b §4).
+    pub icon: Option<String>,
     pub error: Option<String>,
 }
 
@@ -184,6 +186,13 @@ pub(crate) fn parse(src: &str, yaml: Range<usize>) -> Frontmatter {
             }
             Some("cover-y") => fm.cover_y = percent(value),
             Some("cover-x") => fm.cover_x = percent(value),
+            Some("icon") => {
+                fm.icon = value
+                    .as_scalar()
+                    .map(str::trim)
+                    .filter(|s| crate::is_icon(s))
+                    .map(str::to_string)
+            }
             Some("tags") => {
                 let raw: Vec<String> = match value {
                     Node::Seq(items) => items
@@ -322,6 +331,14 @@ mod tests {
     }
 
     /// M4b part 3 §3: a side cover's horizontal focus, read like `cover-y`.
+    #[test]
+    fn icon_is_read_only_when_it_is_an_emoji() {
+        assert_eq!(fm("---\nicon: 🚀\n---\n").icon.as_deref(), Some("🚀"));
+        assert_eq!(fm("---\nicon: \"❤️\"\n---\n").icon.as_deref(), Some("❤️"));
+        assert_eq!(fm("---\nicon: x\n---\n").icon, None);
+        assert_eq!(fm("---\nicon: [🚀]\n---\n").icon, None);
+    }
+
     #[test]
     fn cover_x_is_read_like_cover_y() {
         assert_eq!(fm("---\ncover-x: 30\n---\n").cover_x, Some(30));

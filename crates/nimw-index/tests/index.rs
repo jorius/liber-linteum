@@ -230,3 +230,33 @@ fn stats_return_stored_stat() {
     );
     assert!(idx.stat("nope").unwrap().is_none());
 }
+
+#[test]
+fn m5b_schema_4_tree_rows_carry_page_icons() {
+    assert_eq!(SCHEMA_VERSION, 4);
+    let mut idx = Index::open_in_memory().unwrap();
+    idx.transaction(|tx| {
+        tx.upsert_file(&file("Rocket.md", FileKind::Page))?;
+        tx.upsert_file(&file("Plain.md", FileKind::Page))?;
+        tx.upsert_page(
+            "Rocket.md",
+            &parse_page("---\nicon: 🚀\n---\n# R\n", "Rocket"),
+        )?;
+        tx.upsert_page("Plain.md", &parse_page("# P\n", "Plain"))?;
+        Ok(())
+    })
+    .unwrap();
+    let icons: Vec<_> = idx
+        .tree()
+        .unwrap()
+        .into_iter()
+        .map(|n| (n.path, n.icon))
+        .collect();
+    assert_eq!(
+        icons,
+        vec![
+            ("Plain.md".into(), None),
+            ("Rocket.md".into(), Some("🚀".into()))
+        ]
+    );
+}

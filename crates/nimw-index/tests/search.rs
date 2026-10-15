@@ -87,8 +87,8 @@ fn fts_paths(db: &Path, q: &str) -> Vec<String> {
 // ---- Task 2: the index keeps page_text and fts in sync ----
 
 #[test]
-fn m5_schema_is_3() {
-    assert_eq!(SCHEMA_VERSION, 3);
+fn m5_schema_is_at_least_3() {
+    assert!(SCHEMA_VERSION >= 3);
 }
 
 #[test]

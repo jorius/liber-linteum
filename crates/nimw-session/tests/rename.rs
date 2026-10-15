@@ -447,3 +447,17 @@ fn cover_sides_and_widths_follow_in_app_renames_and_folder_moves() {
         vec![("Hello.md".to_string(), 320)]
     );
 }
+
+/// M5b §4: a folder's icon follows an in-app rename.
+#[test]
+fn m5b_folder_icons_follow_renames() {
+    let (_dir, _c, s) = session("obsidian-basic");
+    s.vault()
+        .set_folder_icon("Game Design", Some("🎮"))
+        .unwrap();
+    s.rename(&vp("Game Design"), &vp("Design"), true).unwrap();
+    assert_eq!(
+        s.vault().folder_icons().into_iter().collect::<Vec<_>>(),
+        vec![("Design".to_string(), "🎮".to_string())]
+    );
+}

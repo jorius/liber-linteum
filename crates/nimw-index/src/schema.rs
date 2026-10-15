@@ -3,7 +3,8 @@
 /// `file:` links are indexed (§9).
 /// 3 (M5): `page_text` and its full-text index `fts` (search). An index built
 /// by an older version is rebuilt.
-pub const SCHEMA_VERSION: i64 = 3;
+/// 4 (M5b §4): pages gain `icon`, the frontmatter emoji.
+pub const SCHEMA_VERSION: i64 = 4;
 
 pub(crate) const SCHEMA: &str = r#"
 CREATE TABLE meta (key TEXT PRIMARY KEY, value TEXT NOT NULL);
@@ -28,7 +29,8 @@ CREATE TABLE pages (
     excerpt TEXT NOT NULL,
     has_image INTEGER NOT NULL,
     has_audio INTEGER NOT NULL,
-    frontmatter_error TEXT
+    frontmatter_error TEXT,
+    icon TEXT
 );
 CREATE TABLE tags (
     path TEXT NOT NULL REFERENCES files(path) ON DELETE CASCADE ON UPDATE CASCADE,
