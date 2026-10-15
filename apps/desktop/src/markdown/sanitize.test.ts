@@ -130,6 +130,24 @@ describe('URL policy (M2a §2.4, PG acceptance: no remote request)', () => {
     ]);
   });
 
+  it('final review C1/m2: raw HTML can never name an outside file itself', () => {
+    const tree = render(
+      [
+        '<img data-external="\\\\host\\s\\x.png"> <a href="#" data-external="\\\\host\\s\\x.pdf">x</a>',
+        '<video data-external="D:\\v.mp4"></video> <audio data-external="/etc/x.wav"></audio>',
+        '',
+        '![ok](file:///Users/j/ok.png)',
+        '',
+      ].join('\n'),
+      'Notes/page.md',
+    );
+    const marked = elements(tree)
+      .filter((e) => e.properties.dataExternal !== undefined)
+      .map((e) => [e.tagName, e.properties.dataExternal]);
+    // Only the Markdown image the pipeline itself marked keeps its target.
+    expect(marked).toEqual([['img', 'file:///Users/j/ok.png']]);
+  });
+
   it('marks external links and internal Markdown links', () => {
     const tree = render('[e](https://e.com) [m](mailto:a@b.c) [p](Other.md#H)\n');
     const links = elements(tree).filter((e) => e.tagName === 'a');

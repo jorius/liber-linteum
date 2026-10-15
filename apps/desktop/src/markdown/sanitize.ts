@@ -400,13 +400,41 @@ const POSITIONS = { file: { toString: () => '' } } as unknown as Parameters<type
 
 const LINKED = new Set(['a', 'img', 'audio', 'video', 'source']);
 
+/** A per-render secret prefixed to every `data-external` the pipeline sets
+ *  (final review C1/m2): raw HTML may carry its own `data-external`, which the
+ *  schema has to let through for ours, so after sanitizing only sealed values
+ *  are kept (unsealed) and any other is dropped. */
+function newSeal(): string {
+  const bytes = new Uint32Array(2);
+  crypto.getRandomValues(bytes);
+  return `nimw${bytes[0].toString(36)}${bytes[1].toString(36)}:`;
+}
+
+/** Keeps the pipeline's own `data-external` values (without their seal) and
+ *  drops any raw HTML wrote. */
+function unsealExternal(node: Root | Element, seal: string) {
+  for (const c of node.children) {
+    if (c.type !== 'element') continue;
+    const value = c.properties.dataExternal;
+    if (value !== undefined) {
+      if (typeof value === 'string' && value.startsWith(seal)) {
+        c.properties.dataExternal = value.slice(seal.length);
+      } else {
+        delete c.properties.dataExternal;
+      }
+    }
+    unsealExternal(c, seal);
+  }
+}
+
 /** Markdown links and images that may name a file outside the vault (M4b
- *  part 3 §9) get `data-external`: the target as the index reads it
- *  (%-decoded, no `#…`). File targets lose their `src`/`href`, which the URL
- *  policy would drop; a leading `/` keeps it (the vault root comes first).
- *  Runs before raw HTML is parsed, so raw HTML never reaches outside files
- *  (the index doesn't see its links: they could never be shown). */
-function markExternal(node: Nodes, ctx: RenderContext) {
+ *  part 3 §9) get `data-external` (sealed with `seal`): the target as the
+ *  index reads it (%-decoded, no `#…`). File targets lose their `src`/`href`,
+ *  which the URL policy would drop; a leading `/` keeps it (the vault root
+ *  comes first). Runs before raw HTML is parsed, and raw HTML's own
+ *  `data-external` is dropped after (`unsealExternal`), so raw HTML never
+ *  reaches outside files (the index doesn't see its links either). */
+function markExternal(node: Nodes, ctx: RenderContext, seal: string) {
   if (node.type === 'element' && LINKED.has(node.tagName)) {
     const p = node.properties;
     const key = node.tagName === 'a' ? 'href' : 'src';
@@ -414,26 +442,28 @@ function markExternal(node: Nodes, ctx: RenderContext) {
     const path = value === null ? '' : safeDecode(value.split('#')[0]);
     if (value !== null && path && !/^(https?|mailto|data):/i.test(value)) {
       if (isFileTarget(path)) {
-        p.dataExternal = path;
+        p.dataExternal = seal + path;
         delete p[key];
         if (node.tagName === 'a') p.dataNimw = 'link';
       } else if (path.startsWith('/') || vaultJoin(ctx.sourcePath, value) === null) {
-        p.dataExternal = path;
+        p.dataExternal = seal + path;
       }
     }
   }
-  if ('children' in node) for (const c of node.children) markExternal(c as Nodes, ctx);
+  if ('children' in node) for (const c of node.children) markExternal(c as Nodes, ctx, seal);
 }
 
 /** The page as a sanitized hast tree, ready for React rendering. */
 export function toSafeHast(page: ParsedPage, ctx: RenderContext): Root {
   const hast = toHast(page.tree, { allowDangerousHtml: true, handlers }) as Root;
   markSourceRanges(hast);
-  markExternal(hast, ctx);
+  const seal = newSeal();
+  markExternal(hast, ctx, seal);
   highlightCode(hast);
   const blocks = htmlBlocks(hast);
   const parsed = raw(hast, POSITIONS) as Root;
   const clean = sanitize(parsed, schema) as Root;
+  unsealExternal(clean, seal);
   applyUrlPolicy(clean, ctx);
   markHtmlBlocks(clean, blocks);
   addHeadingIds(clean);
