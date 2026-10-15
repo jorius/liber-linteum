@@ -512,3 +512,47 @@ fn a_window_without_a_grant_reaches_no_file() {
         "notPermitted"
     );
 }
+
+#[test]
+fn a_file_windows_assets_come_from_its_folder_only() {
+    use nimw_desktop::asset::serve_window;
+    use nimw_desktop::state::AppState;
+    let h = harness();
+    let outer = folder(&[("secret.png", "s")]);
+    let dir = outer.path().join("in");
+    for (name, bytes) in [
+        ("note.md", "n"),
+        ("img/a.png", "0123456789"),
+        (".hidden/h.png", "h"),
+    ] {
+        let path = dir.join(name);
+        std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+        std::fs::write(path, bytes).unwrap();
+    }
+    let w = open(&h, &dir.join("note.md"));
+    let state = h.app.state::<AppState>();
+    let files = h.app.state::<FileWindows>();
+    let get = |label: &str, path: &str, range: Option<&str>| {
+        serve_window(&state, &files, label, path, range)
+    };
+    let ok = get(w.label(), "/img/a.png", None);
+    assert_eq!((ok.status, ok.body.as_slice()), (200, &b"0123456789"[..]));
+    assert_eq!(get(w.label(), "/img/a.png", Some("bytes=2-4")).status, 206);
+    for path in [
+        "/../secret.png",
+        "/%2E%2E/secret.png",
+        "/.hidden/h.png",
+        "/.external/%2Fetc%2Fhosts",
+    ] {
+        assert_eq!(get(w.label(), path, None).status, 403, "{path}");
+    }
+    assert_eq!(get(w.label(), "/missing.png", None).status, 404);
+    #[cfg(unix)]
+    {
+        std::os::unix::fs::symlink(outer.path().join("secret.png"), dir.join("out.png")).unwrap();
+        assert_eq!(get(w.label(), "/out.png", None).status, 404);
+    }
+    // A file-* label with no grant, and the main window with no vault open.
+    assert_eq!(get("file-99", "/img/a.png", None).status, 404);
+    assert_eq!(get("main", "/img/a.png", None).status, 404);
+}

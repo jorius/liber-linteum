@@ -56,17 +56,27 @@ pub fn configure<R: tauri::Runtime>(
         .manage(scratchpad_commands::ScratchpadState::default())
         .register_asynchronous_uri_scheme_protocol(asset::SCHEME, |ctx, request, responder| {
             let app = ctx.app_handle().clone();
+            // A single-file window is served its file's folder (M4c §4).
+            let label = ctx.webview_label().to_string();
             std::thread::spawn(move || {
-                let response = match app.try_state::<AppState>() {
-                    Some(state) => {
+                let state = app.try_state::<AppState>();
+                let files = app.try_state::<file_windows::FileWindows>();
+                let response = match (state, files) {
+                    (Some(state), Some(files)) => {
                         let range = request
                             .headers()
                             .get("range")
                             .and_then(|v| v.to_str().ok())
                             .map(str::to_owned);
-                        asset::serve(&state, request.uri().path(), range.as_deref())
+                        asset::serve_window(
+                            &state,
+                            &files,
+                            &label,
+                            request.uri().path(),
+                            range.as_deref(),
+                        )
                     }
-                    None => asset::AssetResponse {
+                    _ => asset::AssetResponse {
                         status: 404,
                         mime: "text/plain",
                         body: Vec::new(),
