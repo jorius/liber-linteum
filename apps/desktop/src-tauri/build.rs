@@ -3,6 +3,7 @@
 const COMMANDS: &[&str] = &[
     "app_info",
     "window_close_self",
+    "window_title_set",
     "vault_open",
     "vault_create",
     "vault_close",

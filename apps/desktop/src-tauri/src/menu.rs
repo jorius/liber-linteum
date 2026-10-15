@@ -54,8 +54,24 @@ pub const OPEN_FILE_ID: &str = "nimw-open-file";
 pub const OPEN_FILE_EVENT: &str = "menu:open-file";
 /// ⌘⇧O: ⌘O already opens a folder as a vault (spec §3.5).
 pub const OPEN_FILE_ACCELERATOR: &str = "CmdOrCtrl+Shift+O";
+/// Notes In My Way → Settings… (M5b §2.1): the focused window answers
+/// `menu:settings` (file windows have Settings too).
+pub const SETTINGS_ID: &str = "nimw-settings";
+pub const SETTINGS_EVENT: &str = "menu:settings";
+/// Vault → Open Vault… / Close Vault (M5b §2.1): the main window answers
+/// `menu:vault` with `"open"` or `"close"`.
+pub const VAULT_OPEN_ID: &str = "nimw-vault-open";
+pub const VAULT_CLOSE_ID: &str = "nimw-vault-close";
+pub const VAULT_EVENT: &str = "menu:vault";
+/// File → Save (M5b §6, auto save off): the focused window saves its page.
+pub const SAVE_ID: &str = "nimw-save";
+pub const SAVE_EVENT: &str = "menu:save";
+/// View → Toggle Sidebar (M5b §2.5): the main window's sidebar.
+pub const SIDEBAR_ID: &str = "nimw-toggle-sidebar";
+pub const SIDEBAR_EVENT: &str = "menu:sidebar";
 
-/// The app menu: About, Services, Hide, Hide Others, Show All, Quit (ours);
+/// The app menu: About, Settings… (M5b §2.1), Services, Hide, Hide Others,
+/// Show All, Quit (ours); Vault (Open Vault…, Close Vault ⌥⌘W, M5b §2.1);
 /// File (New Quick Note, ⌘⇧N: from any window, so it carries the
 /// accelerator; the page also answers ⌘⇧N where there is no app menu and
 /// ignores a second trigger within a second, M4c §7.10); Edit (Undo, Redo, Cut, Copy, Paste, Select All: macOS routes the text
@@ -83,12 +99,16 @@ pub fn app_menu<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
         true,
         Some("CmdOrCtrl+Q"),
     )?;
+    // ⌘, here and on the page: opening Settings twice is harmless (§11.3).
+    let settings = MenuItem::with_id(app, SETTINGS_ID, "Settings…", true, Some("CmdOrCtrl+,"))?;
     let app_submenu = Submenu::with_items(
         app,
         &name,
         true,
         &[
             &PredefinedMenuItem::about(app, None, Some(about))?,
+            &PredefinedMenuItem::separator(app)?,
+            &settings,
             &PredefinedMenuItem::separator(app)?,
             &PredefinedMenuItem::services(app, None)?,
             &PredefinedMenuItem::separator(app)?,
@@ -114,7 +134,30 @@ pub fn app_menu<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
         true,
         Some(OPEN_FILE_ACCELERATOR),
     )?;
-    let file = Submenu::with_items(app, "File", true, &[&quick_note, &open_file])?;
+    // ⌘S here and on the page: a second save finds nothing to write.
+    let save = MenuItem::with_id(app, SAVE_ID, "Save", true, Some("CmdOrCtrl+S"))?;
+    let file = Submenu::with_items(
+        app,
+        "File",
+        true,
+        &[
+            &quick_note,
+            &open_file,
+            &PredefinedMenuItem::separator(app)?,
+            &save,
+        ],
+    )?;
+    // No accelerator on Open Vault…: the page answers ⌘O, and two folder
+    // dialogs would open (§11.3). ⌥⌘W is the menu's alone.
+    let vault_open = MenuItem::with_id(app, VAULT_OPEN_ID, "Open Vault…", true, None::<&str>)?;
+    let vault_close = MenuItem::with_id(
+        app,
+        VAULT_CLOSE_ID,
+        "Close Vault",
+        true,
+        Some("Alt+CmdOrCtrl+W"),
+    )?;
+    let vault = Submenu::with_items(app, "Vault", true, &[&vault_open, &vault_close])?;
     let edit = Submenu::with_items(
         app,
         "Edit",
@@ -152,6 +195,8 @@ pub fn app_menu<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
         None::<&str>,
     )?;
     let outline = MenuItem::with_id(app, OUTLINE_ID, "Toggle Outline", true, None::<&str>)?;
+    // No accelerator: the page handles ⌘\, and a toggle fired twice undoes itself.
+    let sidebar = MenuItem::with_id(app, SIDEBAR_ID, "Toggle Sidebar", true, None::<&str>)?;
     let view = Submenu::with_items(
         app,
         "View",
@@ -166,6 +211,7 @@ pub fn app_menu<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
             &back,
             &forward,
             &PredefinedMenuItem::separator(app)?,
+            &sidebar,
             &toolbar,
             &line_numbers,
             &outline,
@@ -184,7 +230,7 @@ pub fn app_menu<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
             &PredefinedMenuItem::close_window(app, None)?,
         ],
     )?;
-    Menu::with_items(app, &[&app_submenu, &file, &edit, &view, &window])
+    Menu::with_items(app, &[&app_submenu, &file, &vault, &edit, &view, &window])
 }
 
 /// Installs [`app_menu`] on macOS (the only platform with an app menu by
@@ -234,6 +280,15 @@ pub fn on_menu_event<R: Runtime>(app: &AppHandle<R>, event: MenuEvent) {
         let _ = app.emit_to("main", QUICK_NOTE_EVENT, ());
     } else if id == OPEN_FILE_ID {
         emit_focused(app, OPEN_FILE_EVENT, ());
+    } else if id == SETTINGS_ID {
+        emit_focused(app, SETTINGS_EVENT, ());
+    } else if id == SAVE_ID {
+        emit_focused(app, SAVE_EVENT, ());
+    } else if id == VAULT_OPEN_ID || id == VAULT_CLOSE_ID {
+        let what = if id == VAULT_OPEN_ID { "open" } else { "close" };
+        emit_main(app, VAULT_EVENT, what);
+    } else if id == SIDEBAR_ID {
+        emit_main(app, SIDEBAR_EVENT, ());
     }
 }
 
@@ -248,6 +303,15 @@ pub fn menu_target<R: Runtime>(app: &AppHandle<R>) -> Option<String> {
         .or_else(|| windows.get("main"))
         .or_else(|| windows.values().next())
         .map(|w| w.label().to_string())
+}
+
+/// Shows and focuses the main window, then tells it (vault actions live there).
+fn emit_main<R: Runtime, S: serde::Serialize + Clone>(app: &AppHandle<R>, event: &str, payload: S) {
+    if let Some(main) = app.get_webview_window("main") {
+        let _ = main.show();
+        let _ = main.set_focus();
+    }
+    let _ = app.emit_to("main", event, payload);
 }
 
 fn emit_focused<R: Runtime, S: serde::Serialize + Clone>(

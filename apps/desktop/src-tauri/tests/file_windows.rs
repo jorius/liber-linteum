@@ -55,6 +55,8 @@ const VAULT_COMMANDS: &[&str] = &[
     "scratch_folder_set",
     // M5: search is the main window's.
     "search",
+    // M5b §11.8: the main window's title; file windows keep their own.
+    "window_title_set",
     "vault_create",
     "vault_close",
     "vault_tree",

@@ -6,6 +6,7 @@
   "permissions": [
     "allow-app-info",
     "allow-window-close-self",
+    "allow-window-title-set",
     "allow-vault-open",
     "allow-vault-create",
     "allow-vault-close",

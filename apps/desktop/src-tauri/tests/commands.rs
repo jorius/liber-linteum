@@ -16,6 +16,7 @@ use tauri::{
 /// Every command M1b adds (spec §2.4).
 const COMMANDS: &[&str] = &[
     "window_close_self",
+    "window_title_set",
     "vault_open",
     "vault_create",
     "vault_close",
@@ -614,6 +615,19 @@ fn ed_08_main_window_may_flush_then_close_itself() {
     let err = call(&h.main, "plugin:window|destroy", json!({ "label": "main" })).expect_err("main");
     assert!(err.to_string().contains("not allowed"), "{err}");
     call(&h.main, "window_close_self", json!({})).expect("main closes itself");
+}
+
+/// M5b §11.8: the page names its own window ("Page — Vault"); the mock
+/// runtime keeps no title, so the cleaning is a unit test (`clean_title`).
+#[test]
+fn m5b_window_title_set_is_the_main_windows() {
+    let h = harness();
+    call(
+        &h.main,
+        "window_title_set",
+        json!({ "title": "Military Ranks — Dark Galaxy" }),
+    )
+    .expect("main sets its title");
 }
 
 /// M1b hand-off §10 j: a read-only config dir must not stop a vault from

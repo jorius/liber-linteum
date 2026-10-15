@@ -146,6 +146,17 @@ fn macos_menu_quit_is_ours_and_the_standard_items_stay() {
     let file_at = outline.iter().position(|(t, _)| t == "File").unwrap();
     let edit_at = outline.iter().position(|(t, _)| t == "Edit").unwrap();
     assert!(file_at < edit_at, "File comes before Edit: {outline:?}");
+    // M5b §2.1: Settings… in the app menu, a Vault menu between File and
+    // Edit, File → Save (auto save off, §6), View → Toggle Sidebar (§2.5).
+    assert!(app_texts.iter().any(|t| *t == "Settings…"), "{app_texts:?}");
+    let vault_at = outline
+        .iter()
+        .position(|(t, _)| t == "Vault")
+        .expect("Vault menu");
+    assert!(file_at < vault_at && vault_at < edit_at, "{outline:?}");
+    assert_eq!(texts("Vault"), ["Open Vault…", "Close Vault"]);
+    assert!(texts("File").contains(&"Save".to_string()));
+    assert!(view.iter().any(|t| t == "Toggle Sidebar"), "{view:?}");
 }
 
 /// M4c §3: a menu item acts on one window — the focused one, else the main
@@ -381,6 +392,59 @@ fn quick_note_item_emits_menu_quick_note() {
     assert_eq!(*got.lock().unwrap(), ["main".to_string()]);
 }
 
+/// M5b §2.1, §2.5, §6: Settings and Save act on the focused window (the
+/// main one on the mock runtime); the vault items and the sidebar toggle go
+/// to the main window only, even with a file window open.
+fn m5b_items_emit_their_events() {
+    use tauri::Listener;
+    let got: Arc<std::sync::Mutex<Vec<String>>> = Arc::default();
+    let log = got.clone();
+    build_app("m5b").run_return(move |handle, event| {
+        if let RunEvent::Ready = event {
+            let file = tauri::WebviewWindowBuilder::new(handle, "file-1", Default::default())
+                .build()
+                .unwrap();
+            for (window, name) in [(main_window(handle), "main"), (file, "file-1")] {
+                for event in ["menu:settings", "menu:vault", "menu:save", "menu:sidebar"] {
+                    let log = log.clone();
+                    window.listen(event, move |e| {
+                        log.lock()
+                            .unwrap()
+                            .push(format!("{name} {event} {}", e.payload()));
+                    });
+                }
+            }
+            for id in [
+                nimw_desktop::menu::SETTINGS_ID,
+                nimw_desktop::menu::VAULT_OPEN_ID,
+                nimw_desktop::menu::VAULT_CLOSE_ID,
+                nimw_desktop::menu::SAVE_ID,
+                nimw_desktop::menu::SIDEBAR_ID,
+            ] {
+                nimw_desktop::menu::on_menu_event(
+                    handle,
+                    MenuEvent {
+                        id: MenuId::new(id),
+                    },
+                );
+            }
+            for window in handle.webview_windows().into_values() {
+                window.close().unwrap();
+            }
+        }
+    });
+    assert_eq!(
+        *got.lock().unwrap(),
+        [
+            "main menu:settings null".to_string(),
+            "main menu:vault \"open\"".into(),
+            "main menu:vault \"close\"".into(),
+            "main menu:save null".into(),
+            "main menu:sidebar null".into(),
+        ]
+    );
+}
+
 fn main() {
     #[cfg(target_os = "macos")]
     {
@@ -399,4 +463,6 @@ fn main() {
     println!("test quick_note_item_emits_menu_quick_note ... ok");
     menu_events_reach_one_window_only();
     println!("test menu_events_reach_one_window_only ... ok");
+    m5b_items_emit_their_events();
+    println!("test m5b_items_emit_their_events ... ok");
 }

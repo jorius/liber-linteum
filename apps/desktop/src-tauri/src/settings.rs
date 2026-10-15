@@ -157,6 +157,16 @@ pub enum GlobalViewMode {
     Expand,
 }
 
+/// Where the floating action button sits (M5b §2.2).
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum ActionButton {
+    #[default]
+    BottomRight,
+    BottomLeft,
+    TopRight,
+}
+
 /// Which Global View edge kinds are shown (M3a §6, GV-21); a missing key
 /// means shown.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -331,6 +341,12 @@ pub struct Settings {
     /// first quick note. Set only through `scratchpad_set` (a folder the user
     /// picked, or the default), never through a settings patch (§4).
     pub scratchpad_path: Option<String>,
+    /// Pages save themselves as you type (M5b §6); off: only on ⌘S.
+    pub auto_save: bool,
+    /// The sidebar is collapsed (M5b §2.5), app-wide.
+    pub sidebar_collapsed: bool,
+    /// Where the floating Edit / Global View / Search button sits (M5b §2.2).
+    pub action_button: ActionButton,
     pub recent_vaults: Vec<RecentVault>,
     /// Keys this build does not know (written by a newer version); kept on save.
     #[serde(flatten)]
@@ -361,6 +377,9 @@ impl Default for Settings {
             cover_height: CoverHeight::default(),
             show_attachment_paths: false,
             scratchpad_path: None,
+            auto_save: true,
+            sidebar_collapsed: false,
+            action_button: ActionButton::BottomRight,
             recent_vaults: Vec::new(),
             extra: serde_json::Map::new(),
         }
@@ -390,6 +409,9 @@ pub struct SettingsPatch {
     pub outline: Option<bool>,
     pub cover_height: Option<CoverHeight>,
     pub show_attachment_paths: Option<bool>,
+    pub auto_save: Option<bool>,
+    pub sidebar_collapsed: Option<bool>,
+    pub action_button: Option<ActionButton>,
 }
 
 /// A recent vault as shown on the welcome screen.
@@ -455,6 +477,9 @@ fn parse_lenient(text: &str) -> Result<(Settings, Vec<String>), serde_json::Erro
     field!("coverHeight", cover_height);
     field!("showAttachmentPaths", show_attachment_paths);
     field!("scratchpadPath", scratchpad_path);
+    field!("autoSave", auto_save);
+    field!("sidebarCollapsed", sidebar_collapsed);
+    field!("actionButton", action_button);
     match map.remove("recentVaults") {
         None => {}
         Some(Value::Array(items)) => {
@@ -601,6 +626,15 @@ impl SettingsStore {
         }
         if let Some(v) = patch.show_attachment_paths {
             next.show_attachment_paths = v;
+        }
+        if let Some(v) = patch.auto_save {
+            next.auto_save = v;
+        }
+        if let Some(v) = patch.sidebar_collapsed {
+            next.sidebar_collapsed = v;
+        }
+        if let Some(v) = patch.action_button {
+            next.action_button = v;
         }
         self.save(&next)?;
         *s = next.clone();

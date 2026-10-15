@@ -102,6 +102,7 @@ pub fn configure<R: tauri::Runtime>(
     builder.invoke_handler(tauri::generate_handler![
         commands::app_info,
         commands::window_close_self,
+        commands::window_title_set,
         vault_commands::vault_open,
         vault_commands::vault_create,
         vault_commands::vault_close,
