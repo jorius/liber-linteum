@@ -329,3 +329,35 @@ Built in three streams in parallel, each with its own plan, worktree and signed 
   - one final review, then one fix pass;
   - the hand-off `docs/handoff/2026-10-15-m4b-part3-handoff.md`;
   - the Windows installer for the friend and the Mac app for Jose.
+
+## 13. Amendments from planning (Stream B: §1, §2 editor side, §3)
+
+### Titles (§1)
+- **Empty headings:** an empty first H1 (`#` alone) is skipped like a blank line, so `#\n\n# Next` is titled "Next".
+- **Other first blocks:** any other first block (a paragraph, an embed, a list, an HTML comment, a rule) means the file name.
+- **One rebuild:** the index schema goes to v2 once for both §1 and §3's new `pages.cover_x` column.
+
+### The editor's cover crop (§2)
+- **Audit result:** the header band's image already sat in an absolutely positioned, definite layer, and the new strip uses the same layer.
+- **How it was checked:** an e2e with a Windows (WebView2) user agent serves the asset host `http://nimw-asset.localhost` a 400 × 1200 SVG. It confirms in both engines that each image fills its frame exactly and carries the stored focus.
+- **Result:** no editor-side change was needed. The card fix is Stream A's.
+
+### Side covers (§3)
+- **Controls on a side cover:** the placement group, Change, Reposition and Remove (and Save/Cancel while repositioning) sit at the **foot of the strip**, shown on hover and keyboard focus. The band beside the strip is the plain band.
+- **Placement group:**
+  - It is a roving-tabindex radio group (one Tab stop; the arrow keys move and choose).
+  - Choosing by keyboard, or clicking a radio that has focus, keeps focus on the chosen radio as the group moves between the band and the strip.
+- **Undo:** the "undoable with ⌘Z" placement is an effect-only CodeMirror history entry, isolated from typing. Undo and redo re-save the placement they restore. It is recorded only while the page has an editor view; read-only pages can't undo it.
+- **Reposition keys on a side cover** follow the ARIA slider convention: → and ↑ increase x and y.
+  - The element stays `role="slider"`, since ARIA has no 2-D slider. `aria-valuenow` is y, and `aria-valuetext` names both: "45% from the left, 55% from the top".
+  - A top cover keeps vertical-only reposition.
+- **One focus point across placements:** the top band also uses a stored `cover-x` for `object-position`. Picking a new cover or removing it clears `cover-x` as well as `cover-y`.
+- **Narrow fallback:** the page area is measured with a `ResizeObserver`.
+  - A reading of 0 (a hidden page) changes nothing.
+  - Where there is no `ResizeObserver`, the strip shows.
+- **Strip edge keys:** the arrow keys move the edge the way they point: → widens a left strip and ← widens a right one. The step is 16 px (64 with Shift), as for the cover height.
+- **Cards:**
+  - A folder card takes its index note's placement; a folder without one is `top`.
+  - TS `coverSide`/`coverX` are required on `GvCard`, so Global View card fixtures carry them.
+- **Vault settings:** `vault_settings_get` and every reply built from it carry `coverSides` (`{ path: "left" | "right" }`) and `coverWidths`. A hand-written `"top"` entry is ignored.
+- **i18n:** the strings live in the existing `cover.*` namespace (`cover.placement`, `cover.placeTop|Left|Right`, `cover.width`, `cover.positionBoth`, `cover.sideNotSaved`, `cover.widthNotSaved`).
