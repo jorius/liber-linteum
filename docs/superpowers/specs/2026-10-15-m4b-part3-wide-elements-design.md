@@ -98,7 +98,9 @@ These override §2–§4 where they conflict.
 
 ### How wide elements are laid out
 
-6. **Line numbers sit beside the measure, so a block centred on the text would cover them** (found by the e2e). `Editor.tsx` measures how far past the text a wide block may reach:
+6. **Superseded by M5b §7.2 and §14:** on a wide page the line numbers now sit at the editor's left edge, so blocks grow evenly on both sides, and a table wider than the text fills the editor. The original ruling follows.
+
+   **Line numbers sit beside the measure, so a block centred on the text would cover them** (found by the e2e). `Editor.tsx` measures how far past the text a wide block may reach:
    - `--nimw-wide-m` on both sides;
    - then `--nimw-wide-r` on the right.
 

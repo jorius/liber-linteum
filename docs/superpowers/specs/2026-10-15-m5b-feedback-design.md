@@ -363,3 +363,36 @@ These override §5 where they conflict.
 
 - On a case-insensitive disk with a vault at the home folder, `.trash` is the macOS user Trash (`~/.Trash`). The Trash view would list the whole system Trash. This is not handled.
 - Huge Trash folders are listed whole on every tree refresh.
+## 14. Amendments — Stream D
+
+### 7.1 Search filter rows
+1. **Root cause.** The search box was a scrolling flex column (`overflow: auto`, `max-height`). Everything in it shrinks toward its automatic minimum height, and the filter rows (a column of row flexboxes whose chips wrap) depend on the engine's intrinsic sizing to keep their height. Jose's WKWebView shrank the filters under the result list.
+   - Playwright's WebKit and Chromium computed the minimum correctly, so the overlap itself doesn't reproduce in the e2e. An e2e pins it anyway, at 1000 and 700 px.
+2. **Fix.** The box no longer scrolls:
+   - every region keeps its height (`flex: none`);
+   - the result list is the one region that takes the rest of the height and scrolls;
+   - the filters scroll on their own past 40% of the window height, so a short window still shows results.
+
+   An e2e checks that only the list scrolls.
+3. **Two lines per row.** A row measures its chips (on layout and on resize) and shows what fits in two lines, plus a dashed **+N more** chip that shows the rest.
+   - A row holding a pressed chip past the cut shows everything.
+   - The words: "+N more" / "+N más".
+
+### 7.2 Wide tables
+4. **Root cause.** With line numbers on, the number column sat beside the measure, so there was no room on the left (`m` was 0). Wide blocks only grew to the right (wide spec §6.6), and the table in Jose's screenshot kept the text's left edge.
+5. **Fix, whole column.** On a Wide-elements page, the text's auto margins take all the free room, so the line-number column moves to the editor's left edge and the room beside the text is even on both sides.
+   - This moves the whole column, not only the wide rows' numbers as §7.2 said. Per-row numbers would need a CodeMirror gutter-class extension, and a column that jumps between rows reads worse.
+   - Cost: on wide pages the numbers sit further from the text.
+6. **Fix, full width.** A table whose natural width is wider than the text fills the frame, padding to padding; its columns share the room. `TableScroll` measures this and marks the widget frame `data-wide-full`.
+   - Narrow tables stay with the text.
+   - Code, maths and diagrams grow evenly on both sides to their own width (up to the full width). They don't stretch to fill it. Cost: a code block a little wider than the text isn't full width.
+7. **Tests.** The m4b3-wide test "with line numbers" now expects the table centred on the text, clear of the numbers.
+
+### 7.3 ⌘F
+8. **Why ⌘F did nothing:** only ⌘⇧F was bound. CodeMirror binds no Mod-f, since the app has no `@codemirror/search` and no find-in-note.
+9. **Fix:** ⌘F and ⌘⇧F both open Search.
+   - View → Search… shows ⌘F (`CmdOrCtrl+F`). The page answers it too, and `openSearch` does nothing while any dialog is open, so the menu and the page never open it twice or replace Settings.
+   - From the editor, a selection of up to 80 characters on one line becomes the search text.
+   - The top-bar hint shows ⌘F.
+10. **Not covered by a test:** the menu accelerator itself; the native menu can't be driven in e2e.
+    - On Windows, WebView2's own Ctrl+F (find bar) may show while a dialog is open, since the page then doesn't take the key. This needs the real window.
