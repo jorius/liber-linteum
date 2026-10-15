@@ -664,9 +664,22 @@
   border-color: var(--color-accent);
 }
 
-.toolbarToggle[aria-pressed='true'] {
+.toolbarToggle[aria-pressed='true'],
+.toolbarToggle[data-active] {
   background: var(--color-surface);
   color: var(--color-text-strong);
+}
+
+/* The page width menu (M4b part 3 wide elements §2): a tick column. */
+.widthMenu {
+  z-index: 40;
+}
+
+.widthCheck {
+  display: inline-flex;
+  align-items: center;
+  width: 20px;
+  vertical-align: middle;
 }
 
 .toolbarToggle:focus-visible {

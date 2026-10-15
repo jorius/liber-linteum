@@ -40,7 +40,7 @@ describe('text and code files (M4b part 2 §6)', () => {
     expect(name).toHaveValue('app');
     expect(screen.getByText('.json')).toBeInTheDocument();
     expect(screen.queryByRole('textbox', { name: 'Subtitle' })).not.toBeInTheDocument();
-    for (const gone of ['Full width', 'Outline', 'Formatting toolbar']) {
+    for (const gone of ['Page width', 'Outline', 'Formatting toolbar']) {
       expect(screen.queryByRole('button', { name: gone })).not.toBeInTheDocument();
     }
     expect(screen.queryByRole('radiogroup')).not.toBeInTheDocument();

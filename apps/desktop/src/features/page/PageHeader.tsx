@@ -1,16 +1,16 @@
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { FormatIcon, OutlineIcon, WidthIcon } from '../../app/icons';
+import { FormatIcon, OutlineIcon } from '../../app/icons';
 import type { EditorMode, Page } from '../../ipc';
 import { useEditorStore } from '../../stores/editorStore';
 import { useSettingsStore } from '../../stores/settingsStore';
-import { usePageWidth, usePageWidthStore } from '../../stores/pageWidthStore';
 import { BackArrow } from './BackArrow';
 import { Breadcrumb } from './Breadcrumb';
 import { Cover } from './Cover';
 import { ModeToggle } from './ModeToggle';
 import { NoteTitle } from './NoteTitle';
 import { RelatedChips } from './RelatedChips';
+import { WidthMenu } from './WidthMenu';
 import { WordCount } from './WordCount';
 import styles from './PageView.module.css';
 
@@ -37,7 +37,6 @@ export function PageHeader({
   const toolbar = useSettingsStore((s) => s.settings.toolbar);
   const outline = useSettingsStore((s) => s.settings.outline);
   const editable = useEditorStore((s) => s.doc !== null && s.path === page.path);
-  const full = usePageWidth(page.path) === 'full';
   return (
     <Cover page={page} editable={editable} body={children}>
       {({ addCover, controls }) => (
@@ -72,18 +71,7 @@ export function PageHeader({
                   <span aria-hidden="true">{t('toolbar.short')}</span>
                 </button>
               )}
-              {hasDoc && (
-                <button
-                  type="button"
-                  className={styles.toolbarToggle}
-                  aria-pressed={full}
-                  aria-label={t('page.fullWidth')}
-                  title={t(full ? 'page.fullWidthOff' : 'page.fullWidthOn')}
-                  onClick={() => void usePageWidthStore.getState().toggle(page.path)}
-                >
-                  <WidthIcon />
-                </button>
-              )}
+              {hasDoc && <WidthMenu path={page.path} />}
               {hasDoc && (
                 <button
                   type="button"

@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { clearMocks, mockIPC } from '../ipc/testing';
 import { DEFAULT_SETTINGS, useSettingsStore } from './settingsStore';
-import { usePageWidthStore, widthFor } from './pageWidthStore';
+import { fallbackWidth, usePageWidthStore, widthFor } from './pageWidthStore';
 
 let stored: { pageWidth: string | null; pageWidths: Record<string, string> };
 let calls: [string, unknown][];
@@ -50,18 +50,50 @@ describe('page width (M4b part 2 §1)', () => {
     expect(widthFor('A.md')).toBe('full');
   });
 
-  it('toggling a page stores an entry only when it differs from the default', async () => {
+  it('setting a page stores an entry only when it differs from the default', async () => {
     await usePageWidthStore.getState().load();
-    await usePageWidthStore.getState().toggle('A.md');
+    await usePageWidthStore.getState().set('A.md', 'full');
     expect(widthFor('A.md')).toBe('full');
     expect(stored.pageWidths).toEqual({ 'A.md': 'full' });
-    await usePageWidthStore.getState().toggle('A.md');
+    await usePageWidthStore.getState().set('A.md', 'readable');
     expect(widthFor('A.md')).toBe('readable');
     expect(stored.pageWidths).toEqual({});
-    // With a full vault default, turning a page off stores "readable".
+    // With a full vault default, a readable page stores "readable".
     await usePageWidthStore.getState().setVault('full');
-    await usePageWidthStore.getState().toggle('A.md');
+    await usePageWidthStore.getState().set('A.md', 'readable');
     expect(stored.pageWidths).toEqual({ 'A.md': 'readable' });
     expect(widthFor('A.md')).toBe('readable');
+  });
+});
+
+describe('wide elements (M4b part 3)', () => {
+  it('a page can be wide; null resets it to the default', async () => {
+    await usePageWidthStore.getState().load();
+    await usePageWidthStore.getState().set('A.md', 'wide');
+    expect(stored.pageWidths).toEqual({ 'A.md': 'wide' });
+    expect(widthFor('A.md')).toBe('wide');
+    expect(fallbackWidth()).toBe('readable');
+    await usePageWidthStore.getState().set('A.md', null);
+    expect(stored.pageWidths).toEqual({});
+    expect(widthFor('A.md')).toBe('readable');
+  });
+
+  it('wide resolves at the vault and app levels too', async () => {
+    await usePageWidthStore.getState().setVault('wide');
+    expect(widthFor('A.md')).toBe('wide');
+    expect(fallbackWidth()).toBe('wide');
+    await usePageWidthStore.getState().setVault('default');
+    useSettingsStore.setState({ settings: { ...DEFAULT_SETTINGS, pageWidth: 'wide' } });
+    expect(widthFor('A.md')).toBe('wide');
+  });
+
+  it('tables and diagrams go wide by default', () => {
+    expect(DEFAULT_SETTINGS.wideElements).toEqual({
+      tables: true,
+      code: false,
+      diagrams: true,
+      images: false,
+      maths: false,
+    });
   });
 });

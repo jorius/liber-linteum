@@ -176,17 +176,32 @@ export interface Settings {
   globalViewMode: GlobalViewMode;
   /** Global View: edge kinds shown (M3a §6). */
   globalViewEdges: GlobalViewEdges;
-  /** Readable measure or full width, app-wide (M4b part 2 §1). */
+  /** Readable measure, wide elements or full width, app-wide (M4b part 2
+   *  §1; `wide`: M4b part 3). */
   pageWidth: PageWidth;
+  /** The kinds that span the editor when a page is `wide` (M4b part 3). */
+  wideElements: WideElements;
   /** Outline panel shown beside the editor (M4b part 2 §5). */
   outline: boolean;
   /** Cover band height in px for pages without their own (132–600). */
   coverHeight: number;
 }
 
-export type PageWidth = 'readable' | 'full';
+/** `wide`: text at the readable measure, the chosen elements span the editor. */
+export type PageWidth = 'readable' | 'wide' | 'full';
 /** Where a page's cover sits (M4b part 3 §3). */
 export type CoverSide = 'top' | 'left' | 'right';
+
+/** What goes wide on a `wide` page (M4b part 3, wide elements §2). */
+export interface WideElements {
+  tables: boolean;
+  code: boolean;
+  /** Mermaid diagrams. */
+  diagrams: boolean;
+  images: boolean;
+  /** `$$` maths blocks. */
+  maths: boolean;
+}
 
 export type GlobalViewMode = 'drill' | 'expand';
 
@@ -215,6 +230,7 @@ export interface SettingsPatch {
   globalViewMode?: GlobalViewMode;
   globalViewEdges?: GlobalViewEdges;
   pageWidth?: PageWidth;
+  wideElements?: WideElements;
   outline?: boolean;
   coverHeight?: number;
 }

@@ -107,9 +107,14 @@
     "frontmatterInvalid": "NIMW can’t safely change this note’s frontmatter. Edit it in Source mode.",
     "subtitleLabel": "Subtitle",
     "subtitlePlaceholder": "Add a subtitle",
-    "fullWidth": "Full width",
-    "fullWidthOn": "Use the full width for this page",
-    "fullWidthOff": "Use the readable width for this page",
+    "width": {
+      "label": "Page width",
+      "title": "Page width: {width}",
+      "readable": "Readable",
+      "wide": "Wide elements",
+      "full": "Full width",
+      "reset": "Reset to default"
+    },
     "fileNameLabel": "File name",
     "textOnly": "This file opens in its default app.",
     "openDefault": "Open in default app"

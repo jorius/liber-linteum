@@ -109,10 +109,17 @@ export function FormatIcon() {
 }
 
 /** Full page width: arrows pointing to both edges. */
-export function WidthIcon() {
+/** Page width (M4b part 2 §1; part 3): a narrow column (readable), a column
+ *  crossed by a wide block (wide elements), arrows to both edges (full). */
+export function WidthIcon({ width = 'full' }: { width?: 'readable' | 'wide' | 'full' }) {
+  const d = {
+    readable: 'M7 4v16M17 4v16M10 9h4M10 12h4M10 15h4',
+    wide: 'M8 5h8M8 19h8M3 9h18v6H3z',
+    full: 'M3 12h18M7 8l-4 4 4 4M17 8l4 4-4 4',
+  }[width];
   return (
     <svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true" {...stroke}>
-      <path d="M3 12h18M7 8l-4 4 4 4M17 8l4 4-4 4" />
+      <path d={d} />
     </svg>
   );
 }

@@ -107,9 +107,14 @@
     "titleInNote": "Título en la nota: {title}",
     "subtitleLabel": "Subtítulo",
     "subtitlePlaceholder": "Añade un subtítulo",
-    "fullWidth": "Ancho completo",
-    "fullWidthOn": "Usar todo el ancho en esta página",
-    "fullWidthOff": "Usar el ancho de lectura en esta página",
+    "width": {
+      "label": "Ancho de página",
+      "title": "Ancho de página: {width}",
+      "readable": "De lectura",
+      "wide": "Elementos anchos",
+      "full": "Ancho completo",
+      "reset": "Volver al predeterminado"
+    },
     "fileNameLabel": "Nombre del archivo",
     "textOnly": "Este archivo se abre en su aplicación predeterminada.",
     "openDefault": "Abrir en la aplicación predeterminada"
