@@ -129,6 +129,12 @@ fn macos_menu_quit_is_ours_and_the_standard_items_stay() {
     for want in ["Minimize", "Zoom", "Close Window"] {
         assert!(window.iter().any(|t| t == want), "{want}: {window:?}");
     }
+    // M4c §2: File → New Quick Note, right after the app menu.
+    assert_eq!(outline[1].0, "File", "{outline:?}");
+    assert!(
+        texts("File").iter().any(|t| t == "New Quick Note"),
+        "{outline:?}"
+    );
 }
 
 fn quit_menu_item_requests_the_window_close_like_the_close_button() {
@@ -283,6 +289,34 @@ fn screen_items_emit_menu_screen() {
     );
 }
 
+/// M4c §2: File → New Quick Note tells the main window to take a quick note
+/// (from any window: the event goes to the main one).
+fn quick_note_item_emits_menu_quick_note() {
+    use tauri::Listener;
+    let got: Arc<std::sync::Mutex<Vec<String>>> = Arc::default();
+    let log = got.clone();
+    build_app("quicknote").run_return(move |handle, event| {
+        if let RunEvent::Ready = event {
+            let log = log.clone();
+            // The main window hears it (that is where the page listens).
+            let main = handle.get_webview_window("main").expect("main window");
+            main.listen(nimw_desktop::menu::QUICK_NOTE_EVENT, move |e| {
+                log.lock().unwrap().push(e.payload().to_string());
+            });
+            nimw_desktop::menu::on_menu_event(
+                handle,
+                MenuEvent {
+                    id: MenuId::new(nimw_desktop::menu::QUICK_NOTE_ID),
+                },
+            );
+            for window in handle.webview_windows().into_values() {
+                window.close().unwrap();
+            }
+        }
+    });
+    assert_eq!(got.lock().unwrap().len(), 1);
+}
+
 fn main() {
     #[cfg(target_os = "macos")]
     {
@@ -297,4 +331,6 @@ fn main() {
     println!("test toggle_items_emit_menu_toggle ... ok");
     screen_items_emit_menu_screen();
     println!("test screen_items_emit_menu_screen ... ok");
+    quick_note_item_emits_menu_quick_note();
+    println!("test quick_note_item_emits_menu_quick_note ... ok");
 }

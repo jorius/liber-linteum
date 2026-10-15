@@ -41,9 +41,15 @@ pub const ATOMS_ID: &str = "nimw-see-atoms";
 /// Event telling the page which screen to show; payload `"edit"`,
 /// `"global"`, or `"atoms"` (the open page's atoms in the Global View).
 pub const SCREEN_EVENT: &str = "menu:screen";
+/// Id of File → New Quick Note (M4c §2).
+pub const QUICK_NOTE_ID: &str = "nimw-quick-note";
+/// Event telling the main window to take a quick note (no payload).
+pub const QUICK_NOTE_EVENT: &str = "menu:quickNote";
 
 /// The app menu: About, Services, Hide, Hide Others, Show All, Quit (ours);
-/// Edit (Undo, Redo, Cut, Copy, Paste, Select All: macOS routes the text
+/// File (New Quick Note, ⌘⇧N: from any window, so it carries the
+/// accelerator; the page also answers ⌘⇧N where there is no app menu and
+/// ignores a second trigger within a second, M4c §7.10); Edit (Undo, Redo, Cut, Copy, Paste, Select All: macOS routes the text
 /// editing shortcuts through it); View (Editor, Global View — no
 /// accelerators: the page handles ⌘1 / ⌘2; Back, Forward along the link trail —
 /// no accelerators: the page handles ⌘[ / ⌘] itself, which also works where
@@ -84,6 +90,14 @@ pub fn app_menu<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
             &quit,
         ],
     )?;
+    let quick_note = MenuItem::with_id(
+        app,
+        QUICK_NOTE_ID,
+        "New Quick Note",
+        true,
+        Some("CmdOrCtrl+Shift+N"),
+    )?;
+    let file = Submenu::with_items(app, "File", true, &[&quick_note])?;
     let edit = Submenu::with_items(
         app,
         "Edit",
@@ -149,7 +163,7 @@ pub fn app_menu<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
             &PredefinedMenuItem::close_window(app, None)?,
         ],
     )?;
-    Menu::with_items(app, &[&app_submenu, &edit, &view, &window])
+    Menu::with_items(app, &[&app_submenu, &file, &edit, &view, &window])
 }
 
 /// Installs [`app_menu`] on macOS (the only platform with an app menu by
@@ -182,6 +196,14 @@ pub fn on_menu_event<R: Runtime>(app: &AppHandle<R>, event: MenuEvent) {
         let _ = app.emit(TOGGLE_EVENT, "lineNumbers");
     } else if id == OUTLINE_ID {
         let _ = app.emit(TOGGLE_EVENT, "outline");
+    } else if id == QUICK_NOTE_ID {
+        // Quick notes are taken in the main window, wherever ⌘⇧N was pressed.
+        if let Some(main) = app.get_webview_window("main") {
+            let _ = main.show();
+            let _ = main.unminimize();
+            let _ = main.set_focus();
+        }
+        let _ = app.emit_to("main", QUICK_NOTE_EVENT, ());
     }
 }
 
