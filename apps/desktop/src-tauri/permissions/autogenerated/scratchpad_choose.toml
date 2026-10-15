@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-scratchpad-choose"
+description = "Enables the scratchpad_choose command without any pre-configured scope."
+commands.allow = ["scratchpad_choose"]
+
+[[permission]]
+identifier = "deny-scratchpad-choose"
+description = "Denies the scratchpad_choose command without any pre-configured scope."
+commands.deny = ["scratchpad_choose"]

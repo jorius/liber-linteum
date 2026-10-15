@@ -327,6 +327,10 @@ pub struct Settings {
     pub cover_height: CoverHeight,
     /// A caption with each attachment's place on disk (M4b part 3 §8).
     pub show_attachment_paths: bool,
+    /// The global Scratchpad's folder (M4c §2), canonical; `None` until the
+    /// first quick note. Set only through `scratchpad_set` (a folder the user
+    /// picked, or the default), never through a settings patch (§4).
+    pub scratchpad_path: Option<String>,
     pub recent_vaults: Vec<RecentVault>,
     /// Keys this build does not know (written by a newer version); kept on save.
     #[serde(flatten)]
@@ -356,6 +360,7 @@ impl Default for Settings {
             outline: false,
             cover_height: CoverHeight::default(),
             show_attachment_paths: false,
+            scratchpad_path: None,
             recent_vaults: Vec::new(),
             extra: serde_json::Map::new(),
         }
@@ -395,6 +400,8 @@ pub struct RecentVaultDto {
     pub name: String,
     pub opened_at: String,
     pub missing: bool,
+    /// The global Scratchpad (M4c §2): shown as "Quick notes".
+    pub scratchpad: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
@@ -447,6 +454,7 @@ fn parse_lenient(text: &str) -> Result<(Settings, Vec<String>), serde_json::Erro
     field!("outline", outline);
     field!("coverHeight", cover_height);
     field!("showAttachmentPaths", show_attachment_paths);
+    field!("scratchpadPath", scratchpad_path);
     match map.remove("recentVaults") {
         None => {}
         Some(Value::Array(items)) => {
@@ -620,16 +628,33 @@ impl SettingsStore {
     }
 
     pub fn recent(&self) -> Vec<RecentVaultDto> {
-        self.lock()
-            .recent_vaults
+        let s = self.lock();
+        s.recent_vaults
             .iter()
             .map(|r| RecentVaultDto {
                 path: r.path.clone(),
                 name: r.name.clone(),
                 opened_at: r.opened_at.clone(),
                 missing: !Path::new(&r.path).is_dir(),
+                scratchpad: s.scratchpad_path.as_deref() == Some(r.path.as_str()),
             })
             .collect()
+    }
+
+    /// Stores the global Scratchpad's folder (canonical); see
+    /// `scratchpad_commands` for who may call it.
+    pub fn set_scratchpad_path(&self, path: Option<String>) -> std::io::Result<Settings> {
+        let mut s = self.lock();
+        let mut next = s.clone();
+        next.scratchpad_path = path;
+        self.save(&next)?;
+        *s = next.clone();
+        Ok(next)
+    }
+
+    /// The global Scratchpad is the vault at `root` (canonical).
+    pub fn is_scratchpad(&self, root: &Path) -> bool {
+        self.lock().scratchpad_path.as_deref() == Some(root.to_string_lossy().as_ref())
     }
 
     pub fn forget(&self, path: &str) -> std::io::Result<()> {

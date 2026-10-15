@@ -28,7 +28,7 @@ fn dir_path(s: &str) -> CmdResult<VaultPath> {
     }
 }
 
-fn open_session<R: Runtime>(app: &AppHandle<R>, root: &Path) -> CmdResult<VaultInfo> {
+pub(crate) fn open_session<R: Runtime>(app: &AppHandle<R>, root: &Path) -> CmdResult<VaultInfo> {
     let state = app.state::<AppState>();
     let emitter = app.clone();
     let (session, report) = VaultSession::open(root, &state.cache_dir, move |event| match event {
@@ -74,6 +74,7 @@ fn open_session<R: Runtime>(app: &AppHandle<R>, root: &Path) -> CmdResult<VaultI
     state.set_session(Some(session));
     Ok(VaultInfo {
         name,
+        scratchpad: state.settings.is_scratchpad(&root),
         root: root.to_string_lossy().into_owned(),
         report,
     })

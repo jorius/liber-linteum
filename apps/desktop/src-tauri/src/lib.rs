@@ -10,6 +10,7 @@ pub mod fonts;
 pub mod gv_commands;
 pub mod menu;
 pub mod navigation;
+pub mod scratchpad_commands;
 pub mod settings;
 pub mod settings_commands;
 pub mod state;
@@ -47,6 +48,8 @@ pub fn configure<R: tauri::Runtime>(
         // Files dropped from the OS become importable (M2c §8).
         .on_window_event(drops::on_window_event)
         .on_webview_event(drops::on_webview_event)
+        // Quick notes (M4c): the folder dialog and its grant.
+        .manage(scratchpad_commands::ScratchpadState::default())
         .register_asynchronous_uri_scheme_protocol(asset::SCHEME, |ctx, request, responder| {
             let app = ctx.app_handle().clone();
             std::thread::spawn(move || {
@@ -127,6 +130,14 @@ pub fn configure<R: tauri::Runtime>(
         external_commands::external_reveal,
         external_commands::external_network_allow,
         external_commands::file_pick,
+        scratchpad_commands::scratchpad_default,
+        scratchpad_commands::scratchpad_choose,
+        scratchpad_commands::scratchpad_set,
+        scratchpad_commands::scratchpad_open,
+        scratchpad_commands::quick_note_create,
+        scratchpad_commands::quick_note_autoname,
+        scratchpad_commands::quick_notes_state,
+        scratchpad_commands::scratch_folder_set,
     ])
 }
 

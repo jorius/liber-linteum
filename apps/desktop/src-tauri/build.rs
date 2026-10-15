@@ -47,6 +47,14 @@ const COMMANDS: &[&str] = &[
     "external_reveal",
     "external_network_allow",
     "file_pick",
+    "scratchpad_default",
+    "scratchpad_choose",
+    "scratchpad_set",
+    "scratchpad_open",
+    "quick_note_create",
+    "quick_note_autoname",
+    "quick_notes_state",
+    "scratch_folder_set",
 ];
 
 fn main() {
