@@ -443,8 +443,17 @@ export function AtomsCanvas({ path, title, toggles }: AtomsCanvasProps) {
     const find = () =>
       wrapper.current?.querySelector<HTMLElement>(`[data-gv-card="${CSS.escape(id)}"]`);
     const el = find();
-    if (el) el.focus({ preventScroll: true });
-    else requestAnimationFrame(() => find()?.focus({ preventScroll: true }));
+    if (el) {
+      el.focus({ preventScroll: true });
+      return;
+    }
+    // After the next render — unless the keyboard went elsewhere meanwhile
+    // (⌘F's Search dialog opened while the level loaded).
+    const before = document.activeElement;
+    requestAnimationFrame(() => {
+      const now = document.activeElement;
+      if (now === before || now === document.body) find()?.focus({ preventScroll: true });
+    });
   }
 
   const onKeyDown = (e: KeyboardEvent) => {
