@@ -16,7 +16,7 @@ use nimw_vault::{Vault, VaultPath, WatchEvent, Watcher};
 use serde::Serialize;
 use std::collections::{HashMap, VecDeque};
 use std::path::{Path, PathBuf};
-use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex, MutexGuard};
 use std::time::{Duration, Instant};
 use tauri::{AppHandle, Emitter, Manager, Runtime, WebviewUrl, WebviewWindowBuilder, WindowEvent};
@@ -34,6 +34,25 @@ pub const LINK_DEPTH: usize = 3;
 pub const MAX_LISTED: usize = 10_000;
 /// How long a folder listing is reused for link resolution.
 const LISTING_TTL: Duration = Duration::from_secs(2);
+/// Largest note a file window opens (a text file's cap is `TEXT_MAX_BYTES`):
+/// beyond it, reading the file whole could take the app, and every window's
+/// unsaved text, down.
+pub const PAGE_MAX_BYTES: u64 = 16 * 1024 * 1024;
+
+/// `tooLarge` when a file of `kind` is too big to edit (M4c review m2).
+pub fn check_size(kind: FileKind, len: u64, name: &str) -> CmdResult<()> {
+    let max = match kind {
+        FileKind::Page => PAGE_MAX_BYTES,
+        FileKind::Text => nimw_session::TEXT_MAX_BYTES as u64,
+    };
+    if len > max {
+        return Err(CommandError::new(
+            ErrorKind::TooLarge,
+            format!("{name} is too large to open ({len} bytes)"),
+        ));
+    }
+    Ok(())
+}
 
 /// Whether a window label is a single-file window's.
 pub fn is_file_window(label: &str) -> bool {
@@ -69,6 +88,9 @@ pub struct FileGrant {
     kind: FileKind,
     watcher: Mutex<Option<Watcher>>,
     listing: Mutex<Option<(Instant, Arc<FileSet>)>>,
+    /// Until its window is built: a second open of the file waits for that
+    /// window instead of building another (M4c review I1).
+    building: AtomicBool,
 }
 
 impl std::fmt::Debug for FileGrant {
@@ -103,6 +125,11 @@ impl FileGrant {
     /// The file's absolute path.
     pub fn real_path(&self) -> PathBuf {
         self.name().to_fs_path(self.vault.root())
+    }
+
+    /// Its window is built.
+    pub fn opened(&self) {
+        self.building.store(false, Ordering::Relaxed);
     }
 
     /// After a rename in the app.
@@ -183,8 +210,15 @@ pub struct FileWindows {
 impl FileWindows {
     /// The grant for `path` (an existing, eligible file): a new label, or the
     /// label of the window that already has it (`true`), whatever the
-    /// spelling of the path (relative parts, symlinks).
-    pub fn grant(&self, path: &Path) -> CmdResult<(String, Arc<FileGrant>, bool)> {
+    /// spelling of the path (relative parts, symlinks). `live` says whether a
+    /// label's window exists: a grant whose window was built and is gone
+    /// (closing) is replaced under a new label, so the closing window's
+    /// `Destroyed` can't take the new window's grant (M4c review I1).
+    pub fn grant(
+        &self,
+        path: &Path,
+        live: impl Fn(&str) -> bool,
+    ) -> CmdResult<(String, Arc<FileGrant>, bool)> {
         let real = dunce::canonicalize(path).map_err(|e| {
             CommandError::new(ErrorKind::NotFound, format!("{}: {e}", path.display()))
         })?;
@@ -205,12 +239,20 @@ impl FileWindows {
                 format!("not a note or text file: {name}"),
             )
         })?;
+        check_size(kind, meta.len(), name)?;
         let folder = real
             .parent()
             .ok_or_else(|| CommandError::new(ErrorKind::NotAFile, real.display().to_string()))?;
         let mut grants = lock(&self.grants);
-        if let Some((label, grant)) = grants.iter().find(|(_, g)| g.real_path() == real) {
-            return Ok((label.clone(), grant.clone(), true));
+        if let Some((label, grant)) = grants
+            .iter()
+            .find(|(_, g)| g.real_path() == real)
+            .map(|(l, g)| (l.clone(), g.clone()))
+        {
+            if grant.building.load(Ordering::Relaxed) || live(&label) {
+                return Ok((label, grant, true));
+            }
+            grants.remove(&label);
         }
         let grant = Arc::new(FileGrant {
             vault: Vault::open(folder)?,
@@ -218,6 +260,7 @@ impl FileWindows {
             kind,
             watcher: Mutex::new(None),
             listing: Mutex::new(None),
+            building: AtomicBool::new(true),
         });
         let label = format!(
             "{FILE_WINDOW_PREFIX}{}",
@@ -262,10 +305,14 @@ pub fn grant_for<R: Runtime>(app: &AppHandle<R>, label: &str) -> CmdResult<Arc<F
 /// already shows it. Returns the window's label.
 pub fn open_file_window<R: Runtime>(app: &AppHandle<R>, path: &Path) -> CmdResult<String> {
     let windows = app.state::<FileWindows>();
-    let (label, grant, existed) = windows.grant(path)?;
-    if existed && let Some(window) = app.get_webview_window(&label) {
-        let _ = window.unminimize();
-        let _ = window.set_focus();
+    let (label, grant, existed) = windows.grant(path, |l| app.get_webview_window(l).is_some())?;
+    if existed {
+        // Its window is up (brought forward) or still being built by the
+        // open that granted it, which shows it.
+        if let Some(window) = app.get_webview_window(&label) {
+            let _ = window.unminimize();
+            let _ = window.set_focus();
+        }
         return Ok(label);
     }
     watch(app, &label, &grant);
@@ -276,6 +323,7 @@ pub fn open_file_window<R: Runtime>(app: &AppHandle<R>, path: &Path) -> CmdResul
         .build();
     match built {
         Ok(window) => {
+            grant.opened();
             let app = app.clone();
             let gone = label.clone();
             window.on_window_event(move |event| {
@@ -378,26 +426,82 @@ mod tests {
         std::fs::write(dir.path().join("note.md"), "# n").unwrap();
         std::fs::write(dir.path().join("other.txt"), "o").unwrap();
         let windows = FileWindows::default();
-        let (a, grant, existed) = windows.grant(&dir.path().join("note.md")).unwrap();
+        let (a, grant, existed) = windows
+            .grant(&dir.path().join("note.md"), |_| false)
+            .unwrap();
         assert_eq!((a.as_str(), existed), ("file-1", false));
         assert_eq!(grant.name(), vp("note.md"));
         assert_eq!(grant.kind(), FileKind::Page);
-        let (again, _, existed) = windows.grant(&dir.path().join("x/../note.md")).unwrap();
+        let (again, _, existed) = windows
+            .grant(&dir.path().join("x/../note.md"), |_| false)
+            .unwrap();
         assert_eq!((again.as_str(), existed), ("file-1", true));
         #[cfg(unix)]
         {
             std::os::unix::fs::symlink(dir.path().join("note.md"), dir.path().join("link.md"))
                 .unwrap();
-            let (linked, _, existed) = windows.grant(&dir.path().join("link.md")).unwrap();
+            let (linked, _, existed) = windows
+                .grant(&dir.path().join("link.md"), |_| false)
+                .unwrap();
             assert_eq!((linked.as_str(), existed), ("file-1", true));
         }
-        let (b, grant, _) = windows.grant(&dir.path().join("other.txt")).unwrap();
+        let (b, grant, _) = windows
+            .grant(&dir.path().join("other.txt"), |_| false)
+            .unwrap();
         assert_eq!(b, "file-2");
         assert_eq!(grant.kind(), FileKind::Text);
         windows.revoke("file-1");
         assert!(windows.get("file-1").is_none());
-        let (c, _, existed) = windows.grant(&dir.path().join("note.md")).unwrap();
+        let (c, _, existed) = windows
+            .grant(&dir.path().join("note.md"), |_| false)
+            .unwrap();
         assert_eq!((c.as_str(), existed), ("file-3", false));
+    }
+
+    #[test]
+    fn m4c_review_i1_a_window_being_built_is_shared_and_a_closing_one_replaced() {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::write(dir.path().join("note.md"), "# n").unwrap();
+        let path = dir.path().join("note.md");
+        let windows = FileWindows::default();
+        let none = |_: &str| false;
+        let (a, first, existed) = windows.grant(&path, none).unwrap();
+        assert_eq!((a.as_str(), existed), ("file-1", false));
+        // A second open while the first window is still being built: the
+        // same grant, and the caller builds nothing.
+        let (again, _, existed) = windows.grant(&path, none).unwrap();
+        assert_eq!((again.as_str(), existed), ("file-1", true));
+        first.opened();
+        // Its window is up: the same label.
+        let (live, _, existed) = windows.grant(&path, |l| l == "file-1").unwrap();
+        assert_eq!((live.as_str(), existed), ("file-1", true));
+        // Built once and gone from the window list (closing): a new grant,
+        // which the old window's `Destroyed` can't revoke.
+        let (fresh, _, existed) = windows.grant(&path, none).unwrap();
+        assert_eq!((fresh.as_str(), existed), ("file-2", false));
+        windows.revoke("file-1");
+        assert!(windows.get("file-2").is_some());
+    }
+
+    #[test]
+    fn m4c_review_m2_files_too_large_to_edit_get_no_grant() {
+        let dir = tempfile::tempdir().unwrap();
+        let big = std::fs::File::create(dir.path().join("huge.log.txt")).unwrap();
+        big.set_len(nimw_session::TEXT_MAX_BYTES as u64 + 1)
+            .unwrap();
+        let page = std::fs::File::create(dir.path().join("huge.md")).unwrap();
+        page.set_len(PAGE_MAX_BYTES + 1).unwrap();
+        let windows = FileWindows::default();
+        for name in ["huge.log.txt", "huge.md"] {
+            assert_eq!(
+                windows
+                    .grant(&dir.path().join(name), |_| false)
+                    .unwrap_err()
+                    .kind,
+                ErrorKind::TooLarge,
+                "{name}"
+            );
+        }
     }
 
     #[test]
@@ -405,7 +509,7 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         std::fs::write(dir.path().join("photo.png"), [0u8; 4]).unwrap();
         let windows = FileWindows::default();
-        let kind = |p: PathBuf| windows.grant(&p).unwrap_err().kind;
+        let kind = |p: PathBuf| windows.grant(&p, |_| false).unwrap_err().kind;
         assert_eq!(kind(dir.path().to_path_buf()), ErrorKind::NotAFile);
         assert_eq!(kind(dir.path().join("gone.md")), ErrorKind::NotFound);
         assert_eq!(kind(dir.path().join("photo.png")), ErrorKind::NotAText);
@@ -427,7 +531,9 @@ mod tests {
             std::fs::write(dir.path().join(f), "").unwrap();
         }
         let windows = FileWindows::default();
-        let (_, grant, _) = windows.grant(&dir.path().join("note.md")).unwrap();
+        let (_, grant, _) = windows
+            .grant(&dir.path().join("note.md"), |_| false)
+            .unwrap();
         let files = grant.files();
         assert!(files.contains("a/b/c/deep.md"));
         assert!(!files.contains("a/b/c/d/deeper.md"));
