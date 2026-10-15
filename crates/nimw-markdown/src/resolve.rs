@@ -1,4 +1,5 @@
 use crate::types::LinkKind;
+use percent_encoding::percent_decode_str;
 use std::collections::{BTreeSet, HashMap};
 use unicode_normalization::UnicodeNormalization;
 
@@ -13,6 +14,15 @@ pub fn name_key(s: &str) -> String {
 /// follows `\` too, so a Windows path outside the vault (`D:\Docs\x.pdf`) is
 /// keyed by its file name like everything else (M4b part 3 §9).
 pub fn link_key(target_or_path: &str) -> String {
+    // A wiki `file:` URL is keyed decoded, as the path it names.
+    let decoded;
+    let target_or_path = match target_or_path.get(..5) {
+        Some(head) if head.eq_ignore_ascii_case("file:") => {
+            decoded = percent_decode_str(target_or_path).decode_utf8_lossy();
+            decoded.as_ref()
+        }
+        _ => target_or_path,
+    };
     let base = target_or_path
         .rsplit(['/', '\\'])
         .next()
@@ -430,6 +440,7 @@ mod tests {
         // allow-list finds the links that name a file outside the vault.
         assert_eq!(link_key(r"D:\Docs\My-File.pdf"), "my-file.pdf");
         assert_eq!(link_key("file:///D:/Docs/x.pdf"), "x.pdf");
+        assert_eq!(link_key("file:///D:/Docs/a%20b.pdf"), "a b.pdf");
     }
 
     #[test]
