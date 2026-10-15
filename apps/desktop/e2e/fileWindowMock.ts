@@ -43,7 +43,7 @@ export function installFileWindowMock({
     file_links_resolve: (a) => (a.targets as unknown[]).map(() => null),
     file_follow: () => 'window',
     file_open_in_vault: () => null,
-    'window_close_self': () => null,
+    window_close_self: () => null,
     'plugin:event|listen': () => nextId++,
     'plugin:event|unlisten': () => null,
   };

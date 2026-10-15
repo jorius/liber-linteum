@@ -198,8 +198,8 @@ describe('PageDoc external changes (M2a §3.3)', () => {
                 currentText: now,
                 currentHash: hashOf(now),
               };
-            disk.files.set('note.md', a.text);
-            return { hash: hashOf(a.text) };
+            disk.files.set('note.md', a.text as string);
+            return { hash: hashOf(a.text as string) };
           },
           file_recreate: () => {
             if (disk.files.has('note.md')) throw { kind: 'alreadyExists', message: 'note.md' };
