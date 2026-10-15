@@ -176,3 +176,37 @@ Plan: `docs/superpowers/plans/2026-10-15-m4c-single-files.md`. These override §
 
 17. **`capabilities/file.json`** (`file-*`): the file commands, `settings_get`/`settings_set`, `fonts_list`, `url_open`, `app_info`, event listen/unlisten and window destroy. Vault commands are denied there and the file commands (but `file_open_dialog`) in `main`; real-ACL tests cover both. A `file-*` window without a grant reaches no file (`notPermitted`).
 18. **`settings_set` is allowed in file windows** (beyond §4's "settings reads"): the band's controls are app settings. Cost: a compromised file page could change app settings, as a compromised main window can.
+
+## 9. Final review — single-file windows
+
+A fresh-context Opus review of `ba67c0a..2a8bd14`, focused on security. It found no Critical findings, four Important ones and eight Minor ones. These override §8 where they conflict.
+
+### Fixed (each with a test that failed first)
+
+1. **I1 — one window per file, even while a window opens or closes.**
+   - A second open while the first window is still being built now shares its grant and builds nothing.
+   - A grant whose window is closing is replaced under a fresh label, so the closing window's `Destroyed` can't revoke the live window's grant.
+2. **I2 — a window closes itself and no other.**
+   - The window plugin's `destroy` takes any label, so `core:window:allow-destroy` is gone from both capabilities.
+   - The new command `window_close_self` closes the calling window only.
+   - The UI's close-requested handler closes through it, keeping save-on-close.
+   - This replaces §8.17's "window destroy".
+3. **I3 — a followed link opens only a real document or media file.** The link is resolved, and both its name and its real target must be on the documents-and-media list; the real path is opened.
+4. **I4 — no visible name reaches a hidden file.**
+   - `Vault::visible_fs_path` also refuses a path whose real location is hidden, as reached through a symlink or a Windows 8.3 short name such as `SSH~1`.
+   - `nimw-asset` uses it for file windows and the main vault, and so do the file windows' note reads and link follows.
+   - A file window is served media and documents only.
+5. **m1:** launch arguments are read with `args_os()`, so a file name that isn't UTF-8 is skipped instead of panicking.
+6. **m2 — size caps.**
+   - Notes over 16 MB (`PAGE_MAX_BYTES`) and text files over `TEXT_MAX_BYTES` get no grant.
+   - `file_read` checks the size again before reading, and answers `tooLarge`.
+7. **m3:** in a file window, "Save again" that finds the file back merges into it, instead of moving the text to a conflict copy the window can't write.
+8. **m4:** "Open in its vault" makes the view inert from the start of the hand-off, so nothing typed after the save is lost.
+
+### Deferred (minor)
+
+- **m5:** a file window may listen to events aimed at other windows (`vault:changed` paths, `file:open-in-vault`). It only discloses information.
+- **m6:** a watcher batch landing between a rename and the name update can briefly show the file as deleted.
+- **m7:** link resolution in a huge folder (`~`, `C:\`) walks every directory to depth 3; only files are capped.
+- **m8:** files named on the command line that can't open are dropped silently.
+- **The review's note on settings:** `settings_get` and the `settings:changed` broadcast give file windows the recent-vault and Scratchpad paths. A trimmed settings DTO for `file-*` windows is a later hardening step.
