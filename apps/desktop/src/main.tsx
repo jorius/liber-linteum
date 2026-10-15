@@ -14,7 +14,7 @@ import { installOpenFile, installOpenInVault } from './features/singleFile/openF
 import { SingleFileApp } from './features/singleFile/SingleFileApp';
 import { installFileWatch } from './features/singleFile/singleFileStore';
 import { installSearchMenuIfTauri } from './features/search/searchMenu';
-import { installShellMenuIfTauri } from './features/shell/shellMenu';
+import { installSaveKey, installShellMenuIfTauri } from './features/shell/shellMenu';
 import { installQuitGuardIfTauri } from './stores/editorStore';
 import { installMenuTogglesIfTauri } from './stores/menuToggles';
 import { installMenuNavigationIfTauri } from './stores/navigate';
@@ -33,6 +33,7 @@ void initI18n(detectLanguage(navigator.languages))
     installQuitGuardIfTauri();
     installMenuTogglesIfTauri();
     installShellMenuIfTauri(!singleFile);
+    installSaveKey();
     installSettingsSync();
     installOpenFile();
     if (singleFile) {

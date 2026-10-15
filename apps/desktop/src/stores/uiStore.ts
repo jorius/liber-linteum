@@ -22,7 +22,12 @@ export type DialogState =
   | { type: 'scratchpadSetup'; then: 'quickNote' | 'none' }
   /** Search (M5 §4). */
   | { type: 'search' }
+  /** Save / Don't Save / Cancel before unsaved text is left (M5b §6, auto
+   *  save off). `id` tells two questions apart. */
+  | { type: 'unsaved'; id: number; paths: string[]; answer: (c: UnsavedChoice) => void }
   | null;
+
+export type UnsavedChoice = 'save' | 'discard' | 'cancel';
 
 /** Which screen the open vault shows (M3a §2). */
 export type Screen = 'edit' | 'global';

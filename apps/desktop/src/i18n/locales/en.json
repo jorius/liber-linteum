@@ -192,7 +192,8 @@
       "copy": "Copy into the vault",
       "link": "Link to where it is",
       "cancel": "Cancel"
-    }
+    },
+    "unsaved": "Unsaved"
   },
   "preview": {
     "tableScroll": "Table, scrolls sideways",
@@ -258,6 +259,14 @@
       "where": "It will be created in {folder}.",
       "confirm": "Create page",
       "invalid": "“{name}” can’t be used as a name. {reason}"
+    },
+    "unsaved": {
+      "titleOne": "Save changes to “{name}”?",
+      "titleMany": "{count, plural, one {Save changes to # page?} other {Save changes to # pages?}}",
+      "body": "Auto save is off. Changes you don't save are lost.",
+      "discard": "Don’t Save",
+      "save": "Save",
+      "saveAll": "Save all"
     }
   },
   "settings": {

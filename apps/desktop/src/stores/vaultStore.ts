@@ -1,4 +1,5 @@
 import i18next from 'i18next';
+import { confirmUnsaved, needsUnsavedPrompt } from '../features/editor/unsavedPrompt';
 import { create } from 'zustand';
 import {
   entryCreateFolder,
@@ -193,6 +194,8 @@ export const useVaultStore = create<VaultState>((set, get) => {
    *  changes (M2a §3.3); if a page can't be written, says so and returns
    *  false: its text must not be dropped. */
   async function savedEverything(): Promise<boolean> {
+    // Auto save off (M5b §6): Save / Don't Save / Cancel first.
+    if (needsUnsavedPrompt() && !(await confirmUnsaved())) return false;
     await Promise.all([...beforeSwitch].map((run) => run().catch(() => undefined)));
     const unsaved = await useEditorStore.getState().saveAll();
     if (!unsaved.length) return true;

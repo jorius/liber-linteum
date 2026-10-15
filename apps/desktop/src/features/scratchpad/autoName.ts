@@ -4,6 +4,7 @@
 // only says when to ask, one question at a time.
 import { quickNoteAutoname } from '../../ipc';
 import { useEditorStore } from '../../stores/editorStore';
+import { useSettingsStore } from '../../stores/settingsStore';
 import { useVaultStore } from '../../stores/vaultStore';
 import { AUTOSAVE_MS } from '../editor/pageDoc';
 import { useScratchpadStore } from './scratchpadStore';
@@ -39,7 +40,10 @@ export function installAutoName(): () => void {
     }
     running = true;
     try {
-      await useEditorStore.getState().flushAll();
+      // Auto save off (M5b §6): the name waits for ⌘S, nothing is written for it.
+      if (useSettingsStore.getState().settings.autoSave === false) {
+        if (useEditorStore.getState().dirtyPaths().includes(path)) return;
+      } else await useEditorStore.getState().flushAll();
       const res = await quickNoteAutoname(path);
       if (!res.ok) return; // the name simply stays
       const { path: to, autoNamed, outcome } = res.value;

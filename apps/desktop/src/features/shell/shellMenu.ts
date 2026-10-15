@@ -54,3 +54,17 @@ export async function installShellMenu({ main }: { main: boolean }): Promise<() 
 export function installShellMenuIfTauri(main: boolean): void {
   if (isTauri()) void installShellMenu({ main }).catch(() => undefined);
 }
+
+/** ⌘S / Ctrl+S saves the current page in every window (M5b §6), where there
+ *  is no app menu too; the webview never gets to "save the page" itself.
+ *  Returns the stop. */
+export function installSaveKey(): () => void {
+  const onKeyDown = (e: KeyboardEvent) => {
+    if (!(e.metaKey || e.ctrlKey) || e.shiftKey || e.altKey) return;
+    if (e.key.toLowerCase() !== 's' && e.code !== 'KeyS') return;
+    e.preventDefault();
+    saveNow();
+  };
+  window.addEventListener('keydown', onKeyDown);
+  return () => window.removeEventListener('keydown', onKeyDown);
+}

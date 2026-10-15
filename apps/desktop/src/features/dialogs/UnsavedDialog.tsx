@@ -1,0 +1,64 @@
+import { useEffect, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
+import type { UnsavedChoice } from '../../stores/uiStore';
+import { nameOf } from '../../stores/tree';
+import { Dialog } from './Dialog';
+import styles from './Dialogs.module.css';
+
+/** "Save changes to …?" (M5b §6). Closing it any other way — Escape, or
+ *  another question taking its place — is Cancel. */
+export function UnsavedDialog({
+  paths,
+  answer,
+  onClose,
+}: {
+  paths: string[];
+  answer: (c: UnsavedChoice) => void;
+  onClose: () => void;
+}) {
+  const { t } = useTranslation();
+  const answered = useRef(false);
+  const reply = (c: UnsavedChoice) => {
+    if (answered.current) return;
+    answered.current = true;
+    answer(c);
+  };
+  useEffect(
+    () => () => {
+      if (!answered.current) {
+        answered.current = true;
+        answer('cancel');
+      }
+    },
+    [answer],
+  );
+  const choose = (c: UnsavedChoice) => {
+    reply(c);
+    onClose();
+  };
+  const title =
+    paths.length === 1
+      ? t('dialogs.unsaved.titleOne', { name: nameOf(paths[0]).replace(/\.md$/i, '') })
+      : t('dialogs.unsaved.titleMany', { count: paths.length });
+  return (
+    <Dialog title={title} onClose={() => choose('cancel')} onConfirm={() => choose('save')}>
+      <p className={styles.text}>{t('dialogs.unsaved.body')}</p>
+      <div className={styles.buttons}>
+        <button type="button" className="btn btn-secondary" onClick={() => choose('discard')}>
+          {t('dialogs.unsaved.discard')}
+        </button>
+        <button type="button" className="btn btn-secondary" onClick={() => choose('cancel')}>
+          {t('dialogs.cancel')}
+        </button>
+        <button
+          type="button"
+          className="btn btn-primary"
+          data-autofocus
+          onClick={() => choose('save')}
+        >
+          {paths.length === 1 ? t('dialogs.unsaved.save') : t('dialogs.unsaved.saveAll')}
+        </button>
+      </div>
+    </Dialog>
+  );
+}

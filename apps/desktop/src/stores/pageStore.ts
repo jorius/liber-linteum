@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { confirmUnsaved, needsUnsavedPrompt } from '../features/editor/unsavedPrompt';
 import { pageGet, type ChangedPayload, type Page } from '../ipc';
 import { useEditorStore } from './editorStore';
 import { errorMessage } from './messages';
@@ -92,6 +93,8 @@ export const usePageStore = create<PageState>((set, get) => ({
     set({ jump: { path, from, to, nonce: (get().jump?.nonce ?? 0) + 1 } }),
   clearJump: () => set({ jump: null }),
   load: async (path) => {
+    // Auto save off (M5b §6): leaving unsaved text asks first; Cancel stays.
+    if (path !== get().path && needsUnsavedPrompt() && !(await confirmUnsaved())) return;
     watchSaves();
     const mine = ++seq;
     const same = get().path === path;

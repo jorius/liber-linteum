@@ -3,7 +3,8 @@ import { clearMocks, emit, mockIPC } from '../../ipc/testing';
 import { DEFAULT_SETTINGS, useSettingsStore } from '../../stores/settingsStore';
 import { useUiStore } from '../../stores/uiStore';
 import { useVaultStore } from '../../stores/vaultStore';
-import { installShellMenu } from './shellMenu';
+import { installSaveKey, installShellMenu } from './shellMenu';
+import { useEditorStore } from '../../stores/editorStore';
 
 let calls: { cmd: string; args: unknown }[];
 
@@ -41,9 +42,7 @@ describe('M5b §2.1, §2.5: the app menu items the page answers', () => {
     await emit('menu:vault', 'close');
     await vi.waitFor(() => expect(close).toHaveBeenCalledTimes(1));
     await emit('menu:vault', 'open');
-    await vi.waitFor(() =>
-      expect(calls.some((c) => c.cmd === 'plugin:dialog|open')).toBe(true),
-    );
+    await vi.waitFor(() => expect(calls.some((c) => c.cmd === 'plugin:dialog|open')).toBe(true));
     stop();
   });
 
@@ -67,5 +66,21 @@ describe('M5b §2.1, §2.5: the app menu items the page answers', () => {
     expect(close).not.toHaveBeenCalled();
     expect(calls.filter((c) => c.cmd === 'settings_set')).toEqual([]);
     stop();
+  });
+});
+
+describe('⌘S (M5b §6)', () => {
+  it('saves the current page, in every window, and keeps the browser from saving', () => {
+    const flush = vi.fn(async () => undefined);
+    useEditorStore.setState({ doc: { flush } as never });
+    const stop = installSaveKey();
+    const e = new KeyboardEvent('keydown', { key: 's', metaKey: true, cancelable: true });
+    window.dispatchEvent(e);
+    expect(flush).toHaveBeenCalledTimes(1);
+    expect(e.defaultPrevented).toBe(true);
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 's', metaKey: true, shiftKey: true }));
+    expect(flush).toHaveBeenCalledTimes(1);
+    stop();
+    useEditorStore.setState({ doc: null });
   });
 });

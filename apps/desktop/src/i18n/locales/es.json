@@ -192,7 +192,8 @@
       "copy": "Copiar a la bóveda",
       "link": "Enlazar donde está",
       "cancel": "Cancelar"
-    }
+    },
+    "unsaved": "Sin guardar"
   },
   "preview": {
     "tableScroll": "Tabla, se desplaza de lado",
@@ -258,6 +259,14 @@
       "where": "Se creará en {folder}.",
       "confirm": "Crear página",
       "invalid": "«{name}» no se puede usar como nombre. {reason}"
+    },
+    "unsaved": {
+      "titleOne": "¿Guardar los cambios en «{name}»?",
+      "titleMany": "{count, plural, one {¿Guardar los cambios en # página?} other {¿Guardar los cambios en # páginas?}}",
+      "body": "El guardado automático está desactivado. Los cambios que no guardes se pierden.",
+      "discard": "No guardar",
+      "save": "Guardar",
+      "saveAll": "Guardar todo"
     }
   },
   "settings": {
