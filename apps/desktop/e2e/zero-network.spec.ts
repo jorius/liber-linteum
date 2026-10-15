@@ -193,3 +193,40 @@ test('zero network requests: moving blocks in Split', async ({ page }) => {
   expect(csp).toEqual([]);
   expect(outside).toEqual([]);
 });
+
+// M4b part 2 §3, §4: maths and a Mermaid diagram, in Split and Live Preview
+// (a page of their own: the Global View tests above count the cards).
+const RICH = {
+  ...PAGES,
+  'Rich.md':
+    '# Rich\n\nInline $E = mc^2$ and ![x](https://remote.example/m.png).\n\n$$\n\\sum_{i=1}^n i\n$$\n\n' +
+    '```mermaid\nflowchart LR\n  A[Start] --> B[End]\n```\n',
+};
+
+for (const mode of ['split', 'livePreview']) {
+  test(`zero network requests: maths and Mermaid (${mode})`, async ({ page }) => {
+    const seen = await watchNetwork(page);
+    await page.addInitScript(installIpcMock, { pages: RICH, editorMode: mode });
+    await page.goto('/');
+    await page.getByRole('button', { name: /^vault/ }).click();
+    await page.getByRole('treeitem', { name: 'Rich' }).click();
+    const where =
+      mode === 'split'
+        ? page.getByRole('region', { name: 'Preview' })
+        : page.locator('.cm-content');
+    await expect(where.locator('.katex').first()).toBeVisible();
+    await expect(
+      where.getByRole('img', { name: 'Diagram: flowchart LR' }).locator('svg'),
+    ).toBeVisible({
+      timeout: 15_000,
+    });
+    await page.evaluate(() => document.fonts.ready);
+    await page.waitForLoadState('networkidle');
+    const csp = await page.evaluate(
+      () => (window as unknown as { __nimwCspViolations: string[] }).__nimwCspViolations,
+    );
+    expect(seen.problems).toEqual([]);
+    expect(csp).toEqual([]);
+    expect(seen.outside).toEqual([]);
+  });
+}

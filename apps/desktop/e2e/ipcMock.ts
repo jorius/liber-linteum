@@ -124,6 +124,13 @@ export function installIpcMock({
     editorMode,
     ...overrides,
   };
+  const widths = (): Record<string, string> => {
+    try {
+      return JSON.parse(sessionStorage.getItem('nimwMockWidths') ?? '{}') as Record<string, string>;
+    } catch {
+      return {};
+    }
+  };
   const handlers: Record<string, (a: Args, options?: unknown) => unknown> = {
     app_info: () => ({ name: 'Notes In My Way', version: '0.0.0-e2e' }),
     settings_get: () => ({ settings }),
@@ -154,7 +161,11 @@ export function installIpcMock({
         durationMs: 1,
       },
     }),
-    vault_tree: () => Object.keys(pages).map((path) => ({ path, kind: 'page' })),
+    vault_tree: () =>
+      Object.keys(pages).map((path) => ({
+        path,
+        kind: /\.md$/i.test(path) ? 'page' : 'attachment',
+      })),
     page_get: (a) => page(a.path as string),
     page_read: (a) => ({ text: pages[a.path as string], hash: 'h' }),
     page_write: (a) => {
@@ -162,6 +173,13 @@ export function installIpcMock({
       ((w.__nimwWrites ??= []) as unknown[]).push(a);
       pages[a.path as string] = a.text as string;
       // A new hash per write: the header refreshes when the hash changes.
+      return { hash: `h${nextId++}` };
+    },
+    // ---- M4b part 2: text files (§6) ----
+    text_read: (a) => ({ text: pages[a.path as string], hash: 'h' }),
+    text_write: (a) => {
+      ((w.__nimwWrites ??= []) as unknown[]).push(a);
+      pages[a.path as string] = a.text as string;
       return { hash: `h${nextId++}` };
     },
     backlink_count: () => 0,
@@ -188,7 +206,22 @@ export function installIpcMock({
     vault_settings_get: () => ({
       attachments: { mode: 'subfolder', path: 'attachments' },
       obsidian: null,
+      pageWidth: null,
+      pageWidths: widths(),
     }),
+    // M4b part 2 §1: kept in sessionStorage, so a reload still has them.
+    page_width_set: (a) => {
+      const next = { ...widths() };
+      if (a.width) next[a.path as string] = a.width as string;
+      else delete next[a.path as string];
+      sessionStorage.setItem('nimwMockWidths', JSON.stringify(next));
+      return {
+        attachments: { mode: 'subfolder', path: 'attachments' },
+        obsidian: null,
+        pageWidth: null,
+        pageWidths: next,
+      };
+    },
     vault_settings_set: (a) => (a.patch as { attachments: unknown }) ?? null,
     attachment_paste: (_a, options) => {
       const headers = (options as { headers?: Record<string, string> })?.headers ?? {};
