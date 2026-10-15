@@ -41,6 +41,7 @@
     "allow-page-width-set",
     "allow-text-read",
     "allow-text-write",
+    "allow-entry-create-text",
     "core:event:allow-listen",
     "core:event:allow-unlisten",
     "core:window:allow-destroy",

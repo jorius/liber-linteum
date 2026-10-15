@@ -152,6 +152,32 @@ describe('PageDoc external changes (M2a §3.3)', () => {
     expect(doc.orphaned).toBe(false);
   });
 
+  it('final review I6: a deleted text file is saved as a new text file, not a page', async () => {
+    const disk = fakeDisk({ 'conf/notes.json': '{}\n' });
+    const doc = await load('conf/notes.json');
+    doc.edit('{"unsaved": true}\n');
+    disk.files.delete('conf/notes.json');
+    expect(doc.markDeleted()).toBe(true);
+    const saved = await doc.saveAsNew();
+    expect(saved).toEqual({ ok: true, value: 'conf/notes.json' });
+    expect(disk.files.get('conf/notes.json')).toBe('{"unsaved": true}\n');
+    expect([...disk.files.keys()]).toEqual(['conf/notes.json']);
+    expect(disk.calls.map(([c]) => c)).not.toContain('entry_create_page');
+    expect(disk.calls.map(([c]) => c)).not.toContain('page_write');
+  });
+
+  it('final review I6: when its name is taken again, the copy keeps the type', async () => {
+    const disk = fakeDisk({ 'data.csv': 'a,b\n' });
+    const doc = await load('data.csv');
+    doc.edit('a,b\n1,2\n');
+    disk.files.set('data.csv', 'someone else’s\n');
+    expect(doc.markDeleted()).toBe(true);
+    const saved = await doc.saveAsNew();
+    expect(saved).toEqual({ ok: true, value: 'data (conflict).csv' });
+    expect(disk.files.get('data (conflict).csv')).toBe('a,b\n1,2\n');
+    expect(disk.files.get('data.csv')).toBe('someone else’s\n');
+  });
+
   it('deleted while clean: nothing to keep', async () => {
     fakeDisk({ 'A.md': 'one\n' });
     const doc = await load('A.md');

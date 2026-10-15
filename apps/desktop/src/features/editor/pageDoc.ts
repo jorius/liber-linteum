@@ -1,5 +1,6 @@
 import {
   entryCreatePage,
+  entryCreateText,
   pageCreateConflictCopy,
   pageRead,
   pageWrite,
@@ -135,16 +136,18 @@ export class PageDoc {
     return true;
   }
 
-  /** Writes an orphaned page's text to a new page next to its old path. */
+  /** Writes an orphaned page's text to a new page next to its old path —
+   *  a text file's to a new file of its type (`notes.json`, final review I6). */
   async saveAsNew(): Promise<IpcResult<string>> {
     const dir = parentOf(this.path);
-    const stem = nameOf(this.path).replace(/\.md$/i, '');
-    let created = await entryCreatePage(dir, stem);
+    let created = isTextPath(this.path)
+      ? await entryCreateText(dir, nameOf(this.path))
+      : await entryCreatePage(dir, nameOf(this.path).replace(/\.md$/i, ''));
     if (!created.ok && created.error.kind === 'alreadyExists') {
       created = await pageCreateConflictCopy(this.path, '');
     }
     if (!created.ok) return created;
-    const fresh = await pageRead(created.value);
+    const fresh = await read(created.value);
     if (!fresh.ok) return fresh;
     this.path = created.value;
     this.base = toLf(fresh.value.text);

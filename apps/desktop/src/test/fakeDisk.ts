@@ -3,6 +3,7 @@
 // header data. `extra` overrides or adds commands per test.
 import { mockIPC } from '../ipc/testing';
 import { parsePage } from '../markdown/parse';
+import { isTextPath } from '../stores/textFiles';
 
 export const hashOf = (text: string) => `h:${text}`;
 
@@ -80,15 +81,31 @@ export function fakeDisk(initial: Record<string, string>, extra: Extra = {}): Fa
           return { hash: hashOf(args.text) };
         }
         case 'page_create_conflict_copy': {
-          const stem = args.path.replace(/\.md$/, '');
-          let copy = `${stem} (conflict).md`;
-          for (let n = 2; files.has(copy); n++) copy = `${stem} (conflict ${n}).md`;
+          // A text file's copy keeps its extension (final review I6).
+          const text = isTextPath(args.path);
+          const dot = args.path.lastIndexOf('.');
+          const hasExt = dot > args.path.lastIndexOf('/') + 1;
+          const stem = text
+            ? hasExt
+              ? args.path.slice(0, dot)
+              : args.path
+            : args.path.replace(/\.md$/, '');
+          const ext = text ? (hasExt ? args.path.slice(dot) : '') : '.md';
+          let copy = `${stem} (conflict)${ext}`;
+          for (let n = 2; files.has(copy); n++) copy = `${stem} (conflict ${n})${ext}`;
           files.set(copy, args.text);
           return copy;
         }
         case 'entry_create_page': {
           const name = args.name.endsWith('.md') ? args.name : `${args.name}.md`;
           const path = args.dir ? `${args.dir}/${name}` : name;
+          if (files.has(path)) throw err('alreadyExists', path);
+          files.set(path, '');
+          return path;
+        }
+        case 'entry_create_text': {
+          const path = args.dir ? `${args.dir}/${args.name}` : args.name;
+          if (!isTextPath(path)) throw err('notAText', path);
           if (files.has(path)) throw err('alreadyExists', path);
           files.set(path, '');
           return path;

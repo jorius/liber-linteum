@@ -376,6 +376,9 @@ export const pageGet = (path: string) => call<Page>('page_get', { path });
 export const backlinkCount = (path: string) => call<number>('backlink_count', { path });
 export const entryCreatePage = (dir: string, name: string) =>
   call<string>('entry_create_page', { dir, name });
+/** An empty text or code file `name` in `dir` (final review I6). */
+export const entryCreateText = (dir: string, name: string) =>
+  call<string>('entry_create_text', { dir, name });
 export const entryCreateFolder = (parent: string, name: string) =>
   call<string>('entry_create_folder', { parent, name });
 export const entryRename = (from: string, to: string) =>

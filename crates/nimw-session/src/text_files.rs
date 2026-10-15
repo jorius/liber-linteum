@@ -3,8 +3,9 @@
 //! attachments in the index; nothing here parses them as pages.
 
 use crate::error::{Result, SessionError};
-use crate::session::{VaultSession, clamp_ns, is_page_path};
+use crate::session::{VaultSession, clamp_ns, is_page_path, validate_name};
 use nimw_index::{FileKind, FileRow};
+use nimw_markdown::link_key;
 use nimw_vault::{Hash, VaultPath};
 
 /// Larger files keep "Open in default app".
@@ -63,6 +64,42 @@ impl VaultSession {
         }
         let text = String::from_utf8(bytes).map_err(|_| not_a_text(path))?;
         Ok((text, hash))
+    }
+
+    /// Creates an empty text file `name` in `dir` — "Save as new file" for a
+    /// text file deleted outside the app with unsaved edits (final review
+    /// I6). `NotAText` for a name the text view doesn't open (pages
+    /// included), `AlreadyExists` when the name is taken.
+    pub fn create_text_file(&self, dir: &VaultPath, name: &str) -> Result<VaultPath> {
+        let name = validate_name(name)?;
+        let path = dir.join(name)?;
+        if !is_text_path(name) || is_page_path(name) {
+            return Err(not_a_text(&path));
+        }
+        self.create_attachment(&path, b"")?;
+        Ok(path)
+    }
+
+    /// Writes a new file (never over one) and indexes it as an attachment;
+    /// links to its name resolve at once.
+    pub(crate) fn create_attachment(&self, path: &VaultPath, bytes: &[u8]) -> Result<Hash> {
+        let hash = self.vault.write_cas(path, bytes, None)?;
+        let entry = self
+            .vault
+            .stat(path)?
+            .ok_or_else(|| SessionError::NotIndexed(path.to_string()))?;
+        let row = FileRow {
+            path: path.to_string(),
+            kind: FileKind::Attachment,
+            mtime_ns: clamp_ns(entry.mtime_ns),
+            size: entry.size,
+            hash: Some(hash.to_hex()),
+        };
+        let mut index = self.index();
+        index.transaction(|tx| tx.upsert_file(&row))?;
+        let files = index.file_set()?;
+        index.resolve_affected(&files, &[link_key(path.as_str())])?;
+        Ok(hash)
     }
 
     /// Writes the file's full text if it still has `expected` as its hash,

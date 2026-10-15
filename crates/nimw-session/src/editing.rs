@@ -2,7 +2,8 @@
 //! writes, conflict copies and link resolution against the live file set.
 
 use crate::error::{Result, SessionError};
-use crate::session::VaultSession;
+use crate::session::{VaultSession, is_page_path};
+use crate::text_files::is_text_path;
 use nimw_markdown::{LinkKind, resolve};
 use nimw_vault::{Hash, VaultError, VaultPath};
 
@@ -23,21 +24,33 @@ impl VaultSession {
     }
 
     /// Saves `text` next to `path` as `<stem> (conflict).md`, then
-    /// `(conflict 2)`, … and returns the new page's path.
+    /// `(conflict 2)`, … and returns the new page's path. A text file's copy
+    /// keeps its type: `data (conflict).csv`, an attachment the text view
+    /// opens (final review I6).
     pub fn create_conflict_copy(&self, path: &VaultPath, text: &str) -> Result<VaultPath> {
         let dir = path.parent().unwrap_or_else(VaultPath::root);
         let stem = path.stem();
+        let text_file = is_text_path(path.as_str()) && !is_page_path(path.as_str());
+        let ext = match path.extension() {
+            Some(ext) if text_file => format!(".{ext}"),
+            _ => String::new(),
+        };
         for n in 1.. {
             let name = if n == 1 {
-                format!("{stem} (conflict)")
+                format!("{stem} (conflict){ext}")
             } else {
-                format!("{stem} (conflict {n})")
+                format!("{stem} (conflict {n}){ext}")
             };
-            match self.create_page(&dir, &name) {
-                Ok(copy) => {
-                    self.write_page(&copy, text, Hash::of(b""))?;
-                    return Ok(copy);
-                }
+            let made = if text_file {
+                dir.join(&name)
+                    .map_err(SessionError::from)
+                    .and_then(|copy| self.create_attachment(&copy, text.as_bytes()).map(|_| copy))
+            } else {
+                self.create_page(&dir, &name)
+                    .and_then(|copy| self.write_page(&copy, text, Hash::of(b"")).map(|_| copy))
+            };
+            match made {
+                Ok(copy) => return Ok(copy),
                 Err(SessionError::Vault(VaultError::AlreadyExists(_))) => continue,
                 Err(e) => return Err(e),
             }

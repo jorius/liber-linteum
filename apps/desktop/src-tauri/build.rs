@@ -38,6 +38,7 @@ const COMMANDS: &[&str] = &[
     "page_width_set",
     "text_read",
     "text_write",
+    "entry_create_text",
 ];
 
 fn main() {

@@ -107,3 +107,67 @@ fn only_eligible_text_files() {
     let err = s.write_text(&vp("page.md"), "# x", hash).unwrap_err();
     assert!(matches!(err, SessionError::NotAText(_)), "{err:?}");
 }
+
+fn kind_of(s: &VaultSession, path: &str) -> Option<FileKind> {
+    s.tree()
+        .unwrap()
+        .into_iter()
+        .find(|n| n.path == path)
+        .map(|n| n.kind)
+}
+
+/// Final review I6: an unclean merge on `data.csv` saves their version as
+/// `data (conflict).csv` — still a text file, never a page holding CSV.
+#[test]
+fn a_text_files_conflict_copy_keeps_its_type() {
+    let (dir, _c, s) = session_with(&[("data/data.csv", b"a,b\n"), ("Dockerfile", b"FROM x\n")]);
+    let first = s
+        .create_conflict_copy(&vp("data/data.csv"), "theirs 1\n")
+        .unwrap();
+    let second = s
+        .create_conflict_copy(&vp("data/data.csv"), "theirs 2\n")
+        .unwrap();
+    assert_eq!(first.as_str(), "data/data (conflict).csv");
+    assert_eq!(second.as_str(), "data/data (conflict 2).csv");
+    assert_eq!(
+        std::fs::read_to_string(dir.path().join("data/data (conflict 2).csv")).unwrap(),
+        "theirs 2\n"
+    );
+    assert_eq!(kind_of(&s, second.as_str()), Some(FileKind::Attachment));
+    assert!(s.page(&second).unwrap().is_none());
+    assert_eq!(s.read_text(&second).unwrap().0, "theirs 2\n");
+    // A text file known by its whole name has no extension to keep: its
+    // copy isn't a page either.
+    let copy = s
+        .create_conflict_copy(&vp("Dockerfile"), "FROM y\n")
+        .unwrap();
+    assert_eq!(copy.as_str(), "Dockerfile (conflict)");
+    assert_eq!(kind_of(&s, copy.as_str()), Some(FileKind::Attachment));
+}
+
+/// Final review I6: "Save as new" for a text file deleted outside the app
+/// creates a text file again (`notes.json`, not `notes.json.md`).
+#[test]
+fn create_text_file_keeps_the_name_and_refuses_taken_or_other_names() {
+    let (dir, _c, s) = session_with(&[("conf/app.json", b"{}\n")]);
+    let made = s.create_text_file(&vp("conf"), "notes.json").unwrap();
+    assert_eq!(made.as_str(), "conf/notes.json");
+    assert_eq!(
+        std::fs::read_to_string(dir.path().join("conf/notes.json")).unwrap(),
+        ""
+    );
+    assert_eq!(kind_of(&s, "conf/notes.json"), Some(FileKind::Attachment));
+    let (_, hash) = s.read_text(&made).unwrap();
+    s.write_text(&made, "{\"kept\": true}\n", hash).unwrap();
+    let err = s.create_text_file(&vp("conf"), "app.json").unwrap_err();
+    assert!(
+        matches!(err, SessionError::Vault(VaultError::AlreadyExists(_))),
+        "{err:?}"
+    );
+    for name in ["page.md", "pic.png", "README"] {
+        let err = s.create_text_file(&vp("conf"), name).unwrap_err();
+        assert!(matches!(err, SessionError::NotAText(_)), "{name}: {err:?}");
+    }
+    let err = s.create_text_file(&vp("conf"), "a/b.txt").unwrap_err();
+    assert!(matches!(err, SessionError::InvalidName(_)), "{err:?}");
+}

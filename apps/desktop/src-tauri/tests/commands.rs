@@ -51,6 +51,7 @@ const COMMANDS: &[&str] = &[
     "page_width_set",
     "text_read",
     "text_write",
+    "entry_create_text",
 ];
 
 struct Harness {
@@ -1411,4 +1412,64 @@ fn m4b2_text_files_over_ipc() {
     }
     let err = call(&h.main, "text_read", json!({ "path": "missing.txt" })).unwrap_err();
     assert_eq!(kind(err), "notFound");
+}
+
+/// Final review I6: recovery keeps a text file's type. An unclean merge's
+/// copy of `data.csv` is `data (conflict).csv`, and "Save as new" for a text
+/// file deleted outside the app creates `notes.json` again, not a page.
+#[test]
+fn m4b2_text_files_keep_their_type_in_recovery_over_ipc() {
+    let h = harness();
+    let vault = tempfile::tempdir().unwrap();
+    std::fs::create_dir(vault.path().join("data")).unwrap();
+    std::fs::write(vault.path().join("data/data.csv"), "a,b\n").unwrap();
+    call(&h.main, "vault_open", json!({ "path": vault.path() })).unwrap();
+    let copy = call(
+        &h.main,
+        "page_create_conflict_copy",
+        json!({ "path": "data/data.csv", "text": "theirs\n" }),
+    )
+    .unwrap();
+    assert_eq!(copy, "data/data (conflict).csv");
+    let got = call(
+        &h.main,
+        "text_read",
+        json!({ "path": "data/data (conflict).csv" }),
+    )
+    .unwrap();
+    assert_eq!(got["text"], "theirs\n");
+
+    let made = call(
+        &h.main,
+        "entry_create_text",
+        json!({ "dir": "data", "name": "notes.json" }),
+    )
+    .unwrap();
+    assert_eq!(made, "data/notes.json");
+    let got = call(&h.main, "text_read", json!({ "path": "data/notes.json" })).unwrap();
+    assert_eq!(got["text"], "");
+    call(
+        &h.main,
+        "text_write",
+        json!({ "path": "data/notes.json", "text": "{}\n", "expectedHash": got["hash"] }),
+    )
+    .unwrap();
+    assert_eq!(
+        std::fs::read_to_string(vault.path().join("data/notes.json")).unwrap(),
+        "{}\n"
+    );
+    let err = call(
+        &h.main,
+        "entry_create_text",
+        json!({ "dir": "data", "name": "notes.json" }),
+    )
+    .unwrap_err();
+    assert_eq!(kind(err), "alreadyExists");
+    let err = call(
+        &h.main,
+        "entry_create_text",
+        json!({ "dir": "", "name": "Page.md" }),
+    )
+    .unwrap_err();
+    assert_eq!(kind(err), "notAText");
 }
