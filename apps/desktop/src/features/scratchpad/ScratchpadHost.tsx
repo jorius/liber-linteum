@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { onMenuQuickNote } from '../../ipc';
 import { useUiStore } from '../../stores/uiStore';
+import { installAutoName } from './autoName';
 import { newQuickNote } from './quickNote';
 import { ScratchpadSetupDialog } from './ScratchpadSetupDialog';
 import { installScratchpadSync } from './scratchpadStore';
@@ -20,13 +21,15 @@ function isQuickNoteKey(e: KeyboardEvent): boolean {
 }
 
 /** Quick notes on every screen (M4c §2): ⌘⇧N, File → New Quick Note, the
- *  first-use dialog, and the store kept in step with the open vault.
+ *  first-use dialog, the store kept in step with the open vault, and
+ *  naming quick notes after their first line.
  *  Mounted once, beside the Welcome screen and the app shell. */
 export function ScratchpadHost() {
   const dialog = useUiStore((s) => s.dialog);
   const close = useUiStore((s) => s.closeDialog);
 
   useEffect(() => installScratchpadSync(), []);
+  useEffect(() => installAutoName(), []);
 
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
