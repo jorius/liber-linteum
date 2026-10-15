@@ -3,6 +3,7 @@
 
 mod body;
 mod external;
+mod first_line;
 mod frontmatter;
 mod page;
 mod resolve;
@@ -11,6 +12,7 @@ mod types;
 mod wikilink;
 
 pub use external::{DiskPath, ExternalTarget, external_target, network_server};
+pub use first_line::first_line_text;
 pub use page::parse_page;
 pub use resolve::{FileSet, link_key, name_key, normalize_join, resolve, shortest_unique_target};
 pub use title::extract_title;
