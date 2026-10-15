@@ -22,6 +22,7 @@ import { errorMessage } from '../../stores/messages';
 import { openPage, openPageAt } from '../../stores/navigate';
 import { useToastStore } from '../../stores/toastStore';
 import { useVaultStore } from '../../stores/vaultStore';
+import { toLf } from '../editor/eol';
 import { AtomCard, MoreCard, SectionCard } from './AtomCard';
 import {
   atomsLayout,
@@ -64,7 +65,9 @@ export async function readAtoms(path: string): Promise<IpcResult<AtomsData>> {
   if (text === null) {
     const res = await pageRead(path);
     if (!res.ok) return { ok: false, error: res.error };
-    text = res.value.text;
+    // The editor holds LF text: offsets for the jump must count the same
+    // characters (final review I2).
+    text = toLf(res.value.text);
   }
   const model = buildAtoms(text);
   const level = await gvChildren({ kind: 'page', path });

@@ -81,9 +81,12 @@ const RELATED: GvEdge[] = [
 ];
 
 let reads: string[];
+/** How `page_read` returns Rex: as written, or saved with Windows line ends. */
+let rexOnDisk: string;
 
 beforeEach(() => {
   reads = [];
+  rexOnDisk = REX;
   useSettingsStore.setState({ settings: { ...DEFAULT_SETTINGS } });
   useGvStore.getState().reset();
   useUiStore.setState({ screen: 'global' });
@@ -105,7 +108,7 @@ beforeEach(() => {
         );
       case 'page_read':
         reads.push(args.path as string);
-        return { text: args.path === 'Rex.md' ? REX : '', hash: 'h' };
+        return { text: args.path === 'Rex.md' ? rexOnDisk : '', hash: 'h' };
       case 'page_get':
         return {
           path: args.path,
@@ -192,6 +195,20 @@ describe('See atoms (M4b part 3 §6)', () => {
     expect(usePageStore.getState().jump).toMatchObject({
       path: 'Rex.md',
       from,
+      to: REX.indexOf('magnets') + 'magnets'.length,
+    });
+  });
+
+  // Final review I2: the editor holds LF text, so offsets taken from a CRLF
+  // file's raw text landed one character later per line break above.
+  it('a CRLF note jumps to the block clicked, at its offset in the editor (LF) text', async () => {
+    rexOnDisk = REX.replace(/\n/g, '\r\n');
+    await atomsOf();
+    await userEvent.click(await screen.findByRole('button', { name: 'List: water, magnets' }));
+    await waitFor(() => expect(useUiStore.getState().screen).toBe('edit'));
+    expect(usePageStore.getState().jump).toMatchObject({
+      path: 'Rex.md',
+      from: REX.indexOf('- water'),
       to: REX.indexOf('magnets') + 'magnets'.length,
     });
   });
