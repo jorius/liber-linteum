@@ -207,6 +207,14 @@ export function SettingsDialog({ onClose }: { onClose: () => void }) {
           />
           {t('settings.lineNumbers')}
         </label>
+        <label className={styles.check}>
+          <input
+            type="checkbox"
+            checked={settings.showAttachmentPaths === true}
+            onChange={(e) => void update({ showAttachmentPaths: e.target.checked })}
+          />
+          {t('settings.links.showPaths')}
+        </label>
       </section>
 
       <section className={styles.section} aria-labelledby={ids.files}>

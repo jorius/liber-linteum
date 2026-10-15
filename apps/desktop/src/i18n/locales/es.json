@@ -321,7 +321,7 @@
         "relative": "Relativa a la nota",
         "absolute": "Ruta absoluta en el disco"
       },
-      "example": "Los adjuntos nuevos se escriben como {example}",
+      "example": "Los adjuntos nuevos se escriben como",
       "obsidian": "Sigue la configuración de Obsidian ({format}). Elige un formato para usar el tuyo.",
       "useObsidian": "Usar la configuración de Obsidian",
       "showPaths": "Mostrar dónde están los adjuntos en el disco"

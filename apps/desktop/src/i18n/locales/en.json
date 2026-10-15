@@ -321,7 +321,7 @@
         "relative": "Relative to the note",
         "absolute": "Absolute path on disk"
       },
-      "example": "New attachments are written as {example}",
+      "example": "New attachments are written as",
       "obsidian": "Following Obsidian’s setting ({format}). Choose a format to use your own.",
       "useObsidian": "Use Obsidian’s setting",
       "showPaths": "Show where attachments are on disk"

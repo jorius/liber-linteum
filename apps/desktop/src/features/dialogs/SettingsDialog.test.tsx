@@ -202,6 +202,14 @@ describe('Settings dialog (M2b §4, §5, §7)', () => {
     expect(select).toHaveValue('280');
   });
 
+  it('M4b part 3 §8: "Show where attachments are on disk" is off until turned on', async () => {
+    open();
+    const box = screen.getByRole('checkbox', { name: 'Show where attachments are on disk' });
+    expect(box).not.toBeChecked();
+    await userEvent.click(box);
+    await waitFor(() => expect(patches).toEqual([{ showAttachmentPaths: true }]));
+  });
+
   it('cover resize: a default set by hand outside the four sizes is still shown', () => {
     useSettingsStore.setState({ settings: { ...DEFAULT_SETTINGS, coverHeight: 250 } });
     open();
@@ -227,9 +235,13 @@ describe('Settings → This vault (M2c §5.4)', () => {
   let overrideObsidian: boolean;
   let stored: { mode: string; path: string };
   let vaultWidth: string | null;
+  let linkFormat: string | null;
+  let obsidianLinkFormat: string | null;
 
   beforeEach(() => {
     vaultWidth = null;
+    linkFormat = null;
+    obsidianLinkFormat = null;
     vaultPatches = [];
     obsidian = null;
     overrideObsidian = false;
@@ -243,6 +255,8 @@ describe('Settings → This vault (M2c §5.4)', () => {
         overrideObsidian,
         pageWidth: vaultWidth,
         pageWidths: {},
+        attachmentLinkFormat: linkFormat,
+        obsidianLinkFormat,
       });
       if (cmd === 'vault_settings_get') return reply();
       if (cmd === 'vault_settings_set') {
@@ -251,7 +265,11 @@ describe('Settings → This vault (M2c §5.4)', () => {
           attachments?: typeof stored;
           overrideObsidian?: boolean;
           pageWidth?: string;
+          attachmentLinkFormat?: string;
         };
+        if (patch.attachmentLinkFormat) {
+          linkFormat = patch.attachmentLinkFormat === 'default' ? null : patch.attachmentLinkFormat;
+        }
         if (patch.attachments) stored = patch.attachments;
         if (patch.overrideObsidian !== undefined) overrideObsidian = patch.overrideObsidian;
         if (patch.pageWidth) vaultWidth = patch.pageWidth === 'default' ? null : patch.pageWidth;
@@ -294,6 +312,50 @@ describe('Settings → This vault (M2c §5.4)', () => {
     await waitFor(() => expect(vaultPatches.at(-1)).toEqual({ pageWidth: 'wide' }));
     await userEvent.selectOptions(width, 'default');
     await waitFor(() => expect(vaultPatches.at(-1)).toEqual({ pageWidth: 'default' }));
+  });
+
+  it('M4b part 3 §8: the link format for new attachments is saved at once, with an example', async () => {
+    open();
+    const format = await screen.findByRole('combobox', {
+      name: 'Link format for new attachments',
+    });
+    await waitFor(() => expect(format).toHaveValue('shortest'));
+    expect(
+      within(format)
+        .getAllByRole('option')
+        .map((o) => o.textContent),
+    ).toEqual([
+      'Shortest name',
+      'Full path in the vault',
+      'Relative to the note',
+      'Absolute path on disk',
+    ]);
+    expect(screen.getByText('![[x.png]]')).toBeInTheDocument();
+    await userEvent.selectOptions(format, 'absolute');
+    await waitFor(() => expect(vaultPatches).toEqual([{ attachmentLinkFormat: 'absolute' }]));
+    expect(format).toHaveValue('absolute');
+    expect(screen.getByText('![](file:///…/Assets/x.png)')).toBeInTheDocument();
+  });
+
+  it("M4b part 3 §8: Obsidian's newLinkFormat is followed until NIMW has its own", async () => {
+    obsidianLinkFormat = 'relative';
+    open();
+    const format = await screen.findByRole('combobox', {
+      name: 'Link format for new attachments',
+    });
+    await waitFor(() => expect(format).toHaveValue('default'));
+    expect(
+      screen.getByText(
+        'Following Obsidian’s setting (Relative to the note). Choose a format to use your own.',
+      ),
+    ).toBeInTheDocument();
+    expect(screen.getByText('![[../Assets/x.png]]')).toBeInTheDocument();
+    await userEvent.selectOptions(format, 'vault');
+    await waitFor(() => expect(vaultPatches).toEqual([{ attachmentLinkFormat: 'vault' }]));
+    expect(screen.queryByText(/Following Obsidian’s setting/)).not.toBeInTheDocument();
+    await userEvent.selectOptions(format, 'default');
+    await waitFor(() => expect(vaultPatches.at(-1)).toEqual({ attachmentLinkFormat: 'default' }));
+    expect(format).toHaveValue('default');
   });
 
   it('a folder is saved on Enter; an unusable name is explained and not saved', async () => {
