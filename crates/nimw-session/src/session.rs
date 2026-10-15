@@ -72,7 +72,22 @@ impl VaultSession {
             watcher: Mutex::new(None),
             network_ok: Mutex::new(HashSet::new()),
         };
-        let (report, _) = session.reindex_all()?;
+        let (report, changes) = session.reindex_all()?;
+        session.forget_page_sizes(&changes.removed);
+        // A flag is only trusted for a note the index saw unchanged: one
+        // edited, replaced or new since (Finder, Obsidian, sync, another
+        // machine's empty index) is the user's now (M4c final review I2).
+        let unseen: Vec<String> = changes
+            .created
+            .iter()
+            .chain(&changes.modified)
+            .cloned()
+            .collect();
+        if let Err(e) = session.vault.forget_auto_named(&unseen) {
+            session.emit(SessionEvent::Warning(format!(
+                "Quick notes changed elsewhere may still be renamed: {e}"
+            )));
+        }
         Ok((session, report))
     }
 

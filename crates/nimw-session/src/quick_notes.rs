@@ -6,12 +6,28 @@
 use crate::attachments::sanitize_file_name;
 use crate::session::validate_name;
 use crate::{RenameOutcome, Result, SessionError, SessionEvent, VaultSession};
-use nimw_markdown::first_line_text;
+use nimw_index::FileKind;
+use nimw_markdown::{first_line_text, link_key, name_key};
 use nimw_vault::{EntryKind, VaultError, VaultPath};
 use std::collections::HashSet;
+use unicode_segmentation::UnicodeSegmentation;
 
-/// Longest name taken from a first line, in characters.
+/// Longest name taken from a first line, in characters (graphemes, so a
+/// flag or an accented letter is never cut in half).
 pub const MAX_QUICK_NAME: usize = 60;
+
+/// Bytes a generated stem may take, well under the 255-byte file-name
+/// limit even with `.md` and a number added.
+const MAX_QUICK_BYTES: usize = 200;
+
+/// Invisible characters that would hide or reorder a file name: bidi
+/// controls, zero-width spaces, the soft hyphen and the BOM (final review
+/// M3). Joiners stay: emoji and some scripts need them.
+fn invisible(c: char) -> bool {
+    matches!(c,
+        '\u{00AD}' | '\u{200B}' | '\u{200E}' | '\u{200F}' | '\u{202A}'..='\u{202E}'
+        | '\u{2060}'..='\u{2064}' | '\u{2066}'..='\u{2069}' | '\u{FEFF}')
+}
 
 /// What [`VaultSession::auto_name`] did.
 #[derive(Debug)]
@@ -28,9 +44,21 @@ pub struct AutoName {
 /// visible text, refused characters as `-`, at most 60 characters. `None`
 /// when nothing usable is left, or for a Windows device name.
 pub fn quick_note_stem(text: &str) -> Option<String> {
-    let line = first_line_text(text)?;
+    let line: String = first_line_text(text)?
+        .chars()
+        .filter(|c| !invisible(*c))
+        .collect();
+    if line.trim().is_empty() {
+        return None; // sanitizing would make up a name
+    }
     let clean = sanitize_file_name(&line);
-    let cut: String = clean.chars().take(MAX_QUICK_NAME).collect();
+    let mut cut = String::new();
+    for g in clean.graphemes(true).take(MAX_QUICK_NAME) {
+        if cut.len() + g.len() > MAX_QUICK_BYTES {
+            break;
+        }
+        cut.push_str(g);
+    }
     let stem = cut.trim_end().to_string();
     let usable = stem.chars().any(|c| c != '-' && !c.is_whitespace());
     (usable && !device_name(&stem)).then_some(stem)
@@ -51,9 +79,8 @@ fn device_name(stem: &str) -> bool {
     matches!(base.as_str(), "CON" | "PRN" | "AUX" | "NUL") || numbered("COM") || numbered("LPT")
 }
 
-/// `name` (or `name 1`, `name 2`…) + `.md`, the first not in `taken`
-/// (lower-case names).
-fn free_name(stem: &str, taken: &HashSet<String>) -> String {
+/// `name` (or `name 1`, `name 2`…) + `.md`, the first `taken` refuses.
+fn free_name(stem: &str, taken: impl Fn(&str) -> bool) -> String {
     (0..)
         .map(|i| {
             if i == 0 {
@@ -62,7 +89,7 @@ fn free_name(stem: &str, taken: &HashSet<String>) -> String {
                 format!("{stem} {i}.md")
             }
         })
-        .find(|name| !taken.contains(&name.to_lowercase()))
+        .find(|name| !taken(name))
         .expect("a free name")
 }
 
@@ -95,7 +122,9 @@ impl VaultSession {
     }
 
     /// Renames a flagged note after its saved first line (same folder,
-    /// numbered when taken, the note itself not counting). Unflagged notes,
+    /// numbered when taken, the note itself not counting). A name any file
+    /// in the vault already answers links to counts as taken, so no link
+    /// changes meaning and none is rewritten (final review I1). Unflagged notes,
     /// a first line with nothing usable, or a name that differs only in
     /// letter case leave it as it is.
     pub fn auto_name(&self, path: &VaultPath, rewrite_links: bool) -> Result<AutoName> {
@@ -112,18 +141,25 @@ impl VaultSession {
             return Ok(unchanged(true));
         };
         let dir = path.parent().unwrap_or_else(VaultPath::root);
-        let own = path.file_name().to_lowercase();
-        let taken: HashSet<String> = self
-            .index()
-            .stats()?
-            .into_keys()
-            .filter_map(|p| VaultPath::new(&p).ok())
-            .filter(|p| p.parent().unwrap_or_else(VaultPath::root) == dir)
-            .map(|p| p.file_name().to_lowercase())
-            .filter(|name| *name != own)
-            .collect();
-        let name = free_name(&stem, &taken);
-        if name.to_lowercase() == own {
+        let own = name_key(path.file_name());
+        let mut link_names = HashSet::new();
+        let mut siblings = HashSet::new();
+        for (p, stat) in self.index().stats()? {
+            let Ok(p) = VaultPath::new(&p) else { continue };
+            if p == *path {
+                continue;
+            }
+            if stat.kind != FileKind::Folder {
+                link_names.insert(link_key(p.as_str()));
+            }
+            if p.parent().unwrap_or_else(VaultPath::root) == dir {
+                siblings.insert(name_key(p.file_name()));
+            }
+        }
+        let name = free_name(&stem, |name| {
+            link_names.contains(&link_key(name)) || siblings.contains(&name_key(name))
+        });
+        if name_key(&name) == own {
             return Ok(unchanged(true));
         }
         let to = dir.join(&name)?;
@@ -153,14 +189,24 @@ impl VaultSession {
         rewrite_links: bool,
     ) -> Result<Option<RenameOutcome>> {
         let valid = validate_name(name)?;
-        if valid != name {
+        // Windows can't hold a device name or a trailing dot (final review M4).
+        if valid != name || name.ends_with('.') || device_name(name) {
             return Err(SessionError::InvalidName(name.to_string()));
         }
         let target = VaultPath::new(name)?;
         let current = self.vault.scratch_folder();
         let mut outcome = None;
         if current != name {
-            match self.vault.stat(&target)?.map(|e| e.kind) {
+            // Only the letter case changes: on a case-insensitive disk the
+            // current folder answers to the new name, and must be renamed,
+            // not adopted (final review I4).
+            let case_only = name_key(&current) == name_key(name) && !self.has_exact_entry(name);
+            let existing = if case_only {
+                None
+            } else {
+                self.vault.stat(&target)?.map(|e| e.kind)
+            };
+            match existing {
                 Some(EntryKind::Dir) => {}
                 Some(_) => return Err(VaultError::AlreadyExists(name.to_string()).into()),
                 None => {
@@ -169,13 +215,31 @@ impl VaultSession {
                         self.vault.stat(&from)?.map(|e| e.kind),
                         Some(EntryKind::Dir)
                     ) {
+                        // Its notes keep their names-from-first-line (final review M2).
+                        let prefix = format!("{current}/");
+                        let carried: Vec<String> = self
+                            .vault
+                            .auto_named()
+                            .into_iter()
+                            .filter_map(|p| p.strip_prefix(&prefix).map(str::to_string))
+                            .collect();
                         outcome = Some(self.rename(&from, &target, rewrite_links)?);
+                        for rest in carried {
+                            self.vault.set_auto_named(&format!("{name}/{rest}"), true)?;
+                        }
                     }
                 }
             }
         }
         self.vault.set_scratch_folder(name)?;
         Ok(outcome)
+    }
+
+    /// The vault root holds an entry named exactly `name` (letter case too).
+    fn has_exact_entry(&self, name: &str) -> bool {
+        std::fs::read_dir(self.vault.root())
+            .map(|dir| dir.flatten().any(|e| e.file_name() == name))
+            .unwrap_or(false)
     }
 
     /// Creates `dir` and its missing parents as indexed folders.
@@ -416,5 +480,132 @@ mod tests {
         assert_eq!(quick_note_stem("Lpt1.txt"), None);
         assert_eq!(quick_note_stem("|||"), None);
         assert_eq!(quick_note_stem("# Console"), Some("Console".to_string()));
+    }
+
+    #[test]
+    fn m4c_final_i1_never_takes_a_name_a_link_already_means() {
+        let f = open(&[
+            ("Home.md", "See [[Groceries]]."),
+            ("Shopping/Groceries.md", "milk"),
+        ]);
+        let q = f.s.create_quick_note(&vp("Scratchpad"), "Q").unwrap();
+        std::fs::write(f.root.join("Scratchpad/Q.md"), "Groceries").unwrap();
+        changed(&f, std::slice::from_ref(&q));
+        let out = f.s.auto_name(&q, true).unwrap();
+        assert_eq!(out.path.as_str(), "Scratchpad/Groceries 1.md");
+        assert!(out.renamed.unwrap().updated_files.is_empty());
+        assert_eq!(
+            std::fs::read_to_string(f.root.join("Home.md")).unwrap(),
+            "See [[Groceries]]."
+        );
+        // Accents in another normal form are the same name (M3).
+        let r = f.s.create_quick_note(&vp("Scratchpad"), "R").unwrap();
+        std::fs::write(f.root.join("Shopping/Café.md"), "x").unwrap();
+        changed(&f, &[vp("Shopping/Café.md")]);
+        std::fs::write(f.root.join("Scratchpad/R.md"), "Cafe\u{301}").unwrap();
+        changed(&f, std::slice::from_ref(&r));
+        let out = f.s.auto_name(&r, true).unwrap();
+        assert_eq!(out.path.as_str(), "Scratchpad/Cafe\u{301} 1.md");
+    }
+
+    #[test]
+    fn m4c_final_i2_flags_of_notes_changed_while_closed_are_dropped() {
+        let vault = tempfile::tempdir().unwrap();
+        let cache = tempfile::tempdir().unwrap();
+        let root = vault.path();
+        let reopen = || VaultSession::open(root, cache.path(), |_| {}).unwrap().0;
+        let s = reopen();
+        s.create_quick_note(&VaultPath::root(), "Q").unwrap();
+        s.create_quick_note(&VaultPath::root(), "Kept").unwrap();
+        drop(s);
+        // Nothing changed: the flags stay.
+        let s = reopen();
+        let flags: Vec<String> = s.vault().auto_named().into_iter().collect();
+        assert_eq!(flags, ["Kept.md", "Q.md"]);
+        drop(s);
+        // Renamed in Finder, and a plain note written at the old path.
+        std::fs::rename(root.join("Q.md"), root.join("Mine.md")).unwrap();
+        std::fs::write(root.join("Q.md"), "Important plan").unwrap();
+        let s = reopen();
+        let flags: Vec<String> = s.vault().auto_named().into_iter().collect();
+        assert_eq!(flags, ["Kept.md"]);
+        let out = s.auto_name(&vp("Q.md"), true).unwrap();
+        assert_eq!(out.path.as_str(), "Q.md");
+        assert!(out.renamed.is_none() && !out.auto_named);
+        drop(s);
+        // A fresh index (another machine): no flag can be trusted.
+        let other = tempfile::tempdir().unwrap();
+        let (s, _) = VaultSession::open(root, other.path(), |_| {}).unwrap();
+        assert!(s.vault().auto_named().is_empty());
+    }
+
+    #[test]
+    fn m4c_final_i4_a_case_only_change_renames_the_folder() {
+        let f = open(&[("Scratchpad/a.md", "x")]);
+        assert!(
+            f.s.set_scratch_folder("scratchpad", true)
+                .unwrap()
+                .is_some()
+        );
+        let names: Vec<String> = std::fs::read_dir(&f.root)
+            .unwrap()
+            .map(|e| e.unwrap().file_name().into_string().unwrap())
+            .filter(|n| !n.starts_with('.'))
+            .collect();
+        assert_eq!(names, ["scratchpad"]);
+        assert_eq!(f.s.vault().scratch_folder(), "scratchpad");
+        let tree: Vec<String> = f.s.tree().unwrap().into_iter().map(|n| n.path).collect();
+        assert!(tree.contains(&"scratchpad/a.md".to_string()), "{tree:?}");
+    }
+
+    #[test]
+    fn m4c_final_m2_renaming_the_scratch_folder_keeps_its_notes_flagged() {
+        let f = open(&[("Elsewhere/x.md", "x")]);
+        let q = f.s.create_quick_note(&vp("Scratchpad"), "Q").unwrap();
+        f.s.create_quick_note(&vp("Elsewhere"), "E").unwrap();
+        assert_eq!(q.as_str(), "Scratchpad/Q.md");
+        f.s.set_scratch_folder("Inbox", true).unwrap();
+        assert_eq!(flagged(&f), ["Elsewhere/E.md", "Inbox/Q.md"]);
+    }
+
+    #[test]
+    fn m4c_final_m3_names_cut_by_grapheme_without_invisible_controls() {
+        // 59 letters then a flag, two characters: kept whole, not halved.
+        let flagged = format!("{}\u{1F1EA}\u{1F1F8}", "a".repeat(59));
+        assert_eq!(quick_note_stem(&flagged).unwrap(), flagged);
+        let cut = format!("{}\u{1F1EA}\u{1F1F8}", "a".repeat(60));
+        assert_eq!(quick_note_stem(&cut).unwrap(), "a".repeat(60));
+        // Long emoji sequences stop at whole graphemes within the byte cap.
+        let family = "\u{1F468}\u{200D}\u{1F469}\u{200D}\u{1F467}".repeat(20);
+        let stem = quick_note_stem(&family).unwrap();
+        assert!(stem.len() <= MAX_QUICK_BYTES && family.starts_with(&stem));
+        assert_eq!(
+            stem.len() % "\u{1F468}\u{200D}\u{1F469}\u{200D}\u{1F467}".len(),
+            0
+        );
+        // 59 letters then e + combining acute: the accent isn't lost.
+        let accent = format!("{}e\u{301}", "a".repeat(59));
+        assert_eq!(quick_note_stem(&accent).unwrap(), accent);
+        // Bidi overrides and zero-width characters don't reach file names.
+        assert_eq!(
+            quick_note_stem("pay\u{202E}fdp.exe\u{200B}x").as_deref(),
+            Some("payfdp.exex")
+        );
+        assert_eq!(quick_note_stem("\u{2066}\u{200B}"), None);
+    }
+
+    #[test]
+    fn m4c_final_m4_scratch_folder_names_windows_cant_hold_are_refused() {
+        let f = open(&[]);
+        for bad in ["CON", "nul", "Com1", "Inbox.", "Inbox. "] {
+            assert!(
+                matches!(
+                    f.s.set_scratch_folder(bad, true),
+                    Err(crate::SessionError::InvalidName(_))
+                ),
+                "{bad}"
+            );
+        }
+        assert_eq!(f.s.vault().scratch_folder(), "Scratchpad");
     }
 }
