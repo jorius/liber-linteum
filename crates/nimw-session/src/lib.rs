@@ -8,6 +8,7 @@ mod events;
 mod global_view;
 mod rename;
 mod session;
+mod text_files;
 mod watching;
 
 pub use attachments::{Attached, LinkSuggestion, cover_reference, sanitize_file_name};
@@ -18,3 +19,4 @@ pub use global_view::{
     MAX_VISIBLE, Relation, SUMMARY_TITLES,
 };
 pub use session::{VaultSession, index_db_path};
+pub use text_files::{TEXT_MAX_BYTES, is_text_content, is_text_path};

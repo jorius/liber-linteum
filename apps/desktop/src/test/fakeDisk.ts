@@ -53,12 +53,16 @@ export function fakeDisk(initial: Record<string, string>, extra: Extra = {}): Fa
       calls.push([cmd, args]);
       if (extra[cmd]) return extra[cmd](args);
       switch (cmd) {
-        case 'page_read': {
+        case 'page_read':
+        case 'text_read': {
           const text = files.get(args.path);
           if (text === undefined) throw err('notFound', args.path);
+          // Text files (M4b part 2 §6): a NUL byte stands for "not eligible".
+          if (cmd === 'text_read' && text.includes('\0')) throw err('notAText', args.path);
           return { text, hash: hashOf(text) };
         }
-        case 'page_write': {
+        case 'page_write':
+        case 'text_write': {
           if (gate) await gate;
           if (failing > 0) {
             failing--;
@@ -117,7 +121,10 @@ export function fakeDisk(initial: Record<string, string>, extra: Extra = {}): Fa
           return { moved: [[args.from, args.to]], updatedFiles: [], updatedLinks: 0, failed: [] };
         }
         case 'vault_tree':
-          return [...files.keys()].map((path) => ({ path, kind: 'page' }));
+          return [...files.keys()].map((path) => ({
+            path,
+            kind: /\.md$/i.test(path) ? 'page' : 'attachment',
+          }));
         case 'links_resolve':
           // A wiki target names a page on the disk by its name (enough for
           // embeds in tests); anything else resolves to nothing.
@@ -143,7 +150,7 @@ export function fakeDisk(initial: Record<string, string>, extra: Extra = {}): Fa
     calls,
     writes: () =>
       calls
-        .filter(([c]) => c === 'page_write')
+        .filter(([c]) => c === 'page_write' || c === 'text_write')
         .map(([, a]) => ({ path: a.path as string, text: a.text as string })),
     failWrites: (n) => {
       failing = n;

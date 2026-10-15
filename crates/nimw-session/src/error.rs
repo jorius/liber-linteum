@@ -21,6 +21,10 @@ pub enum SessionError {
     /// A dropped path that isn't a regular file (e.g. a folder).
     #[error("not a file: {0}")]
     NotAFile(String),
+    /// Not a text file the app opens (M4b part 2 §6): another kind of name,
+    /// or content that isn't UTF-8, holds NUL bytes or is over 2 MB.
+    #[error("not a text file: {0}")]
+    NotAText(String),
 }
 
 pub type Result<T> = std::result::Result<T, SessionError>;

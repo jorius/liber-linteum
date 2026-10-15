@@ -30,7 +30,12 @@
 .controls {
   display: flex;
   align-items: center;
-  gap: 12px;
+  /* Saved, the word count and the toggles wrap in a narrow window rather
+     than widen the page (M4b part 2 §5). */
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px 12px;
+  min-width: 0;
 }
 
 .breadcrumb ol {
@@ -301,6 +306,15 @@
   color: var(--color-text-strong);
   margin: 0;
   min-width: 0;
+  display: flex;
+  align-items: baseline;
+}
+
+/* A text file's extension, kept on rename (M4b part 2 §6). */
+.titleExt {
+  flex: none;
+  color: var(--color-text-muted);
+  font-weight: 400;
 }
 
 .subtitle {

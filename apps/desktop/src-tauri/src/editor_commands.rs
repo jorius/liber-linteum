@@ -75,6 +75,47 @@ pub(crate) fn page_write_impl(
     }
 }
 
+pub(crate) fn text_read_impl(state: &AppState, path: String) -> CmdResult<PageText> {
+    let session = state.session()?;
+    let (text, hash) = session.read_text(&VaultPath::new(&path)?)?;
+    Ok(PageText {
+        text,
+        hash: hash.to_hex(),
+    })
+}
+
+/// `page_write` for text files (M4b part 2 §6): the same compare-and-swap,
+/// and the same conflict reply carrying what is on disk now.
+pub(crate) fn text_write_impl(
+    state: &AppState,
+    path: String,
+    text: String,
+    expected_hash: String,
+) -> CmdResult<WriteResult> {
+    let session = state.session()?;
+    let vp = VaultPath::new(&path)?;
+    let expected = Hash::from_hex(&expected_hash)
+        .ok_or_else(|| CommandError::new(ErrorKind::Io, "invalid content hash"))?;
+    match session.write_text(&vp, &text, expected) {
+        Ok(hash) => Ok(WriteResult {
+            hash: hash.to_hex(),
+        }),
+        Err(SessionError::Vault(VaultError::Conflict { .. })) => {
+            let (bytes, current) = session.vault().read(&vp)?;
+            let mut err = CommandError::new(
+                ErrorKind::Conflict,
+                format!("{path} changed on disk since it was opened"),
+            );
+            err.conflict = Some(ConflictInfo {
+                current_text: String::from_utf8_lossy(&bytes).into_owned(),
+                current_hash: current.to_hex(),
+            });
+            Err(err)
+        }
+        Err(e) => Err(e.into()),
+    }
+}
+
 pub(crate) fn page_create_conflict_copy_impl(
     state: &AppState,
     path: String,
@@ -277,6 +318,27 @@ pub async fn page_write<R: Runtime>(
 ) -> CmdResult<WriteResult> {
     blocking(app, move |app| {
         page_write_impl(&app.state::<AppState>(), path, text, expected_hash)
+    })
+    .await
+}
+
+#[tauri::command]
+pub async fn text_read<R: Runtime>(app: AppHandle<R>, path: String) -> CmdResult<PageText> {
+    blocking(app, move |app| {
+        text_read_impl(&app.state::<AppState>(), path)
+    })
+    .await
+}
+
+#[tauri::command]
+pub async fn text_write<R: Runtime>(
+    app: AppHandle<R>,
+    path: String,
+    text: String,
+    expected_hash: String,
+) -> CmdResult<WriteResult> {
+    blocking(app, move |app| {
+        text_write_impl(&app.state::<AppState>(), path, text, expected_hash)
     })
     .await
 }

@@ -1,5 +1,6 @@
 import type { LinkKind } from '../ipc';
 import { openPage } from './navigate';
+import { isTextPath } from './textFiles';
 import { usePageStore } from './pageStore';
 import { useUiStore } from './uiStore';
 
@@ -29,7 +30,9 @@ export function followLink(action: LinkAction): void {
       ui.openDialog({ type: 'openExternal', url: action.url });
       return;
     case 'file':
-      ui.openDialog({ type: 'openFile', path: action.path });
+      // Text and code files open in the app (M4b part 2 §6).
+      if (isTextPath(action.path)) void openPage(action.path, null, 'link');
+      else ui.openDialog({ type: 'openFile', path: action.path });
       return;
     case 'anchor':
       usePageStore.getState().reveal(action.heading);
@@ -39,6 +42,8 @@ export function followLink(action: LinkAction): void {
         ui.openDialog({ type: 'createPage', source: action.source, target: action.target });
       } else if (isPage(action.resolved)) {
         void openPage(action.resolved, action.heading, 'link');
+      } else if (isTextPath(action.resolved)) {
+        void openPage(action.resolved, null, 'link');
       } else {
         ui.openDialog({ type: 'openFile', path: action.resolved });
       }

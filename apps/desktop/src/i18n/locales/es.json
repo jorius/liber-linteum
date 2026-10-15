@@ -39,6 +39,7 @@
     "notPermitted": "Eso no está permitido aquí.",
     "notAFile": "Las carpetas no se pueden adjuntar.",
     "tooLarge": "Ese archivo es demasiado grande para pegarlo.",
+    "notAText": "Este archivo no se puede abrir como texto: no es texto UTF-8 o supera los 2 MB.",
     "io": "Algo salió mal: {message}"
   },
   "toasts": {
@@ -108,7 +109,10 @@
     "subtitlePlaceholder": "Añade un subtítulo",
     "fullWidth": "Ancho completo",
     "fullWidthOn": "Usar todo el ancho en esta página",
-    "fullWidthOff": "Usar el ancho de lectura en esta página"
+    "fullWidthOff": "Usar el ancho de lectura en esta página",
+    "fileNameLabel": "Nombre del archivo",
+    "textOnly": "Este archivo se abre en su aplicación predeterminada.",
+    "openDefault": "Abrir en la aplicación predeterminada"
   },
   "editor": {
     "conflictCopy": "Alguien más cambió esta página — su versión se guardó como «{name}»",

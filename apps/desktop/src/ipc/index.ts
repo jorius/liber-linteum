@@ -35,6 +35,7 @@ export type ErrorKind =
   | 'notPermitted'
   | 'notAFile'
   | 'tooLarge'
+  | 'notAText'
   | 'io';
 
 export interface CommandError {
@@ -387,6 +388,10 @@ export const vaultsForget = (path: string) => call<void>('vaults_forget', { path
 export const pageRead = (path: string) => call<PageText>('page_read', { path });
 export const pageWrite = (path: string, text: string, expectedHash: string) =>
   call<WriteResult>('page_write', { path, text, expectedHash });
+/** Plain-text and code files (M4b part 2 §6): `notAText` for anything else. */
+export const textRead = (path: string) => call<PageText>('text_read', { path });
+export const textWrite = (path: string, text: string, expectedHash: string) =>
+  call<WriteResult>('text_write', { path, text, expectedHash });
 export const pageCreateConflictCopy = (path: string, text: string) =>
   call<string>('page_create_conflict_copy', { path, text });
 export const linksResolve = (source: string, targets: LinkTarget[]) =>

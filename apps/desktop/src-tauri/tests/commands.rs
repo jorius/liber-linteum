@@ -49,6 +49,8 @@ const COMMANDS: &[&str] = &[
     "link_target",
     "index_pick_set",
     "page_width_set",
+    "text_read",
+    "text_write",
 ];
 
 struct Harness {
@@ -1369,4 +1371,44 @@ fn m4b2_page_width_over_ipc() {
         .is_err()
     );
     assert!(vault.path().join(".nimw/vault.json").exists());
+}
+
+/// M4b part 2 §6: text files over IPC — read, compare-and-swap write with the
+/// conflict reply, `notAText` for anything that isn't an eligible text file.
+#[test]
+fn m4b2_text_files_over_ipc() {
+    let h = harness();
+    let vault = tempfile::tempdir().unwrap();
+    std::fs::write(vault.path().join("notes.txt"), "one\n").unwrap();
+    std::fs::write(vault.path().join("data.json"), b"{\"a\":\0}").unwrap();
+    std::fs::write(vault.path().join("Page.md"), "# Page\n").unwrap();
+    call(&h.main, "vault_open", json!({ "path": vault.path() })).unwrap();
+    let got = call(&h.main, "text_read", json!({ "path": "notes.txt" })).unwrap();
+    assert_eq!(got["text"], "one\n");
+    let hash = got["hash"].as_str().unwrap().to_string();
+    let saved = call(
+        &h.main,
+        "text_write",
+        json!({ "path": "notes.txt", "text": "two\n", "expectedHash": hash }),
+    )
+    .unwrap();
+    assert_eq!(
+        std::fs::read_to_string(vault.path().join("notes.txt")).unwrap(),
+        "two\n"
+    );
+    let err = call(
+        &h.main,
+        "text_write",
+        json!({ "path": "notes.txt", "text": "lost\n", "expectedHash": hash }),
+    )
+    .unwrap_err();
+    assert_eq!(err["kind"], "conflict");
+    assert_eq!(err["currentText"], "two\n");
+    assert_eq!(err["currentHash"], saved["hash"]);
+    for path in ["data.json", "Page.md"] {
+        let err = call(&h.main, "text_read", json!({ "path": path })).unwrap_err();
+        assert_eq!(kind(err), "notAText", "{path}");
+    }
+    let err = call(&h.main, "text_read", json!({ "path": "missing.txt" })).unwrap_err();
+    assert_eq!(kind(err), "notFound");
 }

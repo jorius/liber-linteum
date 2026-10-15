@@ -5,7 +5,9 @@ import { usePageStore } from '../../stores/pageStore';
 import { useSettingsStore } from '../../stores/settingsStore';
 import { nameOf } from '../../stores/tree';
 import { Editor } from '../editor/Editor';
+import { isTextPath } from '../../stores/textFiles';
 import { PageHeader } from './PageHeader';
+import { TextView } from './TextView';
 import styles from './PageView.module.css';
 
 /** The open page: header and editor (M2a §3, §5). */
@@ -13,6 +15,7 @@ export function PageView() {
   const { t } = useTranslation();
   const state = usePageStore((s) => s.state);
   const page = usePageStore((s) => s.page);
+  const path = usePageStore((s) => s.path);
   const doc = useEditorStore((s) => s.doc);
   const editorError = useEditorStore((s) => s.error);
   const orphaned = useEditorStore((s) => s.orphaned);
@@ -34,6 +37,7 @@ export function PageView() {
       </section>
     );
   }
+  if (state === 'ready' && path && isTextPath(path)) return <TextView path={path} />;
   // Deleted outside while it had unsaved edits: the text is kept (M2a §3.3).
   const orphanBanner = orphaned && doc && (
     <div className={styles.orphan}>

@@ -29,6 +29,8 @@ pub enum ErrorKind {
     NotAFile,
     /// A pasted file over the size cap (M2c §7.3).
     TooLarge,
+    /// Not a text file the app opens (M4b part 2 §6).
+    NotAText,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
@@ -93,6 +95,9 @@ impl From<SessionError> for CommandError {
             SessionError::NotPermitted(m) => CommandError::new(ErrorKind::NotPermitted, m),
             SessionError::NotAFile(p) => {
                 CommandError::new(ErrorKind::NotAFile, format!("not a file: {p}"))
+            }
+            SessionError::NotAText(p) => {
+                CommandError::new(ErrorKind::NotAText, format!("not a text file: {p}"))
             }
         }
     }

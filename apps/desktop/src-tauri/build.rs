@@ -36,6 +36,8 @@ const COMMANDS: &[&str] = &[
     "link_target",
     "index_pick_set",
     "page_width_set",
+    "text_read",
+    "text_write",
 ];
 
 fn main() {

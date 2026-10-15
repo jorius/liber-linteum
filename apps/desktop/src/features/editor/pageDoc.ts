@@ -3,8 +3,11 @@ import {
   pageCreateConflictCopy,
   pageRead,
   pageWrite,
+  textRead,
+  textWrite,
   type IpcResult,
 } from '../../ipc';
+import { isTextPath } from '../../stores/textFiles';
 import { nameOf, parentOf } from '../../stores/tree';
 import { detectEol, fromLf, toLf, type Eol } from './eol';
 import { merge3 } from './merge';
@@ -15,6 +18,12 @@ export const RETRY_MIN_MS = 1000;
 export const RETRY_MAX_MS = 30_000;
 
 export type SaveStatus = 'saved' | 'saving' | 'retrying';
+
+/** Pages go through `page_*`; text and code files (M4b part 2 §6) through
+ *  `text_*`, with the same compare-and-swap and conflict reply. */
+const read = (path: string) => (isTextPath(path) ? textRead(path) : pageRead(path));
+const write = (path: string, text: string, hash: string) =>
+  isTextPath(path) ? textWrite(path, text, hash) : pageWrite(path, text, hash);
 
 export interface PageDocHooks {
   /** Status, path or text changed. */
@@ -61,7 +70,7 @@ export class PageDoc {
   }
 
   static async load(path: string, hooks: PageDocHooks): Promise<IpcResult<PageDoc>> {
-    const res = await pageRead(path);
+    const res = await read(path);
     if (!res.ok) return res;
     if (typeof res.value?.text !== 'string' || typeof res.value.hash !== 'string') {
       return {
@@ -99,7 +108,7 @@ export class PageDoc {
   /** The file changed on disk: reload or merge (M2a §3.3). */
   sync(): Promise<void> {
     return this.enqueue(async () => {
-      const res = await pageRead(this.path);
+      const res = await read(this.path);
       if (res.ok) {
         const wasOrphaned = this.orphaned;
         this.orphaned = false; // it is back (restored, recreated)
@@ -177,7 +186,7 @@ export class PageDoc {
     const text = this.text;
     this.writing = true;
     this.hooks.onChange(this);
-    const res = await pageWrite(this.path, fromLf(text, this.eol), this.hash);
+    const res = await write(this.path, fromLf(text, this.eol), this.hash);
     this.writing = false;
     if (res.ok) {
       this.base = text;

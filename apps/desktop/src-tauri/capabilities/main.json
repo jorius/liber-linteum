@@ -39,6 +39,8 @@
     "allow-link-target",
     "allow-index-pick-set",
     "allow-page-width-set",
+    "allow-text-read",
+    "allow-text-write",
     "core:event:allow-listen",
     "core:event:allow-unlisten",
     "core:window:allow-destroy",
