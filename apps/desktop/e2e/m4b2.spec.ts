@@ -50,6 +50,9 @@ const PAGES: Record<string, string> = {
   'Maths.md': '# Maths\n\nInline $E = mc^2$ here.\n\n$$\n\\int_0^1 x\\,dx\n$$\n\nAfter.\n',
   'Diagram.md':
     '# Diagram\n\nBefore.\n\n```mermaid\nflowchart LR\n  A[Start] --> B[End]\n```\n\nAfter.\n',
+  'Linked.md':
+    '# Linked\n\nBefore.\n\n```mermaid\nflowchart LR\n  A[Go] --> B[Stay]\n' +
+    '  click A href "https://example.com/x" "Leaves the app"\n```\n\nAfter.\n',
   'Kinds.md':
     '# Kinds\n\n' +
     Object.values(KINDS)
@@ -154,6 +157,32 @@ test('§4: a Mermaid diagram draws in Split and Live Preview, offline', async ({
   await expect(
     page.locator('.cm-content').getByRole('img', { name: 'Diagram: flowchart LR' }).locator('svg'),
   ).toBeVisible({ timeout: 15_000 });
+  await stayedLocal(page, outside, errors);
+});
+
+test('final review I5: a link in a diagram is inert in Split and Live Preview', async ({
+  page,
+}) => {
+  const { outside, errors } = await open(page, 'Linked', 'split');
+  const app = page.url();
+  const diagram = (where: ReturnType<Page['locator']>) =>
+    where.getByRole('img', { name: 'Diagram: flowchart LR' }).locator('svg');
+  // The linked node's shape, off its label (WebKit hit-tests a label's
+  // foreignObject as the whole <svg>).
+  const shapeOfGo = (where: ReturnType<Page['locator']>) =>
+    diagram(where).locator('g.node', { hasText: 'Go' }).locator('rect, path, polygon').first();
+  const pane = page.getByRole('region', { name: 'Preview' });
+  await expect(diagram(pane)).toBeVisible({ timeout: 15_000 });
+  await expect(diagram(pane).locator('a')).toHaveCount(0);
+  await shapeOfGo(pane).click({ position: { x: 3, y: 3 } });
+  await page.getByRole('radio', { name: 'Live Preview' }).click();
+  const live = page.locator('.cm-content');
+  await expect(diagram(live)).toBeVisible({ timeout: 15_000 });
+  await expect(diagram(live).locator('a')).toHaveCount(0);
+  await shapeOfGo(live).click({ position: { x: 3, y: 3 } });
+  // Still the app: nothing navigated the window.
+  await expect(page.getByRole('textbox', { name: 'Page title' })).toHaveValue('Linked');
+  expect(page.url()).toBe(app);
   await stayedLocal(page, outside, errors);
 });
 

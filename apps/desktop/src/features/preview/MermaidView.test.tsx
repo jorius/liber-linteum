@@ -2,8 +2,17 @@ import { act, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const initialize = vi.fn();
+/** What Mermaid 11 draws for `click A href "…"` (strict mode keeps the link). */
+const LINKED =
+  '<svg data-testid="svg"><g class="nodes">' +
+  '<a xlink:href="https://example.com/x" href="https://example.com/x" target="_blank" ' +
+  'transform="translate(45, 35)" class="link">' +
+  '<g class="node clickable" id="flowchart-A-0"><rect></rect><text>Go</text></g></a>' +
+  '<g class="node" id="flowchart-B-1" onclick="alert(1)"><text>Stay</text></g>' +
+  '<use href="#marker"></use></g></svg>';
 const renderDiagram = vi.fn(async (_id: string, source: string) => {
   if (source.includes('broken')) throw new Error('Parse error on line 1');
+  if (source.includes('click')) return { svg: LINKED };
   return { svg: `<svg data-testid="svg"><text>${source.split('\n')[0]}</text></svg>` };
 });
 vi.mock('mermaid', () => ({ default: { initialize, render: renderDiagram } }));
@@ -87,6 +96,33 @@ describe('Mermaid diagrams (M4b part 2 §4)', () => {
     act(() => listeners.forEach((f) => f()));
     await act(() => vi.advanceTimersByTimeAsync(DIAGRAM_DEBOUNCE_MS));
     expect(renderDiagram).toHaveBeenCalledTimes(2);
+  });
+
+  it('final review I5: a diagram is inert — its links and handlers are gone, its shapes stay', async () => {
+    render(
+      <MermaidView
+        source={'flowchart LR\n  A[Go] --> B[Stay]\n  click A href "https://example.com/x"'}
+      />,
+    );
+    await act(() => vi.advanceTimersByTimeAsync(DIAGRAM_DEBOUNCE_MS));
+    vi.useRealTimers();
+    const img = await screen.findByRole('img', { name: 'Diagram: flowchart LR' });
+    await waitFor(() => expect(img.querySelector('svg')).not.toBeNull());
+    expect(img.querySelector('a')).toBeNull();
+    const linkish = [...img.querySelectorAll('*')].filter(
+      (el) => (el.hasAttribute('href') || el.hasAttribute('xlink:href')) && el.tagName !== 'use',
+    );
+    expect(linkish).toEqual([]);
+    expect(img.querySelector('[onclick]')).toBeNull();
+    expect(img.querySelector('.clickable')).toBeNull();
+    // The node itself, where the link placed it, and internal references
+    // (markers), are kept.
+    const node = img.querySelector('#flowchart-A-0')!;
+    expect(node).toHaveTextContent('Go');
+    expect(node.parentElement!.tagName).toBe('g');
+    expect(node.parentElement).toHaveAttribute('transform', 'translate(45, 35)');
+    expect(node.parentElement).toHaveAttribute('class', 'link');
+    expect(img.querySelector('use')).toHaveAttribute('href', '#marker');
   });
 
   it('a WebKit too old for Mermaid says so instead of a raw error (Safari 15.0–15.3)', async () => {

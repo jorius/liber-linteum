@@ -200,7 +200,7 @@ const RICH = {
   ...PAGES,
   'Rich.md':
     '# Rich\n\nInline $E = mc^2$ and ![x](https://remote.example/m.png).\n\n$$\n\\sum_{i=1}^n i\n$$\n\n' +
-    '```mermaid\nflowchart LR\n  A[Start] --> B[End]\n```\n',
+    '```mermaid\nflowchart LR\n  A[Start] --> B[End]\n  click A href "https://remote.example/diagram"\n```\n',
 };
 
 for (const mode of ['split', 'livePreview']) {
@@ -215,11 +215,15 @@ for (const mode of ['split', 'livePreview']) {
         ? page.getByRole('region', { name: 'Preview' })
         : page.locator('.cm-content');
     await expect(where.locator('.katex').first()).toBeVisible();
-    await expect(
-      where.getByRole('img', { name: 'Diagram: flowchart LR' }).locator('svg'),
-    ).toBeVisible({
+    const diagram = where.getByRole('img', { name: 'Diagram: flowchart LR' }).locator('svg');
+    await expect(diagram).toBeVisible({
       timeout: 15_000,
     });
+    // Its link is inert (final review I5): a click goes nowhere.
+    const app = page.url();
+    await diagram.getByText('Start', { exact: true }).click();
+    await expect(page.getByRole('treeitem', { name: 'Rich' })).toBeVisible();
+    expect(page.url()).toBe(app);
     await page.evaluate(() => document.fonts.ready);
     await page.waitForLoadState('networkidle');
     const csp = await page.evaluate(

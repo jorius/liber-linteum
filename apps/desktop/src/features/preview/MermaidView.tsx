@@ -30,6 +30,35 @@ function modernEnough(): boolean {
   );
 }
 
+const SVG_NS = 'http://www.w3.org/2000/svg';
+/** What makes an `<a>` a link; the rest (its placement, classes) is kept. */
+const LINK_ATTRIBUTES =
+  /^(?:xlink:)?href$|^(?:target|rel|download|ping|referrerpolicy|hreflang|type)$/i;
+
+/** Diagrams are pictures, never links (§4: no click handlers). Strict mode
+ *  still keeps `click A href "…"` as a live `<a>` that would navigate the
+ *  app's own window (final review I5): each link becomes a plain group with
+ *  its shapes and placement, and any `on…` handler or "clickable" look is
+ *  dropped. */
+export function inertSvg(svg: string): string {
+  const box = document.createElement('template');
+  box.innerHTML = svg;
+  for (const a of box.content.querySelectorAll('a')) {
+    const svgLink = a.namespaceURI === SVG_NS;
+    const plain = svgLink ? document.createElementNS(SVG_NS, 'g') : document.createElement('span');
+    for (const attr of a.attributes) {
+      if (!LINK_ATTRIBUTES.test(attr.name)) plain.setAttribute(attr.name, attr.value);
+    }
+    plain.append(...a.childNodes);
+    a.replaceWith(plain);
+  }
+  for (const el of box.content.querySelectorAll('*')) {
+    for (const { name } of [...el.attributes]) if (/^on/i.test(name)) el.removeAttribute(name);
+    el.classList.remove('clickable');
+  }
+  return box.innerHTML;
+}
+
 /** The palette's colours, read from the page's tokens. */
 function themeVariables(): Record<string, string> {
   const css = getComputedStyle(document.documentElement);
@@ -83,7 +112,7 @@ export function MermaidView({ source }: { source: string }) {
           });
           const id = `nimw-mermaid-${++seq}`;
           try {
-            const { svg } = await mermaid.render(id, source);
+            const svg = inertSvg((await mermaid.render(id, source)).svg);
             cache.set(key, svg);
             if (live) setState({ svg });
           } finally {
@@ -116,7 +145,8 @@ export function MermaidView({ source }: { source: string }) {
       className={styles.diagram}
       role="img"
       aria-label={t('diagram.label', { first })}
-      // Mermaid's own output, sanitized by its strict security level.
+      // Mermaid's own output, sanitized by its strict security level; links
+      // and handlers removed (`inertSvg`).
       dangerouslySetInnerHTML={state.svg ? { __html: state.svg } : undefined}
     />
   );
