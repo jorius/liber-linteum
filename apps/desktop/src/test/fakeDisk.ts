@@ -31,9 +31,11 @@ const readable = (cmd: string, text: string) =>
 const unreadable = (cmd: string, path: string) =>
   err(cmd.startsWith('text_') ? 'notAText' : 'binary', path);
 
-/** First `# Heading`, else the file name (enough for header tests). */
+/** A `# Heading` on the first line (after the frontmatter and blank lines),
+ *  else the file name, as the index reads it (PG-01, M4b part 3 §1). */
 const titleOf = (path: string, text: string) =>
-  /^# (.+)$/m.exec(text)?.[1] ?? path.slice(path.lastIndexOf('/') + 1).replace(/\.md$/, '');
+  /^(?:---\n[\s\S]*?\n---\n)?\s*# ([^\n]+)/.exec(text)?.[1] ??
+  path.slice(path.lastIndexOf('/') + 1).replace(/\.md$/, '');
 
 /** `#tag`s in the text, like the index's (enough for tests: no code or
  *  front matter awareness). */

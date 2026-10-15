@@ -1,4 +1,5 @@
-pub const SCHEMA_VERSION: i64 = 1;
+/// 2: titles follow the first-line H1 rule (M4b part 3 §1); pages gain `cover_x` (§3).
+pub const SCHEMA_VERSION: i64 = 2;
 
 pub(crate) const SCHEMA: &str = r#"
 CREATE TABLE meta (key TEXT PRIMARY KEY, value TEXT NOT NULL);

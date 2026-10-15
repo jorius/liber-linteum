@@ -39,8 +39,11 @@ export function installIpcMock({
     }
     return out;
   };
+  // A first-line `# Heading` (after the frontmatter), else the file name, as
+  // the index reads it (PG-01, M4b part 3 §1).
   const titleOf = (path: string, text: string) =>
-    /^# (.+)$/m.exec(text)?.[1] ?? path.replace(/\.md$/, '').split('/').pop()!;
+    /^(?:---\n[\s\S]*?\n---\n)?\s*# ([^\n]+)/.exec(text)?.[1] ??
+    path.replace(/\.md$/, '').split('/').pop()!;
   const page = (path: string) => ({
     path,
     title: titleOf(path, pages[path] ?? ''),
