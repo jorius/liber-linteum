@@ -8,6 +8,7 @@ import remarkMath from 'remark-math';
 import remarkParse from 'remark-parse';
 import { unified } from 'unified';
 import { findComments, maskComments, remarkContainerDirectives, transformBlocks } from './blocks';
+import { remarkDollarRules } from './dollarMath';
 import { frontmatterLinks, frontmatterTags, readFrontmatter } from './frontmatter';
 import { scanText } from './inline';
 import { locator } from './locate';
@@ -19,6 +20,7 @@ const processor = unified()
   .use(remarkParse)
   .use(remarkGfm)
   .use(remarkMath)
+  .use(remarkDollarRules)
   .use(remarkFrontmatter, ['yaml'])
   .use(remarkContainerDirectives);
 /** For text without front matter. */
@@ -26,6 +28,7 @@ const noFrontmatter = unified()
   .use(remarkParse)
   .use(remarkGfm)
   .use(remarkMath)
+  .use(remarkDollarRules)
   .use(remarkContainerDirectives);
 
 /** Whether `src` starts with a block remark-frontmatter reads as YAML: a
@@ -39,29 +42,6 @@ export function hasFrontmatter(src: string): boolean {
 }
 
 const processorFor = (src: string) => (hasFrontmatter(src) ? processor : noFrontmatter);
-
-/** `$` pairs that hug spaces aren't maths, as in Obsidian (M4b part 2 §3):
- *  `$5 and $10`, `$ x$`, `$y $` stay text (then scanned for tags and links). */
-function looseDollarsAsText(parent: Parent, src: string) {
-  parent.children = (parent.children as RootContent[]).map((child) => {
-    if (child.type === 'inlineMath' && /^\s|\s$/.test(child.value)) {
-      const [from, to] = rangeOf(child);
-      return { type: 'text', value: src.slice(from, to), position: child.position } as Text;
-    }
-    if ('children' in child) looseDollarsAsText(child as Parent, src);
-    return child;
-  }) as typeof parent.children;
-  // Neighbouring text nodes merge, so tags and links read across them.
-  const merged: RootContent[] = [];
-  for (const c of parent.children as RootContent[]) {
-    const last = merged[merged.length - 1];
-    if (c.type === 'text' && last?.type === 'text' && last.position && c.position) {
-      last.value += c.value;
-      last.position = { start: last.position.start, end: c.position.end };
-    } else merged.push(c);
-  }
-  parent.children = merged as typeof parent.children;
-}
 
 /** Parents whose text is never scanned for extensions. */
 const OPAQUE = new Set(['link', 'linkReference', 'image', 'imageReference']);
@@ -179,7 +159,6 @@ function collectTags(tree: Root, fmTags: string[]): string[] {
  *  first there is a rule (final review C2). */
 export function parseTree(src: string, loc = locator(src), frontmatter = true): Root {
   const tree = (frontmatter ? processorFor(src) : noFrontmatter).parse(src) as Root;
-  looseDollarsAsText(tree, src);
   transformBlocks(tree, src, loc);
   transformInline(tree, src, loc);
   return tree;

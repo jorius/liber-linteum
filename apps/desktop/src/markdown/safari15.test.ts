@@ -11,6 +11,7 @@ const MOVE_PATH = [
   './blockMoves.ts',
   './incremental.ts',
   './parse.ts',
+  './dollarMath.ts',
   './blocks.ts',
   './inline.ts',
   './frontmatter.ts',
