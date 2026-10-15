@@ -22,6 +22,7 @@ fontdb.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 thiserror.workspace = true
+dunce.workspace = true
 nimw-session = { path = "../../../crates/nimw-session" }
 nimw-vault = { path = "../../../crates/nimw-vault" }
 nimw-markdown = { path = "../../../crates/nimw-markdown" }
@@ -29,7 +30,6 @@ nimw-markdown = { path = "../../../crates/nimw-markdown" }
 [dev-dependencies]
 tauri = { workspace = true, features = ["test"] }
 tempfile.workspace = true
-dunce.workspace = true
 nimw-testkit = { path = "../../../crates/nimw-testkit" }
 
 # Runs on the process main thread (muda menus can only be created there).

@@ -6,6 +6,8 @@ pub mod dto;
 pub mod editor_commands;
 pub mod error;
 pub mod external_commands;
+pub mod file_commands;
+pub mod file_windows;
 pub mod fonts;
 pub mod gv_commands;
 pub mod menu;
@@ -36,6 +38,8 @@ pub fn configure<R: tauri::Runtime>(
     dirs: Option<AppDirs>,
 ) -> tauri::Builder<R> {
     let builder = builder
+        // Single-file windows' grants (M4c §3).
+        .manage(file_windows::FileWindows::default())
         .plugin(tauri_plugin_dialog::init())
         // Used only from our own commands (url_open, file_open_external); the
         // webview gets no opener permission.
@@ -138,6 +142,18 @@ pub fn configure<R: tauri::Runtime>(
         scratchpad_commands::quick_note_autoname,
         scratchpad_commands::quick_notes_state,
         scratchpad_commands::scratch_folder_set,
+        // Single-file windows (M4c §3, §4).
+        file_commands::file_info,
+        file_commands::file_read,
+        file_commands::file_write,
+        file_commands::file_conflict_copy,
+        file_commands::file_recreate,
+        file_commands::file_rename,
+        file_commands::file_links_resolve,
+        file_commands::file_note_read,
+        file_commands::file_follow,
+        file_commands::file_open_in_vault,
+        file_commands::file_open_dialog,
     ])
 }
 

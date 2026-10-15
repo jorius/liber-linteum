@@ -40,7 +40,7 @@ fn text_of(bytes: Vec<u8>, path: &VaultPath) -> CmdResult<String> {
 /// isn't text the editor can take, `refused` instead, with no text: a lossy
 /// decoding would be merged and written back over every character it lost
 /// (final review I3).
-fn conflict_reply(
+pub(crate) fn conflict_reply(
     path: &str,
     bytes: Vec<u8>,
     current: Hash,

@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-file-recreate"
+description = "Enables the file_recreate command without any pre-configured scope."
+commands.allow = ["file_recreate"]
+
+[[permission]]
+identifier = "deny-file-recreate"
+description = "Denies the file_recreate command without any pre-configured scope."
+commands.deny = ["file_recreate"]

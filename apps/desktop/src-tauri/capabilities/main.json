@@ -58,6 +58,7 @@
     "allow-quick-note-autoname",
     "allow-quick-notes-state",
     "allow-scratch-folder-set",
+    "allow-file-open-dialog",
     "core:event:allow-listen",
     "core:event:allow-unlisten",
     "core:window:allow-destroy",

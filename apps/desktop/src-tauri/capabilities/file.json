@@ -1,0 +1,27 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "file",
+  "description": "Single-file windows (M4c §3, §4): one file opened on its own. Only the file commands, which act on the window's own file and never take its path from the page, plus the app's settings, fonts, opening web links and the app's name. No vault command. Events only to listen/unlisten (file:changed, menu items); the window plugin only to destroy (the page closes its window after saving).",
+  "windows": ["file-*"],
+  "permissions": [
+    "allow-app-info",
+    "allow-settings-get",
+    "allow-settings-set",
+    "allow-fonts-list",
+    "allow-url-open",
+    "allow-file-info",
+    "allow-file-read",
+    "allow-file-write",
+    "allow-file-conflict-copy",
+    "allow-file-recreate",
+    "allow-file-rename",
+    "allow-file-links-resolve",
+    "allow-file-note-read",
+    "allow-file-follow",
+    "allow-file-open-in-vault",
+    "allow-file-open-dialog",
+    "core:event:allow-listen",
+    "core:event:allow-unlisten",
+    "core:window:allow-destroy"
+  ]
+}

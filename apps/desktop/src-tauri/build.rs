@@ -55,6 +55,18 @@ const COMMANDS: &[&str] = &[
     "quick_note_autoname",
     "quick_notes_state",
     "scratch_folder_set",
+    // Single-file windows (M4c §3, §4): `capabilities/file.json`.
+    "file_info",
+    "file_read",
+    "file_write",
+    "file_conflict_copy",
+    "file_recreate",
+    "file_rename",
+    "file_links_resolve",
+    "file_note_read",
+    "file_follow",
+    "file_open_in_vault",
+    "file_open_dialog",
 ];
 
 fn main() {

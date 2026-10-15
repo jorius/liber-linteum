@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-file-follow"
+description = "Enables the file_follow command without any pre-configured scope."
+commands.allow = ["file_follow"]
+
+[[permission]]
+identifier = "deny-file-follow"
+description = "Denies the file_follow command without any pre-configured scope."
+commands.deny = ["file_follow"]
