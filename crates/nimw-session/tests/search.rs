@@ -187,3 +187,28 @@ fn nfr_03_search_p95_under_50_ms() {
     eprintln!("re-index one page: {rewrite:?}");
     assert!(rewrite < Duration::from_millis(100), "{rewrite:?}");
 }
+
+/// M4c + M5: a quick note renamed after its first line is found by that name,
+/// and no longer by its generated one.
+#[test]
+fn m4c_m5_a_quick_note_is_found_by_its_first_line_name() {
+    let dir = tempfile::tempdir().unwrap();
+    let (_c, s) = open(dir.path());
+    let vp = |p: &str| VaultPath::new(p).unwrap();
+    let q = s
+        .create_quick_note(&vp("Scratchpad"), "Quick note 2026-10-15 09.05")
+        .unwrap();
+    let (_, hash) = s.vault().read(&q).unwrap();
+    s.write_page(&q, "Buy oats and honey\n", hash).unwrap();
+    let out = s.auto_name(&q, true).unwrap();
+    assert_eq!(out.path.as_str(), "Scratchpad/Buy oats and honey.md");
+    assert_eq!(find(&s, "oats"), vec!["Scratchpad/Buy oats and honey.md"]);
+    assert!(
+        find(&s, "quick note").is_empty(),
+        "not by the generated name"
+    );
+    assert_eq!(
+        title_of(&s, "Scratchpad/Buy oats and honey.md"),
+        "Buy oats and honey"
+    );
+}
