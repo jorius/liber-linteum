@@ -212,3 +212,38 @@ The plan (`docs/superpowers/plans/2026-10-14-m4b-part2.md`) was replayed end to 
 
 22. **The e2e IPC mock keeps page widths in `sessionStorage`**, so the reload test sees them.
 23. **The new axe e2e test turns off `label-content-name-mismatch`.** The rule flags the pre-existing **Format** button (named "Formatting toolbar"), which is outside this milestone.
+
+## 11. Amendments from the final review (both parts of M4b)
+
+These override the sections above, and §10, where they conflict.
+
+1. **Startup on Safari 15.0–15.3:** lowlight's grammars are registered one by one (`createLowlight()` + `register`), so nothing calls `Object.hasOwn` at load. A highlighter that throws leaves the code plain. A startup test simulates the missing ≥ 15.4 APIs.
+2. **Language picker:**
+   - **Ranking:** exact id or alias, then exact name, then prefix, then substring, so `js` → JavaScript, `xml` → XML and `c` → C.
+   - **Fence ids:** the shortest alias without spaces, else the name lower-cased with spaces removed.
+   - **Read-back:** the editor and the rendered pane both read ids back through `languageFor`.
+3. **Dollars (replaces §10.7's loose-dollar rule), Pandoc-style:**
+   - an opening `$` needs a non-space character after it and isn't preceded by a letter or digit (`US$5`);
+   - a closing `$` needs a non-space character before it and isn't followed by a digit;
+   - `$10-$20`, `$5.99/$6.99` and `Pay $5 for [[Shop]]/$10` stay text, with their links;
+   - `$$…$$` is unchanged.
+4. **Text files:**
+   - **Recovery:** a conflict copy keeps the extension (`data (conflict).csv`), and "Save as new" recreates a text file (`entry_create_text`, with a real-ACL test).
+   - **Files rewritten outside the app as non-text** (not UTF-8, containing NUL, or over 2 MB) are never merged or overwritten. Rust replies `notAText` (`binary` for pages) with no lossy text, autosave stops, the user's text stays in the editor with a notice and a toast, and **Save as new file** is offered.
+5. **Mermaid:** links in diagrams are inert. Each `<a>` becomes a `<g>` keeping its children and placement, with `on…` attributes removed.
+6. **Focus:** after removing a Related chip, focus goes to the next chip's ×, else the previous one's, else **+ Related page**. Renaming a text file keeps focus in its name field.
+7. **Header band:**
+   - with a cover it stays 132 px from 900 to 1440 px wide, with the cover controls overlaid;
+   - the breadcrumb stays on one line with an ellipsis;
+   - the subtitle ends in an ellipsis, with its full text in a tooltip;
+   - the text view shows the link-trail back arrow.
+8. **Copy** announces "Copied" or "Couldn't copy" through a shared live region.
+9. **Word count and outline:**
+   - they reuse Live Preview's parsed model, so opening a page parses it once;
+   - bare URLs aren't words;
+   - the outline computes sibling positions in one pass.
+10. **Split-pane highlighting** keeps highlight.js's `class_` token class.
+11. **Card excerpts** drop only real display maths (pulldown-cmark's math parsing).
+12. **Page widths** are forgotten when their page is deleted, in the app or by another program.
+13. **Block moves (M4 §10.6):** gutter keys pressed while the Split pane lags are queued and replayed one per render, never dropped.
+
