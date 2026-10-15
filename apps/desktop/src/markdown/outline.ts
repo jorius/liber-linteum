@@ -71,6 +71,18 @@ export function parentsOf(items: OutlineHeading[]): number[] {
   });
 }
 
+/** Each heading's sibling group size and its 1-based place in it (the tree's
+ *  `aria-setsize` / `aria-posinset`), in one pass (final review M5). */
+export function siblingPositions(parents: number[]): { setSize: number[]; posInSet: number[] } {
+  const count = new Map<number, number>();
+  const posInSet = parents.map((p) => {
+    const n = (count.get(p) ?? 0) + 1;
+    count.set(p, n);
+    return n;
+  });
+  return { setSize: parents.map((p) => count.get(p)!), posInSet };
+}
+
 /** The heading whose section holds `pos`, or -1 above the first one. */
 export function headingAt(items: OutlineHeading[], pos: number): number {
   let found = -1;

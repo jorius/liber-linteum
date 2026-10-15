@@ -10,7 +10,13 @@ import {
 } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useMediaQuery } from '../../app/useMediaQuery';
-import { headingAt, headingsOf, parentsOf, type OutlineHeading } from '../../markdown/outline';
+import {
+  headingAt,
+  headingsOf,
+  parentsOf,
+  siblingPositions,
+  type OutlineHeading,
+} from '../../markdown/outline';
 import { useSettingsStore } from '../../stores/settingsStore';
 import styles from './Outline.module.css';
 import { parsedFor } from './pageModel';
@@ -65,6 +71,8 @@ export function Outline({ view, text }: { view: EditorView; text: string }) {
   // Live Preview's model when it has this text (final review M3).
   const items = useMemo(() => headingsOf(parsedFor(source, view.state), source), [source, view]);
   const parents = useMemo(() => parentsOf(items), [items]);
+  // Once per outline, not per item and render (final review M5).
+  const positions = useMemo(() => siblingPositions(parents), [parents]);
 
   // Sections fold by heading position; a changed outline starts unfolded.
   useEffect(() => setFolded(new Set()), [items.length]);
@@ -220,15 +228,14 @@ export function Outline({ view, text }: { view: EditorView; text: string }) {
           {visible.map((i) => {
             const h = items[i];
             const parent = hasChildren(i);
-            const siblings = items.filter((_, j) => parents[j] === parents[i]);
             return (
               <li
                 key={`${h.from}-${i}`}
                 role="treeitem"
                 data-index={i}
                 aria-level={h.level}
-                aria-setsize={siblings.length}
-                aria-posinset={siblings.indexOf(h) + 1}
+                aria-setsize={positions.setSize[i]}
+                aria-posinset={positions.posInSet[i]}
                 aria-expanded={parent ? !folded.has(h.from) : undefined}
                 aria-selected={i === tabStop}
                 aria-current={i === marked ? 'location' : undefined}

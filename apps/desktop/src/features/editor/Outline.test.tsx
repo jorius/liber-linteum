@@ -51,6 +51,20 @@ describe('outline panel (M4b part 2 §5)', () => {
     expect(screen.queryByRole('tree')).not.toBeInTheDocument();
   });
 
+  it('gives each heading its place among its siblings (aria-setsize, aria-posinset)', async () => {
+    const tree = await open();
+    expect(
+      within(tree)
+        .getAllByRole('treeitem')
+        .map((i) => [i.getAttribute('aria-setsize'), i.getAttribute('aria-posinset')]),
+    ).toEqual([
+      ['2', '1'],
+      ['1', '1'],
+      ['1', '1'],
+      ['2', '2'],
+    ]);
+  });
+
   it('click and Enter put the cursor at the heading and the keyboard in the editor', async () => {
     const tree = await open();
     await userEvent.click(within(tree).getByRole('treeitem', { name: /Three/ }));
