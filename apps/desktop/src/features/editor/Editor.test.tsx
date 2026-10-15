@@ -398,3 +398,40 @@ describe('code block badge and language picker (M4b part 2 §2)', () => {
     );
   });
 });
+
+describe('wide elements (M4b part 3)', () => {
+  const host = () => document.querySelector<HTMLElement>('.cm-editor')!.parentElement!;
+  afterEach(() => useSettingsStore.setState({ settings: DEFAULT_SETTINGS }));
+
+  it('the host names the kinds that go wide, only on a wide page', async () => {
+    disk = fakeDisk({ 'W.md': 'x\n' });
+    const doc = await load('W.md');
+    useSettingsStore.setState({ settings: { ...DEFAULT_SETTINGS, pageWidth: 'wide' } });
+    render(<Editor doc={doc} mode="livePreview" label="W" />);
+    expect(host().dataset.width).toBe('wide');
+    expect(host()).toHaveAttribute('data-wide-tables', '');
+    expect(host()).toHaveAttribute('data-wide-diagrams', '');
+    expect(host()).not.toHaveAttribute('data-wide-code');
+    // How wide they may get is measured from the editor.
+    expect(host().style.getPropertyValue('--nimw-wide-max')).toMatch(/^\d+px$/);
+    act(() =>
+      useSettingsStore.setState({
+        settings: {
+          ...DEFAULT_SETTINGS,
+          pageWidth: 'wide',
+          wideElements: { ...DEFAULT_SETTINGS.wideElements, tables: false, code: true },
+        },
+      }),
+    );
+    expect(host()).not.toHaveAttribute('data-wide-tables');
+    expect(host()).toHaveAttribute('data-wide-code', '');
+    act(() =>
+      useSettingsStore.setState({ settings: { ...DEFAULT_SETTINGS, pageWidth: 'full' } }),
+    );
+    expect(host().dataset.width).toBe('full');
+    for (const kind of ['tables', 'code', 'diagrams', 'images', 'maths']) {
+      expect(host()).not.toHaveAttribute(`data-wide-${kind}`);
+    }
+    expect(host().style.getPropertyValue('--nimw-wide-max')).toBe('');
+  });
+});

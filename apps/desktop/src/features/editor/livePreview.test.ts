@@ -247,3 +247,47 @@ describe('Live Preview diagrams (M4b part 2 §4)', () => {
     expect(v.contentDOM.querySelector('.cm-nimw-codebadge')).toBeNull();
   });
 });
+
+describe('wide elements (M4b part 3): what may escape the measure', () => {
+  const kinds = (v: EditorView) =>
+    [...v.contentDOM.querySelectorAll<HTMLElement>('.cm-nimw-widget')].map(
+      (w) => w.dataset.wideKind ?? null,
+    );
+
+  it('block widgets say their kind: tables, maths, diagrams and lone images; others none', () => {
+    const text =
+      'Top\n\n| a | b |\n| - | - |\n| 1 | 2 |\n\n$$\nx^2\n$$\n\n' +
+      '```mermaid\nflowchart LR\n  A --> B\n```\n\n![[pic.png]]\n\n![[Other]]\n\n> [!note]\n> Callout\n';
+    const v = editor(text);
+    expect(kinds(v)).toEqual(['tables', 'maths', 'diagrams', 'images', null, null]);
+  });
+
+  it("code lines carry their block's widest line; raw table lines do while edited", async () => {
+    const text =
+      'Top\n\n```js\nshort();\n\tconst longer = 1;\n```\n\n| a | b |\n| - | - |\n| one | two |\n';
+    const v = editor(text);
+    const code = [...v.contentDOM.querySelectorAll<HTMLElement>('.cm-nimw-codeblock')];
+    expect(code).toHaveLength(4);
+    // The tab counts as four columns: "    const longer = 1;" is 21.
+    expect(code.map((l) => l.style.getPropertyValue('--nimw-ch'))).toEqual([
+      '21',
+      '21',
+      '21',
+      '21',
+    ]);
+    expect(code.map((l) => l.dataset.wideSrc)).toEqual(['code', 'code', 'code', 'code']);
+    expect(v.contentDOM.querySelector('[data-wide-src="tables"]')).toBeNull();
+    await moveTo(v, v.state.doc.line(9).from);
+    const rows = [...v.contentDOM.querySelectorAll<HTMLElement>('[data-wide-src="tables"]')];
+    expect(rows.map((l) => l.textContent)).toEqual(['| a | b |', '| - | - |', '| one | two |']);
+    expect(rows[0].style.getPropertyValue('--nimw-ch')).toBe('13');
+  });
+
+  it('a Mermaid block being edited follows the diagrams choice', async () => {
+    const text = 'Top\n\n```mermaid\nflowchart LR\n```\n';
+    const v = editor(text);
+    await moveTo(v, v.state.doc.line(4).from);
+    const src = [...v.contentDOM.querySelectorAll<HTMLElement>('.cm-nimw-codeblock')];
+    expect(src.map((l) => l.dataset.wideSrc)).toEqual(['diagrams', 'diagrams', 'diagrams']);
+  });
+});

@@ -16,7 +16,7 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react
 import { useTranslation } from 'react-i18next';
 import type { EditorMode } from '../../ipc';
 import { usePageStore } from '../../stores/pageStore';
-import { usePageWidth } from '../../stores/pageWidthStore';
+import { usePageWidth, useWideElements } from '../../stores/pageWidthStore';
 import { isTextPath } from '../../stores/textFiles';
 import { nameOf } from '../../stores/tree';
 import { useSettingsStore } from '../../stores/settingsStore';
@@ -40,6 +40,7 @@ import { blockForOffset, offsetAtTop, topIn } from './scrollSync';
 import { notifyViewReset, notifyViewUpdate, setCurrentView } from './viewUpdates';
 import { Toolbar } from './Toolbar';
 import { hideView, pageDocOf, showView, storedState, storeState } from './views';
+import { LIVE_PADDING, wideAttrs, wideMax } from './wideBox';
 import { toggleTaskIn } from './widgets';
 
 /** The Split pane of the component currently showing each view. */
@@ -326,6 +327,7 @@ export interface EditorProps {
 /** The page editor: Live Preview, Source, or Split (Source + rendered pane). */
 export function Editor({ doc, mode, label }: EditorProps) {
   const width = usePageWidth(doc.path);
+  const wideKinds = useWideElements();
   const textFile = isTextPath(doc.path);
   const { t } = useTranslation();
   const host = useRef<HTMLDivElement>(null);
@@ -470,6 +472,31 @@ export function Editor({ doc, mode, label }: EditorProps) {
     };
   }, [split]);
 
+  // Wide elements (M4b part 3): how wide the chosen kinds may get, measured
+  // from the editor (its scroller less the gutter and the side padding).
+  useLayoutEffect(() => {
+    const h = host.current;
+    const v = toolbarView;
+    if (!h) return;
+    if (!v || width !== 'wide' || mode !== 'livePreview') {
+      h.style.removeProperty('--nimw-wide-max');
+      return;
+    }
+    const measure = () => {
+      const gutters = v.dom.querySelector<HTMLElement>('.cm-gutters');
+      const max = wideMax(v.scrollDOM.clientWidth, gutters?.offsetWidth ?? 0, LIVE_PADDING);
+      h.style.setProperty('--nimw-wide-max', `${max}px`);
+    };
+    measure();
+    const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(measure);
+    observer?.observe(v.scrollDOM);
+    window.addEventListener('resize', measure);
+    return () => {
+      observer?.disconnect();
+      window.removeEventListener('resize', measure);
+    };
+  }, [toolbarView, width, mode, showNumbers]);
+
   const toggleTask = useCallback((at: number) => {
     if (view.current) toggleTaskIn(view.current, at);
   }, []);
@@ -499,6 +526,7 @@ export function Editor({ doc, mode, label }: EditorProps) {
           <div
             ref={host}
             data-width={width}
+            {...wideAttrs(width, wideKinds)}
             className={`${mode === 'livePreview' ? styles.live : styles.source} ${width === 'full' ? styles.full : ''}`}
           />
           {split && (
