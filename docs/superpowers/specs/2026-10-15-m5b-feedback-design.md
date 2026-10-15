@@ -246,3 +246,24 @@ Jose chose full editor width, centred.
 9. **⌘F opens search** until in-note find exists.
 10. **Wide tables span the full editor width;** line numbers move to the far left for those rows.
 11. **The sidebar's collapsed state is app-wide,** not per vault.
+
+## 11. Amendments — Stream A
+
+These rulings come from planning the shell. Each lists its cost if wrong.
+
+1. **No app menu on Windows or Linux.** The native menu is installed on macOS only (`with_app_menu`). §2.1's "File → Settings…" therefore can't be the Windows path.
+   - On every platform, clicking the vault name in the sidebar opens a **vault menu** popover: **Settings…**, **Open another vault…**, **Close vault**.
+   - On macOS the same actions are also in the native menus: Notes In My Way → Settings… ⌘, and the Vault menu.
+   - Cost: none. Adding a Windows menu bar later remains possible.
+2. **Open Recent ▸ is left out of the native Vault menu.** It would need the menu rebuilt whenever the recent list changes. Close Vault returns to the Welcome screen, which lists recent vaults. Cost: one extra click.
+3. **Accelerators that would fire twice.** The page already handles ⌘, and ⌘O.
+   - Settings… keeps its ⌘, accelerator, because opening it twice is harmless.
+   - Open Vault… has none, because two folder dialogs would open.
+   - Close Vault ⌥⌘W, File → Save ⌘S and View → Toggle Sidebar ⌘\ are handled through the menu on macOS. The page answers ⌘S and ⌘\ too, and repeats are harmless.
+4. **The floating button is a disclosure,** not an ARIA menu. A button with `aria-expanded` opens a group of three ordinary buttons (Edit and Global view pressed as before, then Search). ↑ and ↓ move between them, and Escape closes and returns focus. Cost: none; the names stay what they were.
+5. **Red "Unsaved" only with auto save off.** With auto save on, the status stays as today (Saving… is neutral), and only failure states (Retrying, Not saved) turn red. This meets "no red flash while typing" without a timer, and replaces §6's 600 ms rule. Cost: low.
+6. **Don't Save drops the text.** The page's unsaved edits are reverted to the last saved text, and nothing is written. Cancel keeps the page open with its text. One dialog lists every unsaved page, with Save all / Don't Save / Cancel. Cost: low.
+7. **Turning auto save back on** saves every unsaved page within the autosave delay.
+8. **The window title is set through a new `window_title_set` command,** acting on the calling window. There is no window plugin (M4c review I2). It shows "Page — Vault" in the editor, "Global View — Vault" in Global View, and "Vault" otherwise. File windows keep their own title.
+9. **The Global View's heading** ("Global view · level") lived in the top bar. Its own breadcrumb already names the level, so the heading goes.
+10. **The sidebar collapse** keeps the reopen button at the top left of the main area. On macOS that sits below the traffic lights, because the native title bar stays.
