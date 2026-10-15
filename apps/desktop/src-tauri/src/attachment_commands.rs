@@ -11,7 +11,7 @@ use crate::error::{CmdResult, CommandError, ErrorKind};
 use crate::state::AppState;
 use crate::vault_commands::blocking;
 use nimw_session::{VaultSession, cover_reference};
-use nimw_vault::{CoverSide, EntryKind, PageWidth, VaultPath};
+use nimw_vault::{CoverSide, EntryKind, LinkFormat, PageWidth, VaultPath};
 use percent_encoding::percent_decode_str;
 use std::path::PathBuf;
 use tauri::ipc::{InvokeBody, Request};
@@ -189,6 +189,7 @@ pub(crate) fn vault_settings_get_impl(state: &AppState) -> CmdResult<VaultSettin
     let session = state.session()?;
     let config = session.attachment_settings();
     let widths = session.vault().page_widths();
+    let formats = session.vault().link_formats();
     Ok(VaultSettingsDto {
         attachments: AttachmentsDto {
             mode: config.mode,
@@ -206,6 +207,8 @@ pub(crate) fn vault_settings_get_impl(state: &AppState) -> CmdResult<VaultSettin
             .map(|(path, side)| (path, side.as_str()))
             .collect(),
         cover_widths: session.vault().cover_widths(),
+        attachment_link_format: formats.own,
+        obsidian_link_format: formats.obsidian,
     })
 }
 
@@ -304,6 +307,16 @@ pub(crate) fn vault_settings_set_impl(
         session
             .vault()
             .set_vault_page_width(width_of(Some(width))?)?;
+    }
+    if let Some(format) = patch.attachment_link_format.as_deref() {
+        let format = match format {
+            "default" => None,
+            other => Some(
+                LinkFormat::parse(other)
+                    .ok_or_else(|| invalid(format!("unknown link format {other:?}")))?,
+            ),
+        };
+        session.vault().set_link_format(format)?;
     }
     match patch.attachments {
         Some(a) => session.set_attachment_settings(&a.mode, &a.path, patch.override_obsidian)?,

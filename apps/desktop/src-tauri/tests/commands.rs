@@ -736,7 +736,9 @@ fn m2c_vault_settings_round_trip_over_ipc() {
             "pageWidths": {},
             "coverHeights": {},
             "coverSides": {},
-            "coverWidths": {}
+            "coverWidths": {},
+            "attachmentLinkFormat": null,
+            "obsidianLinkFormat": null
         })
     );
     let saved = call(
@@ -1806,6 +1808,57 @@ fn final_review_i3_a_conflict_with_a_non_text_file_carries_no_lossy_text() {
     assert_eq!(
         std::fs::read(vault.path().join("Page.md")).unwrap(),
         b"# Caf\xe9\n"
+    );
+}
+
+/// M4b part 3 §8: the link format over IPC — Obsidian's `newLinkFormat` is
+/// reported, NIMW's own choice wins, `default` clears it, nonsense is refused;
+/// a paste in the absolute format comes back with its `file:` URL.
+#[test]
+fn m4b3_link_format_over_ipc() {
+    let h = harness();
+    let vault = tempfile::tempdir().unwrap();
+    std::fs::create_dir(vault.path().join(".obsidian")).unwrap();
+    std::fs::write(
+        vault.path().join(".obsidian/app.json"),
+        r#"{ "newLinkFormat": "relative" }"#,
+    )
+    .unwrap();
+    std::fs::write(vault.path().join("a.md"), "# A\n").unwrap();
+    call(&h.main, "vault_open", json!({ "path": vault.path() })).unwrap();
+    let got = call(&h.main, "vault_settings_get", json!({})).unwrap();
+    assert_eq!(got["attachmentLinkFormat"], Value::Null);
+    assert_eq!(got["obsidianLinkFormat"], "relative");
+    let set = |value: &str| {
+        call(
+            &h.main,
+            "vault_settings_set",
+            json!({ "patch": { "attachmentLinkFormat": value } }),
+        )
+    };
+    assert_eq!(set("absolute").unwrap()["attachmentLinkFormat"], "absolute");
+    let pasted = get_ipc_response(
+        &h.main,
+        raw_request(
+            "attachment_paste",
+            b"\x89PNG".to_vec(),
+            &[("x-nimw-page", "a.md"), ("x-nimw-name", "shot.png")],
+        ),
+    )
+    .map(|r| r.deserialize::<Value>().unwrap())
+    .unwrap();
+    assert_eq!(pasted["link"], "shot.png");
+    assert!(
+        pasted["url"]
+            .as_str()
+            .is_some_and(|u| u.starts_with("file:///") && u.ends_with("/attachments/shot.png")),
+        "{pasted}"
+    );
+    assert_eq!(set("default").unwrap()["attachmentLinkFormat"], Value::Null);
+    assert_eq!(kind(set("sideways").unwrap_err()), "invalidName");
+    assert_eq!(
+        std::fs::read_to_string(vault.path().join(".obsidian/app.json")).unwrap(),
+        r#"{ "newLinkFormat": "relative" }"#
     );
 }
 

@@ -109,6 +109,10 @@ pub struct WarningPayload {
 pub struct AttachedDto {
     pub path: String,
     pub link: String,
+    /// The `file:` URL to write instead of `link` (absolute link format,
+    /// M4b part 3 §8).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub url: Option<String>,
     pub copied: bool,
 }
 
@@ -117,6 +121,7 @@ impl From<nimw_session::Attached> for AttachedDto {
         AttachedDto {
             path: a.path.to_string(),
             link: a.link,
+            url: a.url,
             copied: a.copied,
         }
     }
@@ -175,6 +180,10 @@ pub struct VaultSettingsDto {
     pub cover_sides: std::collections::BTreeMap<String, &'static str>,
     /// Side covers' own strip widths in px (§3).
     pub cover_widths: std::collections::BTreeMap<String, u32>,
+    /// NIMW's own link format for new attachments (M4b part 3 §8).
+    pub attachment_link_format: Option<nimw_vault::LinkFormat>,
+    /// Obsidian's `newLinkFormat`, as NIMW reads it (applies while NIMW has none).
+    pub obsidian_link_format: Option<nimw_vault::LinkFormat>,
 }
 
 #[derive(Debug, Clone, serde::Deserialize)]
@@ -184,6 +193,9 @@ pub struct VaultSettingsPatch {
     pub override_obsidian: Option<bool>,
     /// `"readable"`, `"full"` or `"default"` (use the app setting).
     pub page_width: Option<String>,
+    /// `"shortest"`, `"vault"`, `"relative"`, `"absolute"` or `"default"`
+    /// (follow Obsidian's, else the shortest name; M4b part 3 §8).
+    pub attachment_link_format: Option<String>,
 }
 
 /// `gv_children`'s argument: which level to open (M3a §3).

@@ -2,20 +2,25 @@
 //! dropped files, covers), NIMW's attachment setting and `[[` suggestions.
 
 use crate::error::{Result, SessionError};
+use crate::external::file_url;
 use crate::session::{
     FORBIDDEN_NAME_CHARS, VaultSession, clamp_ns, folder_row, is_page_path, validate_name,
 };
 use nimw_index::{FileKind, FileRow, LinkCandidate};
-use nimw_markdown::{LinkKind, link_key, name_key, shortest_unique_target};
-use nimw_vault::{AttachmentConfig, Hash, VaultError, VaultPath};
+use nimw_markdown::{LinkKind, link_key, name_key, resolve, shortest_unique_target};
+use nimw_vault::{AttachmentConfig, Hash, LinkFormat, VaultError, VaultPath};
 use std::path::Path;
 
 /// A file saved into (or found in) the vault for a page.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Attached {
     pub path: VaultPath,
-    /// Wiki-style target that resolves from the page back to `path`.
+    /// Wiki-style target that resolves from the page back to `path`, in the
+    /// vault's link format (M4b part 3 §8; the shortest name for `absolute`).
     pub link: String,
+    /// The file's `file:` URL when the format is `absolute`: the UI writes
+    /// `![](url)` instead of `![[link]]`.
+    pub url: Option<String>,
     /// `false` when the dropped file already lived in the vault.
     pub copied: bool,
 }
@@ -67,6 +72,17 @@ pub fn cover_reference(page: &VaultPath, file: &VaultPath) -> String {
     format!("/{file}")
 }
 
+/// `file` relative to `page`'s folder: `../Assets/x.png`, `attachments/x.png`.
+fn relative_path(page: &VaultPath, file: &VaultPath) -> String {
+    let here = page.parent().unwrap_or_else(VaultPath::root);
+    let from: Vec<&str> = here.as_str().split('/').filter(|s| !s.is_empty()).collect();
+    let to: Vec<&str> = file.as_str().split('/').collect();
+    let common = from.iter().zip(&to).take_while(|(a, b)| a == b).count();
+    let mut parts = vec![".."; from.len() - common];
+    parts.extend(&to[common..]);
+    parts.join("/")
+}
+
 fn split_ext(name: &str) -> (&str, Option<&str>) {
     match name.rfind('.') {
         Some(i) if i > 0 && i + 1 < name.len() => (&name[..i], Some(&name[i + 1..])),
@@ -105,10 +121,11 @@ impl VaultSession {
         if let Ok(inside) = VaultPath::from_fs_path(self.vault.root(), &real)
             && self.vault.stat(&inside)?.is_some()
         {
-            let link = self.link_to(page, &inside)?;
+            let (link, url) = self.link_to(page, &inside)?;
             return Ok(Attached {
                 path: inside,
                 link,
+                url,
                 copied: false,
             });
         }
@@ -244,10 +261,11 @@ impl VaultSession {
             match write(&path) {
                 Ok(hash) => {
                     self.index_new_file(&path, hash)?;
-                    let link = self.link_to(page, &path)?;
+                    let (link, url) = self.link_to(page, &path)?;
                     return Ok(Attached {
                         path,
                         link,
+                        url,
                         copied: true,
                     });
                 }
@@ -285,15 +303,36 @@ impl VaultSession {
         Ok(())
     }
 
-    fn link_to(&self, page: &VaultPath, path: &VaultPath) -> Result<String> {
+    /// The link to `path` from `page` in the vault's link format (M4b part 3
+    /// §8), and the `file:` URL for the absolute format. A full or relative
+    /// path that wouldn't find `path` again falls back to the shortest name.
+    fn link_to(&self, page: &VaultPath, path: &VaultPath) -> Result<(String, Option<String>)> {
         let files = self.index().file_set()?;
-        Ok(shortest_unique_target(
-            path.as_str(),
-            page.as_str(),
-            &files,
-            LinkKind::Embed,
-            false,
-        ))
+        let shortest =
+            shortest_unique_target(path.as_str(), page.as_str(), &files, LinkKind::Embed, false);
+        let finds = |link: &str| {
+            resolve(LinkKind::Embed, link, page.as_str(), &files).as_deref() == Some(path.as_str())
+        };
+        let link = match self.vault.link_formats().effective() {
+            LinkFormat::Shortest => shortest,
+            LinkFormat::Vault => Some(path.to_string())
+                .filter(|full| finds(full))
+                .unwrap_or(shortest),
+            LinkFormat::Relative => {
+                let rel = relative_path(page, path);
+                let dotted = format!("./{rel}");
+                [rel, dotted]
+                    .into_iter()
+                    .find(|l| finds(l))
+                    .unwrap_or(shortest)
+            }
+            LinkFormat::Absolute => {
+                let full = self.vault.fs_path(path)?;
+                let url = full.to_str().map(file_url);
+                return Ok((shortest, url));
+            }
+        };
+        Ok((link, None))
     }
 }
 

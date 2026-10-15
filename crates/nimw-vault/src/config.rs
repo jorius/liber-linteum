@@ -165,6 +165,9 @@ pub struct AttachmentConfig {
 pub(crate) struct ObsidianAppJson {
     #[serde(rename = "attachmentFolderPath")]
     pub attachment_folder_path: Option<String>,
+    /// `shortest` | `relative` | `absolute` (M4b part 3 §8).
+    #[serde(rename = "newLinkFormat")]
+    pub new_link_format: Option<String>,
 }
 
 #[cfg(test)]
