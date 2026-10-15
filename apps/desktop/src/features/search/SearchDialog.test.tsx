@@ -7,7 +7,7 @@ import { clearMocks, mockIPC } from '../../ipc/testing';
 import { useUiStore } from '../../stores/uiStore';
 import { useVaultStore } from '../../stores/vaultStore';
 import { useGvStore } from '../global-view/gvStore';
-import { TopBar } from '../shell/TopBar';
+import { ActionButton } from '../shell/ActionButton';
 import { isSearchKey, useGlobalShortcuts } from '../shell/useGlobalShortcuts';
 import { DialogHost } from '../dialogs/DialogHost';
 import { useSearchStore } from './searchStore';
@@ -326,10 +326,11 @@ describe('opening Search (M5 §4)', () => {
     expect(useUiStore.getState().dialog).toEqual({ type: 'search' });
   });
 
-  it('the top bar has a Search button with its shortcut', async () => {
-    render(<TopBar />);
+  it('the floating button has Search with its shortcut (M5b §2.2)', async () => {
+    render(<ActionButton />);
+    await userEvent.click(screen.getByRole('button', { name: 'Actions' }));
     const button = screen.getByRole('button', { name: 'Search' });
-    expect(button).toHaveAttribute('aria-keyshortcuts', 'Meta+Shift+F Control+Shift+F');
+    expect(button).toHaveAttribute('aria-keyshortcuts', 'Meta+F Control+F');
     await userEvent.click(button);
     expect(useUiStore.getState().dialog).toEqual({ type: 'search' });
   });

@@ -81,11 +81,15 @@
     "files": "Archivos · {name}",
     "newPage": "Nueva página",
     "newFolder": "Nueva carpeta",
-    "view": "Vista",
     "edit": "Editar",
     "globalView": "Vista global",
     "settings": "Ajustes",
-    "closeVault": "Cerrar bóveda"
+    "closeVault": "Cerrar bóveda",
+    "actions": "Acciones",
+    "hideSidebar": "Ocultar la barra lateral",
+    "showSidebar": "Mostrar la barra lateral",
+    "settingsItem": "Ajustes…",
+    "openAnother": "Abrir otra bóveda…"
   },
   "page": {
     "region": "Página",
@@ -341,7 +345,12 @@
       "obsidian": "Sigue la configuración de Obsidian ({format}). Elige un formato para usar el tuyo.",
       "useObsidian": "Usar la configuración de Obsidian",
       "showPaths": "Mostrar dónde están los adjuntos en el disco"
-    }
+    },
+    "autoSave": "Guardado automático",
+    "actionButton": "Botón de acciones",
+    "actionButtonBottomRight": "Abajo a la derecha",
+    "actionButtonBottomLeft": "Abajo a la izquierda",
+    "actionButtonTopRight": "Arriba a la derecha"
   },
   "toolbar": {
     "label": "Formato",

@@ -4,6 +4,7 @@ import { goBack, goForward } from '../../stores/navigate';
 import { dirFor } from '../../stores/tree';
 import { useUiStore } from '../../stores/uiStore';
 import { useVaultStore } from '../../stores/vaultStore';
+import { toggleSidebar } from './shellMenu';
 
 /** Keys a layout may put where US keyboards have [ and ]; any other plain
  *  character there (Dvorak's / and =) keeps its own meaning. */
@@ -39,6 +40,7 @@ export function isSearchKey(e: KeyboardEvent): boolean {
 }
 
 /** ⌘ (macOS) / Ctrl shortcuts (spec §3.5): ⇧F search, ⇧E explorer, O open vault,
+ * J the floating button's actions and \ the sidebar (M5b §2.2, §2.5),
  * , settings, N new page ( ⇧N is New Quick Note since M4c §7.9, handled by
  * `ScratchpadHost`), [ / ] back and forward along the
  * link trail (M2b §3), 1 / 2 Edit and Global View (M3a §2). Ignored while a
@@ -70,6 +72,12 @@ export function useGlobalShortcuts(menuOpen: boolean) {
           .then((path) => (path ? vault.open(path) : undefined));
       } else if (key === 'n' && !e.shiftKey) {
         void vault.createPage(dirFor(vault.nodes, vault.selected));
+      } else if (key === 'j' && !e.shiftKey) {
+        // M5b §2.2: the floating button's actions.
+        const ui = useUiStore.getState();
+        ui.setActionsOpen(!ui.actionsOpen);
+      } else if ((e.key === '\\' || e.code === 'Backslash') && !e.shiftKey) {
+        toggleSidebar(); // M5b §2.5
       } else if (key === 'e' && e.shiftKey) {
         document
           .querySelector<HTMLElement>('[role="tree"] [role="treeitem"][tabindex="0"]')

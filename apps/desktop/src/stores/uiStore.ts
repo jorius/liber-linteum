@@ -35,6 +35,9 @@ export type Screen = 'edit' | 'global';
 interface UiState {
   dialog: DialogState;
   screen: Screen;
+  /** The floating button's Edit / Global view / Search are shown (M5b §2.2). */
+  actionsOpen: boolean;
+  setActionsOpen: (open: boolean) => void;
   setScreen: (screen: Screen) => void;
   openDialog: (d: Exclude<DialogState, null>) => void;
   closeDialog: () => void;
@@ -44,6 +47,8 @@ export const useUiStore = create<UiState>((set) => ({
   dialog: null,
   screen: 'edit',
   setScreen: (screen) => set({ screen }),
+  actionsOpen: false,
+  setActionsOpen: (actionsOpen) => set({ actionsOpen }),
   openDialog: (dialog) => set({ dialog }),
   closeDialog: () => set({ dialog: null }),
 }));

@@ -210,6 +210,22 @@ describe('Settings dialog (M2b §4, §5, §7)', () => {
     await waitFor(() => expect(patches).toEqual([{ showAttachmentPaths: true }]));
   });
 
+  it('M5b §6, §2.2: Auto save (on) and where the floating button sits are saved at once', async () => {
+    open();
+    const autoSave = screen.getByRole('checkbox', { name: 'Auto save' });
+    expect(autoSave).toBeChecked();
+    await userEvent.click(autoSave);
+    const place = screen.getByRole('combobox', { name: 'Action button' });
+    expect(place).toHaveValue('bottomRight');
+    await userEvent.selectOptions(place, 'topRight');
+    await waitFor(() =>
+      expect(patches).toEqual([{ autoSave: false }, { actionButton: 'topRight' }]),
+    );
+    expect(screen.getAllByRole('option').map((o) => o.textContent)).toEqual(
+      expect.arrayContaining(['Bottom right', 'Bottom left', 'Top right']),
+    );
+  });
+
   it('cover resize: a default set by hand outside the four sizes is still shown', () => {
     useSettingsStore.setState({ settings: { ...DEFAULT_SETTINGS, coverHeight: 250 } });
     open();

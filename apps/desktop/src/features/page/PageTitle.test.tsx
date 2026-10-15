@@ -208,7 +208,7 @@ describe('editable title (M2b §2)', () => {
     fakeDisk({ 'A.md': 'x\n' });
     render(<PageScreen />);
     await open('A.md');
-    const header = screen.getByRole('banner');
+    const header = screen.getByRole('region', { name: 'Page' });
     const violations = await axe
       .run(header, { rules: { 'color-contrast': { enabled: false } } })
       .then((r) => r.violations);

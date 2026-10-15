@@ -18,7 +18,7 @@ import styles from './PageView.module.css';
  *  the save status, Format and the mode switch; second row, tags, link
  *  counts and the note's own title, with the cover's controls at the right.
  *  With a cover the rows sit on it in veiled pills. The title and subtitle
- *  are in the top bar. */
+ *  follow the band, at the top of the page (M5b §2.3). */
 export function PageHeader({
   page,
   mode,

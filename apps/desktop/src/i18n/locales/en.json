@@ -81,11 +81,15 @@
     "files": "Files · {name}",
     "newPage": "New page",
     "newFolder": "New folder",
-    "view": "View",
     "edit": "Edit",
     "globalView": "Global view",
     "settings": "Settings",
-    "closeVault": "Close vault"
+    "closeVault": "Close vault",
+    "actions": "Actions",
+    "hideSidebar": "Hide sidebar",
+    "showSidebar": "Show sidebar",
+    "settingsItem": "Settings…",
+    "openAnother": "Open another vault…"
   },
   "page": {
     "region": "Page",
@@ -341,7 +345,12 @@
       "obsidian": "Following Obsidian’s setting ({format}). Choose a format to use your own.",
       "useObsidian": "Use Obsidian’s setting",
       "showPaths": "Show where attachments are on disk"
-    }
+    },
+    "autoSave": "Auto save",
+    "actionButton": "Action button",
+    "actionButtonBottomRight": "Bottom right",
+    "actionButtonBottomLeft": "Bottom left",
+    "actionButtonTopRight": "Top right"
   },
   "toolbar": {
     "label": "Formatting",

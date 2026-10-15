@@ -1,13 +1,20 @@
+import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { BrandMark, LockIcon, NewFolderIcon, NewPageIcon } from '../../app/icons';
+import { LockIcon, NewFolderIcon, NewPageIcon, SidebarIcon } from '../../app/icons';
 import { dirFor } from '../../stores/tree';
 import { useVaultStore } from '../../stores/vaultStore';
 import { ExplorerDnd } from '../explorer/ExplorerDnd';
 import type { ExplorerTreeProps } from '../explorer/ExplorerTree';
+import { toggleSidebar } from './shellMenu';
+import { VaultMenu } from './VaultMenu';
 import styles from './Shell.module.css';
 
-/** Left column: brand, explorer actions, the tree and the privacy footer. */
-export function Sidebar(treeProps: ExplorerTreeProps) {
+/** Left column: the vault menu, explorer actions, the tree and the privacy
+ *  footer. `vaultIcon`: the vault's icon before its name (M5b §2.4). */
+export function Sidebar({
+  vaultIcon,
+  ...treeProps
+}: ExplorerTreeProps & { vaultIcon?: ReactNode }) {
   const { t } = useTranslation();
   const name = useVaultStore((s) => s.info?.name ?? '');
   const create = (kind: 'page' | 'folder') => {
@@ -17,11 +24,19 @@ export function Sidebar(treeProps: ExplorerTreeProps) {
   };
   return (
     <aside className={styles.side} aria-label={t('shell.files', { name })}>
-      {/* The vault, not the app (M4b §1): the app's name is in the window
-          title, the About panel and the welcome screen. */}
-      <div className={styles.brand} title={name}>
-        <BrandMark size={26} />
-        <span className={styles.brandName}>{name}</span>
+      {/* The vault, not the app (M4b §1): no app mark beside it (M5b §2.4). */}
+      <div className={styles.brandRow}>
+        <VaultMenu name={name} leading={vaultIcon} />
+        <button
+          type="button"
+          className={styles.iconButton}
+          aria-label={t('shell.hideSidebar')}
+          aria-keyshortcuts="Meta+\ Control+\"
+          title={t('shell.hideSidebar')}
+          onClick={toggleSidebar}
+        >
+          <SidebarIcon />
+        </button>
       </div>
       <div className={styles.sideHeader}>
         <span className={styles.sideLabel}>{t('shell.files', { name })}</span>

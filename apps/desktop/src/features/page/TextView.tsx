@@ -9,6 +9,7 @@ import { onViewUpdate, useCurrentView } from '../editor/viewUpdates';
 import { BackArrow } from './BackArrow';
 import { Breadcrumb } from './Breadcrumb';
 import styles from './PageView.module.css';
+import { PageTitle } from './PageTitle';
 import { UnwritableNotice } from './UnwritableNotice';
 import { COUNT_DEBOUNCE_MS } from './WordCount';
 
@@ -78,6 +79,9 @@ export function TextView({ path }: { path: string }) {
             )}
           </div>
         </div>
+      </div>
+      <div className={styles.titleBlock}>
+        <PageTitle path={path} />
       </div>
       {error || notText ? (
         <div className={`${styles.orphan}`}>

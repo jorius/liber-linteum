@@ -1,0 +1,119 @@
+import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
+import { createPortal } from 'react-dom';
+import { useTranslation } from 'react-i18next';
+import { closeVault, openAnotherVault, openSettings } from './shellMenu';
+import styles from './Shell.module.css';
+
+/** The vault's name in the sidebar, as a menu button (M5b §11.1): Settings…,
+ *  Open another vault…, Close vault — on every platform, where macOS also has
+ *  them in its app menu. `leading`: the vault's icon (Stream B). */
+export function VaultMenu({ name, leading }: { name: string; leading?: ReactNode }) {
+  const { t } = useTranslation();
+  const [open, setOpen] = useState(false);
+  const button = useRef<HTMLButtonElement>(null);
+  const close = (refocus: boolean) => {
+    setOpen(false);
+    if (refocus) button.current?.focus();
+  };
+  return (
+    <>
+      <button
+        ref={button}
+        type="button"
+        className={styles.brand}
+        aria-haspopup="menu"
+        aria-expanded={open}
+        title={name}
+        onClick={() => setOpen((o) => !o)}
+        onKeyDown={(e) => {
+          if (e.key !== 'ArrowDown') return;
+          e.preventDefault();
+          setOpen(true);
+        }}
+      >
+        {leading}
+        <span className={styles.brandName}>{name}</span>
+      </button>
+      {open && button.current && (
+        <Menu
+          anchor={button.current}
+          label={name}
+          items={[
+            [t('shell.settingsItem'), openSettings],
+            [t('shell.openAnother'), openAnotherVault],
+            [t('shell.closeVault'), closeVault],
+          ]}
+          onClose={close}
+        />
+      )}
+    </>
+  );
+}
+
+function Menu({
+  anchor,
+  label,
+  items,
+  onClose,
+}: {
+  anchor: HTMLElement;
+  label: string;
+  items: [string, () => void][];
+  onClose: (refocus: boolean) => void;
+}) {
+  const [active, setActive] = useState(0);
+  const refs = useRef<(HTMLButtonElement | null)[]>([]);
+  const box = useRef<HTMLDivElement>(null);
+  const rect = anchor.getBoundingClientRect();
+  useEffect(() => {
+    refs.current[active]?.focus();
+  }, [active]);
+  useEffect(() => {
+    const onDown = (e: MouseEvent) => {
+      const target = e.target as Node;
+      if (!box.current?.contains(target) && !anchor.contains(target)) onClose(false);
+    };
+    document.addEventListener('mousedown', onDown);
+    return () => document.removeEventListener('mousedown', onDown);
+  }, [anchor, onClose]);
+  const onKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
+    const n = items.length;
+    if (e.key === 'ArrowDown') setActive((a) => (a + 1) % n);
+    else if (e.key === 'ArrowUp') setActive((a) => (a - 1 + n) % n);
+    else if (e.key === 'Home') setActive(0);
+    else if (e.key === 'End') setActive(n - 1);
+    else if (e.key === 'Escape' || e.key === 'Tab') onClose(true);
+    else return;
+    e.preventDefault();
+    e.stopPropagation();
+  };
+  return createPortal(
+    <div
+      ref={box}
+      role="menu"
+      aria-label={label}
+      className="nimw-menu"
+      style={{ position: 'fixed', left: rect.left, top: rect.bottom + 4, minWidth: 220 }}
+      onKeyDown={onKeyDown}
+    >
+      {items.map(([text, run], i) => (
+        <button
+          key={text}
+          ref={(el) => {
+            refs.current[i] = el;
+          }}
+          type="button"
+          role="menuitem"
+          tabIndex={i === active ? 0 : -1}
+          onClick={() => {
+            onClose(false);
+            run();
+          }}
+        >
+          {text}
+        </button>
+      ))}
+    </div>,
+    document.body,
+  );
+}

@@ -8,6 +8,7 @@ import {
   type Theme,
   type PageWidth,
   type WideElements,
+  type ActionButtonPlace,
 } from '../../ipc';
 import { useSettingsStore } from '../../stores/settingsStore';
 import { useVaultStore } from '../../stores/vaultStore';
@@ -106,6 +107,18 @@ export function SettingsDialog({ onClose }: { onClose: () => void }) {
             onSave={(accentColor) => update({ accentColor })}
           />
         )}
+        <label className={styles.field}>
+          <span>{t('settings.actionButton')}</span>
+          <select
+            className={styles.select}
+            value={settings.actionButton}
+            onChange={(e) => void update({ actionButton: e.target.value as ActionButtonPlace })}
+          >
+            <option value="bottomRight">{t('settings.actionButtonBottomRight')}</option>
+            <option value="bottomLeft">{t('settings.actionButtonBottomLeft')}</option>
+            <option value="topRight">{t('settings.actionButtonTopRight')}</option>
+          </select>
+        </label>
       </section>
 
       <section className={styles.section} aria-labelledby={ids.editor}>
@@ -191,6 +204,14 @@ export function SettingsDialog({ onClose }: { onClose: () => void }) {
               </option>
             ))}
           </select>
+        </label>
+        <label className={styles.check}>
+          <input
+            type="checkbox"
+            checked={settings.autoSave !== false}
+            onChange={(e) => void update({ autoSave: e.target.checked })}
+          />
+          {t('settings.autoSave')}
         </label>
         <label className={styles.check}>
           <input

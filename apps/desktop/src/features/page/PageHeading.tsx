@@ -4,8 +4,9 @@ import { isTextPath } from '../../stores/textFiles';
 import { PageSubtitle } from './PageSubtitle';
 import { PageTitle } from './PageTitle';
 
-/** The open page's title and subtitle, in the top bar (M4b §1): both stay
- *  editable in place (M2b §2, M2c §3). Nothing while no page is shown. */
+/** The open page's title and subtitle, at the top of the page (M5b §2.3;
+ *  in the top bar before): both stay editable in place (M2b §2, M2c §3).
+ *  Nothing while no page is shown. */
 export function PageHeading() {
   const state = usePageStore((s) => s.state);
   const page = usePageStore((s) => s.page);

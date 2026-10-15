@@ -46,7 +46,10 @@ describe('save status colours (M5b §6)', () => {
   it.each(PALETTES.flatMap((p) => (['light', 'dark'] as const).map((m) => [p.id, m] as const)))(
     '%s %s: success and danger text are readable on the surface',
     (id, mode) => {
-      const vars = paletteVars(PALETTES.find((p) => p.id === id)!, mode);
+      const vars = paletteVars(
+        PALETTES.find((p) => p.id === id)!,
+        mode,
+      );
       expect(vars['--color-success'], 'success').toMatch(/^#[0-9a-f]{6}$/);
       for (const key of ['--color-success', '--color-danger']) {
         expect(contrast(vars[key], vars['--color-surface']), `${key}`).toBeGreaterThanOrEqual(4.5);

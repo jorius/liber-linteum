@@ -861,3 +861,23 @@ span.relatedOpen {
   outline: 2px solid var(--color-focus);
   outline-offset: 2px;
 }
+
+/* The title and subtitle at the top of the page (M5b §2.3), over the text's
+   measure. */
+.titleBlock {
+  flex: none;
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 760px;
+  margin: 18px auto 4px;
+  padding: 0 40px;
+}
+
+.titleBlock .title {
+  font-size: 30px;
+}
+
+.titleBlock .subtitle,
+.titleBlock .subtitleInput {
+  font-size: 15px;
+}

@@ -205,7 +205,11 @@ describe('settings dialog', () => {
     });
     seed();
     render(<AppShell />);
-    await userEvent.click(screen.getByRole('button', { name: 'Settings' }));
+    // M5b §11.1: Settings… in the vault menu.
+    await userEvent.click(
+      screen.getByRole('button', { name: useVaultStore.getState().info!.name }),
+    );
+    await userEvent.click(screen.getByRole('menuitem', { name: 'Settings…' }));
     const dialog = screen.getByRole('dialog', { name: 'Settings' });
     expect(await axeRun(dialog)).toEqual([]);
     await userEvent.click(within(dialog).getByRole('radio', { name: 'Dark' }));
