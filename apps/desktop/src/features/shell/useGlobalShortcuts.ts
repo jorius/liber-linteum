@@ -4,6 +4,7 @@ import { goBack, goForward } from '../../stores/navigate';
 import { dirFor } from '../../stores/tree';
 import { useUiStore } from '../../stores/uiStore';
 import { useVaultStore } from '../../stores/vaultStore';
+import { openSearch } from '../search/searchMenu';
 import { toggleSidebar } from './shellMenu';
 
 /** Keys a layout may put where US keyboards have [ and ]; any other plain
@@ -31,15 +32,15 @@ function screenKey(e: KeyboardEvent): 'edit' | 'global' | null {
   return null;
 }
 
-/** ⌘⇧F (Ctrl+Shift+F) Search (M5 §4): the F key, or the physical one on
- *  layouts without a Latin F. */
+/** ⌘F or ⌘⇧F (Ctrl+F, Ctrl+Shift+F) Search (M5 §4, M5b §7.3): the F key,
+ *  or the physical one on layouts without a Latin F. */
 export function isSearchKey(e: KeyboardEvent): boolean {
-  if (!(e.metaKey || e.ctrlKey) || !e.shiftKey || e.altKey) return false;
+  if (!(e.metaKey || e.ctrlKey) || e.altKey) return false;
   const key = e.key.toLowerCase();
   return key === 'f' || (!/^[a-z]$/.test(key) && e.code === 'KeyF');
 }
 
-/** ⌘ (macOS) / Ctrl shortcuts (spec §3.5): ⇧F search, ⇧E explorer, O open vault,
+/** ⌘ (macOS) / Ctrl shortcuts (spec §3.5): F or ⇧F search, ⇧E explorer, O open vault,
  * J the floating button's actions and \ the sidebar (M5b §2.2, §2.5),
  * , settings, N new page ( ⇧N is New Quick Note since M4c §7.9, handled by
  * `ScratchpadHost`), [ / ] back and forward along the
@@ -63,7 +64,7 @@ export function useGlobalShortcuts(menuOpen: boolean) {
       if (screen) {
         useUiStore.getState().setScreen(screen);
       } else if (isSearchKey(e)) {
-        useUiStore.getState().openDialog({ type: 'search' });
+        openSearch();
       } else if (key === ',') {
         useUiStore.getState().openDialog({ type: 'settings' });
       } else if (key === 'o' && !e.shiftKey) {

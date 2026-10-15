@@ -20,9 +20,9 @@ export interface WideRoom {
 }
 
 /** How far past the text a wide element may reach: `m` on both sides
- *  (it grows evenly while both have room), then `r` on the right. With line
- *  numbers beside the measure there is no room on the left (`m` is 0), so a
- *  wide element keeps the text's left edge and grows to the right. */
+ *  (it grows evenly while both have room), then `r` on the right. On a wide
+ *  page the line numbers sit at the editor's edge (M5b §7.2), so both sides
+ *  have the same room and `m` equals `r`. */
 export function wideExtents(room: WideRoom): { m: number; r: number } {
   const left = Math.max(0, Math.floor(room.textLeft - room.leftBound));
   const right = Math.max(0, Math.floor(room.rightBound - room.textRight));

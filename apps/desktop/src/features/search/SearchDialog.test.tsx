@@ -10,6 +10,7 @@ import { useGvStore } from '../global-view/gvStore';
 import { ActionButton } from '../shell/ActionButton';
 import { isSearchKey, useGlobalShortcuts } from '../shell/useGlobalShortcuts';
 import { DialogHost } from '../dialogs/DialogHost';
+import { openSearch } from './searchMenu';
 import { useSearchStore } from './searchStore';
 
 const opened = vi.hoisted(() => [] as string[]);
@@ -329,7 +330,10 @@ describe('opening Search (M5 §4)', () => {
     expect(key({ metaKey: true, shiftKey: true, key: 'F', code: 'KeyF' })).toBe(true);
     expect(key({ ctrlKey: true, shiftKey: true, key: 'f', code: 'KeyF' })).toBe(true);
     expect(key({ metaKey: true, shiftKey: true, key: 'А', code: 'KeyF' })).toBe(true);
-    expect(key({ metaKey: true, key: 'f', code: 'KeyF' })).toBe(false);
+    // ⌘F too (M5b §7.3): there is no find-in-note to displace.
+    expect(key({ metaKey: true, key: 'f', code: 'KeyF' })).toBe(true);
+    expect(key({ ctrlKey: true, key: 'f', code: 'KeyF' })).toBe(true);
+    expect(key({ metaKey: true, key: 'g', code: 'KeyG' })).toBe(false);
     expect(key({ metaKey: true, shiftKey: true, altKey: true, key: 'f', code: 'KeyF' })).toBe(
       false,
     );
@@ -339,6 +343,44 @@ describe('opening Search (M5 §4)', () => {
     render(<Shortcuts />);
     fireEvent.keyDown(document.body, { metaKey: true, shiftKey: true, key: 'F', code: 'KeyF' });
     expect(useUiStore.getState().dialog).toEqual({ type: 'search' });
+  });
+
+  it('⌘F in the editor opens Search with a short one-line selection as its text (M5b §7.3)', () => {
+    useVaultStore.setState({ status: 'open' });
+    render(
+      <>
+        <Shortcuts />
+        <div className="cm-content" contentEditable suppressContentEditableWarning>
+          The red wyrm sleeps
+        </div>
+      </>,
+    );
+    const content = document.querySelector<HTMLElement>('.cm-content')!;
+    const select = (from: number, to: number) => {
+      const range = document.createRange();
+      range.setStart(content.firstChild!, from);
+      range.setEnd(content.firstChild!, to);
+      document.getSelection()!.removeAllRanges();
+      document.getSelection()!.addRange(range);
+    };
+    content.focus();
+    select(8, 12);
+    fireEvent.keyDown(content, { metaKey: true, key: 'f', code: 'KeyF' });
+    expect(useUiStore.getState().dialog).toEqual({ type: 'search' });
+    expect(useSearchStore.getState().text).toBe('wyrm');
+  });
+
+  it('a second open while Search shows (menu and page both answering ⌘F) keeps it as it is', () => {
+    useVaultStore.setState({ status: 'open' });
+    openSearch();
+    useSearchStore.getState().setText('typed');
+    openSearch();
+    expect(useSearchStore.getState().text).toBe('typed');
+    expect(useUiStore.getState().dialog).toEqual({ type: 'search' });
+    // Nor does it replace another dialog (the menu's ⌘F over Settings).
+    useUiStore.getState().openDialog({ type: 'settings' });
+    openSearch();
+    expect(useUiStore.getState().dialog).toEqual({ type: 'settings' });
   });
 
   it('the floating button has Search with its shortcut (M5b §2.2)', async () => {

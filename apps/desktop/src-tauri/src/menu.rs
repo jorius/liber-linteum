@@ -177,8 +177,9 @@ pub fn app_menu<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
     // No accelerators: the page handles ⌘1 / ⌘2 itself (as ⌘[ / ⌘]).
     let editor = MenuItem::with_id(app, EDITOR_ID, "Editor", true, None::<&str>)?;
     let global_view = MenuItem::with_id(app, GLOBAL_VIEW_ID, "Global View", true, None::<&str>)?;
-    // No accelerator: the page handles ⌘⇧F itself (as ⌘1 / ⌘2).
-    let search = MenuItem::with_id(app, SEARCH_ID, "Search…", true, None::<&str>)?;
+    // ⌘F shows on the item (M5b §7.3); the page answers it too, and opening
+    // Search a second time does nothing, so either may win.
+    let search = MenuItem::with_id(app, SEARCH_ID, "Search…", true, Some("CmdOrCtrl+F"))?;
     let atoms = MenuItem::with_id(app, ATOMS_ID, "See Atoms of This Page", true, None::<&str>)?;
     let toolbar = MenuItem::with_id(
         app,
