@@ -1,8 +1,8 @@
 // Wide elements (M4b part 3): on a `wide` page, text keeps the readable
 // measure while the kinds chosen in Settings escape it, centred on the text
 // column, up to the editor's width. Live Preview's host says which kinds
-// (data-wide-*) and how wide they may get (--nimw-wide-max); the CSS in
-// Editor.module.css does the rest.
+// (data-wide-*) and how far they may reach past the text on each side
+// (--nimw-wide-m, --nimw-wide-r); the CSS in Editor.module.css does the rest.
 import type { PageWidth, WideElements } from '../../ipc';
 
 /** Live Preview's side padding around the measure (Editor.module.css). */
@@ -10,11 +10,23 @@ export const LIVE_PADDING = 40;
 
 const KINDS: (keyof WideElements)[] = ['tables', 'code', 'diagrams', 'images', 'maths'];
 
-/** The widest a wide element may be: the scroller less the gutter and both
- *  side paddings. Centred on the text column, it then stays clear of the
- *  gutter and of the scroller's edges. */
-export function wideMax(scroller: number, gutter: number, padding: number): number {
-  return Math.max(0, Math.floor(scroller - gutter - 2 * padding));
+/** Where the text column is, and how far a wide element may reach: the
+ *  scroller's edges, or the line-number gutter's, less the side padding. */
+export interface WideRoom {
+  textLeft: number;
+  textRight: number;
+  leftBound: number;
+  rightBound: number;
+}
+
+/** How far past the text a wide element may reach: `m` on both sides
+ *  (it grows evenly while both have room), then `r` on the right. With line
+ *  numbers beside the measure there is no room on the left (`m` is 0), so a
+ *  wide element keeps the text's left edge and grows to the right. */
+export function wideExtents(room: WideRoom): { m: number; r: number } {
+  const left = Math.max(0, Math.floor(room.textLeft - room.leftBound));
+  const right = Math.max(0, Math.floor(room.rightBound - room.textRight));
+  return { m: Math.min(left, right), r: right };
 }
 
 /** The host's attributes naming the kinds that go wide; none unless the

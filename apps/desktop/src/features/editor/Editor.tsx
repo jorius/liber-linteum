@@ -40,7 +40,7 @@ import { blockForOffset, offsetAtTop, topIn } from './scrollSync';
 import { notifyViewReset, notifyViewUpdate, setCurrentView } from './viewUpdates';
 import { Toolbar } from './Toolbar';
 import { hideView, pageDocOf, showView, storedState, storeState } from './views';
-import { LIVE_PADDING, wideAttrs, wideMax } from './wideBox';
+import { LIVE_PADDING, wideAttrs, wideExtents } from './wideBox';
 import { toggleTaskIn } from './widgets';
 
 /** The Split pane of the component currently showing each view. */
@@ -472,24 +472,36 @@ export function Editor({ doc, mode, label }: EditorProps) {
     };
   }, [split]);
 
-  // Wide elements (M4b part 3): how wide the chosen kinds may get, measured
-  // from the editor (its scroller less the gutter and the side padding).
+  // Wide elements (M4b part 3): how far past the text the chosen kinds may
+  // reach, measured from the editor (the scroller, or the line-number
+  // gutter, less the side padding).
   useLayoutEffect(() => {
     const h = host.current;
     const v = toolbarView;
     if (!h) return;
     if (!v || width !== 'wide' || mode !== 'livePreview') {
-      h.style.removeProperty('--nimw-wide-max');
+      h.style.removeProperty('--nimw-wide-m');
+      h.style.removeProperty('--nimw-wide-r');
       return;
     }
     const measure = () => {
-      const gutters = v.dom.querySelector<HTMLElement>('.cm-gutters');
-      const max = wideMax(v.scrollDOM.clientWidth, gutters?.offsetWidth ?? 0, LIVE_PADDING);
-      h.style.setProperty('--nimw-wide-max', `${max}px`);
+      const scroller = v.scrollDOM.getBoundingClientRect();
+      const content = v.contentDOM.getBoundingClientRect();
+      const gutters = v.dom.querySelector<HTMLElement>('.cm-gutters')?.getBoundingClientRect();
+      const { m, r } = wideExtents({
+        textLeft: content.left + LIVE_PADDING,
+        textRight: content.right - LIVE_PADDING,
+        leftBound: Math.max(scroller.left, gutters ? gutters.right : scroller.left) + LIVE_PADDING,
+        rightBound: scroller.left + v.scrollDOM.clientWidth - LIVE_PADDING,
+      });
+      h.style.setProperty('--nimw-wide-m', `${m}px`);
+      h.style.setProperty('--nimw-wide-r', `${r}px`);
     };
     measure();
     const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(measure);
     observer?.observe(v.scrollDOM);
+    const gutters = v.dom.querySelector('.cm-gutters');
+    if (gutters) observer?.observe(gutters);
     window.addEventListener('resize', measure);
     return () => {
       observer?.disconnect();

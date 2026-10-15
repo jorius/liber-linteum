@@ -412,8 +412,9 @@ describe('wide elements (M4b part 3)', () => {
     expect(host()).toHaveAttribute('data-wide-tables', '');
     expect(host()).toHaveAttribute('data-wide-diagrams', '');
     expect(host()).not.toHaveAttribute('data-wide-code');
-    // How wide they may get is measured from the editor.
-    expect(host().style.getPropertyValue('--nimw-wide-max')).toMatch(/^\d+px$/);
+    // How far they may reach is measured from the editor.
+    expect(host().style.getPropertyValue('--nimw-wide-m')).toMatch(/^\d+px$/);
+    expect(host().style.getPropertyValue('--nimw-wide-r')).toMatch(/^\d+px$/);
     act(() =>
       useSettingsStore.setState({
         settings: {
@@ -432,6 +433,7 @@ describe('wide elements (M4b part 3)', () => {
     for (const kind of ['tables', 'code', 'diagrams', 'images', 'maths']) {
       expect(host()).not.toHaveAttribute(`data-wide-${kind}`);
     }
-    expect(host().style.getPropertyValue('--nimw-wide-max')).toBe('');
+    expect(host().style.getPropertyValue('--nimw-wide-m')).toBe('');
+    expect(host().style.getPropertyValue('--nimw-wide-r')).toBe('');
   });
 });
