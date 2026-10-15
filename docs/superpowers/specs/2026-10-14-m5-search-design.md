@@ -165,7 +165,7 @@ Jose, 2026-10-15: "let's go with the scratchpad feature … then the search filt
      - `page_text(rowid, path, title, name, folders, tags, links, body)` holds one row per page. `path` references `files(path)`, cascading on delete and rename.
      - `fts` is an FTS5 table with `content='page_text'`, `tokenize='unicode61 remove_diacritics 2'` and `prefix='2 3'`.
    - **Sync:** three triggers on `page_text` keep `fts` in sync (the SQLite documentation's external-content pattern).
-   - **Snippets** come from `snippet()` with private marker characters, which the index turns into structured parts. Body text never contains those characters, since control characters are dropped from it.
+   - **Snippets** are cut from `page_text.body` in Rust, around the first word a query word starts (folded like the index), with every matching word marked. FTS5's `snippet()` was tried first: it re-expanded every prefix term for each result and alone cost 25–40 ms per page of results on the 10k vault (NFR-03).
    - **Size cost:** the same as §2's.
 4. **The `title` column** holds the title the index already stores: the part 3 rule, a first-block H1, else the file name.
 5. **Body text** is the page's text without its Markdown:
@@ -225,3 +225,15 @@ Jose, 2026-10-15: "let's go with the scratchpad feature … then the search filt
     - Backspace in an empty field removes the last active chip.
 19. **Shift+Enter** shows the page's own level in the Global View, under the vault in the breadcrumb.
 20. **The query and filters are kept per vault session,** in memory. They're forgotten when another vault opens or the vault closes.
+
+### Performance (found while measuring NFR-03)
+
+21. **The matches are materialized once** into a temp table per search. The count, the page of results and the facets read that table instead of re-running the text query and the joins. Facets whose own filter is active get the matches without that filter, in a second temp table.
+22. **On more than 1,500 matches, facets sample.**
+    - The leading tags and links-to pages (3× the number shown) are found in an even, deterministic sample of the matches.
+    - Each candidate is then counted exactly against all the matches.
+    - Counts stay exact. Only a rare page or tag just outside the shown top could be missed on very broad queries.
+23. **Measured** on the 10k reference vault (release, Apple Silicon, other builds running):
+    - first full index, FTS included: 1.4 s;
+    - `search` over 200 queries: p50 18.7 ms, p95 34.8 ms;
+    - re-indexing one page: 18 ms.

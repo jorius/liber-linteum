@@ -228,8 +228,8 @@ impl Piece {
 /// The body's words (M5 §2): headings, paragraphs, lists, tables and code, in
 /// order; wikilinks read as their alias or target, embeds, URLs, HTML and
 /// comments are gone. Runs on one line are joined by a space, others by a
-/// line break; control characters other than `\n` become spaces (the search
-/// index marks its snippets with some).
+/// line break; control characters other than `\n` become spaces (snippets
+/// show this text).
 fn plain_text(src: &str, pieces: &[Piece]) -> String {
     let mut out = String::new();
     let mut prev_end: Option<usize> = None;

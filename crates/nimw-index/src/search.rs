@@ -22,9 +22,8 @@ const LEAD: usize = 3;
 /// bm25 weights: title, name, folders, tags, links, body (§2).
 const WEIGHTS: &str = "10.0, 8.0, 5.0, 6.0, 4.0, 1.0";
 const META_COLUMNS: &str = "{title name folders tags links}";
-/// Snippet markers: control characters, which body text never holds.
-const OPEN: char = '\u{1}';
-const CLOSE: char = '\u{2}';
+/// Words in a snippet.
+const SNIPPET_WORDS: usize = 12;
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct SearchQuery {
@@ -387,8 +386,8 @@ impl Index {
                 })
             })?;
             hit.tags = self.hit_tags(&hit.path, words, &tags)?;
-            if let Some(t) = &text {
-                hit.snippet = self.snippet(&hit.path, &t.any)?;
+            if !words.is_empty() {
+                hit.snippet = self.snippet(&hit.path, words)?;
             }
             results.push(hit);
         }
@@ -518,27 +517,16 @@ impl Index {
         Ok(first)
     }
 
-    /// About 12 words around the first body match; `None` when the body
-    /// doesn't match.
-    fn snippet(&self, path: &str, any: &str) -> Result<Option<Vec<SnippetPart>>> {
-        let found: Option<String> = self
+    /// About 12 words around the first body word a query word starts; `None`
+    /// when there is none. Read from the stored body in Rust: FTS5's
+    /// `snippet()` re-expands every prefix term for each call (NFR-03).
+    fn snippet(&self, path: &str, words: &[String]) -> Result<Option<Vec<SnippetPart>>> {
+        let body: Option<String> = self
             .conn
-            .prepare_cached("SELECT rowid FROM page_text WHERE path = ?1")?
-            .query_row([path], |r| r.get::<_, i64>(0))
-            .optional()?
-            .map(|rowid| {
-                // A plain rowid (not a subquery) lets FTS5 seek to the row.
-                self.conn
-                    .prepare_cached(
-                        "SELECT snippet(fts, 5, char(1), char(2), '…', 12) FROM fts \
-                         WHERE fts MATCH ?1 AND rowid = ?2",
-                    )?
-                    .query_row(params![format!("{{body}} : ({any})"), rowid], |r| r.get(0))
-                    .optional()
-            })
-            .transpose()?
-            .flatten();
-        Ok(found.and_then(|s| snippet_parts(&s)))
+            .prepare_cached("SELECT body FROM page_text WHERE path = ?1")?
+            .query_row([path], |r| r.get(0))
+            .optional()?;
+        Ok(body.and_then(|b| snippet_of(&b, words)))
     }
 
     /// The matches with every filter but `dim`'s, as a temp table: the
@@ -782,30 +770,53 @@ fn unresolved(raw: &str) -> FacetPage {
     }
 }
 
-/// FTS5's marked snippet as parts; `None` without a marked word.
-fn snippet_parts(s: &str) -> Option<Vec<SnippetPart>> {
-    if !s.contains(OPEN) {
-        return None;
+/// About [`SNIPPET_WORDS`] words of `body` around the first word that a
+/// (folded) query word starts, matching words marked; `…` where it was cut.
+fn snippet_of(body: &str, words: &[String]) -> Option<Vec<SnippetPart>> {
+    let mut tokens: Vec<(usize, usize)> = Vec::new();
+    let mut start: Option<usize> = None;
+    for (i, c) in body.char_indices() {
+        match (c.is_alphanumeric(), start) {
+            (true, None) => start = Some(i),
+            (false, Some(s)) => {
+                tokens.push((s, i));
+                start = None;
+            }
+            _ => {}
+        }
     }
+    if let Some(s) = start {
+        tokens.push((s, body.len()));
+    }
+    let hit = |&(a, b): &(usize, usize)| {
+        let folded = fold(&body[a..b]);
+        words.iter().any(|w| folded.starts_with(w.as_str()))
+    };
+    let first = tokens.iter().position(hit)?;
+    let from = first
+        .saturating_sub(SNIPPET_WORDS / 3)
+        .min(tokens.len().saturating_sub(SNIPPET_WORDS));
+    let to = (from + SNIPPET_WORDS).min(tokens.len());
     let mut parts: Vec<SnippetPart> = Vec::new();
     let mut push = |text: &str, hit: bool| {
-        let text = text.replace('\n', " ");
-        if !text.is_empty() {
-            parts.push(SnippetPart { text, hit });
+        let text = text.replace(['\n', '\r', '\t'], " ");
+        match parts.last_mut() {
+            Some(last) if last.hit == hit => last.text.push_str(&text),
+            _ if text.is_empty() => {}
+            _ => parts.push(SnippetPart { text, hit }),
         }
     };
-    for (i, chunk) in s.split(OPEN).enumerate() {
-        if i == 0 {
-            push(chunk, false);
-            continue;
-        }
-        match chunk.split_once(CLOSE) {
-            Some((hit, rest)) => {
-                push(hit, true);
-                push(rest, false);
-            }
-            None => push(chunk, true),
-        }
+    if from > 0 {
+        push("…", false);
+    }
+    let mut at = tokens[from].0;
+    for t in &tokens[from..to] {
+        push(&body[at..t.0], false);
+        push(&body[t.0..t.1], hit(t));
+        at = t.1;
+    }
+    if to < tokens.len() {
+        push("…", false);
     }
     Some(parts)
 }
@@ -834,25 +845,43 @@ mod tests {
     }
 
     #[test]
-    fn snippet_markers_become_parts() {
-        let parts = snippet_parts("…the \u{1}WYRM\u{2} sleeps\nhere").unwrap();
+    fn snippets_mark_prefixes_around_the_first_match() {
+        let words = vec!["drag".to_string()];
+        let body = "one two three four five six seven eight Dragón nine ten eleven twelve thirteen fourteen";
+        let parts = snippet_of(body, &words).unwrap();
+        let text: String = parts.iter().map(|p| p.text.as_str()).collect();
         assert_eq!(
-            parts,
+            text,
+            "…four five six seven eight Dragón nine ten eleven twelve thirteen fourteen"
+        );
+        assert_eq!(
+            parts
+                .iter()
+                .filter(|p| p.hit)
+                .map(|p| p.text.as_str())
+                .collect::<Vec<_>>(),
+            vec!["Dragón"]
+        );
+        let short = snippet_of("a\nDRAGON b", &words).unwrap();
+        assert_eq!(
+            short,
             vec![
                 SnippetPart {
-                    text: "…the ".into(),
+                    text: "a ".into(),
                     hit: false
                 },
                 SnippetPart {
-                    text: "WYRM".into(),
+                    text: "DRAGON".into(),
                     hit: true
                 },
                 SnippetPart {
-                    text: " sleeps here".into(),
+                    text: " b".into(),
                     hit: false
                 },
             ]
         );
-        assert!(snippet_parts("no marks").is_none());
+        assert!(snippet_of("no match here", &words).is_none());
+        assert!(snippet_of("", &words).is_none());
+        assert!(snippet_of("undragon", &words).is_none(), "word starts only");
     }
 }
