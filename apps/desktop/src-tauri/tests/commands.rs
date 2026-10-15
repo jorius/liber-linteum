@@ -52,6 +52,7 @@ const COMMANDS: &[&str] = &[
     "text_read",
     "text_write",
     "entry_create_text",
+    "cover_height_set",
 ];
 
 struct Harness {
@@ -726,7 +727,8 @@ fn m2c_vault_settings_round_trip_over_ipc() {
             "obsidian": null,
             "overrideObsidian": false,
             "pageWidth": null,
-            "pageWidths": {}
+            "pageWidths": {},
+            "coverHeights": {}
         })
     );
     let saved = call(
@@ -1372,6 +1374,120 @@ fn m4b2_page_width_over_ipc() {
         .is_err()
     );
     assert!(vault.path().join(".nimw/vault.json").exists());
+}
+
+/// Cover resize: a page's cover height lives in `.nimw/vault.json`
+/// (`coverHeights`), never in the note; clamped to 132–2000 px; the entry
+/// follows an in-app rename; only visible, indexed pages.
+#[test]
+fn cover_height_over_ipc() {
+    let h = harness();
+    let vault = open_fixture(&h, "obsidian-basic");
+    let before = std::fs::read(vault.path().join("Welcome.md")).unwrap();
+    let got = call(&h.main, "vault_settings_get", json!({})).unwrap();
+    assert_eq!(got["coverHeights"], json!({}));
+    let saved = call(
+        &h.main,
+        "cover_height_set",
+        json!({ "path": "Welcome.md", "height": 280 }),
+    )
+    .unwrap();
+    assert_eq!(saved["coverHeights"], json!({ "Welcome.md": 280 }));
+    // A fractional drag position is rounded; out-of-range values are clamped.
+    let saved = call(
+        &h.main,
+        "cover_height_set",
+        json!({ "path": "Welcome.md", "height": 300.6 }),
+    )
+    .unwrap();
+    assert_eq!(saved["coverHeights"], json!({ "Welcome.md": 301 }));
+    for (height, kept) in [(10, 132), (99_999, 2000)] {
+        let saved = call(
+            &h.main,
+            "cover_height_set",
+            json!({ "path": "Welcome.md", "height": height }),
+        )
+        .unwrap();
+        assert_eq!(saved["coverHeights"]["Welcome.md"], kept, "{height}");
+    }
+    // The note itself is never written.
+    assert_eq!(
+        std::fs::read(vault.path().join("Welcome.md")).unwrap(),
+        before
+    );
+    // The entry follows an in-app rename.
+    call(
+        &h.main,
+        "entry_rename",
+        json!({ "from": "Welcome.md", "to": "Hello.md" }),
+    )
+    .unwrap();
+    let got = call(&h.main, "vault_settings_get", json!({})).unwrap();
+    assert_eq!(got["coverHeights"], json!({ "Hello.md": 2000 }));
+    let file: Value =
+        serde_json::from_slice(&std::fs::read(vault.path().join(".nimw/vault.json")).unwrap())
+            .unwrap();
+    assert_eq!(file["coverHeights"], json!({ "Hello.md": 2000 }));
+    // `null` clears it.
+    let got = call(
+        &h.main,
+        "cover_height_set",
+        json!({ "path": "Hello.md", "height": null }),
+    )
+    .unwrap();
+    assert_eq!(got["coverHeights"], json!({}));
+    // Only visible, indexed pages; a height that isn't a number is refused.
+    for path in [".obsidian/x.md", "Missing.md", "../x.md"] {
+        assert!(
+            call(
+                &h.main,
+                "cover_height_set",
+                json!({ "path": path, "height": 200 })
+            )
+            .is_err(),
+            "{path}"
+        );
+    }
+    let err = call(
+        &h.main,
+        "cover_height_set",
+        json!({ "path": "Missing.md", "height": 200 }),
+    )
+    .unwrap_err();
+    assert_eq!(kind(err), "notFound");
+    assert!(
+        call(
+            &h.main,
+            "cover_height_set",
+            json!({ "path": "Hello.md", "height": "tall" })
+        )
+        .is_err()
+    );
+}
+
+/// Cover resize: the command is in the main window's capability and nowhere
+/// else (the real ACL from `capabilities/main.json`, not a test stand-in).
+#[test]
+fn cover_height_set_is_allowed_from_main_only() {
+    let h = harness();
+    let other = WebviewWindowBuilder::new(&h.app, "other", Default::default())
+        .build()
+        .unwrap();
+    let main = call(
+        &h.main,
+        "cover_height_set",
+        json!({ "path": "A.md", "height": 200 }),
+    )
+    .unwrap_err();
+    assert!(!main.to_string().contains("not allowed"), "{main}");
+    assert_eq!(kind(main), "noVault");
+    let denied = call(
+        &other,
+        "cover_height_set",
+        json!({ "path": "A.md", "height": 200 }),
+    )
+    .unwrap_err();
+    assert!(denied.to_string().contains("not allowed"), "{denied}");
 }
 
 /// M4b part 2 §6: text files over IPC — read, compare-and-swap write with the

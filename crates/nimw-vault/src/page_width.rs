@@ -99,6 +99,19 @@ impl Vault {
     /// folder (final review M10: a new page at the same path starts at the
     /// default); one write, none when nothing was set.
     pub fn forget_page_widths(&self, removed: &[String]) -> Result<()> {
+        self.forget_page_entries("pageWidths", removed)
+    }
+
+    /// Page widths follow a batch of renames (files and folders); one write,
+    /// none when nothing moved.
+    pub fn remap_page_widths_many(&self, renames: &[(String, String)]) -> Result<()> {
+        self.remap_page_entries("pageWidths", renames)
+    }
+
+    /// Drops the entries of `key` (a page-path map in `.nimw/vault.json`) for
+    /// deleted pages and for every page inside a deleted folder; one write,
+    /// none when nothing was set. Shared by page widths and cover heights.
+    pub(crate) fn forget_page_entries(&self, key: &str, removed: &[String]) -> Result<()> {
         if removed.is_empty() {
             return Ok(());
         }
@@ -111,22 +124,20 @@ impl Vault {
             })
         };
         self.update_json_object(NIMW_JSON, false, |map| {
-            let Some(pages) = map
-                .get_mut("pageWidths")
-                .and_then(serde_json::Value::as_object_mut)
-            else {
+            let Some(pages) = map.get_mut(key).and_then(serde_json::Value::as_object_mut) else {
                 return;
             };
             pages.retain(|path, _| !gone(path));
             if pages.is_empty() {
-                map.remove("pageWidths");
+                map.remove(key);
             }
         })
     }
 
-    /// Page widths follow a batch of renames (files and folders); one write,
-    /// none when nothing moved.
-    pub fn remap_page_widths_many(&self, renames: &[(String, String)]) -> Result<()> {
+    /// The entries of `key` (a page-path map in `.nimw/vault.json`) follow a
+    /// batch of renames (files and folders); one write, none when nothing
+    /// moved. Shared by page widths and cover heights.
+    pub(crate) fn remap_page_entries(&self, key: &str, renames: &[(String, String)]) -> Result<()> {
         if renames.is_empty() {
             return Ok(());
         }
@@ -135,15 +146,12 @@ impl Vault {
             .map(|(from, to)| (from.as_str(), to.as_str()))
             .collect();
         self.update_json_object(NIMW_JSON, false, |map| {
-            let Some(pages) = map
-                .get_mut("pageWidths")
-                .and_then(serde_json::Value::as_object_mut)
-            else {
+            let Some(pages) = map.get_mut(key).and_then(serde_json::Value::as_object_mut) else {
                 return;
             };
-            for (path, width) in std::mem::take(pages) {
+            for (path, value) in std::mem::take(pages) {
                 let path = remap(&path, &moves).unwrap_or(path);
-                pages.insert(path, width);
+                pages.insert(path, value);
             }
         })
     }

@@ -2,6 +2,7 @@
 //! Every path crossing this crate's boundary is vault-relative ([`VaultPath`]).
 
 mod config;
+mod cover_height;
 mod error;
 mod fsops;
 mod hash;
@@ -13,6 +14,7 @@ mod vault;
 mod watch;
 
 pub use config::{AttachmentConfig, AttachmentPolicy};
+pub use cover_height::{MAX_COVER_HEIGHT, MIN_COVER_HEIGHT};
 pub use error::{Result, VaultError};
 pub use fsops::TMP_MARKER;
 pub use hash::Hash;

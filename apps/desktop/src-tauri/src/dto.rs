@@ -165,6 +165,8 @@ pub struct VaultSettingsDto {
     pub page_width: Option<nimw_vault::PageWidth>,
     /// Pages with their own width.
     pub page_widths: std::collections::BTreeMap<String, nimw_vault::PageWidth>,
+    /// Pages with their own cover height in px (cover resize).
+    pub cover_heights: std::collections::BTreeMap<String, u32>,
 }
 
 #[derive(Debug, Clone, serde::Deserialize)]

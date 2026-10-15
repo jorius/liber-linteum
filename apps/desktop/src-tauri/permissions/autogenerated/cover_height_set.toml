@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-cover-height-set"
+description = "Enables the cover_height_set command without any pre-configured scope."
+commands.allow = ["cover_height_set"]
+
+[[permission]]
+identifier = "deny-cover-height-set"
+description = "Denies the cover_height_set command without any pre-configured scope."
+commands.deny = ["cover_height_set"]

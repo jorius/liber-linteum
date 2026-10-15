@@ -198,6 +198,7 @@ pub(crate) fn vault_settings_get_impl(state: &AppState) -> CmdResult<VaultSettin
         override_obsidian: config.override_obsidian,
         page_width: widths.vault,
         page_widths: widths.pages,
+        cover_heights: session.vault().cover_heights(),
     })
 }
 
@@ -220,6 +221,28 @@ pub(crate) fn page_width_set_impl(
     let width = width_of(width.as_deref())?;
     let page = visible_page(&session, &path)?;
     session.vault().set_page_width(page.as_str(), width)?;
+    vault_settings_get_impl(state)
+}
+
+/// A cover height from the UI: any finite number of px (a drag gives
+/// fractions), rounded; the vault clamps it to 132–2000.
+fn height_of(value: Option<f64>) -> CmdResult<Option<u32>> {
+    match value {
+        None => Ok(None),
+        Some(px) if px.is_finite() => Ok(Some(px.round().clamp(0.0, f64::from(u32::MAX)) as u32)),
+        Some(px) => Err(invalid(format!("not a cover height: {px}"))),
+    }
+}
+
+pub(crate) fn cover_height_set_impl(
+    state: &AppState,
+    path: String,
+    height: Option<f64>,
+) -> CmdResult<VaultSettingsDto> {
+    let session = state.session()?;
+    let height = height_of(height)?;
+    let page = visible_page(&session, &path)?;
+    session.vault().set_cover_height(page.as_str(), height)?;
     vault_settings_get_impl(state)
 }
 
@@ -316,6 +339,18 @@ pub async fn page_width_set<R: Runtime>(
 ) -> CmdResult<VaultSettingsDto> {
     blocking(app, move |app| {
         page_width_set_impl(&app.state::<AppState>(), path, width)
+    })
+    .await
+}
+
+#[tauri::command]
+pub async fn cover_height_set<R: Runtime>(
+    app: AppHandle<R>,
+    path: String,
+    height: Option<f64>,
+) -> CmdResult<VaultSettingsDto> {
+    blocking(app, move |app| {
+        cover_height_set_impl(&app.state::<AppState>(), path, height)
     })
     .await
 }

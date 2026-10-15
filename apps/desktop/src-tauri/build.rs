@@ -39,6 +39,7 @@ const COMMANDS: &[&str] = &[
     "text_read",
     "text_write",
     "entry_create_text",
+    "cover_height_set",
 ];
 
 fn main() {

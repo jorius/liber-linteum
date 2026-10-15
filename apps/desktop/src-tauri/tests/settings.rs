@@ -418,3 +418,42 @@ fn m4b2_outline_setting_default_persist_and_reset() {
     assert_eq!(s.theme, Theme::Dark);
     assert!(warning.unwrap().contains("outline"));
 }
+
+/// Cover resize: the default cover height for pages without their own,
+/// 200 px, persisted, clamped to 132–600 and reset on its own when it isn't
+/// a number.
+#[test]
+fn cover_height_setting_default_persist_clamp_and_reset() {
+    use nimw_desktop::settings::CoverHeight;
+    let dir = tempfile::tempdir().unwrap();
+    let s = store(dir.path());
+    assert_eq!(s.get().0.cover_height, CoverHeight::new(200));
+    assert_eq!(s.get().0.cover_height.get(), 200);
+    s.update(SettingsPatch {
+        cover_height: Some(CoverHeight::new(280)),
+        ..Default::default()
+    })
+    .unwrap();
+    let saved: serde_json::Value =
+        serde_json::from_str(&std::fs::read_to_string(dir.path().join("settings.json")).unwrap())
+            .unwrap();
+    assert_eq!(saved["coverHeight"], 280);
+    assert_eq!(store(dir.path()).get().0.cover_height.get(), 280);
+    for (text, px) in [
+        (r#"{"coverHeight":20}"#, 132),
+        (r#"{"coverHeight":5000}"#, 600),
+        (r#"{"coverHeight":360}"#, 360),
+    ] {
+        std::fs::write(dir.path().join("settings.json"), text).unwrap();
+        assert_eq!(store(dir.path()).get().0.cover_height.get(), px, "{text}");
+    }
+    std::fs::write(
+        dir.path().join("settings.json"),
+        r#"{"coverHeight":"huge","theme":"dark"}"#,
+    )
+    .unwrap();
+    let (s, warning) = store(dir.path()).get();
+    assert_eq!(s.cover_height.get(), 200);
+    assert_eq!(s.theme, Theme::Dark);
+    assert!(warning.unwrap().contains("coverHeight"));
+}
