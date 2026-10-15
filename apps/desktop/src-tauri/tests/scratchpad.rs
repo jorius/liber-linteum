@@ -311,3 +311,21 @@ fn m4c_scratch_folder_set_over_ipc() {
     let err = call(&h.main, "scratch_folder_set", json!({ "name": "X" })).unwrap_err();
     assert_eq!(kind(err), "notPermitted");
 }
+
+#[test]
+fn m4c_final_m9_the_open_scratchpad_stays_the_scratchpad_after_change() {
+    let h = harness();
+    open_scratchpad(&h);
+    // Change… points quick notes elsewhere while the old Scratchpad is open.
+    let elsewhere = tempfile::tempdir().unwrap();
+    picks(&h, Some(elsewhere.path().to_path_buf()));
+    let picked = call(&h.main, "scratchpad_choose", json!({})).unwrap();
+    call(&h.main, "scratchpad_set", json!({ "path": picked })).unwrap();
+    // Notes still go to the open Scratchpad's root, not a Scratchpad/ in it.
+    let state = call(&h.main, "quick_notes_state", json!({})).unwrap();
+    assert_eq!(state["folder"], Value::Null);
+    let note = call(&h.main, "quick_note_create", json!({ "name": "Q" })).unwrap();
+    assert_eq!(note, "Q.md");
+    let err = call(&h.main, "scratch_folder_set", json!({ "name": "Inbox" })).unwrap_err();
+    assert_eq!(kind(err), "notPermitted");
+}

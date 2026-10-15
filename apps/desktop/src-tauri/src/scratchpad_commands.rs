@@ -102,7 +102,7 @@ fn default_location<R: Runtime>(app: &AppHandle<R>) -> CmdResult<PathBuf> {
 
 /// Where a new quick note goes in the open vault.
 fn scratch_place(state: &AppState, session: &VaultSession) -> CmdResult<Option<VaultPath>> {
-    if state.settings.is_scratchpad(session.vault().root()) {
+    if state.opened_as_scratchpad(session.vault().root()) {
         return Ok(None);
     }
     Ok(Some(VaultPath::new(&session.vault().scratch_folder())?))
@@ -188,7 +188,7 @@ pub(crate) fn scratch_folder_set_impl(
     name: String,
 ) -> CmdResult<ScratchFolderDto> {
     let session = state.session()?;
-    if state.settings.is_scratchpad(session.vault().root()) {
+    if state.opened_as_scratchpad(session.vault().root()) {
         return Err(not_permitted(
             "the Scratchpad's quick notes live at its root",
         ));

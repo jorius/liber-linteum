@@ -72,9 +72,11 @@ pub(crate) fn open_session<R: Runtime>(app: &AppHandle<R>, root: &Path) -> CmdRe
             .push(format!("recent vaults could not be saved: {e}"));
     }
     state.set_session(Some(session));
+    let scratchpad = state.settings.is_scratchpad(&root);
+    state.set_scratchpad_root(scratchpad.then(|| root.clone()));
     Ok(VaultInfo {
         name,
-        scratchpad: state.settings.is_scratchpad(&root),
+        scratchpad,
         root: root.to_string_lossy().into_owned(),
         report,
     })
