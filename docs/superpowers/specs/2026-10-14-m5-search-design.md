@@ -237,3 +237,22 @@ Jose, 2026-10-15: "let's go with the scratchpad feature … then the search filt
     - first full index, FTS included: 1.4 s;
     - `search` over 200 queries: p50 18.7 ms, p95 34.8 ms;
     - re-indexing one page: 18 ms.
+
+## 11. Final review (2026-10-15)
+
+A fresh-context review of `ba67c0a..73f909c` found no Critical issues. Its findings, re-graded by effect:
+
+**Fixed** (each with a test that failed first):
+1. **I1, renamed pages:** a page with no first-line H1 takes its title from its file name. A rename moved its index rows but kept the old title, so search found it by the old name and showed the old title. The session now re-parses each moved page whose file name changed. A rename made by another program was already right; a test pins it.
+2. **I2, Enter on stale hits:** Enter pressed before the answer for the current text arrived opened a hit of the older text (often Recent). While a search is waiting or running, Enter now searches at once and opens the first hit of the current text.
+3. **M1, decomposed text (re-graded Important, since NFD names are common in vaults from macOS):** combining marks count as word characters in the Rust snippet tokenizer and the TS highlight. A decomposed `Canción` gets its snippet and is marked whole.
+4. **M2, tag forms (re-graded Important):** tag keys are NFC before lower-casing, in the index and in the dialog's chip comparisons. A tag matches, and shows as one chip, whichever form it was written in. Still schema 3.
+5. **M3, odd query characters:** control characters split words. A word with no character FTS5 indexes (only combining marks, such as `ा`) is dropped instead of emptying the result.
+6. **M4, self-links:** a page's link to itself doesn't count in the links-to filter, as in its facet, so the chip's count matches the results.
+7. **M6, Show more:** asks once while a page is loading, and is disabled meanwhile.
+8. **M7, long notes:** snippets keep a window of tokens around the first match instead of tokenizing the whole body.
+
+**Deferred:**
+- **M5:** `to:Name` silently picks one page when two share the name; the chip shows only the title. A later pass could show the path trail when the title is ambiguous.
+- **M8:** short query words (`the`) can earn the metadata bonus through a title prefix (`Thesis`). Counting matched words, or a two-letter minimum, can come later.
+- **Approximation:** "a character FTS5 indexes" is approximated as alphanumeric minus combining marks. Symbols with the alphabetic property, such as `Ⓐ`, can still form an empty phrase.
