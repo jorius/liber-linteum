@@ -218,6 +218,18 @@ interface Picking {
   lineOnly: boolean;
 }
 
+/** A key pressed on a grip, as the gutter reads it. */
+interface GutterKey {
+  key: string;
+  altKey: boolean;
+  shiftKey: boolean;
+  metaKey: boolean;
+  ctrlKey: boolean;
+}
+
+/** The keys the gutter may take, which wait while the pane lags. */
+const WAITS = /^(?:Arrow(?:Up|Down|Left|Right)|Enter| |Escape)$/;
+
 export function BlockGutter({
   view,
   pane,
@@ -234,10 +246,14 @@ export function BlockGutter({
     () => (shown && model ? { text: shown.text, model } : null),
     [shown, model],
   );
-  // Each unit's element. Until the layout effect maps a new model, the last
-  // model's map stays (the gutter with the keyboard stays put): an id may be
-  // missing from the new model.
-  const [anchors, setAnchors] = useState<Map<number, HTMLElement>>(new Map());
+  // Each unit's element, and the model it was mapped for. Until the layout
+  // effect maps a new model, the last model's map stays (the gutter with the
+  // keyboard stays put): an id may be missing from the new model.
+  const [mapped, setMapped] = useState<{
+    model: BlockModel | null;
+    anchors: Map<number, HTMLElement>;
+  }>({ model: null, anchors: new Map() });
+  const anchors = mapped.anchors;
   const [hover, setHover] = useState<number[]>([]);
   const [current, setCurrent] = useState<number | null>(null);
   const [picking, setPicking] = useState<Picking | null>(null);
@@ -271,8 +287,8 @@ export function BlockGutter({
 
   // The rendered elements of the version shown (the pane commits first).
   useLayoutEffect(() => {
-    if (!pane.current || !model || !shown) return setAnchors(new Map());
-    setAnchors(anchorsOf(pane.current, model, shown.text));
+    if (!pane.current || !model || !shown) return setMapped({ model: null, anchors: new Map() });
+    setMapped({ model, anchors: anchorsOf(pane.current, model, shown.text) });
   }, [pane, model, shown]);
 
   const order = useMemo(
@@ -288,21 +304,60 @@ export function BlockGutter({
     [model, shown, t],
   );
 
+  /** Keys pressed while the gutter's blocks aren't the editor's (the pane
+   *  lags a move or typing, or a moved block hasn't the keyboard back yet):
+   *  they wait, in order, and are replayed one per render once it settles,
+   *  on the block that has the keyboard then (M4 §10.6; dropping them made
+   *  the keyboard e2e flaky and lost keys). */
+  const waiting = useRef<GutterKey[]>([]);
+  const [woken, wake] = useState(0);
+  /** Replays the first waiting key if the gutter has settled (set below,
+   *  each render); whether it did. */
+  const replay = useRef<() => boolean>(() => false);
+  /** An effect changed the gutter's state and it hasn't rendered yet: a key
+   *  now would read the state before it (a pick-up not yet seen), so it
+   *  waits too. Every commit clears it. */
+  const unrendered = useRef(false);
+  useLayoutEffect(() => {
+    unrendered.current = false;
+  });
+  // Runs after a key waits or is replayed, the moved block takes the keyboard
+  // (`wake`), or the pane shows a new version; each replay shortens the
+  // queue, so the renders it asks for end with it. Declared before the effect
+  // below, so a commit where the moved block takes the keyboard replays
+  // nothing: the next render has it as `tabStop`.
+  useEffect(() => {
+    if (replay.current()) wake((n) => n + 1);
+  }, [woken, shown, mapped]);
+
   // A moved block keeps the keyboard and flashes once the pane shows it.
   useEffect(() => {
-    if (!model || movedAt.current === null) return;
+    if (!model || !shown || movedAt.current === null) return;
+    // A version the pane showed before the move isn't the one it moved in.
+    if (shown.text !== view.state.doc.toString()) return;
     const at = movedAt.current;
     const moved = model.units
       .filter((u) => u.from === at && anchors.has(u.id))
       .sort((a, b) => a.to - a.from - (b.to - b.from))[0];
-    if (!moved) return;
+    if (!moved) {
+      // Mapped and still not shown (nothing to give the keyboard to): keys
+      // stop waiting for it.
+      if (mapped.model === model) movedAt.current = null;
+      if (waiting.current.length) wake((n) => n + 1);
+      return;
+    }
     movedAt.current = null;
     setCurrent(moved.id);
     setFlash(moved.id);
     focusNext.current = true;
+    unrendered.current = true;
+    wake((n) => n + 1);
+  }, [model, anchors, mapped.model, shown, view]);
+  useEffect(() => {
+    if (flash === null) return;
     const timer = setTimeout(() => setFlash(null), 600);
     return () => clearTimeout(timer);
-  }, [model, anchors]);
+  }, [flash]);
 
   // A pick-up made on blocks that have since changed is off.
   const pickedOn = useRef<BlockModel | null>(null);
@@ -541,14 +596,18 @@ export function BlockGutter({
     }
   };
 
-  const onKey = (e: ReactKeyboardEvent, id: number) => {
-    if (!model || !shown || !seen) return;
-    // Until the pane shows the editor's text (a move a moment ago), a key
-    // would act on blocks that have moved: it waits.
-    if (view.state.doc.toString() !== shown.text) {
-      if (e.key.startsWith('Arrow') || e.key === 'Enter' || e.key === ' ') e.preventDefault();
-      return;
-    }
+  /** Whether the gutter's blocks are the editor's: the pane shows the
+   *  editor's text, mapped, and a block just moved has the keyboard back. */
+  const settled = () =>
+    !!shown &&
+    view.state.doc.toString() === shown.text &&
+    mapped.model === model &&
+    movedAt.current === null;
+
+  /** Acts on key `e` pressed on block `id`'s grip; whether it was the
+   *  gutter's (taken from everything else). */
+  const act = (e: GutterKey, id: number): boolean => {
+    if (!model || !seen) return false;
     const unit = model.units[id];
     if (picking) {
       if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
@@ -564,12 +623,11 @@ export function BlockGutter({
       } else if (e.key === 'Escape' || e.key === 'Tab') {
         setPicking(null);
         setStatus(t('editor.blocks.cancelled'));
-        if (e.key === 'Tab') return;
-      } else return;
-      e.preventDefault();
-      e.stopPropagation();
-      return;
+        if (e.key === 'Tab') return false;
+      } else return false;
+      return true;
     }
+    if (!unit) return false;
     const plain = !e.altKey && !e.metaKey && !e.ctrlKey && !e.shiftKey;
     if (plain && (e.key === 'ArrowDown' || e.key === 'ArrowUp')) {
       const k = order.indexOf(id) + (e.key === 'ArrowDown' ? 1 : -1);
@@ -584,14 +642,48 @@ export function BlockGutter({
       move(seen, id, indentSlot(model, unit, e.key === 'ArrowRight' ? 1 : -1));
     } else if (plain && (e.key === 'Enter' || e.key === ' ')) {
       const slots = slotsFor(model, unit, false);
-      if (!slots.length) return;
+      if (!slots.length) return false;
       const after = slots.findIndex((s) => slotAt(model, s) > unit.from);
       const index = after < 0 ? slots.length - 1 : after;
       setPicking({ unit: id, slots, index, lineOnly: false });
       setStatus(`${t('editor.blocks.picked', { block: name(id) })} ${describe(slots[index])}`);
-    } else return;
-    e.preventDefault();
-    e.stopPropagation();
+    } else return false;
+    return true;
+  };
+
+  replay.current = () => {
+    if (!waiting.current.length || tabStop === null || !settled()) return false;
+    act(waiting.current.shift()!, tabStop);
+    unrendered.current = true;
+    return true;
+  };
+
+  const onKey = (e: ReactKeyboardEvent, id: number) => {
+    if (!model || !shown || !seen) return;
+    const key: GutterKey = {
+      key: e.key,
+      altKey: e.altKey,
+      shiftKey: e.shiftKey,
+      metaKey: e.metaKey,
+      ctrlKey: e.ctrlKey,
+    };
+    // Tab leaves the gutter: what was waiting is dropped with it.
+    if (e.key === 'Tab') waiting.current = [];
+    // Behind keys that wait, while the blocks aren't the editor's, or while
+    // this handler's state is behind (an effect's change not yet rendered, the
+    // keyboard not yet on the grip it moved to): wait.
+    else if (waiting.current.length || unrendered.current || focusNext.current || !settled()) {
+      if (!WAITS.test(e.key)) return;
+      e.preventDefault();
+      e.stopPropagation();
+      waiting.current.push(key);
+      wake((n) => n + 1);
+      return;
+    }
+    if (act(key, id)) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
   };
 
   if (!model || !shown || !seen || !pane.current) {
