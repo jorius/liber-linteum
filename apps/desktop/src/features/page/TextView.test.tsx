@@ -76,6 +76,22 @@ describe('text and code files (M4b part 2 §6)', () => {
     );
   });
 
+  it('final review I4: renaming from the name field keeps the keyboard there, and the view', async () => {
+    fakeDisk({ 'notes.txt': 'one\n' });
+    render(<PageScreen />);
+    await open('notes.txt');
+    const editor = document.querySelector('.cm-editor');
+    const name = screen.getByRole('textbox', { name: 'File name' });
+    await userEvent.clear(name);
+    await userEvent.type(name, 'ideas{Enter}');
+    await waitFor(() => expect(usePageStore.getState().path).toBe('ideas.txt'));
+    await waitFor(() => expect(usePageStore.getState().state).toBe('ready'));
+    expect(screen.getByRole('textbox', { name: 'File name' })).toBe(name);
+    expect(name).toHaveFocus();
+    expect(name).toHaveValue('ideas');
+    expect(document.querySelector('.cm-editor')).toBe(editor);
+  });
+
   it('a file that is not eligible text offers its default app', async () => {
     fakeDisk({ 'data.csv': 'a,b\0' });
     render(<PageScreen />);
@@ -107,7 +123,9 @@ describe('text and code files (M4b part 2 §6)', () => {
     const disk = fakeDisk({ 'data.csv': 'José,Bogotá\n' });
     render(<PageScreen />);
     await open('data.csv');
-    act(() => view().dispatch({ changes: { from: 12, insert: 'mine\n' }, userEvent: 'input.type' }));
+    act(() =>
+      view().dispatch({ changes: { from: 12, insert: 'mine\n' }, userEvent: 'input.type' }),
+    );
     disk.files.set('data.csv', 'Jos\0,Bogot\0\n'); // Excel's Windows-1252 export
     await act(() =>
       usePageStore

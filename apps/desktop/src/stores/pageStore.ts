@@ -78,9 +78,12 @@ export const usePageStore = create<PageState>((set, get) => ({
     watchSaves();
     const mine = ++seq;
     const same = get().path === path;
+    // The same document again (reloaded, renamed): it stays shown. A text
+    // file has no page data to wait for (final review I4).
+    const shown = same && (get().page !== null || isTextPath(path));
     set({
       path,
-      state: same && get().page ? get().state : 'loading',
+      state: shown ? get().state : 'loading',
       anchor: same ? get().anchor : null,
     });
     const editing = useEditorStore.getState().open(path);
@@ -122,9 +125,13 @@ export const usePageStore = create<PageState>((set, get) => ({
     if (!next) return;
     // Same document under a new name: keep the page shown (header mounted) while
     // it reloads, so focus in the header (the title just renamed) isn't lost
-    // (final review I3, NFR-10).
+    // (final review I3, NFR-10). A text file has no page data: its name field
+    // stays the same way (final review I4).
     const page = get().page;
     if (page && get().state === 'ready') set({ path: next, page: { ...page, path: next } });
+    else if (get().state === 'ready' && path && isTextPath(path) && isTextPath(next)) {
+      set({ path: next });
+    }
     await get().load(next);
   },
   onExternalChange: async (c, exists) => {

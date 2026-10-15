@@ -79,6 +79,44 @@ describe('Related chips in the header band (M4b §6)', () => {
     await waitFor(() => expect(within(related()).queryAllByRole('listitem')).toHaveLength(0));
   });
 
+  it('final review I4: after × the next chip has the keyboard, else the previous, else + Related page', async () => {
+    fakeDisk(
+      {
+        'A.md': '---\nrelated:\n  - "[[B]]"\n  - "[[C]]"\n  - "[[D]]"\n---\n# A\n',
+        'B.md': '# B\n',
+        'C.md': '# C\n',
+        'D.md': '# D\n',
+      },
+      backend(['A.md', 'B.md', 'C.md', 'D.md']),
+    );
+    render(<PageScreen />);
+    await open('A.md');
+    const remove = (name: string) =>
+      screen.findByRole('button', { name: `Remove the relationship to ${name}` });
+    (await remove('C')).focus();
+    await userEvent.keyboard('{Enter}');
+    await waitFor(() => expect(within(related()).getAllByRole('listitem')).toHaveLength(2));
+    await waitFor(() =>
+      expect(document.activeElement).toBe(
+        screen.getByRole('button', { name: 'Remove the relationship to D' }),
+      ),
+    );
+    await userEvent.keyboard('{Enter}');
+    await waitFor(() => expect(within(related()).getAllByRole('listitem')).toHaveLength(1));
+    await waitFor(() =>
+      expect(document.activeElement).toBe(
+        screen.getByRole('button', { name: 'Remove the relationship to B' }),
+      ),
+    );
+    await userEvent.keyboard('{Enter}');
+    await waitFor(() => expect(within(related()).queryAllByRole('listitem')).toHaveLength(0));
+    await waitFor(() =>
+      expect(document.activeElement).toBe(
+        screen.getByRole('button', { name: 'Add a related page' }),
+      ),
+    );
+  });
+
   it('+ Related page picks a page and relates it', async () => {
     const disk = fakeDisk({ 'A.md': '# A\n', 'Beta.md': '# Beta\n' }, backend(['A.md', 'Beta.md']));
     render(<PageScreen />);

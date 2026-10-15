@@ -53,16 +53,30 @@ export function RelatedChips({ page, editable }: { page: Page; editable: boolean
     }
     await reload();
   };
-  const remove = async (r: Relation) => {
+  // × unmounts the focused button: the chip now at its place takes the
+  // keyboard, else the one before, else "+ Related page" (final review I4,
+  // NFR-10) — unless the user has moved on meanwhile.
+  const list = useRef<HTMLUListElement>(null);
+  const [refocus, setRefocus] = useState<number | null>(null);
+  useEffect(() => {
+    if (refocus === null) return;
+    setRefocus(null);
+    const active = document.activeElement;
+    if (active && active !== document.body && !list.current?.contains(active)) return;
+    const removes = list.current?.querySelectorAll<HTMLElement>('[data-remove]') ?? [];
+    (removes[refocus] ?? removes[refocus - 1] ?? add.current)?.focus();
+  }, [refocus, relations]);
+  const remove = async (r: Relation, at: number) => {
     await removeRelation(r);
     await reload();
+    setRefocus(at);
   };
 
   if (!relations.length && !editable) return null;
   return (
     <>
-      <ul className={styles.related} aria-label={t('page.related')}>
-        {relations.map((r) => {
+      <ul ref={list} className={styles.related} aria-label={t('page.related')}>
+        {relations.map((r, at) => {
           const name = pageName(r);
           const label = r.directed ? `${name} →` : name;
           return (
@@ -87,10 +101,11 @@ export function RelatedChips({ page, editable }: { page: Page; editable: boolean
               {editable && (
                 <button
                   type="button"
+                  data-remove=""
                   className={styles.relatedRemove}
                   aria-label={t('page.removeRelated', { name })}
                   title={t('page.removeRelated', { name })}
-                  onClick={() => void remove(r)}
+                  onClick={() => void remove(r, at)}
                 >
                   <span aria-hidden="true">×</span>
                 </button>
