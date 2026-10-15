@@ -1,0 +1,56 @@
+// The page's side of the app menu's shell items (M5b §2.1, §2.5, §6), and the
+// same actions for the vault menu and the shortcuts.
+import {
+  isTauri,
+  onMenuSave,
+  onMenuSettings,
+  onMenuSidebar,
+  onMenuVault,
+  pickFolder,
+} from '../../ipc';
+import { useEditorStore } from '../../stores/editorStore';
+import { useSettingsStore } from '../../stores/settingsStore';
+import { useUiStore } from '../../stores/uiStore';
+import { useVaultStore } from '../../stores/vaultStore';
+
+export const openSettings = () => useUiStore.getState().openDialog({ type: 'settings' });
+
+/** Another vault, through the folder dialog (as ⌘O). */
+export const openAnotherVault = () =>
+  void pickFolder()
+    .catch(() => null)
+    .then((path) => (path ? useVaultStore.getState().open(path) : undefined));
+
+export const closeVault = () => void useVaultStore.getState().close();
+
+export const toggleSidebar = () => {
+  const { settings, update } = useSettingsStore.getState();
+  void update({ sidebarCollapsed: !settings.sidebarCollapsed });
+};
+
+/** ⌘S / File → Save: the current page, now (with auto save off, the only
+ *  way it is written, M5b §6). */
+export const saveNow = () => void useEditorStore.getState().doc?.flush();
+
+/** Settings and Save act on this window; the vault items and the sidebar only
+ *  on the main one (file windows have neither). Returns the unsubscribe. */
+export async function installShellMenu({ main }: { main: boolean }): Promise<() => void> {
+  const stops = await Promise.all([
+    onMenuSettings(openSettings),
+    onMenuSave(saveNow),
+    ...(main
+      ? [
+          onMenuVault((what) => {
+            if (what === 'open') openAnotherVault();
+            else if (what === 'close') closeVault();
+          }),
+          onMenuSidebar(toggleSidebar),
+        ]
+      : []),
+  ]);
+  return () => stops.forEach((stop) => stop());
+}
+
+export function installShellMenuIfTauri(main: boolean): void {
+  if (isTauri()) void installShellMenu({ main }).catch(() => undefined);
+}

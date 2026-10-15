@@ -194,7 +194,15 @@ export interface Settings {
   /** The global Scratchpad's folder (M4c §2); `null` until the first quick
    *  note. Changed only through `scratchpadSet`, never a settings patch. */
   scratchpadPath?: string | null;
+  /** Pages save as you type (M5b §6); off: only on ⌘S. */
+  autoSave: boolean;
+  /** The sidebar is collapsed (M5b §2.5). */
+  sidebarCollapsed: boolean;
+  /** Where the floating Edit / Global View / Search button sits (M5b §2.2). */
+  actionButton: ActionButtonPlace;
 }
+
+export type ActionButtonPlace = 'bottomRight' | 'bottomLeft' | 'topRight';
 
 /** `wide`: text at the readable measure, the chosen elements span the editor. */
 export type PageWidth = 'readable' | 'wide' | 'full';
@@ -243,6 +251,9 @@ export interface SettingsPatch {
   outline?: boolean;
   coverHeight?: number;
   showAttachmentPaths?: boolean;
+  autoSave?: boolean;
+  sidebarCollapsed?: boolean;
+  actionButton?: ActionButtonPlace;
 }
 
 export interface SettingsResponse {
@@ -554,6 +565,8 @@ export const fileOpenDialog = () => call<string[]>('file_open_dialog');
 /** Closes this window without asking (its pages are saved first). Not the
  *  window plugin's `destroy`, which takes any window's label (M4c review I2). */
 export const destroyWindow = () => call<void>('window_close_self');
+/** Names this window (M5b §2.3: "Page — Vault"). */
+export const windowTitleSet = (title: string) => call<void>('window_title_set', { title });
 
 export const vaultOpen = (path: string) => call<VaultInfo>('vault_open', { path });
 export const vaultCreate = (path: string) => call<VaultInfo>('vault_create', { path });
@@ -823,6 +836,18 @@ export const onMenuQuickNote = (cb: () => void): Promise<UnlistenFn> =>
 /** View → Search… in the app menu (M5 §4). */
 export const onMenuSearch = (cb: () => void): Promise<UnlistenFn> =>
   listen<null>('menu:search', () => cb(), mine());
+/** Notes In My Way → Settings… (M5b §2.1). */
+export const onMenuSettings = (cb: () => void): Promise<UnlistenFn> =>
+  listen<null>('menu:settings', () => cb(), mine());
+/** Vault → Open Vault… / Close Vault (M5b §2.1). */
+export const onMenuVault = (cb: (what: string) => void): Promise<UnlistenFn> =>
+  listen<string>('menu:vault', (e) => cb(e.payload), mine());
+/** File → Save (M5b §6). */
+export const onMenuSave = (cb: () => void): Promise<UnlistenFn> =>
+  listen<null>('menu:save', () => cb(), mine());
+/** View → Toggle Sidebar (M5b §2.5). */
+export const onMenuSidebar = (cb: () => void): Promise<UnlistenFn> =>
+  listen<null>('menu:sidebar', () => cb(), mine());
 export const onVaultWarning = (cb: (p: WarningPayload) => void): Promise<UnlistenFn> =>
   listen<WarningPayload>('vault:warning', (e) => cb(e.payload));
 
