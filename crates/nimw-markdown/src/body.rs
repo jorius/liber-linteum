@@ -194,16 +194,24 @@ fn push_merged(src: &str, regions: &mut Vec<Range<usize>>, r: Range<usize>) {
     }
 }
 
+/// A URL scheme (`https:`, `mailto:`): at least two characters, so a
+/// Windows drive (`D:\…`) is a path (M4b part 3 §9).
 fn has_scheme(dest: &str) -> bool {
     let Some(colon) = dest.find(':') else {
         return false;
     };
     let scheme = &dest[..colon];
-    !scheme.is_empty()
+    scheme.len() > 1
         && scheme.as_bytes()[0].is_ascii_alphabetic()
         && scheme
             .bytes()
             .all(|b| b.is_ascii_alphanumeric() || b == b'+' || b == b'-' || b == b'.')
+}
+
+/// `file:` URLs name files on disk (outside the vault, §9): kept as links.
+fn is_file_url(dest: &str) -> bool {
+    dest.get(..5)
+        .is_some_and(|s| s.eq_ignore_ascii_case("file:"))
 }
 
 fn markdown_link(
@@ -216,7 +224,7 @@ fn markdown_link(
     if link_type != LinkType::Inline
         || dest_url.is_empty()
         || dest_url.starts_with('#')
-        || has_scheme(dest_url)
+        || (has_scheme(dest_url) && !is_file_url(dest_url))
     {
         return None;
     }
@@ -354,6 +362,27 @@ mod tests {
             .into_iter()
             .map(|l| (l.kind, l.target, src[l.range].to_string()))
             .collect()
+    }
+
+    /// M4b part 3 §9: a drive letter is not a URL scheme, and `file:` URLs
+    /// are links (to files outside the vault); other schemes stay out.
+    #[test]
+    fn m4b3_drive_paths_and_file_urls_are_links() {
+        let src = r"![a](D:\Pics\a.png) [b](file:///Users/j/b%20c.pdf) ![c](FILE:///x.png) [w](https://e.com) [o](obsidian://open?x) [z](z:x)";
+        let got: Vec<_> = extract(src, 0)
+            .links
+            .into_iter()
+            .map(|l| (l.kind, l.target))
+            .collect();
+        assert_eq!(
+            got,
+            vec![
+                (LinkKind::MarkdownImage, r"D:\Pics\a.png".to_string()),
+                (LinkKind::Markdown, "file:///Users/j/b c.pdf".to_string()),
+                (LinkKind::MarkdownImage, "FILE:///x.png".to_string()),
+                (LinkKind::Markdown, "z:x".to_string()),
+            ]
+        );
     }
 
     #[test]

@@ -1,4 +1,6 @@
-/// 2: titles follow the first-line H1 rule (M4b part 3 §1); pages gain `cover_x` (§3).
+/// 2 (M4b part 3): titles follow the first-line H1 rule (§1); pages gain
+/// `cover_x` (§3); `target_key` follows `\` in Windows paths and Markdown
+/// `file:` links are indexed (§9). An index built by version 1 is rebuilt.
 pub const SCHEMA_VERSION: i64 = 2;
 
 pub(crate) const SCHEMA: &str = r#"

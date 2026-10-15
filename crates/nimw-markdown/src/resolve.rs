@@ -9,9 +9,15 @@ pub fn name_key(s: &str) -> String {
 
 /// Key shared by link targets and file paths: NFC-lowercased base name without
 /// a trailing `.md`. A file can only satisfy links whose target has its key, so
-/// creates/removes/renames only re-resolve links with these keys.
+/// creates/removes/renames only re-resolve links with these keys. The base name
+/// follows `\` too, so a Windows path outside the vault (`D:\Docs\x.pdf`) is
+/// keyed by its file name like everything else (M4b part 3 §9).
 pub fn link_key(target_or_path: &str) -> String {
-    let key = name_key(basename(target_or_path));
+    let base = target_or_path
+        .rsplit(['/', '\\'])
+        .next()
+        .unwrap_or(target_or_path);
+    let key = name_key(base);
     match key.strip_suffix(".md") {
         Some(stem) if !stem.is_empty() => stem.to_string(),
         _ => key,
@@ -420,6 +426,10 @@ mod tests {
         assert_eq!(link_key("img/Photo.PNG"), "photo.png");
         assert_eq!(link_key("Cafe\u{301}"), link_key("café.md"));
         assert_eq!(link_key(".md"), ".md");
+        // M4b part 3 §9: Windows paths are keyed by their file name too, so the
+        // allow-list finds the links that name a file outside the vault.
+        assert_eq!(link_key(r"D:\Docs\My-File.pdf"), "my-file.pdf");
+        assert_eq!(link_key("file:///D:/Docs/x.pdf"), "x.pdf");
     }
 
     #[test]
