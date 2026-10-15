@@ -150,3 +150,78 @@ The non-negotiables are as before.
 5. **Filter words** (`#tag`, `in:`, `to:`, `from:`) are typed shortcuts for chips. They are the same in every language.
 6. **An empty query shows Recent** (the 20 most recently modified pages).
 7. **Enter opens the editor; Shift+Enter opens the Global View page level.**
+
+## 10. Amendments from planning (2026-10-15)
+
+Jose, 2026-10-15: "let's go with the scratchpad feature … then the search filters". M5 is built next to M4c, and **the filters get the most attention**. These amendments override §1–§9 where they conflict.
+
+### Base and index
+
+1. **Builds on M4c** (`feat/m4c-scratchpad`), not M4. It's developed on `feat/m5-search` from the tip of M4b part 3 and rebased onto M4c once M4c is integrated.
+2. **Schema 3, not 2.** M4b part 3 already took schema 2 (the title rule). Search bumps it to **3**. An index built by version 2 is rebuilt on open, as before.
+3. **External-content FTS5 over `page_text`,** replacing §9.3's contentless table.
+   - **Why:** FTS5's `snippet()` and `highlight()` need the column text, which a contentless table doesn't have. Deleting from a contentless table also needs the old values anyway.
+   - **The tables:**
+     - `page_text(rowid, path, title, name, folders, tags, links, body)` holds one row per page. `path` references `files(path)`, cascading on delete and rename.
+     - `fts` is an FTS5 table with `content='page_text'`, `tokenize='unicode61 remove_diacritics 2'` and `prefix='2 3'`.
+   - **Sync:** three triggers on `page_text` keep `fts` in sync (the SQLite documentation's external-content pattern).
+   - **Snippets** come from `snippet()` with private marker characters, which the index turns into structured parts. Body text never contains those characters, since control characters are dropped from it.
+   - **Size cost:** the same as §2's.
+4. **The `title` column** holds the title the index already stores: the part 3 rule, a first-block H1, else the file name.
+5. **Body text** is the page's text without its Markdown:
+   - **Kept:** headings, paragraphs, list items, table cells, and code (inline and blocks, for the technical-docs persona).
+   - **Dropped:** the frontmatter, `%% %%` and HTML comments, raw HTML, link URLs and embeds.
+   - **Wikilinks** read as their alias, else their target.
+6. **`has_image` / `has_audio`** have been pages flags since M1. Nothing is added. A cover doesn't count as an image: the flags come from embeds and image links, as parsed.
+7. **Text and code files** (M4b part 2) **aren't searched in M5.**
+   - **Why:** the index keeps them as attachments and never reads their text, and results are pages (§9.2).
+   - **Cost if wrong:** a follow-up indexes their text as a second kind of row and opens them in the text view.
+8. **Links to files outside the vault aren't vault links.**
+   - **The `links` column** skips `file:` URLs, Windows and UNC paths, and relative paths that climb above the vault root. A `/`-leading target counts, because Obsidian reads it from the vault root first.
+   - **`linksTo` / `linksFrom`** use only resolved vault targets, which outside links never have.
+9. **The vault's scratch folder** (M4c; `.nimw/vault.json` `scratchpadFolder`) holds ordinary pages, which are searched like any other.
+
+### Query and filters
+
+10. **Ranking:** results sort by four keys, in order:
+    - a metadata hit first. A metadata hit is any query word matching `title`, `name`, `folders`, `tags` or `links`.
+    - then bm25 with §2's weights;
+    - then the shorter path;
+    - then the most recently modified.
+
+    This is §2's "constant bonus", written as a sort key.
+11. **The text:**
+    - Words are made of letters and digits. A word with neither (`-`, `***`) is dropped.
+    - Every word becomes a quoted FTS5 string with `*`, so `AND`, `OR`, `NOT`, `NEAR`, `"`, `*`, `^`, `(` and `:` are always text.
+    - A quoted phrase keeps its order, and its last word is a prefix too.
+12. **Each filter, precisely:**
+
+    | Filter | Typed as | What it matches |
+    |---|---|---|
+    | `project` | (chip only) | The first path component, a top-level folder. Pages at the vault root have no project. |
+    | `folder` | `in:` | A folder path, or a folder name matched case- and accent-insensitively anywhere in the vault (every folder with that name). |
+    | `tags` | `#` | All of them must be present (case-insensitive). A tag also matches its nested tags: `#lore` matches `#lore/places`, as in Obsidian's tag search. |
+    | `linksTo` | `to:` | A page path, or a name resolved like `[[name]]`, else a page whose title matches. |
+    | `linksFrom` | `from:` | Same as `linksTo`. |
+
+    **When a page reference can't be found:** the filter matches nothing, and its chip stays visible so it can be removed.
+13. **Facets:**
+    - The **project**, **links to** and **media** counts are computed with every other active filter applied, but not their own. That way you can switch project without removing the chip first.
+    - **Tag** counts are computed within all filters: tags are ANDed, so this is a drill-down.
+    - Active filters always appear, with a count of 0 when nothing matches.
+14. **An empty text with filters** lists the matching pages, most recently modified first, 50 at a time. With no filters either, it's Recent: the 20 most recently modified pages.
+15. **`indexing`** is true while a full re-index runs, such as after a watcher overflow. The index built on open finishes before the vault opens, so a search can't race it.
+16. **Where the code lives:** the queries, parsing and facets are in `crates/nimw-index/src/search.rs`, because the index owns the SQLite connection. `nimw-session` adds `VaultSession::search` and the `indexing` flag.
+
+### UI
+
+17. **The Search button:**
+    - **Placement:** in the top bar's right group, before Settings, labelled "Search" with a ⌘⇧F (Ctrl+Shift+F) hint. The top bar is shared, so the button shows in both Edit and Global View.
+    - **Shortcut check:** ⌘⇧F was free in every keymap checked: the Rust menu, `useGlobalShortcuts` and the editor (which has no CodeMirror search keymap).
+    - **On layouts without a Latin F,** the physical F key works.
+18. **Filter words in the field:**
+    - `#tag`, `in:name`, `to:name` and `from:name` become chips when Space or Enter follows them. A name with spaces is quoted: `in:"Game design"`.
+    - When the text ends in a filter word, Enter makes the chip instead of opening a result.
+    - Backspace in an empty field removes the last active chip.
+19. **Shift+Enter** shows the page's own level in the Global View, under the vault in the breadcrumb.
+20. **The query and filters are kept per vault session,** in memory. They're forgotten when another vault opens or the vault closes.
