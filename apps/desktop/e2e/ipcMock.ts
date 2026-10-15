@@ -8,6 +8,8 @@ export function installIpcMock({
   remoteCover = true,
   files: vaultFiles = [],
   coverSides = {},
+  outside = {},
+  filePicks = [],
 }: {
   pages: Record<string, string>;
   editorMode: string;
@@ -19,6 +21,10 @@ export function installIpcMock({
   files?: string[];
   /** M4b part 3 §3: pages whose cover is a side strip (`.nimw/vault.json`). */
   coverSides?: Record<string, 'left' | 'right'>;
+  /** M4b part 3 §9: what `links_external` says about each target. */
+  outside?: Record<string, { path: string; exists: boolean; listed: boolean }>;
+  /** M4b part 3 §7: what the Attach button's file dialog picks. */
+  filePicks?: { path: string; name: string; url: string; inVault: string | null }[];
 }) {
   type Args = Record<string, unknown>;
   const w = window as unknown as Record<string, unknown>;
@@ -165,6 +171,8 @@ export function installIpcMock({
   };
   const sides = () => stored<string>('nimwMockSides');
   const coverWidths = () => stored<number>('nimwMockCoverWidths');
+  /** M4b part 3 §8: the vault's own link format for new attachments. */
+  let linkFormat: string | null = null;
   const vaultSettings = () => ({
     attachments: { mode: 'subfolder', path: 'attachments' },
     obsidian: null,
@@ -173,6 +181,8 @@ export function installIpcMock({
     coverHeights: heights(),
     coverSides: sides(),
     coverWidths: coverWidths(),
+    attachmentLinkFormat: linkFormat,
+    obsidianLinkFormat: null,
   });
   const handlers: Record<string, (a: Args, options?: unknown) => unknown> = {
     app_info: () => ({ name: 'Notes In My Way', version: '0.0.0-e2e' }),
@@ -283,7 +293,31 @@ export function installIpcMock({
       sessionStorage.setItem('nimwMockCoverWidths', JSON.stringify(next));
       return vaultSettings();
     },
-    vault_settings_set: (a) => (a.patch as { attachments: unknown }) ?? null,
+    vault_settings_set: (a) => {
+      const patch = a.patch as { attachments?: unknown; attachmentLinkFormat?: string };
+      ((w.__nimwVaultPatches ??= []) as unknown[]).push(patch);
+      if (patch.attachmentLinkFormat) {
+        linkFormat = patch.attachmentLinkFormat === 'default' ? null : patch.attachmentLinkFormat;
+      }
+      return {
+        ...vaultSettings(),
+        ...(patch.attachments ? { attachments: patch.attachments } : {}),
+      };
+    },
+    // ---- M4b part 3: files outside the vault (§9) and the Attach button (§7) ----
+    links_external: (a) =>
+      (a.targets as { kind: string; target: string }[]).map(
+        ({ target }) => outside[target] ?? null,
+      ),
+    file_pick: () => filePicks,
+    external_open: (a) => {
+      ((w.__nimwExternalOpens ??= []) as unknown[]).push(a.path);
+      return null;
+    },
+    external_reveal: (a) => {
+      ((w.__nimwReveals ??= []) as unknown[]).push(a.path);
+      return null;
+    },
     attachment_paste: (_a, options) => {
       const headers = (options as { headers?: Record<string, string> })?.headers ?? {};
       const name = decodeURIComponent(headers['x-nimw-name'] ?? 'pasted.png');
