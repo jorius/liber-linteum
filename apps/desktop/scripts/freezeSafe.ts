@@ -48,9 +48,19 @@ function keyOf(member: Node): string | null {
   return property.type === 'Literal' && typeof property.value === 'string' ? property.value : null;
 }
 
-/** The freeze-safe source of a node_modules file, or null when nothing changes. */
+/** Vite's pre-bundled deps (`node_modules/.vite/deps/…`) were already made
+ *  freeze-safe by the optimizer; the dev server serves them through this
+ *  plugin again. */
+const PREBUNDLED = /[\\/]node_modules[\\/]\.vite[\\/]/;
+
+/** The freeze-safe source of a node_modules file, or null when nothing changes.
+ *  Idempotent: code that already carries the helpers is left alone, so the
+ *  helper's own `Object.assign` is never turned into a call to itself (which
+ *  overflowed the stack and left `pnpm dev` with a blank window). */
 export function freezeSafeSource(code: string, file: string): string | null {
-  if (!NODE_MODULES.test(file) || !HINT.test(code)) return null;
+  if (!NODE_MODULES.test(file) || PREBUNDLED.test(file) || !HINT.test(code)) return null;
+  if (code.includes('var __nimwAssign=function(') || code.includes('var __nimwAssign = function('))
+    return null;
   const { program, errors } = parseSync(file, code, { sourceType: 'unambiguous' });
   if (errors.length > 0) return null;
   // Each edit replaces [start, end) (empty for an insertion). Targets can

@@ -184,3 +184,27 @@ describe('freeze-safe transform for any package', () => {
     ).toBe('10');
   });
 });
+
+describe('freeze-safe transform in the dev server (a blank window in `pnpm dev`)', () => {
+  const plugin = freezeSafe();
+  const src = [
+    'function Selector() {} var mixin = { toString: function () { return "sel"; } };',
+    'Object.assign(Selector.prototype, mixin);',
+    'var copy = Object.assign({}, { valueOf: function () { return 3; } });',
+  ].join('\n');
+  const probe = 'String(new Selector()) + +copy';
+
+  it('is idempotent: transforming its own output changes nothing (no self-calling helper)', () => {
+    const file = '/x/node_modules/p/i.js';
+    const once = plugin.transform(src, file)!;
+    expect(plugin.transform(once, file)).toBeNull();
+    expect(frozen(once, probe)).toBe('sel3');
+  });
+
+  it("skips Vite's pre-bundled deps, which the optimizer already transformed", () => {
+    const once = plugin.transform(src, '/x/node_modules/p/i.js')!;
+    expect(plugin.transform(once, '/x/apps/desktop/node_modules/.vite/deps/react.js')).toBeNull();
+    expect(plugin.transform(src, '/x/apps/desktop/node_modules/.vite/deps/chunk-AB12.js')).toBeNull();
+  });
+});
+
