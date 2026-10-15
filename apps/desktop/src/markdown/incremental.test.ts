@@ -104,6 +104,22 @@ describe('incremental re-parse (M2a §7: typing in a 5,000-line note)', () => {
     expect(fuzz(42, LOCAL_PIECES, 200, HEAD, true)).toBeGreaterThan(110);
   }, 60_000);
 
+  it('M4b part 2 §3: opening or closing a $$ block re-parses as the full parse does', () => {
+    const base = '# M\n\nBefore.\n\n$$\na + b\n$$\n\nAfter $x$.\n\nEnd.\n';
+    const edits: [number, string][] = [
+      [base.indexOf('Before'), '$$\n'], // opens a block that swallows the rest
+      [base.indexOf('$$\na'), 'x'], // breaks the opening fence
+      [base.indexOf('End'), '$$ '], // a stray $$ in a paragraph
+    ];
+    for (const [at, insert] of edits) {
+      const typed = base.slice(0, at) + insert + base.slice(at);
+      expect(reparse(parsePage(base), base, typed), JSON.stringify(insert)).toEqual(
+        parsePage(typed),
+      );
+      expect(reparse(parsePage(typed), typed, base)).toEqual(parsePage(base));
+    }
+  });
+
   it('reference links and footnotes resolve as in the full parse', () => {
     const text = 'Intro.\n\nType here.\n\nMiddle.\n\nEnd.\n\n[ref]: https://e.x\n\n[^1]: Note.\n';
     const typed = text.replace('Type here.', 'Type [ref] and[^1] here.');
