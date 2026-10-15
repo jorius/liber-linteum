@@ -484,6 +484,34 @@ fn m4b2_outline_setting_default_persist_and_reset() {
     assert!(warning.unwrap().contains("outline"));
 }
 
+/// M4b part 3 §8: "Show where attachments are on disk" is an app setting,
+/// off by default; a wrong value falls back to off with a warning.
+#[test]
+fn m4b3_show_attachment_paths_default_persist_and_reset() {
+    let dir = tempfile::tempdir().unwrap();
+    let s = store(dir.path());
+    assert!(!s.get().0.show_attachment_paths);
+    s.update(SettingsPatch {
+        show_attachment_paths: Some(true),
+        ..Default::default()
+    })
+    .unwrap();
+    let saved: serde_json::Value =
+        serde_json::from_str(&std::fs::read_to_string(dir.path().join("settings.json")).unwrap())
+            .unwrap();
+    assert_eq!(saved["showAttachmentPaths"], true);
+    assert!(store(dir.path()).get().0.show_attachment_paths);
+    std::fs::write(
+        dir.path().join("settings.json"),
+        r#"{"showAttachmentPaths":1,"theme":"dark"}"#,
+    )
+    .unwrap();
+    let (s, warning) = store(dir.path()).get();
+    assert!(!s.show_attachment_paths);
+    assert_eq!(s.theme, Theme::Dark);
+    assert!(warning.unwrap().contains("showAttachmentPaths"));
+}
+
 /// Cover resize: the default cover height for pages without their own,
 /// 200 px, persisted, clamped to 132–600 and reset on its own when it isn't
 /// a number.
