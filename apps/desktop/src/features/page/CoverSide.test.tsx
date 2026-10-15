@@ -265,6 +265,82 @@ describe('side covers (M4b part 3 §3)', () => {
     expect(calls(d, 'cover_side_set')).toEqual([]);
   });
 
+  // Final review I1: the edge used to go to 45% of the window whatever room
+  // the page had, so widening past the room flipped the strip to the top
+  // band mid-drag, losing the drag (and keyboard focus) without saving.
+  it("the strip's edge stops where the text would go below its minimum: the strip stays and the width saves", async () => {
+    vi.stubGlobal('ResizeObserver', FakeResizeObserver);
+    sides = { 'Rex.md': 'left' };
+    const d = await openWithCover({ 'Rex.md': COVER }, 'Rex.md');
+    // The sidebar is open: the page area is 900 px, so 900 − 520 = 380 px
+    // is the most the strip can take (less than 45% of 1024 px, 460).
+    act(() => observed.forEach((report) => report(900)));
+    const edge = screen.getByRole('separator', { name: 'Cover width' });
+    expect(edge).toHaveAttribute('aria-valuemax', '380');
+    const at = (type: string, x: number) =>
+      act(() => {
+        edge.dispatchEvent(
+          new PointerEvent(type, { bubbles: true, clientX: x, clientY: 300, pointerId: 1 }),
+        );
+      });
+    await at('pointerdown', 500);
+    await at('pointermove', 700);
+    expect(strip()).not.toBeNull();
+    expect(edge).toHaveAttribute('aria-valuenow', '380');
+    await at('pointerup', 700);
+    await waitFor(() =>
+      expect(calls(d, 'cover_width_set')).toEqual([{ path: 'Rex.md', width: 380 }]),
+    );
+    expect(strip()).not.toBeNull();
+    // End goes to the same limit; the strip and the edge's focus stay.
+    await act(() => useCoverLayoutStore.getState().saveWidth('Rex.md', null));
+    edge.focus();
+    await userEvent.keyboard('{End}');
+    expect(strip()).not.toBeNull();
+    expect(edge).toHaveFocus();
+    expect(edge).toHaveAttribute('aria-valuenow', '380');
+    await userEvent.keyboard('{Enter}');
+    await waitFor(() =>
+      expect(calls(d, 'cover_width_set').at(-1)).toEqual({ path: 'Rex.md', width: 380 }),
+    );
+  });
+
+  it('a window narrowed mid-drag drops the drag: the strip comes back at its saved width', async () => {
+    vi.stubGlobal('ResizeObserver', FakeResizeObserver);
+    sides = { 'Rex.md': 'left' };
+    const d = await openWithCover({ 'Rex.md': COVER }, 'Rex.md');
+    act(() => observed.forEach((report) => report(1200)));
+    const edge = screen.getByRole('separator', { name: 'Cover width' });
+    act(() => {
+      edge.dispatchEvent(
+        new PointerEvent('pointerdown', {
+          bubbles: true,
+          clientX: 500,
+          clientY: 300,
+          pointerId: 1,
+        }),
+      );
+      edge.dispatchEvent(
+        new PointerEvent('pointermove', {
+          bubbles: true,
+          clientX: 560,
+          clientY: 300,
+          pointerId: 1,
+        }),
+      );
+    });
+    // 600 px can't hold even the narrowest strip (160) beside 520 px of text.
+    act(() => observed.forEach((report) => report(600)));
+    await waitFor(() => expect(strip()).toBeNull());
+    act(() => observed.forEach((report) => report(1200)));
+    await waitFor(() => expect(strip()).not.toBeNull());
+    expect(screen.getByRole('separator', { name: 'Cover width' })).toHaveAttribute(
+      'aria-valuenow',
+      '280',
+    );
+    expect(calls(d, 'cover_width_set')).toEqual([]);
+  });
+
   it('⌘Z in the editor puts the previous placement back', async () => {
     const d = await openWithCover({ 'Rex.md': COVER }, 'Rex.md');
     await userEvent.click(within(placement()).getByRole('radio', { name: 'Cover on the right' }));

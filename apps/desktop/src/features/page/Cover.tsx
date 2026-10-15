@@ -22,11 +22,7 @@ import {
   TrashIcon,
 } from '../../app/icons';
 import { assetUrl, coverPick, linksResolve, type CoverSide, type Page } from '../../ipc';
-import {
-  MIN_CONTENT_WIDTH,
-  useCoverLayoutStore,
-  useCoverSide,
-} from '../../stores/coverLayoutStore';
+import { useCoverLayoutStore, useCoverSide } from '../../stores/coverLayoutStore';
 import { useEditorStore } from '../../stores/editorStore';
 import { errorMessage } from '../../stores/messages';
 import { useToastStore } from '../../stores/toastStore';
@@ -138,11 +134,10 @@ export function Cover({
   const resize = useCoverResize(page.path);
   const chosen = useCoverSide(page.path);
   const stripSide = chosen !== 'top' && cover.kind !== 'none' ? chosen : null;
-  const strip = useCoverWidthResize(page.path, stripSide ?? 'left');
   const layout = useRef<HTMLDivElement>(null);
   const available = useMeasuredWidth(layout);
-  const fits = available === null || available - strip.width >= MIN_CONTENT_WIDTH;
-  const side = stripSide && fits ? stripSide : null;
+  const strip = useCoverWidthResize(page.path, stripSide ?? 'left', available);
+  const side = stripSide && strip.fits ? stripSide : null;
 
   const saved: Focus = { x: page.coverX ?? 50, y: page.coverY ?? 50 };
   const [draft, setDraft] = useState<Focus | null>(null);
