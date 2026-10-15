@@ -69,7 +69,8 @@
       "moved": "Moved {name} to {target}.",
       "notAllowed": "{name} can't be moved there.",
       "cancelled": "Move of {name} cancelled."
-    }
+    },
+    "scratchFolder": "{name}, quick notes, {count, plural, one {# note} other {# notes}}"
   },
   "opening": {
     "title": "Opening vault…",
@@ -582,6 +583,11 @@
     "setupHint": "You can change it later in Settings → Files. Notes already taken stay where they are.",
     "folder": "Folder",
     "chooseFolder": "Choose folder…",
-    "create": "Create"
+    "create": "Create",
+    "location": "Quick notes folder (no vault open)",
+    "notYet": "Chosen the first time you take a quick note.",
+    "change": "Change…",
+    "choose": "Choose…",
+    "folderSetting": "Quick notes folder"
   }
 }

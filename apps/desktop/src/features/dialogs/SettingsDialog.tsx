@@ -18,6 +18,7 @@ import { PALETTES } from '../../theme/palettes';
 import { Dialog } from './Dialog';
 import styles from './Dialogs.module.css';
 import { useLatestSave } from './useLatestSave';
+import { ScratchpadLocation } from '../scratchpad/ScratchpadLocation';
 import { VaultSettingsSection } from './VaultSettingsSection';
 
 const THEMES: Theme[] = ['system', 'light', 'dark'];
@@ -237,6 +238,7 @@ export function SettingsDialog({ onClose }: { onClose: () => void }) {
           />
           {t('settings.confirmDelete')}
         </label>
+        <ScratchpadLocation />
       </section>
 
       {vaultOpen && <VaultSettingsSection />}

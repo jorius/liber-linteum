@@ -69,7 +69,8 @@
       "moved": "{name} se movió a {target}.",
       "notAllowed": "{name} no se puede mover ahí.",
       "cancelled": "Se canceló mover {name}."
-    }
+    },
+    "scratchFolder": "{name}, notas rápidas, {count, plural, one {# nota} other {# notas}}"
   },
   "opening": {
     "title": "Abriendo bóveda…",
@@ -582,6 +583,11 @@
     "setupHint": "Puedes cambiarla más tarde en Ajustes → Archivos. Las notas ya tomadas se quedan donde están.",
     "folder": "Carpeta",
     "chooseFolder": "Elegir carpeta…",
-    "create": "Crear"
+    "create": "Crear",
+    "location": "Carpeta de notas rápidas (sin bóveda abierta)",
+    "notYet": "Se elige la primera vez que tomas una nota rápida.",
+    "change": "Cambiar…",
+    "choose": "Elegir…",
+    "folderSetting": "Carpeta de notas rápidas"
   }
 }
