@@ -142,13 +142,9 @@ pub(crate) fn page_create_conflict_copy_impl(
         .to_string())
 }
 
-pub(crate) fn links_resolve_impl(
-    state: &AppState,
-    source: String,
-    targets: Vec<LinkTarget>,
-) -> CmdResult<Vec<Option<String>>> {
-    let session = state.session()?;
-    let parsed = targets
+/// `{ kind, target }` pairs from the UI; an unknown kind is refused.
+pub(crate) fn parse_targets(targets: Vec<LinkTarget>) -> CmdResult<Vec<(LinkKind, String)>> {
+    targets
         .into_iter()
         .map(|t| {
             LinkKind::parse(&t.kind)
@@ -160,7 +156,16 @@ pub(crate) fn links_resolve_impl(
                     )
                 })
         })
-        .collect::<CmdResult<Vec<_>>>()?;
+        .collect()
+}
+
+pub(crate) fn links_resolve_impl(
+    state: &AppState,
+    source: String,
+    targets: Vec<LinkTarget>,
+) -> CmdResult<Vec<Option<String>>> {
+    let session = state.session()?;
+    let parsed = parse_targets(targets)?;
     Ok(session.resolve_links(&VaultPath::new(&source)?, &parsed)?)
 }
 

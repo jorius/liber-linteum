@@ -11,6 +11,10 @@ use std::time::Instant;
 /// Chooses a cover file (M2c §7.4). Tests replace the native dialog with this.
 pub type CoverPicker = Arc<dyn Fn() -> Option<PathBuf> + Send + Sync>;
 
+/// Chooses files for the Attach button (M4b part 3 §7). Tests replace the
+/// native dialog with this.
+pub type FilePicker = Arc<dyn Fn() -> Vec<PathBuf> + Send + Sync>;
+
 pub struct AppState {
     session: Mutex<Option<Arc<VaultSession>>>,
     pub settings: SettingsStore,
@@ -19,6 +23,7 @@ pub struct AppState {
     /// Paths the OS dropped onto the window, importable once (M2c §8).
     drop_grants: Mutex<DropGrants>,
     cover_picker: Mutex<Option<CoverPicker>>,
+    file_picker: Mutex<Option<FilePicker>>,
 }
 
 impl AppState {
@@ -29,6 +34,7 @@ impl AppState {
             cache_dir,
             drop_grants: Mutex::new(DropGrants::default()),
             cover_picker: Mutex::new(None),
+            file_picker: Mutex::new(None),
         }
     }
 
@@ -49,6 +55,15 @@ impl AppState {
 
     pub fn cover_picker(&self) -> Option<CoverPicker> {
         lock(&self.cover_picker).clone()
+    }
+
+    /// Replaces the Attach button's file dialog (tests); `None` restores it.
+    pub fn set_file_picker(&self, picker: Option<FilePicker>) {
+        *lock(&self.file_picker) = picker;
+    }
+
+    pub fn file_picker(&self) -> Option<FilePicker> {
+        lock(&self.file_picker).clone()
     }
 
     /// The open vault, or `noVault`.

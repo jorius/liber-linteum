@@ -28,6 +28,7 @@ nimw-markdown = { path = "../../../crates/nimw-markdown" }
 [dev-dependencies]
 tauri = { workspace = true, features = ["test"] }
 tempfile.workspace = true
+dunce.workspace = true
 nimw-testkit = { path = "../../../crates/nimw-testkit" }
 
 # Runs on the process main thread (muda menus can only be created there).

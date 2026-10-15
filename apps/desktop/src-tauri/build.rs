@@ -42,6 +42,10 @@ const COMMANDS: &[&str] = &[
     "cover_height_set",
     "cover_side_set",
     "cover_width_set",
+    "links_external",
+    "external_open",
+    "external_reveal",
+    "file_pick",
 ];
 
 fn main() {

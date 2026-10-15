@@ -189,6 +189,15 @@ impl VaultSession {
         }))
     }
 
+    /// The vault file at the absolute `path` (symlinks followed), if it is one
+    /// the vault knows (§7: a picked file already in the vault is linked, not
+    /// copied).
+    pub fn vault_path_of(&self, path: &Path) -> Option<VaultPath> {
+        let real = dunce::canonicalize(path).ok()?;
+        let inside = VaultPath::from_fs_path(self.vault.root(), &real).ok()?;
+        (!inside.is_root() && self.vault.stat(&inside).ok()?.is_some()).then_some(inside)
+    }
+
     /// The outside file `path` when the app may read or open it: on the
     /// allow-list (`NotPermitted` otherwise), then `checked_file`.
     pub fn external_file(&self, path: &str) -> Result<PathBuf> {

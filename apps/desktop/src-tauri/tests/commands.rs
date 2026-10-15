@@ -55,6 +55,10 @@ const COMMANDS: &[&str] = &[
     "cover_height_set",
     "cover_side_set",
     "cover_width_set",
+    "links_external",
+    "external_open",
+    "external_reveal",
+    "file_pick",
 ];
 
 struct Harness {
@@ -1803,4 +1807,110 @@ fn final_review_i3_a_conflict_with_a_non_text_file_carries_no_lossy_text() {
         std::fs::read(vault.path().join("Page.md")).unwrap(),
         b"# Caf\xe9\n"
     );
+}
+
+/// M4b part 3 §7: Rust opens the file dialog (a fake picker in tests); each
+/// picked file comes back with its `file:` URL and, when it already lives in
+/// the vault, its vault path. The picks are granted for one import each.
+#[test]
+fn m4b3_file_pick_returns_the_picks_and_grants_them_for_import() {
+    let h = harness();
+    let vault = open_fixture(&h, "obsidian-basic");
+    let outside = tempfile::Builder::new()
+        .prefix("nimw-pick")
+        .tempdir()
+        .unwrap();
+    let pdf = outside.path().join("my brief.pdf");
+    std::fs::write(&pdf, b"%PDF").unwrap();
+    let inside = vault.path().join("Character Design/assets/rex-cover.png");
+    let state = h.app.state::<nimw_desktop::state::AppState>();
+    let picks = vec![pdf.clone(), inside.clone()];
+    state.set_file_picker(Some(Arc::new(move || picks.clone())));
+    let got = call(&h.main, "file_pick", json!({ "page": "Welcome.md" })).unwrap();
+    let pdf_s = pdf.to_str().unwrap();
+    assert_eq!(got[0]["path"], pdf_s);
+    assert_eq!(got[0]["name"], "my brief.pdf");
+    assert_eq!(got[0]["inVault"], Value::Null);
+    assert!(
+        got[0]["url"].as_str().unwrap().ends_with("/my%20brief.pdf"),
+        "{got}"
+    );
+    assert_eq!(got[1]["inVault"], "Character Design/assets/rex-cover.png");
+    let imported = call(
+        &h.main,
+        "attachment_import",
+        json!({ "page": "Welcome.md", "paths": [pdf_s] }),
+    )
+    .unwrap();
+    assert_eq!(imported[0]["ok"]["copied"], true, "{imported}");
+    let again = call(
+        &h.main,
+        "attachment_import",
+        json!({ "page": "Welcome.md", "paths": [pdf_s] }),
+    )
+    .unwrap();
+    assert_eq!(again[0]["err"]["kind"], "notPermitted", "used once");
+    // Cancelled: nothing picked.
+    state.set_file_picker(Some(Arc::new(Vec::new)));
+    assert_eq!(
+        call(&h.main, "file_pick", json!({ "page": "Welcome.md" })).unwrap(),
+        json!([])
+    );
+}
+
+/// M4b part 3 §9 over IPC: `links_external` reports outside files; opening or
+/// revealing one that no page links to, or a program, is refused (the
+/// success paths would open apps on the machine running the tests).
+#[test]
+fn m4b3_outside_files_over_ipc() {
+    let h = harness();
+    let base = tempfile::Builder::new()
+        .prefix("nimw-ext")
+        .tempdir()
+        .unwrap();
+    let pics = dunce::canonicalize(base.path()).unwrap().join("Pics");
+    std::fs::create_dir_all(&pics).unwrap();
+    std::fs::write(pics.join("x.png"), b"\x89PNG").unwrap();
+    std::fs::write(pics.join("run.sh"), b"#!/bin/sh\n").unwrap();
+    std::fs::write(pics.join("other.pdf"), b"%PDF").unwrap();
+    let pic = pics.join("x.png").to_str().unwrap().to_string();
+    let script = pics.join("run.sh").to_str().unwrap().to_string();
+    let other = pics.join("other.pdf").to_str().unwrap().to_string();
+    std::fs::create_dir_all(base.path().join("Vault")).unwrap();
+    std::fs::write(
+        base.path().join("Vault/a.md"),
+        format!("# A\n\n![[{pic}]] [[{script}]] [[b]]\n"),
+    )
+    .unwrap();
+    std::fs::write(base.path().join("Vault/b.md"), "# B\n").unwrap();
+    call(
+        &h.main,
+        "vault_open",
+        json!({ "path": base.path().join("Vault") }),
+    )
+    .unwrap();
+    let got = call(
+        &h.main,
+        "links_external",
+        json!({ "source": "a.md", "targets": [
+            { "kind": "embed", "target": pic },
+            { "kind": "wiki", "target": "b" },
+            { "kind": "embed", "target": other },
+        ] }),
+    )
+    .unwrap();
+    assert_eq!(
+        got,
+        json!([
+            { "path": pic, "exists": true, "listed": true },
+            null,
+            { "path": other, "exists": true, "listed": false },
+        ])
+    );
+    for cmd in ["external_open", "external_reveal"] {
+        let err = call(&h.main, cmd, json!({ "path": other })).unwrap_err();
+        assert_eq!(kind(err), "notPermitted", "{cmd}");
+    }
+    let err = call(&h.main, "external_open", json!({ "path": script })).unwrap_err();
+    assert_eq!(kind(err), "invalidUrl", "a script is never opened");
 }

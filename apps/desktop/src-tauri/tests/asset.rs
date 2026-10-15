@@ -223,3 +223,105 @@ fn symlinks_escaping_the_vault_are_not_served() {
         assert!(r.body.is_empty(), "{path}");
     }
 }
+
+// ---- M4b part 3 §9: files outside the vault ----
+
+/// `base/Vault` (one page linking outside files) and `base/Pics`; the
+/// names aren't hidden (`tempdir()` names start with `.tmp`).
+fn outside_world(
+    page: impl Fn(&std::path::Path) -> String,
+) -> (tempfile::TempDir, std::path::PathBuf) {
+    let base = tempfile::Builder::new()
+        .prefix("nimw-ext")
+        .tempdir()
+        .unwrap();
+    let pics = dunce::canonicalize(base.path()).unwrap().join("Pics");
+    std::fs::create_dir_all(pics.join(".secret")).unwrap();
+    std::fs::write(pics.join("x.png"), b"\x89PNG-outside").unwrap();
+    std::fs::write(pics.join(".secret/key.png"), b"key").unwrap();
+    std::fs::create_dir_all(base.path().join("Vault")).unwrap();
+    std::fs::write(base.path().join("Vault/a.md"), page(&pics)).unwrap();
+    (base, pics)
+}
+
+/// `/.external/<path as one %-encoded segment>`, as the UI asks for it.
+fn external_uri(path: &str) -> String {
+    let encoded: String = path
+        .bytes()
+        .map(|b| {
+            if b.is_ascii_alphanumeric() || b"-_.~".contains(&b) {
+                (b as char).to_string()
+            } else {
+                format!("%{b:02X}")
+            }
+        })
+        .collect();
+    format!("/.external/{encoded}")
+}
+
+#[test]
+fn m4b3_outside_files_are_served_once_a_page_links_them() {
+    let (base, pics) =
+        outside_world(|pics| format!("# A\n\n![[{}]]\n", pics.join("x.png").display()));
+    let (app, _c, _k) = open(&base.path().join("Vault"));
+    let state = app.state::<AppState>();
+    let pic = pics.join("x.png").display().to_string();
+    let r = serve(&state, &external_uri(&pic), None);
+    assert_eq!(r.status, 200);
+    assert_eq!(r.mime, "image/png");
+    assert_eq!(r.body, b"\x89PNG-outside");
+    let res = r.into_response();
+    assert_eq!(
+        res.headers()
+            .get("Content-Security-Policy")
+            .map(|v| v.to_str().unwrap()),
+        Some("default-src 'none'; sandbox")
+    );
+    let part = serve(&state, &external_uri(&pic), Some("bytes=1-3"));
+    assert_eq!((part.status, part.body.as_slice()), (206, &b"PNG"[..]));
+}
+
+#[test]
+fn m4b3_unlisted_hidden_and_malformed_outside_requests_are_refused() {
+    let (base, pics) = outside_world(|pics| {
+        format!(
+            "# A\n\n![[{}]] ![[{}]]\n",
+            pics.join("x.png").display(),
+            pics.join(".secret/key.png").display()
+        )
+    });
+    std::fs::write(pics.join("other.png"), b"other").unwrap();
+    let (app, _c, _k) = open(&base.path().join("Vault"));
+    let state = app.state::<AppState>();
+    let pic = pics.join("x.png").display().to_string();
+    let other = pics.join("other.png").display().to_string();
+    let key = pics.join(".secret/key.png").display().to_string();
+    let roundabout = format!("{}/../x.png", pics.join(".secret").display());
+    for (uri, why) in [
+        (external_uri(&other), "not linked"),
+        (external_uri(&key), "hidden, though linked"),
+        (external_uri(&roundabout), "spelled with .."),
+        // The path must be one segment: a raw `/` after the prefix is malformed.
+        (format!("/.external{pic}"), "raw separators"),
+        (format!("{}%FF", external_uri(&pic)), "not UTF-8"),
+    ] {
+        let r = serve(&state, &uri, None);
+        assert_eq!(r.status, 403, "{why}: {uri}");
+        assert!(r.body.is_empty(), "{why}");
+    }
+    // The prefix's look-alikes are hidden vault paths: refused.
+    assert_eq!(serve(&state, "/.external", None).status, 403);
+    assert_eq!(serve(&state, "/%2Eexternal/x.png", None).status, 403);
+}
+
+#[test]
+fn m4b3_missing_outside_files_are_404() {
+    let (base, pics) =
+        outside_world(|pics| format!("# A\n\n![[{}]]\n", pics.join("gone.png").display()));
+    let (app, _c, _k) = open(&base.path().join("Vault"));
+    let gone = pics.join("gone.png").display().to_string();
+    assert_eq!(
+        serve(&app.state::<AppState>(), &external_uri(&gone), None).status,
+        404
+    );
+}
