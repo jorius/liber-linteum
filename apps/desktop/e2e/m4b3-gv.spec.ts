@@ -144,3 +144,28 @@ test.describe('card covers (spec §2: WebView2 showed the top of the image)', ()
     expect(r.position).toBe('50% 50%');
   });
 });
+
+test('§4: page cards say Edit and open the editor; folders keep See all and look like folders', async ({
+  page,
+}) => {
+  await globalView(page, {
+    'Alpha/One.md': '# One\n\nFirst.\n',
+    'Welcome.md': '# Welcome\n\nStart here.\n',
+  });
+  const folder = page.getByRole('group', { name: 'Alpha, project' });
+  await expect(folder).toHaveAttribute('data-kind', 'project');
+  await expect(folder.getByRole('button', { name: 'See all: Alpha' })).toBeVisible();
+  // The tab sits on the folder card's top edge, above its box.
+  const tab = page.locator('.react-flow__node[data-id="Alpha"] [data-gv-tab]');
+  const tabBox = (await tab.boundingBox())!;
+  const folderBox = (await folder.boundingBox())!;
+  expect(tabBox.y).toBeLessThan(folderBox.y);
+  await expect(page.locator('.react-flow__node[data-id="Welcome.md"] [data-gv-tab]')).toHaveCount(
+    0,
+  );
+
+  const welcome = page.getByRole('group', { name: 'Welcome, page' });
+  await expect(welcome.getByRole('button', { name: /^See all/ })).toHaveCount(0);
+  await welcome.getByRole('button', { name: 'Edit Welcome' }).click();
+  await expect(page.getByRole('textbox', { name: 'Page title' })).toHaveValue('Welcome');
+});

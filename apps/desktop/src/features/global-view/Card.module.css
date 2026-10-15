@@ -13,6 +13,39 @@
   overflow: hidden;
 }
 
+/* Folders and projects (M4b part 3 §4): a second sheet behind the card and a
+   tinted head row; the tab is a sibling (the card clips its own box). */
+.card[data-kind='folder'],
+.card[data-kind='project'] {
+  box-shadow:
+    5px 5px 0 -1px var(--color-surface),
+    5px 5px 0 0 var(--color-card-border),
+    var(--shadow-card);
+}
+
+.card[data-kind='folder'] .head,
+.card[data-kind='project'] .head {
+  background: var(--color-accent-soft);
+}
+
+.card[data-kind='folder'] .kind,
+.card[data-kind='project'] .kind {
+  color: var(--color-accent);
+}
+
+.tab {
+  position: absolute;
+  left: 14px;
+  top: -9px;
+  width: 72px;
+  height: 10px;
+  box-sizing: border-box;
+  border: 1px solid var(--color-card-border);
+  border-bottom: 0;
+  border-radius: 6px 6px 0 0;
+  background: var(--color-accent-soft);
+}
+
 .card[data-open] {
   border-color: var(--color-accent);
   box-shadow: 0 0 0 2px var(--color-accent);
@@ -22,6 +55,23 @@
 .card[data-connecting] {
   border-color: var(--color-edge-manual);
   box-shadow: 0 0 0 2px var(--color-edge-manual);
+}
+
+/* A folder keeps its second sheet under the ring. */
+.card[data-kind='folder'][data-open],
+.card[data-kind='project'][data-open] {
+  box-shadow:
+    0 0 0 2px var(--color-accent),
+    5px 5px 0 -1px var(--color-surface),
+    5px 5px 0 0 var(--color-card-border);
+}
+
+.card[data-kind='folder'][data-connecting],
+.card[data-kind='project'][data-connecting] {
+  box-shadow:
+    0 0 0 2px var(--color-edge-manual),
+    5px 5px 0 -1px var(--color-surface),
+    5px 5px 0 0 var(--color-card-border);
 }
 
 .head {
@@ -43,6 +93,12 @@
   letter-spacing: 0.07em;
   text-transform: uppercase;
   color: var(--color-text-muted);
+}
+
+.kindIcon {
+  display: inline-block;
+  margin-right: 6px;
+  vertical-align: -2px;
 }
 
 .grip {
@@ -235,6 +291,9 @@
 
 .seeAll {
   margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   min-height: 32px;
   padding: 6px 14px;
   border: 1px solid var(--color-accent);

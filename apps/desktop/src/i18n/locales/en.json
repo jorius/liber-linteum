@@ -444,6 +444,8 @@
     "hasAudio": "Has audio",
     "seeAll": "See all",
     "seeAllLabel": "See all: {title}",
+    "edit": "Edit",
+    "editLabel": "Edit {title}",
     "move": "Move card",
     "breadcrumb": "Global View path",
     "mode": "Next level",

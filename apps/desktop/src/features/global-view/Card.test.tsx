@@ -64,9 +64,14 @@ describe('Global View card (M3a §4)', () => {
     );
     expect(screen.getByRole('img', { name: 'Has images' })).toBeInTheDocument();
     expect(screen.getByRole('img', { name: 'Has audio' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'See all: Generator Rex' })).toHaveTextContent(
-      'See all',
+    // M4b part 3 §4: a page is edited, not "seen all".
+    expect(screen.getByRole('button', { name: 'Edit Generator Rex' })).toHaveTextContent('Edit');
+    expect(screen.queryByRole('button', { name: /^See all/ })).not.toBeInTheDocument();
+    expect(screen.getByRole('group', { name: 'Generator Rex, page' })).toHaveAttribute(
+      'data-kind',
+      'page',
     );
+    expect(document.querySelector('[data-gv-tab]')).toBeNull();
   });
 
   it('GV-02: a folder without an index note summarises its children', () => {
@@ -89,6 +94,14 @@ describe('Global View card (M3a §4)', () => {
     );
     expect(screen.getByText('Project')).toBeInTheDocument();
     expect(screen.getByText('2 pages · 1 folder')).toBeInTheDocument();
+    // M4b part 3 §4: folders keep See all and look like folders.
+    expect(screen.getByRole('button', { name: 'See all: Delta' })).toHaveTextContent('See all');
+    expect(screen.queryByRole('button', { name: /^Edit/ })).not.toBeInTheDocument();
+    expect(screen.getByRole('group', { name: 'Delta, project' })).toHaveAttribute(
+      'data-kind',
+      'project',
+    );
+    expect(document.querySelector('[data-gv-tab]')).toHaveAttribute('aria-hidden', 'true');
     expect(document.querySelector('img')).toBeNull();
     expect(screen.queryByRole('img', { name: 'Has images' })).not.toBeInTheDocument();
   });
@@ -149,7 +162,7 @@ describe('Global View card (M3a §4)', () => {
     expect(onOpen).toHaveBeenCalledTimes(2);
     fireEvent.keyDown(open, { key: 'Enter', shiftKey: true });
     expect(onOpenEditor).toHaveBeenCalledTimes(2);
-    fireEvent.click(screen.getByRole('button', { name: 'See all: Generator Rex' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Edit Generator Rex' }));
     expect(onOpenEditor).toHaveBeenCalledTimes(3);
     expect(onOpen).toHaveBeenCalledTimes(2);
   });

@@ -62,6 +62,11 @@ function expectReadableGlobalView(vars: Record<string, string>, at: string) {
     contrast(vars['--color-accent'], vars['--color-surface']),
     `${at} card title`,
   ).toBeGreaterThanOrEqual(4.5);
+  // M4b part 3 §4: a folder card's kind label, accent on its tinted head.
+  expect(
+    contrast(vars['--color-accent'], vars['--color-accent-soft']),
+    `${at} folder kind label`,
+  ).toBeGreaterThanOrEqual(4.5);
 }
 
 describe('Global View tokens (M3a §4, §6)', () => {
