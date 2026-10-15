@@ -202,8 +202,8 @@ test('Wide elements: Tables unticked in Settings brings the table back to the me
 
 test('Wide elements with line numbers: the table stays clear of the gutter', async ({ page }) => {
   await open(page, 'Ranks', { pageWidth: 'wide', lineNumbers: true });
-  // The gutter sits beside the measure, so the table keeps the text's left
-  // edge and grows to the right, up to the editor's edge.
+  // The line numbers sit at the editor's left edge (M5b §7.2, replacing
+  // wide §6.6), so the table grows on both sides, clear of them.
   await expect
     .poll(async () => {
       const g = await geometry(page);
@@ -213,7 +213,7 @@ test('Wide elements with line numbers: the table stays clear of the gutter', asy
   const g = await geometry(page);
   expect(g.gutterRight).not.toBeNull();
   expect(g.widgetLeft).toBeGreaterThanOrEqual(g.gutterRight!);
-  expect(Math.abs(g.widgetLeft - (g.textCentre - g.text / 2))).toBeLessThan(2);
+  expect(Math.abs(g.widgetCentre - g.textCentre)).toBeLessThan(2);
   expect(g.widgetRight).toBeLessThanOrEqual(g.scrollerRight);
 });
 

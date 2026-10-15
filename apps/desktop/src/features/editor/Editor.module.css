@@ -88,6 +88,27 @@
   min-width: 0;
 }
 
+/* A table wider than the measure takes the whole frame (M5b §7.2): from the
+   editor's left padding to its right one, its columns sharing the room.
+   TableScroll marks its frame (data-wide-full) once it measures wider than
+   the text. */
+.live[data-wide-tables] :global(.cm-nimw-widget[data-wide-kind='tables'][data-wide-full] > *) {
+  width: 100%;
+  max-width: 100%;
+}
+
+.live[data-wide-tables] :global(.cm-nimw-widget[data-wide-kind='tables'][data-wide-full] table) {
+  width: 100%;
+}
+
+/* On a Wide-elements page the text's auto margins take all the free room,
+   so the line numbers sit at the editor's left edge, where a full-width
+   block never covers them, and the room beside the text is even on both
+   sides (M5b §7.2, replacing wide §6.6). */
+.live[data-width='wide'] :global(.cm-content) {
+  margin: 0 auto;
+}
+
 /* Code, and a table, maths or diagram being edited: its lines share one
    box as wide as the block's widest line (--nimw-ch, set by Live Preview),
    within the same reach, placed the same way. */
