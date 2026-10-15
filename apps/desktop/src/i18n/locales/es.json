@@ -572,5 +572,8 @@
     "selected": "{selected, number} de {count, plural, one {# palabra} other {# palabras}}",
     "chars": "{chars, plural, one {# carácter} other {# caracteres}} · {bare, number} sin espacios",
     "lines": "{lines, plural, one {# línea} other {# líneas}} · {chars, plural, one {# carácter} other {# caracteres}}"
+  },
+  "scratchpad": {
+    "title": "Notas rápidas"
   }
 }

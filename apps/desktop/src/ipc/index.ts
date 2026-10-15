@@ -91,6 +91,8 @@ export interface VaultInfo {
   name: string;
   root: string;
   report: IndexReport;
+  /** The global Scratchpad (M4c §2). */
+  scratchpad?: boolean;
 }
 
 export type NodeKind = 'page' | 'folder' | 'attachment';
@@ -132,6 +134,8 @@ export interface RecentVault {
   name: string;
   openedAt: string;
   missing: boolean;
+  /** The global Scratchpad (M4c §2): shown as "Quick notes". */
+  scratchpad?: boolean;
 }
 
 export type EditorMode = 'livePreview' | 'source' | 'split';
@@ -187,6 +191,9 @@ export interface Settings {
   coverHeight: number;
   /** A caption with each attachment's place on disk (M4b part 3 §8). */
   showAttachmentPaths: boolean;
+  /** The global Scratchpad's folder (M4c §2); `null` until the first quick
+   *  note. Changed only through `scratchpadSet`, never a settings patch. */
+  scratchpadPath?: string | null;
 }
 
 /** `wide`: text at the readable measure, the chosen elements span the editor. */
@@ -374,6 +381,30 @@ export interface VaultSettingsPatch {
   attachmentLinkFormat?: LinkFormat | 'default';
 }
 
+/** What `quickNoteAutoname` did (M4c §2): where the note is now, whether it
+ *  still follows its first line, and the rename when there was one. */
+export interface AutoName {
+  path: string;
+  autoNamed: boolean;
+  outcome: RenameOutcome | null;
+}
+
+/** The open vault's quick notes (M4c §7): its scratch folder (`null` in the
+ *  global Scratchpad, whose root is the scratch place) and the notes still
+ *  named after their first line. */
+export interface QuickNotesState {
+  folder: string | null;
+  autoNamed: string[];
+}
+
+/** What renaming the scratch folder did: its name now, and the rename on
+ *  disk when the folder existed (`from` → `folder`). */
+export interface ScratchFolderResult {
+  folder: string;
+  from: string | null;
+  outcome: RenameOutcome | null;
+}
+
 /** What one Global View click opens (M3a §3). */
 export type GvLevelRef =
   { kind: 'vault' } | { kind: 'folder'; path: string } | { kind: 'page'; path: string };
@@ -541,6 +572,25 @@ export const coverSideSet = (path: string, side: CoverSide) =>
 export const coverWidthSet = (path: string, width: number | null) =>
   call<VaultSettings>('cover_width_set', { path, width });
 
+// ---- quick notes (M4c §2, §7) ----
+
+/** Where the global Scratchpad goes unless the user picks another folder. */
+export const scratchpadDefault = () => call<string>('scratchpad_default');
+/** A folder dialog Rust opens; `null` when cancelled. */
+export const scratchpadChoose = () => call<string | null>('scratchpad_choose');
+/** Makes `path` (the default, or the folder just chosen) the Scratchpad. */
+export const scratchpadSet = (path: string) => call<Settings>('scratchpad_set', { path });
+/** Opens the global Scratchpad as the vault (no path: Rust knows it). */
+export const scratchpadOpen = () => call<VaultInfo>('scratchpad_open');
+/** A new quick note named `name` in the open vault's scratch place. */
+export const quickNoteCreate = (name: string) => call<string>('quick_note_create', { name });
+/** Renames a quick note after its saved first line, while it follows it. */
+export const quickNoteAutoname = (path: string) => call<AutoName>('quick_note_autoname', { path });
+export const quickNotesState = () => call<QuickNotesState>('quick_notes_state');
+/** Names the open vault's scratch folder (Settings → This vault). */
+export const scratchFolderSet = (name: string) =>
+  call<ScratchFolderResult>('scratch_folder_set', { name });
+
 /** URL of a vault file for <img>/<audio> through the `nimw-asset:` protocol
  *  (M2a §2.5); WebView2 on Windows reaches custom protocols over http. */
 export function assetUrl(path: string): string {
@@ -576,6 +626,9 @@ export const onMenuToggle = (cb: (key: string) => void): Promise<UnlistenFn> =>
 /** View → Editor / Global View in the app menu (M3a §2). */
 export const onMenuScreen = (cb: (screen: string) => void): Promise<UnlistenFn> =>
   listen<string>('menu:screen', (e) => cb(e.payload));
+/** File → New Quick Note in the app menu (M4c §2). */
+export const onMenuQuickNote = (cb: () => void): Promise<UnlistenFn> =>
+  listen('menu:quickNote', () => cb());
 export const onVaultWarning = (cb: (p: WarningPayload) => void): Promise<UnlistenFn> =>
   listen<WarningPayload>('vault:warning', (e) => cb(e.payload));
 

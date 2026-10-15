@@ -31,6 +31,7 @@ export const DEFAULT_SETTINGS: Settings = {
   outline: false,
   coverHeight: 200,
   showAttachmentPaths: false,
+  scratchpadPath: null,
   globalViewMode: 'drill',
   globalViewEdges: { links: true, tree: true, manual: true, aggregated: true },
 };
