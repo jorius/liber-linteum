@@ -20,14 +20,16 @@ export function PageHeading() {
   if (state !== 'ready' || !page) return null;
   return (
     <>
-      {/* The page's optional emoji (M5b §4), before its title. */}
-      <IconButton
-        target={{ kind: 'page', path: page.path }}
-        icon={icon}
-        name={page.title}
-        className={styles.pageIcon}
-      />
-      <PageTitle path={page.path} />
+      {/* The page's optional emoji (M5b §4), on the title's line. */}
+      <div className={styles.titleRow}>
+        <IconButton
+          target={{ kind: 'page', path: page.path }}
+          icon={icon}
+          name={page.title}
+          className={styles.pageIcon}
+        />
+        <PageTitle path={page.path} />
+      </div>
       <PageSubtitle page={page} editable={editable} />
     </>
   );

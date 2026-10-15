@@ -882,8 +882,19 @@ span.relatedOpen {
   font-size: 15px;
 }
 
-/* The page's optional emoji (M5b §4), before the title. */
+/* The page's optional emoji (M5b §4), before the title on its line. */
+.titleRow {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+}
+
 .pageIcon {
-  font-size: 24px;
-  margin-right: 4px;
+  font-size: 18px;
+}
+
+/* At the top of the page the icon matches the title's size (M5b §2.3, §4). */
+.titleBlock .pageIcon {
+  font-size: 30px;
 }
