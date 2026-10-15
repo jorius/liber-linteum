@@ -15,7 +15,7 @@ export default defineConfig({
       name: 'webkit',
       use: { ...devices['Desktop Safari'], browserName: 'webkit' },
       testMatch:
-        /\/(checklist|m2b|m2c|m3a|m3a-a11y|m3a-perf|m3b|m4|m4-perf|m4b|m4b2|cover-resize|m4b3-covers|m4b3-wide|m4b3-gv|m4b3-files)\.spec\.ts$/,
+        /\/(checklist|m2b|m2c|m3a|m3a-a11y|m3a-perf|m3b|m4|m4-perf|m4b|m4b2|cover-resize|m4b3-covers|m4b3-wide|m4b3-gv|m4b3-files|m4b3-settings)\.spec\.ts$/,
     },
   ],
   webServer: {

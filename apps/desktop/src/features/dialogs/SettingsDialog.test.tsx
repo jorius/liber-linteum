@@ -376,6 +376,23 @@ describe('Settings → This vault (M2c §5.4)', () => {
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
   });
 
+  it('M4b part 3: a folder typed but not confirmed is saved when a click outside closes Settings', async () => {
+    const closed: string[] = [];
+    render(<SettingsDialog onClose={() => closed.push('closed')} />);
+    const where = await screen.findByRole('combobox', { name: 'New attachments go to' });
+    await waitFor(() => expect(where).toHaveValue('subfolder'));
+    await userEvent.selectOptions(where, 'folder');
+    vaultPatches.length = 0;
+    await userEvent.type(screen.getByRole('textbox', { name: 'Folder in the vault' }), 'Media');
+    const backdrop = screen.getByRole('dialog', { name: 'Settings' }).parentElement!;
+    fireEvent.mouseDown(backdrop);
+    fireEvent.click(backdrop);
+    expect(closed).toEqual(['closed']);
+    await waitFor(() =>
+      expect(vaultPatches).toEqual([{ attachments: { mode: 'folder', path: 'Media' } }]),
+    );
+  });
+
   it('tabbing through the untouched field writes nothing (no .nimw/ for nothing; final review M5)', async () => {
     open();
     const where = await screen.findByRole('combobox', { name: 'New attachments go to' });
@@ -445,5 +462,53 @@ describe('Settings → This vault (M2c §5.4)', () => {
     await waitFor(() => expect(vaultPatches[2]).toEqual({ overrideObsidian: false }));
     expect(where).toBeDisabled();
     expect(where).toHaveValue('same');
+  });
+});
+
+describe('M4b part 3: Escape and a click outside save and close Settings', () => {
+  const openWith = () => {
+    const closed: string[] = [];
+    render(<SettingsDialog onClose={() => closed.push('closed')} />);
+    return closed;
+  };
+
+  it('Escape closes when nothing in the dialog has focus (WebKit leaves a clicked checkbox unfocused)', () => {
+    const closed = openWith();
+    (document.activeElement as HTMLElement | null)?.blur();
+    fireEvent.keyDown(document.body, { key: 'Escape' });
+    expect(closed).toEqual(['closed']);
+  });
+
+  it('Escape closes once, not twice, when focus is inside the dialog', () => {
+    const closed = openWith();
+    fireEvent.keyDown(screen.getByRole('combobox', { name: 'Language' }), { key: 'Escape' });
+    expect(closed).toEqual(['closed']);
+  });
+
+  it('a click on the backdrop closes; a click inside, or a press inside released outside, does not', () => {
+    const closed = openWith();
+    const dialog = screen.getByRole('dialog', { name: 'Settings' });
+    const backdrop = dialog.parentElement!;
+    fireEvent.mouseDown(dialog);
+    fireEvent.click(backdrop);
+    fireEvent.mouseDown(dialog);
+    fireEvent.click(dialog);
+    expect(closed).toEqual([]);
+    fireEvent.mouseDown(backdrop);
+    fireEvent.click(backdrop);
+    expect(closed).toEqual(['closed']);
+  });
+
+  it('a hex accent typed but not confirmed is saved by Escape before closing', async () => {
+    const closed = openWith();
+    await userEvent.click(screen.getByRole('radio', { name: 'Custom accent' }));
+    const hex = screen.getByRole('textbox', { name: 'Accent colour (hex)' });
+    await userEvent.clear(hex);
+    await userEvent.type(hex, '#123456');
+    fireEvent.keyDown(hex, { key: 'Escape' });
+    expect(closed).toEqual(['closed']);
+    await waitFor(() =>
+      expect(patches).toContainEqual(expect.objectContaining({ accentColor: '#123456' })),
+    );
   });
 });

@@ -47,7 +47,7 @@ export function SettingsDialog({ onClose }: { onClose: () => void }) {
   const vaultOpen = useVaultStore((s) => s.info !== null);
 
   return (
-    <Dialog title={t('settings.title')} onClose={onClose}>
+    <Dialog title={t('settings.title')} onClose={onClose} dismissible>
       <label className={styles.field}>
         <span>{t('settings.language')}</span>
         <select
