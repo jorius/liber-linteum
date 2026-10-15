@@ -8,7 +8,7 @@
 
 use crate::file_windows::{FileWindows, is_file_window};
 use crate::state::AppState;
-use nimw_vault::{Vault, VaultPath, is_hidden_name};
+use nimw_vault::{Vault, VaultPath, is_hidden_path};
 use percent_encoding::percent_decode_str;
 
 pub const SCHEME: &str = "nimw-asset";
@@ -174,7 +174,7 @@ fn serve_from(vault: &Vault, uri_path: &str, range: Option<&str>) -> AssetRespon
     let Ok(path) = VaultPath::new(&decoded) else {
         return AssetResponse::status(403);
     };
-    if path.is_root() || path.as_str().split('/').any(is_hidden_name) {
+    if path.is_root() || is_hidden_path(path.as_str()) {
         return AssetResponse::status(403);
     }
     // A symlink resolving outside the vault, or into a hidden file (or an 8.3

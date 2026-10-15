@@ -46,10 +46,11 @@ impl Vault {
         let inside = real
             .strip_prefix(&self.root)
             .map_err(|_| VaultError::OutsideVault(path.to_string()))?;
-        if inside
+        let parts: Option<Vec<&str>> = inside
             .components()
-            .any(|c| c.as_os_str().to_str().is_none_or(crate::is_hidden_name))
-        {
+            .map(|c| c.as_os_str().to_str())
+            .collect();
+        if parts.is_none_or(|parts| crate::is_hidden_path(&parts.join("/"))) {
             return Err(VaultError::OutsideVault(path.to_string()));
         }
         Ok(full)

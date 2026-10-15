@@ -260,3 +260,36 @@ fn vlt_01_unreadable_subfolder_is_skipped_not_fatal() {
         scan.skipped
     );
 }
+
+/// M5b §5.3: the root `.archive` is the one hidden folder the vault reads
+/// (archived pages stay indexed); `.trash` and other dot folders stay hidden.
+#[test]
+fn m5b_archive_is_scanned_stat_ed_and_served_but_other_hidden_folders_are_not() {
+    let dir = tempfile::tempdir().unwrap();
+    for f in [
+        ".archive/P/a.md",
+        ".archive/.x/h.md",
+        ".trash/b.md",
+        ".obsidian/c.md",
+        "P/.archive/d.md",
+        "e.md",
+    ] {
+        let full = dir.path().join(f);
+        std::fs::create_dir_all(full.parent().unwrap()).unwrap();
+        std::fs::write(full, "x").unwrap();
+    }
+    let vault = Vault::open(dir.path()).unwrap();
+    assert_eq!(
+        paths(&vault),
+        [".archive", ".archive/P", ".archive/P/a.md", "P", "e.md"]
+    );
+    let vp = |s: &str| VaultPath::new(s).unwrap();
+    assert!(vault.stat(&vp(".archive/P/a.md")).unwrap().is_some());
+    assert!(vault.stat(&vp(".trash/b.md")).unwrap().is_none());
+    assert!(vault.stat(&vp("P/.archive/d.md")).unwrap().is_none());
+    assert!(vault.visible_fs_path(&vp(".archive/P/a.md")).is_ok());
+    assert!(vault.visible_fs_path(&vp(".archive/.x/h.md")).is_err());
+    assert!(nimw_vault::is_hidden_path(".trash/b.md"));
+    assert!(!nimw_vault::is_hidden_path(".archive"));
+    assert!(nimw_vault::is_hidden_path(".archive/.x"));
+}

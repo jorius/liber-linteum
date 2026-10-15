@@ -1,5 +1,5 @@
 use crate::error::{Result, VaultError};
-use crate::is_hidden_name;
+use crate::is_hidden_path;
 use crate::path::VaultPath;
 use crate::vault::Vault;
 use notify::{Event, RecommendedWatcher, RecursiveMode, Watcher as _};
@@ -165,10 +165,7 @@ impl PathFilter {
             _ => p.to_path_buf(),
         };
         let vp = VaultPath::from_fs_path(&self.root, &p).ok()?;
-        if vp.is_root()
-            || vp.as_str().split('/').any(is_hidden_name)
-            || self.excludes.is_match(vp.as_str())
-        {
+        if vp.is_root() || is_hidden_path(vp.as_str()) || self.excludes.is_match(vp.as_str()) {
             return None;
         }
         Some(vp)

@@ -38,6 +38,23 @@ pub fn is_hidden_name(name: &str) -> bool {
     name.starts_with('.')
 }
 
+/// The vault's Archive (M5b §5.3): archived items keep their path below it,
+/// and it is the one hidden folder the vault scans, watches and serves.
+pub const ARCHIVE_DIR: &str = ".archive";
+/// The vault's own Trash (M5b §5.1), as Obsidian's "Move to Obsidian trash".
+pub const TRASH_DIR: &str = ".trash";
+
+/// A vault path the app doesn't read: one with a hidden component, except a
+/// leading [`ARCHIVE_DIR`].
+pub fn is_hidden_path(path: &str) -> bool {
+    let rest = match path.strip_prefix(ARCHIVE_DIR) {
+        Some("") => return false,
+        Some(rest) if rest.starts_with('/') => &rest[1..],
+        _ => path,
+    };
+    rest.split('/').any(is_hidden_name)
+}
+
 #[cfg(test)]
 mod tests {
     use super::is_hidden_name;
