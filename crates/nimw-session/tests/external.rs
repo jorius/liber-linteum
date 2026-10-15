@@ -89,6 +89,7 @@ fn an_outside_file_is_listed_once_an_indexed_page_links_it() {
             listed: false,
             network: false,
             ask_first: false,
+            openable: true,
         }
     );
     assert!(matches!(

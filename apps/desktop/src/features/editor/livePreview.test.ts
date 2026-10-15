@@ -203,7 +203,16 @@ describe('links to files outside the vault (M4b part 3 §9)', () => {
     mockIPC((cmd, raw) => {
       const n = ((raw as { targets?: unknown[] })?.targets ?? []).length;
       if (cmd === 'links_resolve') return Array(n).fill(null);
-      if (cmd === 'links_external') return Array(n).fill({ path, exists, listed: true });
+      if (cmd === 'links_external') {
+        return Array(n).fill({
+          path,
+          exists,
+          listed: true,
+          network: false,
+          askFirst: false,
+          openable: true,
+        });
+      }
       return null;
     });
 
@@ -269,6 +278,7 @@ describe('links to files outside the vault (M4b part 3 §9)', () => {
           listed: true,
           network: true,
           askFirst: true,
+          openable: true,
         });
       }
       return null;

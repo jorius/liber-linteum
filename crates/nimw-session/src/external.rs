@@ -27,6 +27,35 @@ pub struct ExternalFile {
     /// A network path the user hasn't loaded yet this session: nothing has
     /// touched it, and nothing will until they do (`allow_network`).
     pub ask_first: bool,
+    /// A document or media file the app may hand to its default app
+    /// (`opens_from_notes`); anything else is only shown in its folder.
+    pub openable: bool,
+}
+
+/// What an outside file may be opened as from a note (final review I2):
+/// documents, images, audio and video. Everything else — programs, scripts,
+/// shortcuts, disk images, help files, consoles, web pages, macro documents —
+/// is only shown in Finder/Explorer: the list says what opens, not what runs.
+const OPENS_FROM_NOTES: &[&str] = &[
+    // Documents
+    "pdf", "txt", "md", "markdown", "csv", "tsv", "json", "rtf", "odt", "ods", "odp", "odg", "doc",
+    "docx", "xls", "xlsx", "ppt", "pptx", "pages", "numbers", "key", "epub", // Images
+    "png", "jpg", "jpeg", "gif", "webp", "avif", "bmp", "tif", "tiff", "heic", "heif",
+    // Audio
+    "mp3", "m4a", "wav", "ogg", "oga", "flac", "aac", "aif", "aiff", "opus", // Video
+    "mp4", "m4v", "mov", "webm", "mkv", "avi",
+];
+
+/// Whether `path` (either OS's form) has a type `OPENS_FROM_NOTES` allows:
+/// its last extension decides, as it does for the OS.
+pub fn opens_from_notes(path: &str) -> bool {
+    let name = path.rsplit(['/', '\\']).next().unwrap_or("");
+    match name.rsplit_once('.') {
+        Some((stem, ext)) if !stem.is_empty() => {
+            OPENS_FROM_NOTES.contains(&ext.to_ascii_lowercase().as_str())
+        }
+        _ => false,
+    }
 }
 
 /// Whether reaching `path` connects to another computer than the one the
@@ -218,6 +247,7 @@ impl VaultSession {
                 listed,
                 network,
                 ask_first,
+                openable: opens_from_notes(&path),
                 path,
             }));
         }
@@ -245,6 +275,7 @@ impl VaultSession {
             listed: true,
             network,
             ask_first: false,
+            openable: opens_from_notes(path),
             path: path.to_string(),
         })
     }
@@ -358,6 +389,7 @@ pub(crate) mod tests {
                 listed: true,
                 network: true,
                 ask_first: true,
+                openable: true,
             })
         );
         for target in ["file://nas.example/share/doc.pdf", "file:///net/host/x.png"] {
@@ -417,6 +449,56 @@ pub(crate) mod tests {
         // A leading `/` (vault root first) isn't looked up either.
         assert_eq!(ext(&w, LinkKind::Embed, outside.to_str().unwrap()), None);
         assert_eq!(probes(), before);
+    }
+
+    #[test]
+    fn only_documents_and_media_open_from_a_note() {
+        // Final review I2: an allow-list, not a list of what runs.
+        for ok in [
+            r"D:\Docs\brief.PDF",
+            "/Users/j/notes.md",
+            "/Users/j/a.docx",
+            "/Users/j/sheet.xlsx",
+            "/Users/j/song.flac",
+            "/Users/j/clip.mov",
+            "/Users/j/pic.heic",
+            "/Users/j/book.epub",
+            "/Users/j/x.lnk.pdf",
+        ] {
+            assert!(opens_from_notes(ok), "{ok}");
+        }
+        for refused in [
+            r"C:\x\console.msc",
+            r"C:\x\explorer.scf",
+            r"C:\x\docs.library-ms",
+            r"C:\x\disk.iso",
+            r"C:\x\help.chm",
+            r"C:\x\report.pdf.exe",
+            r"C:\x\x.pdf.lnk",
+            r"C:\x\page.html",
+            r"C:\x\pic.svg",
+            r"C:\x\theme.themepack",
+            "/Users/j/run",
+            "/Users/j/macro.docm",
+            "/Users/j/.pdf",
+        ] {
+            assert!(!opens_from_notes(refused), "{refused}");
+        }
+    }
+
+    #[test]
+    fn an_outside_file_says_whether_it_opens_from_a_note() {
+        let w = world("# A\n");
+        let dir = dunce::canonicalize(w.base.path()).unwrap();
+        let (pdf, iso) = (dir.join("a.pdf"), dir.join("disk.iso"));
+        std::fs::write(&pdf, b"%PDF").unwrap();
+        std::fs::write(&iso, b"iso").unwrap();
+        let (pdf, iso) = (
+            file_url(pdf.to_str().unwrap()),
+            file_url(iso.to_str().unwrap()),
+        );
+        assert!(ext(&w, LinkKind::Embed, &pdf).unwrap().openable);
+        assert!(!ext(&w, LinkKind::Embed, &iso).unwrap().openable);
     }
 
     #[test]

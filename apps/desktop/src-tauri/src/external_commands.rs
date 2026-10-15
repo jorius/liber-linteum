@@ -8,7 +8,7 @@ use crate::editor_commands::{LinkTarget, check_openable, parse_targets};
 use crate::error::{CmdResult, CommandError, ErrorKind};
 use crate::state::AppState;
 use crate::vault_commands::blocking;
-use nimw_session::file_url;
+use nimw_session::{file_url, opens_from_notes};
 use nimw_vault::VaultPath;
 use serde::Serialize;
 use std::path::PathBuf;
@@ -30,6 +30,8 @@ pub struct ExternalFileDto {
     pub network: bool,
     /// A network file the user hasn't loaded: nothing touched it yet.
     pub ask_first: bool,
+    /// A document or media file `external_open` may open (final review I2).
+    pub openable: bool,
 }
 
 impl From<nimw_session::ExternalFile> for ExternalFileDto {
@@ -40,6 +42,7 @@ impl From<nimw_session::ExternalFile> for ExternalFileDto {
             listed: f.listed,
             network: f.network,
             ask_first: f.ask_first,
+            openable: f.openable,
         }
     }
 }
@@ -95,9 +98,23 @@ pub(crate) fn external_network_allow_impl(
     Ok(state.session()?.allow_network(&path)?.into())
 }
 
+/// An outside file opens in its default app only as a document or media
+/// (final review I2), judged by the name asked for and by the file it really
+/// is (symlinks, Windows short names and trailing dots resolved).
+fn check_external_openable(asked: &str, real: &std::path::Path) -> CmdResult<()> {
+    if opens_from_notes(asked) && real.to_str().is_some_and(opens_from_notes) {
+        return Ok(());
+    }
+    Err(CommandError::new(
+        ErrorKind::InvalidUrl,
+        format!("refusing to open {asked}: only documents and media open from a note"),
+    ))
+}
+
 pub(crate) fn external_open_impl<R: Runtime>(app: &AppHandle<R>, path: String) -> CmdResult<()> {
     let state = app.state::<AppState>();
     let real = state.session()?.external_file(&path)?;
+    check_external_openable(&path, &real)?;
     check_openable(&real)?;
     app.opener()
         .open_path(real.to_string_lossy(), None::<&str>)
@@ -151,6 +168,31 @@ pub(crate) fn file_pick_impl<R: Runtime>(
             })
         })
         .collect())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn outside_files_open_only_as_documents_or_media() {
+        let real = |s: &str| PathBuf::from(s);
+        assert!(check_external_openable(r"D:\Docs\a.pdf", &real(r"D:\Docs\a.pdf")).is_ok());
+        for (asked, resolved) in [
+            (r"C:\x\disk.iso", r"C:\x\disk.iso"),
+            (r"C:\x\console.msc", r"C:\x\console.msc"),
+            (r"C:\x\x.pdf.lnk", r"C:\x\x.pdf.lnk"),
+            // A harmless name that resolves (a symlink, a short name) to a program.
+            (
+                "/Users/j/a.pdf",
+                "/Applications/Evil.app/Contents/MacOS/evil",
+            ),
+            ("/Users/j/a.pdf", "/Users/j/run.command"),
+        ] {
+            let err = check_external_openable(asked, &real(resolved)).unwrap_err();
+            assert_eq!(err.kind, ErrorKind::InvalidUrl, "{asked} → {resolved}");
+        }
+    }
 }
 
 #[tauri::command]

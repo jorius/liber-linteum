@@ -24,7 +24,14 @@ export function installIpcMock({
   /** M4b part 3 §9: what `links_external` says about each target. */
   outside?: Record<
     string,
-    { path: string; exists: boolean; listed: boolean; network?: boolean; askFirst?: boolean }
+    {
+      path: string;
+      exists: boolean;
+      listed: boolean;
+      network?: boolean;
+      askFirst?: boolean;
+      openable?: boolean;
+    }
   >;
   /** M4b part 3 §7: what the Attach button's file dialog picks. */
   filePicks?: { path: string; name: string; url: string; inVault: string | null }[];
@@ -311,7 +318,7 @@ export function installIpcMock({
     links_external: (a) =>
       (a.targets as { kind: string; target: string }[]).map(({ target }) => {
         const f = outside[target];
-        return f ? { network: false, askFirst: false, ...f } : null;
+        return f ? { network: false, askFirst: false, openable: true, ...f } : null;
       }),
     // Final review C1: the user loads a network file; it is found from then on.
     external_network_allow: (a) => {
@@ -320,7 +327,7 @@ export function installIpcMock({
         if (f.path === a.path) outside[target] = { ...f, askFirst: false, exists: true };
       }
       const f = Object.values(outside).find((o) => o.path === a.path);
-      return { network: true, askFirst: false, ...f };
+      return { network: true, askFirst: false, openable: true, ...f };
     },
     file_pick: () => filePicks,
     external_open: (a) => {

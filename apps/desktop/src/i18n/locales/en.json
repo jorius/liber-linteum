@@ -212,7 +212,9 @@
       "copyPath": "Copy path",
       "network": "Network file: {path}",
       "networkNote": "Loading it connects to “{server}”.",
-      "loadNetwork": "Load from network"
+      "loadNetwork": "Load from network",
+      "notOpenable": "Not opened from notes: this kind of file can run programs.",
+      "revealedInstead": "“{name}” isn’t opened from notes. Showing it in its folder instead."
     }
   },
   "menu": {

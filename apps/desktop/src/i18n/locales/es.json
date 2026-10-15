@@ -212,7 +212,9 @@
       "copyPath": "Copiar ruta",
       "network": "Archivo en la red: {path}",
       "networkNote": "Cargarlo conecta con “{server}”.",
-      "loadNetwork": "Cargar desde la red"
+      "loadNetwork": "Cargar desde la red",
+      "notOpenable": "No se abre desde las notas: este tipo de archivo puede ejecutar programas.",
+      "revealedInstead": "“{name}” no se abre desde las notas. Se muestra en su carpeta."
     }
   },
   "menu": {

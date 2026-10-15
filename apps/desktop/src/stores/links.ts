@@ -1,5 +1,5 @@
 import i18next from 'i18next';
-import type { ExternalFile, LinkKind } from '../ipc';
+import { externalReveal, type ExternalFile, type LinkKind } from '../ipc';
 import { openPage } from './navigate';
 import { isTextPath } from './textFiles';
 import { usePageStore } from './pageStore';
@@ -65,9 +65,17 @@ export function followLink(action: LinkAction): void {
 
 /** A click on a link naming a file outside the vault (M4b part 3 §9): it
  *  opens after asking — a network file is loaded only once the user agrees
- *  (final review C1) — or says where it was looked for. */
+ *  (final review C1), anything but a document or media is shown in its
+ *  folder instead (I2) — or says where it was looked for. */
 export function followOutside(file: ExternalFile): void {
-  if (file.askFirst) followLink({ type: 'externalFile', path: file.path, network: true });
+  if (file.exists && !file.openable) {
+    void externalReveal(file.path);
+    useToastStore.getState().push({
+      message: i18next.t('preview.external.revealedInstead', {
+        name: file.path.split(/[\\/]/).pop() ?? file.path,
+      }),
+    });
+  } else if (file.askFirst) followLink({ type: 'externalFile', path: file.path, network: true });
   else if (file.exists) followLink({ type: 'externalFile', path: file.path });
   else {
     useToastStore.getState().push({

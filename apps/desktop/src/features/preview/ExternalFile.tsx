@@ -151,13 +151,17 @@ export function ExternalEmbed({
     body = (
       <span className={styles.card} title={file.path}>
         <span className={styles.fileName}>{nameOf(file.path)}</span>
-        <button
-          type="button"
-          className={styles.cardButton}
-          onClick={() => followLink({ type: 'externalFile', path: file.path })}
-        >
-          {t('preview.external.open')}
-        </button>
+        {file.openable ? (
+          <button
+            type="button"
+            className={styles.cardButton}
+            onClick={() => followLink({ type: 'externalFile', path: file.path })}
+          >
+            {t('preview.external.open')}
+          </button>
+        ) : (
+          <span className={styles.cardNote}>{t('preview.external.notOpenable')}</span>
+        )}
         <button type="button" className={styles.cardButton} onClick={() => void reveal()}>
           {revealLabel(t)}
         </button>

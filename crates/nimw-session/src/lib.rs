@@ -15,7 +15,7 @@ mod watching;
 pub use attachments::{Attached, LinkSuggestion, cover_reference, sanitize_file_name};
 pub use error::{Result, SessionError};
 pub use events::{IndexReport, RenameOutcome, SessionEvent};
-pub use external::{ExternalFile, file_url};
+pub use external::{ExternalFile, file_url, opens_from_notes};
 pub use global_view::{
     CardKind, EdgeKind, GvCard, GvChildren, GvEdge, GvLevel, IndexFrom, MAX_NEIGHBOURS,
     MAX_VISIBLE, Relation, SUMMARY_TITLES,

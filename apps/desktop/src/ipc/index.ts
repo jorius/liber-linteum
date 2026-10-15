@@ -304,6 +304,9 @@ export interface ExternalFile {
   /** A network file the user hasn't loaded yet: nothing has touched it, and
    *  nothing will until they choose to (final review C1). */
   askFirst: boolean;
+  /** A document or media file, which opens in its default app; anything
+   *  else is only shown in its folder (final review I2). */
+  openable: boolean;
 }
 
 /** A file chosen with the Attach button's dialog (M4b part 3 §7). */

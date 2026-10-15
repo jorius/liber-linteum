@@ -67,7 +67,35 @@ const file = (path: string, over: Partial<ExternalFile> = {}): ExternalFile => (
   listed: true,
   network: false,
   askFirst: false,
+  openable: true,
   ...over,
+});
+
+describe('only documents and media open from a note (final review I2)', () => {
+  it('a disk image gets Show in Finder only, with the reason', async () => {
+    vi.stubGlobal('navigator', { ...navigator, userAgent: 'Mozilla/5.0 (Macintosh)' });
+    outside['/Users/j/disk.iso'] = file('/Users/j/disk.iso', { openable: false });
+    show('![[/Users/j/disk.iso]]\n');
+    expect(await screen.findByText('disk.iso')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Open' })).toBeNull();
+    expect(
+      screen.getByText('Not opened from notes: this kind of file can run programs.'),
+    ).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Show in Finder' })).toBeInTheDocument();
+  });
+
+  it('a link to one shows it in its folder instead of opening it', async () => {
+    outside['D:\\x\\disk.iso'] = file('D:\\x\\disk.iso', { openable: false });
+    show('See [[D:\\x\\disk.iso|the image]].\n');
+    const link = await screen.findByText('the image');
+    await waitFor(() => expect(link.closest('a')).toHaveAttribute('data-state', 'resolved'));
+    await userEvent.click(link);
+    expect(useUiStore.getState().dialog).toBeNull();
+    await waitFor(() =>
+      expect(calls).toContainEqual(['external_reveal', { path: 'D:\\x\\disk.iso' }]),
+    );
+    expect(calls.some(([c]) => c === 'external_open')).toBe(false);
+  });
 });
 
 /** A network file nobody has loaded yet: nothing has touched it. */

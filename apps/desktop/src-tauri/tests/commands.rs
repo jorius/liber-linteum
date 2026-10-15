@@ -1927,6 +1927,8 @@ fn m4b3_outside_files_over_ipc() {
     std::fs::write(pics.join("x.png"), b"\x89PNG").unwrap();
     std::fs::write(pics.join("run.sh"), b"#!/bin/sh\n").unwrap();
     std::fs::write(pics.join("other.pdf"), b"%PDF").unwrap();
+    std::fs::write(pics.join("disk.iso"), b"iso").unwrap();
+    let iso = pics.join("disk.iso").to_str().unwrap().to_string();
     let pic = pics.join("x.png").to_str().unwrap().to_string();
     let script = pics.join("run.sh").to_str().unwrap().to_string();
     let other = pics.join("other.pdf").to_str().unwrap().to_string();
@@ -1934,7 +1936,7 @@ fn m4b3_outside_files_over_ipc() {
     let unc = r"\\nas.example\share\x.png";
     std::fs::write(
         base.path().join("Vault/a.md"),
-        format!("# A\n\n![[{pic}]] [[{script}]] [[b]] ![[{unc}]]\n"),
+        format!("# A\n\n![[{pic}]] [[{script}]] [[b]] ![[{unc}]] [[{iso}]]\n"),
     )
     .unwrap();
     std::fs::write(base.path().join("Vault/b.md"), "# B\n").unwrap();
@@ -1961,10 +1963,10 @@ fn m4b3_outside_files_over_ipc() {
     assert_eq!(
         got,
         json!([
-            { "path": pic, "exists": true, "listed": true, "network": false, "askFirst": false },
+            { "path": pic, "exists": true, "listed": true, "network": false, "askFirst": false, "openable": true },
             null,
-            { "path": other, "exists": false, "listed": false, "network": false, "askFirst": false },
-            { "path": unc, "exists": false, "listed": true, "network": true, "askFirst": true },
+            { "path": other, "exists": false, "listed": false, "network": false, "askFirst": false, "openable": true },
+            { "path": unc, "exists": false, "listed": true, "network": true, "askFirst": true, "openable": true },
         ])
     );
     for cmd in ["external_open", "external_reveal"] {
@@ -1981,7 +1983,7 @@ fn m4b3_outside_files_over_ipc() {
     let loaded = call(&h.main, "external_network_allow", json!({ "path": unc })).unwrap();
     assert_eq!(
         loaded,
-        json!({ "path": unc, "exists": false, "listed": true, "network": true, "askFirst": false })
+        json!({ "path": unc, "exists": false, "listed": true, "network": true, "askFirst": false, "openable": true })
     );
     for cmd in ["external_open", "external_reveal"] {
         let err = call(&h.main, cmd, json!({ "path": other })).unwrap_err();
@@ -1989,4 +1991,7 @@ fn m4b3_outside_files_over_ipc() {
     }
     let err = call(&h.main, "external_open", json!({ "path": script })).unwrap_err();
     assert_eq!(kind(err), "invalidUrl", "a script is never opened");
+    // Final review I2: a linked disk image is no document: shown, not opened.
+    let err = call(&h.main, "external_open", json!({ "path": iso })).unwrap_err();
+    assert_eq!(kind(err), "invalidUrl", "only documents and media open");
 }
