@@ -108,7 +108,7 @@ pub(crate) fn external_network_allow_impl(
 /// An outside file opens in its default app only as a document or media
 /// (final review I2), judged by the name asked for and by the file it really
 /// is (symlinks, Windows short names and trailing dots resolved).
-fn check_external_openable(asked: &str, real: &std::path::Path) -> CmdResult<()> {
+pub(crate) fn check_external_openable(asked: &str, real: &std::path::Path) -> CmdResult<()> {
     if opens_from_notes(asked) && real.to_str().is_some_and(opens_from_notes) {
         return Ok(());
     }

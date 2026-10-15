@@ -8,13 +8,14 @@ use crate::editor_commands::{
     LinkTarget, PageText, WriteResult, check_openable, conflict_reply, parse_targets,
 };
 use crate::error::{CmdResult, CommandError, ErrorKind};
+use crate::external_commands::check_external_openable;
 use crate::file_windows::{
     FileGrant, FileKind, FileWindows, check_size, file_kind, grant_for, open_file_window,
 };
 use crate::state::AppState;
 use crate::vault_commands::blocking;
 use nimw_markdown::resolve;
-use nimw_session::{is_text_content, opens_from_notes};
+use nimw_session::is_text_content;
 use nimw_vault::{Hash, VaultError, VaultPath, is_hidden_name};
 use serde::Serialize;
 use std::path::{Path, PathBuf};
@@ -291,16 +292,22 @@ pub(crate) fn file_follow_impl<R: Runtime>(
         open_file_window(app, &full)?;
         return Ok(Followed::Window);
     }
-    if !opens_from_notes(vp.as_str()) {
-        return Err(not_permitted(format!(
-            "{path}: only notes, documents and media open from a note"
-        )));
-    }
-    check_openable(&full)?;
+    let real = document_to_open(&vp, &full)?;
     app.opener()
-        .open_path(full.to_string_lossy(), None::<&str>)
+        .open_path(real.to_string_lossy(), None::<&str>)
         .map_err(|e| CommandError::new(ErrorKind::Io, e.to_string()))?;
     Ok(Followed::Opened)
+}
+
+/// The real file a followed link opens in its default app: a document or
+/// media file by the link's name *and* by what it resolves to, so a
+/// `report.pdf` symlink to a `.chm` stays shut (M4c review I3).
+fn document_to_open(vp: &VaultPath, full: &Path) -> CmdResult<PathBuf> {
+    let real = dunce::canonicalize(full)
+        .map_err(|e| CommandError::new(ErrorKind::NotFound, format!("{vp}: {e}")))?;
+    check_external_openable(vp.as_str(), &real)?;
+    check_openable(&real)?;
+    Ok(real)
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -409,6 +416,23 @@ mod tests {
         assert!(windows[0].1.contains(&"md"));
         assert_eq!(windows[1], ("All files", &["*"][..]));
         assert!(open_filters(true).is_empty());
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn m4c_review_i3_a_link_named_like_a_document_must_be_one() {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::write(dir.path().join("help.chm"), "x").unwrap();
+        std::fs::write(dir.path().join("real.pdf"), "%PDF").unwrap();
+        std::os::unix::fs::symlink(dir.path().join("help.chm"), dir.path().join("report.pdf"))
+            .unwrap();
+        let open =
+            |name: &str| document_to_open(&VaultPath::new(name).unwrap(), &dir.path().join(name));
+        assert!(open("report.pdf").is_err(), "a .pdf link to a .chm");
+        assert_eq!(
+            open("real.pdf").unwrap(),
+            dunce::canonicalize(dir.path().join("real.pdf")).unwrap()
+        );
     }
 }
 
