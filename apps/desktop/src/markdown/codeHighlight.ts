@@ -16,19 +16,48 @@ for (const [name, grammar] of Object.entries(common)) lowlight.register(name, gr
 /** Fences drawn as something else (maths, diagrams), never as code. */
 export const NOT_CODE = new Set(['mermaid', 'math']);
 
-/** The language's display name ("JavaScript"), or the info as written. */
-export function languageName(info: string): string {
-  const desc = LanguageDescription.matchLanguageName(languages, info, true);
-  return desc?.name ?? info;
+/** The id the language picker writes after a fence (M4b part 2 §10.5): the
+ *  shortest alias without white space — on a tie, a plain word (`cpp`, not
+ *  `c++`), then the name in lower case (`xml`, not `rss`) — else the name in
+ *  lower case without its spaces (`mssql`; final review I1). */
+export function fenceId(desc: LanguageDescription): string {
+  const name = desc.name.toLowerCase();
+  const plain = (a: string) => (/^[a-z0-9_-]+$/.test(a) ? 0 : 1);
+  const [best] = desc.alias
+    .filter((a) => a && !/\s/.test(a))
+    .sort(
+      (a, b) =>
+        a.length - b.length || plain(a) - plain(b) || Number(a !== name) - Number(b !== name),
+    );
+  return best ?? name.replace(/\s+/g, '');
 }
 
-/** lowlight's name for a fence language, if it has a grammar for it. */
+const byId = new Map<string, LanguageDescription>();
+for (const desc of languages) if (!byId.has(fenceId(desc))) byId.set(fenceId(desc), desc);
+
+/** The language a fence names: an id the picker writes, else language-data's
+ *  own match (name or alias, then a known name inside the info). */
+export function languageFor(info: string): LanguageDescription | null {
+  return (
+    byId.get(info.toLowerCase()) ?? LanguageDescription.matchLanguageName(languages, info, true)
+  );
+}
+
+/** The language's display name ("JavaScript"), or the info as written. */
+export function languageName(info: string): string {
+  return languageFor(info)?.name ?? info;
+}
+
+/** lowlight's name for a fence language, if it has a grammar for it — or for
+ *  a language it names (`mssql` is highlighted as SQL). */
 function grammarFor(lang: string): string | null {
   const l = lang.toLowerCase();
   if (lowlight.registered(l)) return l;
-  const desc = LanguageDescription.matchLanguageName(languages, lang, true);
-  for (const alias of desc ? [desc.name, ...desc.alias] : []) {
-    if (lowlight.registered(alias.toLowerCase())) return alias.toLowerCase();
+  const descs = [languageFor(lang), LanguageDescription.matchLanguageName(languages, lang, true)];
+  for (const desc of descs) {
+    for (const alias of desc ? [desc.name, ...desc.alias] : []) {
+      if (lowlight.registered(alias.toLowerCase())) return alias.toLowerCase();
+    }
   }
   return null;
 }

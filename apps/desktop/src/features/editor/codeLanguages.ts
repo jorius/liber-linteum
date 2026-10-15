@@ -2,34 +2,44 @@
 // knows, each with the short id written into the fence.
 import { languages } from '@codemirror/language-data';
 import type { EditorView } from '@codemirror/view';
+import { fenceId } from '../../markdown/codeHighlight';
 
 export interface LanguageChoice {
   name: string;
-  /** Written after the fence: the shortest alias, else the name. */
+  /** Written after the fence (`fenceId`): never with white space. */
   id: string;
   aliases: readonly string[];
 }
 
 export const LANGUAGE_CHOICES: LanguageChoice[] = languages
-  .map((d) => {
-    const short = [...d.alias].sort((a, b) => a.length - b.length)[0];
-    return {
-      name: d.name,
-      id: short ?? d.name.toLowerCase().replace(/\s+/g, '-'),
-      aliases: d.alias,
-    };
-  })
+  .map((d) => ({ name: d.name, id: fenceId(d), aliases: d.alias }))
   .sort((a, b) => a.name.localeCompare(b.name));
 
-/** Languages whose name or an alias contains `query` (names first). */
+/** How well a language matches `q` (lower case): 0 an exact id or alias,
+ *  1 the exact name, 2 a name or alias starting with it, 3 holding it;
+ *  null not at all. */
+function rank(l: LanguageChoice, q: string): number | null {
+  const name = l.name.toLowerCase();
+  const words = [l.id, ...l.aliases];
+  if (words.includes(q)) return 0;
+  if (name === q) return 1;
+  if (name.startsWith(q) || words.some((w) => w.startsWith(q))) return 2;
+  if (name.includes(q) || words.some((w) => w.includes(q))) return 3;
+  return null;
+}
+
+/** Languages whose name or an alias holds `query`, best matches first (Enter
+ *  takes the first: `js` is JavaScript, `c` is C; final review I1), then by
+ *  name. */
 export function filterLanguages(query: string): LanguageChoice[] {
   const q = query.trim().toLowerCase();
   if (!q) return LANGUAGE_CHOICES;
-  const byName = LANGUAGE_CHOICES.filter((l) => l.name.toLowerCase().includes(q));
-  const byAlias = LANGUAGE_CHOICES.filter(
-    (l) => !byName.includes(l) && l.aliases.some((a) => a.includes(q)),
-  );
-  return [...byName, ...byAlias];
+  return LANGUAGE_CHOICES.flatMap((l) => {
+    const r = rank(l, q);
+    return r === null ? [] : [{ l, r }];
+  })
+    .sort((a, b) => a.r - b.r)
+    .map(({ l }) => l);
 }
 
 const FENCE = /^(\s*)(`{3,}|~{3,})(\S*)(.*)$/;
