@@ -2,6 +2,7 @@ import {
   useEffect,
   useRef,
   useState,
+  type CSSProperties,
   type KeyboardEvent,
   type PointerEvent,
   type ReactNode,
@@ -20,6 +21,7 @@ import { useEditorStore } from '../../stores/editorStore';
 import { errorMessage } from '../../stores/messages';
 import { useToastStore } from '../../stores/toastStore';
 import { useVaultStore } from '../../stores/vaultStore';
+import { useCoverResize } from './CoverResize';
 import styles from './PageView.module.css';
 
 /** `of`: the `cover:` value the state was resolved for. */
@@ -70,7 +72,9 @@ export interface CoverSlots {
  *  image is the band's background and the rows sit on it; without one the
  *  band is plain. Add (upload), change, reposition and remove; a new cover
  *  opens in reposition mode at once (M4b §2). Without an editable document
- *  the cover is shown read-only. */
+ *  the cover is shown read-only. A cover band is as tall as the page's own
+ *  cover height or the app's default, and its bottom edge resizes it (cover
+ *  resize: kept in `.nimw/vault.json`, so even a read-only page can). */
 export function Cover({
   page,
   editable,
@@ -82,6 +86,7 @@ export function Cover({
 }) {
   const { t } = useTranslation();
   const cover = useCover(page);
+  const resize = useCoverResize(page.path);
   const saved = page.coverY ?? 50;
   const [draft, setDraft] = useState<number | null>(null);
   const slider = useRef<HTMLDivElement>(null);
@@ -338,6 +343,8 @@ export function Cover({
       </div>
     );
   }
+  // The rows stay pinned to the band's top and bottom at any height; the
+  // handle steps aside while the image is being placed.
   return (
     <div
       ref={band}
@@ -345,9 +352,11 @@ export function Cover({
       role="group"
       aria-label={t('cover.label')}
       className={`${styles.band} ${styles.bandCover} ${repositioning ? styles.repositioning : ''}`}
+      style={{ '--cover-height': `${resize.height}px` } as CSSProperties}
     >
       {layer}
       {rows}
+      {!repositioning && resize.handle}
     </div>
   );
 }

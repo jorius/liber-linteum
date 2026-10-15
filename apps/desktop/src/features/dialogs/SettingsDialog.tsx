@@ -17,10 +17,17 @@ const THEMES: Theme[] = ['system', 'light', 'dark'];
 const themeKey = { system: 'themeSystem', light: 'themeLight', dark: 'themeDark' } as const;
 const PALETTE_CHOICES: PaletteChoice[] = [...PALETTE_IDS, 'custom'];
 const SIZES = [13, 14, 15, 16, 17, 18, 19, 20];
+/** Default cover heights (cover resize); a page can be dragged to its own. */
+const COVER_HEIGHTS = [
+  { px: 132, key: 'coverHeightSmall' },
+  { px: 200, key: 'coverHeightMedium' },
+  { px: 280, key: 'coverHeightLarge' },
+  { px: 360, key: 'coverHeightExtraLarge' },
+] as const;
 const HEX = /^#[0-9a-f]{6}$/i;
 
 /** Language, appearance (theme, palette, custom accent), editor (fonts, text
- *  size, toolbar), file settings and, with a vault open, where its
+ *  size, page width, default cover height, toolbar), file settings and, with a vault open, where its
  *  attachments go (M2c §5.4); every change is saved at once (M2b §7). */
 export function SettingsDialog({ onClose }: { onClose: () => void }) {
   const { t } = useTranslation();
@@ -132,6 +139,26 @@ export function SettingsDialog({ onClose }: { onClose: () => void }) {
           >
             <option value="readable">{t('settings.pageWidthReadable')}</option>
             <option value="full">{t('settings.pageWidthFull')}</option>
+          </select>
+        </label>
+        <label className={styles.field}>
+          <span>{t('settings.coverHeight')}</span>
+          <select
+            className={styles.select}
+            value={settings.coverHeight}
+            onChange={(e) => void update({ coverHeight: Number(e.target.value) })}
+          >
+            {/* A default set by hand in settings.json stays visible. */}
+            {!COVER_HEIGHTS.some((c) => c.px === settings.coverHeight) && (
+              <option value={settings.coverHeight}>
+                {t('settings.coverHeightPx', { px: settings.coverHeight })}
+              </option>
+            )}
+            {COVER_HEIGHTS.map(({ px, key }) => (
+              <option key={px} value={px}>
+                {t(`settings.${key}`, { px })}
+              </option>
+            ))}
           </select>
         </label>
         <label className={styles.check}>

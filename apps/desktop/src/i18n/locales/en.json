@@ -272,7 +272,13 @@
     "lineNumbers": "Show line numbers",
     "pageWidth": "Page width",
     "pageWidthReadable": "Readable",
-    "pageWidthFull": "Full width"
+    "pageWidthFull": "Full width",
+    "coverHeight": "Default cover height",
+    "coverHeightSmall": "Small ({px} px)",
+    "coverHeightMedium": "Medium ({px} px)",
+    "coverHeightLarge": "Large ({px} px)",
+    "coverHeightExtraLarge": "Extra large ({px} px)",
+    "coverHeightPx": "{px} px"
   },
   "toolbar": {
     "label": "Formatting",
@@ -310,7 +316,11 @@
     "positionValue": "{value}% from the top",
     "dragHint": "Drag the image to place it",
     "remote": "Remote cover not loaded (privacy)",
-    "missing": "Cover image not found"
+    "missing": "Cover image not found",
+    "height": "Cover height",
+    "heightValue": "{px} px",
+    "resizeHint": "Drag to resize the cover; double-click to reset it",
+    "heightNotSaved": "Cover height not saved: {reason}"
   },
   "attach": {
     "dropOnText": "Drop files onto the page’s text to attach them",

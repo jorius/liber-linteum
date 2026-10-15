@@ -32,12 +32,17 @@ async function watchNetwork(page: Page) {
   return outside;
 }
 
-async function open(page: Page, name: string, opts: { remoteCover?: boolean } = {}) {
+async function open(
+  page: Page,
+  name: string,
+  opts: { remoteCover?: boolean; settings?: Record<string, unknown> } = {},
+) {
   const outside = await watchNetwork(page);
   await page.addInitScript(installIpcMock, {
     pages: { ...PAGES },
     editorMode: 'livePreview',
     remoteCover: opts.remoteCover ?? false,
+    settings: opts.settings,
   });
   await page.goto('/');
   await page.getByRole('button', { name: /^vault/ }).click();
@@ -79,25 +84,30 @@ test('M4b §1: with a cover, the text starts in the top 35% of the window', asyn
   await stayedLocal(page, outside);
 });
 
-test('final review M9: with a cover the band stays 132 px from 900 to 1440 px wide', async ({
-  page,
-}) => {
-  const wordy = 'A very long page name '.repeat(6).trim();
-  const outside = await open(page, wordy, { remoteCover: true });
-  const band = page.locator('[data-band="cover"]');
-  for (const width of [900, 1100, 1280, 1440]) {
-    await page.setViewportSize({ width, height: 900 });
-    await expect(band).toBeVisible();
-    // The cover's controls show on hover and focus, over the band (not a row of their own).
-    await band.hover();
-    await expect(page.getByRole('button', { name: 'Remove' })).toBeVisible();
-    const height = await band.evaluate((el) => el.clientHeight); // without its border
-    expect(`${width}: ${height}`).toBe(`${width}: 132`);
-    // Nothing overflows the window sideways.
-    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(width);
-  }
-  await stayedLocal(page, outside);
-});
+// Cover resize: the band is as tall as the default cover height (Medium,
+// 200 px, unless set otherwise); the smallest choice is the M4b band.
+for (const px of [200, 132]) {
+  test(`final review M9: with a cover the band stays ${px} px from 900 to 1440 px wide`, async ({
+    page,
+  }) => {
+    const wordy = 'A very long page name '.repeat(6).trim();
+    const settings = px === 200 ? {} : { coverHeight: px };
+    const outside = await open(page, wordy, { remoteCover: true, settings });
+    const band = page.locator('[data-band="cover"]');
+    for (const width of [900, 1100, 1280, 1440]) {
+      await page.setViewportSize({ width, height: 900 });
+      await expect(band).toBeVisible();
+      // The cover's controls show on hover and focus, over the band (not a row of their own).
+      await band.hover();
+      await expect(page.getByRole('button', { name: 'Remove' })).toBeVisible();
+      const height = await band.evaluate((el) => el.clientHeight); // without its border
+      expect(`${width}: ${height}`).toBe(`${width}: ${px}`);
+      // Nothing overflows the window sideways.
+      expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(width);
+    }
+    await stayedLocal(page, outside);
+  });
+}
 
 test('final review M9: a subtitle too long for the top bar ends in an ellipsis, whole on hover', async ({
   page,

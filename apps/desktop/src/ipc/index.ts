@@ -177,6 +177,8 @@ export interface Settings {
   pageWidth: PageWidth;
   /** Outline panel shown beside the editor (M4b part 2 §5). */
   outline: boolean;
+  /** Cover band height in px for pages without their own (132–600). */
+  coverHeight: number;
 }
 
 export type PageWidth = 'readable' | 'full';
@@ -209,6 +211,7 @@ export interface SettingsPatch {
   globalViewEdges?: GlobalViewEdges;
   pageWidth?: PageWidth;
   outline?: boolean;
+  coverHeight?: number;
 }
 
 export interface SettingsResponse {
@@ -292,6 +295,8 @@ export interface VaultSettings {
   pageWidth: PageWidth | null;
   /** Pages with their own width. */
   pageWidths: Record<string, PageWidth>;
+  /** Pages with their own cover height in px (cover resize). */
+  coverHeights: Record<string, number>;
 }
 
 export interface VaultSettingsPatch {
@@ -439,6 +444,9 @@ export const vaultSettingsSet = (patch: VaultSettingsPatch) =>
 /** A page's own width (`null` clears it; M4b part 2 §1). */
 export const pageWidthSet = (path: string, width: PageWidth | null) =>
   call<VaultSettings>('page_width_set', { path, width });
+/** A page's cover height in px (Rust clamps it to 132–2000); `null` clears it. */
+export const coverHeightSet = (path: string, height: number | null) =>
+  call<VaultSettings>('cover_height_set', { path, height });
 
 /** URL of a vault file for <img>/<audio> through the `nimw-asset:` protocol
  *  (M2a §2.5); WebView2 on Windows reaches custom protocols over http. */

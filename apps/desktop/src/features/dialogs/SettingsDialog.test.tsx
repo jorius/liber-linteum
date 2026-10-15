@@ -152,6 +152,28 @@ describe('Settings dialog (M2b §4, §5, §7)', () => {
     expect(document.documentElement.style.getPropertyValue('--font-source')).toContain('"Menlo"');
   });
 
+  it('cover resize: the default cover height is a choice of four sizes, saved at once', async () => {
+    open();
+    const select = screen.getByRole('combobox', { name: 'Default cover height' });
+    expect(select).toHaveValue('200');
+    expect(
+      within(select)
+        .getAllByRole('option')
+        .map((o) => o.textContent),
+    ).toEqual(['Small (132 px)', 'Medium (200 px)', 'Large (280 px)', 'Extra large (360 px)']);
+    await userEvent.selectOptions(select, '280');
+    await waitFor(() => expect(patches).toEqual([{ coverHeight: 280 }]));
+    expect(select).toHaveValue('280');
+  });
+
+  it('cover resize: a default set by hand outside the four sizes is still shown', () => {
+    useSettingsStore.setState({ settings: { ...DEFAULT_SETTINGS, coverHeight: 250 } });
+    open();
+    const select = screen.getByRole('combobox', { name: 'Default cover height' });
+    expect(select).toHaveValue('250');
+    expect(within(select).getByRole('option', { name: '250 px' })).toBeInTheDocument();
+  });
+
   it('without the installed list (outside the app) the bundled fonts still work', async () => {
     mockIPC((cmd) => {
       if (cmd === 'fonts_list') throw { kind: 'io', message: 'no' };

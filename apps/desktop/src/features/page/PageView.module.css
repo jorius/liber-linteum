@@ -167,9 +167,11 @@
 }
 
 /* The header band (M4b §1): one compact strip under the top bar. With a
-   cover, the image is its background (132 px) and the rows sit on it in
-   pills of translucent surface (--color-surface-veil), readable on any image;
-   without one the band is just its two rows. */
+   cover, the image is its background and the rows sit on it in pills of
+   translucent surface (--color-surface-veil), readable on any image; without
+   one the band is just its two rows. A cover band is --cover-height tall
+   (cover resize: the page's own height or the app's default, 132 px at
+   least), its first row pinned to the top and its second to the bottom. */
 .band {
   position: relative;
   flex: none;
@@ -178,7 +180,7 @@
 }
 
 .bandCover {
-  min-height: 132px;
+  min-height: var(--cover-height, 132px);
   background: var(--color-surface-subtle);
 }
 
@@ -193,7 +195,7 @@
 
 .bandCover .bandRows {
   box-sizing: border-box;
-  min-height: 132px;
+  min-height: var(--cover-height, 132px);
   justify-content: space-between;
 }
 
@@ -262,7 +264,7 @@
 /* Change / Reposition / Remove at the band's bottom right, shown on hover
    and keyboard focus (separate rules: WebKit before 15.4 drops a selector
    list holding :focus-within/:focus-visible). They sit over the band, not
-   in a row of their own, so it stays 132 px (final review M9). */
+   in a row of their own, so it keeps its height (final review M9). */
 .coverControls {
   position: absolute;
   right: 40px;
@@ -281,6 +283,56 @@
 
 .coverControls:focus-within {
   opacity: 1;
+}
+
+/* Cover resize: the band's bottom edge, a focusable separator. The strip
+   covers only the band's bottom padding (the rows' pills stay clickable);
+   its grip shows on hover, on focus and while dragging (separate rules, as
+   above). The ring is for the keyboard; a click that focuses it shows none
+   where :focus-visible is known. */
+.coverResize {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 10px;
+  cursor: ns-resize;
+  touch-action: none;
+  -webkit-user-select: none;
+  user-select: none;
+  opacity: 0;
+  transition: opacity 120ms ease;
+}
+
+.coverResize::before {
+  content: '';
+  width: 48px;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--color-surface);
+  box-shadow: 0 0 0 1px var(--color-border-strong);
+}
+
+.band:hover .coverResize {
+  opacity: 1;
+}
+
+.coverResize[data-dragging] {
+  opacity: 1;
+}
+
+.coverResize:focus {
+  opacity: 1;
+  outline: 2px solid var(--color-focus);
+  outline-offset: -2px;
+}
+
+.coverResize:focus:not(:focus-visible) {
+  outline: none;
 }
 
 /* Repositioning: only the image and Save / Cancel; the image takes the

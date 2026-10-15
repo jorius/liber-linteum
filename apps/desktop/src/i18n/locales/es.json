@@ -272,7 +272,13 @@
     "lineNumbers": "Mostrar los números de línea",
     "pageWidth": "Ancho de página",
     "pageWidthReadable": "De lectura",
-    "pageWidthFull": "Ancho completo"
+    "pageWidthFull": "Ancho completo",
+    "coverHeight": "Altura predeterminada de la portada",
+    "coverHeightSmall": "Pequeña ({px} px)",
+    "coverHeightMedium": "Mediana ({px} px)",
+    "coverHeightLarge": "Grande ({px} px)",
+    "coverHeightExtraLarge": "Muy grande ({px} px)",
+    "coverHeightPx": "{px} px"
   },
   "toolbar": {
     "label": "Formato",
@@ -310,7 +316,11 @@
     "positionValue": "{value} % desde arriba",
     "dragHint": "Arrastra la imagen para colocarla",
     "remote": "Portada remota no cargada (privacidad)",
-    "missing": "No se encuentra la imagen de portada"
+    "missing": "No se encuentra la imagen de portada",
+    "height": "Altura de la portada",
+    "heightValue": "{px} px",
+    "resizeHint": "Arrastra para cambiar la altura de la portada; doble clic para restablecerla",
+    "heightNotSaved": "No se guardó la altura de la portada: {reason}"
   },
   "attach": {
     "dropOnText": "Suelta los archivos sobre el texto de la página para adjuntarlos",
