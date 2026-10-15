@@ -24,6 +24,15 @@ describe('word count (M4b part 2 §5)', () => {
     expect(count(text).words).toBe(16);
   });
 
+  it('leaves out bare URLs and addresses too (final review M4)', () => {
+    expect(count('Visit https://example.com/x today').words).toBe(2);
+    expect(count('See <https://example.com/x> now').words).toBe(2);
+    expect(count('Go to www.example.com now').words).toBe(3);
+    expect(count('Mail me@example.com or <me@example.com> soon').words).toBe(3);
+    // A link's own words still count, even when they look like an address.
+    expect(count('[the docs](https://example.com) and [example.com](https://x.y)').words).toBe(4);
+  });
+
   it('counts code and maths blocks as text, joined words as one', () => {
     // const, x, 1 (a lone `=` isn't a word).
     expect(count('```js\nconst x = 1;\n```\n').words).toBe(3);

@@ -1,7 +1,7 @@
 // Word count (M4b part 2 §5): the prose of the parsed model — front matter,
-// `%%` comments, Markdown syntax and link URLs left out; code and maths
-// counted as text; each CJK character a word.
-import type { Nodes, Parent } from 'mdast';
+// `%%` comments, Markdown syntax, link URLs and bare URLs left out; code and
+// maths counted as text; each CJK character a word.
+import type { Link, Nodes, Parent } from 'mdast';
 import type { ParsedPage } from './types';
 
 export const WORDS_PER_MINUTE = 230;
@@ -13,6 +13,14 @@ interface Leaf {
 }
 
 const leavesOf = new WeakMap<ParsedPage, Leaf[]>();
+
+/** A bare URL or address — `https://…`, `<https://…>`, `www.…`, an e-mail
+ *  address: a link whose only text is its own address (final review M4). */
+function isBareAddress(link: Link): boolean {
+  const [only] = link.children;
+  if (link.children.length !== 1 || only.type !== 'text') return false;
+  return [only.value, `http://${only.value}`, `mailto:${only.value}`].includes(link.url);
+}
 
 /** The text-bearing leaves of the tree, in source order. */
 function leaves(page: ParsedPage): Leaf[] {
@@ -42,6 +50,10 @@ function leaves(page: ParsedPage): Leaf[] {
         return add(node, node.alt ?? '');
       case 'tag':
         return add(node, node.name);
+      case 'link':
+        if (isBareAddress(node)) return;
+        for (const c of node.children as Nodes[]) walk(c);
+        return;
       default:
         if ('children' in node) for (const c of (node as Parent).children as Nodes[]) walk(c);
     }
