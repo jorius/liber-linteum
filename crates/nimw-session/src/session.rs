@@ -287,8 +287,11 @@ impl VaultSession {
 
     // ---- reads ----
 
+    /// Every indexed entry but the Archive's (M5b §5.3).
     pub fn tree(&self) -> Result<Vec<nimw_index::TreeNode>> {
-        Ok(self.index().tree()?)
+        let mut nodes = self.index().tree()?;
+        nodes.retain(|n| !nimw_vault::is_archived(&n.path));
+        Ok(nodes)
     }
 
     pub fn page(&self, path: &VaultPath) -> Result<Option<nimw_index::PageRow>> {
@@ -342,14 +345,12 @@ impl VaultSession {
         Ok(path)
     }
 
-    /// Moves a file or folder to the OS trash (EXP-03). Links to it become unresolved.
-    pub fn trash(&self, path: &VaultPath) -> Result<()> {
-        self.trash_with_hook(path, &|| {})
-    }
-
-    /// `trash` with a hook that runs just before the OS call. The index lock is
-    /// released during that call: the OS may block on a permission prompt and
-    /// reads/the watcher must not stall meanwhile.
+    /// Moves a file or folder to the OS trash (EXP-03; since M5b only items
+    /// already in the vault's Trash), with a hook that runs just before the
+    /// OS call. The index lock is released during that call: the OS may
+    /// block on a permission prompt and reads/the watcher must not stall
+    /// meanwhile.
+    #[cfg(test)]
     pub(crate) fn trash_with_hook(
         &self,
         path: &VaultPath,
@@ -358,8 +359,9 @@ impl VaultSession {
         self.trash_via(path, before_os_call, &|p| self.vault.trash(p))
     }
 
-    /// `trash_with_hook` with the OS call passed in (tests never use the real
-    /// trash).
+    /// Removes `path` through `os_trash` (the OS trash; a plain removal in
+    /// tests, which never use the real trash). Links to it become
+    /// unresolved, and its sizes are forgotten.
     pub(crate) fn trash_via(
         &self,
         path: &VaultPath,

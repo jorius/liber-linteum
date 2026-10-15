@@ -183,8 +183,10 @@ impl Ctx<'_> {
     /// then pages; attachments and attachment folders are left out.
     fn children(&self, parent: &str, folder_kind: CardKind) -> Result<Vec<GvCard>> {
         let mut cards = Vec::new();
+        // The Archive isn't shown (M5b §5.3).
         for row in self.index.card_children(parent)? {
             match row.kind {
+                _ if nimw_vault::is_archived(&row.path) => {}
                 FileKind::Folder if !is_attachment_folder(self.policy, &row.path) => {
                     cards.push(self.folder_card(&row, folder_kind)?);
                 }
@@ -412,6 +414,9 @@ fn neighbours(centre: &str, links: &[PageLink]) -> Vec<Neighbour> {
         } else {
             continue;
         };
+        if nimw_vault::is_archived(other) {
+            continue;
+        }
         let file = other.rsplit('/').next().unwrap_or(other);
         let entry = sides
             .entry((name_key(file), other.clone()))

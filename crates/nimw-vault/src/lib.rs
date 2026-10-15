@@ -1,6 +1,7 @@
 //! Vault filesystem model: scanning, watching, atomic writes, trash.
 //! Every path crossing this crate's boundary is vault-relative ([`VaultPath`]).
 
+mod bin;
 mod config;
 mod cover_height;
 mod cover_side;
@@ -17,6 +18,7 @@ mod scratch;
 mod vault;
 mod watch;
 
+pub use bin::{Bin, BinRecord};
 pub use config::{AttachmentConfig, AttachmentPolicy};
 pub use cover_height::{MAX_COVER_HEIGHT, MIN_COVER_HEIGHT};
 pub use cover_side::{CoverSide, MAX_COVER_WIDTH, MIN_COVER_WIDTH};
@@ -43,6 +45,12 @@ pub fn is_hidden_name(name: &str) -> bool {
 pub const ARCHIVE_DIR: &str = ".archive";
 /// The vault's own Trash (M5b §5.1), as Obsidian's "Move to Obsidian trash".
 pub const TRASH_DIR: &str = ".trash";
+
+/// The Archive itself or something in it.
+pub fn is_archived(path: &str) -> bool {
+    path.strip_prefix(ARCHIVE_DIR)
+        .is_some_and(|rest| rest.is_empty() || rest.starts_with('/'))
+}
 
 /// A vault path the app doesn't read: one with a hidden component, except a
 /// leading [`ARCHIVE_DIR`].
