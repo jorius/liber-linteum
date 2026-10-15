@@ -413,6 +413,25 @@ summary.calloutTitle {
   cursor: pointer;
 }
 
+/* Where an attachment is on disk (M4b part 3 §8): under the embed. */
+.diskPath {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: 4px 0 10px;
+  color: var(--color-text-muted);
+  font-size: 12.5px;
+}
+
+.diskPathText {
+  font-family: var(--font-mono);
+  color: var(--color-text-body);
+  background: none;
+  overflow-wrap: anywhere;
+  user-select: text;
+}
+
 /* Mermaid diagrams (M4b part 2 §4). */
 .diagram {
   margin: 0 0 1em;

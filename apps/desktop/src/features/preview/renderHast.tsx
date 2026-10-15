@@ -11,7 +11,11 @@ import { Embed } from './Embed';
 import { TableScroll } from './TableScroll';
 import styles from './Preview.module.css';
 import type { Resolve } from './useResolved';
+import type { ExternalLookup } from './useExternal';
 import { safeDecode } from '../../markdown/decode';
+import { looksExternal } from '../../markdown/externalPath';
+import { useToastStore } from '../../stores/toastStore';
+import { ExternalEmbed, WithDiskPath } from './ExternalFile';
 
 export interface RenderCtx {
   /** Page being rendered. */
@@ -21,6 +25,8 @@ export interface RenderCtx {
   /** Pages on the embed path, outermost first (cycle detection). */
   chain: string[];
   resolve: Resolve;
+  /** Outside files that links name (M4b part 3 §9). */
+  external: ExternalLookup;
   t: TFunction;
   /** Transcludes a note (provided by Preview, which renders it recursively). */
   renderNote: (path: string, heading: string | null) => ReactNode;
@@ -74,8 +80,23 @@ function pageLink(e: Element, key: number, ctx: RenderCtx): ReactNode {
   const kind = p.dataNimw === 'wikilink' ? 'wiki' : 'markdown';
   const target = typeof p.dataTarget === 'string' ? p.dataTarget : '';
   const heading = typeof p.dataHeading === 'string' ? p.dataHeading : null;
-  const resolved = target ? ctx.resolve(kind, target) : null;
-  const state = resolved === undefined ? 'pending' : resolved === null ? 'unresolved' : 'resolved';
+  let resolved = target ? ctx.resolve(kind, target) : null;
+  // M4b part 3 §9: a file outside the vault, once the vault has no such file.
+  const marked = typeof p.dataExternal === 'string' ? p.dataExternal : null;
+  const outsideTarget = marked ?? (kind === 'wiki' && looksExternal(target) ? target : null);
+  const outside =
+    resolved === null && outsideTarget !== null ? ctx.external(kind, outsideTarget) : null;
+  if (outside === undefined) resolved = undefined;
+  const state =
+    resolved === undefined
+      ? 'pending'
+      : outside
+        ? outside.exists
+          ? 'resolved'
+          : 'unresolved'
+        : resolved === null
+          ? 'unresolved'
+          : 'resolved';
   return (
     <a
       key={key}
@@ -83,14 +104,59 @@ function pageLink(e: Element, key: number, ctx: RenderCtx): ReactNode {
       className={state === 'unresolved' ? styles.unresolved : styles.link}
       data-nimw={p.dataNimw}
       data-state={state}
+      title={outside ? outside.path : undefined}
       onClick={click(() => {
         if (resolved === undefined) return;
-        if (!target && heading) followLink({ type: 'anchor', heading });
-        else followLink({ type: 'page', kind, target, heading, resolved, source: ctx.path });
+        if (outside) {
+          if (outside.exists) followLink({ type: 'externalFile', path: outside.path });
+          else {
+            useToastStore.getState().push({
+              message: ctx.t('preview.external.notFound', { path: outside.path }),
+              tone: 'error',
+            });
+          }
+        } else if (!target && heading) followLink({ type: 'anchor', heading });
+        else if (target || !marked) {
+          followLink({ type: 'page', kind, target, heading, resolved, source: ctx.path });
+        }
       })}
     >
       {renderChildren(e, ctx)}
     </a>
+  );
+}
+
+/** A Markdown image naming a file outside the vault (M4b part 3 §9). With a
+ *  leading `/` it is a vault file first (`asset`), else the file on disk. */
+function OutsideImage({
+  e,
+  target,
+  asset,
+  ctx,
+}: {
+  e: Element;
+  target: string;
+  asset: string | null;
+  ctx: RenderCtx;
+}) {
+  const p = e.properties;
+  const alt = String(p.alt ?? '');
+  const outside = ctx.external('markdown_image', target);
+  if (outside) {
+    const size = (v: unknown) => (v === undefined ? undefined : Number(v));
+    return <ExternalEmbed file={outside} alt={alt} width={size(p.width)} height={size(p.height)} />;
+  }
+  if (outside === undefined)
+    return <span className={styles.pending}>{ctx.t('preview.loading')}</span>;
+  if (asset) {
+    return (
+      <WithDiskPath vaultPath={asset}>
+        <img {...reactProps(p)} src={assetUrl(asset)} alt={alt} loading="lazy" />
+      </WithDiskPath>
+    );
+  }
+  return (
+    <span className={styles.card}>{ctx.t('preview.notFound', { target: alt || target })}</span>
   );
 }
 
@@ -220,8 +286,11 @@ function renderElement(e: Element, key: number, ctx: RenderCtx): ReactNode {
   }
   const asset = typeof p.dataAssetPath === 'string' ? p.dataAssetPath : null;
   if (e.tagName === 'img') {
+    if (typeof p.dataExternal === 'string') {
+      return <OutsideImage key={key} e={e} target={p.dataExternal} asset={asset} ctx={ctx} />;
+    }
     if (!asset && typeof p.src !== 'string') return null;
-    return (
+    const img = (
       <img
         key={key}
         {...reactProps(p)}
@@ -229,6 +298,13 @@ function renderElement(e: Element, key: number, ctx: RenderCtx): ReactNode {
         alt={String(p.alt ?? '')}
         loading="lazy"
       />
+    );
+    return asset ? (
+      <WithDiskPath key={key} vaultPath={asset}>
+        {img}
+      </WithDiskPath>
+    ) : (
+      img
     );
   }
   if (asset && (e.tagName === 'audio' || e.tagName === 'video' || e.tagName === 'source')) {

@@ -538,6 +538,16 @@ export function assetUrl(path: string): string {
     : `nimw-asset://localhost/${encoded}`;
 }
 
+/** URL of a linked file outside the vault (M4b part 3 §9): its absolute
+ *  path as one encoded segment after `/.external/`; Rust serves it only when
+ *  a saved page links to it. */
+export function externalAssetUrl(path: string): string {
+  const encoded = `.external/${encodeURIComponent(path)}`;
+  return /Windows/i.test(navigator.userAgent)
+    ? `http://nimw-asset.localhost/${encoded}`
+    : `nimw-asset://localhost/${encoded}`;
+}
+
 // ---- events ----
 
 export const onVaultProgress = (cb: (p: ProgressPayload) => void): Promise<UnlistenFn> =>

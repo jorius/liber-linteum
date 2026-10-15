@@ -2,6 +2,7 @@ import { useTranslation } from 'react-i18next';
 import {
   entryCreateFolder,
   entryCreatePage,
+  externalOpen,
   fileOpenExternal,
   urlOpen,
   type IpcResult,
@@ -78,13 +79,26 @@ export function OpenExternalDialog({ url, onClose }: { url: string; onClose: () 
   );
 }
 
-export function OpenFileDialog({ path, onClose }: { path: string; onClose: () => void }) {
+/** A vault file, or (`external`) a linked file outside the vault, opens in
+ *  its default app after a confirmation; an outside file shows its path. */
+export function OpenFileDialog({
+  path,
+  external = false,
+  onClose,
+}: {
+  path: string;
+  external?: boolean;
+  onClose: () => void;
+}) {
   const { t } = useTranslation();
   return (
     <Confirm
-      title={t('dialogs.openFile.title', { name: nameOf(path) })}
+      title={t('dialogs.openFile.title', {
+        name: external ? path.split(/[\\/]/).pop() : nameOf(path),
+      })}
+      text={external ? path : undefined}
       confirm={t('dialogs.openFile.confirm')}
-      onConfirm={async () => report(await fileOpenExternal(path))}
+      onConfirm={async () => report(await (external ? externalOpen(path) : fileOpenExternal(path)))}
       onClose={onClose}
     />
   );

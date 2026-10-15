@@ -7,7 +7,8 @@ export type DialogState =
   /** Link to a page that doesn't exist yet (M2a §3.4). */
   | { type: 'createPage'; source: string; target: string }
   | { type: 'openExternal'; url: string }
-  | { type: 'openFile'; path: string }
+  /** `external`: an absolute path outside the vault (M4b part 3 §9). */
+  | { type: 'openFile'; path: string; external?: boolean }
   /** A page's relationships, or (with `other`) those between two cards'
    *  pages (M3b §3). */
   | { type: 'relations'; page: string; other?: string }

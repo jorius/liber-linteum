@@ -19,7 +19,9 @@ export type LinkAction =
     }
   | { type: 'external'; url: string }
   | { type: 'anchor'; heading: string }
-  | { type: 'file'; path: string };
+  | { type: 'file'; path: string }
+  /** A file outside the vault, by its absolute path (M4b part 3 §9). */
+  | { type: 'externalFile'; path: string };
 
 const isPage = (path: string) => /\.md$/i.test(path);
 
@@ -36,6 +38,9 @@ export function followLink(action: LinkAction): void {
       return;
     case 'anchor':
       usePageStore.getState().reveal(action.heading);
+      return;
+    case 'externalFile':
+      ui.openDialog({ type: 'openFile', path: action.path, external: true });
       return;
     case 'page':
       if (action.resolved === null) {

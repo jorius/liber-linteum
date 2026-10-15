@@ -4,6 +4,7 @@ import { act } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { clearMocks, mockIPC } from '../../ipc/testing';
 import { usePageStore } from '../../stores/pageStore';
+import { useUiStore } from '../../stores/uiStore';
 import {
   followLinkAtCursor,
   LARGE_NOTE_CHARS,
@@ -194,6 +195,48 @@ describe('Live Preview (M2a §3.2)', () => {
     act(() => v.dispatch({ selection: { anchor: 18 } }));
     expect(() => followLinkAtCursor(v)).not.toThrow();
     await vi.waitFor(() => expect(asked).toHaveLength(1));
+  });
+});
+
+describe('links to files outside the vault (M4b part 3 §9)', () => {
+  const outsideAt = (path: string, exists = true) =>
+    mockIPC((cmd, raw) => {
+      const n = ((raw as { targets?: unknown[] })?.targets ?? []).length;
+      if (cmd === 'links_resolve') return Array(n).fill(null);
+      if (cmd === 'links_external') return Array(n).fill({ path, exists, listed: true });
+      return null;
+    });
+
+  it('[[D:\\…]] asks to open the file, never to create a page', async () => {
+    useUiStore.setState({ dialog: null });
+    outsideAt('D:\\Docs\\x.pdf');
+    const v = editor('Read [[D:\\Docs\\x.pdf]] now\n', 8);
+    expect(followLinkAtCursor(v)).toBe(true);
+    await vi.waitFor(() =>
+      expect(useUiStore.getState().dialog).toEqual({
+        type: 'openFile',
+        path: 'D:\\Docs\\x.pdf',
+        external: true,
+      }),
+    );
+  });
+
+  it('a Markdown link with a file: URL or a drive path is followed too', async () => {
+    useUiStore.setState({ dialog: null });
+    outsideAt('/Users/j/a b.pdf');
+    const v = editor('[a](file:///Users/j/a%20b.pdf) [b](D:\\x.pdf)\n', 2);
+    expect(followLinkAtCursor(v)).toBe(true);
+    await vi.waitFor(() =>
+      expect(useUiStore.getState().dialog).toEqual({
+        type: 'openFile',
+        path: '/Users/j/a b.pdf',
+        external: true,
+      }),
+    );
+    useUiStore.setState({ dialog: null });
+    act(() => v.dispatch({ selection: { anchor: 33 } }));
+    expect(followLinkAtCursor(v)).toBe(true);
+    await vi.waitFor(() => expect(useUiStore.getState().dialog?.type).toBe('openFile'));
   });
 });
 

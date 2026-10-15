@@ -16,8 +16,11 @@ import {
   type DecorationSet,
   type ViewUpdate,
 } from '@codemirror/view';
+import i18next from 'i18next';
 import type { Heading, Image, Link, ListItem, Node, Parent, RootContent } from 'mdast';
-import { linksResolve, type LinkKind, type WideElements } from '../../ipc';
+import { linksExternal, linksResolve, type LinkKind, type WideElements } from '../../ipc';
+import { isFileTarget, looksExternal } from '../../markdown/externalPath';
+import { useToastStore } from '../../stores/toastStore';
 import { reparse } from '../../markdown/incremental';
 import { parsePage } from '../../markdown/parse';
 import { toSafeHast, vaultJoin } from '../../markdown/sanitize';
@@ -395,6 +398,22 @@ function linkAt(page: ParsedPage, pos: number): Node | null {
   return found;
 }
 
+/** Follows a file outside the vault (M4b part 3 §9) that `target` names;
+ *  `false` when it names none. */
+async function followOutside(kind: LinkKind, target: string, source: string): Promise<boolean> {
+  const res = await linksExternal(source, [{ kind, target }]);
+  const outside = res.ok ? res.value[0] : null;
+  if (!outside) return false;
+  if (outside.exists) followLink({ type: 'externalFile', path: outside.path });
+  else {
+    useToastStore.getState().push({
+      message: i18next.t('preview.external.notFound', { path: outside.path }),
+      tone: 'error',
+    });
+  }
+  return true;
+}
+
 async function resolveAndFollow(
   kind: LinkKind,
   query: string,
@@ -403,8 +422,12 @@ async function resolveAndFollow(
   source: string,
 ) {
   const res = await linksResolve(source, [{ kind, target: query }]);
-  if (res.ok)
-    followLink({ type: 'page', kind, target, heading, resolved: res.value[0] ?? null, source });
+  if (!res.ok) return;
+  const resolved = res.value[0] ?? null;
+  if (resolved === null && kind !== 'markdown' && looksExternal(target)) {
+    if (await followOutside(kind, target, source)) return;
+  }
+  followLink({ type: 'page', kind, target, heading, resolved, source });
 }
 
 /** Follows the link at `pos` (click, Mod-Enter); `false` if there is none. */
@@ -427,10 +450,20 @@ export function followLinkAt(view: EditorView, pos: number): boolean {
     followLink({ type: 'anchor', heading: safeDecode(url.slice(1)) });
     return true;
   }
-  if (/^[a-z][a-z0-9+.-]*:/i.test(url)) return false;
   const hash = url.indexOf('#');
+  const path = safeDecode(hash >= 0 ? url.slice(0, hash) : url);
+  // M4b part 3 §9: a drive, UNC or file: path names a file outside the vault.
+  if (isFileTarget(path)) {
+    void followOutside('markdown', path, source);
+    return true;
+  }
+  if (/^[a-z][a-z0-9+.-]*:/i.test(url)) return false;
   const joined = vaultJoin(source, hash >= 0 ? url.slice(0, hash) : url);
-  if (!joined) return false;
+  if (!joined) {
+    // Above the vault root: outside it.
+    void followOutside('markdown', path, source);
+    return true;
+  }
   const heading = hash >= 0 ? safeDecode(url.slice(hash + 1)) || null : null;
   void resolveAndFollow('markdown', `/${joined}`, joined, heading, source);
   return true;

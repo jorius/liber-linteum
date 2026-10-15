@@ -209,8 +209,7 @@
       "revealWindows": "Show in Explorer",
       "revealOther": "Show in folder",
       "location": "Location on disk",
-      "copyPath": "Copy path",
-      "copied": "Copied"
+      "copyPath": "Copy path"
     }
   },
   "menu": {

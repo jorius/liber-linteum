@@ -22,6 +22,7 @@ import type {
 } from './types';
 import { highlightCode } from './codeHighlight';
 import { safeDecode } from './decode';
+import { isFileTarget } from './externalPath';
 
 /** Colors allowed in `data-color` / `data-bg` (theme-aware tokens). */
 export const PALETTE = ['red', 'orange', 'yellow', 'green', 'blue', 'purple', 'gray'] as const;
@@ -229,7 +230,7 @@ const schema: Schema = {
   ],
   attributes: {
     '*': [...DATA, 'title'],
-    a: ['href', 'dataTarget', 'dataHeading'],
+    a: ['href', 'dataTarget', 'dataHeading', 'dataExternal'],
     span: [
       'dataColor',
       'dataBg',
@@ -254,10 +255,10 @@ const schema: Schema = {
       'dataTex',
       'dataDisplay',
     ],
-    img: ['src', 'alt', 'width', 'height'],
-    audio: ['src', 'controls'],
-    video: ['src', 'controls', 'width', 'height'],
-    source: ['src', 'type'],
+    img: ['src', 'alt', 'width', 'height', 'dataExternal'],
+    audio: ['src', 'controls', 'dataExternal'],
+    video: ['src', 'controls', 'width', 'height', 'dataExternal'],
+    source: ['src', 'type', 'dataExternal'],
     details: ['open'],
     ol: ['start'],
     li: ['className'],
@@ -293,7 +294,7 @@ function applyUrlPolicy(parent: Root | Element, ctx: RenderContext) {
       } else {
         const hash = href.indexOf('#');
         const path = hash >= 0 ? href.slice(0, hash) : href;
-        const target = path ? vaultJoin(ctx.sourcePath, path) : null;
+        const target = path && !isFileTarget(path) ? vaultJoin(ctx.sourcePath, path) : null;
         p.dataNimw = 'link';
         if (target) p.dataTarget = target;
         if (hash >= 0 && href.slice(hash + 1)) p.dataHeading = safeDecode(href.slice(hash + 1));
@@ -319,7 +320,7 @@ function applyUrlPolicy(parent: Root | Element, ctx: RenderContext) {
         const path = vaultJoin(ctx.sourcePath, src);
         delete p.src;
         if (path) p.dataAssetPath = path;
-        else p.dataNimw = 'missing';
+        else if (p.dataExternal === undefined) p.dataNimw = 'missing';
       }
     }
     applyUrlPolicy(child, ctx);
@@ -397,10 +398,38 @@ function markHtmlBlocks(root: Root, blocks: [number, number][]) {
  *  HTML (it reads the file only for the root's own position). */
 const POSITIONS = { file: { toString: () => '' } } as unknown as Parameters<typeof raw>[1];
 
+const LINKED = new Set(['a', 'img', 'audio', 'video', 'source']);
+
+/** Markdown links and images that may name a file outside the vault (M4b
+ *  part 3 §9) get `data-external`: the target as the index reads it
+ *  (%-decoded, no `#…`). File targets lose their `src`/`href`, which the URL
+ *  policy would drop; a leading `/` keeps it (the vault root comes first).
+ *  Runs before raw HTML is parsed, so raw HTML never reaches outside files
+ *  (the index doesn't see its links: they could never be shown). */
+function markExternal(node: Nodes, ctx: RenderContext) {
+  if (node.type === 'element' && LINKED.has(node.tagName)) {
+    const p = node.properties;
+    const key = node.tagName === 'a' ? 'href' : 'src';
+    const value = typeof p[key] === 'string' ? (p[key] as string) : null;
+    const path = value === null ? '' : safeDecode(value.split('#')[0]);
+    if (value !== null && path && !/^(https?|mailto|data):/i.test(value)) {
+      if (isFileTarget(path)) {
+        p.dataExternal = path;
+        delete p[key];
+        if (node.tagName === 'a') p.dataNimw = 'link';
+      } else if (path.startsWith('/') || vaultJoin(ctx.sourcePath, value) === null) {
+        p.dataExternal = path;
+      }
+    }
+  }
+  if ('children' in node) for (const c of node.children) markExternal(c as Nodes, ctx);
+}
+
 /** The page as a sanitized hast tree, ready for React rendering. */
 export function toSafeHast(page: ParsedPage, ctx: RenderContext): Root {
   const hast = toHast(page.tree, { allowDangerousHtml: true, handlers }) as Root;
   markSourceRanges(hast);
+  markExternal(hast, ctx);
   highlightCode(hast);
   const blocks = htmlBlocks(hast);
   const parsed = raw(hast, POSITIONS) as Root;
