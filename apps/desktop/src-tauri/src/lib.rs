@@ -1,5 +1,6 @@
 pub mod asset;
 pub mod attachment_commands;
+pub mod bin_commands;
 pub mod commands;
 pub mod drops;
 pub mod dto;
@@ -105,6 +106,12 @@ pub fn configure<R: tauri::Runtime>(
         commands::window_close_self,
         commands::window_title_set,
         vault_commands::vault_open,
+        bin_commands::bin_list,
+        bin_commands::trash_restore,
+        bin_commands::trash_delete,
+        bin_commands::trash_empty,
+        bin_commands::entry_archive,
+        bin_commands::archive_restore,
         vault_commands::vault_create,
         vault_commands::vault_close,
         vault_commands::vault_tree,

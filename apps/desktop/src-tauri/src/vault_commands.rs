@@ -257,8 +257,9 @@ pub(crate) fn entry_rename_impl(
         .into())
 }
 
-pub(crate) fn entry_trash_impl(state: &AppState, path: String) -> CmdResult<()> {
-    Ok(state.session()?.trash(&VaultPath::new(&path)?)?)
+/// Moves an item into the vault's Trash (M5b §5.1); its path there.
+pub(crate) fn entry_trash_impl(state: &AppState, path: String) -> CmdResult<String> {
+    Ok(state.session()?.trash(&VaultPath::new(&path)?)?.to_string())
 }
 
 // ---- command wrappers: run off the UI thread (final review I2) ----
@@ -342,7 +343,7 @@ pub async fn entry_rename<R: Runtime>(
 }
 
 #[tauri::command]
-pub async fn entry_trash<R: Runtime>(app: AppHandle<R>, path: String) -> CmdResult<()> {
+pub async fn entry_trash<R: Runtime>(app: AppHandle<R>, path: String) -> CmdResult<String> {
     blocking(app, move |app| {
         entry_trash_impl(&app.state::<AppState>(), path)
     })

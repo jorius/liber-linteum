@@ -57,6 +57,13 @@ const VAULT_COMMANDS: &[&str] = &[
     "search",
     // M5b §11.8: the main window's title; file windows keep their own.
     "window_title_set",
+    // M5b §5: so are the Trash and Archive.
+    "bin_list",
+    "trash_restore",
+    "trash_delete",
+    "trash_empty",
+    "entry_archive",
+    "archive_restore",
     "vault_create",
     "vault_close",
     "vault_tree",

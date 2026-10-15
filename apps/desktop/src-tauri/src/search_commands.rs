@@ -23,6 +23,7 @@ pub struct SearchQueryDto {
     pub links_from: Option<String>,
     pub has_image: bool,
     pub has_audio: bool,
+    pub archived: bool,
     pub offset: u32,
     pub limit: u32,
 }
@@ -71,6 +72,7 @@ pub struct FacetsDto {
     pub links_from: Option<FacetPageDto>,
     pub has_image: u32,
     pub has_audio: u32,
+    pub archived: u32,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -130,6 +132,7 @@ impl From<SearchPage> for SearchPageDto {
                 links_from: p.facets.links_from.map(page),
                 has_image: p.facets.has_image,
                 has_audio: p.facets.has_audio,
+                archived: p.facets.archived,
             },
             recent: p.recent,
             indexing: p.indexing,
@@ -148,6 +151,7 @@ pub(crate) fn search_impl(state: &AppState, q: SearchQueryDto) -> CmdResult<Sear
         links_from: q.links_from,
         has_image: q.has_image,
         has_audio: q.has_audio,
+        archived: q.archived,
         offset: q.offset,
         limit: q.limit,
     };

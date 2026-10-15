@@ -72,6 +72,12 @@ const COMMANDS: &[&str] = &[
     "search",
     "folder_icon_set",
     "vault_icon_set",
+    "bin_list",
+    "trash_restore",
+    "trash_delete",
+    "trash_empty",
+    "entry_archive",
+    "archive_restore",
 ];
 
 fn main() {

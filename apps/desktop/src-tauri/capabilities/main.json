@@ -64,6 +64,12 @@
     "allow-search",
     "allow-folder-icon-set",
     "allow-vault-icon-set",
+    "allow-bin-list",
+    "allow-trash-restore",
+    "allow-trash-delete",
+    "allow-trash-empty",
+    "allow-entry-archive",
+    "allow-archive-restore",
     "core:event:allow-listen",
     "core:event:allow-unlisten",
     "dialog:allow-open"

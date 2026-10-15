@@ -65,6 +65,13 @@ const COMMANDS: &[&str] = &[
     "search",
     "folder_icon_set",
     "vault_icon_set",
+    // M5b §5: the vault's Trash and Archive.
+    "bin_list",
+    "trash_restore",
+    "trash_delete",
+    "trash_empty",
+    "entry_archive",
+    "archive_restore",
 ];
 
 struct Harness {
@@ -2127,4 +2134,70 @@ fn m5b_icons_over_ipc() {
             .iter()
             .all(|n| n["path"] != "Game Design" || n.get("icon").is_none())
     );
+}
+
+/// M5b §5: delete moves into the vault's Trash and comes back; archive moves
+/// into `.archive/` and back; search leaves archived pages out unless asked.
+/// (Never `trash_delete`/`trash_empty` here: they reach the OS trash.)
+#[test]
+fn m5b_trash_and_archive_over_ipc() {
+    let h = harness();
+    let vault = open_fixture(&h, "obsidian-basic");
+    let inner = call(&h.main, "entry_trash", json!({ "path": "Welcome.md" })).unwrap();
+    assert_eq!(inner, ".trash/Welcome.md");
+    let bins = call(&h.main, "bin_list", json!({})).unwrap();
+    assert_eq!(bins["trash"][0]["path"], ".trash/Welcome.md");
+    assert_eq!(bins["trash"][0]["from"], "Welcome.md");
+    assert!(bins["trash"][0]["at"].is_u64());
+    assert_eq!(bins["trash"][0]["folder"], false);
+    let back = call(
+        &h.main,
+        "trash_restore",
+        json!({ "path": ".trash/Welcome.md", "keepBoth": false }),
+    )
+    .unwrap();
+    assert_eq!(back, "Welcome.md");
+    assert!(vault.path().join("Welcome.md").exists());
+
+    let out = call(&h.main, "entry_archive", json!({ "path": "Welcome.md" })).unwrap();
+    assert_eq!(out["moved"][0][1], ".archive/Welcome.md");
+    let bins = call(&h.main, "bin_list", json!({})).unwrap();
+    assert_eq!(bins["archive"][0]["path"], ".archive/Welcome.md");
+    let tree = call(&h.main, "vault_tree", json!({})).unwrap();
+    assert!(
+        tree.as_array()
+            .unwrap()
+            .iter()
+            .all(|n| !n["path"].as_str().unwrap().starts_with(".archive"))
+    );
+    let page = call(
+        &h.main,
+        "page_get",
+        json!({ "path": ".archive/Welcome.md" }),
+    );
+    assert!(page.is_ok(), "an archived page still opens: {page:?}");
+    let hidden = call(&h.main, "search", json!({ "query": { "text": "welcome" } })).unwrap();
+    assert!(hidden["facets"]["archived"].as_u64().unwrap() >= 1);
+    let shown = call(
+        &h.main,
+        "search",
+        json!({ "query": { "text": "welcome", "archived": true } }),
+    )
+    .unwrap();
+    assert!(
+        shown["results"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|r| r["path"] == ".archive/Welcome.md")
+    );
+    let out = call(
+        &h.main,
+        "archive_restore",
+        json!({ "path": ".archive/Welcome.md", "keepBoth": false }),
+    )
+    .unwrap();
+    assert_eq!(out["moved"][0][1], "Welcome.md");
+    // Refused: the bins themselves.
+    assert!(call(&h.main, "entry_trash", json!({ "path": ".nimw" })).is_err());
 }
