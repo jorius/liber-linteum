@@ -1,7 +1,14 @@
 import { useEffect, useId, useState, type KeyboardEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { SUPPORTED_LANGUAGES } from '../../i18n';
-import { fontsList, PALETTE_IDS, type PaletteChoice, type Theme, type PageWidth } from '../../ipc';
+import {
+  fontsList,
+  PALETTE_IDS,
+  type PaletteChoice,
+  type Theme,
+  type PageWidth,
+  type WideElements,
+} from '../../ipc';
 import { useSettingsStore } from '../../stores/settingsStore';
 import { useVaultStore } from '../../stores/vaultStore';
 import { contrast } from '../../theme/color';
@@ -25,6 +32,8 @@ const COVER_HEIGHTS = [
   { px: 360, key: 'coverHeightExtraLarge' },
 ] as const;
 const HEX = /^#[0-9a-f]{6}$/i;
+/** The kinds a `wide` page lets span the editor (M4b part 3). */
+const WIDE_KINDS: (keyof WideElements)[] = ['tables', 'code', 'diagrams', 'images', 'maths'];
 
 /** Language, appearance (theme, palette, custom accent), editor (fonts, text
  *  size, page width, default cover height, toolbar), file settings and, with a vault open, where its
@@ -34,7 +43,7 @@ export function SettingsDialog({ onClose }: { onClose: () => void }) {
   const settings = useSettingsStore((s) => s.settings);
   const update = useSettingsStore((s) => s.update);
   const installed = useInstalledFonts();
-  const ids = { appearance: useId(), editor: useId(), files: useId() };
+  const ids = { appearance: useId(), editor: useId(), files: useId(), wideHint: useId() };
   const vaultOpen = useVaultStore((s) => s.info !== null);
 
   return (
@@ -138,9 +147,30 @@ export function SettingsDialog({ onClose }: { onClose: () => void }) {
             onChange={(e) => void update({ pageWidth: e.target.value as PageWidth })}
           >
             <option value="readable">{t('settings.pageWidthReadable')}</option>
+            <option value="wide">{t('settings.pageWidthWide')}</option>
             <option value="full">{t('settings.pageWidthFull')}</option>
           </select>
         </label>
+        <fieldset className={styles.fieldset} aria-describedby={ids.wideHint}>
+          <legend>{t('settings.wide.title')}</legend>
+          <p id={ids.wideHint} className={styles.hint}>
+            {t('settings.wide.hint')}
+          </p>
+          {WIDE_KINDS.map((kind) => (
+            <label key={kind} className={styles.check}>
+              <input
+                type="checkbox"
+                checked={settings.wideElements[kind]}
+                onChange={(e) =>
+                  void update({
+                    wideElements: { ...settings.wideElements, [kind]: e.target.checked },
+                  })
+                }
+              />
+              {t(`settings.wide.${kind}`)}
+            </label>
+          ))}
+        </fieldset>
         <label className={styles.field}>
           <span>{t('settings.coverHeight')}</span>
           <select

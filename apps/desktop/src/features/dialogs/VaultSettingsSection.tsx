@@ -189,11 +189,12 @@ export function VaultSettingsSection() {
           onChange={(e) =>
             void usePageWidthStore
               .getState()
-              .setVault(e.target.value as 'readable' | 'full' | 'default')
+              .setVault(e.target.value as 'readable' | 'wide' | 'full' | 'default')
           }
         >
           <option value="default">{t('vault.pageWidthDefault')}</option>
           <option value="readable">{t('settings.pageWidthReadable')}</option>
+          <option value="wide">{t('settings.pageWidthWide')}</option>
           <option value="full">{t('settings.pageWidthFull')}</option>
         </select>
       </label>

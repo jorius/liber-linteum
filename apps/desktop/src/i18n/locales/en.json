@@ -277,7 +277,17 @@
     "lineNumbers": "Show line numbers",
     "pageWidth": "Page width",
     "pageWidthReadable": "Readable",
+    "pageWidthWide": "Wide elements",
     "pageWidthFull": "Full width",
+    "wide": {
+      "title": "Wide elements",
+      "hint": "Used when a page’s width is Wide elements.",
+      "tables": "Tables",
+      "code": "Code blocks",
+      "diagrams": "Diagrams",
+      "images": "Images",
+      "maths": "Maths blocks"
+    },
     "coverHeight": "Default cover height",
     "coverHeightSmall": "Small ({px} px)",
     "coverHeightMedium": "Medium ({px} px)",

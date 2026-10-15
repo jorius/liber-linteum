@@ -277,7 +277,17 @@
     "lineNumbers": "Mostrar los números de línea",
     "pageWidth": "Ancho de página",
     "pageWidthReadable": "De lectura",
+    "pageWidthWide": "Elementos anchos",
     "pageWidthFull": "Ancho completo",
+    "wide": {
+      "title": "Elementos anchos",
+      "hint": "Se usa cuando el ancho de una página es Elementos anchos.",
+      "tables": "Tablas",
+      "code": "Bloques de código",
+      "diagrams": "Diagramas",
+      "images": "Imágenes",
+      "maths": "Bloques de fórmulas"
+    },
     "coverHeight": "Altura predeterminada de la portada",
     "coverHeightSmall": "Pequeña ({px} px)",
     "coverHeightMedium": "Mediana ({px} px)",

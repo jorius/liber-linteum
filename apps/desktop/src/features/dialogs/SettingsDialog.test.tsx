@@ -152,6 +152,38 @@ describe('Settings dialog (M2b §4, §5, §7)', () => {
     expect(document.documentElement.style.getPropertyValue('--font-source')).toContain('"Menlo"');
   });
 
+  it('M4b part 3: page width offers Wide elements; the kinds that go wide are checkboxes', async () => {
+    open();
+    const width = screen.getByRole('combobox', { name: 'Page width' });
+    expect(
+      within(width)
+        .getAllByRole('option')
+        .map((o) => o.textContent),
+    ).toEqual(['Readable', 'Wide elements', 'Full width']);
+    await userEvent.selectOptions(width, 'wide');
+    await waitFor(() => expect(patches).toEqual([{ pageWidth: 'wide' }]));
+    const group = screen.getByRole('group', { name: 'Wide elements' });
+    expect(within(group).getByText('Used when a page’s width is Wide elements.')).toBeVisible();
+    const boxes = within(group).getAllByRole('checkbox');
+    expect(boxes.map((b) => b.getAttribute('aria-label') ?? b.parentElement!.textContent)).toEqual(
+      ['Tables', 'Code blocks', 'Diagrams', 'Images', 'Maths blocks'],
+    );
+    expect(boxes.map((b) => (b as HTMLInputElement).checked)).toEqual([
+      true,
+      false,
+      true,
+      false,
+      false,
+    ]);
+    await userEvent.click(within(group).getByRole('checkbox', { name: 'Code blocks' }));
+    await waitFor(() =>
+      expect(patches.at(-1)).toEqual({
+        wideElements: { tables: true, code: true, diagrams: true, images: false, maths: false },
+      }),
+    );
+    expect(within(group).getByRole('checkbox', { name: 'Code blocks' })).toBeChecked();
+  });
+
   it('cover resize: the default cover height is a choice of four sizes, saved at once', async () => {
     open();
     const select = screen.getByRole('combobox', { name: 'Default cover height' });
@@ -253,6 +285,9 @@ describe('Settings → This vault (M2c §5.4)', () => {
     await waitFor(() => expect(width).toHaveValue('default'));
     await userEvent.selectOptions(width, 'full');
     await waitFor(() => expect(vaultPatches).toEqual([{ pageWidth: 'full' }]));
+    // M4b part 3: Wide elements is a vault choice too.
+    await userEvent.selectOptions(width, 'wide');
+    await waitFor(() => expect(vaultPatches.at(-1)).toEqual({ pageWidth: 'wide' }));
     await userEvent.selectOptions(width, 'default');
     await waitFor(() => expect(vaultPatches.at(-1)).toEqual({ pageWidth: 'default' }));
   });
