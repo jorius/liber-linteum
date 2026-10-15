@@ -106,3 +106,26 @@ After the fix pass:
 - `Object.assign` replacement overhead (~130 ns per call);
 - the gutter's current block id isn't remapped after an external re-parse.
 
+## 5. Added after the round: resizable covers (Jose, 2026-10-14)
+
+**The feature:** drag the cover band's bottom edge to resize it, per page.
+- **Storage:** heights live in `.nimw/vault.json` `coverHeights`, never in the note. They follow renames and moves, and are forgotten when the page is deleted.
+- **Default:** set in Settings → Editor → **Default cover height**: Small 132, Medium 200 (the default), Large 280 or Extra large 360.
+- **Range:** 132 px up to 60% of the window, re-clamped when the window shrinks.
+- **Keyboard:** focus the edge, then ↓/↑ (Shift for bigger steps), Home or End, Enter to save, Escape to cancel. Double-click or Delete resets it.
+- **Backend:** command `cover_height_set` (real-ACL test).
+- **Commits:** `8a980c9`, `cec75e9`.
+- **Gate after it:** vitest 1174, e2e 180, cargo 290; all clean.
+
+**Windows test build:** cross-compiled on macOS with `cargo-xwin` and NSIS, in a toolchain kept apart in `~/.nimw-cross`.
+- Output: `target/x86_64-pc-windows-msvc/release/bundle/nsis/Notes In My Way_0.1.0_x64-setup.exe` (unsigned; SmartScreen asks for More info → Run anyway).
+- Rebuild with:
+
+  ```bash
+  cd apps/desktop
+  export CARGO_HOME=$HOME/.nimw-cross/cargo RUSTUP_HOME=$HOME/.nimw-cross/rustup RUSTUP_TOOLCHAIN=1.99.0 XWIN_ACCEPT_LICENSE=1
+  export PATH="/opt/homebrew/opt/rustup/bin:$CARGO_HOME/bin:/opt/homebrew/opt/llvm/bin:/opt/homebrew/opt/lld/bin:$PATH"
+  pnpm tauri build --runner cargo-xwin --target x86_64-pc-windows-msvc --bundles nsis
+  ```
+- Not yet run on real Windows.
+
