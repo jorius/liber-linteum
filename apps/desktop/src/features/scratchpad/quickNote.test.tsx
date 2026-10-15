@@ -219,4 +219,17 @@ describe('⌘⇧N and File → New Quick Note', () => {
     await act(() => emit('menu:quickNote'));
     await waitFor(() => expect(created(calls)).toHaveLength(2));
   });
+
+  it('final review M5: the menu event waits too while a dialog is open', async () => {
+    useSettingsStore.setState({
+      settings: { ...DEFAULT_SETTINGS, scratchpadPath: '/d/Scratchpad' },
+    });
+    const calls = quickBackend('');
+    render(<ScratchpadHost />);
+    useUiStore.setState({ dialog: { type: 'settings' } as never });
+    await act(() => emit('menu:quickNote'));
+    await new Promise((r) => setTimeout(r, 20));
+    expect(created(calls)).toHaveLength(0);
+    useUiStore.setState({ dialog: null });
+  });
 });

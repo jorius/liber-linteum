@@ -67,6 +67,8 @@ describe('"Where should quick notes live?" (M4c §2)', () => {
     render(<ScratchpadHost />);
     const dialog = await screen.findByRole('dialog', { name: 'Where should quick notes live?' });
     expect(await screen.findByText(DEFAULT)).toBeInTheDocument();
+    // The folder is a named group holding its path (final review M11).
+    expect(screen.getByRole('group', { name: 'Folder' })).toHaveTextContent(DEFAULT);
     await userEvent.click(screen.getByRole('button', { name: 'Create' }));
     await waitFor(() => expect(dialog).not.toBeInTheDocument());
     expect(calls.find(([c]) => c === 'scratchpad_set')?.[1]).toEqual({ path: DEFAULT });

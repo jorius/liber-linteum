@@ -52,13 +52,11 @@ export function ScratchpadSetupDialog({
   return (
     <Dialog title={t('scratchpad.setupTitle')} onClose={onClose} onConfirm={() => void create()}>
       <p className={dialogs.text}>{t('scratchpad.setupBody')}</p>
-      <div className={styles.place}>
+      <div className={styles.place} role="group" aria-labelledby={placeId}>
         <span className={styles.placeLabel} id={placeId}>
           {t('scratchpad.folder')}
         </span>
-        <code className={styles.path} aria-labelledby={placeId}>
-          {path ?? '…'}
-        </code>
+        <code className={styles.path}>{path ?? '…'}</code>
         <button type="button" className="btn btn-secondary" onClick={() => void choose()}>
           {t('scratchpad.chooseFolder')}
         </button>

@@ -2,6 +2,7 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import axe from 'axe-core';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { setFileWindow } from '../../ipc';
 import { clearMocks, mockIPC } from '../../ipc/testing';
 import { DEFAULT_SETTINGS, useSettingsStore } from '../../stores/settingsStore';
 import { useToastStore } from '../../stores/toastStore';
@@ -155,5 +156,18 @@ describe('Settings → This vault: the scratch folder (M4c §7.8)', () => {
     backend({});
     render(<ScratchFolderSetting />);
     expect(screen.queryByRole('textbox')).toBeNull();
+  });
+});
+
+describe('in a single-file window (M4c final review M7)', () => {
+  it("has no quick-notes location row: it can't change it", () => {
+    setFileWindow('Note.md');
+    try {
+      backend({});
+      const { container } = render(<ScratchpadLocation />);
+      expect(container).toBeEmptyDOMElement();
+    } finally {
+      setFileWindow(null);
+    }
   });
 });

@@ -1,6 +1,6 @@
 import { useId } from 'react';
 import { useTranslation } from 'react-i18next';
-import { scratchpadChoose, scratchpadSet } from '../../ipc';
+import { fileWindowName, scratchpadChoose, scratchpadSet } from '../../ipc';
 import { errorMessage } from '../../stores/messages';
 import { DEFAULT_SETTINGS, useSettingsStore } from '../../stores/settingsStore';
 import { useToastStore } from '../../stores/toastStore';
@@ -14,6 +14,8 @@ export function ScratchpadLocation() {
   const { t } = useTranslation();
   const path = useSettingsStore((s) => s.settings.scratchpadPath ?? null);
   const labelId = useId();
+  // A single-file window may not choose folders (final review M7).
+  if (fileWindowName() !== null) return null;
 
   const change = async () => {
     const picked = await scratchpadChoose();

@@ -43,7 +43,9 @@ export function ScratchpadHost() {
     window.addEventListener('keydown', onKeyDown);
     let stop: (() => unknown) | null = null;
     let gone = false;
-    void onMenuQuickNote(() => void newQuickNote())
+    void onMenuQuickNote(() => {
+      if (!useUiStore.getState().dialog) void newQuickNote(); // as for the keys
+    })
       .then((un) => (gone ? quietly(un) : (stop = un)))
       .catch(() => undefined); // no Tauri event runtime (plain browser)
     return () => {
