@@ -7,11 +7,13 @@ import { expect, test, type Page } from '@playwright/test';
 import { installIpcMock } from './ipcMock';
 
 const LONG = Array.from({ length: 120 }, (_, i) => `Line ${i + 1} of the long page.`).join('\n\n');
+const SUBTITLE = 'A subtitle that runs on well past the room the top bar has for it, and then on';
 const PAGES = {
   'A.md': '# Alpha\n\nhello world\n\nSee [[B]].\n',
   'B.md': '# Beta\n\nThe second page.\n',
   'Long.md': `# Long\n\n${LONG}\n`,
   [`${'A very long page name '.repeat(6).trim()}.md`]: '# Wordy\n\nText.\n',
+  'Sub.md': `---\nsubtitle: ${SUBTITLE}\n---\n# Sub\n\nText.\n`,
 };
 
 /** Requests that would leave the machine (the test server is 127.0.0.1). */
@@ -94,6 +96,22 @@ test('final review M9: with a cover the band stays 132 px from 900 to 1440 px wi
     // Nothing overflows the window sideways.
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(width);
   }
+  await stayedLocal(page, outside);
+});
+
+test('final review M9: a subtitle too long for the top bar ends in an ellipsis, whole on hover', async ({
+  page,
+}) => {
+  const outside = await open(page, 'Sub');
+  await page.setViewportSize({ width: 900, height: 900 });
+  const subtitle = page.getByRole('banner').getByRole('textbox', { name: 'Subtitle' });
+  await expect(subtitle).toHaveValue(SUBTITLE);
+  await expect(subtitle).toHaveAttribute('title', SUBTITLE);
+  const cut = await subtitle.evaluate((el) => ({
+    overflow: getComputedStyle(el).textOverflow,
+    clipped: el.scrollWidth > el.clientWidth,
+  }));
+  expect(cut).toEqual({ overflow: 'ellipsis', clipped: true });
   await stayedLocal(page, outside);
 });
 
