@@ -95,6 +95,12 @@ After the fix pass:
 | Minors | Word count parsed twice and counted URLs; outline O(n²); `class_` colouring; Copy announcements; excerpts and `$$`; band height 163 px → 132; subtitle ellipsis; text view back arrow; page widths after delete | one commit each, RED → GREEN |
 | M4 bug | Gutter keys pressed while the Split pane lagged were dropped | queued and replayed |
 
+**Found by Jose after the fix pass:**
+- **Symptom:** `pnpm dev` opened a blank window.
+- **Cause:** Vite's dev server ran the freeze-safe transform a second time on its pre-bundled deps (`node_modules/.vite/deps`), turning the helper's own `Object.assign` into a call to itself, so startup overflowed the stack. Production builds run the transform once, so no e2e saw it.
+- **Fix (`ed0b717`):** the transform is idempotent and skips pre-bundled deps; covered by tests in `tests/freezeSafe.test.ts`.
+- **Lesson:** a change to the build pipeline also needs a check against the dev server (`pnpm dev`), not only the production bundle.
+
 **Deferred:**
 - `freezeSafe` edge cases (none occur in the dependency tree);
 - `Object.assign` replacement overhead (~130 ns per call);
