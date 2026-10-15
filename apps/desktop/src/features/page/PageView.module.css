@@ -19,34 +19,60 @@
   flex-direction: column;
 }
 
+/* The band's first row: the breadcrumb and the controls share one line, so
+   the band keeps its height (final review M9); a long path is shortened
+   with an ellipsis rather than taking lines of its own. */
 .bar {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  flex-wrap: wrap;
   gap: 8px 16px;
 }
 
 .controls {
   display: flex;
+  flex: none;
+  /* Room for 8 rem of breadcrumb, whatever its length. */
+  max-width: calc(100% - 9rem);
   align-items: center;
   /* Saved, the word count and the toggles wrap in a narrow window rather
      than widen the page (M4b part 2 §5). */
   flex-wrap: wrap;
   justify-content: flex-end;
   gap: 8px 12px;
+}
+
+.breadcrumb {
   min-width: 0;
 }
 
 .breadcrumb ol {
   list-style: none;
   display: flex;
-  flex-wrap: wrap;
   align-items: center;
   margin: 0;
   padding: 0;
   font-size: 13px;
   color: var(--color-text-muted);
+}
+
+.breadcrumb li {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
+
+/* The vault keeps its name (up to a point); folders and the page shorten. */
+.breadcrumb li:first-child {
+  flex-shrink: 0;
+  max-width: 10rem;
+}
+
+.breadcrumb li > * {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .breadcrumb li + li::before {
@@ -235,12 +261,16 @@
 
 /* Change / Reposition / Remove at the band's bottom right, shown on hover
    and keyboard focus (separate rules: WebKit before 15.4 drops a selector
-   list holding :focus-within/:focus-visible). */
+   list holding :focus-within/:focus-visible). They sit over the band, not
+   in a row of their own, so it stays 132 px (final review M9). */
 .coverControls {
+  position: absolute;
+  right: 40px;
+  bottom: 10px;
+  z-index: 1;
   display: flex;
   align-items: center;
   gap: 6px;
-  margin-left: auto;
   opacity: 0;
   transition: opacity 120ms ease;
 }
@@ -438,6 +468,8 @@
 /* Back arrow + breadcrumb (M2b §3). */
 .where {
   display: flex;
+  /* Gives way: the path shortens before the controls wrap. */
+  flex: 0 1 auto;
   align-items: center;
   gap: 8px;
   min-width: 0;
