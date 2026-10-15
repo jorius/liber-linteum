@@ -23,6 +23,9 @@ interface SingleFileState {
   error: CommandError | null;
   /** Deleted or moved outside with nothing unsaved: there is nothing to edit. */
   gone: boolean;
+  /** Being handed to the main window: the editor takes no more input, so
+   *  nothing typed after the last save is left behind (M4c review m4). */
+  handingOff: boolean;
   load: () => Promise<void>;
   /** Renames the file in its folder (same extension); the editor follows. */
   rename: (to: string) => Promise<IpcResult<string>>;
@@ -32,7 +35,7 @@ interface SingleFileState {
   openInVault: () => Promise<void>;
 }
 
-const IDLE = { info: null, error: null, gone: false };
+const IDLE = { info: null, error: null, gone: false, handingOff: false };
 
 /** Test helper. */
 export function resetSingleFileStore() {
@@ -83,13 +86,16 @@ export const useSingleFileStore = create<SingleFileState>((set, get) => ({
     }
   },
   openInVault: async () => {
+    set({ handingOff: true });
     const unsaved = await useEditorStore.getState().saveAll(QUIT_FLUSH_MS);
     if (unsaved.length) {
+      set({ handingOff: false });
       warnUnsaved(unsaved[0], 'editor.unsavedBlocks');
       return;
     }
     const res = await fileOpenInVault();
     if (!res.ok) {
+      set({ handingOff: false });
       useToastStore.getState().push({ message: errorMessage(res.error), tone: 'error' });
       return;
     }

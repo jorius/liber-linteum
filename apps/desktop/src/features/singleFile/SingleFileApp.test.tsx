@@ -16,6 +16,9 @@ import { SingleFileApp } from './SingleFileApp';
 
 const PAGE: FileInfo = { name: 'note.md', kind: 'page', folder: '/Users/me/Notes', vault: null };
 
+/** Whether the editor took no input when the page was handed to the vault. */
+let frozenAtHandOff: boolean | null = null;
+
 /** One file on disk, as Rust's file commands see it. */
 function backend(info: FileInfo, text: string) {
   const calls: [string, Record<string, unknown>][] = [];
@@ -39,6 +42,8 @@ function backend(info: FileInfo, text: string) {
       case 'file_follow':
         return 'window';
       case 'file_open_in_vault':
+        frozenAtHandOff = document.querySelector('.cm-editor')?.closest('[inert]') != null;
+        return null;
       case 'window_close_self':
         return null;
       case 'settings_set':
@@ -156,9 +161,9 @@ describe('M4c single-file window', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Open in its vault' }));
     await waitFor(() => expect(calls.map(([c]) => c)).toContain('window_close_self'));
     const order = calls.map(([c]) => c);
-    expect(order.indexOf('file_open_in_vault')).toBeLessThan(
-      order.indexOf('window_close_self'),
-    );
+    expect(order.indexOf('file_open_in_vault')).toBeLessThan(order.indexOf('window_close_self'));
+    // M4c review m4: nothing typed after the save is left behind.
+    expect(frozenAtHandOff).toBe(true);
   });
 });
 

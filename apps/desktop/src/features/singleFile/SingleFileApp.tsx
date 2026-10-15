@@ -166,8 +166,9 @@ function FileView({ info }: { info: FileInfo }) {
   const toolbar = useSettingsStore((s) => s.settings.toolbar);
   const outline = useSettingsStore((s) => s.settings.outline);
   const text = info.kind === 'text';
+  const handingOff = useSingleFileStore((s) => s.handingOff);
   return (
-    <main className={shell.content}>
+    <main className={shell.content} inert={handingOff}>
       <section className={page.page} aria-label={t('page.region')}>
         <div data-band="plain" className={page.band}>
           <div className={page.bandRows}>
