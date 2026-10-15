@@ -61,6 +61,7 @@ const COMMANDS: &[&str] = &[
     "external_reveal",
     "external_network_allow",
     "file_pick",
+    "search",
 ];
 
 struct Harness {
@@ -986,6 +987,51 @@ fn m2c_link_suggest_and_cover_y_over_ipc() {
     assert_eq!(page["coverX"], Value::Null);
     let welcome = call(&h.main, "page_get", json!({ "path": "Welcome.md" })).unwrap();
     assert_eq!(welcome["coverY"], Value::Null);
+}
+
+/// M5 §5: search over IPC, camelCase both ways, with filters and facets.
+#[test]
+fn m5_search_over_ipc() {
+    let h = harness();
+    let _vault = open_fixture(&h, "obsidian-basic");
+    let found = call(
+        &h.main,
+        "search",
+        json!({ "query": { "text": "generator" } }),
+    )
+    .unwrap();
+    assert_eq!(found["results"][0]["path"], "Character Design/rex-draft.md");
+    assert_eq!(found["results"][0]["title"], "Generator Rex");
+    assert_eq!(
+        found["results"][0]["cover"],
+        "Character Design/assets/rex-cover.png"
+    );
+    assert_eq!(found["results"][0]["hasImage"], true);
+    assert_eq!(found["recent"], false);
+    assert_eq!(found["indexing"], false);
+    assert!(found["facets"]["tags"].is_array());
+    assert!(found["facets"]["linksTo"].is_array());
+    assert_eq!(found["facets"]["linksFrom"], Value::Null);
+
+    let tagged = call(
+        &h.main,
+        "search",
+        json!({ "query": { "tags": ["character"], "hasImage": true, "limit": 5 } }),
+    )
+    .unwrap();
+    assert_eq!(tagged["total"], 1);
+    assert_eq!(tagged["results"][0]["tags"][0], "character");
+    assert!(
+        tagged["facets"]["projects"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|p| p["value"] == "Character Design")
+    );
+
+    let recent = call(&h.main, "search", json!({ "query": {} })).unwrap();
+    assert_eq!(recent["recent"], true);
+    assert!(recent["results"].as_array().unwrap().len() >= 4);
 }
 
 /// Review focus (M2c §2): a cover saved outside the page's folder (attachments
