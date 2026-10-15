@@ -239,8 +239,10 @@ const schema: Schema = {
       'dataHeight',
       'dataTag',
       'dataTex',
-      // Syntax highlighting (M4b part 2 §2): highlight.js classes only.
-      ['className', /^hljs-[\w-]+$/],
+      // Syntax highlighting (M4b part 2 §2): highlight.js classes only — its
+      // scopes (`hljs-title`) and their sub-scopes (`class_`, `function_`;
+      // final review M6).
+      ['className', /^(?:hljs-[\w-]+|[a-z][a-z0-9]*_+)$/],
     ],
     div: [
       'dataColor',
