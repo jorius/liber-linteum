@@ -1,6 +1,7 @@
 import { defaultKeymap, history, historyKeymap } from '@codemirror/commands';
 import { markdown, markdownLanguage } from '@codemirror/lang-markdown';
 import { languages } from '@codemirror/language-data';
+import { languageFor } from '../../markdown/codeHighlight';
 import {
   HighlightStyle,
   LanguageDescription,
@@ -294,7 +295,8 @@ function createState(d: PageDoc, mode: EditorMode, label: string, numbers: boole
       drawSelection(),
       EditorView.lineWrapping,
       // GFM syntax tree: Source highlighting and the toolbar's pressed state.
-      markdown({ base: markdownLanguage, codeLanguages: languages }),
+      // Picker ids (`mssql`, `angulartemplate`) resolve as in the rendered pane.
+      markdown({ base: markdownLanguage, codeLanguages: languageFor }),
       // Syntax colours inside fenced code (M4b part 2 §2), in every mode.
       syntaxHighlighting(codeHighlighter),
       keymap.of([{ key: 'Mod-Enter', run: followLinkAtCursor }, ...editorKeymap, ...historyKeymap]),

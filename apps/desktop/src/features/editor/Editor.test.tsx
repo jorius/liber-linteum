@@ -345,6 +345,28 @@ describe('code highlighting in the editor (M4b part 2 §2)', () => {
   });
 });
 
+describe('picker ids read back in the editor (final review I1 follow-up)', () => {
+  it('fence ids the picker writes are highlighted in the editor too (`mssql`, `angulartemplate`)', async () => {
+    disk = fakeDisk({
+      'Q.md':
+        'x\n\n```mssql\nSELECT name FROM t;\n```\n\n```angulartemplate\n<div class="a"></div>\n```\n',
+    });
+    const doc = await load('Q.md');
+    render(<Editor doc={doc} mode="source" label="Q" />);
+    await vi.waitFor(
+      () => {
+        const kw = [...viewOf().contentDOM.querySelectorAll('.cm-nimw-code-keyword')];
+        expect(kw.map((e) => e.textContent?.toUpperCase())).toContain('SELECT');
+        const angular = [...viewOf().contentDOM.querySelectorAll('.cm-line')].find((l) =>
+          l.textContent?.startsWith('<div'),
+        );
+        expect(angular?.querySelector('[class*="cm-nimw-code-"]')).not.toBeNull();
+      },
+      { timeout: 3000 },
+    );
+  });
+});
+
 describe('code block badge and language picker (M4b part 2 §2)', () => {
   it('shows the language; picking another rewrites the fence in one undo step', async () => {
     disk = fakeDisk({ 'K.md': 'x\n\n```js\nconst a = 1;\n```\n' });
