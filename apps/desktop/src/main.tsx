@@ -7,28 +7,40 @@ import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { App } from './app/App';
 import { detectLanguage, initI18n } from './i18n';
+import { isFileWindowLabel } from './ipc';
 import { installFileDropIfTauri } from './features/editor/attachments';
 import { installSeeAtomsMenuIfTauri } from './features/global-view/seeAtomsMenu';
+import { installOpenFile, installOpenInVault } from './features/singleFile/openFile';
+import { SingleFileApp } from './features/singleFile/SingleFileApp';
+import { installFileWatch } from './features/singleFile/singleFileStore';
 import { installQuitGuardIfTauri } from './stores/editorStore';
 import { installMenuTogglesIfTauri } from './stores/menuToggles';
 import { installMenuNavigationIfTauri } from './stores/navigate';
-import { useSettingsStore } from './stores/settingsStore';
+import { installSettingsSync, useSettingsStore } from './stores/settingsStore';
 import { applyTheme } from './theme/theme';
 
 applyTheme('system');
+
+// A window showing one file opened on its own (M4c §3): no vault.
+const singleFile = isFileWindowLabel();
 
 // Saved settings (theme, language) apply before the first render.
 void initI18n(detectLanguage(navigator.languages))
   .then(() => useSettingsStore.getState().load())
   .then(() => {
     installQuitGuardIfTauri();
-    installMenuNavigationIfTauri();
     installMenuTogglesIfTauri();
-    installSeeAtomsMenuIfTauri();
-    installFileDropIfTauri();
+    installSettingsSync();
+    installOpenFile();
+    if (singleFile) {
+      void installFileWatch().catch(() => undefined);
+    } else {
+      installMenuNavigationIfTauri();
+      installSeeAtomsMenuIfTauri();
+      installFileDropIfTauri();
+      installOpenInVault();
+    }
     createRoot(document.getElementById('root')!).render(
-      <StrictMode>
-        <App />
-      </StrictMode>,
+      <StrictMode>{singleFile ? <SingleFileApp /> : <App />}</StrictMode>,
     );
   });

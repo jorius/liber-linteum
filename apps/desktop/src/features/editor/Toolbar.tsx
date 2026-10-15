@@ -2,6 +2,7 @@ import type { StateCommand } from '@codemirror/state';
 import type { EditorView } from '@codemirror/view';
 import { useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
+import { fileWindowName } from '../../ipc';
 import styles from './Editor.module.css';
 import { openAttach } from './attachOpen';
 import { openLinkPicker } from './linkPickerOpen';
@@ -158,7 +159,8 @@ export function Toolbar({ view, active }: { view: EditorView; active: Set<Active
       className={styles.toolbar}
       onKeyDown={onKeyDown}
     >
-      {INLINE.map(button)}
+      {/* Attaching needs a vault: none in a single-file window (M4c §3). */}
+      {INLINE.filter((item) => item.id !== 'attach' || fileWindowName() === null).map(button)}
       <span className={styles.toolSep} aria-hidden="true" />
       {(() => {
         const i = index;

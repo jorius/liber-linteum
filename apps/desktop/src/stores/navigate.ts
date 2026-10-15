@@ -1,5 +1,7 @@
-import { isTauri, onMenuNavigate } from '../ipc';
+import { fileFollow, fileWindowName, isTauri, onMenuNavigate } from '../ipc';
+import { errorMessage } from './messages';
 import { usePageStore } from './pageStore';
+import { useToastStore } from './toastStore';
 import { useTrailStore, type TrailEntry } from './trailStore';
 import { useUiStore } from './uiStore';
 import { parentOf } from './tree';
@@ -13,17 +15,32 @@ export type Via = 'link' | 'direct' | 'trail';
 /** Opens a page the app just created (the watcher doesn't report our own
  *  writes, so the tree is refreshed first). */
 export async function openNewPage(path: string, via: Via = 'direct'): Promise<void> {
+  // A single-file window's file written again ("Save again"): shown already.
+  if (fileWindowName() !== null) return;
   await useVaultStore.getState().refreshTree();
   await openPage(path, null, via);
 }
 
 /** Opens a page from anywhere (links, toasts): reveals and selects it in the
- *  explorer and shows it, scrolled to `heading` if given. */
+ *  explorer and shows it, scrolled to `heading` if given. In a single-file
+ *  window (M4c §3) another file opens in a window of its own. */
 export async function openPage(
   path: string,
   heading?: string | null,
   via: Via = 'direct',
 ): Promise<void> {
+  const own = fileWindowName();
+  if (own !== null) {
+    if (path === own) {
+      usePageStore.getState().reveal(heading ?? null);
+      return;
+    }
+    const res = await fileFollow(path);
+    if (!res.ok) {
+      useToastStore.getState().push({ message: errorMessage(res.error), tone: 'error' });
+    }
+    return;
+  }
   const current = here();
   const trail = useTrailStore.getState();
   if (via === 'link') {

@@ -14,6 +14,7 @@ import i18next from 'i18next';
 import {
   attachmentImport,
   attachmentPaste,
+  fileWindowName,
   isTauri,
   onDragDrop,
   type Attached,
@@ -274,6 +275,8 @@ async function pasteImages(view: EditorView, files: File[]) {
 
 const pasteHandler = EditorView.domEventHandlers({
   paste(e, view) {
+    // No vault to save the image in: a single-file window (M4c §3).
+    if (fileWindowName() !== null) return false;
     const data = e.clipboardData;
     if (!data || data.types.includes('text/plain')) return false;
     const files = [...data.files].filter((f) => PASTE_TYPES[f.type] || convertible(f.type));

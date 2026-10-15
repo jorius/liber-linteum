@@ -551,6 +551,8 @@ export const fileFollow = (path: string) => call<'window' | 'opened'>('file_foll
 export const fileOpenInVault = () => call<void>('file_open_in_vault');
 /** File → Open File…: answers the names it couldn't open. */
 export const fileOpenDialog = () => call<string[]>('file_open_dialog');
+/** Closes this window without asking (its pages are saved first). */
+export const destroyWindow = () => ipcCall(() => getCurrentWindow().destroy());
 
 export const vaultOpen = (path: string) => call<VaultInfo>('vault_open', { path });
 export const vaultCreate = (path: string) => call<VaultInfo>('vault_create', { path });

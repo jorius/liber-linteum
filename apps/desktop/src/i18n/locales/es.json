@@ -589,5 +589,20 @@
     "change": "Cambiar…",
     "choose": "Elegir…",
     "folderSetting": "Carpeta de notas rápidas"
+  },
+  "singleFile": {
+    "openFile": "Abrir un archivo",
+    "cantOpen": "{count, plural, one {Este archivo se abre} other {Estos archivos se abren}} en otras aplicaciones, no aquí.",
+    "noSuchFile": "No hay ningún archivo llamado «{target}» en esta carpeta.",
+    "inVaultRegion": "Bóveda",
+    "inVault": "Este archivo está en tu bóveda «{name}».",
+    "openInVault": "Abrir en su bóveda",
+    "deleted": "Este archivo se eliminó o se movió fuera de la aplicación. Tu texto sigue aquí.",
+    "saveAgain": "Guardar de nuevo",
+    "gone": "Este archivo se eliminó o se movió fuera de la aplicación.",
+    "closeWindow": "Cerrar ventana",
+    "saveCopy": "Guardar una copia",
+    "copySaved": "Guardado como «{name}» junto al archivo.",
+    "notText": "Este archivo no se puede editar aquí."
   }
 }

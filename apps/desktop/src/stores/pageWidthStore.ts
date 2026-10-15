@@ -4,6 +4,7 @@
 // changes (renames move them).
 import { create } from 'zustand';
 import {
+  fileWindowName,
   pageWidthSet,
   vaultSettingsGet,
   vaultSettingsSet,
@@ -50,7 +51,19 @@ export const usePageWidthStore = create<PageWidthState>((set) => ({
     set(apply(await vaultSettingsGet()));
   },
   set: async (path, width) => {
-    set(apply(await pageWidthSet(path, width === fallbackWidth() ? null : width)));
+    const own = width === fallbackWidth() ? null : width;
+    // A single-file window has no vault to keep it in: this window's, for
+    // as long as it is open (M4c §3).
+    if (fileWindowName() !== null) {
+      set((s) => {
+        const pages = { ...s.pages };
+        if (own) pages[path] = own;
+        else delete pages[path];
+        return { pages };
+      });
+      return;
+    }
+    set(apply(await pageWidthSet(path, own)));
   },
   setVault: async (width) => {
     set(apply(await vaultSettingsSet({ pageWidth: width })));

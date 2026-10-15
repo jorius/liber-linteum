@@ -589,5 +589,20 @@
     "change": "Change…",
     "choose": "Choose…",
     "folderSetting": "Quick notes folder"
+  },
+  "singleFile": {
+    "openFile": "Open a file",
+    "cantOpen": "{count, plural, one {This file opens} other {These files open}} in other apps, not here.",
+    "noSuchFile": "No file named “{target}” in this folder.",
+    "inVaultRegion": "Vault",
+    "inVault": "This file is in your vault “{name}”.",
+    "openInVault": "Open in its vault",
+    "deleted": "This file was deleted or moved outside the app. Your text is still here.",
+    "saveAgain": "Save again",
+    "gone": "This file was deleted or moved outside the app.",
+    "closeWindow": "Close window",
+    "saveCopy": "Save a copy",
+    "copySaved": "Saved as “{name}” next to the file.",
+    "notText": "This file can't be edited here."
   }
 }
