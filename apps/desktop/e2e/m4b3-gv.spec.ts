@@ -169,3 +169,58 @@ test('§4: page cards say Edit and open the editor; folders keep See all and loo
   await welcome.getByRole('button', { name: 'Edit Welcome' }).click();
   await expect(page.getByRole('textbox', { name: 'Page title' })).toHaveValue('Welcome');
 });
+
+test('§5: parent/child lines are elbows, folder links carry a count chip, hover dims the rest', async ({
+  page,
+}) => {
+  await page.addInitScript(installIpcMock, {
+    pages: {
+      'Alpha/One.md': '# One\n\nSee [[Three]] and [[Four]].\n',
+      'Alpha/Two.md': '# Two\n\nSee [[Three]].\n',
+      'Beta/Three.md': '# Three\n\nThe third.\n',
+      'Beta/Four.md': '# Four\n\nThe fourth.\n',
+      'Gamma/Five.md': '# Five\n\nAlone.\n',
+    },
+    editorMode: 'livePreview',
+    remoteCover: false,
+    settings: { globalViewMode: 'expand' },
+  });
+  await page.goto('/');
+  await page.getByRole('button', { name: /^vault/ }).click();
+  await page.getByRole('button', { name: 'Global view' }).click();
+  await page.getByRole('button', { name: 'Alpha', exact: true }).click();
+  await expect(page.locator('[data-gv-edge="tree"]')).toHaveCount(2);
+  for (const d of await page
+    .locator('[data-gv-edge="tree"]')
+    .evaluateAll((els) => els.map((el) => el.getAttribute('d')!))) {
+    expect(d.replace(/[^MLHV]/g, '')).toBe('MHVH');
+  }
+  // One → Beta: two links into the folder, one chip.
+  const chip = page.locator('[data-gv-count][data-a="Alpha/One.md"][data-b="Beta"]');
+  await expect(chip).toHaveText('2 links');
+  // The legend shows each kind's line.
+  await expect(page.locator('[data-gv-sample="tree"] path')).toHaveAttribute(
+    'd',
+    'M3,1.5V6H27V10.5',
+  );
+
+  const canvas = page.locator('[data-gv-canvas]');
+  // Expanding put the cards below the fold: bring them all in.
+  await page.getByRole('button', { name: 'Fit to screen' }).click();
+  await page.getByRole('button', { name: 'Gamma', exact: true }).hover();
+  await expect(canvas).toHaveAttribute('data-gv-focusing', '');
+  const opacity = (sel: string) =>
+    page
+      .locator(sel)
+      .first()
+      .evaluate((el) => getComputedStyle(el).opacity);
+  expect(await opacity('[data-gv-edge="link-aggregated"]')).toBe('0.15');
+  expect(await opacity('.react-flow__node[data-id="Alpha"]')).toBe('0.55');
+  await page.getByRole('button', { name: 'Beta', exact: true }).hover();
+  expect(await opacity('[data-gv-edge="link-aggregated"]')).toBe('1');
+  expect(await opacity('.react-flow__node[data-id="Alpha/One.md"]')).toBe('1');
+  expect(await opacity('.react-flow__node[data-id="Alpha"]')).toBe('0.55');
+  expect(await opacity('[data-gv-edge="tree"]')).toBe('0.15');
+  await page.mouse.move(2, 2);
+  await expect(canvas).not.toHaveAttribute('data-gv-focusing');
+});

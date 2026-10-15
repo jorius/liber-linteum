@@ -14,6 +14,7 @@ import {
   useEffect,
   useMemo,
   useRef,
+  type FocusEvent,
   type KeyboardEvent,
   type MouseEvent,
   type ReactElement,
@@ -23,7 +24,7 @@ import type { GlobalViewEdges, GvCard } from '../../ipc';
 import { useUiStore } from '../../stores/uiStore';
 import { Card } from './Card';
 import { closeCardMenus, type CardMenuItem } from './CardMenu';
-import { EdgeLayer, MAX_AGGREGATED, strongest, type DrawnEdge } from './edges';
+import { EdgeLayer, focusEdges, MAX_AGGREGATED, strongest, type DrawnEdge } from './edges';
 import { openIndexPick, pageOf, pickable, useGvStore } from './gvStore';
 import {
   CARD_H,
@@ -338,6 +339,46 @@ export function Canvas({ mode, toggles, width, onOpen, onOpenEditor }: CanvasPro
     void useGvStore.getState().connectByDrag(from, to);
   };
 
+  // Focus mode (M4b part 3 §5): the card under the pointer, else the one
+  // the keyboard moved to (arrow keys, Tab inside the canvas), lights its
+  // edges and neighbours. A card focused for you (a level that just loaded)
+  // doesn't: the view would arrive dimmed. Attributes only (focusEdges),
+  // re-applied when the edges drawn change.
+  const lit = useRef<{
+    hover: string | null;
+    keys: string | null;
+    shown: string | null;
+    keyed: boolean;
+  }>({ hover: null, keys: null, shown: null, keyed: false });
+  const relight = (force = false) => {
+    const root = wrapper.current;
+    if (!root) return;
+    const want = lit.current.hover ?? lit.current.keys;
+    if (!force && want === lit.current.shown) return;
+    lit.current.shown = want;
+    focusEdges(root, want);
+  };
+  const nodeOf = (target: EventTarget | null) =>
+    (target as HTMLElement | null)?.closest?.<HTMLElement>('.react-flow__node')?.dataset.id ?? null;
+  const onMouseOver = (e: MouseEvent) => {
+    lit.current.hover = nodeOf(e.target);
+    relight();
+  };
+  const onMouseLeave = () => {
+    lit.current.hover = null;
+    relight();
+  };
+  const onFocusCapture = (e: FocusEvent) => {
+    lit.current.keys = lit.current.keyed ? nodeOf(e.target) : null;
+    lit.current.keyed = false;
+    relight();
+  };
+  const onBlurCapture = () => {
+    lit.current.keys = null;
+    relight();
+  };
+  useEffect(() => relight(true), [drawn, shownKey]);
+
   /** Moves the keyboard to a card: at once when it is on screen, else after
    *  the next render (a level that just loaded). */
   function focusCard(path: string) {
@@ -350,6 +391,7 @@ export function Canvas({ mode, toggles, width, onOpen, onOpenEditor }: CanvasPro
   }
 
   const onKeyDown = (e: KeyboardEvent) => {
+    if (e.key === 'Tab' || KEYS[e.key]) lit.current.keyed = true;
     const from = (e.target as HTMLElement).closest<HTMLElement>('[data-gv-card]')?.dataset.gvCard;
     if (!from) return;
     const dir = KEYS[e.key];
@@ -375,6 +417,11 @@ export function Canvas({ mode, toggles, width, onOpen, onOpenEditor }: CanvasPro
     <div
       ref={wrapper}
       className={styles.canvas}
+      data-gv-canvas=""
+      onMouseOver={onMouseOver}
+      onMouseLeave={onMouseLeave}
+      onFocusCapture={onFocusCapture}
+      onBlurCapture={onBlurCapture}
       onKeyDown={onKeyDown}
       onClickCapture={onClickCapture}
       onDoubleClickCapture={onDoubleClickCapture}

@@ -89,13 +89,13 @@ export function Toolbar() {
               aria-pressed={toggles[key]}
               onClick={() => void update({ globalViewEdges: { ...toggles, [key]: !toggles[key] } })}
             >
-              <svg width="20" height="6" aria-hidden="true">
-                <line
-                  x1="1"
-                  y1="3"
-                  x2="19"
-                  y2="3"
+              {/* The legend (M4b part 3 §5): each kind's line as drawn —
+                  parent/child as an elbow. */}
+              <svg width="30" height="12" aria-hidden="true" data-gv-sample={key}>
+                <path
+                  d={kind === 'tree' ? 'M3,1.5V6H27V10.5' : 'M2,6H28'}
                   style={{
+                    fill: 'none',
                     stroke: s.stroke,
                     strokeWidth: Math.min(s.width, 3),
                     strokeDasharray: s.dash,

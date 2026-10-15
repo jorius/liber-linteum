@@ -2,7 +2,7 @@
 // reference vault has ~2,600 aggregated edges, nearly all with a count:
 // drawn as React Flow edges with HTML count labels they took 1.5–2.5 s in
 // WebKit against NFR-03's 300 ms (final review I2).
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { ReactFlow, ReactFlowProvider, type Node } from '@xyflow/react';
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { GvCard, GvEdge, GvLevel, GvLevelRef } from '../../ipc';
@@ -89,7 +89,7 @@ describe('Global View edges (M3a §6, final review I2)', () => {
       'http://www.w3.org/2000/svg',
       'text',
     ]);
-    expect(counts[0]).toHaveTextContent('×3');
+    expect(counts[0]).toHaveTextContent('3 links');
     expect(document.querySelector('.react-flow__edgelabel-renderer')?.childElementCount ?? 0).toBe(
       0,
     );
@@ -131,7 +131,7 @@ describe('Global View edges (M3a §6, final review I2)', () => {
       screen.getByText('Showing the 500 strongest of 780 links from inside folders.'),
     ).toBeVisible();
     // The weakest pairs went (P0–P2: ×3), the strongest stayed (P38–P39: ×78).
-    const counts = [...drawn('[data-gv-count]')].map((t) => Number(t.textContent!.slice(1)));
+    const counts = [...drawn('[data-gv-count]')].map((t) => parseInt(t.textContent!, 10));
     expect(Math.max(...counts)).toBe(78);
     expect(counts).not.toContain(3);
   });
@@ -155,6 +155,38 @@ describe('Global View edges (M3a §6, final review I2)', () => {
     expect(manual).toHaveClass('nopan');
     expect(getComputedStyle(count!).pointerEvents).toBe('none');
     expect(count!.querySelector('title')).toBeNull();
+  });
+
+  it('M4b part 3 §5: hovering a card lights its edges and neighbours, dims the rest; leaving restores', async () => {
+    level0 = { cards: [card('A'), card('B'), card('C'), card('D')], centre: null };
+    edges = [edge('A', 'B', { count: 4 }), edge('C', 'D', { aggregated: false })];
+    render(<GlobalView />);
+    await waitFor(() => expect(drawn()).toHaveLength(2));
+    const root = document.querySelector<HTMLElement>('[data-gv-canvas]')!;
+    fireEvent.mouseOver(screen.getByRole('button', { name: 'A' }));
+    expect(root).toHaveAttribute('data-gv-focusing');
+    const hot = [...root.querySelectorAll('[data-gv-hot]')].map(
+      (el) =>
+        (el as HTMLElement).dataset.id ??
+        `${el.localName}:${el.getAttribute('data-a')}-${el.getAttribute('data-b')}`,
+    );
+    expect(hot.sort()).toEqual(['A', 'B', 'path:A-B', 'rect:A-B', 'text:A-B']);
+    fireEvent.mouseOver(screen.getByRole('button', { name: 'D' }));
+    expect(root.querySelector('[data-gv-edge][data-gv-hot]')).toHaveAttribute('data-a', 'C');
+    fireEvent.mouseLeave(root);
+    expect(root).not.toHaveAttribute('data-gv-focusing');
+    expect(root.querySelectorAll('[data-gv-hot]')).toHaveLength(0);
+    // A card focused for you (the level just loaded) lights nothing; one the
+    // keyboard moves to does, until the keyboard leaves it.
+    act(() => screen.getByRole('button', { name: 'A' }).focus());
+    expect(root).not.toHaveAttribute('data-gv-focusing');
+    fireEvent.keyDown(screen.getByRole('button', { name: 'A' }), { key: 'ArrowRight' });
+    expect(screen.getByRole('button', { name: 'B' })).toHaveFocus();
+    expect(root).toHaveAttribute('data-gv-focusing');
+    expect(root.querySelector('.react-flow__node[data-id="B"]')).toHaveAttribute('data-gv-hot');
+    expect(root.querySelector('.react-flow__node[data-id="C"]')).not.toHaveAttribute('data-gv-hot');
+    fireEvent.blur(screen.getByRole('button', { name: 'B' }));
+    expect(root).not.toHaveAttribute('data-gv-focusing');
   });
 
   it('no note while every edge is drawn', async () => {

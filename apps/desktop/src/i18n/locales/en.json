@@ -459,6 +459,10 @@
       "aggregated": "Links from inside folders"
     },
     "edgesCapped": "Showing the {shown, number} strongest of {total, number} links from inside folders.",
+    "chip": {
+      "links": "{count, plural, one {# link} other {# links}}",
+      "relationships": "{count, plural, one {# relationship} other {# relationships}}"
+    },
     "reset": "Reset layout",
     "layoutSaveFailed": "Card positions couldn't be saved. {error}",
     "empty": "Empty folder.",

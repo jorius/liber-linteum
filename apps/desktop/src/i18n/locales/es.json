@@ -459,6 +459,10 @@
       "aggregated": "Enlaces desde dentro de carpetas"
     },
     "edgesCapped": "Se muestran los {shown, number} más fuertes de {total, number} enlaces desde dentro de carpetas.",
+    "chip": {
+      "links": "{count, plural, one {# enlace} other {# enlaces}}",
+      "relationships": "{count, plural, one {# relación} other {# relaciones}}"
+    },
     "reset": "Restablecer disposición",
     "layoutSaveFailed": "No se pudieron guardar las posiciones de las tarjetas. {error}",
     "empty": "Carpeta vacía.",
