@@ -31,6 +31,7 @@ pub fn parse_page(source: &str, file_stem: &str) -> PageMeta {
     meta.links.extend(body.links);
     meta.links.sort_by_key(|l| l.range.start);
     meta.excerpt = body.excerpt;
+    meta.body_text = body.text;
     let ext_in = |target: &str, list: &[&str]| {
         target
             .rsplit_once('.')
@@ -169,6 +170,63 @@ mod tests {
         assert_eq!(l.target, "A");
         assert_eq!(l.alias.as_deref(), Some("shown"));
         assert_eq!(&src[l.range.clone()], "A");
+    }
+
+    /// M5 §2: the text search reads — words kept, Markdown dropped.
+    #[test]
+    fn body_text_keeps_words_and_drops_markup() {
+        let src = "---\ntags: [x]\nsecret: fm\n---\n# Dragón title\n\nSome *bold* [[Target|alias]] and [[Plain]] ![[pic.png]] [web](https://e.x) #tag\n\n%% hidden %%\n<div>html</div>\n<!-- note -->\n\n```rust\nlet code = 1;\n```\n\n- item `inline`\n\n| a | b |\n|---|---|\n| cell | [[T2\\|shown]] |\n";
+        let m = parse_page(src, "p");
+        let t = &m.body_text;
+        for w in [
+            "Dragón",
+            "title",
+            "Some",
+            "bold",
+            "alias",
+            "Plain",
+            "web",
+            "#tag",
+            "let code = 1;",
+            "item",
+            "inline",
+            "cell",
+            "shown",
+        ] {
+            assert!(t.contains(w), "{w} missing in {t:?}");
+        }
+        for w in [
+            "secret", "fm", "hidden", "html", "note", "pic.png", "https", "Target", "T2",
+        ] {
+            assert!(!t.contains(w), "{w} leaked into {t:?}");
+        }
+    }
+
+    #[test]
+    fn body_text_separates_blocks_and_has_no_control_characters() {
+        let m = parse_page(
+            "# A\n\nfirst line\nsecond\n\nnext\u{1}x\u{2}y\u{7}\tz\n",
+            "p",
+        );
+        assert!(
+            !m.body_text.chars().any(|c| c.is_control() && c != '\n'),
+            "{:?}",
+            m.body_text
+        );
+        assert!(m.body_text.contains("first line"), "{:?}", m.body_text);
+        assert!(!m.body_text.contains("Afirst"), "{:?}", m.body_text);
+        assert!(!m.body_text.contains("linesecond"), "{:?}", m.body_text);
+        assert!(m.body_text.contains("next x y"), "{:?}", m.body_text);
+    }
+
+    #[test]
+    fn body_text_of_a_bom_page_and_an_empty_one() {
+        assert_eq!(
+            parse_page("\u{FEFF}Hello there.\n", "p").body_text,
+            "Hello there."
+        );
+        assert_eq!(parse_page("", "p").body_text, "");
+        assert_eq!(parse_page("---\ntags: [a]\n---\n", "p").body_text, "");
     }
 
     #[test]

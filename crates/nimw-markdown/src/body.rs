@@ -11,6 +11,15 @@ pub(crate) struct Body {
     pub links: Vec<LinkRef>,
     pub tags: Vec<Tag>,
     pub excerpt: String,
+    /// The body's words for search (M5 §2): see [`plain_text`].
+    pub text: String,
+}
+
+/// A run of body text: Markdown text (wikilinks still in it) at `range`, or
+/// code taken as is.
+struct Piece {
+    range: Range<usize>,
+    code: Option<String>,
 }
 
 const OPTIONS: Options = Options::ENABLE_YAML_STYLE_METADATA_BLOCKS
@@ -106,6 +115,7 @@ fn extract_unmasked(src: &str, body_start: usize) -> Body {
     let mut body = Body::default();
     let mut regions: Vec<Range<usize>> = Vec::new();
     let mut excerpt_regions: Vec<Range<usize>> = Vec::new();
+    let mut pieces: Vec<Piece> = Vec::new();
     let mut in_code = 0usize;
     let mut in_meta = false;
     let mut in_heading = false;
@@ -149,10 +159,15 @@ fn extract_unmasked(src: &str, body_start: usize) -> Body {
             }
             Event::Text(_) if in_code == 0 && !in_meta => {
                 push_merged(src, &mut regions, range.clone());
+                push_piece(src, &mut pieces, range.clone(), None);
                 if !in_heading {
                     push_merged(src, &mut excerpt_regions, range);
                 }
             }
+            Event::Text(text) if !in_meta => {
+                push_piece(src, &mut pieces, range, Some(text.to_string()));
+            }
+            Event::Code(text) => push_piece(src, &mut pieces, range, Some(text.to_string())),
             Event::SoftBreak | Event::HardBreak if !in_heading => {
                 push_merged(src, &mut excerpt_regions, range);
             }
@@ -185,7 +200,72 @@ fn extract_unmasked(src: &str, body_start: usize) -> Body {
     }
     body.links.sort_by_key(|l| l.range.start);
     body.excerpt = excerpt(src, &without(&excerpt_regions, &display_maths(src)));
+    body.text = plain_text(src, &pieces);
     body
+}
+
+/// Appends a run of body text; Markdown text merges with the run before it
+/// as [`push_merged`] does, so a wikilink split by the parser is whole again.
+fn push_piece(src: &str, pieces: &mut Vec<Piece>, range: Range<usize>, code: Option<String>) {
+    if code.is_none()
+        && let Some(last) = pieces.last_mut()
+        && last.code.is_none()
+        && (last.end() == range.start
+            || (last.end() < range.start && &src[last.end()..range.start] == "\\"))
+    {
+        last.range.end = range.end;
+        return;
+    }
+    pieces.push(Piece { range, code });
+}
+
+impl Piece {
+    fn end(&self) -> usize {
+        self.range.end
+    }
+}
+
+/// The body's words (M5 §2): headings, paragraphs, lists, tables and code, in
+/// order; wikilinks read as their alias or target, embeds, URLs, HTML and
+/// comments are gone. Runs on one line are joined by a space, others by a
+/// line break; control characters other than `\n` become spaces (the search
+/// index marks its snippets with some).
+fn plain_text(src: &str, pieces: &[Piece]) -> String {
+    let mut out = String::new();
+    let mut prev_end: Option<usize> = None;
+    for piece in pieces {
+        if let Some(end) = prev_end {
+            let gap = src.get(end..piece.range.start).unwrap_or("");
+            out.push(if gap.contains('\n') { '\n' } else { ' ' });
+        }
+        prev_end = Some(piece.range.end);
+        match &piece.code {
+            Some(code) => out.push_str(code),
+            None => out.push_str(&render_wikilinks(&src[piece.range.clone()]).replace('\\', "")),
+        }
+    }
+    let cleaned: String = out
+        .chars()
+        .map(|c| if c.is_control() && c != '\n' { ' ' } else { c })
+        .collect();
+    cleaned.trim().to_string()
+}
+
+/// `text` with each wikilink replaced by its alias or target, and embeds dropped.
+fn render_wikilinks(text: &str) -> String {
+    let mut rendered = String::new();
+    let mut last = 0;
+    for occ in wikilink::find_all(text) {
+        rendered.push_str(&text[last..occ.whole.start]);
+        if !occ.embed
+            && let Some(p) = wikilink::parse_inner(&text[occ.inner.clone()])
+        {
+            rendered.push_str(p.alias.unwrap_or(p.target));
+        }
+        last = occ.whole.end;
+    }
+    rendered.push_str(&text[last..]);
+    rendered
 }
 
 /// Appends `r`, merging it with the previous range when they touch or are
@@ -305,19 +385,7 @@ fn tags_in(text: &str, out: &mut Vec<Tag>) {
 fn excerpt(src: &str, regions: &[Range<usize>]) -> String {
     let mut words = String::new();
     for region in regions {
-        let text = &src[region.clone()];
-        let mut rendered = String::new();
-        let mut last = 0;
-        for occ in wikilink::find_all(text) {
-            rendered.push_str(&text[last..occ.whole.start]);
-            if !occ.embed
-                && let Some(p) = wikilink::parse_inner(&text[occ.inner.clone()])
-            {
-                rendered.push_str(p.alias.unwrap_or(p.target));
-            }
-            last = occ.whole.end;
-        }
-        rendered.push_str(&text[last..]);
+        let rendered = render_wikilinks(&src[region.clone()]);
         words.push(' ');
         words.push_str(&rendered.replace('\\', ""));
     }

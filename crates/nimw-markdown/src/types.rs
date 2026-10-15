@@ -13,6 +13,10 @@ pub struct PageMeta {
     /// Sorted by `range.start`.
     pub links: Vec<LinkRef>,
     pub excerpt: String,
+    /// The body's words for search (M5 §2): Markdown, the frontmatter,
+    /// comments, HTML, URLs and embeds dropped; wikilinks read as their alias
+    /// or target; code kept.
+    pub body_text: String,
     pub has_image: bool,
     pub has_audio: bool,
     pub frontmatter_error: Option<String>,
