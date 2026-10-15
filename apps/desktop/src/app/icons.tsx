@@ -224,6 +224,47 @@ export function MoveVerticalIcon() {
   );
 }
 
+/** Reposition a side cover: both axes (M4b part 3 §3). */
+export function MoveIcon() {
+  return (
+    <svg {...small} {...stroke}>
+      <path d="M12 2v20M2 12h20M9 5l3-3 3 3M9 19l3 3 3-3M5 9l-3 3 3 3M19 9l3 3-3 3" />
+    </svg>
+  );
+}
+
+/** Cover placements (M4b part 3 §3): a page with its cover on top, on the
+ *  left or on the right (the filled part). */
+export function CoverTopIcon() {
+  return (
+    <svg {...small} {...stroke}>
+      <rect x="3" y="3" width="18" height="18" rx="2" />
+      <path d="M3 9h18" />
+      <rect x="4" y="4" width="16" height="4" fill="currentColor" stroke="none" />
+    </svg>
+  );
+}
+
+export function CoverLeftIcon() {
+  return (
+    <svg {...small} {...stroke}>
+      <rect x="3" y="3" width="18" height="18" rx="2" />
+      <path d="M9 3v18" />
+      <rect x="4" y="4" width="4" height="16" fill="currentColor" stroke="none" />
+    </svg>
+  );
+}
+
+export function CoverRightIcon() {
+  return (
+    <svg {...small} {...stroke}>
+      <rect x="3" y="3" width="18" height="18" rx="2" />
+      <path d="M15 3v18" />
+      <rect x="16" y="4" width="4" height="16" fill="currentColor" stroke="none" />
+    </svg>
+  );
+}
+
 export function TrashIcon() {
   return (
     <svg {...small} {...stroke}>

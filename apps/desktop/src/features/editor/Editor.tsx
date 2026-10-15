@@ -28,6 +28,7 @@ import { attachmentHandlers } from './attachments';
 import { BlockGutter, type Shown } from './BlockGutter';
 import { SplitHint } from './SplitHint';
 import { activeFormats, editorKeymap, type ActiveFormat } from './format';
+import { coverSideHistory } from './coverSideHistory';
 import { linkCompletion } from './linkComplete';
 import { LanguagePicker } from './LanguagePicker';
 import { setLanguagePickerOpener } from './languagePickerOpen';
@@ -307,6 +308,8 @@ function createState(d: PageDoc, mode: EditorMode, label: string, numbers: boole
       // Pasted images and dropped files (M2c §5), `[[` autocomplete (§6).
       attachmentHandlers(),
       linkCompletion(),
+      // Cover placements join the undo history (M4b part 3 §3).
+      coverSideHistory,
       gutterSlot.of(gutter(numbers)),
       followers,
     ],
