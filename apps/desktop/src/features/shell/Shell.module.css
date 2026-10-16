@@ -152,6 +152,20 @@
   flex-direction: column-reverse;
 }
 
+/* The Global View has its own controls in those corners (final review I4):
+   New entry bottom right, zoom bottom left, its toolbar along the top. */
+.main[data-screen='global'] .fab[data-place='bottomRight'] {
+  bottom: 96px;
+}
+
+.main[data-screen='global'] .fab[data-place='bottomLeft'] {
+  left: 68px;
+}
+
+.main[data-screen='global'] .fab[data-place='topRight'] {
+  top: 76px;
+}
+
 .fabButton {
   display: inline-flex;
   align-items: center;

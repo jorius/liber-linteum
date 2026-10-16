@@ -140,7 +140,8 @@
   /* The block gutter (M4 §4) is placed in the pane's scroll coordinates. */
   position: relative;
   overflow: auto;
-  padding: 20px 28px;
+  /* Room under the last line for the floating button (M5b final review I4). */
+  padding: 20px 28px 88px;
 }
 
 /* Editor frame: optional toolbar above the editor (M2b §6). */

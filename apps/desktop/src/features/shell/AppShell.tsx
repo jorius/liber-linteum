@@ -41,7 +41,7 @@ export function AppShell() {
           onRequestMenu={(path, anchor) => setMenu({ path, anchor })}
         />
       )}
-      <div className={styles.main}>
+      <div className={styles.main} data-screen={current}>
         {collapsed && (
           <button
             type="button"
