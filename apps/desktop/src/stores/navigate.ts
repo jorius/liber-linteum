@@ -1,3 +1,4 @@
+import { confirmUnsaved, needsUnsavedPrompt } from '../features/editor/unsavedPrompt';
 import { fileFollow, fileWindowName, isTauri, onMenuNavigate } from '../ipc';
 import { errorMessage } from './messages';
 import { usePageStore } from './pageStore';
@@ -41,6 +42,9 @@ export async function openPage(
     }
     return;
   }
+  // Ask before anything moves: Cancel leaves the screen, selection and trail
+  // as they were (M5b final review M1).
+  if (!(await mayLeaveFor(path))) return;
   const current = here();
   const trail = useTrailStore.getState();
   if (via === 'link') {
@@ -65,6 +69,12 @@ export async function openPageAt(path: string, from: number, to: number): Promis
   usePageStore.getState().requestJump(path, from, to);
 }
 
+/** With auto save off and text unsaved, leaving the page asks first. */
+async function mayLeaveFor(path: string | null): Promise<boolean> {
+  if (path === usePageStore.getState().path || !needsUnsavedPrompt()) return true;
+  return confirmUnsaved();
+}
+
 /** The page on screen and the heading it was opened at. */
 function here(): TrailEntry | null {
   const { path, anchor } = usePageStore.getState();
@@ -74,7 +84,8 @@ function here(): TrailEntry | null {
 /** ← / ⌘[: back along the link trail. False when there is nowhere to go. */
 export async function goBack(): Promise<boolean> {
   const current = here();
-  if (!current) return false;
+  if (!current || !useTrailStore.getState().back.length) return false;
+  if (!(await mayLeaveFor(null))) return false;
   const to = useTrailStore.getState().goBack(current);
   if (!to) return false;
   await openPage(to.path, to.heading, 'trail');
@@ -84,7 +95,8 @@ export async function goBack(): Promise<boolean> {
 /** ⌘]: forward along the link trail (after going back). */
 export async function goForward(): Promise<boolean> {
   const current = here();
-  if (!current) return false;
+  if (!current || !useTrailStore.getState().forward.length) return false;
+  if (!(await mayLeaveFor(null))) return false;
   const to = useTrailStore.getState().goForward(current);
   if (!to) return false;
   await openPage(to.path, to.heading, 'trail');

@@ -8,6 +8,8 @@ import { usePageStore } from '../../stores/pageStore';
 import { DEFAULT_SETTINGS, useSettingsStore } from '../../stores/settingsStore';
 import { useUiStore } from '../../stores/uiStore';
 import { useVaultStore } from '../../stores/vaultStore';
+import { useTrailStore } from '../../stores/trailStore';
+import { goBack, openPage } from '../../stores/navigate';
 import { fakeDisk } from '../../test/fakeDisk';
 import { DialogHost } from '../dialogs/DialogHost';
 import { confirmUnsaved } from './unsavedPrompt';
@@ -128,6 +130,36 @@ describe('Save / Don’t Save / Cancel (M5b §6, auto save off)', () => {
       await userEvent.click(screen.getByRole('button', { name: 'Save' }));
     });
     expect(await second).toBe(true);
+  });
+});
+
+describe('Cancel changes nothing about where you are (M5b final review M1)', () => {
+  it('opening another page: the screen, selection and trail stay', async () => {
+    await editA();
+    useUiStore.getState().setScreen('global');
+    useVaultStore.setState({ selected: 'A.md' });
+    useTrailStore.setState({ back: [{ path: 'X.md', heading: null }], forward: [] });
+    render(<DialogHost />);
+    const opening = openPage('B.md');
+    await userEvent.click(await screen.findByRole('button', { name: 'Cancel' }));
+    await opening;
+    expect(useUiStore.getState().screen).toBe('global');
+    expect(useVaultStore.getState().selected).toBe('A.md');
+    expect(useTrailStore.getState().back).toEqual([{ path: 'X.md', heading: null }]);
+  });
+
+  it('going back: the trail stays where it was', async () => {
+    await editA();
+    useTrailStore.setState({ back: [{ path: 'B.md', heading: null }], forward: [] });
+    render(<DialogHost />);
+    const going = goBack();
+    await userEvent.click(await screen.findByRole('button', { name: 'Cancel' }));
+    expect(await going).toBe(false);
+    expect(useTrailStore.getState()).toMatchObject({
+      back: [{ path: 'B.md', heading: null }],
+      forward: [],
+    });
+    expect(usePageStore.getState().path).toBe('A.md');
   });
 });
 
