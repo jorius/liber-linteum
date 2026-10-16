@@ -103,6 +103,24 @@ describe('Settings dialog (M2b §4, §5, §7)', () => {
     expect(screen.queryByText('No settings match.')).not.toBeInTheDocument();
   });
 
+  it('round-2 review I3: Tab from the last shown control wraps, past a category search hides', async () => {
+    open();
+    const search = screen.getByRole('searchbox', { name: 'Search settings' });
+    await userEvent.type(search, 'theme');
+    const dialog = screen.getByRole('dialog', { name: 'Settings' });
+    // A row that arrives after the search ran (a vault row loading late) stays
+    // unhidden inside its hidden category: it must not be the trap's last stop.
+    const late = document.createElement('button');
+    late.textContent = 'late';
+    [...dialog.querySelectorAll('[data-no-match]')].pop()?.append(late);
+    const shown = [
+      ...dialog.querySelectorAll<HTMLElement>('button, input, select, [tabindex]:not([tabindex="-1"])'),
+    ].filter((n) => !n.closest('[hidden], [data-no-match]'));
+    shown[shown.length - 1].focus();
+    fireEvent.keyDown(document.activeElement as HTMLElement, { key: 'Tab' });
+    expect(document.activeElement).toBe(shown[0]);
+  });
+
   it('a palette applies at once and is saved', async () => {
     open();
     await show('Appearance');

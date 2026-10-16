@@ -106,9 +106,10 @@ export function Dialog({
       return;
     }
     if (e.key !== 'Tab' || !box.current) return;
-    // Controls in hidden parts (Settings' other categories, M5b §18) can't take focus.
+    // Controls in hidden parts (Settings' other categories, M5b §18, and those a
+    // search hides, round-2 review I3) can't take focus.
     const nodes = [...box.current.querySelectorAll<HTMLElement>(FOCUSABLE)].filter(
-      (n) => !n.closest('[hidden]'),
+      (n) => !n.closest('[hidden], [data-no-match], [inert]'),
     );
     if (nodes.length === 0) return;
     const first = nodes[0];
