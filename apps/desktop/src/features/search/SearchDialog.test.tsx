@@ -8,7 +8,7 @@ import { useUiStore } from '../../stores/uiStore';
 import { useVaultStore } from '../../stores/vaultStore';
 import { useGvStore } from '../global-view/gvStore';
 import { ActionButton } from '../shell/ActionButton';
-import { isSearchKey, useGlobalShortcuts } from '../shell/useGlobalShortcuts';
+import { installNoFindBar, isSearchKey, useGlobalShortcuts } from '../shell/useGlobalShortcuts';
 import { DialogHost } from '../dialogs/DialogHost';
 import { openSearch } from './searchMenu';
 import { useSearchStore } from './searchStore';
@@ -343,6 +343,27 @@ describe('opening Search (M5 §4)', () => {
     render(<Shortcuts />);
     fireEvent.keyDown(document.body, { metaKey: true, shiftKey: true, key: 'F', code: 'KeyF' });
     expect(useUiStore.getState().dialog).toEqual({ type: 'search' });
+  });
+
+  it('final review M12: on macOS only ⌘ counts (Ctrl+F stays forward-a-character)', () => {
+    const key = (init: KeyboardEventInit, mac: boolean) =>
+      isSearchKey(new KeyboardEvent('keydown', init), mac);
+    expect(key({ ctrlKey: true, key: 'f', code: 'KeyF' }, true)).toBe(false);
+    expect(key({ metaKey: true, key: 'f', code: 'KeyF' }, true)).toBe(true);
+    expect(key({ ctrlKey: true, key: 'f', code: 'KeyF' }, false)).toBe(true);
+  });
+
+  it('final review M12: elsewhere Ctrl+F never reaches the webview’s find bar', () => {
+    const stop = installNoFindBar(false);
+    const e = new KeyboardEvent('keydown', { ctrlKey: true, key: 'f', cancelable: true });
+    window.dispatchEvent(e);
+    expect(e.defaultPrevented).toBe(true);
+    stop();
+    const mac = installNoFindBar(true);
+    const c = new KeyboardEvent('keydown', { ctrlKey: true, key: 'f', cancelable: true });
+    window.dispatchEvent(c);
+    expect(c.defaultPrevented).toBe(false);
+    mac();
   });
 
   it('⌘F in the editor opens Search with a short one-line selection as its text (M5b §7.3)', () => {

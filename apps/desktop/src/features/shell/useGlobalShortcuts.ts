@@ -32,10 +32,24 @@ function screenKey(e: KeyboardEvent): 'edit' | 'global' | null {
   return null;
 }
 
+const MAC = /Mac/i.test(navigator.platform);
+
+/** Outside macOS, Ctrl+F never opens the webview's own find bar (WebView2),
+ *  also where Search doesn't open (a dialog, the Welcome screen; final review
+ *  M12). Returns the uninstall. */
+export function installNoFindBar(mac = MAC): () => void {
+  const onKeyDown = (e: KeyboardEvent) => {
+    if (!mac && e.ctrlKey && !e.altKey && e.key.toLowerCase() === 'f') e.preventDefault();
+  };
+  window.addEventListener('keydown', onKeyDown);
+  return () => window.removeEventListener('keydown', onKeyDown);
+}
+
 /** ⌘F or ⌘⇧F (Ctrl+F, Ctrl+Shift+F) Search (M5 §4, M5b §7.3): the F key,
  *  or the physical one on layouts without a Latin F. */
-export function isSearchKey(e: KeyboardEvent): boolean {
-  if (!(e.metaKey || e.ctrlKey) || e.altKey) return false;
+export function isSearchKey(e: KeyboardEvent, mac = MAC): boolean {
+  // On macOS only ⌘: Ctrl+F is "forward one character" in text (final review M12).
+  if (!(mac ? e.metaKey : e.metaKey || e.ctrlKey) || e.altKey) return false;
   const key = e.key.toLowerCase();
   return key === 'f' || (!/^[a-z]$/.test(key) && e.code === 'KeyF');
 }
