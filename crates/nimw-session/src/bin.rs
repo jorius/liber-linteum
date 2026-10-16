@@ -15,7 +15,7 @@ use nimw_vault::{
 use std::time::{SystemTime, UNIX_EPOCH};
 
 /// One item in a bin.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct BinItem {
     /// Its path now (`.trash/…` or `.archive/…`).
     pub path: String,
@@ -24,6 +24,48 @@ pub struct BinItem {
     /// When it went in (ms since epoch).
     pub at: Option<u64>,
     pub folder: bool,
+    /// Bytes of the file, or of every file in the folder (M5b round 2;
+    /// Trash items only).
+    pub size: u64,
+    /// A folder's pages, however deep.
+    pub pages: Option<u32>,
+    /// A page's frontmatter emoji, or a folder's.
+    pub icon: Option<String>,
+}
+
+/// Bytes of every file under `full` (itself, for a file) and how many of
+/// them are pages; links are never followed.
+fn measure(full: &std::path::Path) -> (u64, u32) {
+    let Ok(meta) = std::fs::symlink_metadata(full) else {
+        return (0, 0);
+    };
+    if !meta.is_dir() {
+        let page = full
+            .extension()
+            .is_some_and(|e| e.eq_ignore_ascii_case("md"));
+        return (meta.len(), u32::from(page));
+    }
+    let mut total = (0, 0);
+    for entry in std::fs::read_dir(full).into_iter().flatten().flatten() {
+        let (size, pages) = measure(&entry.path());
+        total = (total.0 + size, total.1 + pages);
+    }
+    total
+}
+
+/// A trashed page's frontmatter emoji (the Trash isn't indexed); big files
+/// aren't read for it.
+fn page_icon(full: &std::path::Path, size: u64) -> Option<String> {
+    let page = full
+        .extension()
+        .is_some_and(|e| e.eq_ignore_ascii_case("md"));
+    if !page || size > 1 << 20 {
+        return None;
+    }
+    let text = std::fs::read_to_string(full).ok()?;
+    nimw_markdown::parse_page(&text, "")
+        .icon
+        .filter(|i| nimw_markdown::is_icon(i))
 }
 
 fn now_ms() -> u64 {
@@ -191,6 +233,7 @@ impl VaultSession {
     /// The Trash's items, newest first; unrecorded ones (Obsidian's) last.
     pub fn trash_list(&self) -> Result<Vec<BinItem>> {
         let records = self.vault.bin_records(Bin::Trash);
+        let folder_icons = self.vault.folder_icons();
         let dir = self.vault.fs_path(&self.bin_dir(TRASH_DIR)?)?;
         let mut items = Vec::new();
         let Ok(read) = std::fs::read_dir(&dir) else {
@@ -205,10 +248,20 @@ impl VaultSession {
             }
             let path = format!("{TRASH_DIR}/{name}");
             let r = records.get(&path);
+            let folder = entry.file_type().is_ok_and(|t| t.is_dir());
+            let (size, pages) = measure(&entry.path());
+            let icon = if folder {
+                folder_icons.get(&path).cloned()
+            } else {
+                page_icon(&entry.path(), size)
+            };
             items.push(BinItem {
-                folder: entry.file_type().is_ok_and(|t| t.is_dir()),
+                folder,
                 from: r.map(|r| r.from.clone()),
                 at: r.map(|r| r.at),
+                size,
+                pages: folder.then_some(pages),
+                icon,
                 path,
             });
         }
@@ -362,6 +415,7 @@ impl VaultSession {
                     from: Some(r.from.clone()),
                     at: Some(r.at),
                     folder: stat.kind == nimw_index::FileKind::Folder,
+                    ..BinItem::default()
                 });
             }
         }
@@ -381,8 +435,7 @@ impl VaultSession {
                 items.push(BinItem {
                     path: path.clone(),
                     from: Some(strip_archive(&vp)?.to_string()),
-                    at: None,
-                    folder: false,
+                    ..BinItem::default()
                 });
             }
         }
@@ -505,6 +558,29 @@ mod tests {
                 source,
             })
         }
+    }
+
+    #[test]
+    fn m5b_r2_the_trash_lists_sizes_page_counts_and_icons() {
+        let f = fx(&[
+            ("Rocket.md", "---\nicon: 🚀\n---\n# R\n"),
+            ("Camp/a.md", "aaaa"),
+            ("Camp/Inner/b.md", "bb"),
+            ("Camp/map.png", "png!"),
+        ]);
+        f.s.vault().set_folder_icon("Camp", Some("🏕️")).unwrap();
+        f.s.trash(&vp("Rocket.md")).unwrap();
+        f.s.trash(&vp("Camp")).unwrap();
+        let items = f.s.trash_list().unwrap();
+        let get = |p: &str| items.iter().find(|i| i.path == p).unwrap();
+        let rocket = get(".trash/Rocket.md");
+        assert_eq!(rocket.size, "---\nicon: 🚀\n---\n# R\n".len() as u64);
+        assert_eq!(rocket.icon.as_deref(), Some("🚀"));
+        assert_eq!(rocket.pages, None);
+        let camp = get(".trash/Camp");
+        assert_eq!(camp.size, 10, "4 + 2 + 4 bytes, every file inside");
+        assert_eq!(camp.pages, Some(2));
+        assert_eq!(camp.icon.as_deref(), Some("🏕️"));
     }
 
     #[test]

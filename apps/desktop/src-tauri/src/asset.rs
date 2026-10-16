@@ -142,7 +142,36 @@ pub fn serve(state: &AppState, uri_path: &str, range: Option<&str>) -> AssetResp
     {
         return serve_external(&session, encoded, range);
     }
+    if let Some(name) = uri_path.trim_start_matches('/').strip_prefix(".trash/") {
+        return serve_trashed_image(session.vault(), name, range);
+    }
     serve_from(session.vault(), uri_path, range)
+}
+
+/// A trashed image, for its thumbnail in the Trash view (M5b round 2): only
+/// images directly in a real `.trash` folder, never through a link.
+fn serve_trashed_image(vault: &Vault, encoded: &str, range: Option<&str>) -> AssetResponse {
+    let Ok(name) = percent_decode_str(encoded).decode_utf8() else {
+        return AssetResponse::status(403);
+    };
+    let mime = mime_for(&name);
+    if name.contains(['/', '\\'])
+        || nimw_vault::is_hidden_name(&name)
+        || !mime.starts_with("image/")
+    {
+        return AssetResponse::status(403);
+    }
+    let dir = vault.root().join(".trash");
+    let file = dir.join(name.as_ref());
+    let real_dir = std::fs::symlink_metadata(&dir).is_ok_and(|m| m.is_dir());
+    let real_file = std::fs::symlink_metadata(&file).is_ok_and(|m| m.is_file());
+    if !real_dir || !real_file {
+        return AssetResponse::status(404);
+    }
+    match std::fs::read(&file) {
+        Ok(bytes) => respond(bytes, mime, range),
+        Err(_) => AssetResponse::status(404),
+    }
 }
 
 /// Serves a request from the webview labelled `label`: a single-file window

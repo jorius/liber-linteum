@@ -2287,6 +2287,8 @@ fn m5b_trash_and_archive_over_ipc() {
     assert_eq!(bins["trash"][0]["from"], "Welcome.md");
     assert!(bins["trash"][0]["at"].is_u64());
     assert_eq!(bins["trash"][0]["folder"], false);
+    // M5b round 2: its size, for the Trash view.
+    assert!(bins["trash"][0]["size"].as_u64().unwrap() > 0);
     let back = call(
         &h.main,
         "trash_restore",

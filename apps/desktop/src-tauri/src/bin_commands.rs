@@ -17,6 +17,12 @@ pub struct BinItemDto {
     pub from: Option<String>,
     pub at: Option<u64>,
     pub folder: bool,
+    /// Bytes, a folder's whole contents (M5b round 2).
+    pub size: u64,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub pages: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub icon: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -31,6 +37,9 @@ fn item(i: BinItem) -> BinItemDto {
         from: i.from,
         at: i.at,
         folder: i.folder,
+        size: i.size,
+        pages: i.pages,
+        icon: i.icon,
     }
 }
 
