@@ -403,7 +403,7 @@ These override §5 where they conflict.
 
 ## 15. Final review — Trash, Archive and icons
 
-The Opus review of `855c6ea..5f961aa` found 2 Important and 8 Minor issues; M1 was re-graded Important by effect. Fixed with a test that failed first (`crates/nimw-session/src/bin.rs` `m5b_review_*`, `features/bin/Bin.test.tsx` "M5b final review", `stores/editorStore.test.tsx` `flushUnder`):
+The Opus review of `855c6ea..5f961aa` found 2 Important and 8 Minor issues; M1 was re-graded Important by effect. Fixed with a test that failed first (`crates/nimw-session/src/bin.rs` `m5b_review_*`, `features/bin/Bin.test.tsx` "M5b final review", `stores/editorStore.test.tsx` `flushBefore`):
 
 1. **I1, records trusted as restore places.**
    - A Trash or Archive record naming a hidden place (`.git/hooks/…`, `.obsidian/…`) or an unusable name is treated as unrecorded: the root for the Trash, the path under `.archive` for the Archive.
@@ -419,7 +419,7 @@ The Opus review of `855c6ea..5f961aa` found 2 Important and 8 Minor issues; M1 w
    - Deleting several items writes `trash.json` once, and what is left after a failure keeps its record.
    - `[[` suggestions use the cached icon map.
 10. **M8, numbering.** A folder's dots stay in its name (`v1.2 1`).
-11. **Auto save off.** Archiving and unarchiving save only the pages that move (`flushUnder`), not every unsaved page.
+11. **Auto save off.** Archiving and unarchiving save only the pages that move (`flushBefore`, shared with the shell fixes since integration), not every unsaved page.
 
 **Rulings:**
 - **M2 falls back to the root** rather than adding an error kind. Cost if wrong: the user finds the item at the root instead of being told why.
