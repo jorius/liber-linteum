@@ -464,3 +464,93 @@ The fresh review of `855c6ea..5f961aa` found no Critical issues. Each fix below 
 - **M7:** hidden row actions still reserve about 70 px, so long names cut early; the scratch row's count hides only on hover.
 - **M13 (rest):** the Vault menu items aren't disabled while a file window is focused (they bring the main window forward); the native ⌘, opens Settings over another dialog.
 - Windows shutdown/logout with Auto save off (see I2).
+
+## 17. Round 2 (Jose, 2026-10-15 evening)
+
+Jose's second look at the M5b build produced six items:
+- items 1–5 below;
+- item 6, the Trash redesign, built from his approved mock (`Trash.dc.html`).
+
+Settings categories are being mocked separately and aren't part of this round.
+
+### 17.1 `{{save}}` in the Auto save hint
+- **Cause:** messages are ICU (`i18next-icu`), whose placeholders take one brace. The hint used i18next's own `{{save}}`, which ICU leaves as it is.
+- **Fix:** `{save}` in en and es.
+- **Guard:** a test refuses `{{` anywhere in either locale file.
+
+### 17.2 Settings text fields
+- **Change:** the Subfolder name and Quick notes folder fields take the dialog's full-width text field. They had borrowed the accent's 10-character hex box.
+- **Refused names:** these fields are red-bordered when a name is refused, like the hex field.
+- **Ruling:** these fields use the body font, not the hex field's monospace.
+
+### 17.3 Toasts
+- **How long they stay:**
+  - with an action (Undo, Open): 8 s;
+  - plain: 5 s;
+  - listing details: stay until dismissed, as before.
+- **Pausing:** the timer pauses while the pointer is over a toast or focus is inside it.
+- **Limit:** at most three show; the oldest goes first.
+- **Ruling:** plain errors keep the existing 5 s rule rather than becoming sticky. Errors that list details were already sticky.
+  - Cost if wrong: a short error can be missed. Changing it is one condition in `toastStore.push`.
+
+### 17.4 Sort by
+- **The orders:** Name A→Z (the default, never stored), Name Z→A, Modified newest or oldest first, Created newest first.
+- **Storage:** per folder in `.nimw/vault.json` `folderSorts`, with `""` for the vault root. It follows renames and is forgotten on delete, like `folderIcons`.
+- **Commands:** `folder_sort_get` and `folder_sort_set`, main window only.
+- **Where the order is applied:** the session orders the tree (`order_folders`); the UI keeps the order it's given.
+- **Rulings:**
+  1. Folders stay first in every order. Under the date orders they keep their names' order; under Z→A they reverse too.
+  2. "Created" is the file system's birth time, read only for folders sorted that way. Where it's missing (some Linux file systems), ties fall back to the name.
+  3. In a row's menu, **Sort by** replaces the menu with the orders (→ or Enter opens them, ← goes back), as Icon… does.
+     - On a page it orders the page's folder.
+     - A sort button beside New page / New folder orders the vault root.
+
+### 17.5 The Archive is a read-only folder
+- **The tree:** `vault_tree` now includes `.archive` and what's in it. The UI keeps it out of `nodes` (the vault everywhere else) and lists it under the **Archived** row, which expands like a folder.
+- **The old view is gone:** the Archived list view and the `archive` screen are removed.
+- **Opening reveals:** archiving an item opens Archived, like a folder something moved into.
+- **Row actions:** Open, Unarchive, Sort by, Move to Trash (🗑).
+  - No +, ☺, rename (F2 does nothing) or move.
+  - The Archive's tree sits outside the explorer's drag-and-drop, so nothing drags in or out.
+- **A read-only page:**
+  - the editor takes no edits, except changes from the disk;
+  - the formatting toolbar and the width menu are hidden;
+  - the title field is read-only;
+  - the subtitle shows as text;
+  - the icon is shown but can't be picked;
+  - cover controls and relationships are off;
+  - the banner reads "This page is archived. Unarchive it to edit it."
+- **Rust:** refuses, with `notPermitted`:
+  - `page_write`, `text_write`, `page_create_conflict_copy`;
+  - `entry_rename` from or into `.archive`;
+  - `entry_create_page`, `entry_create_folder`, `entry_create_text` in it;
+  - `attachment_paste`, `attachment_import`, `cover_pick`;
+  - `page_width_set`, `cover_height_set`, `cover_side_set`, `cover_width_set`.
+- **Still allowed:** Unarchive (`archive_restore`), Move to Trash (`entry_trash`) and `folder_sort_set`.
+- **Ruling:** the toolbar is hidden on archived pages rather than shown disabled. A disabled toolbar would still say "edit me".
+
+### 17.6 The Trash, redesigned (Jose's approved mock)
+- **Rust:** Trash items carry:
+  - `size` (a file's bytes, or a folder's whole contents);
+  - `pages` (a folder's pages, however deep);
+  - `icon` (a page's frontmatter emoji, or a folder's).
+
+  `nimw-asset` serves images directly in a real `.trash` folder for thumbnails: nothing else in it, and never through a link.
+- **Rulings:**
+  1. **Groups:** "Earlier this week" means the last seven days, after Today and Yesterday. Older items group by date; items with no recorded time go under "Date unknown".
+  2. **Sorting:**
+     - **Name** shows a single "All items" group.
+     - **Original folder** groups by that folder.
+     - The sort is remembered for the session, not saved.
+  3. **Sizes** are 1024-based: `512 byte`, `840 kB`, `1.2 MB`.
+     - The time of day shows for the last 48 hours, the date before that.
+     - Pages show no size, as in the mock.
+  4. **Thumbnails:** only images directly in `.trash` get one. A folder's images don't; a failed load falls back to the image glyph.
+  5. **Selection:**
+     - Restore runs over the ticked items one after another; each clash asks Keep both / Cancel.
+     - Delete confirms once with the count.
+     - Escape clears the selection unless a dialog is open.
+  6. **Accessibility:**
+     - each row is a list item named after its item;
+     - group headings are hidden from assistive tech, and each list is named after its group;
+     - the selection bar is a region named "Selection", with its count in a polite live region.
