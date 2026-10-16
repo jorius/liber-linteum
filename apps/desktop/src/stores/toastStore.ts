@@ -3,7 +3,8 @@ import { create } from 'zustand';
 export const TOAST_MS = 5000;
 /** A toast with a button (Undo, Open) stays longer, to be reachable (M5b round 2). */
 export const ACTION_TOAST_MS = 8000;
-/** The most toasts shown at once; the oldest makes room. */
+/** The most toasts shown at once; the oldest timed one makes room, never one
+ *  listing details (round-2 review I4). */
 export const MAX_TOASTS = 3;
 
 export interface Toast {
@@ -51,8 +52,13 @@ export const useToastStore = create<ToastState>((set, get) => ({
   toasts: [],
   push: ({ message, detail, tone = 'info', action }) => {
     const id = nextId++;
-    const kept = get().toasts.slice(-(MAX_TOASTS - 1));
-    for (const t of get().toasts) if (!kept.includes(t)) stop(t.id);
+    let kept = get().toasts;
+    while (kept.length >= MAX_TOASTS) {
+      const oldest = kept.find((t) => !t.detail?.length);
+      if (!oldest) break;
+      stop(oldest.id);
+      kept = kept.filter((t) => t !== oldest);
+    }
     set({ toasts: [...kept, { id, message, detail, tone, action }] });
     if (!detail?.length) {
       timers.set(id, { left: action ? ACTION_TOAST_MS : TOAST_MS, at: 0 });

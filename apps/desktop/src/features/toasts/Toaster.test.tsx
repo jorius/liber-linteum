@@ -67,4 +67,13 @@ describe('Toaster timing', () => {
     expect(messages()).toEqual(['Moved 2', 'Moved 3', 'Moved 4']);
     expect(screen.getAllByRole('button', { name: 'Undo' })).toHaveLength(3);
   });
+
+  it('round-2 review I4: a toast listing details is never pushed out; the oldest timed one goes', () => {
+    render(<Toaster />);
+    push({ message: 'Links not updated', detail: ['a.md'] });
+    for (const n of [1, 2, 3]) {
+      push({ message: `Moved ${n}`, action: { label: 'Undo', run: () => undefined } });
+    }
+    expect(messages()).toEqual(['Links not updated', 'Moved 2', 'Moved 3']);
+  });
 });
