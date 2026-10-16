@@ -352,7 +352,7 @@
       "showPaths": "Show where attachments are on disk"
     },
     "autoSave": "Auto save",
-    "autoSaveHint": "When off, {{save}} saves. Changing the title, subtitle, cover or relationships, and moving a page to the Trash, also save its text.",
+    "autoSaveHint": "When off, {save} saves. Changing the title, subtitle, cover or relationships, and moving a page to the Trash, also save its text.",
     "actionButton": "Action button",
     "actionButtonBottomRight": "Bottom right",
     "actionButtonBottomLeft": "Bottom left",

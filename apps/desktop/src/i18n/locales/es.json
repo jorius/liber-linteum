@@ -352,7 +352,7 @@
       "showPaths": "Mostrar dónde están los adjuntos en el disco"
     },
     "autoSave": "Guardado automático",
-    "autoSaveHint": "Si está desactivado, {{save}} guarda. Cambiar el título, el subtítulo, la portada o las relaciones, y mover una página a la Papelera, también guardan su texto.",
+    "autoSaveHint": "Si está desactivado, {save} guarda. Cambiar el título, el subtítulo, la portada o las relaciones, y mover una página a la Papelera, también guardan su texto.",
     "actionButton": "Botón de acciones",
     "actionButtonBottomRight": "Abajo a la derecha",
     "actionButtonBottomLeft": "Abajo a la izquierda",
