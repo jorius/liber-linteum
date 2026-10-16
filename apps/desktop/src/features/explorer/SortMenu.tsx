@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { folderSortGet, folderSortSet, type FolderSort } from '../../ipc';
+import { errorMessage } from '../../stores/messages';
+import { useToastStore } from '../../stores/toastStore';
 import { useVaultStore } from '../../stores/vaultStore';
 
 const SORTS: FolderSort[] = [
@@ -12,7 +14,9 @@ const SORTS: FolderSort[] = [
 ];
 
 /** How a folder (`""`: the vault root) lists its entries (M5b round 2): a
- *  radio menu at `anchor`. ← goes `back` to the menu it came from. */
+ *  radio menu at `anchor`. ← goes `back` to the menu it came from.
+ *  `onClose(refocus)`: true after a choice or Escape, to give focus back to
+ *  what opened it (round-2 review M14). */
 export function SortMenu({
   path,
   name,
@@ -23,7 +27,7 @@ export function SortMenu({
   path: string;
   name: string;
   anchor: { x: number; y: number };
-  onClose: () => void;
+  onClose: (refocus: boolean) => void;
   onBack?: () => void;
 }) {
   const { t } = useTranslation();
@@ -38,23 +42,27 @@ export function SortMenu({
   useEffect(() => items.current[active]?.focus(), [active]);
   useEffect(() => {
     const onDown = (e: MouseEvent) => {
-      if (box.current && !box.current.contains(e.target as Node)) onClose();
+      const target = e.target as HTMLElement;
+      // A press on the open menu's own button is that button's: it toggles.
+      if (target.closest?.('[aria-haspopup="menu"][aria-expanded="true"]')) return;
+      if (box.current && !box.current.contains(target)) onClose(false);
     };
     document.addEventListener('mousedown', onDown);
     return () => document.removeEventListener('mousedown', onDown);
   }, [onClose]);
 
   const choose = (sort: FolderSort) => {
-    onClose();
+    onClose(true);
     void folderSortSet(path, sort).then(async (r) => {
       if (r.ok) await useVaultStore.getState().refreshTree();
+      else useToastStore.getState().push({ message: errorMessage(r.error), tone: 'error' });
     });
   };
   const onKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
     if (e.key === 'ArrowDown') setActive((a) => (a + 1) % SORTS.length);
     else if (e.key === 'ArrowUp') setActive((a) => (a - 1 + SORTS.length) % SORTS.length);
     else if (e.key === 'ArrowLeft' && onBack) onBack();
-    else if (e.key === 'Escape' || e.key === 'Tab') onClose();
+    else if (e.key === 'Escape' || e.key === 'Tab') onClose(e.key === 'Escape');
     else return;
     e.preventDefault();
     e.stopPropagation();

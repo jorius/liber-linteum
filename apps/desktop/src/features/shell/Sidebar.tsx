@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { NewFolderIcon, NewPageIcon, SidebarIcon, SortIcon } from '../../app/icons';
 import { dirFor } from '../../stores/tree';
@@ -20,6 +20,7 @@ export function Sidebar(treeProps: ExplorerTreeProps) {
   const icon = useVaultStore((s) => s.info?.icon);
   // The vault root's order (M5b round 2), opened under its button.
   const [sortAt, setSortAt] = useState<{ x: number; y: number } | null>(null);
+  const sortButton = useRef<HTMLButtonElement>(null);
   const create = (kind: 'page' | 'folder') => {
     const { nodes, selected, createPage, createFolder } = useVaultStore.getState();
     const dir = dirFor(nodes, selected);
@@ -73,6 +74,7 @@ export function Sidebar(treeProps: ExplorerTreeProps) {
           <button
             type="button"
             className={styles.iconButton}
+            ref={sortButton}
             aria-label={t('sort.vault')}
             aria-haspopup="menu"
             aria-expanded={sortAt !== null}
@@ -85,7 +87,15 @@ export function Sidebar(treeProps: ExplorerTreeProps) {
             <SortIcon />
           </button>
           {sortAt && (
-            <SortMenu path="" name={name} anchor={sortAt} onClose={() => setSortAt(null)} />
+            <SortMenu
+              path=""
+              name={name}
+              anchor={sortAt}
+              onClose={(refocus) => {
+                setSortAt(null);
+                if (refocus) sortButton.current?.focus();
+              }}
+            />
           )}
         </span>
       </div>

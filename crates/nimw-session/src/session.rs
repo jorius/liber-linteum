@@ -328,9 +328,14 @@ impl VaultSession {
             } else {
                 HashMap::new()
             };
+            // Keys made once per entry, not per comparison (round-2 review M14).
+            let keys: HashMap<String, String> = run
+                .iter()
+                .map(|n| (n.path.clone(), nimw_markdown::name_key(&n.name)))
+                .collect();
             run.sort_by(|a, b| {
                 let folders = (a.kind != FileKind::Folder).cmp(&(b.kind != FileKind::Folder));
-                let name = nimw_markdown::name_key(&a.name).cmp(&nimw_markdown::name_key(&b.name));
+                let name = keys[&a.path].cmp(&keys[&b.path]);
                 let order = match (sort, a.kind == FileKind::Folder) {
                     (NameDesc, _) => name.reverse(),
                     // Folders keep their names' order under a date order.
