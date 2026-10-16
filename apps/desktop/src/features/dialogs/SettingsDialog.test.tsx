@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { clearMocks, mockIPC } from '../../ipc/testing';
 import { DEFAULT_SETTINGS, useSettingsStore } from '../../stores/settingsStore';
 import { resetVaultStore, useVaultStore } from '../../stores/vaultStore';
+import styles from './Dialogs.module.css';
 import { SettingsDialog } from './SettingsDialog';
 
 let patches: Record<string, unknown>[];
@@ -310,6 +311,8 @@ describe('Settings → This vault (M2c §5.4)', () => {
     const where = await screen.findByRole('combobox', { name: 'New attachments go to' });
     await waitFor(() => expect(where).toHaveValue('subfolder'));
     expect(screen.getByRole('textbox', { name: 'Subfolder name' })).toHaveValue('attachments');
+    // M5b round 2: as wide as the selects around it, not a 10-character box.
+    expect(screen.getByRole('textbox', { name: 'Subfolder name' })).toHaveClass(styles.textInput);
     await userEvent.selectOptions(where, 'same');
     await waitFor(() =>
       expect(vaultPatches).toEqual([{ attachments: { mode: 'same', path: '' } }]),

@@ -188,7 +188,8 @@
   padding: 6px 8px;
 }
 
-.hexInput[aria-invalid='true'] {
+.hexInput[aria-invalid='true'],
+.textInput[aria-invalid='true'] {
   border-color: var(--color-warn-border);
 }
 
