@@ -59,6 +59,9 @@ export function TextView({ path }: { path: string }) {
     <section className={styles.page} aria-label={t('page.region')}>
       <div data-band="plain" className={styles.band}>
         <div className={styles.bandRows}>
+          <div className={styles.heading}>
+            <PageTitle path={path} />
+          </div>
           <div className={styles.bar}>
             <div className={`${styles.where} ${styles.pill}`}>
               <BackArrow />
@@ -79,9 +82,6 @@ export function TextView({ path }: { path: string }) {
             )}
           </div>
         </div>
-      </div>
-      <div className={styles.titleBlock}>
-        <PageTitle path={path} />
       </div>
       {error || notText ? (
         <div className={`${styles.orphan}`}>

@@ -9,6 +9,7 @@ import { Breadcrumb } from './Breadcrumb';
 import { Cover } from './Cover';
 import { ModeToggle } from './ModeToggle';
 import { NoteTitle } from './NoteTitle';
+import { PageHeading } from './PageHeading';
 import { RelatedChips } from './RelatedChips';
 import { WidthMenu } from './WidthMenu';
 import { WordCount } from './WordCount';
@@ -18,7 +19,7 @@ import styles from './PageView.module.css';
  *  the save status, Format and the mode switch; second row, tags, link
  *  counts and the note's own title, with the cover's controls at the right.
  *  With a cover the rows sit on it in veiled pills. The title and subtitle
- *  follow the band, at the top of the page (M5b §2.3). */
+ *  head the band, above the breadcrumb (on the cover when there is one). */
 export function PageHeader({
   page,
   mode,
@@ -41,6 +42,10 @@ export function PageHeader({
     <Cover page={page} editable={editable} body={children}>
       {({ addCover, controls }) => (
         <>
+          {/* The title and subtitle, on the cover above the breadcrumb (Jose, M5b). */}
+          <div className={`${styles.heading} ${styles.pill}`}>
+            <PageHeading />
+          </div>
           <div className={styles.bar}>
             <div className={`${styles.where} ${styles.pill}`}>
               <BackArrow />

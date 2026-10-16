@@ -63,7 +63,11 @@ describe('PageView (M2a §5)', () => {
       'VaultCharacter Designrex',
     );
     // M2b §2: the title is the file name; the note's own title is shown under it.
-    expect(screen.getByRole('heading', { level: 1, name: 'rex' })).toBeInTheDocument();
+    const title = screen.getByRole('heading', { level: 1, name: 'rex' });
+    // Jose (M5b): the title heads the cover band, above the breadcrumb.
+    const crumbs = screen.getByRole('navigation', { name: 'Breadcrumb' });
+    expect(title.compareDocumentPosition(crumbs) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(title.closest('[data-band]')).toBe(crumbs.closest('[data-band]'));
     expect(screen.getByText('Title in the note: Generator Rex')).toBeInTheDocument();
     // M2c §3: the subtitle is editable in place.
     expect(screen.getByRole('textbox', { name: 'Subtitle' })).toHaveValue('Hero redesign · v3');

@@ -8,7 +8,6 @@ import { ArchivedBanner } from '../bin/ArchivedBanner';
 import { Editor } from '../editor/Editor';
 import { isTextPath } from '../../stores/textFiles';
 import { PageHeader } from './PageHeader';
-import { PageHeading } from './PageHeading';
 import { TextView } from './TextView';
 import { UnwritableNotice } from './UnwritableNotice';
 import styles from './PageView.module.css';
@@ -77,10 +76,6 @@ export function PageView() {
     <section className={styles.page} aria-label={t('page.region')}>
       {/* A side cover (M4b part 3 §3) runs beside the header and the text. */}
       <PageHeader page={page} mode={mode}>
-        {/* The title and subtitle, back in the page (M5b §2.3). */}
-        <div className={styles.titleBlock}>
-          <PageHeading />
-        </div>
         {orphanBanner}
         <ArchivedBanner path={path} />
         <UnwritableNotice />

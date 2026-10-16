@@ -116,6 +116,8 @@ export function PageTitle({
           aria-invalid={error !== null}
           aria-describedby={error ? errorId : undefined}
           spellCheck={false}
+          // As wide as its text, so the heading's pill fits it (Safari 15 has no field-sizing).
+          size={Math.max(8, draft.length + 1)}
           value={draft}
           onChange={(e) => {
             setDraft(e.target.value);

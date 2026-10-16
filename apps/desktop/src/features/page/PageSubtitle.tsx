@@ -46,6 +46,7 @@ export function PageSubtitle({ page, editable }: { page: Page; editable: boolean
       aria-label={t('page.subtitleLabel')}
       placeholder={t('page.subtitlePlaceholder')}
       title={draft || undefined}
+      size={Math.max(16, draft.length + 1)}
       value={draft}
       onChange={(e) => setDraft(e.target.value)}
       onKeyDown={onKeyDown}

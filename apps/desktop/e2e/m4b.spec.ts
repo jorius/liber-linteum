@@ -103,7 +103,13 @@ for (const px of [200, 132]) {
       await band.hover();
       await expect(page.getByRole('button', { name: 'Remove' })).toBeVisible();
       const height = await band.evaluate((el) => el.clientHeight); // without its border
-      expect(`${width}: ${height}`).toBe(`${width}: ${px}`);
+      if (px === 200) expect(`${width}: ${height}`).toBe(`${width}: ${px}`);
+      // The smallest choice can't hold the title, breadcrumb and facts rows
+      // (Jose, M5b: the title heads the band): it grows just enough.
+      else expect(height).toBeGreaterThanOrEqual(px);
+      const foot = (await page.getByText(/links? · \d+ backlinks?/).boundingBox())!;
+      const box = (await band.boundingBox())!;
+      expect(foot.y + foot.height).toBeLessThanOrEqual(box.y + box.height);
       // Nothing overflows the window sideways.
       expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(width);
     }

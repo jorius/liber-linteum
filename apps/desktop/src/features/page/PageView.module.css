@@ -207,7 +207,11 @@
 .bandCover .bandRows {
   box-sizing: border-box;
   min-height: var(--cover-height, 132px);
-  justify-content: space-between;
+}
+
+/* The title and breadcrumb rows sit at the top; the facts at the bottom. */
+.bandCover .bandFoot {
+  margin-top: auto;
 }
 
 /* On the veil, muted text would fall to about 4:1 over a dark or bright
@@ -864,22 +868,17 @@ span.relatedOpen {
 
 /* The title and subtitle at the top of the page (M5b §2.3), over the text's
    measure. */
-.titleBlock {
-  flex: none;
+/* The title and subtitle head the band, above the breadcrumb, at the size
+   they had in the top bar (Jose, M5b): one line each, ellipsis when long. */
+.heading {
   box-sizing: border-box;
-  width: 100%;
-  max-width: 760px;
-  margin: 8px auto 0;
-  padding: 0 40px;
+  width: fit-content;
+  max-width: min(100%, 760px);
+  min-width: 0;
 }
 
-.titleBlock .title {
-  font-size: 30px;
-}
-
-.titleBlock .subtitle,
-.titleBlock .subtitleInput {
-  font-size: 15px;
+.repositioning .heading {
+  visibility: hidden;
 }
 
 /* The page's optional emoji (M5b §4), before the title on its line. */
@@ -895,6 +894,3 @@ span.relatedOpen {
 }
 
 /* At the top of the page the icon matches the title's size (M5b §2.3, §4). */
-.titleBlock .pageIcon {
-  font-size: 30px;
-}

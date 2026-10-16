@@ -474,31 +474,29 @@ export function Cover({
     );
   }
 
-  let header: ReactNode;
-  if (cover.kind === 'none' || side) {
-    header = (
-      <div ref={band} data-band="plain" className={styles.band}>
-        {rows}
-      </div>
-    );
-  } else {
-    // The rows stay pinned to the band's top and bottom at any height; the
-    // handle steps aside while the image is being placed.
-    header = (
-      <div
-        ref={band}
-        data-band="cover"
-        role="group"
-        aria-label={t('cover.label')}
-        className={`${styles.band} ${styles.bandCover} ${repositioning ? styles.repositioning : ''}`}
-        style={{ '--cover-height': `${resize.height}px` } as CSSProperties}
-      >
-        {layer}
-        {rows}
-        {!repositioning && resize.handle}
-      </div>
-    );
-  }
+  // One band element either way, so the title and subtitle in its rows
+  // survive a cover being added or removed while they're being edited. The
+  // rows stay pinned to the band's top and bottom at any height; the handle
+  // steps aside while the image is being placed.
+  const plain = cover.kind === 'none' || !!side;
+  const header = (
+    <div
+      ref={band}
+      data-band={plain ? 'plain' : 'cover'}
+      role={plain ? undefined : 'group'}
+      aria-label={plain ? undefined : t('cover.label')}
+      className={
+        plain
+          ? styles.band
+          : `${styles.band} ${styles.bandCover} ${repositioning ? styles.repositioning : ''}`
+      }
+      style={plain ? undefined : ({ '--cover-height': `${resize.height}px` } as CSSProperties)}
+    >
+      {plain ? null : layer}
+      {rows}
+      {plain || repositioning ? null : resize.handle}
+    </div>
+  );
 
   const stripNode = side && (
     <div
