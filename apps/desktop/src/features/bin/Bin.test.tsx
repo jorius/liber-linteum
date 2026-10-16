@@ -8,6 +8,7 @@ import { DEFAULT_SETTINGS, useSettingsStore } from '../../stores/settingsStore';
 import { useToastStore } from '../../stores/toastStore';
 import { useUiStore } from '../../stores/uiStore';
 import { resetVaultStore, useVaultStore } from '../../stores/vaultStore';
+import { DialogHost } from '../dialogs/DialogHost';
 import { ArchivedBanner } from './ArchivedBanner';
 import { BinView } from './BinView';
 import { useBinStore } from './binStore';
@@ -127,7 +128,12 @@ describe('BinView: the Trash', () => {
         return 'P/Old 1.md';
       },
     });
-    render(<BinView kind="trash" />);
+    render(
+      <>
+        <BinView kind="trash" />
+        <DialogHost />
+      </>,
+    );
     const list = await screen.findByRole('list', { name: 'Trash' });
     await userEvent.click(within(list).getAllByRole('button', { name: 'Restore Old' })[0]);
     const dialog = await screen.findByRole('dialog', { name: 'Old already exists' });
@@ -170,6 +176,7 @@ describe('BinView: the Trash', () => {
 describe('BinView: the Archive', () => {
   it('unarchives an item and moves another to the Trash', async () => {
     lists.archive.push(item('.archive/Old.md', 'Old.md'));
+    useSettingsStore.setState({ settings: { ...DEFAULT_SETTINGS, confirmDelete: false } });
     const calls = backend();
     render(<BinView kind="archive" />);
     const list = await screen.findByRole('list', { name: 'Archived' });
@@ -207,5 +214,56 @@ describe('moving to the Trash and the Archive', () => {
     backend();
     const { container } = render(<ArchivedBanner path="Camp/a.md" />);
     expect(container).toBeEmptyDOMElement();
+  });
+});
+
+describe('M5b final review', () => {
+  it('M3: Unarchive from the banner asks to keep both on a clash', async () => {
+    const calls = backend({
+      archive_restore: (a) => {
+        if (!a.keepBoth) throw { kind: 'alreadyExists', message: 'Camp/a.md' };
+        return { moved: [[a.path, 'Camp/a 1.md']], updatedFiles: [], updatedLinks: 0, failed: [] };
+      },
+    });
+    render(
+      <>
+        <ArchivedBanner path=".archive/Camp/a.md" />
+        <DialogHost />
+      </>,
+    );
+    await userEvent.click(screen.getByRole('button', { name: 'Unarchive' }));
+    const dialog = await screen.findByRole('dialog', { name: 'a already exists' });
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Keep both' }));
+    await waitFor(() =>
+      expect(called(calls, 'archive_restore')).toEqual([
+        { path: '.archive/Camp/a.md', keepBoth: false },
+        { path: '.archive/Camp/a.md', keepBoth: true },
+      ]),
+    );
+  });
+
+  it('M4: Move to Trash from the Archived view asks first', async () => {
+    lists.archive.push(item('.archive/Old.md', 'Old.md'));
+    const calls = backend();
+    render(<BinView kind="archive" />);
+    const list = await screen.findByRole('list', { name: 'Archived' });
+    await userEvent.click(within(list).getByRole('button', { name: 'Move Old to Trash' }));
+    expect(useUiStore.getState().dialog).toEqual({ type: 'delete', path: '.archive/Old.md' });
+    expect(called(calls, 'entry_trash')).toEqual([]);
+  });
+
+  it("M5: a trash toast's Undo never brings back another item that took the name", async () => {
+    const calls = backend();
+    await useVaultStore.getState().trash('P/Old.md');
+    const undo = useToastStore.getState().toasts.at(-1)?.action;
+    // Restored meanwhile, and B/Old.md trashed under the same name.
+    lists.trash = [item('.trash/Old.md', 'B/Old.md')];
+    undo?.run();
+    await waitFor(() =>
+      expect(useToastStore.getState().toasts.at(-1)?.message).toBe(
+        'That item is no longer in the Trash.',
+      ),
+    );
+    expect(called(calls, 'trash_restore')).toEqual([]);
   });
 });

@@ -25,6 +25,9 @@ export type DialogState =
   /** Save / Don't Save / Cancel before unsaved text is left (M5b §6, auto
    *  save off). `id` tells two questions apart. */
   | { type: 'unsaved'; id: number; paths: string[]; answer: (c: UnsavedChoice) => void }
+  /** Restore or Unarchive found something new in the old place: keep both?
+   *  (M5b §5.2; final review M3: from the banner and the toasts too). */
+  | { type: 'binClash'; kind: 'trash' | 'archive'; path: string }
   | null;
 
 export type UnsavedChoice = 'save' | 'discard' | 'cancel';

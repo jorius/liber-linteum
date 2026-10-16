@@ -19,6 +19,7 @@ import { linkSuggest, linksResolve, pageRead, type LinkSuggestion } from '../../
 import { headingLinkText } from '../../markdown/headings';
 import { parsePage } from '../../markdown/parse';
 import { text as nodeText } from '../../markdown/section';
+import { iconsOf } from '../icons/ItemIcon';
 import { announce } from './announce';
 import { useVaultStore } from '../../stores/vaultStore';
 import { pagePath } from './livePreview';
@@ -87,7 +88,7 @@ function fileOption(s: LinkSuggestion, q: LinkQuery): Completion {
   const alias = q.embed ? null : aliasFor(s);
   const label = s.title ?? baseName(s.path);
   // The page's optional emoji (M5b §4) shows; matching stays on the name.
-  const icon = useVaultStore.getState().nodes.find((n) => n.path === s.path)?.icon;
+  const icon = iconsOf(useVaultStore.getState().nodes).get(s.path);
   return {
     label,
     ...(icon ? { displayLabel: `${icon} ${label}` } : {}),

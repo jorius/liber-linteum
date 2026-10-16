@@ -48,6 +48,9 @@ interface EditorState {
   close: () => Promise<void>;
   /** Saves every open page (current and background); capped at `timeoutMs`. */
   flushAll: (timeoutMs?: number) => Promise<void>;
+  /** Saves only the open pages at or below `path` (a page or folder about
+   *  to move), so other unsaved text stays unsaved (auto save off). */
+  flushUnder: (path: string) => Promise<void>;
   onExternalChange: (c: ChangedPayload, exists?: (path: string) => boolean) => Promise<void>;
   follow: (from: string, to: string) => void;
   /** Re-reads pages rewritten by our own link updates (rename/move). */
@@ -224,6 +227,11 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     const all = Promise.all([...docs.values()].map((d) => d.flush()));
     await (timeoutMs === undefined ? all : Promise.race([all, delay(timeoutMs)]));
     docs.forEach((d) => dropIfDone(d));
+  },
+  flushUnder: async (path) => {
+    const under = [...docs.values()].filter((d) => remap(d.path, path, path) !== null);
+    await Promise.all(under.map((d) => d.flush()));
+    under.forEach((d) => dropIfDone(d));
   },
   onExternalChange: async (c, exists) => {
     for (const [from, to] of c.renamed) get().follow(from, to);

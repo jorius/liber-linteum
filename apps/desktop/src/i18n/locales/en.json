@@ -710,6 +710,7 @@
     "keepBoth": "Keep both",
     "archivedPage": "This page is archived.",
     "archivedToast": "Archived",
-    "undo": "Undo"
+    "undo": "Undo",
+    "undoGone": "That item is no longer in the Trash."
   }
 }

@@ -710,6 +710,7 @@
     "keepBoth": "Conservar ambos",
     "archivedPage": "Esta página está archivada.",
     "archivedToast": "Archivado",
-    "undo": "Deshacer"
+    "undo": "Deshacer",
+    "undoGone": "Ese elemento ya no está en la Papelera."
   }
 }

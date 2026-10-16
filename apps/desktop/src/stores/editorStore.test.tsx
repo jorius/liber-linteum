@@ -9,6 +9,7 @@ import { clearMocks, emit, mockIPC, mockWindows } from '../ipc/testing';
 import { fakeDisk } from '../test/fakeDisk';
 import { installQuitGuard, resetEditorStore, useEditorStore } from './editorStore';
 import { usePageStore } from './pageStore';
+import { DEFAULT_SETTINGS, useSettingsStore } from './settingsStore';
 import { useToastStore } from './toastStore';
 
 const editor = () => useEditorStore.getState();
@@ -304,5 +305,22 @@ describe('frontmatter edits from the header (M2c §4)', () => {
         'NIMW can’t safely change this note’s frontmatter. Edit it in Source mode.',
       );
     }
+  });
+});
+
+describe('M5b final review: a move saves only what moves', () => {
+  afterEach(() => useSettingsStore.setState({ settings: DEFAULT_SETTINGS }));
+
+  it('flushUnder writes the pages at or below a path and leaves other unsaved text', async () => {
+    useSettingsStore.setState({ settings: { ...DEFAULT_SETTINGS, autoSave: false } });
+    const disk = fakeDisk({ 'A.md': 'a\n', 'F/b.md': 'b\n' });
+    await editor().open('F/b.md');
+    editor().doc!.edit('b2\n');
+    await editor().open('A.md');
+    editor().doc!.edit('a2\n');
+    await editor().flushUnder('F');
+    expect(disk.files.get('F/b.md')).toBe('b2\n');
+    expect(disk.files.get('A.md')).toBe('a\n');
+    expect(editor().dirtyPaths()).toEqual(['A.md']);
   });
 });

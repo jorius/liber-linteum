@@ -1,4 +1,5 @@
 import { useUiStore } from '../../stores/uiStore';
+import { BinClashDialog } from '../bin/BinClashDialog';
 import { IndexPickDialog } from '../global-view/IndexPickDialog';
 import { RelationsDialog } from '../global-view/RelationsDialog';
 import { SearchDialog } from '../search/SearchDialog';
@@ -55,6 +56,8 @@ export function DialogHost() {
           onClose={close}
         />
       );
+    case 'binClash':
+      return <BinClashDialog kind={dialog.kind} path={dialog.path} onClose={close} />;
     case 'scratchpadSetup':
       return null; // ScratchpadHost shows it, on the Welcome screen too
   }

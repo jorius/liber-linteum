@@ -6,6 +6,7 @@ import {
   entryCreatePage,
   entryRename,
   entryTrash,
+  binList,
   trashRestore,
   onVaultChanged,
   onVaultProgress,
@@ -405,10 +406,20 @@ export const useVaultStore = create<VaultState>((set, get) => {
         action: {
           label: i18next.t('bin.undo'),
           run: () =>
-            void trashRestore(inner, false).then((back) => {
+            void (async () => {
+              // Only the item this toast trashed (final review M5): it may
+              // have been restored, and another taken its name since.
+              const list = await binList();
+              const still =
+                list.ok && list.value?.trash.some((i) => i.path === inner && i.from === path);
+              if (!still) {
+                toast().push({ message: i18next.t('bin.undoGone') });
+                return;
+              }
+              const back = await trashRestore(inner, false);
               if (!back.ok) toast().push({ message: errorMessage(back.error), tone: 'error' });
-              return get().refreshTree();
-            }),
+              await get().refreshTree();
+            })(),
         },
       });
       return res;

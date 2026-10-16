@@ -2,21 +2,18 @@ import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { BinItem } from '../../ipc';
 import { nameOf, parentOf } from '../../stores/tree';
-import { useVaultStore } from '../../stores/vaultStore';
 import { Dialog } from '../dialogs/Dialog';
 import dialogStyles from '../dialogs/Dialogs.module.css';
+import { requestTrash } from '../explorer/trashAction';
 import { deleteItems, emptyTrash, restoreItem } from './binActions';
 import { useBinStore } from './binStore';
 import styles from './Bin.module.css';
 
-type Ask =
-  { type: 'clash'; item: BinItem } | { type: 'delete'; items: BinItem[] } | { type: 'empty' };
+type Ask = { type: 'delete'; items: BinItem[] } | { type: 'empty' };
 
 /** A page's name without `.md`; a folder's or attachment's as is. */
-const label = (item: BinItem) => {
-  const name = nameOf(item.path);
-  return item.folder ? name : name.replace(/\.md$/i, '');
-};
+export const binLabel = (path: string) => nameOf(path).replace(/\.md$/i, '');
+const label = (item: BinItem) => (item.folder ? nameOf(item.path) : binLabel(item.path));
 
 /** The Trash or the Archive, in place of the editor (M5b §5.2, §5.3). */
 export function BinView({ kind }: { kind: 'trash' | 'archive' }) {
@@ -27,9 +24,6 @@ export function BinView({ kind }: { kind: 'trash' | 'archive' }) {
     void useBinStore.getState().refresh();
   }, [kind]);
 
-  const restore = async (item: BinItem, keepBoth = false) => {
-    if ((await restoreItem(kind, item.path, keepBoth)) === 'clash') setAsk({ type: 'clash', item });
-  };
   const when = (at: number | null) =>
     at === null
       ? null
@@ -79,7 +73,7 @@ export function BinView({ kind }: { kind: 'trash' | 'archive' }) {
                     aria-label={t(kind === 'trash' ? 'bin.restoreName' : 'bin.unarchiveName', {
                       name,
                     })}
-                    onClick={() => void restore(item)}
+                    onClick={() => void restoreItem(kind, item.path)}
                   >
                     {t(kind === 'trash' ? 'bin.restore' : 'bin.unarchive')}
                   </button>
@@ -97,7 +91,7 @@ export function BinView({ kind }: { kind: 'trash' | 'archive' }) {
                       type="button"
                       className="btn btn-secondary"
                       aria-label={t('bin.toTrashName', { name })}
-                      onClick={() => void useVaultStore.getState().trash(item.path)}
+                      onClick={() => requestTrash(item.path)}
                     >
                       {t('bin.toTrash')}
                     </button>
@@ -108,58 +102,33 @@ export function BinView({ kind }: { kind: 'trash' | 'archive' }) {
           })}
         </ul>
       )}
-      {ask && (
-        <Confirm ask={ask} count={items.length} onClose={() => setAsk(null)} restore={restore} />
-      )}
+      {ask && <Confirm ask={ask} count={items.length} onClose={() => setAsk(null)} />}
     </section>
   );
 }
 
-function Confirm({
-  ask,
-  count,
-  onClose,
-  restore,
-}: {
-  ask: Ask;
-  count: number;
-  onClose: () => void;
-  restore: (item: BinItem, keepBoth: boolean) => Promise<void>;
-}) {
+function Confirm({ ask, count, onClose }: { ask: Ask; count: number; onClose: () => void }) {
   const { t } = useTranslation();
-  const [title, body, confirm, run] =
-    ask.type === 'clash'
+  const [title, confirm, run] =
+    ask.type === 'delete'
       ? [
-          t('bin.clashTitle', { name: label(ask.item) }),
-          t('bin.clashBody'),
-          t('bin.keepBoth'),
-          () => restore(ask.item, true),
+          t('bin.deleteTitle', { count: ask.items.length }),
+          t('bin.delete'),
+          () => deleteItems(ask.items),
         ]
-      : ask.type === 'delete'
-        ? [
-            t('bin.deleteTitle', { count: ask.items.length }),
-            t('bin.deleteBody'),
-            t('bin.delete'),
-            () => deleteItems(ask.items),
-          ]
-        : [t('bin.emptyTitle', { count }), t('bin.deleteBody'), t('bin.empty'), () => emptyTrash()];
+      : [t('bin.emptyTitle', { count }), t('bin.empty'), () => emptyTrash()];
   const go = () => {
     onClose();
     void run();
   };
   return (
     <Dialog title={title} onClose={onClose} onConfirm={go}>
-      <p className={dialogStyles.text}>{body}</p>
+      <p className={dialogStyles.text}>{t('bin.deleteBody')}</p>
       <div className={dialogStyles.buttons}>
         <button type="button" className="btn btn-secondary" onClick={onClose}>
           {t('dialogs.cancel')}
         </button>
-        <button
-          type="button"
-          className={ask.type === 'clash' ? 'btn btn-primary' : 'btn btn-danger'}
-          data-autofocus
-          onClick={go}
-        >
+        <button type="button" className="btn btn-danger" data-autofocus onClick={go}>
           {confirm}
         </button>
       </div>

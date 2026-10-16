@@ -11,6 +11,7 @@ import {
 import { useEditorStore } from '../../stores/editorStore';
 import { errorMessage } from '../../stores/messages';
 import { useToastStore } from '../../stores/toastStore';
+import { useUiStore } from '../../stores/uiStore';
 import { useVaultStore } from '../../stores/vaultStore';
 import { useBinStore } from './binStore';
 
@@ -20,14 +21,18 @@ const vault = () => useVaultStore.getState();
 /** `clash`: something new is where it was (ask, then `keepBoth`). */
 export type RestoreResult = 'done' | 'clash' | 'failed';
 
-function failed(res: IpcResult<unknown>): RestoreResult {
+function failed(res: IpcResult<unknown>, kind: 'trash' | 'archive', path: string): RestoreResult {
   if (res.ok) return 'done';
-  if (res.error.kind === 'alreadyExists') return 'clash';
+  if (res.error.kind === 'alreadyExists') {
+    useUiStore.getState().openDialog({ type: 'binClash', kind, path });
+    return 'clash';
+  }
   toast().push({ message: errorMessage(res.error), tone: 'error' });
   return 'failed';
 }
 
-/** Restores from the Trash, or unarchives (M5b §5.2, §5.3). */
+/** Restores from the Trash, or unarchives (M5b §5.2, §5.3); a clash asks
+ *  whether to keep both. */
 export async function restoreItem(
   kind: 'trash' | 'archive',
   path: string,
@@ -36,15 +41,15 @@ export async function restoreItem(
   if (kind === 'trash') {
     const res = await trashRestore(path, keepBoth);
     if (res.ok) await vault().refreshTree();
-    return failed(res);
+    return failed(res, kind, path);
   }
-  await useEditorStore.getState().flushAll(); // the move takes the latest text
+  await useEditorStore.getState().flushUnder(path); // the move takes the latest text
   const res = await archiveRestore(path, keepBoth);
   if (res.ok) {
     const to = res.value.moved.find(([from]) => from === path)?.[1] ?? path;
     await vault().applyRename(path, to, res.value);
   }
-  return failed(res);
+  return failed(res, kind, path);
 }
 
 /** Deletes items from the Trash for good (to the system Trash). */
@@ -63,7 +68,7 @@ export async function emptyTrash() {
 /** Archives a page or folder (M5b §5.3): it leaves the explorer, links keep
  *  working, and the toast can undo it. */
 export async function archiveItem(path: string) {
-  await useEditorStore.getState().flushAll();
+  await useEditorStore.getState().flushUnder(path);
   const res = await entryArchive(path);
   if (!res.ok) {
     toast().push({ message: errorMessage(res.error), tone: 'error' });

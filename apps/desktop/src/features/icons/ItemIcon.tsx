@@ -8,7 +8,7 @@ import styles from './Icons.module.css';
 import { setIcon, type IconTarget } from './setIcon';
 
 let cache: { nodes: TreeNode[]; icons: Map<string, string> } | null = null;
-function iconsOf(nodes: TreeNode[]): Map<string, string> {
+export function iconsOf(nodes: TreeNode[]): Map<string, string> {
   if (cache?.nodes !== nodes) {
     const icons = new Map<string, string>();
     for (const n of nodes) if (n.icon) icons.set(n.path, n.icon);
