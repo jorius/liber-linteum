@@ -322,9 +322,7 @@ export function BinView() {
           ))}
         </>
       )}
-      {ask && (
-        <Confirm ask={ask} count={items.length} bulk={bulk} onClose={() => setAsk(null)} />
-      )}
+      {ask && <Confirm ask={ask} count={items.length} bulk={bulk} onClose={() => setAsk(null)} />}
     </section>
   );
 }

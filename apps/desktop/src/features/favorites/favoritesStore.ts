@@ -59,7 +59,9 @@ export const useFavoritesStore = create<FavoritesState>((set, get) => {
       set({ paths: res.ok && Array.isArray(res.value) ? res.value : [] });
     },
     toggle: (path) =>
-      change((paths) => (paths.includes(path) ? paths.filter((p) => p !== path) : [...paths, path])),
+      change((paths) =>
+        paths.includes(path) ? paths.filter((p) => p !== path) : [...paths, path],
+      ),
     move: (path, before) =>
       change((paths) => {
         const rest = paths.filter((p) => p !== path);

@@ -1,4 +1,12 @@
-import { act, fireEvent, render, renderHook, screen, waitFor, within } from '@testing-library/react';
+import {
+  act,
+  fireEvent,
+  render,
+  renderHook,
+  screen,
+  waitFor,
+  within,
+} from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import axe from 'axe-core';
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -184,12 +192,24 @@ describe('Favorites (M5b §19)', () => {
     renderHook(() => useGlobalShortcuts(false));
     // Dvorak: the key labelled E sits where QWERTY's D is.
     usePageStore.setState({ state: 'ready', path: 'Welcome.md' });
-    fireEvent.keyDown(window, { key: 'E', code: 'KeyD', ctrlKey: true, metaKey: true, shiftKey: true });
+    fireEvent.keyDown(window, {
+      key: 'E',
+      code: 'KeyD',
+      ctrlKey: true,
+      metaKey: true,
+      shiftKey: true,
+    });
     expect(sets).toHaveLength(0);
     // A text file open in the editor isn't a page Favorites can show.
     useVaultStore.setState({ nodes: [...nodes, { path: 'data.csv', kind: 'attachment' }] });
     usePageStore.setState({ state: 'ready', path: 'data.csv' });
-    fireEvent.keyDown(window, { key: 'D', code: 'KeyD', ctrlKey: true, metaKey: true, shiftKey: true });
+    fireEvent.keyDown(window, {
+      key: 'D',
+      code: 'KeyD',
+      ctrlKey: true,
+      metaKey: true,
+      shiftKey: true,
+    });
     expect(sets).toHaveLength(0);
   });
 

@@ -114,7 +114,9 @@ describe('Settings dialog (M2b §4, §5, §7)', () => {
     late.textContent = 'late';
     [...dialog.querySelectorAll('[data-no-match]')].pop()?.append(late);
     const shown = [
-      ...dialog.querySelectorAll<HTMLElement>('button, input, select, [tabindex]:not([tabindex="-1"])'),
+      ...dialog.querySelectorAll<HTMLElement>(
+        'button, input, select, [tabindex]:not([tabindex="-1"])',
+      ),
     ].filter((n) => !n.closest('[hidden], [data-no-match]'));
     shown[shown.length - 1].focus();
     fireEvent.keyDown(document.activeElement as HTMLElement, { key: 'Tab' });
