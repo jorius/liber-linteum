@@ -266,3 +266,105 @@ No Critical issues. Fixed, each with a test that failed first:
 | Ctrl+F shows WebView2's find bar | The page must `preventDefault` Ctrl+F everywhere on Windows and Linux (spec §16 M12). |
 | `read fixture dir: NotFound` in cargo tests | A seeded target dir from a removed worktree. Run `cargo clean -p nimw-testkit -p nimw-desktop -p nimw-session -p nimw-vault -p nimw-index -p nimw-markdown`. |
 | An e2e spec can't find the Search, Settings or Edit buttons | The top bar is gone. Use `e2e/shell.ts` (`openSearch`, `openSettings`, `showGlobalView`, `showEditor`). |
+
+---
+
+## 7. Round 2 (evening of 2026-10-15)
+
+Jose tested the M5b build and sent a second batch of feedback. Everything below is on `feat/m5b-feedback` after `d0677c6`: 29 signed commits from `4aae8f3` (the title fix) to the tip. Spec: §17 (round 2 and its review), §18 (Settings with categories), §19 (Favorites).
+
+### 7.1 What changed
+
+- **The title is back in the cover** (`4aae8f3`). The title and subtitle head the cover band, above the breadcrumb, at their old top-bar size: one line each, in a pill fitted to the text. Without a cover, they head the plain band.
+  - The band is now one element with or without a cover, so adding a cover while typing in the subtitle no longer loses the cursor.
+  - The Small cover height (132 px) can't hold the title, breadcrumb and facts rows, so it grows just enough.
+- **`{{save}}` in Settings** now reads "When off, ⌘S saves…". The two strings used i18next's `{{…}}` syntax, but the app uses ICU single braces. A test now bans double braces in every message.
+- **Settings → This vault fields:** Subfolder name and Quick notes folder are as wide as the selects.
+- **Toasts go away:** after 8 s with a button (Undo), 5 s without. They wait while the pointer is on them or focus is in them. At most 3 show; the oldest timed one makes room, and a toast listing details is never pushed out.
+- **Sort by:** in every folder's … / context menu, plus a sort button beside New page / New folder for the vault root. The orders are Name A→Z (default), Name Z→A, Modified newest or oldest first, and Created newest first. Folders stay first.
+  - Stored per folder in `.nimw/vault.json` `folderSorts`. It follows renames and the Trash, and is forgotten on delete.
+- **Archived is a read-only folder.** It's a tree node above Trash at the bottom of the sidebar.
+  - Its pages open in the editor read-only: no typing; title, subtitle, cover, icon and relationships locked; toolbar and width menu hidden; task boxes disabled; paste, drop and Attach ignored.
+  - A banner offers Unarchive.
+  - Rust refuses 14 kinds of writes under `.archive/` in any letter case.
+  - Link maintenance is the one exception: renaming a live page still rewrites links inside archived pages.
+  - The old Archived list view is gone.
+- **The Trash, redesigned** from the approved mock:
+  - a header with an icon, the count and size, and Empty Trash;
+  - a filter field and a Sort select (deleted newest or oldest first, name, original folder);
+  - items grouped by day, each with a tile (emoji, folder, or a thumbnail for images), the name, a "Page · from Scratchpad · deleted 8:23 PM" line, Restore (whose tooltip says where to) and a 🗑 icon button;
+  - check boxes, with a dark bar to Restore or Delete the selection;
+  - an empty state.
+  - Bulk restore asks about each name clash in turn.
+- **Settings with categories** from the approved mock:
+  - a dark left menu like the file explorer, with search and the groups General, Appearance, Editor, Files and quick notes, Keyboard shortcuts, and This vault (under the vault's name);
+  - one category shown at a time, theme as three preview cards, palettes in a 3-column grid;
+  - search across categories, accent-insensitive;
+  - a read-only Keyboard shortcuts list.
+- **Favorites:**
+  - a section right under the Scratchpad, collapsible, remembered per vault, hidden while empty;
+  - add or remove from the … menu, the header star, or ⌘⇧D (Ctrl+Shift+D);
+  - reorder by dragging (Escape cancels) or Move up / Move down, which says the new position aloud;
+  - folders open in place;
+  - stored in `.nimw/vault.json` `favorites`; entries follow renames and moves, into and back from the Trash and the Archive.
+  - Obsidian's bookmarks are neither read nor written.
+
+### 7.2 Totals
+
+- **Gate on `ccb44ee`:** ALL-OK. vitest 1506 tests (137 files); e2e 332 passed, 8 skipped; cargo 511 passed, 3 ignored. Lint, typecheck, i18n, build, fmt, clippy and deny all OK.
+- **Windows compile:** `cargo xwin check --target x86_64-pc-windows-msvc` is clean.
+- **Dev server:** Vite in Chromium and WebKit, no page errors (vault, page, Settings search, ⌘F search).
+
+### 7.3 Review and fixes
+
+A fresh Opus review of `4aae8f3..7c69026` found 4 Important issues and 14 Minor ones. Each fix below has a test that failed first, unless marked.
+
+| # | Finding | Fix |
+|---|---|---|
+| I1 | A Trash thumbnail name like `D:photo.png` left `.trash` on Windows | names holding `:` are refused |
+| I2 | Bulk restore only asked about the last clash | each clash asks in turn; the buttons rest while it runs |
+| I3 | During a Settings search, Tab could leave the dialog | the trap skips categories the search hides |
+| I4 | The 3-toast limit evicted toasts that list details | only timed toasts make room |
+| M1 | Renaming rewrites links inside archived pages | ruling: kept on purpose; pinned by a test |
+| M3 | `.ARCHIVE/x` slipped past the write guard | the guard ignores letter case |
+| M4, M5 | Archived task boxes looked live; drop or paste showed an error | disabled and ignored, quietly |
+| M6, M7 | ⌘⇧D fired on Dvorak's E, and on text files | the D key only, pages only |
+| M8 | Favourite saves could race, or undo a rename | one at a time, each from Rust's current list |
+| M9 | One unreadable favourite failing the list | no change needed: `stat` never errors; pinned |
+| M10 | Favourite drag had no cancel; Move up was silent | pointercancel and Escape cancel; the position is announced |
+| M11 | Keyboard shortcuts missed ⌘⇧D and the list toggles | added; the test reads the editor keymap |
+| M13 | Deleting stopped at an item already gone | it's skipped, and the rest carry on |
+| M14 | Sort: per-comparison keys, silent failures, a menu that reopened | keys made once, a toast, focus back, the button toggles |
+
+### 7.4 Deferred
+
+- **M2:** a single-file window opened on a file under `.archive/` (Finder → Open With) edits it normally. The read-only rule lives in the vault window.
+- **M12:** the Trash is measured on every tree refresh. A huge trashed folder slows every refresh.
+- From the streams: Search's Favorites chip is not built (it needs the list inside the Rust query). Drag reordering on WebView2 is untested.
+
+### 7.5 Rulings to confirm
+
+- Favourites in the Archive follow it into `.archive` and come back on Unarchive; they're hidden while archived.
+- Favorites is its own labelled list, not part of the tree. With a pinned Scratchpad, the explorer is two trees (Quick notes, Files) around it.
+- ⌘⇧D works in the editor only.
+- Plain error toasts go after 5 s too; only toasts that list details stay.
+- Sort: under Z→A, folders reverse too; under the date orders they keep A→Z. "Created" falls back to the name where the disk has no birth time.
+- Settings: the last category is remembered until the app quits. The bottom Close button became an ✕ in the pane header (Escape and a click outside still save and close).
+- The Trash's "Earlier this week" means the last 7 days; sizes are 1024-based.
+- Favourites saves go through a queue over the whole-list command, not separate add/remove/move commands.
+
+### 7.6 Real-window checklist (Jose, on the Mac `.app`)
+
+1. **Title on covers:** open a page with a top cover. The title and subtitle sit at the top of the cover, the breadcrumb under them. Try Settings → Editor → Default cover height → Small: the band grows a little to fit. Add a cover while typing in the subtitle: the cursor stays.
+2. **Settings:** ⌘, opens on General. Walk the categories with the mouse and with ↑/↓. Search "theme", then "line"; clear it. Tab round the dialog while searching: it stays inside. Check Keyboard shortcuts (it shows ⌘⇧D and ⌘⇧7/8/9/.). Settings → This vault: both text fields are full width. The Auto save hint says ⌘S.
+3. **Favorites:** add a page and a folder from the … menu, and one with ⌘⇧D. They show under the Scratchpad. Drag one to reorder; press Escape mid-drag (nothing moves). Use Move up from the menu. Click the header star to remove. Rename a favourite page, then trash and restore it: it stays a favourite.
+4. **Sort:** on a folder, … → Sort by → Modified, newest first. Then the root's sort button → Name Z→A. Click the sort button again: it closes. Reopen the app: the orders are kept.
+5. **Archived:** archive a page with a task list, then open it from the Archived node. Typing, the task boxes, pasting an image and dropping a file do nothing, with no error. Click Unarchive.
+6. **Trash:** delete a page, a folder and an image. In the Trash: thumbnails show, filter and sort work, tick two and Restore. Make a name clash for both: you're asked twice. Then Delete one, and Empty Trash. Check they're in the macOS Trash.
+7. **Toasts:** delete four things quickly. At most 3 toasts show, and they leave after about 8 s; hovering keeps one.
+
+### 7.7 Builds
+
+See §5 for the commands. Both were rebuilt from the tip after this section was written:
+- Mac: `target/release/bundle/macos/Notes In My Way.app` (ad hoc signed).
+- Windows: `target/x86_64-pc-windows-msvc/release/bundle/nsis/Notes In My Way_0.1.0_x64-setup.exe` (unsigned).
