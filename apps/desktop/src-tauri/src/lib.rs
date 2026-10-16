@@ -15,6 +15,7 @@ pub mod icon_commands;
 pub mod menu;
 pub mod navigation;
 pub mod opening;
+pub mod quit_guard;
 pub mod scratchpad_commands;
 pub mod search_commands;
 pub mod settings;
@@ -199,6 +200,7 @@ pub fn run() {
         .run(|app, event| match event {
             // Files named on the command line that started the app.
             tauri::RunEvent::Ready => {
+                quit_guard::install(app);
                 let args: Vec<std::ffi::OsString> = std::env::args_os().skip(1).collect();
                 let cwd = std::env::current_dir().unwrap_or_default();
                 opening::open_later(app, opening::paths_from_args(&args, &cwd));

@@ -2590,6 +2590,7 @@ dependencies = [
  "nimw-session",
  "nimw-testkit",
  "nimw-vault",
+ "objc2",
  "percent-encoding",
  "serde",
  "serde_json",
