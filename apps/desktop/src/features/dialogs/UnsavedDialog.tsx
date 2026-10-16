@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useId, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { UnsavedChoice } from '../../stores/uiStore';
 import { nameOf } from '../../stores/tree';
@@ -17,6 +17,7 @@ export function UnsavedDialog({
   onClose: () => void;
 }) {
   const { t } = useTranslation();
+  const bodyId = useId();
   const answered = useRef(false);
   const reply = (c: UnsavedChoice) => {
     if (answered.current) return;
@@ -41,8 +42,23 @@ export function UnsavedDialog({
       ? t('dialogs.unsaved.titleOne', { name: nameOf(paths[0]).replace(/\.md$/i, '') })
       : t('dialogs.unsaved.titleMany', { count: paths.length });
   return (
-    <Dialog title={title} onClose={() => choose('cancel')} onConfirm={() => choose('save')}>
-      <p className={styles.text}>{t('dialogs.unsaved.body')}</p>
+    <Dialog
+      title={title}
+      alert
+      describedBy={bodyId}
+      onClose={() => choose('cancel')}
+      onConfirm={() => choose('save')}
+    >
+      <p id={bodyId} className={styles.text}>
+        {t('dialogs.unsaved.body')}
+      </p>
+      {paths.length > 1 && (
+        <ul className={styles.text} aria-label={t('dialogs.unsaved.list')}>
+          {paths.map((p) => (
+            <li key={p}>{nameOf(p).replace(/\.md$/i, '')}</li>
+          ))}
+        </ul>
+      )}
       <div className={styles.buttons}>
         <button type="button" className="btn btn-secondary" onClick={() => choose('discard')}>
           {t('dialogs.unsaved.discard')}

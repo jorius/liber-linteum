@@ -274,7 +274,8 @@
       "body": "Auto save is off. Changes you don't save are lost.",
       "discard": "Don’t Save",
       "save": "Save",
-      "saveAll": "Save all"
+      "saveAll": "Save all",
+      "list": "Unsaved pages"
     }
   },
   "settings": {

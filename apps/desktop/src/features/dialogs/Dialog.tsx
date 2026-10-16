@@ -23,6 +23,8 @@ export function Dialog({
   dismissible = false,
   wide = false,
   hideTitle = false,
+  alert = false,
+  describedBy,
   children,
 }: {
   title: string;
@@ -32,6 +34,10 @@ export function Dialog({
   dismissible?: boolean;
   wide?: boolean;
   hideTitle?: boolean;
+  /** A question that interrupts (M5b final review M4): `alertdialog`. */
+  alert?: boolean;
+  /** The id of the text that explains the question. */
+  describedBy?: string;
   children: ReactNode;
 }) {
   const box = useRef<HTMLDivElement>(null);
@@ -61,7 +67,7 @@ export function Dialog({
       if (e.key !== 'Escape' || e.defaultPrevented || !box_) return;
       if (e.target instanceof Node && box_.contains(e.target)) return;
       // Only the topmost dialog answers.
-      const dialogs = document.querySelectorAll('[role="dialog"]');
+      const dialogs = document.querySelectorAll('[role="dialog"], [role="alertdialog"]');
       if (dialogs[dialogs.length - 1] !== box_) return;
       e.preventDefault();
       closeRef.current();
@@ -129,9 +135,10 @@ export function Dialog({
     >
       <div
         ref={box}
-        role="dialog"
+        role={alert ? 'alertdialog' : 'dialog'}
         aria-modal="true"
         aria-labelledby="dialog-title"
+        aria-describedby={describedBy}
         className={wide ? `${styles.dialog} ${styles.wide}` : styles.dialog}
         onKeyDown={onKeyDown}
       >

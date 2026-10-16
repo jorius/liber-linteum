@@ -72,7 +72,7 @@ describe('Save / Don’t Save / Cancel (M5b §6, auto save off)', () => {
     await userEvent.click(await screen.findByRole('button', { name: 'Cancel' }));
     expect(await asked).toBe(false);
     asked = confirmUnsaved();
-    await screen.findByRole('dialog', { name: 'Save changes to “A”?' });
+    await screen.findByRole('alertdialog', { name: 'Save changes to “A”?' });
     await userEvent.keyboard('{Escape}');
     expect(await asked).toBe(false);
     expect(editor().doc!.text).toBe('a edited\n');
@@ -83,7 +83,7 @@ describe('Save / Don’t Save / Cancel (M5b §6, auto save off)', () => {
     await editA();
     const { container } = render(<DialogHost />);
     void confirmUnsaved();
-    await screen.findByRole('dialog');
+    await screen.findByRole('alertdialog');
     const violations = await axe
       .run(container, { rules: { 'color-contrast': { enabled: false } } })
       .then((r) => r.violations);
@@ -123,13 +123,30 @@ describe('Save / Don’t Save / Cancel (M5b §6, auto save off)', () => {
     await editA();
     render(<DialogHost />);
     const first = confirmUnsaved();
-    await screen.findByRole('dialog');
+    await screen.findByRole('alertdialog');
     const second = confirmUnsaved();
     expect(await first).toBe(false);
     await act(async () => {
       await userEvent.click(screen.getByRole('button', { name: 'Save' }));
     });
     expect(await second).toBe(true);
+  });
+});
+
+describe('the prompt reads well to a screen reader (M5b final review M4)', () => {
+  it('is an alert dialog with its text as description, listing every unsaved page', async () => {
+    render(<DialogHost />);
+    act(() =>
+      useUiStore.getState().openDialog({
+        type: 'unsaved',
+        id: 99,
+        paths: ['A.md', 'Notes/B.md'],
+        answer: () => undefined,
+      }),
+    );
+    const ask = await screen.findByRole('alertdialog', { name: 'Save changes to 2 pages?' });
+    expect(ask).toHaveAccessibleDescription(/Auto save is off/);
+    expect(screen.getByRole('list', { name: 'Unsaved pages' })).toHaveTextContent('AB');
   });
 });
 

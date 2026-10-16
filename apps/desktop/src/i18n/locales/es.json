@@ -274,7 +274,8 @@
       "body": "El guardado automático está desactivado. Los cambios que no guardes se pierden.",
       "discard": "No guardar",
       "save": "Guardar",
-      "saveAll": "Guardar todo"
+      "saveAll": "Guardar todo",
+      "list": "Páginas sin guardar"
     }
   },
   "settings": {

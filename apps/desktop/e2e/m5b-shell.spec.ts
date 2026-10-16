@@ -104,7 +104,7 @@ test('auto save off: nothing is written until ⌘S; leaving asks first', async (
 
   // Opening another page asks; Cancel stays on this one.
   await page.getByRole('treeitem', { name: 'B', exact: true }).click();
-  const ask = page.getByRole('dialog', { name: 'Save changes to “A”?' });
+  const ask = page.getByRole('alertdialog', { name: 'Save changes to “A”?' });
   await ask.getByRole('button', { name: 'Cancel' }).click();
   await expect(page.getByRole('textbox', { name: 'Page title' })).toHaveValue('A');
   expect(await writes(page)).toEqual([]);
