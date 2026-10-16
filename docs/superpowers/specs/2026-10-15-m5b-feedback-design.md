@@ -346,6 +346,7 @@ These override §5 where they conflict.
    - Ruling: the scratch folder can't be trashed. The cost: someone who wants it gone must rename it in Settings first, or delete it in Finder.
 6. **Archive is a move into `.archive/<its path>`**, done by the rename machinery with links rewritten when `rewriteLinks` is on.
    - In practice almost nothing is rewritten: `[[Old]]` and `[[P/Old]]` both still resolve to `.archive/P/Old.md`, because a path link matches a path's end, as Obsidian reads it.
+   - **Amended by §15 (M1):** a live page now wins a name over an archived one. Where a live page shares the name, the rewrite at archive time keeps old links on the archived page; a link written later means the live page.
    - A clash in the Archive takes the next free name.
    - Unarchive moves the item back, removes the Archive folders it leaves empty, and gives `AlreadyExists` (or, with "Keep both", a numbered name) when something new took its place.
 7. **Restore from the Trash** recreates missing folders and re-indexes through the watcher's own `apply([Changed])`, so links resolve again at once. An item that was archived before it was trashed is restored into the Archive and recorded there again.
@@ -396,3 +397,36 @@ These override §5 where they conflict.
    - The top-bar hint shows ⌘F.
 10. **Not covered by a test:** the menu accelerator itself; the native menu can't be driven in e2e.
     - On Windows, WebView2's own Ctrl+F (find bar) may show while a dialog is open, since the page then doesn't take the key. This needs the real window.
+
+## 15. Final review — Trash, Archive and icons
+
+The Opus review of `855c6ea..5f961aa` found 2 Important and 8 Minor issues; M1 was re-graded Important by effect. Fixed with a test that failed first (`crates/nimw-session/src/bin.rs` `m5b_review_*`, `features/bin/Bin.test.tsx` "M5b final review", `stores/editorStore.test.tsx` `flushUnder`):
+
+1. **I1, records trusted as restore places.**
+   - A Trash or Archive record naming a hidden place (`.git/hooks/…`, `.obsidian/…`) or an unusable name is treated as unrecorded: the root for the Trash, the path under `.archive` for the Archive.
+   - A rename never moves anything into a hidden folder (`session.rename`), which closes the older `entry_rename` gap too.
+2. **I2, a bin that is a symlink.** `.trash` and `.archive` must be real folders. Listing, trashing, deleting, emptying and archiving refuse a symlinked bin.
+3. **M1, archived pages winning a name.** The resolver ranks an archived page last unless the link is itself in the Archive.
+4. **M2, restoring under a file.** A recorded place whose folder is now a file sends the restore to the vault root, with no endless Keep both loop.
+5. **M3, clashes from the banner and Undo.** A clash on restore or unarchive opens one Keep both / Cancel dialog from any entry point.
+6. **M4, the Archived view's trash button.** It asks first, through `requestTrash`.
+7. **M5, Undo on a trash toast.** It restores only the item it trashed, and otherwise says "That item is no longer in the Trash."
+8. **M6, delete from vault.** It forgets Global View positions and index-note picks too.
+9. **M7, cheap parts.**
+   - Deleting several items writes `trash.json` once, and what is left after a failure keeps its record.
+   - `[[` suggestions use the cached icon map.
+10. **M8, numbering.** A folder's dots stay in its name (`v1.2 1`).
+11. **Auto save off.** Archiving and unarchiving save only the pages that move (`flushUnder`), not every unsaved page.
+
+**Rulings:**
+- **M2 falls back to the root** rather than adding an error kind. Cost if wrong: the user finds the item at the root instead of being told why.
+- **An existing Obsidian `.trash` that is a symlink is refused too.** Cost if wrong: such a vault can't use the Trash until the link is replaced.
+
+**Deferred:**
+- **M7, the rest:** `bin_list` on every tree refresh; `archive_list`'s O(files × records) pass.
+- **Notes from the review's "declined to judge":**
+  - Obsidian doesn't show `.archive`, so links to archived pages look unresolved there.
+  - A vault that already has its own `.archive` folder gets it indexed.
+  - A `.Archive` folder on a case-insensitive disk takes archived items.
+  - A vault at `~` on macOS would list `~/.Trash` (from §13).
+
