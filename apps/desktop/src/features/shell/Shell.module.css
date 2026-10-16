@@ -125,6 +125,11 @@
   z-index: 5;
 }
 
+/* Room for it, so it covers no breadcrumb (final review M8). */
+.main[data-collapsed] .content {
+  padding-left: 56px;
+}
+
 /* The floating Edit / Global view / Search button (M5b §2.2). */
 .fab {
   position: absolute;

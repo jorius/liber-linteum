@@ -63,3 +63,23 @@ test('I4: the Split preview leaves room under its last line for the button', asy
     .evaluate((el) => parseFloat(getComputedStyle(el).paddingBottom));
   expect(pad).toBeGreaterThanOrEqual(72);
 });
+
+test('M8: with the sidebar collapsed, "Show sidebar" covers nothing of the page header', async ({
+  page,
+}) => {
+  await open(page, {});
+  await page.getByRole('button', { name: 'Hide sidebar' }).click();
+  const show = await page.getByRole('button', { name: 'Show sidebar' }).boundingBox();
+  const crumbs = page.getByRole('navigation', { name: 'Breadcrumb' }).locator('a, button, span');
+  for (const box of await crumbs.evaluateAll((els) =>
+    els.map((el) => el.getBoundingClientRect().toJSON() as DOMRect),
+  )) {
+    if (!box.width) continue;
+    const meets =
+      box.left < show!.x + show!.width &&
+      box.right > show!.x &&
+      box.top < show!.y + show!.height &&
+      box.bottom > show!.y;
+    expect(meets).toBe(false);
+  }
+});
