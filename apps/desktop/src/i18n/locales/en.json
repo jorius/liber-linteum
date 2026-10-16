@@ -818,6 +818,7 @@
     "removeNamed": "Remove {name} from Favorites",
     "moveUp": "Move up in Favorites",
     "moveDown": "Move down in Favorites",
+    "movedTo": "{name} moved to {position} of {count} in Favorites",
     "scratchTree": "Quick notes"
   }
 }

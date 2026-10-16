@@ -818,6 +818,7 @@
     "removeNamed": "Quitar {name} de Favoritos",
     "moveUp": "Subir en Favoritos",
     "moveDown": "Bajar en Favoritos",
+    "movedTo": "{name} pasó a la posición {position} de {count} en Favoritos",
     "scratchTree": "Notas rápidas"
   }
 }

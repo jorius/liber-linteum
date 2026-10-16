@@ -103,6 +103,17 @@ export function FavoritesSection({ onRequestMenu }: { onRequestMenu?: MenuOpener
     d.moved = true;
     setDropBefore(targetAt(e.clientY));
   };
+  // A cancelled pointer or Escape drops the drag: nothing moves (round-2 review M10).
+  const cancelDrag = () => {
+    drag.current = null;
+    setDropBefore(undefined);
+  };
+  const onDragKey = (e: KeyboardEvent<HTMLElement>) => {
+    if (e.key === 'Escape' && drag.current?.moved) {
+      e.stopPropagation();
+      cancelDrag();
+    }
+  };
   const onPointerUp = (e: PointerEvent<HTMLElement>) => {
     const d = drag.current;
     if (d?.moved) {
@@ -117,7 +128,12 @@ export function FavoritesSection({ onRequestMenu }: { onRequestMenu?: MenuOpener
   };
 
   return (
-    <section className={styles.section} aria-labelledby={headingId} data-favorites>
+    <section
+      className={styles.section}
+      aria-labelledby={headingId}
+      data-favorites
+      onKeyDown={onDragKey}
+    >
       <h2 className={styles.heading} id={headingId}>
         <button
           type="button"
@@ -155,7 +171,7 @@ export function FavoritesSection({ onRequestMenu }: { onRequestMenu?: MenuOpener
                 else rows.current.delete(node.path);
               }}
               dragged={() => drag.current?.moved === true}
-              pointer={{ onPointerDown, onPointerMove, onPointerUp }}
+              pointer={{ onPointerDown, onPointerMove, onPointerUp, onPointerCancel: cancelDrag }}
               onRequestMenu={onRequestMenu}
             />
           ))}
@@ -178,6 +194,7 @@ interface RowProps {
     onPointerDown: (e: PointerEvent<HTMLElement>, path: string) => void;
     onPointerMove: (e: PointerEvent<HTMLElement>) => void;
     onPointerUp: (e: PointerEvent<HTMLElement>) => void;
+    onPointerCancel: () => void;
   };
   onRequestMenu?: MenuOpener;
 }
@@ -225,6 +242,7 @@ function FavoriteRow({
         onPointerDown={pointer ? (e) => pointer.onPointerDown(e, node.path) : undefined}
         onPointerMove={pointer?.onPointerMove}
         onPointerUp={pointer?.onPointerUp}
+        onPointerCancel={pointer?.onPointerCancel}
         onContextMenu={(e) => {
           if (!onRequestMenu) return;
           e.preventDefault();

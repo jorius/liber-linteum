@@ -1,8 +1,10 @@
 // Favorites (M5b §19): the vault's ordered list, kept by Rust in
 // `.nimw/vault.json` (it follows renames, the Trash and the Archive there).
+import i18next from 'i18next';
 import { create } from 'zustand';
 import { favoritesGet, favoritesSet, type TreeNode } from '../../ipc';
 import { errorMessage } from '../../stores/messages';
+import { announce } from '../editor/announce';
 import { useToastStore } from '../../stores/toastStore';
 import { useVaultStore } from '../../stores/vaultStore';
 
@@ -68,13 +70,22 @@ export const useFavoritesStore = create<FavoritesState>((set, get) => {
   };
 });
 
-/** Moves a shown favorite one place up (-1) or down (+1) among the shown ones. */
+/** Moves a shown favorite one place up (-1) or down (+1) among the shown
+ *  ones, and says where it went (round-2 review M10). */
 export function nudgeFavorite(path: string, step: -1 | 1) {
   const { paths, move } = useFavoritesStore.getState();
   const shown = shownFavorites(paths, useVaultStore.getState().nodes).map((n) => n.path);
   const i = shown.indexOf(path);
   if (i < 0 || i + step < 0 || i + step >= shown.length) return;
   void move(path, step < 0 ? shown[i - 1] : (shown[i + 2] ?? null));
+  announce(
+    i18next.t('favorites.movedTo', {
+      name: path.slice(path.lastIndexOf('/') + 1).replace(/\.md$/i, ''),
+      position: i + step + 1,
+      count: shown.length,
+    }),
+    true,
+  );
 }
 
 // Renames, moves, the Trash and another vault change the list in Rust: read

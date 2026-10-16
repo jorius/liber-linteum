@@ -218,6 +218,29 @@ describe('Favorites (M5b §19)', () => {
     expect(stored).toEqual(['Old.md', 'Zed.md', 'Art']);
   });
 
+  it('round-2 review M10: a cancelled or Escaped drag moves nothing; Move up says where it went', async () => {
+    const sets = await open(['Zed.md', 'Welcome.md']);
+    render(<ExplorerTree />);
+    const row = section().querySelector('[data-favorite="Welcome.md"] > div') as HTMLElement;
+    fireEvent.pointerDown(row, { button: 0, clientY: 100, pointerId: 1 });
+    fireEvent.pointerMove(row, { clientY: 10, pointerId: 1 });
+    fireEvent.pointerCancel(row, { pointerId: 1 });
+    fireEvent.pointerUp(row, { clientY: 10, pointerId: 1 });
+    fireEvent.pointerDown(row, { button: 0, clientY: 100, pointerId: 2 });
+    fireEvent.pointerMove(row, { clientY: 10, pointerId: 2 });
+    fireEvent.keyDown(row, { key: 'Escape' });
+    fireEvent.pointerUp(row, { clientY: 10, pointerId: 2 });
+    await act(() => new Promise((r) => setTimeout(r, 20)));
+    expect(sets).toEqual([]);
+    expect(section().querySelector('[class*="dropAbove"]')).toBeNull();
+    const close = vi.fn();
+    render(<ContextMenu menu={{ path: 'Welcome.md', anchor: { x: 0, y: 0 } }} onClose={close} />);
+    await userEvent.click(screen.getByRole('menuitem', { name: 'Move up in Favorites' }));
+    expect(document.querySelector('[data-nimw-status]')).toHaveTextContent(
+      'Welcome moved to 1 of 2 in Favorites',
+    );
+  });
+
   it('has no axe violations', async () => {
     await open(['Art', 'Welcome.md']);
     const { container } = render(<ExplorerTree />);
