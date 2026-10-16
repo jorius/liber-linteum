@@ -1,4 +1,4 @@
-/* Layout values from the prototype (.shell, .side, .topbar, .toggle, .tg). */
+/* Layout values from the prototype (.shell, .side, .toggle, .tg); no top bar since M5b. */
 .shell {
   display: flex;
   height: 100%;

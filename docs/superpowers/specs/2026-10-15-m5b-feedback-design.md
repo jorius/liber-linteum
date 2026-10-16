@@ -259,7 +259,8 @@ These rulings come from planning the shell. Each lists its cost if wrong.
 3. **Accelerators that would fire twice.** The page already handles ⌘, and ⌘O.
    - Settings… keeps its ⌘, accelerator, because opening it twice is harmless.
    - Open Vault… has none, because two folder dialogs would open.
-   - Close Vault ⌥⌘W, File → Save ⌘S and View → Toggle Sidebar ⌘\ are handled through the menu on macOS. The page answers ⌘S and ⌘\ too, and repeats are harmless.
+   - Close Vault ⌥⌘W and File → Save ⌘S are handled through the menu on macOS; the page answers ⌘S too, and repeats are harmless.
+   - View → Toggle Sidebar has **no** accelerator: the page handles ⌘\, since two toggles would cancel out (corrected in §16).
 4. **The floating button is a disclosure,** not an ARIA menu. A button with `aria-expanded` opens a group of three ordinary buttons (Edit and Global view pressed as before, then Search). ↑ and ↓ move between them, and Escape closes and returns focus. Cost: none; the names stay what they were.
 5. **Red "Unsaved" only with auto save off.** With auto save on, the status stays as today (Saving… is neutral), and only failure states (Retrying, Not saved) turn red. This meets "no red flash while typing" without a timer, and replaces §6's 600 ms rule. Cost: low.
 6. **Don't Save drops the text.** The page's unsaved edits are reverted to the last saved text, and nothing is written. Cancel keeps the page open with its text. One dialog lists every unsaved page, with Save all / Don't Save / Cancel. Cost: low.
@@ -273,6 +274,8 @@ These rulings come from planning the shell. Each lists its cost if wrong.
     - moving or trashing a page writes its text before the file moves.
 
     They are file operations the user started. Cost: an edit the user meant to discard is kept if they then do one of these.
+
+    Re-graded in §16 (final review I1): a move or rename writes nothing (the page follows its file, still unsaved), and a trash writes only the pages it takes. Header edits still save; Settings says so under Auto save.
 13. **The floating button shows ⌘F for Search.** Stream D makes ⌘F the search shortcut. Until D lands, ⌘⇧F still opens search, and the label is ahead by one stream.
 14. **Leaving the editor (blur) no longer saves when auto save is off.** The e2e test found this: blur called `flush`.
 ## 12. Amendments — Stream B (row actions and icons)
@@ -430,3 +433,34 @@ The Opus review of `855c6ea..5f961aa` found 2 Important and 8 Minor issues; M1 w
   - A `.Archive` folder on a case-insensitive disk takes archived items.
   - A vault at `~` on macOS would list `~/.Trash` (from §13).
 
+
+## 16. Final review — shell, Auto save and fixes
+
+The fresh review of `855c6ea..5f961aa` found no Critical issues. Each fix below has a test that failed first.
+
+**Fixed:**
+- **I1, Auto save off, other pages written by a move:** a rename, move or new-item rename no longer flushes every page. Moves write nothing; a trash writes only the pages under the trashed path (`flushBefore`). Settings → Editor → Auto save has a hint naming what still saves (header edits, a trash).
+- **I2, Dock Quit / logout / shutdown:** tao's app delegate had no `applicationShouldTerminate:`, so those quits skipped every close request. `quit_guard.rs` adds it at launch (macOS). With Auto save off it answers "cancel" and quits through each window's close request, which runs the Save / Don't Save / Cancel prompt; with Auto save on nothing changes (the M2a ≤ 500 ms limit).
+  - Ruling: no recovery copy. A logout with Auto save off is cancelled once by the app (macOS names it), which then asks and quits; the user logs out again. Cost: one extra logout attempt.
+  - Windows and Linux: closing reaches the windows' close requests already; Windows shutdown with Auto save off is not covered (deferred, needs `WM_QUERYENDSESSION`).
+- **I3:** the file window's header keeps its layout (its rules moved to `SingleFile.module.css`).
+- **I4:** in the Global View the floating button moves clear of New entry (bottom right), the zoom group (bottom left) and the toolbar (top right); the Split preview pane has 88 px under its last line. An e2e at 1280 × 800 checks that no control meets the button at each place.
+- **I5:** collapsing the sidebar from inside it puts the keyboard on "Show sidebar"; reopening puts it on "Hide sidebar".
+- **M1:** Cancel in the prompt leaves the screen, selection and link trail as they were (the question comes first in `openPage`, `goBack`, `goForward`).
+- **M3:** a page deleted outside the app while unsaved no longer makes every page switch ask; its orphan banner covers it.
+- **M4:** the prompt is an `alertdialog` described by its text, and lists the unsaved pages by name.
+- **M5:** the floating button's group: ⌘J from inside it gives the keyboard to the button, Tab out closes it, and an action puts the keyboard on the editor (or back on the button), never on nothing.
+- **M6:** after a row's emoji picker the keyboard is back on the tree row.
+- **M8:** with the sidebar collapsed, the page area leaves room for "Show sidebar", which covers no breadcrumb.
+- **M9:** "+N more" carries `aria-expanded="false"`; from the keyboard it hands focus to the first chip it shows.
+- **M10:** the window title names Trash and Archived, and the app again once the vault closes.
+- **M11:** window titles drop bidi and zero-width characters.
+- **M12:** on macOS only ⌘F opens search (plain Ctrl+F stays "forward one character"); elsewhere Ctrl+F is kept from the webview's find bar everywhere, dialogs and Welcome included.
+- **M14:** "Saved" green is chosen to meet 4.5:1 on the header and on its veiled pill over black and white covers; the palette test checks green and red there.
+- **M15:** the unused `deleteFlow.ts` is gone, "top bar" comments are updated, and §11.3 is corrected (⌘\ has no menu accelerator).
+
+**Deferred:**
+- **M2:** ⌘N, ⌘⇧N and a row's + create the file before any question, so Cancel leaves a new "Untitled".
+- **M7:** hidden row actions still reserve about 70 px, so long names cut early; the scratch row's count hides only on hover.
+- **M13 (rest):** the Vault menu items aren't disabled while a file window is focused (they bring the main window forward); the native ⌘, opens Settings over another dialog.
+- Windows shutdown/logout with Auto save off (see I2).

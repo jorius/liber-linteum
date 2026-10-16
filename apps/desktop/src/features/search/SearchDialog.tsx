@@ -158,7 +158,7 @@ function Chip({
 }
 
 /** Search (M5 §4): a field with filter chips over the vault's pages, opened
- *  by the top bar, ⌘⇧F and View → Search…. ↑/↓ move through the results
+ *  by the floating button, ⌘F / ⌘⇧F and View → Search…. ↑/↓ move through the results
  *  with the keyboard kept in the field; Enter opens the page, Shift+Enter
  *  its level in the Global View; Escape clears the text, then closes. */
 export function SearchDialog({ onClose }: { onClose: () => void }) {

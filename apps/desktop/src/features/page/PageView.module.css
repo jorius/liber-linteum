@@ -177,7 +177,7 @@
   white-space: nowrap;
 }
 
-/* The header band (M4b §1): one compact strip under the top bar. With a
+/* The header band (M4b §1): one compact strip under the title. With a
    cover, the image is its background and the rows sit on it in pills of
    translucent surface (--color-surface-veil), readable on any image; without
    one the band is just its two rows. A cover band is --cover-height tall
@@ -549,7 +549,7 @@
   opacity: 1;
 }
 
-/* In the top bar (M4b §1): one compact line each for title and subtitle. */
+/* The title block (M5b §2.3): one compact line each for title and subtitle. */
 .title {
   font: 700 20px/1.2 var(--font-display);
   color: var(--color-text-strong);
