@@ -98,12 +98,19 @@ export function useGlobalShortcuts(menuOpen: boolean) {
         if (ui.actionsOpen && inside) {
           inside.querySelector<HTMLElement>(':scope > button[aria-expanded]')?.focus();
         }
-      } else if ((key === 'd' || e.code === 'KeyD') && e.shiftKey && (!MAC || e.metaKey)) {
+      } else if (
+        // The D key, or where it sits on layouts without Latin letters (round-2 review M6).
+        (key === 'd' || (!/^[a-z]$/.test(key) && e.code === 'KeyD')) &&
+        e.shiftKey &&
+        (!MAC || e.metaKey)
+      ) {
         // M5b §19: the open page in or out of Favorites.
         const page = usePageStore.getState();
         const editing = useUiStore.getState().screen === 'edit';
         if (!editing || page.state !== 'ready' || !page.path) return;
         if (page.path.startsWith('.archive/')) return;
+        // Pages only: Favorites doesn't show text files (round-2 review M7).
+        if (vault.nodes.find((n) => n.path === page.path)?.kind !== 'page') return;
         void useFavoritesStore.getState().toggle(page.path);
       } else if ((e.key === '\\' || e.code === 'Backslash') && !e.shiftKey) {
         toggleSidebar(); // M5b §2.5
