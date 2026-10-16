@@ -831,7 +831,7 @@ mod tests {
         f.s.vault().set_index_pick("F", Some("F/a.md")).unwrap();
         let inner = f.s.trash(&vp("F")).unwrap();
         assert!(!f.s.vault().layout_level(inner.as_str()).is_empty());
-        f.s.trash_delete_via(&[inner.clone()], &remove(&f.root))
+        f.s.trash_delete_via(std::slice::from_ref(&inner), &remove(&f.root))
             .unwrap();
         std::fs::create_dir_all(f.root.join(inner.as_str())).unwrap();
         assert!(f.s.vault().layout_level(inner.as_str()).is_empty());
