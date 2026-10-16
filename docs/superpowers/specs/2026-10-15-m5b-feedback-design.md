@@ -555,6 +555,30 @@ Settings categories are being mocked separately and aren't part of this round.
      - group headings are hidden from assistive tech, and each list is named after its group;
      - the selection bar is a region named "Selection", with its count in a polite live region.
 
+### Round-2 review (Opus, `4aae8f3..7c69026`)
+
+**Fixed** (each with a test that failed first, except where noted):
+- **I1:** a Trash thumbnail name holding `:` is refused, so a Windows drive prefix (`D:photo.png`) can't leave `.trash`.
+- **I2:** a bulk restore asks Keep both / Cancel about each clash in turn and waits for the answer; the Trash's buttons rest while a bulk action runs. The clash dialog answers its restore exactly once (closing it any other way counts as Cancel).
+- **I3:** the dialog's Tab trap skips categories a Settings search hides (`[data-no-match]`), and `[inert]` parts.
+- **I4:** the three-toast limit pushes out the oldest timed toast, never one listing details.
+- **M3:** the Archive's write guard ignores letter case (`.ARCHIVE/x` on a case-insensitive disk).
+- **M4, M5:** an archived page's task boxes are disabled; a paste, drop or Attach there is left alone, with no error toast.
+- **M6, M7:** ⌘⇧D answers the D key itself (`e.code` only for non-Latin layouts, so Dvorak's E stays "Go to the files") and pages only.
+- **M8:** favourites save one at a time, each applied to the list Rust holds at its turn (re-read before writing), so a rename since the last read isn't undone and saves can't land out of order. Ruling: a queue over the whole-list command, rather than add/remove/move commands — one IPC shape, same guarantee.
+- **M10:** a favourite drag ends with no move on a cancelled pointer or Escape; Move up / Move down announces "Name moved to 2 of 5 in Favorites".
+- **M11:** Keyboard shortcuts lists ⌘⇧D and the list and quote toggles (Mod+Shift+7/8/9/.); the test reads the editor's keymap from `format.ts`, and a hand-kept list covers the keys only `useGlobalShortcuts` answers.
+- **M13:** deleting from the Trash skips an item already gone (removed outside the app) and carries on; its record goes too.
+- **M14:** sort keys are made once per entry; a failed sort shows a toast; Escape or a choice gives focus back to the sort button; a press on the open menu's own button closes it instead of reopening it.
+
+**Rulings:**
+- **M1:** link maintenance is exempt from the read-only Archive: renaming a live page rewrites `[[links]]` inside archived pages, so they keep working once unarchived. Pinned by `m5b_r2_review_m1_a_rename_rewrites_links_inside_archived_pages`.
+- **M9:** no change needed: `Vault::stat` never returns an error (unreadable entries read as missing), so one bad favourite can't fail the list. Pinned by `m5b_r2_review_m9_an_unreadable_favorite_is_dropped_not_fatal`.
+
+**Deferred:**
+- **M2:** a single-file window (Finder → Open With, File → Open File…) opened on a file under `<vault>/.archive/` edits it normally; the read-only rule lives in the vault window only. On Windows `.archive` isn't hidden in Explorer, so this is reachable.
+- **M12:** the Trash is measured (sizes, page counts, icons) on every tree refresh; a huge trashed folder makes every refresh pay for it. Count for the sidebar only and measure when the Trash view opens.
+
 ## 18. Settings with categories
 
 Jose, on the evening of 2026-10-15: the single long Settings page becomes a menu of categories, styled like the file explorer. He approved the mock: the "Settings with categories" artboard on the M5b mocks canvas.
