@@ -333,6 +333,14 @@ export function installIpcMock({
       return null;
     },
     vault_icon_set: () => null,
+    // M5b §19: kept in sessionStorage, so a reload still has them.
+    favorites_get: () =>
+      JSON.parse(sessionStorage.getItem('nimwMockFavorites') ?? '[]') as string[],
+    favorites_set: (a) => {
+      const next = (a.paths as string[]).filter((p, i, all) => all.indexOf(p) === i);
+      sessionStorage.setItem('nimwMockFavorites', JSON.stringify(next));
+      return next;
+    },
     page_get: (a) => page(a.path as string),
     page_read: (a) => ({ text: pages[a.path as string], hash: 'h' }),
     page_write: (a) => {

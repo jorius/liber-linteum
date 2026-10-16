@@ -10,6 +10,7 @@ import { isArchived } from '../../stores/tree';
 import { openPage } from '../../stores/navigate';
 import { SortMenu } from './SortMenu';
 import { requestTrash } from './trashAction';
+import { nudgeFavorite, shownFavorites, useFavoritesStore } from '../favorites/favoritesStore';
 import { displayName } from './TreeRow';
 
 export interface MenuState {
@@ -24,6 +25,7 @@ export function ContextMenu({ menu, onClose }: { menu: MenuState; onClose: () =>
   const node = useVaultStore((s) =>
     s.children.get(parentOf(menu.path))?.find((n) => n.path === menu.path),
   );
+  const favorites = useFavoritesStore((s) => s.paths);
   const [active, setActive] = useState(0);
   // Icon… swaps the menu for the emoji picker at the same place (M5b §4).
   const [picking, setPicking] = useState(false);
@@ -76,6 +78,8 @@ export function ContextMenu({ menu, onClose }: { menu: MenuState; onClose: () =>
         [t('menu.sortBy'), () => setSorting(true)],
         [t('menu.archive'), () => void archiveItem(node.path)],
         [t('menu.delete'), () => requestTrash(node.path)],
+        // Favorites (M5b §19): pages and folders; a favorite also moves in the list.
+        ...favoriteActions(node.path, node.kind, favorites, t),
       ];
 
   const sortIndex = actions.findIndex(([label]) => label === t('menu.sortBy'));
@@ -161,4 +165,26 @@ export function ContextMenu({ menu, onClose }: { menu: MenuState; onClose: () =>
       ))}
     </div>
   );
+}
+
+function favoriteActions(
+  path: string,
+  kind: string,
+  favorites: string[],
+  t: (key: string) => string,
+): [string, () => void][] {
+  if (kind === 'attachment') return [];
+  const toggle = () => void useFavoritesStore.getState().toggle(path);
+  if (!favorites.includes(path)) return [[t('favorites.add'), toggle]];
+  const shown = shownFavorites(favorites, useVaultStore.getState().nodes).map((n) => n.path);
+  const i = shown.indexOf(path);
+  return [
+    [t('favorites.remove'), toggle],
+    ...(i > 0
+      ? [[t('favorites.moveUp'), () => nudgeFavorite(path, -1)] as [string, () => void]]
+      : []),
+    ...(i >= 0 && i < shown.length - 1
+      ? [[t('favorites.moveDown'), () => nudgeFavorite(path, 1)] as [string, () => void]]
+      : []),
+  ];
 }

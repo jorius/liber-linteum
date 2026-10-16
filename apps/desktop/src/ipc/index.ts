@@ -702,6 +702,11 @@ export const folderSortSet = (path: string, sort: FolderSort) =>
   call<null>('folder_sort_set', { path, sort });
 /** The vault's own emoji (M5b §4); `null` removes it. */
 export const vaultIconSet = (icon: string | null) => call<null>('vault_icon_set', { icon });
+/** The vault's favorites, in the order they were added (M5b §19). */
+export const favoritesGet = () => call<string[]>('favorites_get');
+/** Replaces the favorites; Rust drops missing entries and repeats and
+ *  returns what it stored. */
+export const favoritesSet = (paths: string[]) => call<string[]>('favorites_set', { paths });
 
 // ---- quick notes (M4c §2, §7) ----
 

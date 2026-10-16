@@ -4,7 +4,9 @@ import { goBack, goForward } from '../../stores/navigate';
 import { dirFor } from '../../stores/tree';
 import { useUiStore } from '../../stores/uiStore';
 import { useVaultStore } from '../../stores/vaultStore';
+import { useFavoritesStore } from '../favorites/favoritesStore';
 import { openSearch } from '../search/searchMenu';
+import { usePageStore } from '../../stores/pageStore';
 import { toggleSidebar } from './shellMenu';
 
 /** Keys a layout may put where US keyboards have [ and ]; any other plain
@@ -56,7 +58,7 @@ export function isSearchKey(e: KeyboardEvent, mac = MAC): boolean {
 
 /** ⌘ (macOS) / Ctrl shortcuts (spec §3.5): F or ⇧F search, ⇧E explorer, O open vault,
  * J the floating button's actions and \ the sidebar (M5b §2.2, §2.5),
- * , settings, N new page ( ⇧N is New Quick Note since M4c §7.9, handled by
+ * ⇧D Favorites (M5b §19), , settings, N new page ( ⇧N is New Quick Note since M4c §7.9, handled by
  * `ScratchpadHost`), [ / ] back and forward along the
  * link trail (M2b §3), 1 / 2 Edit and Global View (M3a §2). Ignored while a
  * dialog is open. */
@@ -96,6 +98,13 @@ export function useGlobalShortcuts(menuOpen: boolean) {
         if (ui.actionsOpen && inside) {
           inside.querySelector<HTMLElement>(':scope > button[aria-expanded]')?.focus();
         }
+      } else if ((key === 'd' || e.code === 'KeyD') && e.shiftKey && (!MAC || e.metaKey)) {
+        // M5b §19: the open page in or out of Favorites.
+        const page = usePageStore.getState();
+        const editing = useUiStore.getState().screen === 'edit';
+        if (!editing || page.state !== 'ready' || !page.path) return;
+        if (page.path.startsWith('.archive/')) return;
+        void useFavoritesStore.getState().toggle(page.path);
       } else if ((e.key === '\\' || e.code === 'Backslash') && !e.shiftKey) {
         toggleSidebar(); // M5b §2.5
       } else if (key === 'e' && e.shiftKey) {

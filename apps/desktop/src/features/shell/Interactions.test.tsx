@@ -132,6 +132,7 @@ describe('context menu', () => {
       'Sort by',
       'Archive',
       'Delete',
+      'Add to Favorites',
     ]);
     expect(items[0]).toHaveFocus();
     await userEvent.keyboard('{ArrowDown}{ArrowDown}');

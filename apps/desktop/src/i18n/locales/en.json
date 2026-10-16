@@ -810,5 +810,14 @@
     "modified-desc": "Modified, newest first",
     "modified-asc": "Modified, oldest first",
     "created-desc": "Created, newest first"
+  },
+  "favorites": {
+    "title": "Favorites",
+    "add": "Add to Favorites",
+    "remove": "Remove from Favorites",
+    "removeNamed": "Remove {name} from Favorites",
+    "moveUp": "Move up in Favorites",
+    "moveDown": "Move down in Favorites",
+    "scratchTree": "Quick notes"
   }
 }

@@ -4,6 +4,7 @@ import { FormatIcon, OutlineIcon } from '../../app/icons';
 import type { EditorMode, Page } from '../../ipc';
 import { useEditorStore } from '../../stores/editorStore';
 import { useSettingsStore } from '../../stores/settingsStore';
+import { FavoriteToggle } from '../favorites/FavoriteToggle';
 import { BackArrow } from './BackArrow';
 import { Breadcrumb } from './Breadcrumb';
 import { Cover } from './Cover';
@@ -93,6 +94,7 @@ export function PageHeader({
                   <OutlineIcon />
                 </button>
               )}
+              {!archived && <FavoriteToggle path={page.path} />}
               <ModeToggle mode={mode} />
             </div>
           </div>

@@ -590,3 +590,41 @@ Jose, on the evening of 2026-10-15: the single long Settings page becomes a menu
 8. **The old "Close" button at the bottom becomes the pane's ✕ button,** with the same accessible name, "Close". Escape and a click outside still save and close (§ M4b part 3).
 9. **Theme is three preview cards,** still radios; the chosen card has an accent border. **Palettes are a 3-column grid.**
 10. **The unused `settings.sections.appearance/editor/files` keys are removed.** The vault section still uses `settings.sections.vault`.
+
+## 19. Favorites
+
+Jose, 2026-10-15: "add a Favorites section right below the Scratchpad section."
+
+**What it is:**
+- A **Favorites** section in the sidebar under the pinned Scratchpad, or first when the vault has no scratch folder yet.
+- Its heading is a disclosure button (chevron, star, "Favorites"); the collapsed state is remembered per vault.
+- It lists favourite pages and folders in the order they were added, with their emoji or file/folder glyph. Folders open in place.
+- The section is hidden while there are none.
+
+**Adding and removing:**
+- **Add to Favorites** / **Remove from Favorites** in every page's and folder's row menu.
+- A star in the page header (`aria-pressed`).
+- **⌘⇧D** (Ctrl+Shift+D) for the open page.
+- Each favourite row has a filled ☆ to take it out, and its … menu.
+
+**Order:** drag a favourite among the others, or **Move up / Move down in Favorites** in its row menu.
+
+**Storage:**
+- `.nimw/vault.json` `favorites: [path, …]`.
+- Commands `favorites_get` and `favorites_set(paths)` (main window only; refused in file windows) read and replace the whole list.
+- Rust refuses escaping or hidden paths, and drops missing entries and repeats.
+- Entries follow renames and moves in place, are forgotten when deleted from the vault, and follow items into the Trash, so Restore brings them back.
+
+**Rulings** (cost if wrong):
+1. **Archived favourites follow into `.archive/` and come back on Unarchive.** They are hidden while archived, the same as the Trash. This differs from the brief's "drop out, not re-added". Cost: an unarchived page reappears in Favorites.
+2. **Accessibility: a separate labelled list, not part of the tree.**
+   - When the Scratchpad is pinned, the explorer splits into two trees around it, "Quick notes" and "Files". They keep one Tab stop and one arrow-key order between them.
+   - Each favourite's name is a button and a Tab stop. Shift+F10 or the Menu key opens its menu.
+   - Cost: many favourites mean many Tab stops.
+3. **⌘⇧D was free** in the page's shortcuts, the native menu and CodeMirror. It acts only in the editor, and on macOS only with ⌘ (Ctrl+Shift+D isn't taken over). There's no native menu item. Cost: one more shortcut to learn.
+4. **Obsidian's `.obsidian/bookmarks.json` is neither read nor written.** It's a different feature, with groups, searches and headings. Cost: no seed from Obsidian.
+5. **Search's Favorites chip is deferred.** It needs the list in the Rust search query. Cost: no "search only favourites" yet.
+6. **The row-menu items are appended after Delete**, to keep the parallel branches' edits apart. The menu is text-only, so they have no star icon. Cost: placement only.
+7. **Drag reordering uses pointer events, not the explorer's dnd-kit**, which would read a drop on a folder as a move. The keyboard has Move up / Move down. Cost: no drop onto the tree from Favorites.
+8. **Attachments can't be favourites**: the menu doesn't offer it. Rust accepts any existing entry. Cost: none.
+9. **The list is read again on every tree refresh** (one small IPC), so renames and moves done in Rust show at once. Cost: a few extra IPC calls.
