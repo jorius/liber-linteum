@@ -57,7 +57,14 @@ export function DialogHost() {
         />
       );
     case 'binClash':
-      return <BinClashDialog kind={dialog.kind} path={dialog.path} onClose={close} />;
+      return (
+        <BinClashDialog
+          key={dialog.path}
+          path={dialog.path}
+          answer={dialog.answer}
+          onClose={close}
+        />
+      );
     case 'scratchpadSetup':
       return null; // ScratchpadHost shows it, on the Welcome screen too
   }

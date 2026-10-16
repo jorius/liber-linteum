@@ -259,6 +259,45 @@ describe('BinView: the Trash (M5b round 2 design)', () => {
     ]);
   });
 
+  it('round-2 review I2: a bulk restore asks about each clash in turn, and waits', async () => {
+    const asked = new Set<string>();
+    const calls = backend({
+      trash_restore: (a) => {
+        if (!a.keepBoth && !asked.has(String(a.path))) {
+          asked.add(String(a.path));
+          throw { kind: 'alreadyExists', message: String(a.path) };
+        }
+        lists.trash = lists.trash.filter((i) => i.path !== a.path);
+        return 'x';
+      },
+    });
+    render(
+      <>
+        <BinView />
+        <DialogHost />
+      </>,
+    );
+    await userEvent.click(await screen.findByRole('checkbox', { name: 'Select Old' }));
+    await userEvent.click(screen.getByRole('checkbox', { name: 'Select Drafts' }));
+    const bar = screen.getByRole('region', { name: 'Selection' });
+    await userEvent.click(within(bar).getByRole('button', { name: 'Restore' }));
+    const first = await screen.findByRole('dialog', { name: 'Old already exists' });
+    // While it runs, the selection can't start a second action.
+    expect(within(bar).getByRole('button', { name: 'Restore' })).toBeDisabled();
+    expect(within(bar).getByRole('button', { name: 'Delete' })).toBeDisabled();
+    await userEvent.click(within(first).getByRole('button', { name: 'Keep both' }));
+    const second = await screen.findByRole('dialog', { name: 'Drafts already exists' });
+    await userEvent.click(within(second).getByRole('button', { name: 'Keep both' }));
+    await waitFor(() =>
+      expect(called(calls, 'trash_restore')).toEqual([
+        { path: '.trash/Old.md', keepBoth: false },
+        { path: '.trash/Old.md', keepBoth: true },
+        { path: '.trash/Drafts', keepBoth: false },
+        { path: '.trash/Drafts', keepBoth: true },
+      ]),
+    );
+  });
+
   it('deletes one, then empties the Trash, each after a confirmation naming the count', async () => {
     lists.trash = lists.trash.slice(0, 2);
     const calls = backend();

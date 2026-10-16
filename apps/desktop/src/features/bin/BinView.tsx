@@ -129,9 +129,20 @@ export function BinView() {
       else next.add(path);
       return next;
     });
-  const restoreChosen = async () => {
-    for (const item of chosen) await restoreItem('trash', item.path);
+  // One bulk action at a time: its buttons wait until it ends (round-2 review I2).
+  const [busy, setBusy] = useState(false);
+  const bulk = async (run: () => Promise<unknown>) => {
+    setBusy(true);
+    try {
+      await run();
+    } finally {
+      setBusy(false);
+    }
   };
+  const restoreChosen = () =>
+    bulk(async () => {
+      for (const item of chosen) await restoreItem('trash', item.path);
+    });
   const onKeyDown = (e: KeyboardEvent<HTMLElement>) => {
     if (e.key === 'Escape' && picked.size > 0 && !ask) {
       e.stopPropagation();
@@ -230,6 +241,7 @@ export function BinView() {
               <button
                 type="button"
                 className={styles.barButton}
+                disabled={busy}
                 onClick={() => void restoreChosen()}
               >
                 <RestoreIcon />
@@ -238,6 +250,7 @@ export function BinView() {
               <button
                 type="button"
                 className={`${styles.barButton} ${styles.barDanger}`}
+                disabled={busy}
                 onClick={() => setAsk({ type: 'delete', items: chosen })}
               >
                 <TrashIcon />
@@ -281,6 +294,7 @@ export function BinView() {
                       <button
                         type="button"
                         className={styles.restoreButton}
+                        disabled={busy}
                         aria-label={t('bin.restoreName', { name })}
                         title={
                           from === null ? t('bin.restore') : t('bin.restoreTo', { folder: from })
@@ -293,6 +307,7 @@ export function BinView() {
                       <button
                         type="button"
                         className={styles.deleteButton}
+                        disabled={busy}
                         aria-label={t('bin.deleteName', { name })}
                         title={t('bin.deleteTitleShort')}
                         onClick={() => setAsk({ type: 'delete', items: [item] })}
@@ -307,7 +322,9 @@ export function BinView() {
           ))}
         </>
       )}
-      {ask && <Confirm ask={ask} count={items.length} onClose={() => setAsk(null)} />}
+      {ask && (
+        <Confirm ask={ask} count={items.length} bulk={bulk} onClose={() => setAsk(null)} />
+      )}
     </section>
   );
 }
@@ -353,7 +370,17 @@ function PageGlyph() {
   );
 }
 
-function Confirm({ ask, count, onClose }: { ask: Ask; count: number; onClose: () => void }) {
+function Confirm({
+  ask,
+  count,
+  bulk,
+  onClose,
+}: {
+  ask: Ask;
+  count: number;
+  bulk: (run: () => Promise<unknown>) => Promise<void>;
+  onClose: () => void;
+}) {
   const { t } = useTranslation();
   const [title, confirm, run] =
     ask.type === 'delete'
@@ -365,7 +392,7 @@ function Confirm({ ask, count, onClose }: { ask: Ask; count: number; onClose: ()
       : [t('bin.emptyTitle', { count }), t('bin.empty'), () => emptyTrash()];
   const go = () => {
     onClose();
-    void run();
+    void bulk(run);
   };
   return (
     <Dialog title={title} onClose={onClose} onConfirm={go}>

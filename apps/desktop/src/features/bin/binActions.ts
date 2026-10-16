@@ -18,14 +18,25 @@ import { useBinStore } from './binStore';
 const toast = () => useToastStore.getState();
 const vault = () => useVaultStore.getState();
 
-/** `clash`: something new is where it was (ask, then `keepBoth`). */
+/** `clash`: something new is where it was, and the user cancelled. */
 export type RestoreResult = 'done' | 'clash' | 'failed';
 
-function failed(res: IpcResult<unknown>, kind: 'trash' | 'archive', path: string): RestoreResult {
+/** Asks Keep both / Cancel and waits for the answer, so a bulk restore asks
+ *  about each clash in turn (round-2 review I2). */
+const askKeepBoth = (kind: 'trash' | 'archive', path: string) =>
+  new Promise<boolean>((answer) =>
+    useUiStore.getState().openDialog({ type: 'binClash', kind, path, answer }),
+  );
+
+async function settle(
+  res: IpcResult<unknown>,
+  kind: 'trash' | 'archive',
+  path: string,
+  keepBoth: boolean,
+): Promise<RestoreResult> {
   if (res.ok) return 'done';
-  if (res.error.kind === 'alreadyExists') {
-    useUiStore.getState().openDialog({ type: 'binClash', kind, path });
-    return 'clash';
+  if (res.error.kind === 'alreadyExists' && !keepBoth) {
+    return (await askKeepBoth(kind, path)) ? restoreItem(kind, path, true) : 'clash';
   }
   toast().push({ message: errorMessage(res.error), tone: 'error' });
   return 'failed';
@@ -41,7 +52,7 @@ export async function restoreItem(
   if (kind === 'trash') {
     const res = await trashRestore(path, keepBoth);
     if (res.ok) await vault().refreshTree();
-    return failed(res, kind, path);
+    return settle(res, kind, path, keepBoth);
   }
   await useEditorStore.getState().flushBefore(path); // the move takes the latest text
   const res = await archiveRestore(path, keepBoth);
@@ -49,7 +60,7 @@ export async function restoreItem(
     const to = res.value.moved.find(([from]) => from === path)?.[1] ?? path;
     await vault().applyRename(path, to, res.value);
   }
-  return failed(res, kind, path);
+  return settle(res, kind, path, keepBoth);
 }
 
 /** Deletes items from the Trash for good (to the system Trash). */

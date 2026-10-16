@@ -27,7 +27,13 @@ export type DialogState =
   | { type: 'unsaved'; id: number; paths: string[]; answer: (c: UnsavedChoice) => void }
   /** Restore or Unarchive found something new in the old place: keep both?
    *  (M5b §5.2; final review M3: from the banner and the toasts too). */
-  | { type: 'binClash'; kind: 'trash' | 'archive'; path: string }
+  | {
+      type: 'binClash';
+      kind: 'trash' | 'archive';
+      path: string;
+      /** Called once: keep both (true) or cancel (false). */
+      answer: (keepBoth: boolean) => void;
+    }
   | null;
 
 export type UnsavedChoice = 'save' | 'discard' | 'cancel';

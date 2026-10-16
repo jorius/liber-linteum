@@ -1,34 +1,48 @@
+import { useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Dialog } from '../dialogs/Dialog';
 import dialogStyles from '../dialogs/Dialogs.module.css';
-import { restoreItem } from './binActions';
 import { binLabel } from './BinView';
 
 /** Something new is where a restored or unarchived item was: keep both
- *  (the restored one numbered), or cancel (M5b §5.2). */
+ *  (the restored one numbered), or cancel (M5b §5.2). The answer goes back
+ *  to the restore waiting on it (round-2 review I2), exactly once. */
 export function BinClashDialog({
-  kind,
   path,
+  answer,
   onClose,
 }: {
-  kind: 'trash' | 'archive';
   path: string;
+  answer: (keepBoth: boolean) => void;
   onClose: () => void;
 }) {
   const { t } = useTranslation();
-  const keepBoth = () => {
+  const answered = useRef(false);
+  const reply = (keep: boolean) => {
+    if (!answered.current) {
+      answered.current = true;
+      answer(keep);
+    }
     onClose();
-    void restoreItem(kind, path, true);
   };
+  // Closed some other way (the vault closed): the restore stops waiting.
+  useEffect(
+    () => () => {
+      if (!answered.current) answer(false);
+    },
+    [answer],
+  );
+  const keepBoth = () => reply(true);
+  const cancel = () => reply(false);
   return (
     <Dialog
       title={t('bin.clashTitle', { name: binLabel(path) })}
-      onClose={onClose}
+      onClose={cancel}
       onConfirm={keepBoth}
     >
       <p className={dialogStyles.text}>{t('bin.clashBody')}</p>
       <div className={dialogStyles.buttons}>
-        <button type="button" className="btn btn-secondary" onClick={onClose}>
+        <button type="button" className="btn btn-secondary" onClick={cancel}>
           {t('dialogs.cancel')}
         </button>
         <button type="button" className="btn btn-primary" data-autofocus onClick={keepBoth}>
