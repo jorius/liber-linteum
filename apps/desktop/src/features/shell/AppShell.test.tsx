@@ -293,6 +293,34 @@ describe('AppShell', () => {
     expect(actions.closest('[data-place]')).toHaveAttribute('data-place', 'topRight');
   });
 
+  it('final review M5: ⌘J and Tab close the group without losing the keyboard; an action keeps it', async () => {
+    seed();
+    render(<AppShell />);
+    const actions = screen.getByRole('button', { name: 'Actions' });
+    actions.focus();
+    await userEvent.keyboard('{Enter}');
+    expect(screen.getByRole('button', { name: /^Search/ })).toHaveFocus();
+    act(() => {
+      document.activeElement!.dispatchEvent(
+        new KeyboardEvent('keydown', { key: 'j', metaKey: true, bubbles: true }),
+      );
+    });
+    expect(actions).toHaveAttribute('aria-expanded', 'false');
+    expect(actions).toHaveFocus();
+
+    await userEvent.keyboard('{Enter}');
+    await userEvent.tab(); // Global view
+    await userEvent.tab(); // Edit
+    await userEvent.tab(); // the button
+    await userEvent.tab(); // out of the group
+    expect(actions).toHaveAttribute('aria-expanded', 'false');
+
+    act(() => useUiStore.getState().setScreen('global'));
+    await userEvent.click(actions);
+    await userEvent.click(screen.getByRole('button', { name: /^Edit/ }));
+    await waitFor(() => expect(document.activeElement).not.toBe(document.body));
+  });
+
   it('NFR-10 has no axe violations', async () => {
     seed('Art/rex.md');
     const { container } = render(<AppShell />);

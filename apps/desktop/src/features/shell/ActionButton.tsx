@@ -31,9 +31,17 @@ export function ActionButton() {
     return () => document.removeEventListener('mousedown', onDown);
   }, [open, setOpen]);
 
-  const run = (action: () => void) => {
+  /** Runs an action; the keyboard goes to the screen it shows (the editor),
+   *  else back to the button, never to nothing (final review M5). */
+  const run = (action: () => void, target?: string) => {
     setOpen(false);
     action();
+    requestAnimationFrame(() => {
+      const now = document.activeElement;
+      if (now && now !== document.body) return; // a dialog took it
+      const to = target ? document.querySelector<HTMLElement>(target) : null;
+      (to ?? button.current)?.focus({ preventScroll: true });
+    });
   };
   const onKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
     const items = [
@@ -52,7 +60,16 @@ export function ActionButton() {
   };
   const { setScreen, openDialog } = useUiStore.getState();
   return (
-    <div ref={box} className={styles.fab} data-place={place} onKeyDown={onKeyDown}>
+    <div
+      ref={box}
+      className={styles.fab}
+      data-place={place}
+      onKeyDown={onKeyDown}
+      // Tab out of the group closes it (final review M5).
+      onBlur={(e) => {
+        if (open && !box.current?.contains(e.relatedTarget as Node | null)) setOpen(false);
+      }}
+    >
       {open && (
         <div
           id="nimw-actions"
@@ -77,7 +94,7 @@ export function ActionButton() {
             className={styles.fabItem}
             aria-pressed={screen === 'global'}
             aria-keyshortcuts="Meta+2 Control+2"
-            onClick={() => run(() => setScreen('global'))}
+            onClick={() => run(() => setScreen('global'), '[data-gv-card]')}
           >
             <GraphIcon />
             {t('shell.globalView')}
@@ -90,7 +107,7 @@ export function ActionButton() {
             className={styles.fabItem}
             aria-pressed={screen === 'edit'}
             aria-keyshortcuts="Meta+1 Control+1"
-            onClick={() => run(() => setScreen('edit'))}
+            onClick={() => run(() => setScreen('edit'), '.cm-content')}
           >
             <PencilIcon />
             {t('shell.edit')}

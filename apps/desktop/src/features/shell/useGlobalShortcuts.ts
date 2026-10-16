@@ -76,7 +76,12 @@ export function useGlobalShortcuts(menuOpen: boolean) {
       } else if (key === 'j' && !e.shiftKey) {
         // M5b §2.2: the floating button's actions.
         const ui = useUiStore.getState();
+        // Closing from inside the group gives the keyboard to its button (final review M5).
+        const inside = document.activeElement?.closest('[data-place]');
         ui.setActionsOpen(!ui.actionsOpen);
+        if (ui.actionsOpen && inside) {
+          inside.querySelector<HTMLElement>(':scope > button[aria-expanded]')?.focus();
+        }
       } else if ((e.key === '\\' || e.code === 'Backslash') && !e.shiftKey) {
         toggleSidebar(); // M5b §2.5
       } else if (key === 'e' && e.shiftKey) {
