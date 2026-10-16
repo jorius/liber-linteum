@@ -2405,3 +2405,24 @@ fn m5b_r2_review_m3_the_archive_guard_ignores_case() {
         assert_eq!(kind(err.clone()), "notPermitted", "{path}: {err}");
     }
 }
+
+/// Round-2 review M9: a favourite that can't be checked (no permission)
+/// counts as missing; it doesn't fail the whole list.
+#[cfg(unix)]
+#[test]
+fn m5b_r2_review_m9_an_unreadable_favorite_is_dropped_not_fatal() {
+    use std::os::unix::fs::PermissionsExt;
+    let h = harness();
+    let vault = open_fixture(&h, "obsidian-basic");
+    let locked = vault.path().join("Locked");
+    std::fs::create_dir(&locked).unwrap();
+    std::fs::write(locked.join("x.md"), "x").unwrap();
+    std::fs::set_permissions(&locked, std::fs::Permissions::from_mode(0o000)).unwrap();
+    let out = call(
+        &h.main,
+        "favorites_set",
+        json!({ "paths": ["Welcome.md", "Locked/x.md"] }),
+    );
+    std::fs::set_permissions(&locked, std::fs::Permissions::from_mode(0o755)).unwrap();
+    assert_eq!(out.unwrap(), json!(["Welcome.md"]));
+}
