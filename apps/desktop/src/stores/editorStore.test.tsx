@@ -311,14 +311,14 @@ describe('frontmatter edits from the header (M2c §4)', () => {
 describe('M5b final review: a move saves only what moves', () => {
   afterEach(() => useSettingsStore.setState({ settings: DEFAULT_SETTINGS }));
 
-  it('flushUnder writes the pages at or below a path and leaves other unsaved text', async () => {
+  it('flushBefore writes the pages at or below a path and leaves other unsaved text', async () => {
     useSettingsStore.setState({ settings: { ...DEFAULT_SETTINGS, autoSave: false } });
     const disk = fakeDisk({ 'A.md': 'a\n', 'F/b.md': 'b\n' });
     await editor().open('F/b.md');
     editor().doc!.edit('b2\n');
     await editor().open('A.md');
     editor().doc!.edit('a2\n');
-    await editor().flushUnder('F');
+    await editor().flushBefore('F');
     expect(disk.files.get('F/b.md')).toBe('b2\n');
     expect(disk.files.get('A.md')).toBe('a\n');
     expect(editor().dirtyPaths()).toEqual(['A.md']);

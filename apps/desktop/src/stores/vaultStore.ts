@@ -349,7 +349,7 @@ export const useVaultStore = create<VaultState>((set, get) => {
       return res;
     },
     rename: async (from, to, opts) => {
-      await useEditorStore.getState().flushAll(); // the move takes the latest text
+      await useEditorStore.getState().flushBefore(); // the move takes the latest text
       const res = await entryRename(from, to);
       if (!res.ok) {
         if (!opts?.quiet) toast().push({ message: errorMessage(res.error), tone: 'error' });
@@ -388,7 +388,7 @@ export const useVaultStore = create<VaultState>((set, get) => {
       const siblings = get().children.get(parentOf(path)) ?? [];
       const i = siblings.findIndex((n) => n.path === path);
       const next = siblings[i + 1]?.path ?? (parentOf(path) || null);
-      await useEditorStore.getState().flushAll(); // the Trash gets the latest text
+      await useEditorStore.getState().flushBefore(path); // the Trash gets the latest text
       const res = await entryTrash(path);
       if (!res.ok) {
         toast().push({ message: errorMessage(res.error), tone: 'error' });

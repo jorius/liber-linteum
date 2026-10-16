@@ -43,7 +43,7 @@ export async function restoreItem(
     if (res.ok) await vault().refreshTree();
     return failed(res, kind, path);
   }
-  await useEditorStore.getState().flushUnder(path); // the move takes the latest text
+  await useEditorStore.getState().flushBefore(path); // the move takes the latest text
   const res = await archiveRestore(path, keepBoth);
   if (res.ok) {
     const to = res.value.moved.find(([from]) => from === path)?.[1] ?? path;
@@ -68,7 +68,7 @@ export async function emptyTrash() {
 /** Archives a page or folder (M5b §5.3): it leaves the explorer, links keep
  *  working, and the toast can undo it. */
 export async function archiveItem(path: string) {
-  await useEditorStore.getState().flushUnder(path);
+  await useEditorStore.getState().flushBefore(path);
   const res = await entryArchive(path);
   if (!res.ok) {
     toast().push({ message: errorMessage(res.error), tone: 'error' });

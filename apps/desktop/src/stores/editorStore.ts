@@ -48,9 +48,9 @@ interface EditorState {
   close: () => Promise<void>;
   /** Saves every open page (current and background); capped at `timeoutMs`. */
   flushAll: (timeoutMs?: number) => Promise<void>;
-  /** Saves only the open pages at or below `path` (a page or folder about
-   *  to move), so other unsaved text stays unsaved (auto save off). */
-  flushUnder: (path: string) => Promise<void>;
+  /** Before a move or trash: everything with auto save on; with it off only
+   *  the pages under `under` (a trash), never others (M5b final review I1). */
+  flushBefore: (under?: string) => Promise<void>;
   onExternalChange: (c: ChangedPayload, exists?: (path: string) => boolean) => Promise<void>;
   follow: (from: string, to: string) => void;
   /** Re-reads pages rewritten by our own link updates (rename/move). */
@@ -228,10 +228,12 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     await (timeoutMs === undefined ? all : Promise.race([all, delay(timeoutMs)]));
     docs.forEach((d) => dropIfDone(d));
   },
-  flushUnder: async (path) => {
-    const under = [...docs.values()].filter((d) => remap(d.path, path, path) !== null);
-    await Promise.all(under.map((d) => d.flush()));
-    under.forEach((d) => dropIfDone(d));
+  flushBefore: async (under) => {
+    if (useSettingsStore.getState().settings.autoSave !== false) return get().flushAll();
+    if (under === undefined) return; // a moved page follows its file, unsaved
+    const docsUnder = [...docs.values()].filter((d) => remap(d.path, under, under) !== null);
+    await Promise.all(docsUnder.map((d) => d.flush()));
+    docsUnder.forEach((d) => dropIfDone(d));
   },
   onExternalChange: async (c, exists) => {
     for (const [from, to] of c.renamed) get().follow(from, to);

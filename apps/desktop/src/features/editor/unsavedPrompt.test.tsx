@@ -7,6 +7,7 @@ import { mayClose, resetEditorStore, useEditorStore } from '../../stores/editorS
 import { usePageStore } from '../../stores/pageStore';
 import { DEFAULT_SETTINGS, useSettingsStore } from '../../stores/settingsStore';
 import { useUiStore } from '../../stores/uiStore';
+import { useVaultStore } from '../../stores/vaultStore';
 import { fakeDisk } from '../../test/fakeDisk';
 import { DialogHost } from '../dialogs/DialogHost';
 import { confirmUnsaved } from './unsavedPrompt';
@@ -127,5 +128,25 @@ describe('Save / Don’t Save / Cancel (M5b §6, auto save off)', () => {
       await userEvent.click(screen.getByRole('button', { name: 'Save' }));
     });
     expect(await second).toBe(true);
+  });
+});
+
+describe('auto save off: moving or trashing one entry writes no other page (M5b final review I1)', () => {
+  it('a rename elsewhere, or of the page itself, writes nothing', async () => {
+    const disk = await editA(fakeDisk({ 'A.md': 'a\n', 'B.md': 'b\n' }));
+    await useVaultStore.getState().rename('B.md', 'C.md');
+    await useVaultStore.getState().rename('A.md', 'D.md');
+    expect(disk.writes()).toEqual([]);
+    expect(editor().doc!.dirty).toBe(true);
+  });
+
+  it('trashing another page writes nothing; trashing the page keeps its latest text', async () => {
+    const disk = await editA(
+      fakeDisk({ 'A.md': 'a\n', 'B.md': 'b\n' }, { entry_trash: (a) => `.trash/${a.path}` }),
+    );
+    await useVaultStore.getState().trash('B.md');
+    expect(disk.writes()).toEqual([]);
+    await useVaultStore.getState().trash('A.md');
+    expect(disk.writes()).toEqual([{ path: 'A.md', text: 'a edited\n' }]);
   });
 });

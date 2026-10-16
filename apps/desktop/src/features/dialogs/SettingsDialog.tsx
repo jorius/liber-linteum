@@ -45,7 +45,13 @@ export function SettingsDialog({ onClose }: { onClose: () => void }) {
   const settings = useSettingsStore((s) => s.settings);
   const update = useSettingsStore((s) => s.update);
   const installed = useInstalledFonts();
-  const ids = { appearance: useId(), editor: useId(), files: useId(), wideHint: useId() };
+  const ids = {
+    appearance: useId(),
+    editor: useId(),
+    files: useId(),
+    wideHint: useId(),
+    autoSaveHint: useId(),
+  };
   const vaultOpen = useVaultStore((s) => s.info !== null);
 
   return (
@@ -210,9 +216,13 @@ export function SettingsDialog({ onClose }: { onClose: () => void }) {
             type="checkbox"
             checked={settings.autoSave !== false}
             onChange={(e) => void update({ autoSave: e.target.checked })}
+            aria-describedby={ids.autoSaveHint}
           />
           {t('settings.autoSave')}
         </label>
+        <p id={ids.autoSaveHint} className={styles.hint}>
+          {t('settings.autoSaveHint', { save: /Mac/i.test(navigator.platform) ? '⌘S' : 'Ctrl+S' })}
+        </p>
         <label className={styles.check}>
           <input
             type="checkbox"
