@@ -72,7 +72,9 @@ export function IconButton({
   const [open, setOpen] = useState(false);
   const close = () => {
     setOpen(false);
-    button.current?.focus();
+    // A tree row's ☺ isn't a Tab stop: the keyboard goes back to its row (final review M6).
+    const row = button.current?.closest<HTMLElement>('[role="treeitem"]');
+    (row ?? button.current)?.focus();
   };
   const anchor = () => {
     const r = button.current?.getBoundingClientRect();

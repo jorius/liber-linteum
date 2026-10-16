@@ -342,6 +342,16 @@ describe('row quick actions (M5b §3)', () => {
     expect(calls).toContainEqual(['folder_icon_set', { path: 'Games', icon: '🕹️' }]);
     expect(useVaultStore.getState().selected).toBeNull();
   });
+
+  it('final review M6: after the picker the keyboard is back on the row, so ↑ / ↓ move again', async () => {
+    seed();
+    render(<ExplorerTree />);
+    const row = screen.getByRole('treeitem', { name: 'Games' });
+    await userEvent.click(within(row).getByRole('button', { name: 'Icon for Games' }));
+    await screen.findByRole('searchbox', { name: 'Search emoji' });
+    await userEvent.keyboard('{Escape}');
+    await waitFor(() => expect(row).toHaveFocus());
+  });
 });
 
 describe('the row menu (M5b §3, §4)', () => {
