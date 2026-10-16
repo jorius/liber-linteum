@@ -26,6 +26,11 @@ export const SHORTCUT_GROUPS = [
       { keys: 'Mod+E', label: 'code' },
       { keys: 'Mod+Shift+X', label: 'strike' },
       { keys: 'Mod+Shift+H', label: 'highlight' },
+      { keys: 'Mod+Shift+7', label: 'numbered' },
+      { keys: 'Mod+Shift+8', label: 'bullet' },
+      { keys: 'Mod+Shift+9', label: 'task' },
+      { keys: 'Mod+Shift+.', label: 'quote' },
+      { keys: 'Mod+Shift+D', label: 'favorite' },
     ],
   },
   {
