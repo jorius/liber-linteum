@@ -110,8 +110,19 @@ function Row({ label, children }: { label: string; children: ReactNode }) {
           <button
             type="button"
             className={styles.moreChip}
+            aria-expanded={false}
             onMouseDown={(e) => e.preventDefault()}
-            onClick={() => setOpen(true)}
+            onClick={(e) => {
+              // From the keyboard, focus goes to the first chip it shows, not to
+              // nothing as the button leaves (final review M9).
+              const first = e.currentTarget === document.activeElement ? visible.length : -1;
+              setOpen(true);
+              if (first >= 0) {
+                requestAnimationFrame(() =>
+                  box.current?.querySelectorAll<HTMLElement>('button')[first]?.focus(),
+                );
+              }
+            }}
           >
             {t('search.moreChips', { count: hidden })}
           </button>

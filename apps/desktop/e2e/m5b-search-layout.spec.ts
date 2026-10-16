@@ -112,3 +112,17 @@ test('only the results scroll; the field and the filters stay in view', async ({
   expect((await field.boundingBox())!.y).toBe(before);
   await expect(dialog.getByRole('group', { name: 'Links to' })).toBeInViewport();
 });
+
+test('final review M9: "+N more" is a collapsed disclosure; from the keyboard it hands focus to the first chip it shows', async ({
+  page,
+}) => {
+  const { dialog } = await openSearch(page, 1000);
+  const links = dialog.getByRole('group', { name: 'Links to' });
+  const more = links.getByRole('button', { name: /^\+\d+ more$/ });
+  await expect(more).toHaveAttribute('aria-expanded', 'false');
+  const shown = (await links.getByRole('button').count()) - 1;
+  await more.focus();
+  await page.keyboard.press('Enter');
+  await expect(more).toHaveCount(0);
+  await expect(links.getByRole('button').nth(shown)).toBeFocused();
+});
