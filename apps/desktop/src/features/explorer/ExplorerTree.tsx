@@ -5,6 +5,7 @@ import { usePageStore } from '../../stores/pageStore';
 import { useTrailStore } from '../../stores/trailStore';
 import { joinPath, parentOf, remap } from '../../stores/tree';
 import { useVaultStore } from '../../stores/vaultStore';
+import { useUiStore } from '../../stores/uiStore';
 import { useScratchpadStore } from '../scratchpad/scratchpadStore';
 import styles from './Explorer.module.css';
 import { displayName, keptExtension, TreeRow } from './TreeRow';
@@ -128,6 +129,9 @@ export function ExplorerTree({
       // Pages, and text and code files in the text view (M4b part 2 §6).
       // Opening from the explorer starts a fresh link trail (M2b §3).
       useTrailStore.getState().reset();
+      // The Trash and Archived views take the editor's place (M5b §5).
+      const ui = useUiStore.getState();
+      if (ui.screen === 'trash' || ui.screen === 'archive') ui.setScreen('edit');
       void usePageStore.getState().load(node.path);
     }
   };

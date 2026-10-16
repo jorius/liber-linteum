@@ -354,6 +354,22 @@ describe('row quick actions (M5b §3)', () => {
   });
 });
 
+describe('the Trash and Archived views (M5b §5)', () => {
+  afterEach(() => useUiStore.setState({ screen: 'edit' }));
+
+  it('a page clicked in the files leaves the Trash or Archived view for the editor', async () => {
+    backend({ page_read: () => ({ text: '# rex\n', hash: 'h' }) });
+    for (const view of ['trash', 'archive'] as const) {
+      seed(nodes, { expanded: new Set(['Art']) });
+      useUiStore.setState({ screen: view });
+      render(<ExplorerTree />);
+      await userEvent.click(screen.getByRole('treeitem', { name: 'rex' }));
+      expect(useUiStore.getState().screen).toBe('edit');
+      document.body.innerHTML = '';
+    }
+  });
+});
+
 describe('the row menu (M5b §3, §4)', () => {
   it('offers Icon… for pages and folders, which opens the picker in its place', async () => {
     const calls = backend({ folder_icon_set: () => null });
