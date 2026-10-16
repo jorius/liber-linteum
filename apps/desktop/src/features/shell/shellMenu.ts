@@ -25,7 +25,18 @@ export const closeVault = () => void useVaultStore.getState().close();
 
 export const toggleSidebar = () => {
   const { settings, update } = useSettingsStore.getState();
-  void update({ sidebarCollapsed: !settings.sidebarCollapsed });
+  const collapsing = !settings.sidebarCollapsed;
+  const active = document.activeElement;
+  // The keyboard follows the toggle when the sidebar it was in goes, and
+  // back when it returns (final review I5).
+  const move = collapsing
+    ? !!active?.closest('aside')
+    : active === document.body || !!active?.closest('[data-sidebar-toggle]');
+  void update({ sidebarCollapsed: collapsing }).then((res) => {
+    if (res.ok && move) {
+      setTimeout(() => document.querySelector<HTMLElement>('[data-sidebar-toggle]')?.focus());
+    }
+  });
 };
 
 /** ⌘S / File → Save: the current page, now (with auto save off, the only

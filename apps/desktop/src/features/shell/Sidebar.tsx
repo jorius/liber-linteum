@@ -37,6 +37,7 @@ export function Sidebar(treeProps: ExplorerTreeProps) {
           type="button"
           className={styles.iconButton}
           aria-label={t('shell.hideSidebar')}
+          data-sidebar-toggle
           aria-keyshortcuts="Meta+\ Control+\"
           title={t('shell.hideSidebar')}
           onClick={toggleSidebar}

@@ -47,6 +47,7 @@ export function AppShell() {
             type="button"
             className={`${styles.iconButtonLight} ${styles.reopen}`}
             aria-label={t('shell.showSidebar')}
+            data-sidebar-toggle
             aria-keyshortcuts="Meta+\ Control+\"
             title={t('shell.showSidebar')}
             onClick={toggleSidebar}

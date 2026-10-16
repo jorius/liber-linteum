@@ -246,6 +246,18 @@ describe('AppShell', () => {
     ).toBeInTheDocument();
   });
 
+  it('final review I5: collapsing from inside the sidebar keeps the keyboard; reopening returns it', async () => {
+    backend({
+      settings_set: (a) => ({ ...useSettingsStore.getState().settings, ...(a.patch as object) }),
+    });
+    seed();
+    render(<AppShell />);
+    await userEvent.click(screen.getByRole('button', { name: 'Hide sidebar' }));
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Show sidebar' })).toHaveFocus());
+    await userEvent.keyboard('{Enter}');
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Hide sidebar' })).toHaveFocus());
+  });
+
   it('M5b §2.2: the floating button opens with the keyboard, ⌘J toggles it, Escape gives focus back', async () => {
     seed();
     render(<AppShell />);
