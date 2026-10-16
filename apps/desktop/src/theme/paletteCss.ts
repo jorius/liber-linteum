@@ -54,8 +54,14 @@ export function paletteVars(p: Palette, mode: 'light' | 'dark'): Record<string, 
     '--color-surface-veil': alpha(t.surface, 0.88),
     '--color-danger': DANGER[mode].bg,
     '--color-danger-contrast': DANGER[mode].text,
-    // M5b §6: "Saved" in green, readable on this palette's header.
-    '--color-success': readableOn(t.surface, 145, 0.14, mode),
+    // M5b §6: "Saved" in green, readable on this palette's header and on its
+    // veiled pill over a black or white cover (final review M14).
+    '--color-success': readableOn(
+      [t.surface, mix(t.surface, '#000000', 0.12), mix(t.surface, '#ffffff', 0.12)],
+      145,
+      0.14,
+      mode,
+    ),
     // M4b part 2 §2: syntax colours, readable on this palette's code background.
     ...codeTokens(t.code, t.text, t.muted, mode),
   };
@@ -73,12 +79,18 @@ const CODE_HUES = {
 } as const;
 
 /** The first lightness, walking from the starting point away from the
- *  background, at which `hue` reads at ≥ 4.6:1 on `bg`. */
-function readableOn(bg: string, hue: number, chroma: number, mode: 'light' | 'dark'): string {
+ *  background, at which `hue` reads at ≥ 4.6:1 on `bg` (each of them). */
+function readableOn(
+  bg: string | string[],
+  hue: number,
+  chroma: number,
+  mode: 'light' | 'dark',
+): string {
   const step = mode === 'light' ? -0.01 : 0.01;
+  const bgs = typeof bg === 'string' ? [bg] : bg;
   for (let L = mode === 'light' ? 0.52 : 0.78; L > 0.05 && L < 0.99; L += step) {
     const hex = oklchToHex(L, chroma, hue);
-    if (contrast(hex, bg) >= 4.6) return hex;
+    if (bgs.every((b) => contrast(hex, b) >= 4.6)) return hex;
   }
   return mode === 'light' ? '#000000' : '#ffffff';
 }

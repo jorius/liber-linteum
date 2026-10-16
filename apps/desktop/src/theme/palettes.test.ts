@@ -320,7 +320,13 @@ describe('review focus: text on the veil over any cover (M4b §1)', () => {
     const vars = paletteVars(palettes[i], mode);
     for (const image of ['#000000', '#ffffff']) {
       const pill = over(vars['--color-surface-veil'], image);
-      for (const text of ['--color-text', '--color-text-body'] as const) {
+      // The save status too: "Saved" green, "Unsaved" red (M5b final review M14).
+      for (const text of [
+        '--color-text',
+        '--color-text-body',
+        '--color-success',
+        '--color-danger',
+      ] as const) {
         expect(contrast(vars[text], pill), `${text} over ${image}`).toBeGreaterThanOrEqual(4.5);
       }
     }
