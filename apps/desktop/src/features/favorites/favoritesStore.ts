@@ -27,14 +27,24 @@ export function shownFavorites(paths: string[], nodes: TreeNode[]): TreeNode[] {
 }
 
 export const useFavoritesStore = create<FavoritesState>((set, get) => {
-  const save = async (next: string[]) => {
-    set({ paths: next });
-    const res = await favoritesSet(next);
-    if (res.ok) set({ paths: Array.isArray(res.value) ? res.value : next });
-    else {
-      useToastStore.getState().push({ message: errorMessage(res.error), tone: 'error' });
-      await get().load();
-    }
+  // One save at a time, each applied to the list Rust holds at its turn: a
+  // rename there since the last read isn't undone, and saves can't land out of
+  // order (round-2 review M8).
+  let queue: Promise<void> = Promise.resolve();
+  const change = (edit: (paths: string[]) => string[]) => {
+    set({ paths: edit(get().paths) }); // shown at once
+    const turn = queue.then(async () => {
+      const now = await favoritesGet();
+      const base = now.ok && Array.isArray(now.value) ? now.value : get().paths;
+      const res = await favoritesSet(edit(base));
+      if (res.ok && Array.isArray(res.value)) set({ paths: res.value });
+      else if (!res.ok) {
+        useToastStore.getState().push({ message: errorMessage(res.error), tone: 'error' });
+        await get().load();
+      }
+    });
+    queue = turn.catch(() => undefined);
+    return turn;
   };
   return {
     paths: [],
@@ -46,16 +56,15 @@ export const useFavoritesStore = create<FavoritesState>((set, get) => {
       const res = await favoritesGet();
       set({ paths: res.ok && Array.isArray(res.value) ? res.value : [] });
     },
-    toggle: (path) => {
-      const paths = get().paths;
-      return save(paths.includes(path) ? paths.filter((p) => p !== path) : [...paths, path]);
-    },
-    move: (path, before) => {
-      const rest = get().paths.filter((p) => p !== path);
-      const at = before === null ? rest.length : rest.indexOf(before);
-      rest.splice(at < 0 ? rest.length : at, 0, path);
-      return save(rest);
-    },
+    toggle: (path) =>
+      change((paths) => (paths.includes(path) ? paths.filter((p) => p !== path) : [...paths, path])),
+    move: (path, before) =>
+      change((paths) => {
+        const rest = paths.filter((p) => p !== path);
+        const at = before === null ? rest.length : rest.indexOf(before);
+        rest.splice(at < 0 ? rest.length : at, 0, path);
+        return rest;
+      }),
   };
 });
 

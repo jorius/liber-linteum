@@ -193,6 +193,31 @@ describe('Favorites (M5b §19)', () => {
     expect(sets).toHaveLength(0);
   });
 
+  it('round-2 review M8: saves run one at a time, each from the list Rust holds now', async () => {
+    await open([]);
+    let stored = ['Old.md']; // Rust renamed Welcome.md → Old.md meanwhile; the store hasn't reloaded
+    let first = true;
+    mockIPC(async (cmd, args) => {
+      if (cmd === 'favorites_get') return stored;
+      if (cmd === 'favorites_set') {
+        const paths = (args as { paths: string[] }).paths;
+        if (first) {
+          first = false;
+          await new Promise((r) => setTimeout(r, 30)); // the first save lands last
+        }
+        stored = paths.filter((p) => p !== 'Welcome.md'); // Rust drops what's gone
+        return stored;
+      }
+      return null;
+    });
+    useFavoritesStore.setState({ paths: ['Welcome.md'] });
+    await Promise.all([
+      useFavoritesStore.getState().toggle('Zed.md'),
+      useFavoritesStore.getState().toggle('Art'),
+    ]);
+    expect(stored).toEqual(['Old.md', 'Zed.md', 'Art']);
+  });
+
   it('has no axe violations', async () => {
     await open(['Art', 'Welcome.md']);
     const { container } = render(<ExplorerTree />);
