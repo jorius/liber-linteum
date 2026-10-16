@@ -7,6 +7,7 @@ import { afterEach, beforeAll, describe, expect, it } from 'vitest';
 import type { TreeNode } from '../../ipc';
 import { clearMocks, mockIPC } from '../../ipc/testing';
 import { fakeDisk } from '../../test/fakeDisk';
+import { resetEditorStore } from '../../stores/editorStore';
 import { installReactFlowStubs } from '../../test/reactFlow';
 import { openPage } from '../../stores/navigate';
 import { usePageStore } from '../../stores/pageStore';
@@ -48,6 +49,9 @@ function backend(handlers: Record<string, (a: Record<string, unknown>) => unknow
 beforeAll(installReactFlowStubs);
 
 afterEach(async () => {
+  // A page a test opened would otherwise autosave into the next test's mock,
+  // which answers page_write with nothing (the 1-in-8 failure, M5b round 2).
+  resetEditorStore();
   await resetVaultStore();
   usePageStore.getState().clear();
   useUiStore.getState().closeDialog();
