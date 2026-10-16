@@ -396,3 +396,29 @@ describe('PageView (M2a §5)', () => {
     expect(results.violations).toEqual([]);
   });
 });
+
+// M5b round 2: archived pages are read-only, everywhere on the page.
+describe('an archived page', () => {
+  it('opens read-only: no typing, no edits from the toolbar or keys, a read-only header', async () => {
+    useSettingsStore.setState({ settings: { ...DEFAULT_SETTINGS, toolbar: true } });
+    const disk = fakeDisk({
+      '.archive/Old.md': '---\ncover: a.png\n---\n# Old\n\nKept for the record.\n',
+    });
+    render(<PageScreen />);
+    await open('.archive/Old.md');
+    expect(screen.getByText('This page is archived. Unarchive it to edit it.')).toBeInTheDocument();
+    const content = document.querySelector('.cm-content')!;
+    expect(content).toHaveAttribute('contenteditable', 'false');
+    // Edits that don't come from the disk are dropped (toolbar commands, keys).
+    type('Changed ');
+    expect(view().state.doc.toString()).not.toContain('Changed');
+    expect(screen.queryByRole('toolbar', { name: 'Formatting' })).not.toBeInTheDocument();
+    expect(screen.getByRole('textbox', { name: 'Page title' })).toHaveAttribute('readonly');
+    expect(screen.queryByRole('textbox', { name: 'Subtitle' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Add an icon|Icon for/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Related page/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Page width/ })).not.toBeInTheDocument();
+    await act(() => new Promise((r) => setTimeout(r, 50)));
+    expect(disk.calls.filter(([c]) => c === 'page_write')).toEqual([]);
+  });
+});

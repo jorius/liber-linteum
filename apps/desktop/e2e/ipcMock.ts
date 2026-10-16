@@ -311,17 +311,19 @@ export function installIpcMock({
         kind: 'folder',
         ...(folderIcons[path] ? { icon: folderIcons[path] } : {}),
       })),
-      ...Object.keys(pages)
-        .filter((path) => !path.startsWith('.archive/'))
-        .map((path) => {
-          // M5b §4: a page's frontmatter emoji, as the index reads it.
-          const icon = /^---\n(?:[^\n]*\n)*?icon: (\S+)\n/.exec(pages[path] ?? '')?.[1];
-          return {
-            path,
-            kind: /\.md$/i.test(path) ? 'page' : 'attachment',
-            ...(icon ? { icon } : {}),
-          };
-        }),
+      // M5b round 2: the Archive comes with the tree, as its own folder.
+      ...(Object.keys(pages).some((p) => p.startsWith('.archive/'))
+        ? [{ path: '.archive', kind: 'folder' }]
+        : []),
+      ...Object.keys(pages).map((path) => {
+        // M5b §4: a page's frontmatter emoji, as the index reads it.
+        const icon = /^---\n(?:[^\n]*\n)*?icon: (\S+)\n/.exec(pages[path] ?? '')?.[1];
+        return {
+          path,
+          kind: /\.md$/i.test(path) ? 'page' : 'attachment',
+          ...(icon ? { icon } : {}),
+        };
+      }),
     ],
     // ---- M5b §4: folder and vault icons ----
     folder_icon_set: (a) => {

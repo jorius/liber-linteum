@@ -126,11 +126,24 @@ pub(crate) fn vault_close_impl(state: &AppState) {
     state.set_session(None);
 }
 
+/// Archived pages are read-only (M5b round 2): anything that would change
+/// one, or put something in the Archive, is refused. Unarchive and Move to
+/// Trash have their own commands.
+pub(crate) fn not_archived(path: &str) -> CmdResult<()> {
+    if nimw_vault::is_archived(path) {
+        return Err(CommandError::new(
+            ErrorKind::NotPermitted,
+            format!("{path} is archived; unarchive it to change it"),
+        ));
+    }
+    Ok(())
+}
+
 pub(crate) fn vault_tree_impl(state: &AppState) -> CmdResult<Vec<TreeNodeDto>> {
     let session = state.session()?;
     let mut folders = session.vault().folder_icons();
     Ok(session
-        .tree()?
+        .tree_with_archive()?
         .into_iter()
         .map(|n| {
             // Pages: the indexed frontmatter emoji; folders: vault.json (M5b §4).
@@ -215,6 +228,7 @@ pub(crate) fn entry_create_page_impl(
     dir: String,
     name: String,
 ) -> CmdResult<String> {
+    crate::vault_commands::not_archived(&dir)?;
     Ok(state
         .session()?
         .create_page(&dir_path(&dir)?, &name)?
@@ -228,6 +242,7 @@ pub(crate) fn entry_create_text_impl(
     dir: String,
     name: String,
 ) -> CmdResult<String> {
+    crate::vault_commands::not_archived(&dir)?;
     Ok(state
         .session()?
         .create_text_file(&dir_path(&dir)?, &name)?
@@ -239,6 +254,7 @@ pub(crate) fn entry_create_folder_impl(
     parent: String,
     name: String,
 ) -> CmdResult<String> {
+    crate::vault_commands::not_archived(&parent)?;
     Ok(state
         .session()?
         .create_folder(&dir_path(&parent)?, &name)?
@@ -250,6 +266,8 @@ pub(crate) fn entry_rename_impl(
     from: String,
     to: String,
 ) -> CmdResult<RenameOutcomeDto> {
+    crate::vault_commands::not_archived(&from)?;
+    crate::vault_commands::not_archived(&to)?;
     let rewrite = state.settings.get().0.rewrite_links;
     Ok(state
         .session()?

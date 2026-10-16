@@ -354,12 +354,12 @@ describe('row quick actions (M5b §3)', () => {
   });
 });
 
-describe('the Trash and Archived views (M5b §5)', () => {
+describe('the Trash view (M5b §5)', () => {
   afterEach(() => useUiStore.setState({ screen: 'edit' }));
 
-  it('a page clicked in the files leaves the Trash or Archived view for the editor', async () => {
+  it('a page clicked in the files leaves the Trash view for the editor', async () => {
     backend({ page_read: () => ({ text: '# rex\n', hash: 'h' }) });
-    for (const view of ['trash', 'archive'] as const) {
+    for (const view of ['trash'] as const) {
       seed(nodes, { expanded: new Set(['Art']) });
       useUiStore.setState({ screen: view });
       render(<ExplorerTree />);

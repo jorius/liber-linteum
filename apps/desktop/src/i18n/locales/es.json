@@ -235,7 +235,9 @@
     "delete": "Eliminar",
     "icon": "Icono…",
     "archive": "Archivar",
-    "sortBy": "Ordenar por"
+    "sortBy": "Ordenar por",
+    "open": "Abrir",
+    "unarchive": "Desarchivar"
   },
   "dialogs": {
     "cancel": "Cancelar",
@@ -711,7 +713,7 @@
     "clashTitle": "{name} ya existe",
     "clashBody": "Hay algo nuevo donde estaba. ¿Conservar ambos, añadiendo un número al restaurado?",
     "keepBoth": "Conservar ambos",
-    "archivedPage": "Esta página está archivada.",
+    "archivedPage": "Esta página está archivada. Desarchívala para editarla.",
     "archivedToast": "Archivado",
     "undo": "Deshacer",
     "undoGone": "Ese elemento ya no está en la Papelera."

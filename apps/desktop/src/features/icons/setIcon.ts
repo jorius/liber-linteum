@@ -3,7 +3,7 @@ import { setFrontmatter } from '../../markdown/frontmatterEdit';
 import { errorMessage } from '../../stores/messages';
 import { editRelations } from '../../stores/relations';
 import { useToastStore } from '../../stores/toastStore';
-import { childrenByParent } from '../../stores/tree';
+import { childrenByParent, isArchived } from '../../stores/tree';
 import { useVaultStore } from '../../stores/vaultStore';
 
 export type IconTarget = { kind: 'page' | 'folder'; path: string } | { kind: 'vault' };
@@ -15,7 +15,9 @@ function showOnRow(path: string, icon: string | null) {
     const nodes = s.nodes.map((n) =>
       n.path !== path ? n : icon ? { ...n, icon } : { path: n.path, kind: n.kind },
     );
-    return { nodes, children: childrenByParent(nodes) };
+    // `children` also holds the Archive's rows, which `nodes` leaves out.
+    const archive = [...s.children.values()].flat().filter((n) => isArchived(n.path));
+    return { nodes, children: childrenByParent([...nodes, ...archive]) };
   });
 }
 

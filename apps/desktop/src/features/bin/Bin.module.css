@@ -145,3 +145,9 @@
 .banner p {
   margin: 0;
 }
+
+/* The Archive's own tree (M5b round 2), under its row; long lists scroll. */
+.archiveTree {
+  max-height: 40vh;
+  overflow-y: auto;
+}

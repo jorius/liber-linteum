@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import type { IpcResult } from '../../ipc';
 import { errorMessage } from '../../stores/messages';
 import { usePageStore } from '../../stores/pageStore';
-import { nameOf, parentOf } from '../../stores/tree';
+import { isArchived, nameOf, parentOf } from '../../stores/tree';
 import { useVaultStore } from '../../stores/vaultStore';
 import { validateName } from '../explorer/nameRules';
 import styles from './PageView.module.css';
@@ -116,6 +116,8 @@ export function PageTitle({
           aria-invalid={error !== null}
           aria-describedby={error ? errorId : undefined}
           spellCheck={false}
+          // Archived pages are read-only (M5b round 2).
+          readOnly={isArchived(path)}
           // As wide as its text, so the heading's pill fits it (Safari 15 has no field-sizing).
           size={Math.max(8, draft.length + 1)}
           value={draft}

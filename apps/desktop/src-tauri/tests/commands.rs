@@ -2199,6 +2199,80 @@ fn m5b_r2_folder_sorts_over_ipc() {
     assert_eq!(get(""), "name-asc");
 }
 
+/// M5b round 2: archived pages are read-only. Every command that would
+/// change one, or put something in the Archive, is refused; Unarchive and
+/// Move to Trash still work.
+#[test]
+fn m5b_r2_the_archive_is_read_only() {
+    let h = harness();
+    let vault = open_fixture(&h, "obsidian-basic");
+    call(&h.main, "entry_archive", json!({ "path": "Welcome.md" })).unwrap();
+    let a = ".archive/Welcome.md";
+    let read = call(&h.main, "page_read", json!({ "path": a })).unwrap();
+    let hash = read["hash"].clone();
+    let refused: Vec<(&str, Value)> = vec![
+        (
+            "page_write",
+            json!({ "path": a, "text": "x", "expectedHash": hash }),
+        ),
+        (
+            "text_write",
+            json!({ "path": a, "text": "x", "expectedHash": hash }),
+        ),
+        (
+            "page_create_conflict_copy",
+            json!({ "path": a, "text": "x" }),
+        ),
+        (
+            "entry_rename",
+            json!({ "from": a, "to": ".archive/Other.md" }),
+        ),
+        (
+            "entry_rename",
+            json!({ "from": "Game Design", "to": ".archive/Game Design" }),
+        ),
+        (
+            "entry_create_page",
+            json!({ "dir": ".archive", "name": "New" }),
+        ),
+        (
+            "entry_create_folder",
+            json!({ "parent": ".archive", "name": "New" }),
+        ),
+        (
+            "entry_create_text",
+            json!({ "dir": ".archive", "name": "n.txt" }),
+        ),
+        ("attachment_import", json!({ "page": a, "paths": [] })),
+        ("cover_pick", json!({ "page": a })),
+        ("page_width_set", json!({ "path": a, "width": "full" })),
+        ("cover_height_set", json!({ "path": a, "height": 200.0 })),
+        ("cover_side_set", json!({ "path": a, "side": "left" })),
+        ("cover_width_set", json!({ "path": a, "width": 300.0 })),
+    ];
+    for (cmd, args) in refused {
+        let err = call(&h.main, cmd, args.clone()).unwrap_err();
+        assert_eq!(kind(err), "notPermitted", "{cmd} {args}");
+    }
+    assert!(vault.path().join(a).exists());
+    // Sorting it is fine; Unarchive and Move to Trash still work.
+    std::fs::create_dir_all(vault.path().join(".archive/Old")).unwrap();
+    call(
+        &h.main,
+        "folder_sort_set",
+        json!({ "path": ".archive/Old", "sort": "name-desc" }),
+    )
+    .unwrap();
+    call(
+        &h.main,
+        "archive_restore",
+        json!({ "path": a, "keepBoth": false }),
+    )
+    .unwrap();
+    call(&h.main, "entry_archive", json!({ "path": "Welcome.md" })).unwrap();
+    call(&h.main, "entry_trash", json!({ "path": a })).unwrap();
+}
+
 /// M5b §5: delete moves into the vault's Trash and comes back; archive moves
 /// into `.archive/` and back; search leaves archived pages out unless asked.
 /// (Never `trash_delete`/`trash_empty` here: they reach the OS trash.)
@@ -2226,12 +2300,14 @@ fn m5b_trash_and_archive_over_ipc() {
     assert_eq!(out["moved"][0][1], ".archive/Welcome.md");
     let bins = call(&h.main, "bin_list", json!({})).unwrap();
     assert_eq!(bins["archive"][0]["path"], ".archive/Welcome.md");
+    // M5b round 2: the tree carries the Archive too, for its own read-only
+    // folder in the sidebar; the UI keeps it out of the vault's tree.
     let tree = call(&h.main, "vault_tree", json!({})).unwrap();
     assert!(
         tree.as_array()
             .unwrap()
             .iter()
-            .all(|n| !n["path"].as_str().unwrap().starts_with(".archive"))
+            .any(|n| n["path"] == ".archive/Welcome.md")
     );
     let page = call(
         &h.main,

@@ -46,3 +46,6 @@ export function dirFor(nodes: TreeNode[], selected: string | null): string {
   if (!node) return '';
   return node.kind === 'folder' ? node.path : parentOf(node.path);
 }
+
+/** In the vault's Archive (M5b §5.3): read-only (round 2). */
+export const isArchived = (path: string) => path === '.archive' || path.startsWith('.archive/');

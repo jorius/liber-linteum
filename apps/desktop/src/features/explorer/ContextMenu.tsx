@@ -5,7 +5,9 @@ import { useUiStore } from '../../stores/uiStore';
 import { useVaultStore } from '../../stores/vaultStore';
 import { EmojiPicker } from '../icons/EmojiPicker';
 import { setIcon } from '../icons/setIcon';
-import { archiveItem } from '../bin/binActions';
+import { archiveItem, restoreItem } from '../bin/binActions';
+import { isArchived } from '../../stores/tree';
+import { openPage } from '../../stores/navigate';
 import { SortMenu } from './SortMenu';
 import { requestTrash } from './trashAction';
 import { displayName } from './TreeRow';
@@ -18,7 +20,10 @@ export interface MenuState {
 /** Explorer actions for one item (right-click, "…" or Shift+F10). */
 export function ContextMenu({ menu, onClose }: { menu: MenuState; onClose: () => void }) {
   const { t } = useTranslation();
-  const node = useVaultStore((s) => s.nodes.find((n) => n.path === menu.path));
+  // From its folder's rows, which also hold the Archive's (M5b round 2).
+  const node = useVaultStore((s) =>
+    s.children.get(parentOf(menu.path))?.find((n) => n.path === menu.path),
+  );
   const [active, setActive] = useState(0);
   // Icon… swaps the menu for the emoji picker at the same place (M5b §4).
   const [picking, setPicking] = useState(false);
@@ -49,26 +54,44 @@ export function ContextMenu({ menu, onClose }: { menu: MenuState; onClose: () =>
   if (!node) return null;
   const dir = node.kind === 'folder' ? node.path : parentOf(node.path);
   const vault = useVaultStore.getState;
-  const actions: [string, () => void][] = [
-    [t('menu.newPage'), () => void vault().createPage(dir)],
-    [t('menu.newFolder'), () => void vault().createFolder(dir)],
-    [t('menu.rename'), () => vault().startRename(node.path)],
-    [t('menu.move'), () => useUiStore.getState().openDialog({ type: 'move', path: node.path })],
-    ...(node.kind === 'attachment'
-      ? []
-      : [[t('menu.icon'), () => setPicking(true)] as [string, () => void]]),
-    [t('menu.sortBy'), () => setSorting(true)],
-    [t('menu.archive'), () => void archiveItem(node.path)],
-    [t('menu.delete'), () => requestTrash(node.path)],
-  ];
+  // The Archive is read-only (M5b round 2): open, unarchive, sort or trash.
+  const archived = isArchived(node.path);
+  const actions: [string, () => void][] = archived
+    ? [
+        ...(node.kind === 'folder'
+          ? []
+          : [[t('menu.open'), () => void openPage(node.path)] as [string, () => void]]),
+        [t('menu.unarchive'), () => void restoreItem('archive', node.path)],
+        [t('menu.sortBy'), () => setSorting(true)],
+        [t('menu.delete'), () => requestTrash(node.path)],
+      ]
+    : [
+        [t('menu.newPage'), () => void vault().createPage(dir)],
+        [t('menu.newFolder'), () => void vault().createFolder(dir)],
+        [t('menu.rename'), () => vault().startRename(node.path)],
+        [t('menu.move'), () => useUiStore.getState().openDialog({ type: 'move', path: node.path })],
+        ...(node.kind === 'attachment'
+          ? []
+          : [[t('menu.icon'), () => setPicking(true)] as [string, () => void]]),
+        [t('menu.sortBy'), () => setSorting(true)],
+        [t('menu.archive'), () => void archiveItem(node.path)],
+        [t('menu.delete'), () => requestTrash(node.path)],
+      ];
 
   const sortIndex = actions.findIndex(([label]) => label === t('menu.sortBy'));
   if (sorting) {
-    const folder = dir ? useVaultStore.getState().nodes.find((n) => n.path === dir) : undefined;
+    const vault = useVaultStore.getState();
+    const folder = vault.children.get(parentOf(dir))?.find((n) => n.path === dir);
+    const name =
+      dir === '.archive'
+        ? t('bin.archived')
+        : folder && dir
+          ? displayName(folder)
+          : (vault.info?.name ?? '');
     return (
       <SortMenu
         path={dir}
-        name={folder ? displayName(folder) : (useVaultStore.getState().info?.name ?? '')}
+        name={name}
         anchor={menu.anchor}
         onClose={onClose}
         onBack={() => {

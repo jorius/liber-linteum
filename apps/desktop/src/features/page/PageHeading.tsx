@@ -1,7 +1,8 @@
 import { useEditorStore } from '../../stores/editorStore';
 import { usePageStore } from '../../stores/pageStore';
 import { isTextPath } from '../../stores/textFiles';
-import { IconButton, useIcon } from '../icons/ItemIcon';
+import { isArchived } from '../../stores/tree';
+import { IconButton, ItemIcon, useIcon } from '../icons/ItemIcon';
 import { PageSubtitle } from './PageSubtitle';
 import { PageTitle } from './PageTitle';
 import styles from './PageView.module.css';
@@ -13,7 +14,8 @@ export function PageHeading() {
   const state = usePageStore((s) => s.state);
   const page = usePageStore((s) => s.page);
   const path = usePageStore((s) => s.path);
-  const editable = useEditorStore((s) => s.doc !== null && s.path === page?.path);
+  const archived = !!page && isArchived(page.path);
+  const editable = useEditorStore((s) => s.doc !== null && s.path === page?.path) && !archived;
   const icon = useIcon(page?.path);
   // A text file: its name, no subtitle (M4b part 2 §6).
   if (state === 'ready' && path && isTextPath(path)) return <PageTitle path={path} />;
@@ -22,12 +24,16 @@ export function PageHeading() {
     <>
       {/* The page's optional emoji (M5b §4), on the title's line. */}
       <div className={styles.titleRow}>
-        <IconButton
-          target={{ kind: 'page', path: page.path }}
-          icon={icon}
-          name={page.title}
-          className={styles.pageIcon}
-        />
+        {archived ? (
+          <ItemIcon icon={icon} className={styles.pageIcon} />
+        ) : (
+          <IconButton
+            target={{ kind: 'page', path: page.path }}
+            icon={icon}
+            name={page.title}
+            className={styles.pageIcon}
+          />
+        )}
         <PageTitle path={page.path} />
       </div>
       <PageSubtitle page={page} editable={editable} />

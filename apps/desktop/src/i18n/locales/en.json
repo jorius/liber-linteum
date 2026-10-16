@@ -235,7 +235,9 @@
     "delete": "Delete",
     "icon": "Icon…",
     "archive": "Archive",
-    "sortBy": "Sort by"
+    "sortBy": "Sort by",
+    "open": "Open",
+    "unarchive": "Unarchive"
   },
   "dialogs": {
     "cancel": "Cancel",
@@ -711,7 +713,7 @@
     "clashTitle": "{name} already exists",
     "clashBody": "Something new is where it was. Keep both, with a number added to the restored one?",
     "keepBoth": "Keep both",
-    "archivedPage": "This page is archived.",
+    "archivedPage": "This page is archived. Unarchive it to edit it.",
     "archivedToast": "Archived",
     "undo": "Undo",
     "undoGone": "That item is no longer in the Trash."

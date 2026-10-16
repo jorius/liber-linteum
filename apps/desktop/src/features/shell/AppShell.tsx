@@ -62,7 +62,7 @@ export function AppShell() {
             <PageView />
           </div>
           {current === 'global' && <GlobalView />}
-          {(current === 'trash' || current === 'archive') && <BinView kind={current} />}
+          {current === 'trash' && <BinView kind="trash" />}
         </main>
         <ActionButton />
       </div>

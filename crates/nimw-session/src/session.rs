@@ -289,8 +289,15 @@ impl VaultSession {
 
     /// Every indexed entry but the Archive's (M5b §5.3).
     pub fn tree(&self) -> Result<Vec<nimw_index::TreeNode>> {
-        let mut nodes = self.index().tree()?;
+        let mut nodes = self.tree_with_archive()?;
         nodes.retain(|n| !nimw_vault::is_archived(&n.path));
+        Ok(nodes)
+    }
+
+    /// The tree with the Archive (`.archive` and what's in it), which the
+    /// sidebar shows as its own read-only folder (M5b round 2).
+    pub fn tree_with_archive(&self) -> Result<Vec<nimw_index::TreeNode>> {
+        let mut nodes = self.index().tree()?;
         self.order_folders(&mut nodes);
         Ok(nodes)
     }

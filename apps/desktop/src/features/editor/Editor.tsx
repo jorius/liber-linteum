@@ -18,7 +18,7 @@ import type { EditorMode, PickedFile } from '../../ipc';
 import { usePageStore } from '../../stores/pageStore';
 import { usePageWidth, useWideElements } from '../../stores/pageWidthStore';
 import { isTextPath } from '../../stores/textFiles';
-import { nameOf } from '../../stores/tree';
+import { isArchived, nameOf } from '../../stores/tree';
 import { useSettingsStore } from '../../stores/settingsStore';
 import { useUiStore } from '../../stores/uiStore';
 import { Preview } from '../preview/Preview';
@@ -56,6 +56,17 @@ const labelSlot = new Compartment();
 const gutterSlot = new Compartment();
 /** A text file's language, loaded by its name (M4b part 2 §6). */
 const languageSlot = new Compartment();
+/** Archived pages are read-only (M5b round 2): no typing, and no edits from
+ *  the toolbar or keys; changes from the disk still show. */
+const readOnlySlot = new Compartment();
+const readOnly = [
+  EditorState.readOnly.of(true),
+  EditorView.editable.of(false),
+  EditorState.transactionFilter.of((tr) =>
+    tr.docChanged && !tr.annotation(Transaction.remote) ? [] : tr,
+  ),
+];
+const readOnlyFor = (path: string) => (isArchived(path) ? readOnly : []);
 const gutter = (on: boolean): Extension => (on ? lineNumbers() : []);
 
 const sourceHighlight = HighlightStyle.define([
@@ -273,6 +284,7 @@ function createTextState(d: PageDoc, label: string): EditorState {
     doc: d.text,
     extensions: [
       pageDocOf.of(d),
+      readOnlySlot.of(readOnlyFor(d.path)),
       history(),
       drawSelection(),
       EditorView.lineWrapping,
@@ -296,6 +308,7 @@ function createState(d: PageDoc, mode: EditorMode, label: string, numbers: boole
     doc: d.text,
     extensions: [
       pageDocOf.of(d),
+      readOnlySlot.of(readOnlyFor(d.path)),
       history(),
       drawSelection(),
       EditorView.lineWrapping,
@@ -426,6 +439,11 @@ export function Editor({ doc, mode, label }: EditorProps) {
     });
   }, [mode, label]);
 
+  // Unarchived (or archived) while open: the same doc, a new place.
+  useLayoutEffect(() => {
+    view.current?.dispatch({ effects: readOnlySlot.reconfigure(readOnlyFor(doc.path)) });
+  }, [doc, doc.path]);
+
   useLayoutEffect(() => {
     view.current?.dispatch({
       effects: gutterSlot.reconfigure(gutter(showNumbers || isTextPath(current.current.path))),
@@ -541,7 +559,9 @@ export function Editor({ doc, mode, label }: EditorProps) {
 
   return (
     <div className={styles.frame}>
-      {showToolbar && !textFile && toolbarView && <Toolbar view={toolbarView} active={active} />}
+      {showToolbar && !textFile && !isArchived(doc.path) && toolbarView && (
+        <Toolbar view={toolbarView} active={active} />
+      )}
       {picker && toolbarView && <LinkPicker view={toolbarView} onClose={() => setPicker(false)} />}
       {attach && toolbarView && (
         <AttachChoice view={toolbarView} files={attach} onClose={() => setAttach(null)} />

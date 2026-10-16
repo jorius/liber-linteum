@@ -60,6 +60,60 @@ afterEach(async () => {
   clearMocks();
 });
 
+describe('the Archive (M5b round 2)', () => {
+  it('is its own read-only folder at the foot, kept out of the vault tree', async () => {
+    const all: TreeNode[] = [
+      ...nodes,
+      { path: '.archive', kind: 'folder' },
+      { path: '.archive/Camp', kind: 'folder' },
+      { path: '.archive/Camp/a.md', kind: 'page' },
+      { path: '.archive/Old.md', kind: 'page' },
+    ];
+    const calls = backend({
+      vault_tree: () => all,
+      bin_list: () => ({ trash: [], archive: [] }),
+      archive_restore: () => ({ ...outcome, moved: [['.archive/Old.md', 'Old.md']] }),
+    });
+    seed();
+    render(<AppShell />);
+    await act(() => useVaultStore.getState().refreshTree());
+    expect(useVaultStore.getState().nodes.some((n) => n.path.startsWith('.archive'))).toBe(false);
+    const files = screen.getByRole('tree', { name: 'Files' });
+    expect(within(files).queryByText('.archive')).not.toBeInTheDocument();
+    const toggle = screen.getByRole('button', { name: /^Archived/ });
+    expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.queryByRole('tree', { name: 'Archived' })).not.toBeInTheDocument();
+    await userEvent.click(toggle);
+    expect(toggle).toHaveAttribute('aria-expanded', 'true');
+    const archived = screen.getByRole('tree', { name: 'Archived' });
+    expect(
+      within(archived)
+        .getAllByRole('treeitem')
+        .map((r) => r.getAttribute('data-path')),
+    ).toEqual(['.archive/Camp', '.archive/Old.md']);
+    // Read-only: no new page inside, no icon; 🗑 and … stay.
+    expect(within(archived).queryByRole('button', { name: /New page in|icon/i })).toBeNull();
+    expect(within(archived).getByRole('button', { name: 'Move Old to Trash' })).toBeInTheDocument();
+    // F2 renames nothing here.
+    within(archived).getByRole('treeitem', { name: 'Old' }).focus();
+    await userEvent.keyboard('{F2}');
+    expect(useVaultStore.getState().renaming).toBeNull();
+    fireEvent.contextMenu(within(archived).getByRole('treeitem', { name: 'Old' }));
+    const menu = screen.getByRole('menu', { name: 'Actions for Old' });
+    expect(
+      within(menu)
+        .getAllByRole('menuitem')
+        .map((i) => i.textContent),
+    ).toEqual(['Open', 'Unarchive', 'Sort by', 'Delete']);
+    await userEvent.click(within(menu).getByRole('menuitem', { name: 'Unarchive' }));
+    await waitFor(() =>
+      expect(calls.filter(([c]) => c === 'archive_restore')).toEqual([
+        ['archive_restore', { path: '.archive/Old.md', keepBoth: false }],
+      ]),
+    );
+  });
+});
+
 describe('context menu', () => {
   it('opens with Shift+F10, navigates with arrows and closes with Escape', async () => {
     backend({});

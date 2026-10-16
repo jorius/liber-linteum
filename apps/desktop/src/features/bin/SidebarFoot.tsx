@@ -1,38 +1,56 @@
-import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ArchiveIcon, LockIcon, TrashIcon } from '../../app/icons';
 import { useUiStore } from '../../stores/uiStore';
+import { useVaultStore } from '../../stores/vaultStore';
+import { ExplorerTree, type ExplorerTreeProps } from '../explorer/ExplorerTree';
 import { useBinStore } from './binStore';
 import styles from './Bin.module.css';
 
-/** The sidebar's foot (M5b §5.2–§5.3): Archived above Trash, each opening
- *  its view, then the privacy line. */
-export function SidebarFoot() {
+const ARCHIVE = '.archive';
+
+/** The sidebar's foot (M5b §5.2–§5.3): Archived above Trash, then the
+ *  privacy line. Archived opens like a folder, read-only (round 2); Trash
+ *  opens its view. */
+export function SidebarFoot({ onRequestDelete, onRequestMenu }: ExplorerTreeProps) {
   const { t } = useTranslation();
   const screen = useUiStore((s) => s.screen);
-  const counts = {
-    archive: useBinStore((s) => s.archive.length),
-    trash: useBinStore((s) => s.trash.length),
-  };
-  const row = (kind: 'archive' | 'trash', icon: ReactNode) => (
-    <button
-      type="button"
-      className={styles.footRow}
-      aria-current={screen === kind ? 'page' : undefined}
-      aria-label={t(kind === 'trash' ? 'bin.trashCount' : 'bin.archivedCount', {
-        count: counts[kind],
-      })}
-      onClick={() => useUiStore.getState().setScreen(kind)}
-    >
-      {icon}
-      <span className={styles.footName}>{t(kind === 'trash' ? 'bin.trash' : 'bin.archived')}</span>
-      {counts[kind] > 0 && <span className={styles.footCount}>{counts[kind]}</span>}
-    </button>
-  );
+  const archived = useBinStore((s) => s.archive.length);
+  const trash = useBinStore((s) => s.trash.length);
+  const open = useVaultStore((s) => s.expanded.has(ARCHIVE));
+  const hasItems = useVaultStore((s) => (s.children.get(ARCHIVE)?.length ?? 0) > 0);
   return (
     <div className={styles.foot}>
-      {row('archive', <ArchiveIcon />)}
-      {row('trash', <TrashIcon />)}
+      <button
+        type="button"
+        className={styles.footRow}
+        aria-expanded={open}
+        aria-label={t('bin.archivedCount', { count: archived })}
+        onClick={() => useVaultStore.getState().toggle(ARCHIVE)}
+      >
+        <ArchiveIcon />
+        <span className={styles.footName}>{t('bin.archived')}</span>
+        {archived > 0 && <span className={styles.footCount}>{archived}</span>}
+      </button>
+      {open && hasItems && (
+        <div className={styles.archiveTree}>
+          <ExplorerTree
+            root={ARCHIVE}
+            onRequestDelete={onRequestDelete}
+            onRequestMenu={onRequestMenu}
+          />
+        </div>
+      )}
+      <button
+        type="button"
+        className={styles.footRow}
+        aria-current={screen === 'trash' ? 'page' : undefined}
+        aria-label={t('bin.trashCount', { count: trash })}
+        onClick={() => useUiStore.getState().setScreen('trash')}
+      >
+        <TrashIcon />
+        <span className={styles.footName}>{t('bin.trash')}</span>
+        {trash > 0 && <span className={styles.footCount}>{trash}</span>}
+      </button>
       <p className={styles.privacy}>
         <LockIcon />
         {t('privacy.localOnly')}

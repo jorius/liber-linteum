@@ -20,11 +20,9 @@ export function useWindowTitle() {
       ? t('shell.globalView')
       : screen === 'trash'
         ? t('bin.trash')
-        : screen === 'archive'
-          ? t('bin.archived')
-          : path
-            ? nameOf(path).replace(/\.md$/i, '')
-            : null;
+        : path
+          ? nameOf(path).replace(/\.md$/i, '')
+          : null;
   const title = what ? `${what} — ${vault}` : vault;
   useEffect(() => {
     // Outside the app the call simply fails (ipcCall answers an error).

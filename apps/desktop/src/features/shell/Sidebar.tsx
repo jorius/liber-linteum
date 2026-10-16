@@ -92,7 +92,10 @@ export function Sidebar(treeProps: ExplorerTreeProps) {
       <nav className={styles.treeScroll}>
         <ExplorerDnd {...treeProps} />
       </nav>
-      <SidebarFoot />
+      <SidebarFoot
+        onRequestDelete={treeProps.onRequestDelete}
+        onRequestMenu={treeProps.onRequestMenu}
+      />
     </aside>
   );
 }

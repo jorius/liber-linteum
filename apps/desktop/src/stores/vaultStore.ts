@@ -31,7 +31,7 @@ import { usePageStore } from './pageStore';
 import { useToastStore } from './toastStore';
 import { useTrailStore } from './trailStore';
 import { useUiStore } from './uiStore';
-import { childrenByParent, joinPath, nextFreeName, parentOf, remap } from './tree';
+import { childrenByParent, isArchived, joinPath, nextFreeName, parentOf, remap } from './tree';
 
 /** External changes arriving within this window trigger one tree refresh. */
 export const COALESCE_MS = 100;
@@ -286,8 +286,12 @@ export const useVaultStore = create<VaultState>((set, get) => {
       const mine = ++treeSeq;
       const res = await vaultTree();
       if (mine !== treeSeq || !res.ok) return; // a newer refresh won, or no vault
-      const nodes = res.value;
-      const exists = new Set(nodes.map((n) => n.path));
+      // The Archive comes with the tree: its own read-only folder in the
+      // sidebar (M5b round 2), kept out of `nodes` (the vault's pages and
+      // folders everywhere else), but in `children` for its rows.
+      const all = res.value;
+      const nodes = all.filter((n) => !isArchived(n.path));
+      const exists = new Set(all.map((n) => n.path));
       let { selected } = get();
       // Selection falls back to the nearest ancestor that still exists.
       while (selected && !exists.has(selected)) {
@@ -295,7 +299,7 @@ export const useVaultStore = create<VaultState>((set, get) => {
         selected = parent || null;
       }
       const expanded = new Set([...get().expanded].filter((p) => exists.has(p)));
-      set({ nodes, children: childrenByParent(nodes), selected, expanded });
+      set({ nodes, children: childrenByParent(all), selected, expanded });
       // The Trash and Archive change with the tree (M5b §5).
       void useBinStore.getState().refresh();
     },

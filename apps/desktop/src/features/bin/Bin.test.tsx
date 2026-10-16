@@ -87,7 +87,7 @@ afterEach(async () => {
 });
 
 describe('SidebarFoot (M5b §5.2, §5.3)', () => {
-  it('shows Archived above Trash with their counts and opens their views', async () => {
+  it('shows Archived above Trash with their counts; Trash opens its view, Archived opens like a folder', async () => {
     backend();
     render(<SidebarFoot />);
     await act(() => useBinStore.getState().refresh());
@@ -97,8 +97,10 @@ describe('SidebarFoot (M5b §5.2, §5.3)', () => {
     await userEvent.click(trash);
     expect(useUiStore.getState().screen).toBe('trash');
     expect(trash).toHaveAttribute('aria-current', 'page');
+    // M5b round 2: no Archived view; the row expands in place.
     await userEvent.click(archived);
-    expect(useUiStore.getState().screen).toBe('archive');
+    expect(useUiStore.getState().screen).toBe('trash');
+    expect(archived).toHaveAttribute('aria-expanded', 'true');
   });
 });
 
@@ -173,20 +175,6 @@ describe('BinView: the Trash', () => {
   });
 });
 
-describe('BinView: the Archive', () => {
-  it('unarchives an item and moves another to the Trash', async () => {
-    lists.archive.push(item('.archive/Old.md', 'Old.md'));
-    useSettingsStore.setState({ settings: { ...DEFAULT_SETTINGS, confirmDelete: false } });
-    const calls = backend();
-    render(<BinView kind="archive" />);
-    const list = await screen.findByRole('list', { name: 'Archived' });
-    await userEvent.click(within(list).getByRole('button', { name: 'Unarchive Camp' }));
-    expect(called(calls, 'archive_restore')).toEqual([{ path: '.archive/Camp', keepBoth: false }]);
-    await userEvent.click(within(list).getByRole('button', { name: 'Move Old to Trash' }));
-    expect(called(calls, 'entry_trash')).toEqual([{ path: '.archive/Old.md' }]);
-  });
-});
-
 describe('moving to the Trash and the Archive', () => {
   it('a trash toast offers Undo, which restores', async () => {
     const calls = backend();
@@ -240,16 +228,6 @@ describe('M5b final review', () => {
         { path: '.archive/Camp/a.md', keepBoth: true },
       ]),
     );
-  });
-
-  it('M4: Move to Trash from the Archived view asks first', async () => {
-    lists.archive.push(item('.archive/Old.md', 'Old.md'));
-    const calls = backend();
-    render(<BinView kind="archive" />);
-    const list = await screen.findByRole('list', { name: 'Archived' });
-    await userEvent.click(within(list).getByRole('button', { name: 'Move Old to Trash' }));
-    expect(useUiStore.getState().dialog).toEqual({ type: 'delete', path: '.archive/Old.md' });
-    expect(called(calls, 'entry_trash')).toEqual([]);
   });
 
   it("M5: a trash toast's Undo never brings back another item that took the name", async () => {

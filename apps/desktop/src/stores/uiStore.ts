@@ -34,7 +34,7 @@ export type UnsavedChoice = 'save' | 'discard' | 'cancel';
 
 /** Which screen the open vault shows (M3a §2); the Trash and the Archive
  *  (M5b §5) show in place of the editor. */
-export type Screen = 'edit' | 'global' | 'trash' | 'archive';
+export type Screen = 'edit' | 'global' | 'trash';
 
 interface UiState {
   dialog: DialogState;

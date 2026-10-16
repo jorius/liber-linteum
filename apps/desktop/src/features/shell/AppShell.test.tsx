@@ -107,7 +107,7 @@ describe('AppShell', () => {
     );
   });
 
-  it('final review M10: the window title names Trash and Archived, and goes back to the app name on close', async () => {
+  it('final review M10: the window title names the Trash, and goes back to the app name on close', async () => {
     const calls: [string, Record<string, unknown>][] = [];
     seed();
     backend({
@@ -121,10 +121,6 @@ describe('AppShell', () => {
     act(() => useUiStore.getState().setScreen('trash'));
     await waitFor(() =>
       expect(calls.at(-1)).toEqual(['window_title_set', { title: 'Trash — Digital Brain' }]),
-    );
-    act(() => useUiStore.getState().setScreen('archive'));
-    await waitFor(() =>
-      expect(calls.at(-1)).toEqual(['window_title_set', { title: 'Archived — Digital Brain' }]),
     );
     unmount();
     expect(calls.at(-1)).toEqual(['window_title_set', { title: 'Notes In My Way' }]);

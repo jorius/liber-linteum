@@ -37,16 +37,28 @@ test('delete moves to the Trash, and Restore brings it back', async ({ page }) =
   expect(errors).toEqual([]);
 });
 
-test('Archive hides a page; the Archived view unarchives it', async ({ page }) => {
+test('Archive hides a page; Archived opens like a folder, read-only, and unarchives it', async ({
+  page,
+}) => {
   const errors = await open(page);
   await page.getByRole('treeitem', { name: 'A', exact: true }).click({ button: 'right' });
   await page.getByRole('menuitem', { name: 'Archive' }).click();
-  await expect(page.getByRole('treeitem', { name: 'A', exact: true })).toBeHidden();
+  const files = page.getByRole('tree', { name: 'Files' });
+  await expect(files.getByRole('treeitem', { name: 'A', exact: true })).toBeHidden();
 
-  await page.getByRole('button', { name: 'Archived, 1 item' }).click();
-  const list = page.getByRole('list', { name: 'Archived' });
-  await list.getByRole('button', { name: 'Unarchive A' }).click();
-  await expect(page.getByText('Nothing is archived.')).toBeVisible();
-  await expect(page.getByRole('treeitem', { name: 'A', exact: true })).toBeVisible();
+  // Archived opens on its own, like a folder something moved into.
+  const toggle = page.getByRole('button', { name: 'Archived, 1 item' });
+  await expect(toggle).toHaveAttribute('aria-expanded', 'true');
+  const archived = page.getByRole('tree', { name: 'Archived' });
+  await archived.getByRole('treeitem', { name: 'A', exact: true }).click();
+  // M5b round 2: archived pages are read-only.
+  await expect(page.getByText('This page is archived. Unarchive it to edit it.')).toBeVisible();
+  await expect(page.locator('.cm-content')).toHaveAttribute('contenteditable', 'false');
+  await expect(page.getByRole('textbox', { name: 'Page title' })).toHaveAttribute('readonly', '');
+
+  await archived.getByRole('treeitem', { name: 'A', exact: true }).click({ button: 'right' });
+  await page.getByRole('menuitem', { name: 'Unarchive' }).click();
+  await expect(files.getByRole('treeitem', { name: 'A', exact: true })).toBeVisible();
+  await expect(page.getByRole('tree', { name: 'Archived' })).toBeHidden();
   expect(errors).toEqual([]);
 });
