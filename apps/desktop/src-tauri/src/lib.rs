@@ -7,6 +7,7 @@ pub mod dto;
 pub mod editor_commands;
 pub mod error;
 pub mod external_commands;
+pub mod favorite_commands;
 pub mod file_commands;
 pub mod file_windows;
 pub mod fonts;
@@ -183,6 +184,8 @@ pub fn configure<R: tauri::Runtime>(
         sort_commands::folder_sort_get,
         sort_commands::folder_sort_set,
         icon_commands::vault_icon_set,
+        favorite_commands::favorites_get,
+        favorite_commands::favorites_set,
     ])
 }
 

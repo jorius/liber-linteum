@@ -80,6 +80,9 @@ const COMMANDS: &[&str] = &[
     "trash_empty",
     "entry_archive",
     "archive_restore",
+    // M5b §19: Favorites.
+    "favorites_get",
+    "favorites_set",
 ];
 
 fn main() {

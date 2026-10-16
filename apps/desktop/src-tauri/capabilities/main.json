@@ -72,6 +72,8 @@
     "allow-trash-empty",
     "allow-entry-archive",
     "allow-archive-restore",
+    "allow-favorites-get",
+    "allow-favorites-set",
     "core:event:allow-listen",
     "core:event:allow-unlisten",
     "dialog:allow-open"

@@ -915,6 +915,29 @@ mod tests {
     }
 
     #[test]
+    fn m5b_favorites_follow_trash_restore_archive_and_are_forgotten_on_delete() {
+        let f = fx(&[("a.md", "a"), ("F/b.md", "b"), ("c.md", "c")]);
+        let v = f.s.vault();
+        v.set_favorites(&["a.md".into(), "F".into(), "c.md".into()])
+            .unwrap();
+        // Trash and Restore: the entry keeps its place.
+        let inner = f.s.trash(&vp("F")).unwrap();
+        assert_eq!(v.favorites()[1], inner.as_str());
+        f.s.trash_restore(&inner, false).unwrap();
+        assert_eq!(v.favorites(), ["a.md", "F", "c.md"]);
+        // Archive and Unarchive: the same.
+        f.s.archive(&vp("a.md"), true).unwrap();
+        assert_eq!(v.favorites()[0], ".archive/a.md");
+        f.s.unarchive(&vp(".archive/a.md"), false, true).unwrap();
+        assert_eq!(v.favorites()[0], "a.md");
+        // Deleting from the Trash forgets it.
+        let inner = f.s.trash(&vp("c.md")).unwrap();
+        f.s.trash_delete_via(std::slice::from_ref(&inner), &remove(&f.root))
+            .unwrap();
+        assert_eq!(v.favorites(), ["a.md", "F"]);
+    }
+
+    #[test]
     fn m5b_review_m8_a_folder_name_keeps_its_dots() {
         assert_eq!(super::numbered_entry("v1.2", 1, true), "v1.2 1");
         assert_eq!(super::numbered_entry("a.tar.gz", 1, false), "a.tar 1.gz");

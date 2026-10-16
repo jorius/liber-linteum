@@ -108,6 +108,8 @@ const VAULT_COMMANDS: &[&str] = &[
     "folder_sort_get",
     "folder_sort_set",
     "vault_icon_set",
+    "favorites_get",
+    "favorites_set",
 ];
 
 struct Harness {

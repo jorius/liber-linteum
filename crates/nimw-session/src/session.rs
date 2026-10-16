@@ -447,6 +447,8 @@ impl VaultSession {
         // And folder icons (M5b §4).
         let icons = self.vault.forget_folder_icons(removed);
         let sorts = self.vault.forget_folder_sorts(removed);
+        // And favorites (M5b §19).
+        let favorites = self.vault.forget_favorites(removed);
         // Deleted quick notes stop being named after their first line (M4c).
         let quick = self.vault.forget_auto_named(removed);
         // And Global View positions and index-note picks (M5b final review M6).
@@ -458,6 +460,7 @@ impl VaultSession {
             .and(strips)
             .and(icons)
             .and(sorts)
+            .and(favorites)
             .and(quick)
         {
             self.emit(SessionEvent::Warning(format!(

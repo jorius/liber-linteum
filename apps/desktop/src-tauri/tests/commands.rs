@@ -75,6 +75,9 @@ const COMMANDS: &[&str] = &[
     // M5b round 2: folder orders.
     "folder_sort_get",
     "folder_sort_set",
+    // M5b §19: Favorites.
+    "favorites_get",
+    "favorites_set",
 ];
 
 struct Harness {
@@ -2341,4 +2344,46 @@ fn m5b_trash_and_archive_over_ipc() {
     assert_eq!(out["moved"][0][1], "Welcome.md");
     // Refused: the bins themselves.
     assert!(call(&h.main, "entry_trash", json!({ "path": ".nimw" })).is_err());
+}
+
+/// M5b §19: Favorites are one ordered list; escaping or hidden paths are
+/// refused, missing ones and repeats dropped, and the list follows renames.
+#[test]
+fn m5b_favorites_over_ipc() {
+    let h = harness();
+    let vault = copy_fixture("obsidian-basic");
+    call(&h.main, "vault_open", json!({ "path": vault.path() })).unwrap();
+    assert_eq!(
+        call(&h.main, "favorites_get", json!({})).unwrap(),
+        json!([])
+    );
+    let stored = call(
+        &h.main,
+        "favorites_set",
+        json!({ "paths": ["Welcome.md", "Game Design", "Missing.md", "Welcome.md"] }),
+    )
+    .unwrap();
+    assert_eq!(stored, json!(["Welcome.md", "Game Design"]));
+    for bad in [
+        "../x.md",
+        ".obsidian/app.json",
+        ".nimw/vault.json",
+        ".trash/.x",
+        "/abs.md",
+    ] {
+        assert!(
+            call(&h.main, "favorites_set", json!({ "paths": [bad] })).is_err(),
+            "{bad}"
+        );
+    }
+    call(
+        &h.main,
+        "entry_rename",
+        json!({ "from": "Game Design", "to": "Design" }),
+    )
+    .unwrap();
+    assert_eq!(
+        call(&h.main, "favorites_get", json!({})).unwrap(),
+        json!(["Welcome.md", "Design"])
+    );
 }

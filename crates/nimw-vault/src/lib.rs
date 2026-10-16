@@ -7,6 +7,7 @@ mod cover_height;
 mod cover_side;
 mod error;
 mod folder_sort;
+mod favorite;
 mod fsops;
 mod hash;
 mod icon;
