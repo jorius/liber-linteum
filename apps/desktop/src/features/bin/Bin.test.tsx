@@ -1,7 +1,7 @@
 import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import axe from 'axe-core';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { BinItem } from '../../ipc';
 import { clearMocks, mockIPC } from '../../ipc/testing';
 import { DEFAULT_SETTINGS, useSettingsStore } from '../../stores/settingsStore';
@@ -10,7 +10,7 @@ import { useUiStore } from '../../stores/uiStore';
 import { resetVaultStore, useVaultStore } from '../../stores/vaultStore';
 import { DialogHost } from '../dialogs/DialogHost';
 import { ArchivedBanner } from './ArchivedBanner';
-import { BinView } from './BinView';
+import { BinView, resetTrashView } from './BinView';
 import { useBinStore } from './binStore';
 import { SidebarFoot } from './SidebarFoot';
 
@@ -104,18 +104,132 @@ describe('SidebarFoot (M5b §5.2, §5.3)', () => {
   });
 });
 
-describe('BinView: the Trash', () => {
-  it('lists items with where they came from, and restores one', async () => {
+describe('BinView: the Trash (M5b round 2 design)', () => {
+  const NOW = Date.parse('2026-10-15T18:00:00');
+  const at = (iso: string) => Date.parse(iso);
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(NOW);
+    resetTrashView();
+    lists.trash = [
+      {
+        ...item('.trash/Old.md', 'P/Old.md'),
+        at: at('2026-10-15T08:23:00'),
+        size: 2048,
+        icon: '📝',
+      },
+      {
+        ...item('.trash/Drafts', 'Lore/Drafts', true),
+        at: at('2026-10-14T19:51:00'),
+        size: 10_000,
+        pages: 14,
+      },
+      { ...item('.trash/map.png', 'World/map.png'), at: at('2026-10-12T18:02:00'), size: 860_160 },
+      { ...item('.trash/Spells.md', 'Game/Spells.md'), at: at('2026-10-01T09:00:00'), size: 512 },
+    ];
+  });
+  afterEach(() => vi.useRealTimers());
+  const groups = () =>
+    screen.getAllByRole('list').map((l) => [
+      l.getAttribute('aria-label'),
+      within(l)
+        .getAllByRole('listitem')
+        .map((r) => r.querySelector('[data-name]')?.textContent),
+    ]);
+
+  it('says how many items and how much space, grouped by the day they were deleted', async () => {
+    backend();
+    render(<BinView />);
+    expect(await screen.findByRole('heading', { level: 1, name: 'Trash' })).toBeInTheDocument();
+    expect(
+      screen.getByText(/^4 items · 852 kB\. They stay inside the vault until you delete them/),
+    ).toBeInTheDocument();
+    expect(groups()).toEqual([
+      ['Today', ['Old']],
+      ['Yesterday', ['Drafts']],
+      ['Earlier this week', ['map.png']],
+      ['Oct 1, 2026', ['Spells']],
+    ]);
+    const old = screen.getByRole('listitem', { name: 'Old' });
+    expect(old).toHaveTextContent('Page · from P · deleted 8:23 AM');
+    expect(old).toHaveTextContent('📝');
+    expect(screen.getByRole('listitem', { name: 'Drafts' })).toHaveTextContent(
+      'Folder · 14 pages · from Lore',
+    );
+    expect(screen.getByRole('listitem', { name: 'map.png' })).toHaveTextContent(
+      'Image · 840 kB · from World',
+    );
+    expect(screen.getByRole('button', { name: 'Restore Old' })).toHaveAttribute(
+      'title',
+      'Restore to P',
+    );
+  });
+
+  it('filters by name or folder, and sorts (remembered for the session)', async () => {
+    backend();
+    const { unmount } = render(<BinView />);
+    await screen.findByRole('heading', { level: 1, name: 'Trash' });
+    await userEvent.type(screen.getByRole('searchbox', { name: 'Filter the Trash' }), 'lore');
+    expect(groups()).toEqual([['Yesterday', ['Drafts']]]);
+    await userEvent.clear(screen.getByRole('searchbox', { name: 'Filter the Trash' }));
+    await userEvent.selectOptions(screen.getByRole('combobox', { name: 'Sort' }), 'name');
+    expect(groups()).toEqual([['All items', ['Drafts', 'map.png', 'Old', 'Spells']]]);
+    unmount();
+    render(<BinView />);
+    await screen.findByRole('heading', { level: 1, name: 'Trash' });
+    expect(screen.getByRole('combobox', { name: 'Sort' })).toHaveValue('name');
+    await userEvent.selectOptions(screen.getByRole('combobox', { name: 'Sort' }), 'oldest');
+    expect(groups().map(([g]) => g)).toEqual([
+      'Oct 1, 2026',
+      'Earlier this week',
+      'Yesterday',
+      'Today',
+    ]);
+  });
+
+  it('restores and deletes several at once from the selection bar; Escape clears it', async () => {
     const calls = backend();
-    render(<BinView kind="trash" />);
-    const list = await screen.findByRole('list', { name: 'Trash' });
-    const rows = within(list).getAllByRole('listitem');
-    expect(rows).toHaveLength(2);
-    expect(rows[0]).toHaveTextContent('Old');
-    expect(rows[0]).toHaveTextContent('P');
-    await userEvent.click(within(rows[0]).getByRole('button', { name: 'Restore Old' }));
-    expect(called(calls, 'trash_restore')).toEqual([{ path: '.trash/Old.md', keepBoth: false }]);
-    await waitFor(() => expect(within(list).getAllByRole('listitem')).toHaveLength(1));
+    render(
+      <>
+        <BinView />
+        <DialogHost />
+      </>,
+    );
+    await screen.findByRole('heading', { level: 1, name: 'Trash' });
+    expect(screen.queryByRole('region', { name: 'Selection' })).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole('checkbox', { name: 'Select Old' }));
+    await userEvent.click(screen.getByRole('checkbox', { name: 'Select Drafts' }));
+    const bar = screen.getByRole('region', { name: 'Selection' });
+    expect(bar).toHaveTextContent('2 selected');
+    await userEvent.keyboard('{Escape}');
+    expect(screen.queryByRole('region', { name: 'Selection' })).not.toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole('checkbox', { name: 'Select Old' }));
+    await userEvent.click(screen.getByRole('checkbox', { name: 'Select Drafts' }));
+    await userEvent.click(
+      within(screen.getByRole('region', { name: 'Selection' })).getByRole('button', {
+        name: 'Restore',
+      }),
+    );
+    await waitFor(() =>
+      expect(called(calls, 'trash_restore')).toEqual([
+        { path: '.trash/Old.md', keepBoth: false },
+        { path: '.trash/Drafts', keepBoth: false },
+      ]),
+    );
+
+    await userEvent.click(screen.getByRole('checkbox', { name: 'Select map.png' }));
+    await userEvent.click(screen.getByRole('checkbox', { name: 'Select Spells' }));
+    await userEvent.click(
+      within(screen.getByRole('region', { name: 'Selection' })).getByRole('button', {
+        name: 'Delete',
+      }),
+    );
+    const dialog = await screen.findByRole('dialog', { name: 'Delete 2 items from the vault?' });
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Delete' }));
+    expect(called(calls, 'trash_delete')).toEqual([
+      { paths: ['.trash/map.png', '.trash/Spells.md'] },
+    ]);
   });
 
   it('asks to keep both when something took the old place', async () => {
@@ -132,12 +246,11 @@ describe('BinView: the Trash', () => {
     });
     render(
       <>
-        <BinView kind="trash" />
+        <BinView />
         <DialogHost />
       </>,
     );
-    const list = await screen.findByRole('list', { name: 'Trash' });
-    await userEvent.click(within(list).getAllByRole('button', { name: 'Restore Old' })[0]);
+    await userEvent.click(await screen.findByRole('button', { name: 'Restore Old' }));
     const dialog = await screen.findByRole('dialog', { name: 'Old already exists' });
     await userEvent.click(within(dialog).getByRole('button', { name: 'Keep both' }));
     expect(called(calls, 'trash_restore')).toEqual([
@@ -147,31 +260,36 @@ describe('BinView: the Trash', () => {
   });
 
   it('deletes one, then empties the Trash, each after a confirmation naming the count', async () => {
+    lists.trash = lists.trash.slice(0, 2);
     const calls = backend();
-    render(<BinView kind="trash" />);
-    const list = await screen.findByRole('list', { name: 'Trash' });
+    render(<BinView />);
     await userEvent.click(
-      within(list).getByRole('button', { name: 'Delete Drafts from the vault' }),
+      await screen.findByRole('button', { name: 'Delete Drafts from the vault' }),
     );
     let dialog = await screen.findByRole('dialog', { name: 'Delete 1 item from the vault?' });
     expect(dialog).toHaveTextContent('system Trash');
     await userEvent.click(within(dialog).getByRole('button', { name: 'Delete' }));
     expect(called(calls, 'trash_delete')).toEqual([{ paths: ['.trash/Drafts'] }]);
-    await waitFor(() => expect(within(list).getAllByRole('listitem')).toHaveLength(1));
+    await waitFor(() => expect(screen.getAllByRole('listitem')).toHaveLength(1));
 
     await userEvent.click(screen.getByRole('button', { name: 'Empty Trash' }));
     dialog = await screen.findByRole('dialog', { name: 'Empty the Trash (1 item)?' });
     await userEvent.click(within(dialog).getByRole('button', { name: 'Empty Trash' }));
     expect(called(calls, 'trash_empty')).toHaveLength(1);
-    expect(await screen.findByText('The Trash is empty.')).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'The Trash is empty' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Empty Trash' })).not.toBeInTheDocument();
   });
 
-  it('is axe-clean', async () => {
+  it('is axe-clean, light and dark', async () => {
     backend();
-    render(<BinView kind="trash" />);
-    await screen.findByRole('list', { name: 'Trash' });
-    const result = await axe.run(document.body);
-    expect(result.violations).toEqual([]);
+    render(<BinView />);
+    await screen.findByRole('heading', { level: 1, name: 'Trash' });
+    await userEvent.click(screen.getByRole('checkbox', { name: 'Select Old' }));
+    for (const theme of ['light', 'dark']) {
+      document.documentElement.dataset.theme = theme;
+      expect((await axe.run(document.body)).violations).toEqual([]);
+    }
+    delete document.documentElement.dataset.theme;
   });
 });
 

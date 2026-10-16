@@ -809,6 +809,12 @@ export interface BinItem {
   /** When it went in (ms since epoch). */
   at: number | null;
   folder: boolean;
+  /** Bytes; a folder's whole contents (Trash items, M5b round 2). */
+  size?: number;
+  /** A folder's pages, however deep. */
+  pages?: number;
+  /** A page's frontmatter emoji, or a folder's. */
+  icon?: string;
 }
 
 export interface BinLists {

@@ -222,7 +222,7 @@ export function installIpcMock({
       .slice(0, 60)
       .trim();
   /** M5b §5: pages moved into the vault's Trash, by their path there. */
-  const trashed: Record<string, { text: string; from: string }> = {};
+  const trashed: Record<string, { text: string; from: string; at: number }> = {};
   const handlers: Record<string, (a: Args, options?: unknown) => unknown> = {
     app_info: () => ({ name: 'Notes In My Way', version: '0.0.0-e2e' }),
     settings_get: () => ({ settings }),
@@ -243,7 +243,7 @@ export function installIpcMock({
     entry_trash: (a) => {
       const from = a.path as string;
       const inner = `.trash/${from.split('/').pop()}`;
-      trashed[inner] = { text: pages[from], from };
+      trashed[inner] = { text: pages[from], from, at: Date.now() };
       delete pages[from];
       return inner;
     },
@@ -279,8 +279,9 @@ export function installIpcMock({
       trash: Object.entries(trashed).map(([path, t]) => ({
         path,
         from: t.from,
-        at: 1_760_000_000_000,
+        at: t.at,
         folder: false,
+        size: (t.text ?? '').length,
       })),
       archive: Object.keys(pages)
         .filter((p) => p.startsWith('.archive/'))
