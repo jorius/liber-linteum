@@ -12,7 +12,7 @@ let asked = 0;
 export function needsUnsavedPrompt(): boolean {
   return (
     useSettingsStore.getState().settings.autoSave === false &&
-    useEditorStore.getState().dirtyPaths().length > 0
+    useEditorStore.getState().askPaths().length > 0
   );
 }
 
@@ -20,7 +20,7 @@ export function needsUnsavedPrompt(): boolean {
  *  or a save that failed). */
 export async function confirmUnsaved(): Promise<boolean> {
   if (!needsUnsavedPrompt()) return true;
-  const paths = useEditorStore.getState().dirtyPaths();
+  const paths = useEditorStore.getState().askPaths();
   const choice = await new Promise<UnsavedChoice>((answer) =>
     useUiStore.getState().openDialog({ type: 'unsaved', id: ++asked, paths, answer }),
   );
@@ -29,7 +29,10 @@ export async function confirmUnsaved(): Promise<boolean> {
     useEditorStore.getState().discardAll();
     return true;
   }
-  const left = await useEditorStore.getState().saveAll();
+  // An orphaned page can't be saved here; its banner offers "Save as new page".
+  const left = (await useEditorStore.getState().saveAll()).filter((p) =>
+    useEditorStore.getState().askPaths().includes(p),
+  );
   if (left.length) warnUnsaved(left[0], 'editor.unsavedBlocks');
   return left.length === 0;
 }

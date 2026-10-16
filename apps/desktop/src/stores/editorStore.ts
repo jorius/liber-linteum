@@ -64,6 +64,9 @@ interface EditorState {
   reset: () => void;
   /** Pages with text not written yet (auto save off, failing, orphaned). */
   dirtyPaths: () => string[];
+  /** Unsaved pages Save / Don't Save can act on: a page deleted outside the
+   *  app has its own banner (M5b final review M3). */
+  askPaths: () => string[];
   /** Don't Save (M5b §6): every page back to its saved text; nothing written. */
   discardAll: () => void;
   /** Header edits (cover, subtitle, M2c §4): changes the current page's
@@ -269,6 +272,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   },
   reset: () => resetEditorStore(),
   dirtyPaths: () => [...docs.values()].filter((d) => d.dirty).map((d) => d.path),
+  askPaths: () => [...docs.values()].filter((d) => d.dirty && !d.orphaned).map((d) => d.path),
   discardAll: () => {
     for (const doc of [...docs.values()]) {
       if (doc.dirty && !doc.orphaned) doc.revert();

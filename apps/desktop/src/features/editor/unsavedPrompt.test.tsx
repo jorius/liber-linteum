@@ -12,7 +12,7 @@ import { useTrailStore } from '../../stores/trailStore';
 import { goBack, openPage } from '../../stores/navigate';
 import { fakeDisk } from '../../test/fakeDisk';
 import { DialogHost } from '../dialogs/DialogHost';
-import { confirmUnsaved } from './unsavedPrompt';
+import { confirmUnsaved, needsUnsavedPrompt } from './unsavedPrompt';
 
 const editor = () => useEditorStore.getState();
 const autoSave = (on: boolean) =>
@@ -130,6 +130,18 @@ describe('Save / Don’t Save / Cancel (M5b §6, auto save off)', () => {
       await userEvent.click(screen.getByRole('button', { name: 'Save' }));
     });
     expect(await second).toBe(true);
+  });
+});
+
+describe('a page deleted outside the app while unsaved (M5b final review M3)', () => {
+  it('does not make every page switch ask; its orphan banner covers it', async () => {
+    await editA();
+    await editor().onExternalChange(
+      { renamed: [], removed: ['A.md'], modified: [], created: [] },
+      () => false,
+    );
+    expect(editor().doc!.orphaned).toBe(true);
+    expect(needsUnsavedPrompt()).toBe(false);
   });
 });
 
