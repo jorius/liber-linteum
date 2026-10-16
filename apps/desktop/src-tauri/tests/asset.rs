@@ -361,3 +361,19 @@ fn m5b_r2_trashed_images_are_served_for_their_thumbnails() {
         assert_ne!(serve(&state, "/.trash/link.png", None).status, 200);
     }
 }
+
+/// Round-2 review I1: a name holding `:` is refused — on Windows
+/// `D:photo.png` joined onto `.trash` would leave it for drive D.
+#[test]
+fn m5b_r2_review_i1_a_trashed_name_with_a_colon_is_refused() {
+    let vault = copy_fixture("obsidian-basic");
+    let trash = vault.path().join(".trash");
+    std::fs::create_dir_all(&trash).unwrap();
+    #[cfg(unix)]
+    std::fs::write(trash.join("D:photo.png"), b"png!").unwrap();
+    let (app, _c, _k) = open(vault.path());
+    let state = app.state::<AppState>();
+    for refused in ["/.trash/D%3Aphoto.png", "/.trash/D:photo.png", "/.trash/C%3A%5Cx.png"] {
+        assert_eq!(serve(&state, refused, None).status, 403, "{refused}");
+    }
+}

@@ -155,7 +155,8 @@ fn serve_trashed_image(vault: &Vault, encoded: &str, range: Option<&str>) -> Ass
         return AssetResponse::status(403);
     };
     let mime = mime_for(&name);
-    if name.contains(['/', '\\'])
+    // `:` too: on Windows `D:photo.png` joined onto `.trash` leaves it for drive D.
+    if name.contains(['/', '\\', ':'])
         || nimw_vault::is_hidden_name(&name)
         || !mime.starts_with("image/")
     {
