@@ -48,6 +48,12 @@ export function ActionButton() {
       ...(box.current?.querySelectorAll<HTMLButtonElement>('[role="group"] button') ?? []),
     ];
     const at = items.indexOf(document.activeElement as HTMLButtonElement);
+    if (e.key === 'Tab') {
+      // Tab out of the group closes it; the keyboard moves on (final review M5).
+      const out = e.shiftKey ? at === 0 : document.activeElement === button.current;
+      if (out) setOpen(false);
+      return;
+    }
     if (e.key === 'Escape') {
       setOpen(false);
       button.current?.focus();
@@ -60,16 +66,7 @@ export function ActionButton() {
   };
   const { setScreen, openDialog } = useUiStore.getState();
   return (
-    <div
-      ref={box}
-      className={styles.fab}
-      data-place={place}
-      onKeyDown={onKeyDown}
-      // Tab out of the group closes it (final review M5).
-      onBlur={(e) => {
-        if (open && !box.current?.contains(e.relatedTarget as Node | null)) setOpen(false);
-      }}
-    >
+    <div ref={box} className={styles.fab} data-place={place} onKeyDown={onKeyDown}>
       {open && (
         <div
           id="nimw-actions"
