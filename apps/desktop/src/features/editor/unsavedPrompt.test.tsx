@@ -10,6 +10,7 @@ import { useUiStore } from '../../stores/uiStore';
 import { useVaultStore } from '../../stores/vaultStore';
 import { useTrailStore } from '../../stores/trailStore';
 import { goBack, openPage } from '../../stores/navigate';
+import { archiveItem } from '../bin/binActions';
 import { fakeDisk } from '../../test/fakeDisk';
 import { DialogHost } from '../dialogs/DialogHost';
 import { confirmUnsaved, needsUnsavedPrompt } from './unsavedPrompt';
@@ -209,5 +210,21 @@ describe('auto save off: moving or trashing one entry writes no other page (M5b 
     expect(disk.writes()).toEqual([]);
     await useVaultStore.getState().trash('A.md');
     expect(disk.writes()).toEqual([{ path: 'A.md', text: 'a edited\n' }]);
+  });
+
+  it('archiving another page writes nothing', async () => {
+    const outcome = { moved: [], updatedFiles: [], updatedLinks: 0, failed: [] };
+    const disk = await editA(
+      fakeDisk(
+        { 'A.md': 'a\n', 'B.md': 'b\n' },
+        {
+          entry_archive: (a) => ({ ...outcome, moved: [[a.path, `.archive/${String(a.path)}`]] }),
+          bin_list: () => ({ trash: [], archive: [] }),
+        },
+      ),
+    );
+    await archiveItem('B.md');
+    expect(disk.writes()).toEqual([]);
+    expect(editor().doc!.dirty).toBe(true);
   });
 });
