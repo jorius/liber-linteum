@@ -130,7 +130,9 @@ pub(crate) fn vault_close_impl(state: &AppState) {
 /// one, or put something in the Archive, is refused. Unarchive and Move to
 /// Trash have their own commands.
 pub(crate) fn not_archived(path: &str) -> CmdResult<()> {
-    if nimw_vault::is_archived(path) {
+    // Any letter case: on a case-insensitive disk `.ARCHIVE/x` is the Archive (round-2 review M3).
+    let first = path.split('/').next().unwrap_or_default();
+    if first.eq_ignore_ascii_case(nimw_vault::ARCHIVE_DIR) {
         return Err(CommandError::new(
             ErrorKind::NotPermitted,
             format!("{path} is archived; unarchive it to change it"),

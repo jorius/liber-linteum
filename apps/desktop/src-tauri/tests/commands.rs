@@ -2387,3 +2387,21 @@ fn m5b_favorites_over_ipc() {
         json!(["Welcome.md", "Design"])
     );
 }
+
+/// Round-2 review M3: the Archive's write guard ignores letter case — on a
+/// case-insensitive disk `.ARCHIVE/x.md` is the archived file.
+#[test]
+fn m5b_r2_review_m3_the_archive_guard_ignores_case() {
+    let h = harness();
+    let _vault = open_fixture(&h, "obsidian-basic");
+    call(&h.main, "entry_archive", json!({ "path": "Welcome.md" })).unwrap();
+    for path in [".ARCHIVE/Welcome.md", ".Archive/x.md"] {
+        let err = call(
+            &h.main,
+            "page_write",
+            json!({ "path": path, "text": "x", "expectedHash": "0" }),
+        )
+        .unwrap_err();
+        assert_eq!(kind(err.clone()), "notPermitted", "{path}: {err}");
+    }
+}
