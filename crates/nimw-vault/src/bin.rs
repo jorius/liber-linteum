@@ -70,6 +70,17 @@ impl Vault {
             }
         })
     }
+
+    /// Forgets several records in one write (none when none is there).
+    pub fn forget_bin_records(&self, bin: Bin, paths: &[String]) -> Result<()> {
+        self.update_json_object(bin.file(), false, |map| {
+            if let Some(items) = map.get_mut("items").and_then(Value::as_object_mut) {
+                for p in paths {
+                    items.remove(p);
+                }
+            }
+        })
+    }
 }
 
 #[cfg(test)]

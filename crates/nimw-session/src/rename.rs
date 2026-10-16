@@ -179,6 +179,11 @@ impl VaultSession {
         if validate_name(to.file_name())? != to.file_name() {
             return Err(SessionError::InvalidName(to.to_string()));
         }
+        // Nothing moves into `.git`, `.obsidian` or another hidden folder
+        // (M5b final review I1); `.archive` is the Archive's own.
+        if nimw_vault::is_hidden_path(to.as_str()) {
+            return Err(SessionError::InvalidName(to.to_string()));
+        }
         let (plan, sources) = {
             let index = self.index();
             let stats = index.stats()?;

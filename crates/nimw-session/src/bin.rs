@@ -6,7 +6,7 @@
 
 use crate::error::{Result, SessionError};
 use crate::events::RenameOutcome;
-use crate::session::VaultSession;
+use crate::session::{VaultSession, validate_name};
 use nimw_markdown::link_key;
 use nimw_vault::{
     ARCHIVE_DIR, Bin, BinRecord, TRASH_DIR, VaultError, VaultPath, WatchEvent, is_hidden_name,
@@ -33,12 +33,13 @@ fn now_ms() -> u64 {
         .unwrap_or(0)
 }
 
-/// `name`, `name 1`, `name 2`… (a file keeps its extension last).
-fn numbered(name: &str, i: usize) -> String {
+/// `name`, `name 1`, `name 2`… (a file keeps its extension last; a folder's
+/// dots are part of its name).
+fn numbered_entry(name: &str, i: usize, folder: bool) -> String {
     if i == 0 {
         return name.to_string();
     }
-    match name.rfind('.').filter(|&dot| dot > 0) {
+    match name.rfind('.').filter(|&dot| dot > 0 && !folder) {
         Some(dot) => format!("{} {i}{}", &name[..dot], &name[dot..]),
         None => format!("{name} {i}"),
     }
@@ -53,14 +54,64 @@ fn in_bin(path: &VaultPath, dir: &str) -> bool {
 impl VaultSession {
     /// The first of `parent/name`, `parent/name 1`… with nothing on disk
     /// (case-insensitive disks included: the file system answers).
-    fn free_path(&self, parent: &VaultPath, name: &str) -> Result<VaultPath> {
+    fn free_path(&self, parent: &VaultPath, name: &str, folder: bool) -> Result<VaultPath> {
         for i in 0.. {
-            let p = parent.join(&numbered(name, i))?;
+            let p = parent.join(&numbered_entry(name, i, folder))?;
             if self.vault.fs_path(&p)?.symlink_metadata().is_err() {
                 return Ok(p);
             }
         }
         unreachable!("a free name")
+    }
+
+    fn is_dir(&self, path: &VaultPath) -> bool {
+        self.vault.fs_path(path).is_ok_and(|p| p.is_dir())
+    }
+
+    /// A bin folder, refused when it is a symlink: a `.trash` linked back
+    /// into the vault would make Empty Trash take the vault with it.
+    fn bin_dir(&self, dir: &str) -> Result<VaultPath> {
+        let bin = VaultPath::new(dir)?;
+        if bin
+            .to_fs_path(self.vault.root())
+            .symlink_metadata()
+            .is_ok_and(|m| !m.is_dir())
+        {
+            return Err(SessionError::NotPermitted(format!("{dir} isn't a folder")));
+        }
+        Ok(bin)
+    }
+
+    /// Where an item goes back to: its record's path when that is a visible
+    /// place under folders (a synced record is not trusted to name `.git`
+    /// or `.obsidian`), else `fallback`.
+    fn restore_target(&self, recorded: Option<&str>, fallback: VaultPath) -> VaultPath {
+        recorded
+            .and_then(|from| VaultPath::new(from).ok())
+            .filter(|t| {
+                !t.is_root()
+                    && !is_hidden_path(t.as_str())
+                    && validate_name(t.file_name()).is_ok_and(|n| n == t.file_name())
+                    && self.parents_are_folders(t)
+            })
+            .unwrap_or(fallback)
+    }
+
+    /// True when nothing above `path` is a file (a folder can be recreated,
+    /// a file in the way can't).
+    fn parents_are_folders(&self, path: &VaultPath) -> bool {
+        let mut dir = path.parent();
+        while let Some(d) = dir.filter(|d| !d.is_root()) {
+            if self
+                .vault
+                .fs_path(&d)
+                .is_ok_and(|p| p.symlink_metadata().is_ok() && !p.is_dir())
+            {
+                return false;
+            }
+            dir = d.parent();
+        }
+        true
     }
 
     /// Refuses what can't go into a bin: the root, hidden paths, the bins
@@ -109,9 +160,9 @@ impl VaultSession {
         if self.vault.fs_path(path)?.symlink_metadata().is_err() {
             return Err(VaultError::NotFound(path.to_string()).into());
         }
-        let bin = VaultPath::new(TRASH_DIR)?;
+        let bin = self.bin_dir(TRASH_DIR)?;
         self.vault.create_dir_all(&bin)?;
-        let dest = self.free_path(&bin, path.file_name())?;
+        let dest = self.free_path(&bin, path.file_name(), self.is_dir(path))?;
         let keys: Vec<String> = self
             .index()
             .file_set()?
@@ -140,7 +191,7 @@ impl VaultSession {
     /// The Trash's items, newest first; unrecorded ones (Obsidian's) last.
     pub fn trash_list(&self) -> Result<Vec<BinItem>> {
         let records = self.vault.bin_records(Bin::Trash);
-        let dir = self.vault.fs_path(&VaultPath::new(TRASH_DIR)?)?;
+        let dir = self.vault.fs_path(&self.bin_dir(TRASH_DIR)?)?;
         let mut items = Vec::new();
         let Ok(read) = std::fs::read_dir(&dir) else {
             return Ok(items);
@@ -175,11 +226,11 @@ impl VaultSession {
             )));
         }
         let from = self.vault.bin_records(Bin::Trash).remove(inner.as_str());
-        let target = match &from {
-            Some(r) => VaultPath::new(&r.from)?,
-            None => VaultPath::root().join(inner.file_name())?,
-        };
-        let target = self.bin_place(&target, keep_both)?;
+        let target = self.restore_target(
+            from.as_ref().map(|r| r.from.as_str()),
+            VaultPath::root().join(inner.file_name())?,
+        );
+        let target = self.bin_place(&target, keep_both, self.is_dir(inner))?;
         let parent = target.parent().unwrap_or_else(VaultPath::root);
         let created = self.vault.create_dir_all(&parent)?;
         self.vault.rename(inner, &target)?;
@@ -194,7 +245,7 @@ impl VaultSession {
     }
 
     /// `target` when free; else `AlreadyExists`, or its next free name.
-    fn bin_place(&self, target: &VaultPath, keep_both: bool) -> Result<VaultPath> {
+    fn bin_place(&self, target: &VaultPath, keep_both: bool, folder: bool) -> Result<VaultPath> {
         if self.vault.fs_path(target)?.symlink_metadata().is_err() {
             return Ok(target.clone());
         }
@@ -202,7 +253,7 @@ impl VaultSession {
             return Err(VaultError::AlreadyExists(target.to_string()).into());
         }
         let parent = target.parent().unwrap_or_else(VaultPath::root);
-        self.free_path(&parent, target.file_name())
+        self.free_path(&parent, target.file_name(), folder)
     }
 
     /// Deletes items from the Trash for good: to the OS trash.
@@ -217,6 +268,7 @@ impl VaultSession {
         items: &[VaultPath],
         os_trash: &dyn Fn(&VaultPath) -> nimw_vault::Result<()>,
     ) -> Result<()> {
+        self.bin_dir(TRASH_DIR)?;
         if let Some(p) = items
             .iter()
             .find(|p| p.parent().is_none_or(|d| d.as_str() != TRASH_DIR) || !in_bin(p, TRASH_DIR))
@@ -225,11 +277,22 @@ impl VaultSession {
                 "{p} isn't in the Trash"
             )));
         }
+        let mut done = Vec::new();
+        let mut result = Ok(());
         for p in items {
-            self.trash_via(p, &|| {}, os_trash)?;
-            self.forget_record(Bin::Trash, p);
+            if let Err(e) = self.trash_via(p, &|| {}, os_trash) {
+                result = Err(e);
+                break;
+            }
+            done.push(p.to_string());
         }
-        Ok(())
+        // One write for every item gone; what is left keeps its record.
+        if let Err(e) = self.vault.forget_bin_records(Bin::Trash, &done) {
+            self.emit(crate::events::SessionEvent::Warning(format!(
+                "Trash records not updated: {e}"
+            )));
+        }
+        result
     }
 
     /// Empties the Trash: everything in it to the OS trash.
@@ -247,9 +310,12 @@ impl VaultSession {
             .map(|i| VaultPath::new(&i.path))
             .collect::<std::result::Result<_, _>>()?;
         self.trash_delete_via(&items, os_trash)?;
-        // Records whose items are gone already.
-        for path in self.vault.bin_records(Bin::Trash).into_keys() {
-            self.forget_record(Bin::Trash, &VaultPath::new(&path)?);
+        // Records whose items are gone already, in one write.
+        let stale: Vec<String> = self.vault.bin_records(Bin::Trash).into_keys().collect();
+        if let Err(e) = self.vault.forget_bin_records(Bin::Trash, &stale) {
+            self.emit(crate::events::SessionEvent::Warning(format!(
+                "Trash records not cleared: {e}"
+            )));
         }
         Ok(())
     }
@@ -264,10 +330,11 @@ impl VaultSession {
                 "{path} is archived already"
             )));
         }
+        self.bin_dir(ARCHIVE_DIR)?;
         let dest = VaultPath::new(&format!("{ARCHIVE_DIR}/{path}"))?;
         let parent = dest.parent().unwrap_or_else(VaultPath::root);
         let created = self.vault.create_dir_all(&parent)?;
-        let dest = self.bin_place(&dest, true)?;
+        let dest = self.bin_place(&dest, true, self.is_dir(path))?;
         self.record(Bin::Archive, &dest, path)?;
         let out = match self.rename(path, &dest, rewrite_links) {
             Ok(out) => out,
@@ -335,11 +402,11 @@ impl VaultSession {
             return Err(SessionError::NotPermitted(format!("{path} isn't archived")));
         }
         let records = self.vault.bin_records(Bin::Archive);
-        let target = match records.get(path.as_str()) {
-            Some(r) => VaultPath::new(&r.from)?,
-            None => strip_archive(path)?,
-        };
-        let target = self.bin_place(&target, keep_both)?;
+        let target = self.restore_target(
+            records.get(path.as_str()).map(|r| r.from.as_str()),
+            strip_archive(path)?,
+        );
+        let target = self.bin_place(&target, keep_both, self.is_dir(path))?;
         let parent = target.parent().unwrap_or_else(VaultPath::root);
         let created = self.vault.create_dir_all(&parent)?;
         let out = self.rename(path, &target, rewrite_links)?;
@@ -665,5 +732,115 @@ mod tests {
             .unwrap();
         assert!(exists(&f.root, "Notes/x.md"));
         assert!(f.s.page(&vp("Notes/x.md")).unwrap().is_some());
+    }
+
+    #[test]
+    fn m5b_review_i1_a_record_never_restores_into_a_hidden_folder() {
+        let f = fx(&[
+            (".trash/post-checkout", "#!/bin/sh"),
+            (".archive/x.md", "x"),
+            ("a.md", "a"),
+        ]);
+        let rec = |from: &str| nimw_vault::BinRecord {
+            from: from.into(),
+            at: 1,
+        };
+        f.s.vault()
+            .set_bin_record(
+                Bin::Trash,
+                ".trash/post-checkout",
+                Some(&rec(".git/hooks/post-checkout")),
+            )
+            .unwrap();
+        f.s.vault()
+            .set_bin_record(Bin::Archive, ".archive/x.md", Some(&rec(".obsidian/x.md")))
+            .unwrap();
+        let back =
+            f.s.trash_restore(&vp(".trash/post-checkout"), false)
+                .unwrap();
+        assert_eq!(back.as_str(), "post-checkout", "as unrecorded: the root");
+        assert!(!exists(&f.root, ".git"));
+        f.s.unarchive(&vp(".archive/x.md"), false, true).unwrap();
+        assert!(exists(&f.root, "x.md"));
+        assert!(!exists(&f.root, ".obsidian"));
+        // A rename from the page can't move anything into a hidden folder.
+        assert!(f.s.rename(&vp("a.md"), &vp(".git/a.md"), true).is_err());
+        assert!(
+            f.s.rename(&vp("a.md"), &vp("P/.hidden/a.md"), true)
+                .is_err()
+        );
+        assert!(exists(&f.root, "a.md"));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn m5b_review_i2_a_bin_that_is_a_symlink_is_refused() {
+        let f = fx(&[("Notes/a.md", "a"), ("b.md", "b")]);
+        std::os::unix::fs::symlink(".", f.root.join(".trash")).unwrap();
+        assert!(f.s.trash_list().is_err());
+        assert!(f.s.trash_empty_via(&remove(&f.root)).is_err());
+        assert!(f.s.trash(&vp("b.md")).is_err());
+        assert!(exists(&f.root, "Notes/a.md") && exists(&f.root, "b.md"));
+        std::os::unix::fs::symlink("Notes", f.root.join(".archive")).unwrap();
+        assert!(f.s.archive(&vp("b.md"), true).is_err());
+        assert!(exists(&f.root, "b.md"));
+    }
+
+    #[test]
+    fn m5b_review_m1_a_live_page_wins_a_name_over_an_archived_one() {
+        // `.archive/Old.md` and `Q/Old.md` tie on depth, and `.` sorts first.
+        let f = fx(&[
+            ("Old.md", "# Old"),
+            ("Q/Old.md", "# Q"),
+            ("A.md", "[[Old]]"),
+        ]);
+        assert_eq!(backlinks(&f.s, "Old.md"), 1);
+        f.s.archive(&vp("Old.md"), true).unwrap();
+        assert_eq!(backlinks(&f.s, ".archive/Old.md"), 1, "A keeps its target");
+        std::fs::write(f.root.join("B.md"), "[[Old]]").unwrap();
+        f.s.apply(vec![nimw_vault::WatchEvent::Changed(vp("B.md"))])
+            .unwrap();
+        assert_eq!(
+            backlinks(&f.s, "Q/Old.md"),
+            1,
+            "a new link means the live page"
+        );
+    }
+
+    #[test]
+    fn m5b_review_m2_restoring_under_what_is_now_a_file_goes_to_the_root() {
+        let f = fx(&[("P/a.md", "a")]);
+        let inner = f.s.trash(&vp("P/a.md")).unwrap();
+        std::fs::remove_dir(f.root.join("P")).unwrap();
+        std::fs::write(f.root.join("P"), "now a file").unwrap();
+        let back = f.s.trash_restore(&inner, false).unwrap();
+        assert_eq!(back.as_str(), "a.md");
+        assert_eq!(
+            std::fs::read_to_string(f.root.join("P")).unwrap(),
+            "now a file"
+        );
+    }
+
+    #[test]
+    fn m5b_review_m6_deleting_from_the_trash_forgets_positions_and_picks() {
+        let f = fx(&[("F/a.md", "a"), ("F/b.md", "b")]);
+        let at = nimw_vault::CardPosition { x: 1.0, y: 2.0 };
+        f.s.vault()
+            .set_layout_level("F", &[("F/a.md".to_string(), at)].into())
+            .unwrap();
+        f.s.vault().set_index_pick("F", Some("F/a.md")).unwrap();
+        let inner = f.s.trash(&vp("F")).unwrap();
+        assert!(!f.s.vault().layout_level(inner.as_str()).is_empty());
+        f.s.trash_delete_via(&[inner.clone()], &remove(&f.root))
+            .unwrap();
+        std::fs::create_dir_all(f.root.join(inner.as_str())).unwrap();
+        assert!(f.s.vault().layout_level(inner.as_str()).is_empty());
+        assert!(f.s.vault().index_picks().is_empty());
+    }
+
+    #[test]
+    fn m5b_review_m8_a_folder_name_keeps_its_dots() {
+        assert_eq!(super::numbered_entry("v1.2", 1, true), "v1.2 1");
+        assert_eq!(super::numbered_entry("a.tar.gz", 1, false), "a.tar 1.gz");
     }
 }

@@ -195,8 +195,18 @@ pub fn resolve(kind: LinkKind, target: &str, source: &str, files: &FileSet) -> O
             })
             .unwrap_or_default();
         if !matches.is_empty() {
-            // Same folder as the source first, then fewest components, then path order.
-            matches.sort_by_key(|p| (dir_of(p) != source_dir, p.matches('/').count(), p.as_str()));
+            // Same folder as the source first, then fewest components, then path
+            // order; an archived page only wins when nothing live has the name
+            // (M5b final review M1), unless the link is in the Archive itself.
+            let archived = |p: &str| p.starts_with(".archive/");
+            matches.sort_by_key(|p| {
+                (
+                    archived(p) != archived(source),
+                    dir_of(p) != source_dir,
+                    p.matches('/').count(),
+                    p.as_str(),
+                )
+            });
             return Some(matches[0].clone());
         }
     }

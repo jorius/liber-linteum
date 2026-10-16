@@ -398,7 +398,10 @@ impl VaultSession {
         let icons = self.vault.forget_folder_icons(removed);
         // Deleted quick notes stop being named after their first line (M4c).
         let quick = self.vault.forget_auto_named(removed);
+        // And Global View positions and index-note picks (M5b final review M6).
+        let layout = self.vault.forget_layout(removed);
         if let Err(e) = widths
+            .and(layout)
             .and(heights)
             .and(sides)
             .and(strips)
