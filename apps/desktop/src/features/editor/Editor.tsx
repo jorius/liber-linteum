@@ -589,7 +589,7 @@ export function Editor({ doc, mode, label }: EditorProps) {
               <Preview
                 text={text}
                 path={doc.path}
-                onToggleTask={toggleTask}
+                onToggleTask={isArchived(doc.path) ? undefined : toggleTask}
                 onRendered={onRendered}
                 delay={renderNow ? 0 : undefined}
               />

@@ -7,6 +7,7 @@ import { clearMocks, mockIPC } from '../../ipc/testing';
 import { resetEditorStore, useEditorStore } from '../../stores/editorStore';
 import { usePageStore } from '../../stores/pageStore';
 import { DEFAULT_SETTINGS, useSettingsStore } from '../../stores/settingsStore';
+import { useToastStore } from '../../stores/toastStore';
 import { resetVaultStore, useVaultStore } from '../../stores/vaultStore';
 import { fakeDisk } from '../../test/fakeDisk';
 import { AUTOSAVE_MS } from '../editor/pageDoc';
@@ -420,5 +421,27 @@ describe('an archived page', () => {
     expect(screen.queryByRole('button', { name: /Page width/ })).not.toBeInTheDocument();
     await act(() => new Promise((r) => setTimeout(r, 50)));
     expect(disk.calls.filter(([c]) => c === 'page_write')).toEqual([]);
+  });
+
+  it('round-2 review M4, M5: its task boxes are disabled; a pasted image is left alone, quietly', async () => {
+    useToastStore.getState().clear();
+    const disk = fakeDisk({ '.archive/Old.md': '# Old\n\n- [ ] a task\n' });
+    render(<PageScreen />);
+    await open('.archive/Old.md');
+    const box = await waitFor(() => {
+      const el = document.querySelector<HTMLInputElement>('.cm-nimw-checkbox');
+      expect(el).not.toBeNull();
+      return el!;
+    });
+    expect(box).toBeDisabled();
+    const paste = new Event('paste', { bubbles: true, cancelable: true });
+    const image = new File([new Uint8Array([1])], 'x.png', { type: 'image/png' });
+    Object.defineProperty(paste, 'clipboardData', {
+      value: { types: ['Files'], files: [image] },
+    });
+    document.querySelector('.cm-content')!.dispatchEvent(paste);
+    await act(() => new Promise((r) => setTimeout(r, 20)));
+    expect(disk.calls.filter(([c]) => c === 'attachment_paste')).toEqual([]);
+    expect(useToastStore.getState().toasts).toEqual([]);
   });
 });
