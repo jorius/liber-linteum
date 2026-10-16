@@ -25,7 +25,7 @@ async function open(page: Page) {
 test('Escape closes Settings even when nothing in it has focus', async ({ page }) => {
   const errors = await open(page);
   const dialog = page.getByRole('dialog', { name: 'Settings' });
-  await openSettings(page);
+  await openSettings(page, 'Editor');
   await dialog.getByRole('checkbox', { name: 'Show line numbers' }).check();
   // As after a click in WKWebView: focus on nothing.
   await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
@@ -40,7 +40,7 @@ test('a click outside closes Settings and saves the accent typed but not confirm
 }) => {
   const errors = await open(page);
   const dialog = page.getByRole('dialog', { name: 'Settings' });
-  await openSettings(page);
+  await openSettings(page, 'Appearance');
   // A press inside released outside is a selection or a drag, not a close.
   const box = (await dialog.boundingBox())!;
   await page.mouse.move(box.x + box.width / 2, box.y + 20);
@@ -55,7 +55,7 @@ test('a click outside closes Settings and saves the accent typed but not confirm
   await page.mouse.click(4, 4);
   await expect(dialog).toBeHidden();
 
-  await openSettings(page);
+  await openSettings(page, 'Appearance');
   await expect(dialog.getByRole('textbox', { name: 'Accent colour (hex)' })).toHaveValue('#123456');
   expect(errors).toEqual([]);
 });

@@ -292,9 +292,6 @@
     "rewriteLinks": "Update links when renaming or moving",
     "confirmDelete": "Ask before moving to Trash",
     "sections": {
-      "appearance": "Appearance",
-      "editor": "Editor",
-      "files": "Files",
       "vault": "This vault"
     },
     "palette": "Palette",
@@ -359,7 +356,73 @@
     "actionButton": "Action button",
     "actionButtonBottomRight": "Bottom right",
     "actionButtonBottomLeft": "Bottom left",
-    "actionButtonTopRight": "Top right"
+    "actionButtonTopRight": "Top right",
+    "categoriesLabel": "Settings categories",
+    "search": "Search settings",
+    "searchResults": "Search results",
+    "noMatch": "No settings match.",
+    "savedAsYouChange": "Saved as you change",
+    "groups": {
+      "app": "App"
+    },
+    "categories": {
+      "general": {
+        "title": "General",
+        "description": "The language of the app."
+      },
+      "appearance": {
+        "title": "Appearance",
+        "description": "Theme, colours and where the action button sits."
+      },
+      "editor": {
+        "title": "Editor",
+        "description": "Fonts, page width, covers and saving."
+      },
+      "files": {
+        "title": "Files and quick notes",
+        "description": "Renaming, deleting and where quick notes live."
+      },
+      "shortcuts": {
+        "title": "Keyboard shortcuts",
+        "description": "What the keyboard does, everywhere in the app."
+      },
+      "vault": {
+        "title": "This vault",
+        "description": "Settings kept with this vault, in .nimw/vault.json."
+      }
+    },
+    "shortcuts": {
+      "groups": {
+        "navigation": "Navigation",
+        "editing": "Editing",
+        "vault": "Vault",
+        "view": "View"
+      },
+      "items": {
+        "back": "Back",
+        "forward": "Forward",
+        "edit": "Edit",
+        "globalView": "Global View",
+        "search": "Search",
+        "files": "Go to the files",
+        "newPage": "New page",
+        "quickNote": "New quick note",
+        "save": "Save",
+        "link": "Insert a link",
+        "bold": "Bold",
+        "italic": "Italic",
+        "code": "Inline code",
+        "strike": "Strikethrough",
+        "highlight": "Highlight",
+        "openVault": "Open a vault",
+        "closeVault": "Close the vault",
+        "openFile": "Open a file",
+        "sidebar": "Show or hide the sidebar",
+        "actions": "Show the actions",
+        "settings": "Settings",
+        "quit": "Quit"
+      }
+    }
   },
   "toolbar": {
     "label": "Formatting",

@@ -150,7 +150,7 @@ test('§7 Attach → Link to where it is writes file: URLs; Escape cancels', asy
 
 test('§8 the link format for new attachments, in Settings → This vault', async ({ page }) => {
   const outside = await open(page, 'A');
-  await openSettings(page);
+  await openSettings(page, 'This vault');
   const format = page.getByRole('combobox', { name: 'Link format for new attachments' });
   await expect(format).toHaveValue('shortest');
   await expect(page.getByText('![[x.png]]')).toBeVisible();

@@ -188,7 +188,7 @@ test('Wide elements: Tables unticked in Settings brings the table back to the me
 }) => {
   await open(page, 'Ranks', { pageWidth: 'wide' });
   await expect.poll(async () => (await geometry(page)).widget).toBeGreaterThan(800);
-  await openSettings(page);
+  await openSettings(page, 'Editor');
   await page
     .getByRole('group', { name: 'Wide elements' })
     .getByRole('checkbox', { name: 'Tables' })

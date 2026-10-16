@@ -1,5 +1,24 @@
-import { useEffect, useId, useState, type KeyboardEvent } from 'react';
+import {
+  useEffect,
+  useId,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type KeyboardEvent,
+  type ReactNode,
+} from 'react';
 import { useTranslation } from 'react-i18next';
+import {
+  CloseIcon,
+  FolderIcon,
+  FormatIcon,
+  GearIcon,
+  LockIcon,
+  NewPageIcon,
+  PencilIcon,
+  SearchIcon,
+  WidthIcon,
+} from '../../app/icons';
 import { SUPPORTED_LANGUAGES } from '../../i18n';
 import {
   fontsList,
@@ -18,6 +37,7 @@ import { LIVE_FONTS, SOURCE_FONTS, systemChoice, type FontOption } from '../../t
 import { PALETTES } from '../../theme/palettes';
 import { Dialog } from './Dialog';
 import styles from './Dialogs.module.css';
+import { keyLabel, SHORTCUT_GROUPS } from './shortcuts';
 import { useLatestSave } from './useLatestSave';
 import { ScratchpadLocation } from '../scratchpad/ScratchpadLocation';
 import { VaultSettingsSection } from './VaultSettingsSection';
@@ -37,250 +57,475 @@ const HEX = /^#[0-9a-f]{6}$/i;
 /** The kinds a `wide` page lets span the editor (M4b part 3). */
 const WIDE_KINDS: (keyof WideElements)[] = ['tables', 'code', 'diagrams', 'images', 'maths'];
 
-/** Language, appearance (theme, palette, custom accent), editor (fonts, text
- *  size, page width, default cover height, toolbar), file settings and, with a vault open, where its
- *  attachments go (M2c §5.4); every change is saved at once (M2b §7). */
+/** The categories of the left menu (M5b §18), in order; `vault` only with a
+ *  vault open. */
+const APP_CATEGORIES = ['general', 'appearance', 'editor', 'files', 'shortcuts'] as const;
+type Category = (typeof APP_CATEGORIES)[number] | 'vault';
+/** The category shown last, for the session (M5b §18). */
+let lastCategory: Category = 'general';
+/** Tests start from General. */
+export function resetSettingsCategory() {
+  lastCategory = 'general';
+}
+
+const MAC = /Mac/i.test(navigator.platform);
+
+/** Lower case, without accents: what search compares. */
+const fold = (s: string) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+
+/** A category's rows: its children, and a section's children (This vault). */
+function rowsOf(panel: HTMLElement): HTMLElement[] {
+  const rows: HTMLElement[] = [];
+  for (const child of panel.children) {
+    if (!(child instanceof HTMLElement) || child.tagName === 'H4') continue;
+    if (child.tagName === 'SECTION') {
+      for (const inner of child.children) {
+        if (inner instanceof HTMLElement && inner.tagName !== 'H3') rows.push(inner);
+      }
+    } else rows.push(child);
+  }
+  return rows;
+}
+
+/** Settings in categories (M5b §18): a left menu like the file explorer
+ *  (App: General, Appearance, Editor, Files and quick notes, Keyboard
+ *  shortcuts; the open vault: This vault) and the chosen category on the
+ *  right. Search shows the matching rows of every category. Every change is
+ *  saved at once (M2b §7). */
 export function SettingsDialog({ onClose }: { onClose: () => void }) {
   const { t } = useTranslation();
   const settings = useSettingsStore((s) => s.settings);
   const update = useSettingsStore((s) => s.update);
   const installed = useInstalledFonts();
   const ids = {
-    appearance: useId(),
-    editor: useId(),
-    files: useId(),
     wideHint: useId(),
     autoSaveHint: useId(),
   };
-  const vaultOpen = useVaultStore((s) => s.info !== null);
+  const vault = useVaultStore((s) => s.info);
+  const vaultOpen = vault !== null;
+  const [category, setCategory] = useState<Category>(() =>
+    lastCategory === 'vault' && !vaultOpen ? 'general' : lastCategory,
+  );
+  const [query, setQuery] = useState('');
+  const [empty, setEmpty] = useState(false);
+  const heading = useRef<HTMLHeadingElement>(null);
+  const body = useRef<HTMLDivElement>(null);
+  const focusHeading = useRef(false);
+  const searching = query.trim() !== '';
+
+  const select = (next: Category, moveFocus: boolean) => {
+    lastCategory = next;
+    focusHeading.current = moveFocus;
+    setQuery('');
+    setCategory(next);
+  };
+  useEffect(() => {
+    if (focusHeading.current) heading.current?.focus();
+    focusHeading.current = false;
+  }, [category]);
+
+  // shortcut: rows are filtered in the DOM by their text (labels and
+  // choices); a row that appears later (a vault setting still loading) is
+  // checked on the next keystroke. Upgrade to declared rows if that bites.
+  useLayoutEffect(() => {
+    const root = body.current;
+    if (!root) return;
+    const q = fold(query.trim());
+    let any = false;
+    for (const panel of root.querySelectorAll<HTMLElement>('[data-category]')) {
+      let hit = false;
+      let prev = false;
+      for (const row of rowsOf(panel)) {
+        // A hint goes with the row above it.
+        const show: boolean =
+          !q ||
+          fold(row.textContent ?? '').includes(q) ||
+          (prev && row.classList.contains(styles.hint));
+        row.hidden = !show;
+        prev = show;
+        hit = hit || show;
+      }
+      panel.toggleAttribute('data-no-match', q !== '' && !hit);
+      any = any || hit;
+    }
+    setEmpty(q !== '' && !any);
+  }, [query, category, vaultOpen]);
+
+  const onNavKeyDown = (e: KeyboardEvent<HTMLElement>) => {
+    if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return;
+    const buttons = [...e.currentTarget.querySelectorAll<HTMLButtonElement>('[data-nav]')];
+    const at = buttons.indexOf(document.activeElement as HTMLButtonElement);
+    if (at < 0) return;
+    e.preventDefault();
+    const step = e.key === 'ArrowDown' ? 1 : -1;
+    const next = buttons[(at + step + buttons.length) % buttons.length];
+    next.focus();
+    select(next.dataset.nav as Category, false);
+  };
+
+  const navButton = (c: Category) => (
+    <button
+      key={c}
+      type="button"
+      data-nav={c}
+      className={styles.navItem}
+      aria-current={!searching && category === c ? 'page' : undefined}
+      onClick={() => select(c, true)}
+    >
+      <CategoryIcon category={c} />
+      {t(`settings.categories.${c}.title`)}
+    </button>
+  );
+
+  const panel = (c: Category, children: ReactNode) => (
+    <div
+      role="group"
+      data-category={c}
+      aria-label={t(`settings.categories.${c}.title`)}
+      className={styles.panel}
+      hidden={!searching && category !== c}
+    >
+      {searching && <h4 className={styles.panelTitle}>{t(`settings.categories.${c}.title`)}</h4>}
+      {children}
+    </div>
+  );
 
   return (
-    <Dialog title={t('settings.title')} onClose={onClose} dismissible>
-      <label className={styles.field}>
-        <span>{t('settings.language')}</span>
-        <select
-          className={styles.select}
-          value={settings.language ?? 'system'}
-          onChange={(e) => void update({ language: e.target.value })}
-        >
-          <option value="system">{t('settings.languageSystem')}</option>
-          {SUPPORTED_LANGUAGES.map((lng) => (
-            <option key={lng} value={lng} lang={lng}>
-              {t(`languages.${lng}`)}
-            </option>
-          ))}
-        </select>
-      </label>
-
-      <section className={styles.section} aria-labelledby={ids.appearance}>
-        <h3 id={ids.appearance} className={styles.sectionTitle}>
-          {t('settings.sections.appearance')}
-        </h3>
-        <fieldset className={styles.fieldset}>
-          <legend>{t('settings.theme')}</legend>
-          {THEMES.map((theme) => (
-            <label key={theme} className={styles.check}>
-              <input
-                type="radio"
-                name="theme"
-                value={theme}
-                checked={settings.theme === theme}
-                onChange={() => void update({ theme })}
-              />
-              {t(`settings.${themeKey[theme]}`)}
-            </label>
-          ))}
-        </fieldset>
-        <fieldset className={`${styles.fieldset} ${styles.palettes}`}>
-          <legend>{t('settings.palette')}</legend>
-          {PALETTE_CHOICES.map((id) => (
-            <label key={id} className={styles.palette}>
-              <input
-                type="radio"
-                name="palette"
-                value={id}
-                checked={settings.palette === id}
-                onChange={() => void update({ palette: id })}
-              />
-              <Swatch id={id} accent={settings.accentColor} />
-              <span>{t(`settings.palettes.${id}`)}</span>
-            </label>
-          ))}
-        </fieldset>
-        {settings.palette === 'custom' && (
-          <AccentEditor
-            value={settings.accentColor}
-            onSave={(accentColor) => update({ accentColor })}
-          />
-        )}
-        <label className={styles.field}>
-          <span>{t('settings.actionButton')}</span>
-          <select
-            className={styles.select}
-            value={settings.actionButton}
-            onChange={(e) => void update({ actionButton: e.target.value as ActionButtonPlace })}
-          >
-            <option value="bottomRight">{t('settings.actionButtonBottomRight')}</option>
-            <option value="bottomLeft">{t('settings.actionButtonBottomLeft')}</option>
-            <option value="topRight">{t('settings.actionButtonTopRight')}</option>
-          </select>
-        </label>
-      </section>
-
-      <section className={styles.section} aria-labelledby={ids.editor}>
-        <h3 id={ids.editor} className={styles.sectionTitle}>
-          {t('settings.sections.editor')}
-        </h3>
-        <FontSelect
-          label={t('settings.fontLive')}
-          fonts={LIVE_FONTS}
-          installed={installed}
-          value={settings.fontLivePreview}
-          onChange={(fontLivePreview) => void update({ fontLivePreview })}
-        />
-        <FontSelect
-          label={t('settings.fontSource')}
-          fonts={SOURCE_FONTS}
-          installed={installed}
-          value={settings.fontSource}
-          onChange={(fontSource) => void update({ fontSource })}
-        />
-        <label className={styles.field}>
-          <span>{t('settings.fontSize')}</span>
-          <select
-            className={styles.select}
-            value={settings.fontSize}
-            onChange={(e) => void update({ fontSize: Number(e.target.value) })}
-          >
-            {SIZES.map((px) => (
-              <option key={px} value={px}>
-                {t('settings.fontSizePx', { px })}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className={styles.field}>
-          <span>{t('settings.pageWidth')}</span>
-          <select
-            className={styles.select}
-            value={settings.pageWidth}
-            onChange={(e) => void update({ pageWidth: e.target.value as PageWidth })}
-          >
-            <option value="readable">{t('settings.pageWidthReadable')}</option>
-            <option value="wide">{t('settings.pageWidthWide')}</option>
-            <option value="full">{t('settings.pageWidthFull')}</option>
-          </select>
-        </label>
-        <fieldset className={styles.fieldset} aria-describedby={ids.wideHint}>
-          <legend>{t('settings.wide.title')}</legend>
-          <p id={ids.wideHint} className={styles.hint}>
-            {t('settings.wide.hint')}
-          </p>
-          {WIDE_KINDS.map((kind) => (
-            <label key={kind} className={styles.check}>
-              <input
-                type="checkbox"
-                checked={settings.wideElements[kind]}
-                onChange={(e) =>
-                  void update({
-                    wideElements: { ...settings.wideElements, [kind]: e.target.checked },
-                  })
-                }
-              />
-              {t(`settings.wide.${kind}`)}
-            </label>
-          ))}
-        </fieldset>
-        <label className={styles.field}>
-          <span>{t('settings.coverHeight')}</span>
-          <select
-            className={styles.select}
-            value={settings.coverHeight}
-            onChange={(e) => void update({ coverHeight: Number(e.target.value) })}
-          >
-            {/* A default set by hand in settings.json stays visible. */}
-            {!COVER_HEIGHTS.some((c) => c.px === settings.coverHeight) && (
-              <option value={settings.coverHeight}>
-                {t('settings.coverHeightPx', { px: settings.coverHeight })}
-              </option>
-            )}
-            {COVER_HEIGHTS.map(({ px, key }) => (
-              <option key={px} value={px}>
-                {t(`settings.${key}`, { px })}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className={styles.check}>
-          <input
-            type="checkbox"
-            checked={settings.autoSave !== false}
-            onChange={(e) => void update({ autoSave: e.target.checked })}
-            aria-describedby={ids.autoSaveHint}
-          />
-          {t('settings.autoSave')}
-        </label>
-        <p id={ids.autoSaveHint} className={styles.hint}>
-          {t('settings.autoSaveHint', { save: /Mac/i.test(navigator.platform) ? '⌘S' : 'Ctrl+S' })}
+    <Dialog title={t('settings.title')} onClose={onClose} dismissible panes hideTitle>
+      <nav
+        aria-label={t('settings.categoriesLabel')}
+        className={styles.nav}
+        onKeyDown={onNavKeyDown}
+      >
+        <p className={styles.navTitle} aria-hidden="true">
+          {t('settings.title')}
         </p>
-        <label className={styles.check}>
+        <label className={styles.navSearch}>
+          <SearchIcon />
           <input
-            type="checkbox"
-            checked={settings.toolbar}
-            onChange={(e) => void update({ toolbar: e.target.checked })}
+            type="search"
+            aria-label={t('settings.search')}
+            placeholder={t('settings.search')}
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
           />
-          {t('settings.toolbar')}
         </label>
-        <label className={styles.check}>
-          <input
-            type="checkbox"
-            checked={settings.lineNumbers}
-            onChange={(e) => void update({ lineNumbers: e.target.checked })}
-          />
-          {t('settings.lineNumbers')}
-        </label>
-        <label className={styles.check}>
-          <input
-            type="checkbox"
-            checked={settings.showAttachmentPaths === true}
-            onChange={(e) => void update({ showAttachmentPaths: e.target.checked })}
-          />
-          {t('settings.links.showPaths')}
-        </label>
-      </section>
+        <p className={styles.navGroup}>{t('settings.groups.app')}</p>
+        {APP_CATEGORIES.map(navButton)}
+        {vaultOpen && (
+          <>
+            <p className={styles.navGroup}>
+              {vault.icon ? `${vault.icon} ` : ''}
+              {vault.name}
+            </p>
+            {navButton('vault')}
+          </>
+        )}
+        <p className={styles.navFoot}>
+          <LockIcon />
+          {t('settings.savedAsYouChange')}
+        </p>
+      </nav>
 
-      <section className={styles.section} aria-labelledby={ids.files}>
-        <h3 id={ids.files} className={styles.sectionTitle}>
-          {t('settings.sections.files')}
-        </h3>
-        <label className={styles.check}>
-          <input
-            type="checkbox"
-            checked={settings.rewriteLinks}
-            onChange={(e) => void update({ rewriteLinks: e.target.checked })}
-          />
-          {t('settings.rewriteLinks')}
-        </label>
-        <label className={styles.check}>
-          <input
-            type="checkbox"
-            checked={settings.confirmDelete}
-            onChange={(e) => void update({ confirmDelete: e.target.checked })}
-          />
-          {t('settings.confirmDelete')}
-        </label>
-        <ScratchpadLocation />
-      </section>
+      <div className={styles.paneMain}>
+        <div className={styles.paneHead}>
+          <div className={styles.paneHeadText}>
+            <h3 ref={heading} tabIndex={-1} className={styles.paneTitle}>
+              {searching ? t('settings.searchResults') : t(`settings.categories.${category}.title`)}
+            </h3>
+            {!searching && (
+              <p className={styles.hint}>{t(`settings.categories.${category}.description`)}</p>
+            )}
+          </div>
+          <button
+            type="button"
+            className={styles.paneClose}
+            aria-label={t('dialogs.close')}
+            onClick={onClose}
+          >
+            <CloseIcon />
+          </button>
+        </div>
 
-      {vaultOpen && <VaultSettingsSection />}
-
-      <div className={styles.buttons}>
-        <button type="button" className="btn btn-secondary" onClick={onClose}>
-          {t('dialogs.close')}
-        </button>
+        <div ref={body} className={styles.paneBody}>
+          {empty && <p className={styles.text}>{t('settings.noMatch')}</p>}
+          {panel(
+            'general',
+            <>
+              <label className={styles.field}>
+                <span>{t('settings.language')}</span>
+                <select
+                  className={styles.select}
+                  value={settings.language ?? 'system'}
+                  onChange={(e) => void update({ language: e.target.value })}
+                >
+                  <option value="system">{t('settings.languageSystem')}</option>
+                  {SUPPORTED_LANGUAGES.map((lng) => (
+                    <option key={lng} value={lng} lang={lng}>
+                      {t(`languages.${lng}`)}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </>,
+          )}
+          {panel(
+            'appearance',
+            <>
+              <fieldset className={`${styles.fieldset} ${styles.themes}`}>
+                <legend>{t('settings.theme')}</legend>
+                {THEMES.map((theme) => (
+                  <label
+                    key={theme}
+                    className={`${styles.themeCard} ${settings.theme === theme ? styles.chosen : ''}`}
+                  >
+                    <span
+                      className={styles.themePreview}
+                      data-theme-preview={theme}
+                      aria-hidden="true"
+                    />
+                    <input
+                      type="radio"
+                      name="theme"
+                      value={theme}
+                      checked={settings.theme === theme}
+                      onChange={() => void update({ theme })}
+                    />
+                    {t(`settings.${themeKey[theme]}`)}
+                  </label>
+                ))}
+              </fieldset>
+              <fieldset className={`${styles.fieldset} ${styles.palettes}`}>
+                <legend>{t('settings.palette')}</legend>
+                {PALETTE_CHOICES.map((id) => (
+                  <label key={id} className={styles.palette}>
+                    <input
+                      type="radio"
+                      name="palette"
+                      value={id}
+                      checked={settings.palette === id}
+                      onChange={() => void update({ palette: id })}
+                    />
+                    <Swatch id={id} accent={settings.accentColor} />
+                    <span>{t(`settings.palettes.${id}`)}</span>
+                  </label>
+                ))}
+              </fieldset>
+              {settings.palette === 'custom' && (
+                <AccentEditor
+                  value={settings.accentColor}
+                  onSave={(accentColor) => update({ accentColor })}
+                />
+              )}
+              <label className={styles.field}>
+                <span>{t('settings.actionButton')}</span>
+                <select
+                  className={styles.select}
+                  value={settings.actionButton}
+                  onChange={(e) =>
+                    void update({ actionButton: e.target.value as ActionButtonPlace })
+                  }
+                >
+                  <option value="bottomRight">{t('settings.actionButtonBottomRight')}</option>
+                  <option value="bottomLeft">{t('settings.actionButtonBottomLeft')}</option>
+                  <option value="topRight">{t('settings.actionButtonTopRight')}</option>
+                </select>
+              </label>
+            </>,
+          )}
+          {panel(
+            'editor',
+            <>
+              <FontSelect
+                label={t('settings.fontLive')}
+                fonts={LIVE_FONTS}
+                installed={installed}
+                value={settings.fontLivePreview}
+                onChange={(fontLivePreview) => void update({ fontLivePreview })}
+              />
+              <FontSelect
+                label={t('settings.fontSource')}
+                fonts={SOURCE_FONTS}
+                installed={installed}
+                value={settings.fontSource}
+                onChange={(fontSource) => void update({ fontSource })}
+              />
+              <label className={styles.field}>
+                <span>{t('settings.fontSize')}</span>
+                <select
+                  className={styles.select}
+                  value={settings.fontSize}
+                  onChange={(e) => void update({ fontSize: Number(e.target.value) })}
+                >
+                  {SIZES.map((px) => (
+                    <option key={px} value={px}>
+                      {t('settings.fontSizePx', { px })}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className={styles.field}>
+                <span>{t('settings.pageWidth')}</span>
+                <select
+                  className={styles.select}
+                  value={settings.pageWidth}
+                  onChange={(e) => void update({ pageWidth: e.target.value as PageWidth })}
+                >
+                  <option value="readable">{t('settings.pageWidthReadable')}</option>
+                  <option value="wide">{t('settings.pageWidthWide')}</option>
+                  <option value="full">{t('settings.pageWidthFull')}</option>
+                </select>
+              </label>
+              <fieldset className={styles.fieldset} aria-describedby={ids.wideHint}>
+                <legend>{t('settings.wide.title')}</legend>
+                <p id={ids.wideHint} className={styles.hint}>
+                  {t('settings.wide.hint')}
+                </p>
+                {WIDE_KINDS.map((kind) => (
+                  <label key={kind} className={styles.check}>
+                    <input
+                      type="checkbox"
+                      checked={settings.wideElements[kind]}
+                      onChange={(e) =>
+                        void update({
+                          wideElements: { ...settings.wideElements, [kind]: e.target.checked },
+                        })
+                      }
+                    />
+                    {t(`settings.wide.${kind}`)}
+                  </label>
+                ))}
+              </fieldset>
+              <label className={styles.field}>
+                <span>{t('settings.coverHeight')}</span>
+                <select
+                  className={styles.select}
+                  value={settings.coverHeight}
+                  onChange={(e) => void update({ coverHeight: Number(e.target.value) })}
+                >
+                  {/* A default set by hand in settings.json stays visible. */}
+                  {!COVER_HEIGHTS.some((c) => c.px === settings.coverHeight) && (
+                    <option value={settings.coverHeight}>
+                      {t('settings.coverHeightPx', { px: settings.coverHeight })}
+                    </option>
+                  )}
+                  {COVER_HEIGHTS.map(({ px, key }) => (
+                    <option key={px} value={px}>
+                      {t(`settings.${key}`, { px })}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className={styles.check}>
+                <input
+                  type="checkbox"
+                  checked={settings.autoSave !== false}
+                  onChange={(e) => void update({ autoSave: e.target.checked })}
+                  aria-describedby={ids.autoSaveHint}
+                />
+                {t('settings.autoSave')}
+              </label>
+              <p id={ids.autoSaveHint} className={styles.hint}>
+                {t('settings.autoSaveHint', {
+                  save: /Mac/i.test(navigator.platform) ? '⌘S' : 'Ctrl+S',
+                })}
+              </p>
+              <label className={styles.check}>
+                <input
+                  type="checkbox"
+                  checked={settings.toolbar}
+                  onChange={(e) => void update({ toolbar: e.target.checked })}
+                />
+                {t('settings.toolbar')}
+              </label>
+              <label className={styles.check}>
+                <input
+                  type="checkbox"
+                  checked={settings.lineNumbers}
+                  onChange={(e) => void update({ lineNumbers: e.target.checked })}
+                />
+                {t('settings.lineNumbers')}
+              </label>
+              <label className={styles.check}>
+                <input
+                  type="checkbox"
+                  checked={settings.showAttachmentPaths === true}
+                  onChange={(e) => void update({ showAttachmentPaths: e.target.checked })}
+                />
+                {t('settings.links.showPaths')}
+              </label>
+            </>,
+          )}
+          {panel(
+            'files',
+            <>
+              <label className={styles.check}>
+                <input
+                  type="checkbox"
+                  checked={settings.rewriteLinks}
+                  onChange={(e) => void update({ rewriteLinks: e.target.checked })}
+                />
+                {t('settings.rewriteLinks')}
+              </label>
+              <label className={styles.check}>
+                <input
+                  type="checkbox"
+                  checked={settings.confirmDelete}
+                  onChange={(e) => void update({ confirmDelete: e.target.checked })}
+                />
+                {t('settings.confirmDelete')}
+              </label>
+              <ScratchpadLocation />
+            </>,
+          )}
+          {panel('shortcuts', <ShortcutList />)}
+          {vaultOpen && panel('vault', <VaultSettingsSection />)}
+        </div>
       </div>
     </Dialog>
   );
+}
+
+/** Settings → Keyboard shortcuts (M5b §18): read only, as the platform writes keys. */
+function ShortcutList() {
+  const { t } = useTranslation();
+  return (
+    <>
+      {SHORTCUT_GROUPS.map((group) => (
+        <div key={group.id} className={styles.shortcutGroup}>
+          <h5 className={styles.shortcutTitle}>{t(`settings.shortcuts.groups.${group.id}`)}</h5>
+          <dl className={styles.shortcuts}>
+            {group.items.map((item) => (
+              <div key={item.keys} className={styles.shortcut}>
+                <dt>{t(`settings.shortcuts.items.${item.label}`)}</dt>
+                <dd>
+                  <kbd>{keyLabel(item.keys, MAC)}</kbd>
+                </dd>
+              </div>
+            ))}
+          </dl>
+        </div>
+      ))}
+    </>
+  );
+}
+
+/** The left menu's icons, from the app's set. */
+function CategoryIcon({ category }: { category: Category }) {
+  switch (category) {
+    case 'general':
+      return <GearIcon />;
+    case 'appearance':
+      return <WidthIcon />;
+    case 'editor':
+      return <PencilIcon />;
+    case 'files':
+      return <NewPageIcon />;
+    case 'shortcuts':
+      return <FormatIcon />;
+    case 'vault':
+      return <FolderIcon />;
+  }
 }
 
 /** Installed font families (empty outside the app or on error). */

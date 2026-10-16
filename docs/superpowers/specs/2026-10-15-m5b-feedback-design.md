@@ -554,3 +554,39 @@ Settings categories are being mocked separately and aren't part of this round.
      - each row is a list item named after its item;
      - group headings are hidden from assistive tech, and each list is named after its group;
      - the selection bar is a region named "Selection", with its count in a polite live region.
+
+## 18. Settings with categories
+
+Jose, on the evening of 2026-10-15: the single long Settings page becomes a menu of categories, styled like the file explorer. He approved the mock: the "Settings with categories" artboard on the M5b mocks canvas.
+
+**Layout**
+- The dialog is 960 × 680 px. It shrinks with the window, down to 720 × 520 px.
+- **Left: a dark menu**, using the sidebar's tokens:
+  - a "Settings" heading and a search field;
+  - **App**: General, Appearance, Editor, Files and quick notes, Keyboard shortcuts;
+  - **the open vault's name** (with its icon): This vault;
+  - "Saved as you change" at the foot.
+- **Right:** the category's title and a one-line description, a close button, then that category's controls. Only this pane scrolls.
+
+**Rulings**
+1. **Every category stays mounted; the others are `hidden`.**
+   - Search reads every row, and This vault loads its settings once, as before.
+   - The dialog's Tab trap skips controls inside hidden parts. Before this change, Tab could leave the dialog: the shell test caught it.
+2. **Search filters rows by their visible text.** That is the label plus the choices, in the current language, ignoring case and accents.
+   - A hint stays with the row above it.
+   - The categories that match show under their own names; with none, the pane says "No settings match."
+   - Clearing the search returns to the chosen category, and so does picking a category.
+   - The filter is a DOM pass, marked `shortcut:` in the code. A row that appears later, such as a vault setting still loading, is checked on the next keystroke.
+3. **Keyboard in the menu:**
+   - ↑ and ↓ move through the categories and show each one as they go.
+   - A click, Enter or Space moves focus to the pane's heading.
+   - Arrows keep focus in the menu, so you can keep moving.
+4. **The last category is remembered for the session.** It is a module variable, not a setting. This vault falls back to General when no vault is open.
+5. **No entry points jump straight to This vault.** None exist today: Settings opens from the vault-name menu, ⌘, and the app menu.
+6. **Keyboard shortcuts is a static table** (`features/dialogs/shortcuts.ts`), written with the platform's names (⌘ ⇧ ⌥, or Ctrl, Shift, Alt).
+   - A unit test checks that every accelerator in `menu.rs` is listed.
+   - The page-only keys handled in `useGlobalShortcuts` and the editor keymap were listed by hand. One shared table for code, menu and list would mean rewriting the shortcut handlers, so that wasn't done.
+7. **This vault's own section heading is hidden** inside the pane, which already names it. Each category is a named `group`, not a region, so two "This vault" landmarks can't clash (axe `landmark-unique`).
+8. **The old "Close" button at the bottom becomes the pane's ✕ button,** with the same accessible name, "Close". Escape and a click outside still save and close (§ M4b part 3).
+9. **Theme is three preview cards,** still radios; the chosen card has an accent border. **Palettes are a 3-column grid.**
+10. **The unused `settings.sections.appearance/editor/files` keys are removed.** The vault section still uses `settings.sections.vault`.

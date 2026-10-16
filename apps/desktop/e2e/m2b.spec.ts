@@ -95,7 +95,7 @@ test('a table or callout in Live Preview has no blank lines above it', async ({ 
 
 test('a palette from Settings applies at once', async ({ page }) => {
   await open(page, 'A');
-  await openSettings(page);
+  await openSettings(page, 'Appearance');
   await page.getByRole('radio', { name: 'Graphite' }).click();
   await expect(page.locator('html')).toHaveAttribute('data-palette', 'graphite');
   await expect

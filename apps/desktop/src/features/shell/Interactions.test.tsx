@@ -356,8 +356,14 @@ describe('settings dialog', () => {
     await userEvent.click(screen.getByRole('menuitem', { name: 'Settings…' }));
     const dialog = screen.getByRole('dialog', { name: 'Settings' });
     expect(await axeRun(dialog)).toEqual([]);
+    // M5b §18: one category at a time, from the left menu.
+    const category = (name: RegExp) =>
+      userEvent.click(within(dialog).getByRole('button', { name }));
+    await category(/^Appearance$/);
     await userEvent.click(within(dialog).getByRole('radio', { name: 'Dark' }));
+    await category(/^General$/);
     await userEvent.selectOptions(within(dialog).getByRole('combobox', { name: 'Language' }), 'es');
+    await category(/^(Files and quick notes|Archivos y notas rápidas)$/);
     await userEvent.click(
       within(dialog).getByRole('checkbox', { name: /Actualizar enlaces|Update links/ }),
     );

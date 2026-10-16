@@ -292,9 +292,6 @@
     "rewriteLinks": "Actualizar enlaces al renombrar o mover",
     "confirmDelete": "Preguntar antes de mover a la papelera",
     "sections": {
-      "appearance": "Apariencia",
-      "editor": "Editor",
-      "files": "Archivos",
       "vault": "Esta bóveda"
     },
     "palette": "Paleta",
@@ -359,7 +356,73 @@
     "actionButton": "Botón de acciones",
     "actionButtonBottomRight": "Abajo a la derecha",
     "actionButtonBottomLeft": "Abajo a la izquierda",
-    "actionButtonTopRight": "Arriba a la derecha"
+    "actionButtonTopRight": "Arriba a la derecha",
+    "categoriesLabel": "Categorías de los ajustes",
+    "search": "Buscar en los ajustes",
+    "searchResults": "Resultados",
+    "noMatch": "Ningún ajuste coincide.",
+    "savedAsYouChange": "Se guarda al cambiar",
+    "groups": {
+      "app": "App"
+    },
+    "categories": {
+      "general": {
+        "title": "General",
+        "description": "El idioma de la app."
+      },
+      "appearance": {
+        "title": "Apariencia",
+        "description": "Tema, colores y dónde va el botón de acciones."
+      },
+      "editor": {
+        "title": "Editor",
+        "description": "Fuentes, ancho de página, portadas y guardado."
+      },
+      "files": {
+        "title": "Archivos y notas rápidas",
+        "description": "Renombrar, borrar y dónde viven las notas rápidas."
+      },
+      "shortcuts": {
+        "title": "Atajos de teclado",
+        "description": "Lo que hace el teclado en toda la app."
+      },
+      "vault": {
+        "title": "Esta bóveda",
+        "description": "Ajustes guardados con esta bóveda, en .nimw/vault.json."
+      }
+    },
+    "shortcuts": {
+      "groups": {
+        "navigation": "Navegación",
+        "editing": "Edición",
+        "vault": "Bóveda",
+        "view": "Vista"
+      },
+      "items": {
+        "back": "Atrás",
+        "forward": "Adelante",
+        "edit": "Editar",
+        "globalView": "Vista global",
+        "search": "Buscar",
+        "files": "Ir a los archivos",
+        "newPage": "Nueva página",
+        "quickNote": "Nueva nota rápida",
+        "save": "Guardar",
+        "link": "Insertar un enlace",
+        "bold": "Negrita",
+        "italic": "Cursiva",
+        "code": "Código en línea",
+        "strike": "Tachado",
+        "highlight": "Resaltar",
+        "openVault": "Abrir una bóveda",
+        "closeVault": "Cerrar la bóveda",
+        "openFile": "Abrir un archivo",
+        "sidebar": "Mostrar u ocultar la barra lateral",
+        "actions": "Mostrar las acciones",
+        "settings": "Ajustes",
+        "quit": "Salir"
+      }
+    }
   },
   "toolbar": {
     "label": "Formato",

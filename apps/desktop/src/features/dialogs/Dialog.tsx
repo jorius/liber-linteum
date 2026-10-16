@@ -13,8 +13,9 @@ const FOCUSABLE =
  *  Escape closes even when nothing inside has focus (WebKit doesn't focus a
  *  clicked checkbox or button), a click on the backdrop closes, and closing
  *  first blurs the focused field so a value typed but not confirmed is saved.
- *  `wide` (Search, M5 §4): 780 px; `hideTitle`: the title names the dialog
- *  for screen readers only. */
+ *  `wide` (Search, M5 §4): 780 px; `panes` (Settings, M5b §18): a menu and
+ *  a pane side by side; `hideTitle`: the title names the dialog for screen
+ *  readers only. */
 export function Dialog({
   title,
   onClose,
@@ -22,6 +23,7 @@ export function Dialog({
   returnFocus,
   dismissible = false,
   wide = false,
+  panes = false,
   hideTitle = false,
   alert = false,
   describedBy,
@@ -33,6 +35,7 @@ export function Dialog({
   returnFocus?: () => HTMLElement | null | undefined;
   dismissible?: boolean;
   wide?: boolean;
+  panes?: boolean;
   hideTitle?: boolean;
   /** A question that interrupts (M5b final review M4): `alertdialog`. */
   alert?: boolean;
@@ -103,7 +106,10 @@ export function Dialog({
       return;
     }
     if (e.key !== 'Tab' || !box.current) return;
-    const nodes = [...box.current.querySelectorAll<HTMLElement>(FOCUSABLE)];
+    // Controls in hidden parts (Settings' other categories, M5b §18) can't take focus.
+    const nodes = [...box.current.querySelectorAll<HTMLElement>(FOCUSABLE)].filter(
+      (n) => !n.closest('[hidden]'),
+    );
     if (nodes.length === 0) return;
     const first = nodes[0];
     const last = nodes[nodes.length - 1];
@@ -139,7 +145,7 @@ export function Dialog({
         aria-modal="true"
         aria-labelledby="dialog-title"
         aria-describedby={describedBy}
-        className={wide ? `${styles.dialog} ${styles.wide}` : styles.dialog}
+        className={`${styles.dialog} ${wide ? styles.wide : ''} ${panes ? styles.panes : ''}`}
         onKeyDown={onKeyDown}
       >
         <h2 id="dialog-title" className={hideTitle ? styles.srOnly : styles.title}>
