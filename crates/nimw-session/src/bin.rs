@@ -333,7 +333,10 @@ impl VaultSession {
         let mut done = Vec::new();
         let mut result = Ok(());
         for p in items {
-            if let Err(e) = self.trash_via(p, &|| {}, os_trash) {
+            // Already gone (removed outside the app): nothing to delete; its
+            // record goes too, and the rest carry on (round-2 review M13).
+            let gone = std::fs::symlink_metadata(p.to_fs_path(self.vault.root())).is_err();
+            if !gone && let Err(e) = self.trash_via(p, &|| {}, os_trash) {
                 result = Err(e);
                 break;
             }
@@ -712,6 +715,18 @@ mod tests {
         assert!(f.s.vault().page_widths().pages.is_empty());
         assert_eq!(f.s.trash_list().unwrap().len(), 1);
         f.s.trash_empty_via(&remove(&f.root)).unwrap();
+        assert!(f.s.trash_list().unwrap().is_empty());
+        assert!(f.s.vault().bin_records(Bin::Trash).is_empty());
+    }
+
+    #[test]
+    fn m5b_r2_review_m13_deleting_skips_an_item_already_gone() {
+        let f = fx(&[("a.md", "a"), ("b.md", "b")]);
+        let a = f.s.trash(&vp("a.md")).unwrap();
+        let b = f.s.trash(&vp("b.md")).unwrap();
+        std::fs::remove_file(f.root.join(a.as_str())).unwrap(); // gone outside the app
+        f.s.trash_delete_via(&[a, b], &remove(&f.root)).unwrap();
+        assert!(!exists(&f.root, ".trash/b.md"));
         assert!(f.s.trash_list().unwrap().is_empty());
         assert!(f.s.vault().bin_records(Bin::Trash).is_empty());
     }
