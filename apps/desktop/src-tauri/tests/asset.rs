@@ -373,7 +373,11 @@ fn m5b_r2_review_i1_a_trashed_name_with_a_colon_is_refused() {
     std::fs::write(trash.join("D:photo.png"), b"png!").unwrap();
     let (app, _c, _k) = open(vault.path());
     let state = app.state::<AppState>();
-    for refused in ["/.trash/D%3Aphoto.png", "/.trash/D:photo.png", "/.trash/C%3A%5Cx.png"] {
+    for refused in [
+        "/.trash/D%3Aphoto.png",
+        "/.trash/D:photo.png",
+        "/.trash/C%3A%5Cx.png",
+    ] {
         assert_eq!(serve(&state, refused, None).status, 403, "{refused}");
     }
 }
