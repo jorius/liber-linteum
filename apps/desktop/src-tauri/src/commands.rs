@@ -36,10 +36,16 @@ const TITLE_MAX_CHARS: usize = 200;
 
 /// A page-supplied title, cleaned: no control characters, at most 200
 /// characters.
+/// Bidi controls and zero-width characters (M5b final review M11): a synced
+/// file name holding them could reorder or hide part of the window title.
+fn is_invisible_format(c: char) -> bool {
+    matches!(c, '\u{200B}'..='\u{200F}' | '\u{202A}'..='\u{202E}' | '\u{2060}'..='\u{2069}' | '\u{FEFF}' | '\u{061C}')
+}
+
 pub fn clean_title(title: &str) -> String {
     title
         .chars()
-        .filter(|c| !c.is_control())
+        .filter(|c| !c.is_control() && !is_invisible_format(*c))
         .take(TITLE_MAX_CHARS)
         .collect()
 }
@@ -67,6 +73,13 @@ mod tests {
         let t = super::clean_title(&long);
         assert!(t.starts_with("abé"), "{t}");
         assert_eq!(t.chars().count(), 200);
+    }
+
+    #[test]
+    fn m5b_final_m11_titles_lose_bidi_and_zero_width_characters() {
+        // A synced file name can't reorder the title in the Dock or taskbar.
+        let spoof = "inv\u{202E}fdp.exe\u{2066}x\u{2069}\u{200B}y\u{FEFF}z\u{200D}";
+        assert_eq!(super::clean_title(spoof), "invfdp.exexyz");
     }
 
     #[test]
