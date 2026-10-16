@@ -20,6 +20,7 @@ pub mod scratchpad_commands;
 pub mod search_commands;
 pub mod settings;
 pub mod settings_commands;
+pub mod sort_commands;
 pub mod state;
 pub mod vault_commands;
 
@@ -179,6 +180,8 @@ pub fn configure<R: tauri::Runtime>(
         file_commands::file_open_dialog,
         search_commands::search,
         icon_commands::folder_icon_set,
+        sort_commands::folder_sort_get,
+        sort_commands::folder_sort_set,
         icon_commands::vault_icon_set,
     ])
 }

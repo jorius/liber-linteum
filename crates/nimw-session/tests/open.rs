@@ -282,3 +282,49 @@ fn review_focus_names_differing_only_by_case_on_case_sensitive_fs() {
         "deterministic: path order"
     );
 }
+
+#[test]
+fn m5b_r2_folders_list_their_entries_in_their_own_order() {
+    use nimw_vault::FolderSort;
+    use std::time::{Duration, SystemTime};
+    let vault = tempfile::tempdir().unwrap();
+    let cache = tempfile::tempdir().unwrap();
+    let root = vault.path();
+    std::fs::create_dir_all(root.join("Z")).unwrap();
+    std::fs::create_dir_all(root.join("A")).unwrap();
+    let base = SystemTime::now() - Duration::from_secs(3600);
+    for (name, age) in [("a.md", 30), ("b.md", 10), ("c.md", 20)] {
+        let path = root.join(name);
+        std::fs::write(&path, "x\n").unwrap();
+        let f = std::fs::File::options().write(true).open(&path).unwrap();
+        f.set_modified(base + Duration::from_secs(100 - age))
+            .unwrap();
+    }
+    let (s, _, _) = open(root, cache.path());
+    let order = |s: &VaultSession| -> Vec<String> {
+        s.tree()
+            .unwrap()
+            .into_iter()
+            .filter(|n| !n.path.contains('/'))
+            .map(|n| n.path)
+            .collect()
+    };
+    // The default, unchanged: folders first, then by name.
+    assert_eq!(order(&s), ["A", "Z", "a.md", "b.md", "c.md"]);
+    s.vault().set_folder_sort("", FolderSort::NameDesc).unwrap();
+    assert_eq!(order(&s), ["Z", "A", "c.md", "b.md", "a.md"]);
+    s.vault()
+        .set_folder_sort("", FolderSort::ModifiedDesc)
+        .unwrap();
+    assert_eq!(order(&s), ["A", "Z", "b.md", "c.md", "a.md"]);
+    s.vault()
+        .set_folder_sort("", FolderSort::ModifiedAsc)
+        .unwrap();
+    assert_eq!(order(&s), ["A", "Z", "a.md", "c.md", "b.md"]);
+    // Created: every file here was created in the same instant or so; the
+    // order still holds folders first and is total (ties by name).
+    s.vault()
+        .set_folder_sort("", FolderSort::CreatedDesc)
+        .unwrap();
+    assert_eq!(&order(&s)[..2], ["A", "Z"]);
+}

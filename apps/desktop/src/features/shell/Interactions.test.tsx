@@ -75,6 +75,7 @@ describe('context menu', () => {
       'Rename',
       'Move to…',
       'Icon…',
+      'Sort by',
       'Archive',
       'Delete',
     ]);
@@ -86,6 +87,69 @@ describe('context menu', () => {
     await userEvent.keyboard('{Escape}');
     expect(screen.queryByRole('menu')).not.toBeInTheDocument();
     expect(await axeRun(document.body)).toEqual([]);
+  });
+
+  it('Sort by: → opens the orders with the current one checked; a choice saves it and reloads the tree (M5b round 2)', async () => {
+    const calls = backend({
+      folder_sort_get: () => 'modified-desc',
+      folder_sort_set: () => null,
+      vault_tree: () => nodes,
+    });
+    seed();
+    render(<AppShell />);
+    screen.getByRole('treeitem', { name: 'Art' }).focus();
+    await userEvent.keyboard('{Shift>}{F10}{/Shift}');
+    const sortBy = screen.getByRole('menuitem', { name: 'Sort by' });
+    expect(sortBy).toHaveAttribute('aria-haspopup', 'menu');
+    sortBy.focus();
+    await userEvent.keyboard('{ArrowRight}');
+    const orders = await screen.findByRole('menu', { name: 'Sort Art by' });
+    const radios = within(orders).getAllByRole('menuitemradio');
+    expect(radios.map((r) => r.textContent)).toEqual([
+      'Name, A → Z',
+      'Name, Z → A',
+      'Modified, newest first',
+      'Modified, oldest first',
+      'Created, newest first',
+    ]);
+    await waitFor(() => expect(radios[2]).toHaveAttribute('aria-checked', 'true'));
+    expect(radios[0]).toHaveAttribute('aria-checked', 'false');
+    // ← goes back to the actions.
+    await userEvent.keyboard('{ArrowLeft}');
+    expect(screen.getByRole('menuitem', { name: 'Sort by' })).toHaveFocus();
+    await userEvent.keyboard('{Enter}');
+    await userEvent.click(await screen.findByRole('menuitemradio', { name: 'Name, Z → A' }));
+    await waitFor(() =>
+      expect(calls.filter(([c]) => c === 'folder_sort_set')).toEqual([
+        ['folder_sort_set', { path: 'Art', sort: 'name-desc' }],
+      ]),
+    );
+    await waitFor(() => expect(calls.filter(([c]) => c === 'vault_tree').length).toBe(1));
+    expect(screen.queryByRole('menu')).not.toBeInTheDocument();
+  });
+
+  it("a page's Sort by orders its folder; the files header sorts the vault root (M5b round 2)", async () => {
+    const calls = backend({
+      folder_sort_get: () => 'name-asc',
+      folder_sort_set: () => null,
+      vault_tree: () => nodes,
+    });
+    seed();
+    render(<AppShell />);
+    fireEvent.contextMenu(screen.getByRole('treeitem', { name: 'Welcome' }));
+    await userEvent.click(screen.getByRole('menuitem', { name: 'Sort by' }));
+    await userEvent.click(
+      await screen.findByRole('menuitemradio', { name: 'Modified, newest first' }),
+    );
+    await userEvent.click(screen.getByRole('button', { name: 'Sort the vault' }));
+    expect(await screen.findByRole('menu', { name: 'Sort Vault by' })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('menuitemradio', { name: 'Created, newest first' }));
+    await waitFor(() =>
+      expect(calls.filter(([c]) => c === 'folder_sort_set').map(([, a]) => a)).toEqual([
+        { path: '', sort: 'modified-desc' },
+        { path: '', sort: 'created-desc' },
+      ]),
+    );
   });
 
   it('Archive moves the item into the Archive and offers Undo (M5b §5.3)', async () => {

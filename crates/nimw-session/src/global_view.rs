@@ -525,6 +525,8 @@ impl VaultSession {
         let strips = self.vault.remap_cover_widths_many(renames);
         // Folder icons too (M5b §4).
         let icons = self.vault.remap_folder_icons_many(renames);
+        // And folder orders (M5b round 2).
+        let sorts = self.vault.remap_folder_sorts_many(renames);
         // Quick notes (M4c §7): a rename that isn't the auto-name's own ends
         // naming from the first line, and the scratch folder follows a
         // top-level rename.
@@ -540,6 +542,7 @@ impl VaultSession {
             .and(sides)
             .and(strips)
             .and(icons)
+            .and(sorts)
             .and(quick)
             .and(scratch)
         {

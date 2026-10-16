@@ -6,6 +6,7 @@ import { useVaultStore } from '../../stores/vaultStore';
 import { EmojiPicker } from '../icons/EmojiPicker';
 import { setIcon } from '../icons/setIcon';
 import { archiveItem } from '../bin/binActions';
+import { SortMenu } from './SortMenu';
 import { requestTrash } from './trashAction';
 import { displayName } from './TreeRow';
 
@@ -21,21 +22,23 @@ export function ContextMenu({ menu, onClose }: { menu: MenuState; onClose: () =>
   const [active, setActive] = useState(0);
   // Icon… swaps the menu for the emoji picker at the same place (M5b §4).
   const [picking, setPicking] = useState(false);
+  // Sort by ▸ swaps the menu for the folder's orders (M5b round 2).
+  const [sorting, setSorting] = useState(false);
   const items = useRef<(HTMLButtonElement | null)[]>([]);
   const box = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     items.current[active]?.focus();
-  }, [active]);
+  }, [active, sorting]);
 
   useEffect(() => {
-    if (picking) return;
+    if (picking || sorting) return;
     const onDown = (e: MouseEvent) => {
       if (box.current && !box.current.contains(e.target as Node)) onClose();
     };
     document.addEventListener('mousedown', onDown);
     return () => document.removeEventListener('mousedown', onDown);
-  }, [onClose, picking]);
+  }, [onClose, picking, sorting]);
 
   // Its item vanished (deleted or renamed outside the app): close instead of
   // lingering invisibly with global shortcuts disabled (final review, upgraded M3).
@@ -54,9 +57,27 @@ export function ContextMenu({ menu, onClose }: { menu: MenuState; onClose: () =>
     ...(node.kind === 'attachment'
       ? []
       : [[t('menu.icon'), () => setPicking(true)] as [string, () => void]]),
+    [t('menu.sortBy'), () => setSorting(true)],
     [t('menu.archive'), () => void archiveItem(node.path)],
     [t('menu.delete'), () => requestTrash(node.path)],
   ];
+
+  const sortIndex = actions.findIndex(([label]) => label === t('menu.sortBy'));
+  if (sorting) {
+    const folder = dir ? useVaultStore.getState().nodes.find((n) => n.path === dir) : undefined;
+    return (
+      <SortMenu
+        path={dir}
+        name={folder ? displayName(folder) : (useVaultStore.getState().info?.name ?? '')}
+        anchor={menu.anchor}
+        onClose={onClose}
+        onBack={() => {
+          setActive(sortIndex);
+          setSorting(false);
+        }}
+      />
+    );
+  }
 
   if (picking) {
     const kind = node.kind === 'folder' ? 'folder' : 'page';
@@ -79,7 +100,10 @@ export function ContextMenu({ menu, onClose }: { menu: MenuState; onClose: () =>
     else if (e.key === 'ArrowUp') setActive((a) => (a - 1 + actions.length) % actions.length);
     else if (e.key === 'Home') setActive(0);
     else if (e.key === 'End') setActive(actions.length - 1);
-    else if (e.key === 'Escape' || e.key === 'Tab') onClose();
+    else if (e.key === 'ArrowRight' && document.activeElement === items.current[sortIndex]) {
+      setActive(sortIndex);
+      setSorting(true);
+    } else if (e.key === 'Escape' || e.key === 'Tab') onClose();
     else return;
     e.preventDefault();
     e.stopPropagation();
@@ -103,8 +127,9 @@ export function ContextMenu({ menu, onClose }: { menu: MenuState; onClose: () =>
           type="button"
           role="menuitem"
           tabIndex={i === active ? 0 : -1}
+          aria-haspopup={i === sortIndex ? 'menu' : undefined}
           onClick={() => {
-            if (label !== t('menu.icon')) onClose();
+            if (label !== t('menu.icon') && i !== sortIndex) onClose();
             run();
           }}
         >

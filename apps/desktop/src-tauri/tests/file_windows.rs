@@ -105,6 +105,8 @@ const VAULT_COMMANDS: &[&str] = &[
     "external_network_allow",
     "file_pick",
     "folder_icon_set",
+    "folder_sort_get",
+    "folder_sort_set",
     "vault_icon_set",
 ];
 

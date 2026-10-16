@@ -71,6 +71,8 @@ const COMMANDS: &[&str] = &[
     "file_open_dialog",
     "search",
     "folder_icon_set",
+    "folder_sort_get",
+    "folder_sort_set",
     "vault_icon_set",
     "bin_list",
     "trash_restore",

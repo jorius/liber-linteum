@@ -234,7 +234,8 @@
     "move": "Mover a…",
     "delete": "Eliminar",
     "icon": "Icono…",
-    "archive": "Archivar"
+    "archive": "Archivar",
+    "sortBy": "Ordenar por"
   },
   "dialogs": {
     "cancel": "Cancelar",
@@ -714,5 +715,14 @@
     "archivedToast": "Archivado",
     "undo": "Deshacer",
     "undoGone": "Ese elemento ya no está en la Papelera."
+  },
+  "sort": {
+    "label": "Ordenar {name} por",
+    "vault": "Ordenar la bóveda",
+    "name-asc": "Nombre, A → Z",
+    "name-desc": "Nombre, Z → A",
+    "modified-desc": "Modificado, más reciente primero",
+    "modified-asc": "Modificado, más antiguo primero",
+    "created-desc": "Creado, más reciente primero"
   }
 }

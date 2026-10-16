@@ -1,9 +1,11 @@
+import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { NewFolderIcon, NewPageIcon, SidebarIcon } from '../../app/icons';
+import { NewFolderIcon, NewPageIcon, SidebarIcon, SortIcon } from '../../app/icons';
 import { dirFor } from '../../stores/tree';
 import { useVaultStore } from '../../stores/vaultStore';
 import { SidebarFoot } from '../bin/SidebarFoot';
 import { ExplorerDnd } from '../explorer/ExplorerDnd';
+import { SortMenu } from '../explorer/SortMenu';
 import type { ExplorerTreeProps } from '../explorer/ExplorerTree';
 import { IconButton } from '../icons/ItemIcon';
 import { toggleSidebar } from './shellMenu';
@@ -16,6 +18,8 @@ export function Sidebar(treeProps: ExplorerTreeProps) {
   const { t } = useTranslation();
   const name = useVaultStore((s) => s.info?.name ?? '');
   const icon = useVaultStore((s) => s.info?.icon);
+  // The vault root's order (M5b round 2), opened under its button.
+  const [sortAt, setSortAt] = useState<{ x: number; y: number } | null>(null);
   const create = (kind: 'page' | 'folder') => {
     const { nodes, selected, createPage, createFolder } = useVaultStore.getState();
     const dir = dirFor(nodes, selected);
@@ -66,6 +70,23 @@ export function Sidebar(treeProps: ExplorerTreeProps) {
           >
             <NewFolderIcon />
           </button>
+          <button
+            type="button"
+            className={styles.iconButton}
+            aria-label={t('sort.vault')}
+            aria-haspopup="menu"
+            aria-expanded={sortAt !== null}
+            title={t('sort.vault')}
+            onClick={(e) => {
+              const r = e.currentTarget.getBoundingClientRect();
+              setSortAt(sortAt ? null : { x: r.left, y: r.bottom + 4 });
+            }}
+          >
+            <SortIcon />
+          </button>
+          {sortAt && (
+            <SortMenu path="" name={name} anchor={sortAt} onClose={() => setSortAt(null)} />
+          )}
         </span>
       </div>
       <nav className={styles.treeScroll}>

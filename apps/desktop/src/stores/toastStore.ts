@@ -37,7 +37,10 @@ interface ToastState {
 
 let nextId = 1;
 /** Running timers: the time left, and when it last started counting. */
-const timers = new Map<number, { timer?: ReturnType<typeof setTimeout>; left: number; at: number }>();
+const timers = new Map<
+  number,
+  { timer?: ReturnType<typeof setTimeout>; left: number; at: number }
+>();
 
 function stop(id: number) {
   clearTimeout(timers.get(id)?.timer);

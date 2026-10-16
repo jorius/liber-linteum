@@ -230,7 +230,7 @@ impl Index {
     /// accent-insensitive key).
     pub fn tree(&self) -> Result<Vec<TreeNode>> {
         let mut stmt = self.conn.prepare(
-            "SELECT f.path, f.parent, f.name, f.kind, p.title, p.icon FROM files f LEFT JOIN pages p ON p.path = f.path",
+            "SELECT f.path, f.parent, f.name, f.kind, p.title, p.icon, f.mtime_ns FROM files f LEFT JOIN pages p ON p.path = f.path",
         )?;
         let mut nodes = stmt
             .query_map([], |r| {
@@ -241,6 +241,7 @@ impl Index {
                     kind: FileKind::parse(&r.get::<_, String>(3)?),
                     title: r.get(4)?,
                     icon: r.get(5)?,
+                    mtime_ns: r.get(6)?,
                 })
             })?
             .collect::<rusqlite::Result<Vec<_>>>()?;

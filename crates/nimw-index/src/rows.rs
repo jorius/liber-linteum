@@ -96,6 +96,8 @@ pub struct TreeNode {
     pub kind: FileKind,
     pub title: Option<String>,
     pub icon: Option<String>,
+    /// Last modified, for folders sorted by date (M5b round 2).
+    pub mtime_ns: i64,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

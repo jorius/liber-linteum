@@ -234,7 +234,8 @@
     "move": "Move to…",
     "delete": "Delete",
     "icon": "Icon…",
-    "archive": "Archive"
+    "archive": "Archive",
+    "sortBy": "Sort by"
   },
   "dialogs": {
     "cancel": "Cancel",
@@ -714,5 +715,14 @@
     "archivedToast": "Archived",
     "undo": "Undo",
     "undoGone": "That item is no longer in the Trash."
+  },
+  "sort": {
+    "label": "Sort {name} by",
+    "vault": "Sort the vault",
+    "name-asc": "Name, A → Z",
+    "name-desc": "Name, Z → A",
+    "modified-desc": "Modified, newest first",
+    "modified-asc": "Modified, oldest first",
+    "created-desc": "Created, newest first"
   }
 }

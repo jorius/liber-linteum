@@ -171,6 +171,15 @@ export function NewFolderIcon() {
   );
 }
 
+/** Sort (M5b round 2): lines shortening downward, with an arrow. */
+export function SortIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true" {...stroke}>
+      <path d="M4 6h10M4 12h7M4 18h4M17 5v14M14 16l3 3 3-3" />
+    </svg>
+  );
+}
+
 export function NewPageIcon() {
   return (
     <svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true" {...stroke}>

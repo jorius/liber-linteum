@@ -693,6 +693,13 @@ export const coverWidthSet = (path: string, width: number | null) =>
 /** A folder's emoji (M5b §4); `null` removes it. Page icons are frontmatter. */
 export const folderIconSet = (path: string, icon: string | null) =>
   call<null>('folder_icon_set', { path, icon });
+/** How a folder lists its entries (M5b round 2); folders always come first. */
+export type FolderSort =
+  'name-asc' | 'name-desc' | 'modified-desc' | 'modified-asc' | 'created-desc';
+/** A folder's order (`""`: the vault root). */
+export const folderSortGet = (path: string) => call<FolderSort>('folder_sort_get', { path });
+export const folderSortSet = (path: string, sort: FolderSort) =>
+  call<null>('folder_sort_set', { path, sort });
 /** The vault's own emoji (M5b §4); `null` removes it. */
 export const vaultIconSet = (icon: string | null) => call<null>('vault_icon_set', { icon });
 

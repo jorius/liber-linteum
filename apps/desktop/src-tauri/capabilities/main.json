@@ -63,6 +63,8 @@
     "allow-file-open-dialog",
     "allow-search",
     "allow-folder-icon-set",
+    "allow-folder-sort-get",
+    "allow-folder-sort-set",
     "allow-vault-icon-set",
     "allow-bin-list",
     "allow-trash-restore",

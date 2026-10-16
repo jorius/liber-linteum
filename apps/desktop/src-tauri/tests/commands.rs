@@ -72,6 +72,9 @@ const COMMANDS: &[&str] = &[
     "trash_empty",
     "entry_archive",
     "archive_restore",
+    // M5b round 2: folder orders.
+    "folder_sort_get",
+    "folder_sort_set",
 ];
 
 struct Harness {
@@ -2134,6 +2137,66 @@ fn m5b_icons_over_ipc() {
             .iter()
             .all(|n| n["path"] != "Game Design" || n.get("icon").is_none())
     );
+}
+
+/// M5b round 2: a folder (or the root, `""`) lists its entries in its own
+/// order; the default isn't stored; files and unknown orders are refused.
+#[test]
+fn m5b_r2_folder_sorts_over_ipc() {
+    let h = harness();
+    let vault = copy_fixture("obsidian-basic");
+    call(&h.main, "vault_open", json!({ "path": vault.path() })).unwrap();
+    let get = |path: &str| call(&h.main, "folder_sort_get", json!({ "path": path })).unwrap();
+    assert_eq!(get(""), "name-asc");
+    call(
+        &h.main,
+        "folder_sort_set",
+        json!({ "path": "", "sort": "name-desc" }),
+    )
+    .unwrap();
+    call(
+        &h.main,
+        "folder_sort_set",
+        json!({ "path": "Game Design", "sort": "modified-desc" }),
+    )
+    .unwrap();
+    assert_eq!(get(""), "name-desc");
+    assert_eq!(get("Game Design"), "modified-desc");
+    let tree = call(&h.main, "vault_tree", json!({})).unwrap();
+    let roots: Vec<&str> = tree
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|n| n["path"].as_str().unwrap())
+        .filter(|p| !p.contains('/'))
+        .collect();
+    let mut names = roots.clone();
+    names.sort_by_key(|p| std::cmp::Reverse(p.to_lowercase()));
+    names.sort_by_key(|p| !vault.path().join(p).is_dir());
+    assert_eq!(roots, names);
+    for (path, sort) in [
+        ("Welcome.md", "name-asc"),
+        ("Missing", "name-asc"),
+        (".obsidian", "name-asc"),
+        ("", "size"),
+    ] {
+        assert!(
+            call(
+                &h.main,
+                "folder_sort_set",
+                json!({ "path": path, "sort": sort })
+            )
+            .is_err(),
+            "{path} {sort}"
+        );
+    }
+    call(
+        &h.main,
+        "folder_sort_set",
+        json!({ "path": "", "sort": "name-asc" }),
+    )
+    .unwrap();
+    assert_eq!(get(""), "name-asc");
 }
 
 /// M5b §5: delete moves into the vault's Trash and comes back; archive moves

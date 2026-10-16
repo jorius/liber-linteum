@@ -291,7 +291,50 @@ impl VaultSession {
     pub fn tree(&self) -> Result<Vec<nimw_index::TreeNode>> {
         let mut nodes = self.index().tree()?;
         nodes.retain(|n| !nimw_vault::is_archived(&n.path));
+        self.order_folders(&mut nodes);
         Ok(nodes)
+    }
+
+    /// Lists each folder's entries in its own order (M5b round 2). The index
+    /// gives them by parent, folders first, then by name; folders with an
+    /// order of their own are re-sorted in place, folders still first.
+    fn order_folders(&self, nodes: &mut [nimw_index::TreeNode]) {
+        use nimw_vault::FolderSort::*;
+        let sorts = self.vault.folder_sorts();
+        if sorts.is_empty() {
+            return;
+        }
+        let created = |path: &str| {
+            let full = VaultPath::new(path)
+                .ok()
+                .and_then(|p| self.vault.fs_path(&p).ok());
+            full.and_then(|f| std::fs::metadata(f).ok()?.created().ok())
+        };
+        for run in nodes.chunk_by_mut(|a, b| a.parent == b.parent) {
+            let Some(&sort) = sorts.get(&run[0].parent) else {
+                continue;
+            };
+            let born: HashMap<String, _> = if sort == CreatedDesc {
+                run.iter()
+                    .map(|n| (n.path.clone(), created(&n.path)))
+                    .collect()
+            } else {
+                HashMap::new()
+            };
+            run.sort_by(|a, b| {
+                let folders = (a.kind != FileKind::Folder).cmp(&(b.kind != FileKind::Folder));
+                let name = nimw_markdown::name_key(&a.name).cmp(&nimw_markdown::name_key(&b.name));
+                let order = match (sort, a.kind == FileKind::Folder) {
+                    (NameDesc, _) => name.reverse(),
+                    // Folders keep their names' order under a date order.
+                    (_, true) | (NameAsc, _) => name,
+                    (ModifiedDesc, _) => b.mtime_ns.cmp(&a.mtime_ns).then(name),
+                    (ModifiedAsc, _) => a.mtime_ns.cmp(&b.mtime_ns).then(name),
+                    (CreatedDesc, _) => born[&b.path].cmp(&born[&a.path]).then(name),
+                };
+                folders.then(order)
+            });
+        }
     }
 
     pub fn page(&self, path: &VaultPath) -> Result<Option<nimw_index::PageRow>> {
@@ -396,6 +439,7 @@ impl VaultSession {
         let strips = self.vault.forget_cover_widths(removed);
         // And folder icons (M5b §4).
         let icons = self.vault.forget_folder_icons(removed);
+        let sorts = self.vault.forget_folder_sorts(removed);
         // Deleted quick notes stop being named after their first line (M4c).
         let quick = self.vault.forget_auto_named(removed);
         // And Global View positions and index-note picks (M5b final review M6).
@@ -406,6 +450,7 @@ impl VaultSession {
             .and(sides)
             .and(strips)
             .and(icons)
+            .and(sorts)
             .and(quick)
         {
             self.emit(SessionEvent::Warning(format!(
