@@ -100,7 +100,15 @@ fn link_text(path: &str, stems: &HashMap<String, usize>) -> String {
 }
 
 /// Reads the export and decides every file the vault gets. Nothing is written.
-pub fn plan(export: &Export) -> Result<Plan, ImportError> {
+/// `cancel` is checked between files: a long export stops when asked.
+pub fn plan(export: &Export, cancel: &AtomicBool) -> Result<Plan, ImportError> {
+    let stop = || {
+        if cancel.load(Ordering::Relaxed) {
+            Err(ImportError::Cancelled)
+        } else {
+            Ok(())
+        }
+    };
     let entries = export.entries();
     let mut warnings: Vec<String> = export.warnings().to_vec();
     let mut order: Vec<usize> = (0..entries.len()).collect();
@@ -159,6 +167,7 @@ pub fn plan(export: &Export) -> Result<Plan, ImportError> {
     let mut dbs: Vec<Db> = Vec::new();
     let mut row_of: HashMap<usize, (usize, usize)> = HashMap::new();
     for db in &databases {
+        stop()?;
         let csv = &entries[db.csv];
         let table = match export.read_text(csv).map(|(text, _)| Table::parse(&text)) {
             Ok(Some(t)) => t,
@@ -284,6 +293,7 @@ pub fn plan(export: &Export) -> Result<Plan, ImportError> {
     let mut counts = Preview::default();
     let mut files = Vec::new();
     for &i in &order {
+        stop()?;
         let e = &entries[i];
         counts.bytes += e.size;
         match ext(e).as_str() {
@@ -590,7 +600,7 @@ mod tests {
         cancel_after: Option<usize>,
     ) -> (tempfile::TempDir, Result<Report, ImportError>, Plan) {
         let export = Export::open(zip, &Limits::default()).unwrap();
-        let plan = plan(&export).unwrap();
+        let plan = plan(&export, &AtomicBool::new(false)).unwrap();
         let dir = tempfile::tempdir().unwrap();
         let cancel = AtomicBool::new(false);
         let mut progress = |done: usize, _total: usize| {
@@ -617,7 +627,7 @@ mod tests {
     fn m7_previews_without_writing() {
         let zip = sample();
         let export = Export::open(zip.path(), &Limits::default()).unwrap();
-        let preview = plan(&export).unwrap().counts;
+        let preview = plan(&export, &AtomicBool::new(false)).unwrap().counts;
         assert_eq!(
             (
                 preview.pages,
@@ -685,7 +695,7 @@ mod tests {
     fn m7_never_writes_into_an_existing_folder() {
         let zip = sample();
         let export = Export::open(zip.path(), &Limits::default()).unwrap();
-        let plan = plan(&export).unwrap();
+        let plan = plan(&export, &AtomicBool::new(false)).unwrap();
         let dir = tempfile::tempdir().unwrap();
         let err = write(
             &export,
@@ -707,6 +717,14 @@ mod tests {
         assert_eq!(report.written, 3, "two files and the report");
         assert!(plan.total() > 3);
         assert!(read(&dir, REPORT).contains("**Cancelled.** 2 of"));
+    }
+
+    #[test]
+    fn b6_review_i2_planning_stops_when_cancelled() {
+        let zip = sample();
+        let export = Export::open(zip.path(), &Limits::default()).unwrap();
+        let err = plan(&export, &AtomicBool::new(true)).err().expect("cancelled");
+        assert!(matches!(err, ImportError::Cancelled), "{err}");
     }
 
     #[test]
@@ -761,7 +779,7 @@ mod tests {
         let zip = zip_file(&refs);
         let started = std::time::Instant::now();
         let export = Export::open(zip.path(), &Limits::default()).unwrap();
-        let plan = plan(&export).unwrap();
+        let plan = plan(&export, &AtomicBool::new(false)).unwrap();
         let preview = started.elapsed();
         let dir = tempfile::tempdir().unwrap();
         write(

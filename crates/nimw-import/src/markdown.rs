@@ -107,21 +107,33 @@ fn rewrite_link(
     })
 }
 
-/// The index of the `close` matching the `open` at `start`, or `None`.
-fn matching(chars: &[char], start: usize, open: char, close: char) -> Option<usize> {
-    let mut depth = 0usize;
-    for (i, &c) in chars.iter().enumerate().skip(start) {
-        if c == '\\' {
-            continue;
-        }
+/// For every `open`, the index of its matching `close` (the first point the
+/// nesting depth from it returns to zero), in one pass: scanning ahead from
+/// each `[` was quadratic on a line of unclosed brackets.
+fn pairs(chars: &[char], open: char, close: char) -> Vec<Option<usize>> {
+    let mut out = vec![None; chars.len()];
+    let mut stack = Vec::new();
+    for (i, &c) in chars.iter().enumerate() {
         if c == open {
-            depth += 1;
-        } else if c == close {
-            depth -= 1;
-            if depth == 0 {
-                return Some(i);
-            }
+            stack.push(i);
+        } else if c == close
+            && let Some(o) = stack.pop()
+        {
+            out[o] = Some(i);
         }
+    }
+    out
+}
+
+/// The end of the code span whose backtick run of length `run` starts at
+/// `start`: the index just past the next run of `run` backticks.
+fn code_span_end(chars: &[char], start: usize, run: usize) -> Option<usize> {
+    let mut j = start + run;
+    while j + run <= chars.len() {
+        if chars[j..j + run].iter().all(|&c| c == '`') {
+            return Some(j + run);
+        }
+        j += 1;
     }
     None
 }
@@ -129,6 +141,8 @@ fn matching(chars: &[char], start: usize, open: char, close: char) -> Option<usi
 /// Rewrites the links of one line outside code spans.
 fn rewrite_line(line: &str, dir: &[String], r: &dyn Resolver, missing: &mut Vec<String>) -> String {
     let chars: Vec<char> = line.chars().collect();
+    let square = pairs(&chars, '[', ']');
+    let round = pairs(&chars, '(', ')');
     let mut out = String::with_capacity(line.len());
     let mut i = 0;
     while i < chars.len() {
@@ -136,28 +150,18 @@ fn rewrite_line(line: &str, dir: &[String], r: &dyn Resolver, missing: &mut Vec<
         if c == '`' {
             // A code span: copied as is up to its closing run of backticks.
             let run = chars[i..].iter().take_while(|&&b| b == '`').count();
-            let rest: String = chars[i + run..].iter().collect();
-            let fence = "`".repeat(run);
-            match rest.find(&fence) {
-                Some(end) => {
-                    let len = rest[..end].chars().count() + run;
-                    out.extend(&chars[i..i + run + len]);
-                    i += run + len;
-                }
-                None => {
-                    out.extend(&chars[i..]);
-                    i = chars.len();
-                }
-            }
+            let end = code_span_end(&chars, i, run).unwrap_or(chars.len());
+            out.extend(&chars[i..end]);
+            i = end;
             continue;
         }
         let bang = c == '!' && chars.get(i + 1) == Some(&'[');
         let open = if bang { i + 1 } else { i };
         if chars.get(open) == Some(&'[')
             && (bang || c == '[')
-            && let Some(close) = matching(&chars, open, '[', ']')
+            && let Some(close) = square[open]
             && chars.get(close + 1) == Some(&'(')
-            && let Some(end) = matching(&chars, close + 1, '(', ')')
+            && let Some(end) = round[close + 1]
         {
             let text: String = chars[open + 1..close].iter().collect();
             let href: String = chars[close + 2..end].iter().collect();
@@ -393,6 +397,25 @@ pub(crate) mod tests {
             out,
             "> [!note]\n> 💡 Remember\n>\n> this\n\n> [!note]- More\n>\n> Hidden\n> > [!note]\n> > In\nAfter\n"
         );
+    }
+
+    #[test]
+    fn b6_review_i2_long_lines_convert_in_linear_time() {
+        let started = std::time::Instant::now();
+        let brackets = "[".repeat(1 << 20);
+        let (out, _) = convert(&brackets, &dir(), &map());
+        assert_eq!(out.len(), brackets.len());
+        let spans = "`a` [x](y) ".repeat(100_000);
+        let (out, _) = convert(&spans, &dir(), &map());
+        assert_eq!(out.len(), spans.len());
+        // Quadratic took minutes here; linear takes milliseconds.
+        assert!(started.elapsed().as_secs() < 5, "{:?}", started.elapsed());
+    }
+
+    #[test]
+    fn b6_review_i2_matching_still_pairs_nested_brackets() {
+        let (out, _) = convert("[[a] [Child](Child%20def.md) x](z) `[c](Child%20def.md)` [b]\n", &dir(), &map());
+        assert_eq!(out, "[[a] [[Child]] x](z) `[c](Child%20def.md)` [b]\n");
     }
 
     #[test]

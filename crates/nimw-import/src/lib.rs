@@ -23,6 +23,9 @@ pub enum ImportError {
     Limit(String),
     #[error("{0} already exists")]
     Exists(String),
+    /// Stopped by the user before anything was written.
+    #[error("the import was cancelled")]
+    Cancelled,
     #[error(transparent)]
     Io(#[from] std::io::Error),
     #[error(transparent)]

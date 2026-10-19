@@ -57,6 +57,9 @@ impl From<ImportError> for CommandError {
                 CommandError::new(ErrorKind::AlreadyExists, format!("{p} already exists"))
             }
             ImportError::Limit(m) => CommandError::new(ErrorKind::NotPermitted, m),
+            ImportError::Cancelled => {
+                CommandError::new(ErrorKind::NotPermitted, "the import was cancelled")
+            }
             ImportError::Zip(m) => {
                 CommandError::new(ErrorKind::Io, format!("not a readable zip: {m}"))
             }
@@ -150,8 +153,9 @@ pub(crate) fn notion_pick_parent_impl<R: Runtime>(app: &AppHandle<R>) -> Option<
 }
 
 pub(crate) fn notion_preview_impl<R: Runtime>(app: &AppHandle<R>) -> CmdResult<NotionPreviewDto> {
+    let state = app.state::<NotionState>();
     let export = Export::open(&picked_zip(app)?, &Limits::default())?;
-    let plan = nimw_import::plan(&export)?;
+    let plan = nimw_import::plan(&export, &state.cancel)?;
     let p = plan.preview();
     Ok(NotionPreviewDto {
         pages: p.pages,
@@ -189,7 +193,7 @@ pub(crate) fn notion_import_impl<R: Runtime>(
     let target = parent.join(vault_name(&name)?);
     state.cancel.store(false, Ordering::Relaxed);
     let export = Export::open(&zip, &Limits::default())?;
-    let plan = nimw_import::plan(&export)?;
+    let plan = nimw_import::plan(&export, &state.cancel)?;
     let source = zip
         .file_name()
         .map(|n| n.to_string_lossy().into_owned())
