@@ -9,7 +9,7 @@ Where to start, depending on what you need.
 | The index, its SQLite database and how indexing works | [`architecture/index-and-database.md`](architecture/index-and-database.md) |
 | One milestone in detail | its spec in [`superpowers/specs/`](superpowers/specs/) (`YYYY-MM-DD-<milestone>-design.md`); later sections hold the amendments, review findings and rulings |
 | How a milestone was planned task by task | [`superpowers/plans/`](superpowers/plans/) |
-| What a round delivered, its reviews, rulings to confirm and real-window checklists | [`handoff/`](handoff/): one per round, newest is `2026-10-15-m5b-feedback-handoff.md` |
+| What a round delivered, its reviews, rulings to confirm and real-window checklists | [`handoff/`](handoff/): one per round, newest is `2026-10-18-batch6-handoff.md` |
 | Visual references | [`design/`](design/) (palettes) and the clickable prototype in `../design/prototype/` |
 
 ## Milestones and their documents
@@ -24,8 +24,9 @@ Where to start, depending on what you need.
 | M4c Scratchpad and single-file windows | `2026-10-14-m4c-scratchpad-design.md` | `2026-10-15-m4c-scratchpad-handoff.md` |
 | M5 search | `2026-10-14-m5-search-design.md` | `2026-10-15-m5-search-handoff.md` |
 | M5b third feedback round | `2026-10-15-m5b-feedback-design.md` | `2026-10-15-m5b-feedback-handoff.md` |
-| M6 audio | `2026-10-14-m6-audio-design.md` (§10: batch-6 amendments) | — (batch 6) |
-| M7 Notion import | `2026-10-18-m7-notion-import-design.md` | — (batch 6) |
+| M6 audio | `2026-10-14-m6-audio-design.md` (§10–§11: batch-6 amendments and review) | `2026-10-18-batch6-handoff.md` |
+| M7 Notion import | `2026-10-18-m7-notion-import-design.md` | `2026-10-18-batch6-handoff.md` |
+| Batch 6 (main merge, text-file search, docs review, M6, M7) | M5 spec §12, M6 and M7 specs | `2026-10-18-batch6-handoff.md` |
 | M8 packaging | — | — |
 
 All of M0–M5b is merged on `main` (2026-10-18).
