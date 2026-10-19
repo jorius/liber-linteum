@@ -4,6 +4,28 @@
 > **Roles:** Jose — tech lead (decisions below are DECIDED) · PO — product owner
 > **Companion to:** `docs/product-spec.md` v0.2 (the *what*). This file is the *how*.
 > Requirement IDs (e.g. `GV-11`) refer to the product spec.
+> **As built:** this is the approved v1 design. Where the code went another way, §0 says so and the section is marked; the milestone specs in `docs/superpowers/specs/` hold the details. The index and its database are documented as built in `docs/architecture/index-and-database.md`.
+
+---
+
+## 0. As built (2026-10-18, `main` at `de2378e`, M0–M5b)
+
+| Area | v1 design said | As built |
+|------|----------------|----------|
+| Crates | 5: vault, markdown, index, audio, import | 7: plus **`nimw-session`** (one open vault: indexing, watching and every file operation, composed from the others) and **`nimw-testkit`** (fixtures, generated vaults). `nimw-audio` and `nimw-import` are still stubs (M6, M7). The index depends on `nimw-markdown` only; the session ties vault, markdown and index together. |
+| Global View layout | elkjs in a web worker | Own deterministic layouts in `features/global-view/layout.ts`; no elkjs (M3a). Edges are one SVG layer, not React Flow edges. |
+| HTML sanitizing | DOMPurify | `hast-util-sanitize` with an explicit schema, in the remark/rehype pipeline. |
+| File watching | `notify` + a debouncer crate | `notify` with the app's own batching (200 ms quiet, 2 s cap), because the debouncer crates drop macOS deletes or rescan signals. |
+| Trash (EXP-03) | OS trash via the `trash` crate | Delete moves items to the vault's own **`.trash/`** with a record in `.nimw/trash.json` (M5b §5); **Delete from vault** and **Empty Trash** send them on to the OS trash. **Archive** moves items to `.archive/` and keeps them indexed, read-only. |
+| Asset protocol | `asset:` | A custom **`nimw-asset:`** scheme (CSP `img-src`/`media-src`), scoped per window: the vault for the main window, the file's folder for a single-file window; outside files only when a saved note links them (M4b part 3 §15). |
+| Index schema (§3.2) | v1 sketch | **Schema 4**: `files`, `pages` (incl. `cover_x`, `icon`), `tags`, `links` (byte offsets, resolved `target_path`), `page_text` + FTS5 external-content `fts`, `meta`. See `docs/architecture/index-and-database.md`. |
+| `vault.json` (§3.1) | `version`, `viewMode`, `indexPicks`, `exclude`, `attachments` | Also `attachmentLinkFormat`, `pageWidth`, `pageWidths`, `coverHeights`, `coverSides`, `coverWidths`, `autoNamed`, `scratchpadFolder`, `icon`, `folderIcons`, `favorites`, `folderSorts`; unknown keys are kept. Plus `.nimw/trash.json` and `.nimw/archive.json`. |
+| Frontmatter keys (§3.3) | `cover`, `cover-y`, `subtitle`, `tags`, `related` | Also `cover-x` (side covers) and `icon` (the page's emoji). |
+| Windows | one window | The vault window (`main`) plus **single-file windows** (`file-<n>`) with their own capability file `capabilities/file.json` and per-window path grants (M4c). |
+| Shell | top bar with view switch, search, settings, close | No top bar (M5b): native menus (Settings, a **Vault** menu), a floating action button (Search ⌘F, Global View ⌘2, Edit ⌘1), a collapsible sidebar, the title in the page's cover band. |
+| Saving (§4.2) | auto-save always | **Auto save** is a setting; when off, ⌘S saves and leaving, closing or quitting asks first (M5b §6). |
+| IPC surface (§8) | the initial list | Many more commands; the authoritative list is `apps/desktop/src-tauri/build.rs` (each command is named there for the ACL) and the typed wrappers in `apps/desktop/src/ipc/`. |
+| CI (§9.3) | GitHub Actions matrix, nightly benchmarks | `.github/workflows/ci.yml` exists; there is no remote yet, so the gate runs locally (`pnpm check` plus `cargo deny check`). No nightly benchmark job: the perf tests are `--ignored` and run by hand (index doc §7). |
 
 ---
 
@@ -85,6 +107,8 @@ notes-in-my-way/
 `layout.json`: `{ "version": 1, "levels": { "<levelKey>": { "<nodePath>": { "x": 0, "y": 0 } } } }` where `levelKey` is the drilled path (`""` = level 0) or `expand:<rootPath>`.
 
 ### 3.2 Index schema (SQLite)
+
+> **Superseded** by schema 4; the full schema, the indexing pipeline and search are documented as built in `docs/architecture/index-and-database.md`. The v1 sketch is kept for history:
 
 - `files(path PK, kind, parent, mtime, size, hash)`
 - `pages(path PK, title, subtitle, cover, cover_y, excerpt, has_image, has_audio)`
@@ -255,17 +279,17 @@ Checked by a nightly benchmark job.
 
 ## 10. Milestones
 
-| M | Scope | Main IDs |
-|---|-------|----------|
-| M0 | Scaffold (below) | NFR-04 (CSP/capabilities), NFR-07, NFR-09 |
-| M1 | Vault, explorer, index, watcher, CAS writes, trash, link rewrite | VLT-*, EXP-*, PG-01/04/05 |
-| M2 | Editor modes, covers, subtitle, attachments, sanitizer, Tier B rendering | ED-*, PG-02/03, §5.1 |
-| M3 | Global View | GV-* |
-| M4 | Block drag-and-drop | DND-* |
-| M5 | Search | SR-* |
-| M6 | Audio | AUD-* |
-| M7 | Notion importer | IMP-* |
-| M8 | Packaging, signing, dark theme polish, a11y audit, perf budgets | NFR-* |
+| M | Scope | Main IDs | Status (2026-10-18) |
+|---|-------|----------|--------|
+| M0 | Scaffold (below) | NFR-04 (CSP/capabilities), NFR-07, NFR-09 | Done |
+| M1 | Vault, explorer, index, watcher, CAS writes, trash, link rewrite | VLT-*, EXP-*, PG-01/04/05 | Done (M1a, M1b) |
+| M2 | Editor modes, covers, subtitle, attachments, sanitizer, Tier B rendering | ED-*, PG-02/03, §5.1 | Done (M2a, M2b editor UX, M2c page extras) |
+| M3 | Global View | GV-* | Done (M3a, M3b relationships) |
+| M4 | Block drag-and-drop | DND-* | Done, plus the M4b feedback rounds (parts 1–3) and **M4c** (Scratchpad, single-file windows) |
+| M5 | Search | SR-* | Done, plus the **M5b** feedback round (shell, auto save, icons, Trash and Archive, Favorites, sort, Settings categories) |
+| M6 | Audio | AUD-* | Spec drafted (`2026-10-14-m6-audio-design.md`) |
+| M7 | Notion importer | IMP-* | Not started |
+| M8 | Packaging, signing, dark theme polish, a11y audit, perf budgets | NFR-* | Not started |
 
 ### M0 scaffold contents
 - Cargo workspace with the 5 crates (stub public APIs, one passing test each) and the Tauri shell; pnpm workspace with `apps/desktop`.
