@@ -81,11 +81,12 @@ fn iso_date(s: &str) -> Option<String> {
     let digits = |t: &str| !t.is_empty() && t.chars().all(|c| c.is_ascii_digit());
     // 2026-10-18 or 2026/10/18 (a time after ISO dates is kept as written).
     let sep = if s.len() >= 10 { s.as_bytes()[4] } else { 0 };
+    // `get`, not slicing: a multi-byte character may sit where a digit would.
     if (sep == b'-' || sep == b'/')
         && s.as_bytes()[7] == sep
-        && digits(&s[..4])
-        && digits(&s[5..7])
-        && digits(&s[8..10])
+        && s.get(..4).is_some_and(digits)
+        && s.get(5..7).is_some_and(digits)
+        && s.get(8..10).is_some_and(digits)
     {
         let rest = &s[10..];
         if rest.is_empty() || (sep == b'-' && rest.starts_with('T')) {
@@ -331,6 +332,14 @@ mod tests {
         );
         assert_eq!(iso_date("October 18, 2026 → October 20, 2026"), None);
         assert_eq!(iso_date("Maybe 1, 2026"), None);
+    }
+
+    #[test]
+    fn b6_review_i1_a_multi_byte_character_after_a_date_never_panics() {
+        assert_eq!(iso_date("2026-10-1é"), None);
+        assert_eq!(iso_date("2026-10-18é"), None);
+        let t = Table::parse("Name,When\nA,2026-10-1é\n").unwrap();
+        assert_eq!(t.kinds[1], Kind::Text);
     }
 
     #[test]
