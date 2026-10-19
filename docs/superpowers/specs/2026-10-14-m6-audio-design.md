@@ -151,3 +151,41 @@
 6. **The custom player replaces `<audio controls>` everywhere** an audio embed renders.
 7. **The level meter is decorative for screen readers,** with periodic text announcements instead.
 8. **MP3 through LAME** (`mp3lame-encoder`) as the architecture states. If the crate or its licence fails `cargo deny` or can't build offline, the plan records a ruling (the fallback is WAV-only with MP3 deferred), and the user is told.
+
+## 10. Amendments (batch 6, 2026-10-18)
+
+Jose confirmed the spec on 2026-10-18 ("Keep as written"). It predates M4b part 2/3, M4c, M5 and M5b; these rulings bring it up to date and override §1–§9 where they conflict.
+
+1. **WAV only for now; MP3 is deferred.**
+   - `mp3lame-encoder` (LGPL-3.0, LAME 3.100) builds on macOS, but its `mp3lame-sys` build runs LAME's autotools `configure`, which can't target MSVC from the Mac. Windows builds are cross-compiled with cargo-xwin. Three tries failed: as is ("cannot run C compiled programs"), with `MP3LAME_SYS_OVERRIDE_HOST=x86_64-w64-mingw32` ("/lib/cpp fails sanity check"), and with `CPP="clang-cl -E"`.
+   - Shipping MP3 on two systems out of three breaks the "all desktop OSes ship together" rule.
+   - So: no MP3 encoder dependency, no WAV|MP3 toggle and no `recordingFormat` setting yet, since there is nothing to choose. `RecordingFormat` stays in `nimw-audio` for when MP3 returns.
+   - **The way back:** a pure-Rust encoder, or building LAME's C files with `cc` and its `configMS.h`, as `mp3lame-sys` already does on a Windows host.
+2. **Where the controls go:**
+   - **Record clip:** a microphone button in the page header controls, beside Format. The top bar is gone (M5b §2.3), and the formatting toolbar is optional.
+   - **The recorder bar:** opens under the header band. It holds the microphone select, Start recording, then the timer, the level meter, **Stop & insert** and **Cancel**, plus **Upload clip…**.
+   - The floating action button stays screen-level (Search, Global View, Edit).
+3. **No schema bump.** The index already sets `hasAudio` for pages that embed audio (M5), and search's SHOW row has its Audio chip. An inserted clip sets both once the page is saved and re-indexed.
+4. **Read-only pages can't record.**
+   - The button is hidden on archived pages, on text files and in single-file windows.
+   - `audio_record_start` and `audio_pick` refuse `.archive/` pages (`not_archived`).
+   - All audio commands are main-window only; `capabilities/file.json` doesn't list them.
+5. **With Auto save off,** the inserted embed only makes the page unsaved; it isn't written. The clip itself is an attachment and is written when you stop. If you then choose Don't Save, the clip stays in the attachments folder, unlinked.
+6. **Where clips go.**
+   - A take is written to the app's cache folder (`<cache>/audio/clip-YYYYMMDD-HHMMSS.wav`), never into the vault while recording.
+   - Stop imports it with `import_attachment`, which brings the vault's attachment folder rule, de-duplication (` 1`) and re-indexing. The temporary file is then removed.
+   - This replaces §3's hidden `.clip-*.part` files in the target folder. Nothing half-written ever sits in the vault, and leftovers from a crash are cleared from the cache when the next recording starts.
+   - **The name:** the page proposes it in local time (`clip-YYYYMMDD-HHMMSS`), as pasted images are named. Rust accepts only that exact shape.
+   - Clips are ordinary attachments for the Trash and Archive.
+7. **Quitting or closing the vault while recording** stops the take and inserts it before pages are saved (the M2a quit guard runs the recorder first).
+8. **The microphone on macOS:**
+   - `NSMicrophoneUsageDescription` is in `src-tauri/Info.plist`, which Tauri merges into the bundle. The audio-input entitlement waits for the hardened runtime and signing in M8.
+   - A denied microphone gives silence on macOS, not an error. So the bar says so after 3 s of exact digital silence: "No sound is reaching the app. If you denied microphone access, allow it in System Settings → Privacy & Security → Microphone."
+   - cpal's `PermissionDenied` maps to `notPermitted` with the same guidance.
+9. **A microphone that disconnects mid-take** ends the capture. The bar says "The microphone was disconnected", and **Stop & insert** keeps what was recorded.
+10. **Building per system:**
+    - **Windows:** cpal (WASAPI) and hound pass `cargo xwin` for `x86_64-pc-windows-msvc`.
+    - **Linux:** cpal needs the ALSA headers (`libasound2-dev`) to build. This is noted for CI and M8.
+    - **Licences:** cpal Apache-2.0, hound Apache-2.0.
+11. **The player** (§4) replaces `<audio controls>` for `![[…]]` audio embeds and for audio files outside the vault (M4b part 3). Raw HTML `<audio>` written in a note keeps the browser's player.
+12. **Microphone choice** is remembered for the app session (§9.4, unchanged).
