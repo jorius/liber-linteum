@@ -1,8 +1,35 @@
-//! Microphone capture and WAV/MP3 encoding for audio clips.
+//! Microphone capture and WAV encoding for audio clips (M6).
+//!
+//! No Tauri here: the desktop app runs [`record`] on a thread of its own with
+//! [`CpalHost`]; tests use [`SyntheticHost`] and never open a microphone.
+
+mod cpal_host;
+mod host;
+mod level;
+mod record;
+
+pub use cpal_host::CpalHost;
+pub use host::{Device, Ended, Host, SYNTHETIC_DEVICE, Sink, StreamFormat, SyntheticHost};
+pub use level::{Level, level};
+pub use record::{Take, record};
 
 use serde::{Deserialize, Serialize};
 
-/// AUD-02: recording container/codec. Default is WAV (Q-AUD-1).
+/// Why a recording couldn't start or go on.
+#[derive(Debug, thiserror::Error)]
+pub enum AudioError {
+    #[error("the app isn't allowed to use the microphone")]
+    Permission,
+    #[error("no microphone was found")]
+    NoDevice,
+    #[error("the microphone failed: {0}")]
+    Device(String),
+    #[error("the clip couldn't be written: {0}")]
+    Write(String),
+}
+
+/// AUD-02: recording container/codec. Default is WAV (Q-AUD-1). Only WAV is
+/// recorded for now (M6 §10.1: MP3 is deferred).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum RecordingFormat {
