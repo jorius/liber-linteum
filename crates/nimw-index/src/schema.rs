@@ -4,7 +4,9 @@
 /// 3 (M5): `page_text` and its full-text index `fts` (search). An index built
 /// by an older version is rebuilt.
 /// 4 (M5b §4): pages gain `icon`, the frontmatter emoji.
-pub const SCHEMA_VERSION: i64 = 4;
+/// 5 (batch 6): text and code files get `page_text` rows too, so search finds
+/// them (they stay attachments everywhere else).
+pub const SCHEMA_VERSION: i64 = 5;
 
 pub(crate) const SCHEMA: &str = r#"
 CREATE TABLE meta (key TEXT PRIMARY KEY, value TEXT NOT NULL);
@@ -58,7 +60,8 @@ CREATE TABLE links (
 CREATE INDEX links_target_path ON links(target_path);
 CREATE INDEX links_target_key ON links(target_key);
 CREATE INDEX links_src ON links(src);
--- M5 §2, §10.3: what search reads of each page, and its full-text index
+-- M5 §2, §10.3: what search reads of each page (and, since batch 6, of each
+-- text file), and its full-text index
 -- (external content: snippets need the text). The triggers keep `fts` in
 -- step with every write; deletes and renames of `files` cascade here.
 CREATE TABLE page_text (

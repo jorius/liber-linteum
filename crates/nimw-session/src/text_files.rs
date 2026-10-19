@@ -3,7 +3,7 @@
 //! attachments in the index; nothing here parses them as pages.
 
 use crate::error::{Result, SessionError};
-use crate::session::{VaultSession, clamp_ns, is_page_path, validate_name};
+use crate::session::{VaultSession, clamp_ns, is_page_path, text_of, validate_name};
 use nimw_index::{FileKind, FileRow};
 use nimw_markdown::link_key;
 use nimw_vault::{Hash, VaultPath};
@@ -95,8 +95,13 @@ impl VaultSession {
             size: entry.size,
             hash: Some(hash.to_hex()),
         };
+        let text = text_of(path.as_str(), bytes);
         let mut index = self.index();
-        index.transaction(|tx| tx.upsert_file(&row))?;
+        index.transaction(|tx| {
+            tx.upsert_file(&row)?;
+            text.as_deref()
+                .map_or(Ok(()), |t| tx.upsert_text(&row.path, t))
+        })?;
         let files = index.file_set()?;
         index.resolve_affected(&files, &[link_key(path.as_str())])?;
         Ok(hash)
@@ -124,7 +129,10 @@ impl VaultSession {
             size: entry.size,
             hash: Some(hash.to_hex()),
         };
-        self.index().transaction(|tx| tx.upsert_file(&row))?;
+        self.index().transaction(|tx| {
+            tx.upsert_file(&row)?;
+            tx.upsert_text(&row.path, text)
+        })?;
         Ok(hash)
     }
 }

@@ -42,6 +42,15 @@ pub(crate) enum Loaded {
     StatOnly(FileRow),
     Page(FileRow, Box<PageMeta>),
     Attachment(FileRow),
+    /// A text or code file and its text, which search reads (batch 6).
+    Text(FileRow, String),
+}
+
+/// `bytes` as text, if `path` names a text or code file and they read as one
+/// (UTF-8, no NUL, within the size cap); search indexes it (batch 6).
+pub(crate) fn text_of(path: &str, bytes: &[u8]) -> Option<String> {
+    (crate::text_files::is_text_path(path) && crate::text_files::is_text_content(bytes))
+        .then(|| String::from_utf8_lossy(bytes).into_owned())
 }
 
 pub(crate) fn is_page_path(path: &str) -> bool {
@@ -175,7 +184,7 @@ impl VaultSession {
         for l in &loaded {
             let (path, is_new) = match l {
                 Loaded::StatOnly(r) => (&r.path, false),
-                Loaded::Page(r, _) | Loaded::Attachment(r) => {
+                Loaded::Page(r, _) | Loaded::Attachment(r) | Loaded::Text(r, _) => {
                     (&r.path, !stored.contains_key(&r.path))
                 }
             };
@@ -243,7 +252,10 @@ impl VaultSession {
             return Some(Loaded::StatOnly(row));
         }
         if !page {
-            return Some(Loaded::Attachment(row));
+            return Some(match text_of(&row.path, &bytes) {
+                Some(text) => Loaded::Text(row, text),
+                None => Loaded::Attachment(row),
+            });
         }
         match String::from_utf8(bytes) {
             Ok(text) => {
@@ -490,6 +502,10 @@ pub(crate) fn write_loaded(tx: &nimw_index::Tx<'_>, loaded: &Loaded) -> nimw_ind
         Loaded::Page(row, meta) => {
             tx.upsert_file(row)?;
             tx.upsert_page(&row.path, meta)
+        }
+        Loaded::Text(row, text) => {
+            tx.upsert_file(row)?;
+            tx.upsert_text(&row.path, text)
         }
     }
 }

@@ -62,6 +62,20 @@ pub(crate) fn text_columns(path: &str, meta: &PageMeta) -> [String; 6] {
     ]
 }
 
+/// `[title, name, folders, tags, links, body]` for a text file (batch 6):
+/// titled by its file name, extension kept; no tags or links.
+pub(crate) fn text_file_columns(path: &str, body: &str) -> [String; 6] {
+    let name = path.rsplit('/').next().unwrap_or(path).to_string();
+    [
+        name.clone(),
+        name,
+        folders_column(path),
+        String::new(),
+        String::new(),
+        body.to_string(),
+    ]
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

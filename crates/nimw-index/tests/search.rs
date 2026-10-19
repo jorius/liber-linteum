@@ -63,6 +63,30 @@ impl Fixture {
         self
     }
 
+    /// Adds (or replaces) a text file (batch 6): an attachment row with
+    /// `hash`, then its searchable text.
+    fn text(&mut self, path: &str, body: &str, hash: &str) -> &mut Fixture {
+        self.clock += 1;
+        let mtime = self.clock;
+        let folders: Vec<String> = {
+            let parts: Vec<&str> = path.split('/').collect();
+            (1..parts.len()).map(|i| parts[..i].join("/")).collect()
+        };
+        self.ix
+            .transaction(|tx| {
+                for f in &folders {
+                    tx.upsert_file(&row(f, FileKind::Folder, 0))?;
+                }
+                tx.upsert_file(&FileRow {
+                    hash: Some(hash.into()),
+                    ..row(path, FileKind::Attachment, mtime)
+                })?;
+                tx.upsert_text(path, body)
+            })
+            .unwrap();
+        self
+    }
+
     /// Paths whose FTS row matches `q` (raw FTS5 syntax), read by another
     /// connection.
     fn fts(&self, q: &str) -> Vec<String> {
@@ -970,4 +994,106 @@ fn m5b_archived_pages_only_with_the_archived_chip() {
     let recent = f.ix.search(&SearchQuery::default()).unwrap();
     assert!(recent.recent);
     assert_eq!(paths(&recent), strs(&["P/dragon.md"]));
+}
+
+// ---- Batch 6: text files are searchable ----
+
+#[test]
+fn b6_text_files_are_found_by_name_and_body_with_a_snippet() {
+    let mut f = Fixture::new();
+    f.page("Notes/A.md", "# A\n\nNothing here.\n")
+        .text("Notes/todo.txt", "buy dragonfruit and limes", "t1")
+        .text("Other/config.json", "{\"dragonfruit\": 1}", "t2");
+    let page = f.ix.search(&text_query("dragonfruit")).unwrap();
+    assert_eq!(
+        sorted(paths(&page)),
+        strs(&["Notes/todo.txt", "Other/config.json"])
+    );
+    let hit = page
+        .results
+        .iter()
+        .find(|h| h.path == "Notes/todo.txt")
+        .unwrap();
+    assert_eq!(hit.title, "todo.txt");
+    assert!(
+        hit.snippet
+            .as_ref()
+            .unwrap()
+            .iter()
+            .any(|p| p.hit && p.text == "dragonfruit")
+    );
+    assert_eq!(
+        paths(&f.ix.search(&text_query("todo")).unwrap()),
+        strs(&["Notes/todo.txt"])
+    );
+    // Project and folder apply; tags and links never match a text file.
+    let q = SearchQuery {
+        project: Some("Notes".into()),
+        ..text_query("dragonfruit")
+    };
+    assert_eq!(paths(&f.ix.search(&q).unwrap()), strs(&["Notes/todo.txt"]));
+    let q = SearchQuery {
+        tags: vec!["x".into()],
+        ..text_query("dragonfruit")
+    };
+    assert!(paths(&f.ix.search(&q).unwrap()).is_empty());
+}
+
+#[test]
+fn b6_the_text_files_chip_narrows_to_them_and_counts_them() {
+    let mut f = Fixture::new();
+    f.page("A.md", "# A\n\nOne lime.\n")
+        .text("b.txt", "two limes", "t");
+    let page = f.ix.search(&text_query("lime")).unwrap();
+    assert_eq!(page.total, 2);
+    assert_eq!(page.facets.text_files, 1);
+    let q = SearchQuery {
+        text_files: true,
+        ..text_query("lime")
+    };
+    let page = f.ix.search(&q).unwrap();
+    assert_eq!(paths(&page), strs(&["b.txt"]));
+    assert_eq!(page.facets.text_files, 1);
+    // Recent (no text, no filter) lists text files with pages.
+    assert_eq!(f.ix.search(&SearchQuery::default()).unwrap().total, 2);
+}
+
+#[test]
+fn b6_an_unchanged_text_file_keeps_its_text_and_a_changed_one_loses_it() {
+    let mut f = Fixture::new();
+    f.text("n.txt", "quartz", "h1");
+    // A rescan with the same hash writes only the file row.
+    f.ix.transaction(|tx| {
+        tx.upsert_file(&FileRow {
+            hash: Some("h1".into()),
+            ..row("n.txt", FileKind::Attachment, 9)
+        })
+    })
+    .unwrap();
+    assert_eq!(f.fts("quartz"), strs(&["n.txt"]));
+    // New content without text (no longer readable as text) drops it.
+    f.ix.transaction(|tx| {
+        tx.upsert_file(&FileRow {
+            hash: Some("h2".into()),
+            ..row("n.txt", FileKind::Attachment, 10)
+        })
+    })
+    .unwrap();
+    assert!(f.fts("quartz").is_empty());
+}
+
+#[test]
+fn b6_text_files_follow_rename_and_delete() {
+    let mut f = Fixture::new();
+    f.text("Notes/todo.txt", "basalt", "h");
+    f.ix.transaction(|tx| tx.rename("Notes/todo.txt", "Lists/groceries.txt"))
+        .unwrap();
+    let page = f.ix.search(&text_query("groceries")).unwrap();
+    assert_eq!(paths(&page), strs(&["Lists/groceries.txt"]));
+    assert_eq!(page.results[0].title, "groceries.txt");
+    assert!(paths(&f.ix.search(&text_query("todo")).unwrap()).is_empty());
+    assert_eq!(f.fts("basalt"), strs(&["Lists/groceries.txt"]));
+    f.ix.transaction(|tx| tx.remove("Lists/groceries.txt"))
+        .unwrap();
+    assert!(f.fts("basalt").is_empty());
 }

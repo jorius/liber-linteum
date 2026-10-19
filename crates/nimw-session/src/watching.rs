@@ -174,7 +174,8 @@ impl VaultSession {
             }
         }
         for (l, is_new) in &loaded {
-            if let (true, Loaded::Page(row, _) | Loaded::Attachment(row)) = (is_new, l)
+            if let (true, Loaded::Page(row, _) | Loaded::Attachment(row) | Loaded::Text(row, _)) =
+                (is_new, l)
                 && let Some(from) = row.hash.as_deref().and_then(|h| by_hash.remove(h))
             {
                 renamed.push((from.to_string(), row.path.clone()));
@@ -185,7 +186,7 @@ impl VaultSession {
         let mut created = Vec::new();
         let mut modified = Vec::new();
         for (l, is_new) in &loaded {
-            let (Loaded::Page(row, _) | Loaded::Attachment(row)) = l else {
+            let (Loaded::Page(row, _) | Loaded::Attachment(row) | Loaded::Text(row, _)) = l else {
                 continue;
             };
             if renamed.iter().any(|(_, to)| to == &row.path) {

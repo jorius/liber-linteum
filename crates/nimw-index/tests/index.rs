@@ -233,7 +233,7 @@ fn stats_return_stored_stat() {
 
 #[test]
 fn m5b_schema_4_tree_rows_carry_page_icons() {
-    assert_eq!(SCHEMA_VERSION, 4);
+    const { assert!(SCHEMA_VERSION >= 4) };
     let mut idx = Index::open_in_memory().unwrap();
     idx.transaction(|tx| {
         tx.upsert_file(&file("Rocket.md", FileKind::Page))?;

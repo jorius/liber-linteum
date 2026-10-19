@@ -3,7 +3,7 @@ use crate::rows::{
     split_path,
 };
 use crate::schema::{SCHEMA, SCHEMA_VERSION};
-use crate::text::{folders_column, name_column, text_columns};
+use crate::text::{folders_column, name_column, text_columns, text_file_columns};
 use nimw_markdown::{FileSet, LinkKind, PageMeta, Tag, link_key, name_key, resolve};
 use rusqlite::{Connection, OptionalExtension, Row, params};
 use std::collections::HashMap;
@@ -473,6 +473,16 @@ impl Index {
 impl Tx<'_> {
     pub fn upsert_file(&self, row: &FileRow) -> Result<()> {
         let (parent, name) = split_path(&row.path);
+        if row.kind != FileKind::Page {
+            // A text file's searchable text (batch 6) outlives a rescan that
+            // finds it unchanged; new content brings its own (`upsert_text`).
+            self.tx
+                .prepare_cached(
+                    "DELETE FROM page_text WHERE path = ?1 AND NOT EXISTS (SELECT 1 FROM files
+                     WHERE path = ?1 AND kind = 'attachment' AND ?2 = 'attachment' AND hash IS ?3)",
+                )?
+                .execute(params![row.path, row.kind.as_str(), row.hash])?;
+        }
         self.tx.prepare_cached(
             "INSERT INTO files (path, parent, name, ext, kind, mtime_ns, size, hash) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)
              ON CONFLICT(path) DO UPDATE SET kind = ?5, mtime_ns = ?6, size = ?7, hash = ?8",
@@ -481,9 +491,6 @@ impl Tx<'_> {
         if row.kind != FileKind::Page {
             self.tx
                 .prepare_cached("DELETE FROM pages WHERE path = ?1")?
-                .execute([&row.path])?;
-            self.tx
-                .prepare_cached("DELETE FROM page_text WHERE path = ?1")?
                 .execute([&row.path])?;
             self.tx
                 .prepare_cached("DELETE FROM tags WHERE path = ?1")?
@@ -551,6 +558,21 @@ impl Tx<'_> {
         Ok(())
     }
 
+    /// Stores a text file's searchable text (batch 6); `path` must already be
+    /// in `files` as an attachment.
+    pub fn upsert_text(&self, path: &str, body: &str) -> Result<()> {
+        let [title, name, folders, tags, links, body] = text_file_columns(path, body);
+        self.tx
+            .prepare_cached(
+                "INSERT INTO page_text (path, title, name, folders, tags, links, body)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)
+                 ON CONFLICT(path) DO UPDATE SET title = ?2, name = ?3, folders = ?4,
+                 tags = ?5, links = ?6, body = ?7",
+            )?
+            .execute(params![path, title, name, folders, tags, links, body])?;
+        Ok(())
+    }
+
     /// Removes `path` and, for folders, everything inside it. Links pointing at
     /// removed files become unresolved.
     pub fn remove(&self, path: &str) -> Result<()> {
@@ -579,16 +601,19 @@ impl Tx<'_> {
             .tx
             .prepare_cached("UPDATE links SET target_path = ?2 WHERE target_path = ?1")?;
         // The path cascades into `page_text`; the name and folder words that
-        // search finds a page by follow here.
-        let mut words = self
-            .tx
-            .prepare_cached("UPDATE page_text SET name = ?2, folders = ?3 WHERE path = ?1")?;
+        // search finds a page by follow here, and a text file's title (its
+        // file name, batch 6).
+        let mut words = self.tx.prepare_cached(
+            "UPDATE page_text SET name = ?2, folders = ?3, title = CASE WHEN EXISTS
+             (SELECT 1 FROM files WHERE path = ?1 AND kind = 'attachment') THEN ?4 ELSE title END
+             WHERE path = ?1",
+        )?;
         for old in paths {
             let new = format!("{to}{}", &old[from.len()..]);
             let (parent, name) = split_path(&new);
             update.execute(params![old, new, parent, name, ext_of(name)])?;
             retarget.execute(params![old, new])?;
-            words.execute(params![new, name_column(&new), folders_column(&new)])?;
+            words.execute(params![new, name_column(&new), folders_column(&new), name])?;
         }
         Ok(())
     }

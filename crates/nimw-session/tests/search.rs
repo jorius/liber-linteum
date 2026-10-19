@@ -212,3 +212,42 @@ fn m4c_m5_a_quick_note_is_found_by_its_first_line_name() {
         "Buy oats and honey"
     );
 }
+
+/// Batch 6: text and code files are found by name and content; files that
+/// aren't readable text (not UTF-8, too large) are skipped, never an error.
+#[test]
+fn b6_text_files_are_searchable_through_the_session() {
+    let dir = tempfile::tempdir().unwrap();
+    write(dir.path(), "Notes/todo.txt", "buy dragonfruit\n");
+    write(dir.path(), "Code/main.rs", "fn obsidianite() {}\n");
+    std::fs::write(dir.path().join("Notes/latin1.txt"), b"caf\xe9 malachite").unwrap();
+    let big = format!("zircon {}", "x".repeat(nimw_session::TEXT_MAX_BYTES));
+    write(dir.path(), "Notes/huge.log", &big);
+    write(dir.path(), "pic.png", "dragonfruit");
+    let (_c, s) = open(dir.path());
+    assert_eq!(find(&s, "dragonfruit"), vec!["Notes/todo.txt"]);
+    assert_eq!(find(&s, "obsidianite"), vec!["Code/main.rs"]);
+    assert!(find(&s, "malachite").is_empty());
+    assert!(find(&s, "zircon").is_empty());
+
+    let path = VaultPath::new("Notes/todo.txt").unwrap();
+    let (_, hash) = s.vault().read(&path).unwrap();
+    s.write_text(&path, "sell rhubarb\n", hash).unwrap();
+    assert!(find(&s, "dragonfruit").is_empty());
+    assert_eq!(find(&s, "rhubarb"), vec!["Notes/todo.txt"]);
+
+    s.create_folder(&VaultPath::root(), "Lists").unwrap();
+    let to = VaultPath::new("Lists/groceries.txt").unwrap();
+    s.rename(&path, &to, false).unwrap();
+    assert_eq!(find(&s, "groceries"), vec!["Lists/groceries.txt"]);
+    assert_eq!(find(&s, "rhubarb"), vec!["Lists/groceries.txt"]);
+    assert!(find(&s, "todo").is_empty());
+
+    // A new text file made in the app is found once it has text.
+    let made = s
+        .create_text_file(&VaultPath::new("Notes").unwrap(), "new.txt")
+        .unwrap();
+    let (_, hash) = s.vault().read(&made).unwrap();
+    s.write_text(&made, "tourmaline\n", hash).unwrap();
+    assert_eq!(find(&s, "tourmaline"), vec!["Notes/new.txt"]);
+}

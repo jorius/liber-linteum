@@ -29,6 +29,8 @@ const WEIGHTS: &str = "10.0, 8.0, 5.0, 6.0, 4.0, 1.0";
 const META_COLUMNS: &str = "{title name folders tags links}";
 /// Words in a snippet.
 const SNIPPET_WORDS: usize = 12;
+/// A match's media flags and whether it's a text file (batch 6), over `base`.
+const MEDIA: &str = "coalesce(pg.has_image, 0), coalesce(pg.has_audio, 0), f.kind = 'attachment'";
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct SearchQuery {
@@ -46,6 +48,8 @@ pub struct SearchQuery {
     pub has_audio: bool,
     /// Include archived pages (M5b §5.3); they're left out otherwise.
     pub archived: bool,
+    /// Only text and code files (batch 6); they're included either way.
+    pub text_files: bool,
     pub offset: u32,
     /// Clamped to 1–[`MAX_LIMIT`]; 0 means [`MAX_LIMIT`].
     pub limit: u32,
@@ -93,6 +97,8 @@ pub struct Facets {
     pub has_audio: u32,
     /// Archived matches, whether or not they're included.
     pub archived: u32,
+    /// Text and code files among the matches (batch 6).
+    pub text_files: u32,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -194,6 +200,7 @@ enum Dim {
     Image,
     Audio,
     Archived,
+    Text,
 }
 
 struct Filter {
@@ -326,14 +333,22 @@ impl Index {
         if q.has_image {
             filters.push(Filter {
                 dim: Dim::Image,
-                sql: "p.has_image".into(),
+                sql: "pg.has_image".into(),
                 params: Vec::new(),
             });
         }
         if q.has_audio {
             filters.push(Filter {
                 dim: Dim::Audio,
-                sql: "p.has_audio".into(),
+                sql: "pg.has_audio".into(),
+                params: Vec::new(),
+            });
+        }
+
+        if q.text_files {
+            filters.push(Filter {
+                dim: Dim::Text,
+                sql: "f.kind = 'attachment'".into(),
                 params: Vec::new(),
             });
         }
@@ -347,12 +362,17 @@ impl Index {
                 params,
             });
         }
+        // `page_text` holds pages and text files (batch 6); `pg` is a page's
+        // own row, missing for a text file.
         let base = match &text {
             Some(t) => {
                 self.fill_hits(t)?;
-                "temp.nimw_hits h JOIN pages p ON p.path = h.path JOIN files f ON f.path = p.path"
+                "temp.nimw_hits h JOIN page_text p ON p.path = h.path \
+                 JOIN files f ON f.path = p.path LEFT JOIN pages pg ON pg.path = p.path"
             }
-            None => "pages p JOIN files f ON f.path = p.path",
+            None => {
+                "page_text p JOIN files f ON f.path = p.path LEFT JOIN pages pg ON pg.path = p.path"
+            }
         };
         let scored = if text.is_some() {
             "h.meta, h.score"
@@ -365,13 +385,13 @@ impl Index {
         self.conn.execute_batch(
             "CREATE TEMP TABLE IF NOT EXISTS nimw_match (path TEXT PRIMARY KEY, \
              meta INTEGER NOT NULL, score REAL NOT NULL, mtime INTEGER NOT NULL, \
-             has_image INTEGER NOT NULL, has_audio INTEGER NOT NULL); \
+             has_image INTEGER NOT NULL, has_audio INTEGER NOT NULL, text INTEGER NOT NULL); \
              DELETE FROM temp.nimw_match;",
         )?;
         self.conn.execute(
             &format!(
                 "INSERT INTO temp.nimw_match \
-                 SELECT p.path, {scored}, f.mtime_ns, p.has_image, p.has_audio \
+                 SELECT p.path, {scored}, f.mtime_ns, {MEDIA} \
                  FROM {base} WHERE {cond}"
             ),
             params_from_iter(params.iter()),
@@ -409,7 +429,8 @@ impl Index {
             let mut hit = self.conn.prepare_cached(
                 "SELECT p.path, p.title, \
                  (SELECT l.target_path FROM links l WHERE l.src = p.path AND l.kind = 'cover' LIMIT 1), \
-                 p.has_image, p.has_audio FROM pages p WHERE p.path = ?1",
+                 coalesce(pg.has_image, 0), coalesce(pg.has_audio, 0) \
+                 FROM page_text p LEFT JOIN pages pg ON pg.path = p.path WHERE p.path = ?1",
             )?
             .query_row([&path], |r| {
                 Ok(SearchHit {
@@ -581,13 +602,13 @@ impl Index {
             let (cond, params) = where_sql(filters, Some(dim));
             self.conn.execute_batch(
                 "CREATE TEMP TABLE IF NOT EXISTS nimw_except (path TEXT PRIMARY KEY, \
-                 has_image INTEGER NOT NULL, has_audio INTEGER NOT NULL); \
+                 has_image INTEGER NOT NULL, has_audio INTEGER NOT NULL, text INTEGER NOT NULL); \
                  DELETE FROM temp.nimw_except;",
             )?;
             self.conn.execute(
                 &format!(
                     "INSERT INTO temp.nimw_except \
-                     SELECT p.path, p.has_image, p.has_audio FROM {base} WHERE {cond}"
+                     SELECT p.path, {MEDIA} FROM {base} WHERE {cond}"
                 ),
                 params_from_iter(params.iter()),
             )?;
@@ -785,22 +806,22 @@ impl Index {
         )?;
         facets.archived = n as u32;
 
-        for dim in [Dim::Image, Dim::Audio] {
+        for dim in [Dim::Image, Dim::Audio, Dim::Text] {
             let (src, _) = self.matches_except(base, filters, dim)?;
-            let column = if dim == Dim::Image {
-                "has_image"
-            } else {
-                "has_audio"
+            let column = match dim {
+                Dim::Image => "has_image",
+                Dim::Audio => "has_audio",
+                _ => "text",
             };
             let n: i64 = self.conn.query_row(
                 &format!("SELECT count(*) FROM {src} WHERE {column}"),
                 [],
                 |r| r.get(0),
             )?;
-            if dim == Dim::Image {
-                facets.has_image = n as u32;
-            } else {
-                facets.has_audio = n as u32;
+            match dim {
+                Dim::Image => facets.has_image = n as u32,
+                Dim::Audio => facets.has_audio = n as u32,
+                _ => facets.text_files = n as u32,
             }
         }
         Ok(facets)

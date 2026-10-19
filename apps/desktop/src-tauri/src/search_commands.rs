@@ -24,6 +24,8 @@ pub struct SearchQueryDto {
     pub has_image: bool,
     pub has_audio: bool,
     pub archived: bool,
+    /// Only text and code files (batch 6).
+    pub text_files: bool,
     pub offset: u32,
     pub limit: u32,
 }
@@ -73,6 +75,7 @@ pub struct FacetsDto {
     pub has_image: u32,
     pub has_audio: u32,
     pub archived: u32,
+    pub text_files: u32,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -133,6 +136,7 @@ impl From<SearchPage> for SearchPageDto {
                 has_image: p.facets.has_image,
                 has_audio: p.facets.has_audio,
                 archived: p.facets.archived,
+                text_files: p.facets.text_files,
             },
             recent: p.recent,
             indexing: p.indexing,
@@ -152,6 +156,7 @@ pub(crate) fn search_impl(state: &AppState, q: SearchQueryDto) -> CmdResult<Sear
         has_image: q.has_image,
         has_audio: q.has_audio,
         archived: q.archived,
+        text_files: q.text_files,
         offset: q.offset,
         limit: q.limit,
     };

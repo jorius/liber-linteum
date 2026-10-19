@@ -4,7 +4,7 @@
 use crate::error::{Result, SessionError};
 use crate::external::file_url;
 use crate::session::{
-    FORBIDDEN_NAME_CHARS, VaultSession, clamp_ns, folder_row, is_page_path, validate_name,
+    FORBIDDEN_NAME_CHARS, VaultSession, clamp_ns, folder_row, is_page_path, text_of, validate_name,
 };
 use nimw_index::{FileKind, FileRow, LinkCandidate};
 use nimw_markdown::{LinkKind, link_key, name_key, resolve, shortest_unique_target};
@@ -295,7 +295,16 @@ impl VaultSession {
                 size: entry.size,
                 hash: Some(hash.to_hex()),
             };
-            self.index().transaction(|tx| tx.upsert_file(&row))?;
+            // A text or code file is read for search (batch 6); others aren't read.
+            let text = crate::text_files::is_text_path(path.as_str())
+                .then(|| self.vault.read(path).ok())
+                .flatten()
+                .and_then(|(bytes, _)| text_of(path.as_str(), &bytes));
+            self.index().transaction(|tx| {
+                tx.upsert_file(&row)?;
+                text.as_deref()
+                    .map_or(Ok(()), |t| tx.upsert_text(&row.path, t))
+            })?;
         }
         let mut index = self.index();
         let files = index.file_set()?;

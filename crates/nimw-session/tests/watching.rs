@@ -394,3 +394,23 @@ fn m5b_folder_icons_of_folders_deleted_outside_are_forgotten() {
         vec!["Kept".to_string()]
     );
 }
+
+/// Batch 6: a text file changed outside the app is found by its new words.
+#[test]
+fn b6_an_outside_edit_to_a_text_file_reaches_search() {
+    let (dir, _c, s, _events) = watched("obsidian-basic");
+    std::fs::write(dir.path().join("Game Design/notes.txt"), "labradorite\n").unwrap();
+    let find = |w: &str| {
+        s.search(&nimw_session::SearchQuery {
+            text: w.into(),
+            ..Default::default()
+        })
+        .unwrap()
+        .results
+        .into_iter()
+        .map(|h| h.path)
+        .collect::<Vec<_>>()
+    };
+    assert!(wait_until(WAIT, || find("labradorite")
+        == vec!["Game Design/notes.txt"]));
+}
