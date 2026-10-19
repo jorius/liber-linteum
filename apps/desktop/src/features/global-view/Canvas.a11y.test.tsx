@@ -23,6 +23,8 @@ const card = (path: string): GvCard => ({
   cover: null,
   coverRemote: false,
   coverY: null,
+  coverX: null,
+  coverSide: 'top',
   excerpt: '',
   hasImage: false,
   hasAudio: false,

@@ -107,6 +107,9 @@ export interface Page {
   cover: string | null;
   /** Frontmatter `cover-y` (0–100), `null` when absent (M2c §4). */
   coverY: number | null;
+  /** Frontmatter `cover-x` (0–100), a side cover's horizontal focus, `null`
+   *  when absent (M4b part 3 §3). */
+  coverX: number | null;
   tags: string[];
   links: number;
   backlinks: number;
@@ -173,15 +176,34 @@ export interface Settings {
   globalViewMode: GlobalViewMode;
   /** Global View: edge kinds shown (M3a §6). */
   globalViewEdges: GlobalViewEdges;
-  /** Readable measure or full width, app-wide (M4b part 2 §1). */
+  /** Readable measure, wide elements or full width, app-wide (M4b part 2
+   *  §1; `wide`: M4b part 3). */
   pageWidth: PageWidth;
+  /** The kinds that span the editor when a page is `wide` (M4b part 3). */
+  wideElements: WideElements;
   /** Outline panel shown beside the editor (M4b part 2 §5). */
   outline: boolean;
   /** Cover band height in px for pages without their own (132–600). */
   coverHeight: number;
+  /** A caption with each attachment's place on disk (M4b part 3 §8). */
+  showAttachmentPaths: boolean;
 }
 
-export type PageWidth = 'readable' | 'full';
+/** `wide`: text at the readable measure, the chosen elements span the editor. */
+export type PageWidth = 'readable' | 'wide' | 'full';
+/** Where a page's cover sits (M4b part 3 §3). */
+export type CoverSide = 'top' | 'left' | 'right';
+
+/** What goes wide on a `wide` page (M4b part 3, wide elements §2). */
+export interface WideElements {
+  tables: boolean;
+  code: boolean;
+  /** Mermaid diagrams. */
+  diagrams: boolean;
+  images: boolean;
+  /** `$$` maths blocks. */
+  maths: boolean;
+}
 
 export type GlobalViewMode = 'drill' | 'expand';
 
@@ -210,8 +232,10 @@ export interface SettingsPatch {
   globalViewMode?: GlobalViewMode;
   globalViewEdges?: GlobalViewEdges;
   pageWidth?: PageWidth;
+  wideElements?: WideElements;
   outline?: boolean;
   coverHeight?: number;
+  showAttachmentPaths?: boolean;
 }
 
 export interface SettingsResponse {
@@ -257,8 +281,42 @@ export interface Attached {
   path: string;
   /** Wiki-style target that resolves from the page back to `path`. */
   link: string;
+  /** The `file:` URL to write instead of `link` (the vault's link format is
+   *  "Absolute path on disk", M4b part 3 §8). */
+  url?: string;
   /** `false` when the dropped file already lived in the vault. */
   copied: boolean;
+}
+
+/** How links to new attachments are written (M4b part 3 §8). */
+export type LinkFormat = 'shortest' | 'vault' | 'relative' | 'absolute';
+
+/** A file outside the vault that a link names (M4b part 3 §9). */
+export interface ExternalFile {
+  /** Absolute, in its OS's form (`D:\Docs\x.pdf`, `/Users/jose/x.png`). */
+  path: string;
+  /** A regular, visible file on this computer. */
+  exists: boolean;
+  /** Linked from a saved page of the vault: the app may show or open it. */
+  listed: boolean;
+  /** On another computer (`\\server\…`, `/net/host/…`). */
+  network: boolean;
+  /** A network file the user hasn't loaded yet: nothing has touched it, and
+   *  nothing will until they choose to (final review C1). */
+  askFirst: boolean;
+  /** A document or media file, which opens in its default app; anything
+   *  else is only shown in its folder (final review I2). */
+  openable: boolean;
+}
+
+/** A file chosen with the Attach button's dialog (M4b part 3 §7). */
+export interface PickedFile {
+  path: string;
+  name: string;
+  /** Its `file:` URL, for "Link to where it is". */
+  url: string;
+  /** The vault path when the file already lives in the vault. */
+  inVault: string | null;
 }
 
 /** One dropped path's outcome. */
@@ -297,6 +355,14 @@ export interface VaultSettings {
   pageWidths: Record<string, PageWidth>;
   /** Pages with their own cover height in px (cover resize). */
   coverHeights: Record<string, number>;
+  /** Pages whose cover sits beside the text (M4b part 3 §3). */
+  coverSides: Record<string, 'left' | 'right'>;
+  /** Side covers' own strip widths in px (§3). */
+  coverWidths: Record<string, number>;
+  /** NIMW's own link format for new attachments (M4b part 3 §8). */
+  attachmentLinkFormat?: LinkFormat | null;
+  /** Obsidian's `newLinkFormat` (applies while NIMW has none of its own). */
+  obsidianLinkFormat?: LinkFormat | null;
 }
 
 export interface VaultSettingsPatch {
@@ -304,6 +370,8 @@ export interface VaultSettingsPatch {
   overrideObsidian?: boolean;
   /** `'default'` clears the vault's own width. */
   pageWidth?: PageWidth | 'default';
+  /** `'default'` follows Obsidian's format, else the shortest name. */
+  attachmentLinkFormat?: LinkFormat | 'default';
 }
 
 /** What one Global View click opens (M3a §3). */
@@ -323,6 +391,10 @@ export interface GvCard {
   cover: string | null;
   coverRemote: boolean;
   coverY: number | null;
+  /** `cover-x` (0–100), `null` when absent (M4b part 3 §3). */
+  coverX: number | null;
+  /** Where the cover sits: the header band or a strip beside the text (§3). */
+  coverSide: CoverSide;
   excerpt: string;
   hasImage: boolean;
   hasAudio: boolean;
@@ -406,6 +478,20 @@ export const linksResolve = (source: string, targets: LinkTarget[]) =>
   call<(string | null)[]>('links_resolve', { source, targets });
 export const urlOpen = (url: string) => call<void>('url_open', { url });
 export const fileOpenExternal = (path: string) => call<void>('file_open_external', { path });
+/** Outside files the targets name (M4b part 3 §9): `null` for vault targets.
+ *  Markdown targets are as written (relative to `source`), not vault-joined. */
+export const linksExternal = (source: string, targets: LinkTarget[]) =>
+  call<(ExternalFile | null)[]>('links_external', { source, targets });
+/** Opens a linked outside file in its default app (programs are refused). */
+export const externalOpen = (path: string) => call<void>('external_open', { path });
+/** The user loads a linked network file (final review C1): from now on,
+ *  this session, it is looked up, shown and opened like any outside file. */
+export const externalNetworkAllow = (path: string) =>
+  call<ExternalFile>('external_network_allow', { path });
+/** Shows a linked outside file in Finder / Explorer. */
+export const externalReveal = (path: string) => call<void>('external_reveal', { path });
+/** The Attach button's file dialog (Rust side); `[]` when cancelled. */
+export const filePick = (page: string) => call<PickedFile[]>('file_pick', { page });
 
 /** Font families installed on this computer (M2b §5). */
 export const fontsList = () => call<string[]>('fonts_list');
@@ -447,11 +533,28 @@ export const pageWidthSet = (path: string, width: PageWidth | null) =>
 /** A page's cover height in px (Rust clamps it to 132–2000); `null` clears it. */
 export const coverHeightSet = (path: string, height: number | null) =>
   call<VaultSettings>('cover_height_set', { path, height });
+/** Where a page's cover sits (`top` clears it; M4b part 3 §3). */
+export const coverSideSet = (path: string, side: CoverSide) =>
+  call<VaultSettings>('cover_side_set', { path, side });
+/** A side cover's strip width in px (Rust clamps it to 160–2000); `null`
+ *  clears it. */
+export const coverWidthSet = (path: string, width: number | null) =>
+  call<VaultSettings>('cover_width_set', { path, width });
 
 /** URL of a vault file for <img>/<audio> through the `nimw-asset:` protocol
  *  (M2a §2.5); WebView2 on Windows reaches custom protocols over http. */
 export function assetUrl(path: string): string {
   const encoded = path.split('/').map(encodeURIComponent).join('/');
+  return /Windows/i.test(navigator.userAgent)
+    ? `http://nimw-asset.localhost/${encoded}`
+    : `nimw-asset://localhost/${encoded}`;
+}
+
+/** URL of a linked file outside the vault (M4b part 3 §9): its absolute
+ *  path as one encoded segment after `/.external/`; Rust serves it only when
+ *  a saved page links to it. */
+export function externalAssetUrl(path: string): string {
+  const encoded = `.external/${encodeURIComponent(path)}`;
   return /Windows/i.test(navigator.userAgent)
     ? `http://nimw-asset.localhost/${encoded}`
     : `nimw-asset://localhost/${encoded}`;

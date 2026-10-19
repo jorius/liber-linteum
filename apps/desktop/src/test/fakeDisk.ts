@@ -31,9 +31,11 @@ const readable = (cmd: string, text: string) =>
 const unreadable = (cmd: string, path: string) =>
   err(cmd.startsWith('text_') ? 'notAText' : 'binary', path);
 
-/** First `# Heading`, else the file name (enough for header tests). */
+/** A `# Heading` on the first line (after the frontmatter and blank lines),
+ *  else the file name, as the index reads it (PG-01, M4b part 3 §1). */
 const titleOf = (path: string, text: string) =>
-  /^# (.+)$/m.exec(text)?.[1] ?? path.slice(path.lastIndexOf('/') + 1).replace(/\.md$/, '');
+  /^(?:---\n[\s\S]*?\n---\n)?\s*# ([^\n]+)/.exec(text)?.[1] ??
+  path.slice(path.lastIndexOf('/') + 1).replace(/\.md$/, '');
 
 /** `#tag`s in the text, like the index's (enough for tests: no code or
  *  front matter awareness). */
@@ -45,11 +47,13 @@ function tagsOf(text: string): string[] {
 function headerOf(text: string) {
   const data = parsePage(text).frontmatter?.data ?? {};
   const str = (v: unknown) => (typeof v === 'string' && v.trim() ? v : null);
-  const y = data['cover-y'];
+  const percent = (v: unknown) =>
+    typeof v === 'number' ? Math.min(100, Math.max(0, Math.round(v))) : null;
   return {
     subtitle: str(data.subtitle),
     cover: str(data.cover),
-    coverY: typeof y === 'number' ? Math.min(100, Math.max(0, Math.round(y))) : null,
+    coverY: percent(data['cover-y']),
+    coverX: percent(data['cover-x']),
   };
 }
 

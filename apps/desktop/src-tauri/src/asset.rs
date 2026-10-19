@@ -97,11 +97,50 @@ fn parse_range(header: &str, len: usize) -> Option<Result<(usize, usize), ()>> {
     })
 }
 
+/// Files outside the vault (M4b part 3 §9) are asked for as
+/// `/.external/<absolute path, one %-encoded segment>`. A vault path with a
+/// hidden component is never served, so the prefix can't shadow a vault file.
+pub const EXTERNAL_PREFIX: &str = ".external/";
+
+/// An outside file, through the session's allow-list and checks
+/// (`VaultSession::external_file`): 403 when it may not be shown, 404 when
+/// it isn't there.
+fn serve_external(
+    session: &nimw_session::VaultSession,
+    encoded: &str,
+    range: Option<&str>,
+) -> AssetResponse {
+    use nimw_session::SessionError;
+    if encoded.contains('/') {
+        return AssetResponse::status(403);
+    }
+    let Ok(path) = percent_decode_str(encoded).decode_utf8() else {
+        return AssetResponse::status(403);
+    };
+    let real = match session.external_file(&path) {
+        Ok(real) => real,
+        Err(SessionError::NotPermitted(_) | SessionError::NotAFile(_)) => {
+            return AssetResponse::status(403);
+        }
+        Err(_) => return AssetResponse::status(404),
+    };
+    let Ok(bytes) = std::fs::read(&real) else {
+        return AssetResponse::status(404);
+    };
+    respond(bytes, mime_for(&path), range)
+}
+
 /// Serves `uri_path` (the request path, percent-encoded, starting with `/`).
 pub fn serve(state: &AppState, uri_path: &str, range: Option<&str>) -> AssetResponse {
     let Ok(session) = state.session() else {
         return AssetResponse::status(404);
     };
+    if let Some(encoded) = uri_path
+        .trim_start_matches('/')
+        .strip_prefix(EXTERNAL_PREFIX)
+    {
+        return serve_external(&session, encoded, range);
+    }
     let decoded = percent_decode_str(uri_path.trim_start_matches('/')).decode_utf8_lossy();
     let Ok(path) = VaultPath::new(&decoded) else {
         return AssetResponse::status(403);
@@ -114,7 +153,11 @@ pub fn serve(state: &AppState, uri_path: &str, range: Option<&str>) -> AssetResp
     let Ok((bytes, _)) = session.vault().read(&path) else {
         return AssetResponse::status(404);
     };
-    let mime = mime_for(path.as_str());
+    respond(bytes, mime_for(path.as_str()), range)
+}
+
+/// A file's bytes as a full (200) or partial (206/416) response.
+fn respond(bytes: Vec<u8>, mime: &'static str, range: Option<&str>) -> AssetResponse {
     let len = bytes.len();
     match range.and_then(|r| parse_range(r, len)) {
         Some(Ok((start, end))) => AssetResponse {

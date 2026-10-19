@@ -5,6 +5,7 @@ pub mod drops;
 pub mod dto;
 pub mod editor_commands;
 pub mod error;
+pub mod external_commands;
 pub mod fonts;
 pub mod gv_commands;
 pub mod menu;
@@ -119,6 +120,13 @@ pub fn configure<R: tauri::Runtime>(
         editor_commands::text_write,
         vault_commands::entry_create_text,
         attachment_commands::cover_height_set,
+        attachment_commands::cover_side_set,
+        attachment_commands::cover_width_set,
+        external_commands::links_external,
+        external_commands::external_open,
+        external_commands::external_reveal,
+        external_commands::external_network_allow,
+        external_commands::file_pick,
     ])
 }
 

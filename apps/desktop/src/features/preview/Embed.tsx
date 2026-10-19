@@ -1,6 +1,8 @@
 import type { Element } from 'hast';
 import { assetUrl } from '../../ipc';
+import { looksExternal } from '../../markdown/externalPath';
 import { followLink } from '../../stores/links';
+import { ExternalEmbed, WithDiskPath } from './ExternalFile';
 import { nameOf } from '../../stores/tree';
 import styles from './Preview.module.css';
 import type { RenderCtx } from './renderHast';
@@ -23,6 +25,17 @@ export function Embed({ e, ctx, block }: { e: Element; ctx: RenderCtx; block: bo
   const resolved = ctx.resolve('embed', target);
   if (resolved === undefined) {
     return <span className={styles.pending}>{t('preview.loading')}</span>;
+  }
+  const width = p.dataWidth === undefined ? undefined : Number(p.dataWidth);
+  const height = p.dataHeight === undefined ? undefined : Number(p.dataHeight);
+  if (resolved === null && looksExternal(target)) {
+    // M4b part 3 §9: a path outside the vault (or not a vault path at all).
+    const outside = ctx.external('embed', target);
+    if (outside === undefined)
+      return <span className={styles.pending}>{t('preview.loading')}</span>;
+    if (outside) {
+      return <ExternalEmbed file={outside} alt={target} width={width} height={height} />;
+    }
   }
   if (resolved === null) {
     const ext = extOf(target);
@@ -53,24 +66,28 @@ export function Embed({ e, ctx, block }: { e: Element; ctx: RenderCtx; block: bo
   const ext = extOf(resolved);
   if (IMAGE.has(ext)) {
     return (
-      <img
-        className={styles.embedImage}
-        src={assetUrl(resolved)}
-        alt={target}
-        width={p.dataWidth === undefined ? undefined : Number(p.dataWidth)}
-        height={p.dataHeight === undefined ? undefined : Number(p.dataHeight)}
-        loading="lazy"
-      />
+      <WithDiskPath vaultPath={resolved}>
+        <img
+          className={styles.embedImage}
+          src={assetUrl(resolved)}
+          alt={target}
+          width={width}
+          height={height}
+          loading="lazy"
+        />
+      </WithDiskPath>
     );
   }
   if (AUDIO.has(ext)) {
     return (
-      <audio
-        className={styles.embedAudio}
-        controls
-        src={assetUrl(resolved)}
-        aria-label={nameOf(resolved)}
-      />
+      <WithDiskPath vaultPath={resolved}>
+        <audio
+          className={styles.embedAudio}
+          controls
+          src={assetUrl(resolved)}
+          aria-label={nameOf(resolved)}
+        />
+      </WithDiskPath>
     );
   }
   if (ext === 'md') {
@@ -103,15 +120,17 @@ export function Embed({ e, ctx, block }: { e: Element; ctx: RenderCtx; block: bo
     return ctx.renderNote(resolved, heading);
   }
   return (
-    <span className={styles.card}>
-      <span className={styles.fileName}>{nameOf(resolved)}</span>
-      <button
-        type="button"
-        className={styles.cardButton}
-        onClick={() => followLink({ type: 'file', path: resolved })}
-      >
-        {t('preview.openInApp')}
-      </button>
-    </span>
+    <WithDiskPath vaultPath={resolved}>
+      <span className={styles.card}>
+        <span className={styles.fileName}>{nameOf(resolved)}</span>
+        <button
+          type="button"
+          className={styles.cardButton}
+          onClick={() => followLink({ type: 'file', path: resolved })}
+        >
+          {t('preview.openInApp')}
+        </button>
+      </span>
+    </WithDiskPath>
   );
 }

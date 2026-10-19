@@ -11,6 +11,8 @@ const CARD: GvCard = {
   cover: null,
   coverRemote: false,
   coverY: null,
+  coverX: null,
+  coverSide: 'top',
   excerpt: 'Some text.',
   hasImage: false,
   hasAudio: false,

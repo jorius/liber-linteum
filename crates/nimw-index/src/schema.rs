@@ -1,4 +1,7 @@
-pub const SCHEMA_VERSION: i64 = 1;
+/// 2 (M4b part 3): titles follow the first-line H1 rule (§1); pages gain
+/// `cover_x` (§3); `target_key` follows `\` in Windows paths and Markdown
+/// `file:` links are indexed (§9). An index built by version 1 is rebuilt.
+pub const SCHEMA_VERSION: i64 = 2;
 
 pub(crate) const SCHEMA: &str = r#"
 CREATE TABLE meta (key TEXT PRIMARY KEY, value TEXT NOT NULL);
@@ -19,6 +22,7 @@ CREATE TABLE pages (
     subtitle TEXT,
     cover TEXT,
     cover_y INTEGER,
+    cover_x INTEGER,
     excerpt TEXT NOT NULL,
     has_image INTEGER NOT NULL,
     has_audio INTEGER NOT NULL,

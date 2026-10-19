@@ -180,6 +180,36 @@ impl Default for GlobalViewEdges {
     }
 }
 
+/// The element kinds that span the editor when a page's width is `wide`
+/// (M4b part 3, wide elements §2); a missing key takes its default, and
+/// keys this build does not know are kept.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct WideElements {
+    pub tables: bool,
+    pub code: bool,
+    /// Mermaid diagrams.
+    pub diagrams: bool,
+    pub images: bool,
+    /// `$$` maths blocks.
+    pub maths: bool,
+    #[serde(flatten)]
+    pub extra: serde_json::Map<String, serde_json::Value>,
+}
+
+impl Default for WideElements {
+    fn default() -> WideElements {
+        WideElements {
+            tables: true,
+            code: false,
+            diagrams: true,
+            images: false,
+            maths: false,
+            extra: serde_json::Map::new(),
+        }
+    }
+}
+
 pub const MIN_FONT_SIZE: u8 = 13;
 pub const MAX_FONT_SIZE: u8 = 20;
 
@@ -286,12 +316,17 @@ pub struct Settings {
     pub global_view_mode: GlobalViewMode,
     /// Global View: edge kinds shown (M3a §6).
     pub global_view_edges: GlobalViewEdges,
-    /// Readable measure or full width, app-wide (M4b part 2 §1).
+    /// Readable measure, wide elements or full width, app-wide (M4b part 2
+    /// §1; `wide`: M4b part 3).
     pub page_width: PageWidth,
+    /// What goes wide when a page's width is `wide` (M4b part 3).
+    pub wide_elements: WideElements,
     /// Outline panel shown beside the editor (M4b part 2 §5).
     pub outline: bool,
     /// Cover band height for pages without their own (cover resize).
     pub cover_height: CoverHeight,
+    /// A caption with each attachment's place on disk (M4b part 3 §8).
+    pub show_attachment_paths: bool,
     pub recent_vaults: Vec<RecentVault>,
     /// Keys this build does not know (written by a newer version); kept on save.
     #[serde(flatten)]
@@ -317,8 +352,10 @@ impl Default for Settings {
             global_view_mode: GlobalViewMode::Drill,
             global_view_edges: GlobalViewEdges::default(),
             page_width: PageWidth::Readable,
+            wide_elements: WideElements::default(),
             outline: false,
             cover_height: CoverHeight::default(),
+            show_attachment_paths: false,
             recent_vaults: Vec::new(),
             extra: serde_json::Map::new(),
         }
@@ -344,8 +381,10 @@ pub struct SettingsPatch {
     pub global_view_mode: Option<GlobalViewMode>,
     pub global_view_edges: Option<GlobalViewEdges>,
     pub page_width: Option<PageWidth>,
+    pub wide_elements: Option<WideElements>,
     pub outline: Option<bool>,
     pub cover_height: Option<CoverHeight>,
+    pub show_attachment_paths: Option<bool>,
 }
 
 /// A recent vault as shown on the welcome screen.
@@ -404,8 +443,10 @@ fn parse_lenient(text: &str) -> Result<(Settings, Vec<String>), serde_json::Erro
     field!("globalViewMode", global_view_mode);
     field!("globalViewEdges", global_view_edges);
     field!("pageWidth", page_width);
+    field!("wideElements", wide_elements);
     field!("outline", outline);
     field!("coverHeight", cover_height);
+    field!("showAttachmentPaths", show_attachment_paths);
     match map.remove("recentVaults") {
         None => {}
         Some(Value::Array(items)) => {
@@ -537,11 +578,21 @@ impl SettingsStore {
         if let Some(v) = patch.page_width {
             next.page_width = v;
         }
+        if let Some(mut v) = patch.wide_elements {
+            // Keys a newer version wrote survive a patch from this one.
+            let mut extra = std::mem::take(&mut next.wide_elements.extra);
+            extra.append(&mut v.extra);
+            v.extra = extra;
+            next.wide_elements = v;
+        }
         if let Some(v) = patch.outline {
             next.outline = v;
         }
         if let Some(v) = patch.cover_height {
             next.cover_height = v;
+        }
+        if let Some(v) = patch.show_attachment_paths {
+            next.show_attachment_paths = v;
         }
         self.save(&next)?;
         *s = next.clone();

@@ -107,9 +107,14 @@
     "titleInNote": "Título en la nota: {title}",
     "subtitleLabel": "Subtítulo",
     "subtitlePlaceholder": "Añade un subtítulo",
-    "fullWidth": "Ancho completo",
-    "fullWidthOn": "Usar todo el ancho en esta página",
-    "fullWidthOff": "Usar el ancho de lectura en esta página",
+    "width": {
+      "label": "Ancho de página",
+      "title": "Ancho de página: {width}",
+      "readable": "De lectura",
+      "wide": "Elementos anchos",
+      "full": "Ancho completo",
+      "reset": "Volver al predeterminado"
+    },
     "fileNameLabel": "Nombre del archivo",
     "textOnly": "Este archivo se abre en su aplicación predeterminada.",
     "openDefault": "Abrir en la aplicación predeterminada"
@@ -177,9 +182,18 @@
       },
       "hint": "Arrastra los bloques en la vista previa para reordenarlos; el Markdown de la izquierda los sigue.",
       "dismissHint": "Cerrar la sugerencia"
+    },
+    "attach": {
+      "title": "{count, plural, one {Adjuntar # archivo} other {Adjuntar # archivos}}",
+      "more": "{count, plural, one {y # más} other {y # más}}",
+      "explain": "Las copias viajan con la bóveda y se abren en Obsidian. Los enlaces dejan el archivo donde está.",
+      "copy": "Copiar a la bóveda",
+      "link": "Enlazar donde está",
+      "cancel": "Cancelar"
     }
   },
   "preview": {
+    "tableScroll": "Tabla, se desplaza de lado",
     "remoteBlocked": "Imagen remota bloqueada (privacidad)",
     "notFound": "No encontrado: {target}",
     "createPage": "Crear página",
@@ -187,7 +201,21 @@
     "open": "Abrir",
     "cycle": "La nota incrustada vuelve a esta página",
     "loading": "Cargando…",
-    "renderFailed": "No se pudo mostrar esta página. El texto está a salvo en el editor."
+    "renderFailed": "No se pudo mostrar esta página. El texto está a salvo en el editor.",
+    "external": {
+      "notFound": "No encontrado: {path}",
+      "open": "Abrir",
+      "revealMac": "Mostrar en Finder",
+      "revealWindows": "Mostrar en el Explorador",
+      "revealOther": "Mostrar en la carpeta",
+      "location": "Ubicación en el disco",
+      "copyPath": "Copiar ruta",
+      "network": "Archivo en la red: {path}",
+      "networkNote": "Cargarlo conecta con “{server}”.",
+      "loadNetwork": "Cargar desde la red",
+      "notOpenable": "No se abre desde las notas: este tipo de archivo puede ejecutar programas.",
+      "revealedInstead": "“{name}” no se abre desde las notas. Se muestra en su carpeta."
+    }
   },
   "menu": {
     "label": "Acciones para {name}",
@@ -219,7 +247,8 @@
     },
     "openFile": {
       "title": "¿Abrir «{name}» en su app predeterminada?",
-      "confirm": "Abrir"
+      "confirm": "Abrir",
+      "network": "Abrirlo conecta con “{server}”."
     },
     "createPage": {
       "title": "¿Crear la página «{name}»?",
@@ -272,13 +301,36 @@
     "lineNumbers": "Mostrar los números de línea",
     "pageWidth": "Ancho de página",
     "pageWidthReadable": "De lectura",
+    "pageWidthWide": "Elementos anchos",
     "pageWidthFull": "Ancho completo",
+    "wide": {
+      "title": "Elementos anchos",
+      "hint": "Se usa cuando el ancho de una página es Elementos anchos.",
+      "tables": "Tablas",
+      "code": "Bloques de código",
+      "diagrams": "Diagramas",
+      "images": "Imágenes",
+      "maths": "Bloques de fórmulas"
+    },
     "coverHeight": "Altura predeterminada de la portada",
     "coverHeightSmall": "Pequeña ({px} px)",
     "coverHeightMedium": "Mediana ({px} px)",
     "coverHeightLarge": "Grande ({px} px)",
     "coverHeightExtraLarge": "Muy grande ({px} px)",
-    "coverHeightPx": "{px} px"
+    "coverHeightPx": "{px} px",
+    "links": {
+      "label": "Formato de enlace para adjuntos nuevos",
+      "formats": {
+        "shortest": "Nombre más corto",
+        "vault": "Ruta completa en la bóveda",
+        "relative": "Relativa a la nota",
+        "absolute": "Ruta absoluta en el disco"
+      },
+      "example": "Los adjuntos nuevos se escriben como",
+      "obsidian": "Sigue la configuración de Obsidian ({format}). Elige un formato para usar el tuyo.",
+      "useObsidian": "Usar la configuración de Obsidian",
+      "showPaths": "Mostrar dónde están los adjuntos en el disco"
+    }
   },
   "toolbar": {
     "label": "Formato",
@@ -299,7 +351,8 @@
     "toggle": "Barra de formato",
     "short": "Formato",
     "show": "Mostrar la barra de formato",
-    "hide": "Ocultar la barra de formato"
+    "hide": "Ocultar la barra de formato",
+    "attach": "Adjuntar un archivo o imagen…"
   },
   "trail": {
     "back": "Volver a {name}"
@@ -320,7 +373,19 @@
     "height": "Altura de la portada",
     "heightValue": "{px} px",
     "resizeHint": "Arrastra para cambiar la altura de la portada; doble clic para restablecerla",
-    "heightNotSaved": "No se guardó la altura de la portada: {reason}"
+    "heightNotSaved": "No se guardó la altura de la portada: {reason}",
+    "placement": "Ubicación de la portada",
+    "top": "Arriba",
+    "left": "Izquierda",
+    "right": "Derecha",
+    "placeTop": "Portada arriba",
+    "placeLeft": "Portada a la izquierda",
+    "placeRight": "Portada a la derecha",
+    "positionBoth": "{x} % desde la izquierda, {y} % desde arriba",
+    "width": "Ancho de la portada",
+    "widthValue": "{px} px",
+    "sideNotSaved": "No se guardó la ubicación de la portada: {reason}",
+    "widthNotSaved": "No se guardó el ancho de la portada: {reason}"
   },
   "attach": {
     "dropOnText": "Suelta los archivos sobre el texto de la página para adjuntarlos",
@@ -416,6 +481,8 @@
     "hasAudio": "Tiene audio",
     "seeAll": "Ver todo",
     "seeAllLabel": "Ver todo: {title}",
+    "edit": "Editar",
+    "editLabel": "Editar {title}",
     "move": "Mover tarjeta",
     "breadcrumb": "Ruta de la vista global",
     "mode": "Siguiente nivel",
@@ -429,6 +496,10 @@
       "aggregated": "Enlaces desde dentro de carpetas"
     },
     "edgesCapped": "Se muestran los {shown, number} más fuertes de {total, number} enlaces desde dentro de carpetas.",
+    "chip": {
+      "links": "{count, plural, one {# enlace} other {# enlaces}}",
+      "relationships": "{count, plural, one {# relación} other {# relaciones}}"
+    },
     "reset": "Restablecer disposición",
     "layoutSaveFailed": "No se pudieron guardar las posiciones de las tarjetas. {error}",
     "empty": "Carpeta vacía.",
@@ -438,7 +509,39 @@
     "zoomOut": "Alejar",
     "fit": "Ajustar a la pantalla",
     "connections": "{links, plural, =0 {Sin enlaces.} one {Enlazada con # tarjeta.} other {Enlazada con # tarjetas.}} {manual, plural, =0 {} one {# relación.} other {# relaciones.}}",
-    "newEntry": "Nueva entrada"
+    "newEntry": "Nueva entrada",
+    "atoms": {
+      "see": "Ver átomos de {title}",
+      "menu": "Ver átomos",
+      "crumb": "Átomos",
+      "canvas": "Átomos de {title}",
+      "keys": "Las flechas mueven entre tarjetas. Intro abre la página en ese bloque, Escape vuelve atrás.",
+      "empty": "Esta página aún no tiene bloques.",
+      "level": "H{level}",
+      "sectionName": "Encabezado {level}: {title}",
+      "blocks": "{count, plural, one {# bloque} other {# bloques}}",
+      "items": "{count, plural, one {# elemento} other {# elementos}}",
+      "done": "{done, number} de {count, number} hechas",
+      "rows": "{count, plural, one {# fila} other {# filas}}",
+      "more": "{count, plural, one {# bloque más} other {# bloques más}}",
+      "moreLabel": "{count, plural, one {# bloque más: abrir la página ahí} other {# bloques más: abrir la página ahí}}",
+      "kind": {
+        "paragraph": "Párrafo",
+        "list": "Lista",
+        "tasks": "Tareas",
+        "quote": "Cita",
+        "callout": "Aviso",
+        "code": "Código",
+        "table": "Tabla",
+        "image": "Imagen",
+        "audio": "Audio",
+        "file": "Archivo",
+        "note": "Página incrustada",
+        "math": "Fórmula",
+        "diagram": "Diagrama",
+        "html": "HTML"
+      }
+    }
   },
   "code": {
     "plain": "Texto sin formato",

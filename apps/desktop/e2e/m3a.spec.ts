@@ -76,7 +76,10 @@ test('a double click opens the page in the editor', async ({ page }) => {
   await globalView(page);
   await card(page, 'Welcome').dblclick();
   await expect(page.getByRole('textbox', { name: 'Page title' })).toHaveValue('Welcome');
-  await expect(page.getByRole('button', { name: 'Edit' })).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.getByRole('button', { name: 'Edit', exact: true })).toHaveAttribute(
+    'aria-pressed',
+    'true',
+  );
 });
 
 test('a dragged card keeps its place after a reload (GV-31); Reset layout restores it', async ({
@@ -220,7 +223,10 @@ test('a slow double click on a folder leaves it open once; the card now under th
   await page.waitForTimeout(400); // past the single-click wait of the second press
   await expect(crumbs(page).getByText('Alpha')).toHaveAttribute('aria-current', 'page');
   await expect(card(page, 'One')).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Edit' })).toHaveAttribute('aria-pressed', 'false');
+  await expect(page.getByRole('button', { name: 'Edit', exact: true })).toHaveAttribute(
+    'aria-pressed',
+    'false',
+  );
 });
 
 test('a slow double click on a page opens that page (final review I5)', async ({ page }) => {

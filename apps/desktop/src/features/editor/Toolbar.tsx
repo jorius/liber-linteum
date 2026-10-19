@@ -3,6 +3,7 @@ import type { EditorView } from '@codemirror/view';
 import { useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import styles from './Editor.module.css';
+import { openAttach } from './attachOpen';
 import { openLinkPicker } from './linkPickerOpen';
 import {
   insertDivider,
@@ -50,6 +51,15 @@ const INLINE: Item[] = [
     run: insertLink,
     open: openLinkPicker,
     icon: svg('M6.5 9.5l3-3M7 4.5l1-1a2.8 2.8 0 0 1 4 4l-1 1M9 11.5l-1 1a2.8 2.8 0 0 1-4-4l1-1'),
+  },
+  {
+    // M4b part 3 §7: the OS file dialog; the command itself never runs.
+    id: 'attach',
+    run: () => false,
+    open: openAttach,
+    icon: svg(
+      'M10.5 4.5 5.8 9.2a1.4 1.4 0 0 0 2 2l5-5a2.8 2.8 0 0 0-4-4l-5 5a4.2 4.2 0 0 0 6 6l4.2-4.2',
+    ),
   },
 ];
 const BLOCK: Item[] = [

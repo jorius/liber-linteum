@@ -4,6 +4,7 @@ import { act } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { clearMocks, mockIPC } from '../../ipc/testing';
 import { usePageStore } from '../../stores/pageStore';
+import { useUiStore } from '../../stores/uiStore';
 import {
   followLinkAtCursor,
   LARGE_NOTE_CHARS,
@@ -197,6 +198,104 @@ describe('Live Preview (M2a §3.2)', () => {
   });
 });
 
+describe('links to files outside the vault (M4b part 3 §9)', () => {
+  const outsideAt = (path: string, exists = true) =>
+    mockIPC((cmd, raw) => {
+      const n = ((raw as { targets?: unknown[] })?.targets ?? []).length;
+      if (cmd === 'links_resolve') return Array(n).fill(null);
+      if (cmd === 'links_external') {
+        return Array(n).fill({
+          path,
+          exists,
+          listed: true,
+          network: false,
+          askFirst: false,
+          openable: true,
+        });
+      }
+      return null;
+    });
+
+  it('[[D:\\…]] asks to open the file, never to create a page', async () => {
+    useUiStore.setState({ dialog: null });
+    outsideAt('D:\\Docs\\x.pdf');
+    const v = editor('Read [[D:\\Docs\\x.pdf]] now\n', 8);
+    expect(followLinkAtCursor(v)).toBe(true);
+    await vi.waitFor(() =>
+      expect(useUiStore.getState().dialog).toEqual({
+        type: 'openFile',
+        path: 'D:\\Docs\\x.pdf',
+        external: true,
+      }),
+    );
+  });
+
+  it('a Markdown link with a file: URL or a drive path is followed too', async () => {
+    useUiStore.setState({ dialog: null });
+    outsideAt('/Users/j/a b.pdf');
+    const v = editor('[a](file:///Users/j/a%20b.pdf) [b](D:\\x.pdf)\n', 2);
+    expect(followLinkAtCursor(v)).toBe(true);
+    await vi.waitFor(() =>
+      expect(useUiStore.getState().dialog).toEqual({
+        type: 'openFile',
+        path: '/Users/j/a b.pdf',
+        external: true,
+      }),
+    );
+    useUiStore.setState({ dialog: null });
+    act(() => v.dispatch({ selection: { anchor: 33 } }));
+    expect(followLinkAtCursor(v)).toBe(true);
+    await vi.waitFor(() => expect(useUiStore.getState().dialog?.type).toBe('openFile'));
+  });
+
+  it('final review I1: [[/Projects/New idea]] with nothing on disk offers Create page', async () => {
+    useUiStore.setState({ dialog: null });
+    mockIPC((cmd, raw) => {
+      const n = ((raw as { targets?: unknown[] })?.targets ?? []).length;
+      if (cmd === 'links_resolve' || cmd === 'links_external') return Array(n).fill(null);
+      return null;
+    });
+    const v = editor('See [[/Projects/New idea]] now\n', 8);
+    expect(followLinkAtCursor(v)).toBe(true);
+    await vi.waitFor(() =>
+      expect(useUiStore.getState().dialog).toMatchObject({
+        type: 'createPage',
+        target: '/Projects/New idea',
+      }),
+    );
+  });
+
+  it('final review C1: a link to a network file asks before anything loads it', async () => {
+    useUiStore.setState({ dialog: null });
+    const unc = '\\\\nas\\share\\x.pdf';
+    mockIPC((cmd, raw) => {
+      const n = ((raw as { targets?: unknown[] })?.targets ?? []).length;
+      if (cmd === 'links_resolve') return Array(n).fill(null);
+      if (cmd === 'links_external') {
+        return Array(n).fill({
+          path: unc,
+          exists: false,
+          listed: true,
+          network: true,
+          askFirst: true,
+          openable: true,
+        });
+      }
+      return null;
+    });
+    const v = editor(`Read [[${unc}]] now\n`, 8);
+    expect(followLinkAtCursor(v)).toBe(true);
+    await vi.waitFor(() =>
+      expect(useUiStore.getState().dialog).toEqual({
+        type: 'openFile',
+        path: unc,
+        external: true,
+        network: true,
+      }),
+    );
+  });
+});
+
 describe('raw HTML blocks (M2c §7.7)', () => {
   it('render sanitized like a table; the cursor on them shows the source', async () => {
     const v = editor(
@@ -245,5 +344,49 @@ describe('Live Preview diagrams (M4b part 2 §4)', () => {
     const v = editor(text, text.length - 1);
     expect(v.contentDOM.querySelector('.cm-nimw-widget')).not.toBeNull();
     expect(v.contentDOM.querySelector('.cm-nimw-codebadge')).toBeNull();
+  });
+});
+
+describe('wide elements (M4b part 3): what may escape the measure', () => {
+  const kinds = (v: EditorView) =>
+    [...v.contentDOM.querySelectorAll<HTMLElement>('.cm-nimw-widget')].map(
+      (w) => w.dataset.wideKind ?? null,
+    );
+
+  it('block widgets say their kind: tables, maths, diagrams and lone images; others none', () => {
+    const text =
+      'Top\n\n| a | b |\n| - | - |\n| 1 | 2 |\n\n$$\nx^2\n$$\n\n' +
+      '```mermaid\nflowchart LR\n  A --> B\n```\n\n![[pic.png]]\n\n![[Other]]\n\n> [!note]\n> Callout\n';
+    const v = editor(text);
+    expect(kinds(v)).toEqual(['tables', 'maths', 'diagrams', 'images', null, null]);
+  });
+
+  it("code lines carry their block's widest line; raw table lines do while edited", async () => {
+    const text =
+      'Top\n\n```js\nshort();\n\tconst longer = 1;\n```\n\n| a | b |\n| - | - |\n| one | two |\n';
+    const v = editor(text);
+    const code = [...v.contentDOM.querySelectorAll<HTMLElement>('.cm-nimw-codeblock')];
+    expect(code).toHaveLength(4);
+    // The tab counts as four columns: "    const longer = 1;" is 21.
+    expect(code.map((l) => l.style.getPropertyValue('--nimw-ch'))).toEqual([
+      '21',
+      '21',
+      '21',
+      '21',
+    ]);
+    expect(code.map((l) => l.dataset.wideSrc)).toEqual(['code', 'code', 'code', 'code']);
+    expect(v.contentDOM.querySelector('[data-wide-src="tables"]')).toBeNull();
+    await moveTo(v, v.state.doc.line(9).from);
+    const rows = [...v.contentDOM.querySelectorAll<HTMLElement>('[data-wide-src="tables"]')];
+    expect(rows.map((l) => l.textContent)).toEqual(['| a | b |', '| - | - |', '| one | two |']);
+    expect(rows[0].style.getPropertyValue('--nimw-ch')).toBe('13');
+  });
+
+  it('a Mermaid block being edited follows the diagrams choice', async () => {
+    const text = 'Top\n\n```mermaid\nflowchart LR\n```\n';
+    const v = editor(text);
+    await moveTo(v, v.state.doc.line(4).from);
+    const src = [...v.contentDOM.querySelectorAll<HTMLElement>('.cm-nimw-codeblock')];
+    expect(src.map((l) => l.dataset.wideSrc)).toEqual(['diagrams', 'diagrams', 'diagrams']);
   });
 });

@@ -73,16 +73,18 @@ export function PageView() {
   const binary = !kept && (page.binary || editorError?.kind === 'binary');
   return (
     <section className={styles.page} aria-label={t('page.region')}>
-      <PageHeader page={page} mode={mode} />
-      {orphanBanner}
-      <UnwritableNotice />
-      {binary ? (
-        <p className={`${styles.notice} ${styles.inset}`}>{t('page.binary')}</p>
-      ) : editorError ? (
-        <p className={`${styles.notice} ${styles.inset}`}>{errorMessage(editorError)}</p>
-      ) : (
-        doc && <Editor doc={doc} mode={mode} label={page.title} />
-      )}
+      {/* A side cover (M4b part 3 §3) runs beside the header and the text. */}
+      <PageHeader page={page} mode={mode}>
+        {orphanBanner}
+        <UnwritableNotice />
+        {binary ? (
+          <p className={`${styles.notice} ${styles.inset}`}>{t('page.binary')}</p>
+        ) : editorError ? (
+          <p className={`${styles.notice} ${styles.inset}`}>{errorMessage(editorError)}</p>
+        ) : (
+          doc && <Editor doc={doc} mode={mode} label={page.title} />
+        )}
+      </PageHeader>
     </section>
   );
 }

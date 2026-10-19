@@ -1,6 +1,6 @@
 use nimw_session::{SessionEvent, VaultSession};
 use nimw_testkit::{copy_fixture, wait_until};
-use nimw_vault::{PageWidth, VaultPath, WatchEvent};
+use nimw_vault::{CoverSide, PageWidth, VaultPath, WatchEvent};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
@@ -349,5 +349,33 @@ fn cover_heights_of_pages_deleted_outside_are_forgotten_renames_keep_them() {
             ("Kept.md".to_string(), 300),
             ("Renamed.md".to_string(), 300)
         ]
+    );
+}
+
+/// M4b part 3 §3: pages deleted outside the app take their cover placement
+/// and strip width with them; a rename by another program keeps them.
+#[test]
+fn cover_sides_and_widths_of_pages_deleted_outside_are_forgotten() {
+    let (dir, _c, s) = unwatched(&[("A.md", "# a"), ("Kept.md", "# kept"), ("Moved.md", "# m")]);
+    for page in ["A.md", "Kept.md", "Moved.md"] {
+        s.vault().set_cover_side(page, CoverSide::Left).unwrap();
+        s.vault().set_cover_width(page, Some(300)).unwrap();
+    }
+    std::fs::remove_file(dir.path().join("A.md")).unwrap();
+    std::fs::rename(dir.path().join("Moved.md"), dir.path().join("Renamed.md")).unwrap();
+    s.apply(vec![
+        WatchEvent::Removed(vp("A.md")),
+        WatchEvent::Removed(vp("Moved.md")),
+        WatchEvent::Changed(vp("Renamed.md")),
+    ])
+    .unwrap();
+    let kept = ["Kept.md".to_string(), "Renamed.md".to_string()];
+    assert_eq!(
+        s.vault().cover_sides().into_keys().collect::<Vec<_>>(),
+        kept
+    );
+    assert_eq!(
+        s.vault().cover_widths().into_keys().collect::<Vec<_>>(),
+        kept
     );
 }

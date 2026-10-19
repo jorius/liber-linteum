@@ -145,6 +145,7 @@ describe('startup on Safari 15.0–15.3 (final review C1)', () => {
         import('./app/App'),
         import('./i18n'),
         import('./features/editor/attachments'),
+        import('./features/global-view/seeAtomsMenu'),
         import('./stores/editorStore'),
         import('./stores/menuToggles'),
         import('./stores/navigate'),

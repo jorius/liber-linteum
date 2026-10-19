@@ -152,6 +152,42 @@ describe('Settings dialog (M2b §4, §5, §7)', () => {
     expect(document.documentElement.style.getPropertyValue('--font-source')).toContain('"Menlo"');
   });
 
+  it('M4b part 3: page width offers Wide elements; the kinds that go wide are checkboxes', async () => {
+    open();
+    const width = screen.getByRole('combobox', { name: 'Page width' });
+    expect(
+      within(width)
+        .getAllByRole('option')
+        .map((o) => o.textContent),
+    ).toEqual(['Readable', 'Wide elements', 'Full width']);
+    await userEvent.selectOptions(width, 'wide');
+    await waitFor(() => expect(patches).toEqual([{ pageWidth: 'wide' }]));
+    const group = screen.getByRole('group', { name: 'Wide elements' });
+    expect(within(group).getByText('Used when a page’s width is Wide elements.')).toBeVisible();
+    const boxes = within(group).getAllByRole('checkbox');
+    expect(boxes.map((b) => b.getAttribute('aria-label') ?? b.parentElement!.textContent)).toEqual([
+      'Tables',
+      'Code blocks',
+      'Diagrams',
+      'Images',
+      'Maths blocks',
+    ]);
+    expect(boxes.map((b) => (b as HTMLInputElement).checked)).toEqual([
+      true,
+      false,
+      true,
+      false,
+      false,
+    ]);
+    await userEvent.click(within(group).getByRole('checkbox', { name: 'Code blocks' }));
+    await waitFor(() =>
+      expect(patches.at(-1)).toEqual({
+        wideElements: { tables: true, code: true, diagrams: true, images: false, maths: false },
+      }),
+    );
+    expect(within(group).getByRole('checkbox', { name: 'Code blocks' })).toBeChecked();
+  });
+
   it('cover resize: the default cover height is a choice of four sizes, saved at once', async () => {
     open();
     const select = screen.getByRole('combobox', { name: 'Default cover height' });
@@ -164,6 +200,14 @@ describe('Settings dialog (M2b §4, §5, §7)', () => {
     await userEvent.selectOptions(select, '280');
     await waitFor(() => expect(patches).toEqual([{ coverHeight: 280 }]));
     expect(select).toHaveValue('280');
+  });
+
+  it('M4b part 3 §8: "Show where attachments are on disk" is off until turned on', async () => {
+    open();
+    const box = screen.getByRole('checkbox', { name: 'Show where attachments are on disk' });
+    expect(box).not.toBeChecked();
+    await userEvent.click(box);
+    await waitFor(() => expect(patches).toEqual([{ showAttachmentPaths: true }]));
   });
 
   it('cover resize: a default set by hand outside the four sizes is still shown', () => {
@@ -191,9 +235,13 @@ describe('Settings → This vault (M2c §5.4)', () => {
   let overrideObsidian: boolean;
   let stored: { mode: string; path: string };
   let vaultWidth: string | null;
+  let linkFormat: string | null;
+  let obsidianLinkFormat: string | null;
 
   beforeEach(() => {
     vaultWidth = null;
+    linkFormat = null;
+    obsidianLinkFormat = null;
     vaultPatches = [];
     obsidian = null;
     overrideObsidian = false;
@@ -207,6 +255,8 @@ describe('Settings → This vault (M2c §5.4)', () => {
         overrideObsidian,
         pageWidth: vaultWidth,
         pageWidths: {},
+        attachmentLinkFormat: linkFormat,
+        obsidianLinkFormat,
       });
       if (cmd === 'vault_settings_get') return reply();
       if (cmd === 'vault_settings_set') {
@@ -215,7 +265,11 @@ describe('Settings → This vault (M2c §5.4)', () => {
           attachments?: typeof stored;
           overrideObsidian?: boolean;
           pageWidth?: string;
+          attachmentLinkFormat?: string;
         };
+        if (patch.attachmentLinkFormat) {
+          linkFormat = patch.attachmentLinkFormat === 'default' ? null : patch.attachmentLinkFormat;
+        }
         if (patch.attachments) stored = patch.attachments;
         if (patch.overrideObsidian !== undefined) overrideObsidian = patch.overrideObsidian;
         if (patch.pageWidth) vaultWidth = patch.pageWidth === 'default' ? null : patch.pageWidth;
@@ -253,8 +307,55 @@ describe('Settings → This vault (M2c §5.4)', () => {
     await waitFor(() => expect(width).toHaveValue('default'));
     await userEvent.selectOptions(width, 'full');
     await waitFor(() => expect(vaultPatches).toEqual([{ pageWidth: 'full' }]));
+    // M4b part 3: Wide elements is a vault choice too.
+    await userEvent.selectOptions(width, 'wide');
+    await waitFor(() => expect(vaultPatches.at(-1)).toEqual({ pageWidth: 'wide' }));
     await userEvent.selectOptions(width, 'default');
     await waitFor(() => expect(vaultPatches.at(-1)).toEqual({ pageWidth: 'default' }));
+  });
+
+  it('M4b part 3 §8: the link format for new attachments is saved at once, with an example', async () => {
+    open();
+    const format = await screen.findByRole('combobox', {
+      name: 'Link format for new attachments',
+    });
+    await waitFor(() => expect(format).toHaveValue('shortest'));
+    expect(
+      within(format)
+        .getAllByRole('option')
+        .map((o) => o.textContent),
+    ).toEqual([
+      'Shortest name',
+      'Full path in the vault',
+      'Relative to the note',
+      'Absolute path on disk',
+    ]);
+    expect(screen.getByText('![[x.png]]')).toBeInTheDocument();
+    await userEvent.selectOptions(format, 'absolute');
+    await waitFor(() => expect(vaultPatches).toEqual([{ attachmentLinkFormat: 'absolute' }]));
+    expect(format).toHaveValue('absolute');
+    expect(screen.getByText('![](file:///…/Assets/x.png)')).toBeInTheDocument();
+  });
+
+  it("M4b part 3 §8: Obsidian's newLinkFormat is followed until NIMW has its own", async () => {
+    obsidianLinkFormat = 'relative';
+    open();
+    const format = await screen.findByRole('combobox', {
+      name: 'Link format for new attachments',
+    });
+    await waitFor(() => expect(format).toHaveValue('default'));
+    expect(
+      screen.getByText(
+        'Following Obsidian’s setting (Relative to the note). Choose a format to use your own.',
+      ),
+    ).toBeInTheDocument();
+    expect(screen.getByText('![[../Assets/x.png]]')).toBeInTheDocument();
+    await userEvent.selectOptions(format, 'vault');
+    await waitFor(() => expect(vaultPatches).toEqual([{ attachmentLinkFormat: 'vault' }]));
+    expect(screen.queryByText(/Following Obsidian’s setting/)).not.toBeInTheDocument();
+    await userEvent.selectOptions(format, 'default');
+    await waitFor(() => expect(vaultPatches.at(-1)).toEqual({ attachmentLinkFormat: 'default' }));
+    expect(format).toHaveValue('default');
   });
 
   it('a folder is saved on Enter; an unusable name is explained and not saved', async () => {
@@ -273,6 +374,23 @@ describe('Settings → This vault (M2c §5.4)', () => {
       expect(vaultPatches).toEqual([{ attachments: { mode: 'folder', path: 'Media/Img' } }]),
     );
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
+
+  it('M4b part 3: a folder typed but not confirmed is saved when a click outside closes Settings', async () => {
+    const closed: string[] = [];
+    render(<SettingsDialog onClose={() => closed.push('closed')} />);
+    const where = await screen.findByRole('combobox', { name: 'New attachments go to' });
+    await waitFor(() => expect(where).toHaveValue('subfolder'));
+    await userEvent.selectOptions(where, 'folder');
+    vaultPatches.length = 0;
+    await userEvent.type(screen.getByRole('textbox', { name: 'Folder in the vault' }), 'Media');
+    const backdrop = screen.getByRole('dialog', { name: 'Settings' }).parentElement!;
+    fireEvent.mouseDown(backdrop);
+    fireEvent.click(backdrop);
+    expect(closed).toEqual(['closed']);
+    await waitFor(() =>
+      expect(vaultPatches).toEqual([{ attachments: { mode: 'folder', path: 'Media' } }]),
+    );
   });
 
   it('tabbing through the untouched field writes nothing (no .nimw/ for nothing; final review M5)', async () => {
@@ -344,5 +462,53 @@ describe('Settings → This vault (M2c §5.4)', () => {
     await waitFor(() => expect(vaultPatches[2]).toEqual({ overrideObsidian: false }));
     expect(where).toBeDisabled();
     expect(where).toHaveValue('same');
+  });
+});
+
+describe('M4b part 3: Escape and a click outside save and close Settings', () => {
+  const openWith = () => {
+    const closed: string[] = [];
+    render(<SettingsDialog onClose={() => closed.push('closed')} />);
+    return closed;
+  };
+
+  it('Escape closes when nothing in the dialog has focus (WebKit leaves a clicked checkbox unfocused)', () => {
+    const closed = openWith();
+    (document.activeElement as HTMLElement | null)?.blur();
+    fireEvent.keyDown(document.body, { key: 'Escape' });
+    expect(closed).toEqual(['closed']);
+  });
+
+  it('Escape closes once, not twice, when focus is inside the dialog', () => {
+    const closed = openWith();
+    fireEvent.keyDown(screen.getByRole('combobox', { name: 'Language' }), { key: 'Escape' });
+    expect(closed).toEqual(['closed']);
+  });
+
+  it('a click on the backdrop closes; a click inside, or a press inside released outside, does not', () => {
+    const closed = openWith();
+    const dialog = screen.getByRole('dialog', { name: 'Settings' });
+    const backdrop = dialog.parentElement!;
+    fireEvent.mouseDown(dialog);
+    fireEvent.click(backdrop);
+    fireEvent.mouseDown(dialog);
+    fireEvent.click(dialog);
+    expect(closed).toEqual([]);
+    fireEvent.mouseDown(backdrop);
+    fireEvent.click(backdrop);
+    expect(closed).toEqual(['closed']);
+  });
+
+  it('a hex accent typed but not confirmed is saved by Escape before closing', async () => {
+    const closed = openWith();
+    await userEvent.click(screen.getByRole('radio', { name: 'Custom accent' }));
+    const hex = screen.getByRole('textbox', { name: 'Accent colour (hex)' });
+    await userEvent.clear(hex);
+    await userEvent.type(hex, '#123456');
+    fireEvent.keyDown(hex, { key: 'Escape' });
+    expect(closed).toEqual(['closed']);
+    await waitFor(() =>
+      expect(patches).toContainEqual(expect.objectContaining({ accentColor: '#123456' })),
+    );
   });
 });

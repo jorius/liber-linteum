@@ -1,6 +1,7 @@
-// Full page width (M4b part 2 §1): a page's own width, else the vault's,
-// else the app's. Page and vault widths live in `.nimw/vault.json` (Rust);
-// they're re-read when the vault or its tree changes (renames move them).
+// Page width (M4b part 2 §1; `wide`: M4b part 3): a page's own width, else
+// the vault's, else the app's. Page and vault widths live in
+// `.nimw/vault.json` (Rust); they're re-read when the vault or its tree
+// changes (renames move them).
 import { create } from 'zustand';
 import {
   pageWidthSet,
@@ -9,6 +10,7 @@ import {
   type IpcResult,
   type PageWidth,
   type VaultSettings,
+  type WideElements,
 } from '../ipc';
 import { useSettingsStore } from './settingsStore';
 import { useVaultStore } from './vaultStore';
@@ -18,9 +20,9 @@ interface PageWidthState {
   pages: Record<string, PageWidth>;
   loaded: boolean;
   load: () => Promise<void>;
-  /** Full ↔ readable for one page; stores an entry only when it differs
-   *  from the vault/app default. */
-  toggle: (path: string) => Promise<void>;
+  /** One page's width; `null`, or the default's own width, clears its entry
+   *  so the page follows the default again (part 2 §10.2). */
+  set: (path: string, width: PageWidth | null) => Promise<void>;
   setVault: (width: PageWidth | 'default') => Promise<void>;
 }
 
@@ -30,23 +32,25 @@ function apply(res: IpcResult<VaultSettings>): Partial<PageWidthState> {
   return { vault: res.value.pageWidth ?? null, pages: res.value.pageWidths ?? {}, loaded: true };
 }
 
-/** The width the page shows. */
-export function widthFor(path: string): PageWidth {
-  const { vault, pages } = usePageWidthStore.getState();
-  return pages[path] ?? vault ?? useSettingsStore.getState().settings.pageWidth;
+/** The width a page without its own shows: the vault's, else the app's. */
+export function fallbackWidth(): PageWidth {
+  return usePageWidthStore.getState().vault ?? useSettingsStore.getState().settings.pageWidth;
 }
 
-export const usePageWidthStore = create<PageWidthState>((set, get) => ({
+/** The width the page shows. */
+export function widthFor(path: string): PageWidth {
+  return usePageWidthStore.getState().pages[path] ?? fallbackWidth();
+}
+
+export const usePageWidthStore = create<PageWidthState>((set) => ({
   vault: null,
   pages: {},
   loaded: false,
   load: async () => {
     set(apply(await vaultSettingsGet()));
   },
-  toggle: async (path) => {
-    const fallback = get().vault ?? useSettingsStore.getState().settings.pageWidth;
-    const next: PageWidth = widthFor(path) === 'full' ? 'readable' : 'full';
-    set(apply(await pageWidthSet(path, next === fallback ? null : next)));
+  set: async (path, width) => {
+    set(apply(await pageWidthSet(path, width === fallbackWidth() ? null : width)));
   },
   setVault: async (width) => {
     set(apply(await vaultSettingsSet({ pageWidth: width })));
@@ -58,6 +62,16 @@ export function usePageWidth(path: string): PageWidth {
   const own = usePageWidthStore((s) => s.pages[path] ?? s.vault);
   const app = useSettingsStore((s) => s.settings.pageWidth);
   return own ?? app;
+}
+
+/** Whether the page has a width of its own (Reset to default clears it). */
+export function useOwnPageWidth(path: string): boolean {
+  return usePageWidthStore((s) => s.pages[path] !== undefined);
+}
+
+/** The kinds that go wide on a `wide` page (M4b part 3). */
+export function useWideElements(): WideElements {
+  return useSettingsStore((s) => s.settings.wideElements);
 }
 
 // Re-read with each vault and after tree changes (renames move entries).

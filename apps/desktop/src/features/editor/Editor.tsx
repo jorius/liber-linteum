@@ -14,9 +14,9 @@ import { tagHighlighter, tags } from '@lezer/highlight';
 import { diffIndices } from 'node-diff3';
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import type { EditorMode } from '../../ipc';
+import type { EditorMode, PickedFile } from '../../ipc';
 import { usePageStore } from '../../stores/pageStore';
-import { usePageWidth } from '../../stores/pageWidthStore';
+import { usePageWidth, useWideElements } from '../../stores/pageWidthStore';
 import { isTextPath } from '../../stores/textFiles';
 import { nameOf } from '../../stores/tree';
 import { useSettingsStore } from '../../stores/settingsStore';
@@ -25,20 +25,25 @@ import { Preview } from '../preview/Preview';
 import styles from './Editor.module.css';
 import { followLinkAtCursor, livePreview, pagePath } from './livePreview';
 import { attachmentHandlers } from './attachments';
+import { flash, jumpTo } from './flash';
 import { BlockGutter, type Shown } from './BlockGutter';
 import { SplitHint } from './SplitHint';
 import { activeFormats, editorKeymap, type ActiveFormat } from './format';
+import { coverSideHistory } from './coverSideHistory';
 import { linkCompletion } from './linkComplete';
 import { LanguagePicker } from './LanguagePicker';
 import { setLanguagePickerOpener } from './languagePickerOpen';
 import { LinkPicker } from './LinkPicker';
 import { setLinkPickerOpener } from './linkPickerOpen';
+import { setAttachChooser } from './attachOpen';
+import { AttachChoice } from './AttachChoice';
 import type { PageDoc } from './pageDoc';
 import { Outline } from './Outline';
 import { blockForOffset, offsetAtTop, topIn } from './scrollSync';
 import { notifyViewReset, notifyViewUpdate, setCurrentView } from './viewUpdates';
 import { Toolbar } from './Toolbar';
 import { hideView, pageDocOf, showView, storedState, storeState } from './views';
+import { LIVE_PADDING, wideAttrs, wideExtents } from './wideBox';
 import { toggleTaskIn } from './widgets';
 
 /** The Split pane of the component currently showing each view. */
@@ -307,6 +312,10 @@ function createState(d: PageDoc, mode: EditorMode, label: string, numbers: boole
       // Pasted images and dropped files (M2c §5), `[[` autocomplete (§6).
       attachmentHandlers(),
       linkCompletion(),
+      // Cover placements join the undo history (M4b part 3 §3).
+      coverSideHistory,
+      // An atom clicked in the Global View flashes here (M4b part 3 §6).
+      flash,
       gutterSlot.of(gutter(numbers)),
       followers,
     ],
@@ -323,6 +332,7 @@ export interface EditorProps {
 /** The page editor: Live Preview, Source, or Split (Source + rendered pane). */
 export function Editor({ doc, mode, label }: EditorProps) {
   const width = usePageWidth(doc.path);
+  const wideKinds = useWideElements();
   const textFile = isTextPath(doc.path);
   const { t } = useTranslation();
   const host = useRef<HTMLDivElement>(null);
@@ -342,6 +352,7 @@ export function Editor({ doc, mode, label }: EditorProps) {
   const showOutline = useSettingsStore((s) => s.settings.outline);
   const [toolbarView, setToolbarView] = useState<EditorView | null>(null);
   const [picker, setPicker] = useState(false);
+  const [attach, setAttach] = useState<PickedFile[] | null>(null);
   const [langPicker, setLangPicker] = useState<{ at: number; anchor: HTMLElement } | null>(null);
   const [active, setActive] = useState<Set<ActiveFormat>>(() => new Set());
   const showFormats = useCallback((state: EditorState) => {
@@ -361,6 +372,7 @@ export function Editor({ doc, mode, label }: EditorProps) {
     toolbarOf.set(v, showFormats);
     setToolbarView(v);
     setLinkPickerOpener(v, () => setPicker(true));
+    setAttachChooser(v, setAttach);
     setLanguagePickerOpener(v, (at, anchor) => setLangPicker({ at, anchor }));
     showFormats(v.state);
     setCurrentView(v);
@@ -373,6 +385,7 @@ export function Editor({ doc, mode, label }: EditorProps) {
       paneOf.delete(v);
       toolbarOf.delete(v);
       setLinkPickerOpener(v, null);
+      setAttachChooser(v, null);
       setLanguagePickerOpener(v, null);
       v.destroy();
       view.current = null;
@@ -432,6 +445,17 @@ export function Editor({ doc, mode, label }: EditorProps) {
     if (!active || active === document.body) v.focus();
   }, [wantsFocus, screen]);
 
+  // See atoms (M4b part 3 §6): an atom clicked in the Global View puts the
+  // cursor on its block, once its page shows here.
+  const jump = usePageStore((s) => s.jump);
+  useEffect(() => {
+    const v = view.current;
+    if (!jump || !v || screen !== 'edit' || current.current.path !== jump.path) return;
+    usePageStore.getState().clearJump();
+    jumpTo(v, jump.from, jump.to);
+    v.focus();
+  }, [jump, screen, doc]);
+
   // Split: the editor and the rendered pane follow each other's scrolling.
   useEffect(() => {
     if (!split || !view.current || !pane.current) return;
@@ -467,6 +491,43 @@ export function Editor({ doc, mode, label }: EditorProps) {
     };
   }, [split]);
 
+  // Wide elements (M4b part 3): how far past the text the chosen kinds may
+  // reach, measured from the editor (the scroller, or the line-number
+  // gutter, less the side padding).
+  useLayoutEffect(() => {
+    const h = host.current;
+    const v = toolbarView;
+    if (!h) return;
+    if (!v || width !== 'wide' || mode !== 'livePreview') {
+      h.style.removeProperty('--nimw-wide-m');
+      h.style.removeProperty('--nimw-wide-r');
+      return;
+    }
+    const measure = () => {
+      const scroller = v.scrollDOM.getBoundingClientRect();
+      const content = v.contentDOM.getBoundingClientRect();
+      const gutters = v.dom.querySelector<HTMLElement>('.cm-gutters')?.getBoundingClientRect();
+      const { m, r } = wideExtents({
+        textLeft: content.left + LIVE_PADDING,
+        textRight: content.right - LIVE_PADDING,
+        leftBound: Math.max(scroller.left, gutters ? gutters.right : scroller.left) + LIVE_PADDING,
+        rightBound: scroller.left + v.scrollDOM.clientWidth - LIVE_PADDING,
+      });
+      h.style.setProperty('--nimw-wide-m', `${m}px`);
+      h.style.setProperty('--nimw-wide-r', `${r}px`);
+    };
+    measure();
+    const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(measure);
+    observer?.observe(v.scrollDOM);
+    const gutters = v.dom.querySelector('.cm-gutters');
+    if (gutters) observer?.observe(gutters);
+    window.addEventListener('resize', measure);
+    return () => {
+      observer?.disconnect();
+      window.removeEventListener('resize', measure);
+    };
+  }, [toolbarView, width, mode, showNumbers]);
+
   const toggleTask = useCallback((at: number) => {
     if (view.current) toggleTaskIn(view.current, at);
   }, []);
@@ -482,6 +543,9 @@ export function Editor({ doc, mode, label }: EditorProps) {
     <div className={styles.frame}>
       {showToolbar && !textFile && toolbarView && <Toolbar view={toolbarView} active={active} />}
       {picker && toolbarView && <LinkPicker view={toolbarView} onClose={() => setPicker(false)} />}
+      {attach && toolbarView && (
+        <AttachChoice view={toolbarView} files={attach} onClose={() => setAttach(null)} />
+      )}
       {langPicker && toolbarView && (
         <LanguagePicker
           view={toolbarView}
@@ -496,6 +560,7 @@ export function Editor({ doc, mode, label }: EditorProps) {
           <div
             ref={host}
             data-width={width}
+            {...wideAttrs(width, wideKinds)}
             className={`${mode === 'livePreview' ? styles.live : styles.source} ${width === 'full' ? styles.full : ''}`}
           />
           {split && (

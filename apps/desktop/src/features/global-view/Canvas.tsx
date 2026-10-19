@@ -24,6 +24,7 @@ import { useUiStore } from '../../stores/uiStore';
 import { Card } from './Card';
 import { closeCardMenus, type CardMenuItem } from './CardMenu';
 import { EdgeLayer, MAX_AGGREGATED, strongest, type DrawnEdge } from './edges';
+import { useFocusMode } from './focusMode';
 import { openIndexPick, pageOf, pickable, useGvStore } from './gvStore';
 import {
   CARD_H,
@@ -47,6 +48,7 @@ interface CardData extends Record<string, unknown> {
   connecting: boolean;
   onOpen: (card: GvCard) => void;
   onOpenEditor: (card: GvCard) => void;
+  onSeeAtoms?: () => void;
 }
 
 type CardNode = Node<CardData, 'card'>;
@@ -75,6 +77,7 @@ function CardNodeView({ data }: NodeProps<CardNode>) {
         wrapConnect={connectHandle}
         onOpen={() => data.onOpen(data.card)}
         onOpenEditor={() => data.onOpenEditor(data.card)}
+        onSeeAtoms={data.onSeeAtoms}
         onFocus={() => setFocus(data.card.path)}
       />
     </>
@@ -227,6 +230,13 @@ export function Canvas({ mode, toggles, width, onOpen, onOpenEditor }: CanvasPro
       if (pickable(card)) {
         items.push({ label: t('gv.indexPick.pick'), run: () => openIndexPick(card) });
       }
+      // See atoms (M4b part 3 §6) of the page the card stands for.
+      if (page) {
+        items.push({
+          label: t('gv.atoms.menu'),
+          run: () => useGvStore.getState().seeAtoms(page, card.title),
+        });
+      }
       return items;
     },
     [t],
@@ -268,6 +278,9 @@ export function Canvas({ mode, toggles, width, onOpen, onOpenEditor }: CanvasPro
           connecting: connectFrom?.path === card.path,
           onOpen: open,
           onOpenEditor,
+          ...(card.kind === 'page' && {
+            onSeeAtoms: () => useGvStore.getState().seeAtoms(card.path, card.title),
+          }),
         },
       })),
     [
@@ -338,6 +351,10 @@ export function Canvas({ mode, toggles, width, onOpen, onOpenEditor }: CanvasPro
     void useGvStore.getState().connectByDrag(from, to);
   };
 
+  // Focus mode (M4b part 3 §5): a hovered or keyboard-moved-to card lights
+  // its edges and neighbours.
+  const focusMode = useFocusMode(wrapper, [drawn, shownKey]);
+
   /** Moves the keyboard to a card: at once when it is on screen, else after
    *  the next render (a level that just loaded). */
   function focusCard(path: string) {
@@ -375,6 +392,8 @@ export function Canvas({ mode, toggles, width, onOpen, onOpenEditor }: CanvasPro
     <div
       ref={wrapper}
       className={styles.canvas}
+      data-gv-canvas=""
+      {...focusMode}
       onKeyDown={onKeyDown}
       onClickCapture={onClickCapture}
       onDoubleClickCapture={onDoubleClickCapture}

@@ -191,6 +191,26 @@ describe('Editor (M2a §3.2–3.3)', () => {
   });
 });
 
+describe('a jump from the Global View (M4b part 3 §6: See atoms)', () => {
+  it('puts the cursor on the atom and flashes it, once, when its page shows', async () => {
+    disk = fakeDisk({ 'A.md': '# A\n\nintro\n\ntarget block\n', 'B.md': 'other\n' });
+    useUiStore.setState({ screen: 'edit' });
+    const b = await load('B.md');
+    const { rerender } = render(<Editor doc={b} mode="livePreview" label="B" />);
+    // Asked for A while B shows: it waits for A.
+    act(() => usePageStore.getState().requestJump('A.md', 12, 24));
+    expect(viewOf().state.selection.main.head).toBe(0);
+    expect(usePageStore.getState().jump).not.toBeNull();
+    const a = await load('A.md');
+    rerender(<Editor doc={a} mode="livePreview" label="A" />);
+    expect(viewOf().state.selection.main.head).toBe(12);
+    expect([...document.querySelectorAll('.cm-nimw-flash')].map((el) => el.textContent)).toEqual([
+      'target block',
+    ]);
+    expect(usePageStore.getState().jump).toBeNull();
+  });
+});
+
 describe('task checkboxes outside the source text (feedback 2026-10-13)', () => {
   it('a click in the Split pane toggles the task in the page', async () => {
     disk = fakeDisk({ 'T.md': '# T\n\n- [ ] a\n' });
@@ -396,5 +416,42 @@ describe('code block badge and language picker (M4b part 2 §2)', () => {
     await vi.waitFor(() =>
       expect(screen.getByRole('button', { name: 'Copy code' })).toHaveTextContent('Copied'),
     );
+  });
+});
+
+describe('wide elements (M4b part 3)', () => {
+  const host = () => document.querySelector<HTMLElement>('.cm-editor')!.parentElement!;
+  afterEach(() => useSettingsStore.setState({ settings: DEFAULT_SETTINGS }));
+
+  it('the host names the kinds that go wide, only on a wide page', async () => {
+    disk = fakeDisk({ 'W.md': 'x\n' });
+    const doc = await load('W.md');
+    useSettingsStore.setState({ settings: { ...DEFAULT_SETTINGS, pageWidth: 'wide' } });
+    render(<Editor doc={doc} mode="livePreview" label="W" />);
+    expect(host().dataset.width).toBe('wide');
+    expect(host()).toHaveAttribute('data-wide-tables', '');
+    expect(host()).toHaveAttribute('data-wide-diagrams', '');
+    expect(host()).not.toHaveAttribute('data-wide-code');
+    // How far they may reach is measured from the editor.
+    expect(host().style.getPropertyValue('--nimw-wide-m')).toMatch(/^\d+px$/);
+    expect(host().style.getPropertyValue('--nimw-wide-r')).toMatch(/^\d+px$/);
+    act(() =>
+      useSettingsStore.setState({
+        settings: {
+          ...DEFAULT_SETTINGS,
+          pageWidth: 'wide',
+          wideElements: { ...DEFAULT_SETTINGS.wideElements, tables: false, code: true },
+        },
+      }),
+    );
+    expect(host()).not.toHaveAttribute('data-wide-tables');
+    expect(host()).toHaveAttribute('data-wide-code', '');
+    act(() => useSettingsStore.setState({ settings: { ...DEFAULT_SETTINGS, pageWidth: 'full' } }));
+    expect(host().dataset.width).toBe('full');
+    for (const kind of ['tables', 'code', 'diagrams', 'images', 'maths']) {
+      expect(host()).not.toHaveAttribute(`data-wide-${kind}`);
+    }
+    expect(host().style.getPropertyValue('--nimw-wide-m')).toBe('');
+    expect(host().style.getPropertyValue('--nimw-wide-r')).toBe('');
   });
 });

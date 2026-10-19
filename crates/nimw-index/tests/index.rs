@@ -150,6 +150,27 @@ fn upsert_file_as_attachment_drops_page_data() {
     assert!(idx.links_from("Home.md").unwrap().is_empty());
 }
 
+/// M4b part 3 §1: titles changed rule (a first-line H1, else the file name),
+/// so an index written before it is rebuilt rather than reused.
+#[test]
+fn an_index_from_before_the_title_rule_is_rebuilt() {
+    let dir = tempfile::tempdir().unwrap();
+    let db = dir.path().join("nimw/abc/index.sqlite");
+    {
+        let mut idx = Index::open(&db).unwrap();
+        idx.transaction(|tx| tx.upsert_file(&file("x.md", FileKind::Page)))
+            .unwrap();
+    }
+    rusqlite::Connection::open(&db)
+        .unwrap()
+        .execute(
+            "UPDATE meta SET value = '1' WHERE key = 'schema_version'",
+            [],
+        )
+        .unwrap();
+    assert_eq!(Index::open(&db).unwrap().counts().unwrap().0, 0);
+}
+
 #[test]
 fn review_focus_corrupt_or_foreign_or_old_db_is_rebuilt() {
     let dir = tempfile::tempdir().unwrap();

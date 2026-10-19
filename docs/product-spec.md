@@ -137,7 +137,7 @@ The defining feature is the **Global View**: a navigable canvas where each proje
 ### 5.2 Page metadata
 | ID | Requirement |
 |----|-------------|
-| PG-01 | **Title** = first H1; fallback to file name. [DECIDED] |
+| PG-01 | **Title** = an H1 that is the first block of the body (after frontmatter and blank lines); fallback to file name, as in Obsidian (revised 2026-10-15, M4b part 3 §1). [DECIDED] |
 | PG-02 | **Cover**: user can add, change, reposition and remove a cover image via UI ("Add cover"), Notion-style. Stored as frontmatter `cover:` (vault-relative image path) and `cover-y:` (vertical position). [DECIDED] |
 | PG-03 | **Subtitle**: shown on cards and below the title; stored in frontmatter `subtitle:`, edited from the page header. [DECIDED] (Q-PG-1) |
 | PG-04 | **Tags**: `#tag` in the body and frontmatter `tags:` (Obsidian compatibility). [DECIDED] |

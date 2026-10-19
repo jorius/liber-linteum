@@ -13,6 +13,39 @@
   overflow: hidden;
 }
 
+/* Folders and projects (M4b part 3 §4): a second sheet behind the card and a
+   tinted head row; the tab is a sibling (the card clips its own box). */
+.card[data-kind='folder'],
+.card[data-kind='project'] {
+  box-shadow:
+    5px 5px 0 -1px var(--color-surface),
+    5px 5px 0 0 var(--color-card-border),
+    var(--shadow-card);
+}
+
+.card[data-kind='folder'] .head,
+.card[data-kind='project'] .head {
+  background: var(--color-accent-soft);
+}
+
+.card[data-kind='folder'] .kind,
+.card[data-kind='project'] .kind {
+  color: var(--color-accent);
+}
+
+.tab {
+  position: absolute;
+  left: 14px;
+  top: -9px;
+  width: 72px;
+  height: 10px;
+  box-sizing: border-box;
+  border: 1px solid var(--color-card-border);
+  border-bottom: 0;
+  border-radius: 6px 6px 0 0;
+  background: var(--color-accent-soft);
+}
+
 .card[data-open] {
   border-color: var(--color-accent);
   box-shadow: 0 0 0 2px var(--color-accent);
@@ -22,6 +55,23 @@
 .card[data-connecting] {
   border-color: var(--color-edge-manual);
   box-shadow: 0 0 0 2px var(--color-edge-manual);
+}
+
+/* A folder keeps its second sheet under the ring. */
+.card[data-kind='folder'][data-open],
+.card[data-kind='project'][data-open] {
+  box-shadow:
+    0 0 0 2px var(--color-accent),
+    5px 5px 0 -1px var(--color-surface),
+    5px 5px 0 0 var(--color-card-border);
+}
+
+.card[data-kind='folder'][data-connecting],
+.card[data-kind='project'][data-connecting] {
+  box-shadow:
+    0 0 0 2px var(--color-edge-manual),
+    5px 5px 0 -1px var(--color-surface),
+    5px 5px 0 0 var(--color-card-border);
 }
 
 .head {
@@ -43,6 +93,12 @@
   letter-spacing: 0.07em;
   text-transform: uppercase;
   color: var(--color-text-muted);
+}
+
+.kindIcon {
+  display: inline-block;
+  margin-right: 6px;
+  vertical-align: -2px;
 }
 
 .grip {
@@ -114,7 +170,12 @@
   outline: none;
 }
 
+/* The frame has a definite size and the image fills it absolutely (M4b part
+   3 §2): with `height: 100%` on a grid item in an auto row, Chromium (WebView2
+   on Windows) kept the image's natural height, so object-fit had nothing to
+   crop and the card showed the image's top instead of its focus. */
 .cover {
+  position: relative;
   flex: 0 0 96px;
   display: grid;
   place-items: center;
@@ -131,10 +192,43 @@
 }
 
 .image {
+  position: absolute;
+  inset: 0;
   width: 100%;
   height: 100%;
   object-fit: cover;
   display: block;
+}
+
+/* A side cover (M4b part 3 §3): a 96 px strip, full height, on its side; the
+   title, subtitle and excerpt beside it. The card keeps its size. */
+.hit[data-cover-side] {
+  display: grid;
+  grid-template-columns: 96px minmax(0, 1fr);
+  grid-template-rows: auto auto 1fr;
+  align-content: start;
+}
+
+.hit[data-cover-side] > .cover {
+  grid-column: 1;
+  grid-row: 1 / -1;
+  height: 100%;
+}
+
+.hit[data-cover-side] > :not(.cover) {
+  grid-column: 2;
+}
+
+.hit[data-cover-side='right'] {
+  grid-template-columns: minmax(0, 1fr) 96px;
+}
+
+.hit[data-cover-side='right'] > .cover {
+  grid-column: 2;
+}
+
+.hit[data-cover-side='right'] > :not(.cover) {
+  grid-column: 1;
 }
 
 .none {
@@ -195,8 +289,40 @@
   place-items: center;
 }
 
+/* See atoms (M4b part 3 §6): an icon button before Edit. */
+.atoms {
+  margin-left: auto;
+  display: inline-grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-pill);
+  background: var(--color-surface);
+  color: var(--color-accent);
+  cursor: pointer;
+}
+
+.atoms:hover {
+  border-color: var(--color-accent);
+  background: var(--color-accent-soft);
+}
+
+.atoms:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 2px;
+}
+
+.atoms + .seeAll {
+  margin-left: 0;
+}
+
 .seeAll {
   margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   min-height: 32px;
   padding: 6px 14px;
   border: 1px solid var(--color-accent);

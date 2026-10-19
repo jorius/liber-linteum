@@ -267,7 +267,7 @@ impl Vault {
 }
 
 pub(crate) const NIMW_JSON: &str = ".nimw/vault.json";
-const OBSIDIAN_JSON: &str = ".obsidian/app.json";
+pub(crate) const OBSIDIAN_JSON: &str = ".obsidian/app.json";
 
 /// True when an index-note pick can hold: `page` sits directly in `folder`
 /// (GV-02, M3b §6; final review I4).

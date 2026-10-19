@@ -63,12 +63,31 @@
   border-collapse: collapse;
 }
 
+/* A table's own box (M4b part 3 wide elements §3): a table wider than the
+   room it has scrolls sideways here instead of squeezing its columns. */
+.tableScroll {
+  max-width: 100%;
+  overflow-x: auto;
+  border-radius: var(--radius-sm);
+}
+
+.tableScroll:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 2px;
+}
+
 .content th,
 .content td,
 .nested th,
 .nested td {
   border: 1px solid var(--color-border);
   padding: 4px 10px;
+  /* Whole words (wide elements §3): the pane's `overflow-wrap: anywhere`
+     also shrinks a column's minimum width to one letter, so cells broke
+     "Lieutenant" into "Lieutena nt". `break-word` leaves the minimum at the
+     longest word; a table that can't fit scrolls in its box instead. */
+  overflow-wrap: break-word;
+  word-break: normal;
 }
 
 .content hr,
@@ -277,6 +296,16 @@ summary.calloutTitle {
   font-family: var(--font-mono);
 }
 
+/* A network file's card (final review C1): the line saying what loading it
+   does, in the card's own muted text. */
+.cardNote {
+  font-size: 12.5px;
+}
+
+.networkCard {
+  flex-wrap: wrap;
+}
+
 .cardButton {
   font: 600 12.5px var(--font-body);
   color: var(--color-accent);
@@ -392,6 +421,25 @@ summary.calloutTitle {
   background: var(--color-surface);
   color: var(--color-text-body);
   cursor: pointer;
+}
+
+/* Where an attachment is on disk (M4b part 3 §8): under the embed. */
+.diskPath {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: 4px 0 10px;
+  color: var(--color-text-muted);
+  font-size: 12.5px;
+}
+
+.diskPathText {
+  font-family: var(--font-mono);
+  color: var(--color-text-body);
+  background: none;
+  overflow-wrap: anywhere;
+  user-select: text;
 }
 
 /* Mermaid diagrams (M4b part 2 §4). */

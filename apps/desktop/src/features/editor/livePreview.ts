@@ -17,14 +17,16 @@ import {
   type ViewUpdate,
 } from '@codemirror/view';
 import type { Heading, Image, Link, ListItem, Node, Parent, RootContent } from 'mdast';
-import { linksResolve, type LinkKind } from '../../ipc';
+import { linksExternal, linksResolve, type LinkKind, type WideElements } from '../../ipc';
+import { isFileTarget, looksExternal } from '../../markdown/externalPath';
 import { reparse } from '../../markdown/incremental';
 import { parsePage } from '../../markdown/parse';
 import { toSafeHast, vaultJoin } from '../../markdown/sanitize';
 import type { Embed, ParsedPage, WikiLink } from '../../markdown/types';
 import { rangeOf } from '../../markdown/walk';
-import { followLink } from '../../stores/links';
+import { followLink, followOutside as followOutsideFile } from '../../stores/links';
 import { CheckboxWidget, CodeBadgeWidget, InlineMathWidget, PreviewWidget } from './widgets';
+import { widestLine } from './wideBox';
 
 import { LARGE_NOTE_CHARS } from './limits';
 import { safeDecode } from '../../markdown/decode';
@@ -66,6 +68,9 @@ const lineClass = (cls: string) => Decoration.line({ class: cls });
 
 const BLOCK_WIDGET = new Set(['table', 'callout', 'columns', 'thematicBreak', 'math']);
 const TASK = /^(\s*(?:[-*+]|\d+[.)])[ \t]+)\[([ xX])\]/;
+/** The wide-elements choice (M4b part 3) a block widget follows. */
+const WIDE_KIND: Record<string, keyof WideElements> = { table: 'tables', math: 'maths' };
+const IMAGE_FILE = /\.(?:png|jpe?g|gif|webp|svg|avif|bmp)$/i;
 
 /** Whether an HTML block renders nothing once sanitized (comments, scripts):
  *  such blocks keep their source, muted, so nothing silently disappears
@@ -130,22 +135,48 @@ function build(state: EditorState, page: ParsedPage, active: Set<number>): Decor
       conceal(inner[1], to);
     }
   };
-  const blockWidget = (node: Node) => {
+  const blockWidget = (node: Node, kind: keyof WideElements | null = null) => {
     const [from, to] = rangeOf(node);
     const start = doc.lineAt(from).from;
     const end = doc.lineAt(Math.min(to, doc.length)).to;
     out.push(
       Decoration.replace({
-        widget: new PreviewWidget(text(start, end), path),
+        widget: new PreviewWidget(text(start, end), path, kind),
         block: true,
       }).range(start, end),
     );
   };
-  const isLoneEmbed = (node: Parent) => {
+  /** Lines shown as source that may escape the measure with `kind` (M4b
+   *  part 3): one box as wide as the block's widest line, in `ch`. */
+  const wideLines = (from: number, to: number, kind: keyof WideElements, cls?: string) => {
+    const first = doc.lineAt(from).number;
+    const last = doc.lineAt(Math.min(to, doc.length)).number;
+    const texts: string[] = [];
+    for (let n = first; n <= last; n++) texts.push(doc.line(n).text);
+    const deco = Decoration.line({
+      ...(cls ? { class: cls } : {}),
+      attributes: { 'data-wide-src': kind, style: `--nimw-ch: ${widestLine(texts)}` },
+    });
+    lines(from, to, deco);
+  };
+  const loneChild = (node: Parent): RootContent | null => {
     const kids = (node.children as RootContent[]).filter(
       (c) => !(c.type === 'text' && !c.value.trim()),
     );
-    return kids.length === 1 && (kids[0].type === ('embed' as string) || kids[0].type === 'image');
+    return kids.length === 1 ? kids[0] : null;
+  };
+  const isLoneEmbed = (node: Parent) => {
+    const kid = loneChild(node);
+    return !!kid && (kid.type === ('embed' as string) || kid.type === 'image');
+  };
+  /** A lone embed goes wide with Images when it shows an image file. */
+  const embedKind = (node: Parent): keyof WideElements | null => {
+    const kid = loneChild(node);
+    if (kid?.type === 'image') return 'images';
+    const target = kid && (kid as unknown as Embed).target;
+    return typeof target === 'string' && IMAGE_FILE.test(target.replace(/[#|].*$/, ''))
+      ? 'images'
+      : null;
   };
 
   const visit = (node: Node) => {
@@ -153,13 +184,16 @@ function build(state: EditorState, page: ParsedPage, active: Set<number>): Decor
     const [from, to] = rangeOf(node);
     const type = node.type as string;
     if (!reduced) {
-      if (
-        (BLOCK_WIDGET.has(type) || (type === 'paragraph' && isLoneEmbed(node as Parent))) &&
-        !touched(from, to)
-      ) {
-        blockWidget(node);
+      if (BLOCK_WIDGET.has(type) && !touched(from, to)) {
+        blockWidget(node, WIDE_KIND[type] ?? null);
         return;
       }
+      if (type === 'paragraph' && isLoneEmbed(node as Parent) && !touched(from, to)) {
+        blockWidget(node, embedKind(node as Parent));
+        return;
+      }
+      // M4b part 3: a table or maths block being edited keeps its wide box.
+      if (type === 'table' || type === 'math') wideLines(from, to, WIDE_KIND[type]);
     }
     switch (type) {
       case 'heading': {
@@ -214,14 +248,14 @@ function build(state: EditorState, page: ParsedPage, active: Set<number>): Decor
       case 'code': {
         if (reduced) return;
         // M4b part 2 §4: a diagram off the cursor is drawn as a block widget.
-        if (
-          (node as unknown as { lang?: string }).lang?.toLowerCase() === 'mermaid' &&
-          !touched(from, to)
-        ) {
-          blockWidget(node);
+        const mermaid = (node as unknown as { lang?: string }).lang?.toLowerCase() === 'mermaid';
+        if (mermaid && !touched(from, to)) {
+          blockWidget(node, 'diagrams');
           return;
         }
-        lines(from, to, lineClass('cm-nimw-codeblock'));
+        // M4b part 3: a diagram's source follows the Diagrams choice, so it
+        // keeps its box while edited; other code follows Code blocks.
+        wideLines(from, to, mermaid ? 'diagrams' : 'code', 'cm-nimw-codeblock');
         // M4b part 2 §2: a fenced block's language badge and Copy button.
         const first = doc.lineAt(from);
         const fence = /^\s*(`{3,}|~{3,})(\S*)/.exec(first.text);
@@ -362,6 +396,16 @@ function linkAt(page: ParsedPage, pos: number): Node | null {
   return found;
 }
 
+/** Follows a file outside the vault (M4b part 3 §9) that `target` names;
+ *  `false` when it names none. */
+async function followOutside(kind: LinkKind, target: string, source: string): Promise<boolean> {
+  const res = await linksExternal(source, [{ kind, target }]);
+  const outside = res.ok ? res.value[0] : null;
+  if (!outside) return false;
+  followOutsideFile(outside);
+  return true;
+}
+
 async function resolveAndFollow(
   kind: LinkKind,
   query: string,
@@ -370,8 +414,12 @@ async function resolveAndFollow(
   source: string,
 ) {
   const res = await linksResolve(source, [{ kind, target: query }]);
-  if (res.ok)
-    followLink({ type: 'page', kind, target, heading, resolved: res.value[0] ?? null, source });
+  if (!res.ok) return;
+  const resolved = res.value[0] ?? null;
+  if (resolved === null && kind !== 'markdown' && looksExternal(target)) {
+    if (await followOutside(kind, target, source)) return;
+  }
+  followLink({ type: 'page', kind, target, heading, resolved, source });
 }
 
 /** Follows the link at `pos` (click, Mod-Enter); `false` if there is none. */
@@ -394,10 +442,20 @@ export function followLinkAt(view: EditorView, pos: number): boolean {
     followLink({ type: 'anchor', heading: safeDecode(url.slice(1)) });
     return true;
   }
-  if (/^[a-z][a-z0-9+.-]*:/i.test(url)) return false;
   const hash = url.indexOf('#');
+  const path = safeDecode(hash >= 0 ? url.slice(0, hash) : url);
+  // M4b part 3 §9: a drive, UNC or file: path names a file outside the vault.
+  if (isFileTarget(path)) {
+    void followOutside('markdown', path, source);
+    return true;
+  }
+  if (/^[a-z][a-z0-9+.-]*:/i.test(url)) return false;
   const joined = vaultJoin(source, hash >= 0 ? url.slice(0, hash) : url);
-  if (!joined) return false;
+  if (!joined) {
+    // Above the vault root: outside it.
+    void followOutside('markdown', path, source);
+    return true;
+  }
   const heading = hash >= 0 ? safeDecode(url.slice(hash + 1)) || null : null;
   void resolveAndFollow('markdown', `/${joined}`, joined, heading, source);
   return true;

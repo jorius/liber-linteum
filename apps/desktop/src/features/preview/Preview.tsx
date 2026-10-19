@@ -15,6 +15,7 @@ import { RenderBoundary } from './RenderBoundary';
 import { renderChildren, type RenderCtx } from './renderHast';
 import { useDebounced } from './useDebounced';
 import { useParsed } from './useParsed';
+import { useExternal } from './useExternal';
 import { useResolved } from './useResolved';
 
 /** Re-render delay after typing (M2a §4). */
@@ -72,6 +73,7 @@ function PreviewBody({
     return toSafeHast(part, { sourcePath: path });
   }, [page, path, heading]);
   const resolve = useResolved(path, tree);
+  const external = useExternal(path, tree);
   useEffect(() => onRendered?.(shown, page), [onRendered, shown, page]);
   const anchor = usePageStore((s) => (depth === 0 && !embedded ? s.anchor : null));
   const box = useRef<HTMLDivElement>(null);
@@ -99,6 +101,7 @@ function PreviewBody({
       depth,
       chain: [...chain, path],
       resolve,
+      external,
       t,
       renderNote: (note, h) => <NoteEmbed key={`${note}#${h}`} path={note} heading={h} ctx={ctx} />,
       toggleTask: onToggleTask,
@@ -106,7 +109,7 @@ function PreviewBody({
     return renderChildren(tree, ctx);
     // `chainKey` stands for `chain`.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tree, resolve, path, depth, chainKey, t, onToggleTask]);
+  }, [tree, resolve, external, path, depth, chainKey, t, onToggleTask]);
   return (
     <div ref={box} className={depth || embedded ? styles.nested : styles.content}>
       {body}

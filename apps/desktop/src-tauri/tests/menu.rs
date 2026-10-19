@@ -121,6 +121,7 @@ fn macos_menu_quit_is_ours_and_the_standard_items_stay() {
         "Toggle Outline",
         "Editor",
         "Global View",
+        "See Atoms of This Page",
     ] {
         assert!(view.iter().any(|t| t == want), "{want}: {view:?}");
     }
@@ -243,7 +244,8 @@ fn toggle_items_emit_menu_toggle() {
     );
 }
 
-/// M3a §2: View → Editor / Global View tell the page which screen to show.
+/// M3a §2: View → Editor / Global View tell the page which screen to show;
+/// M4b part 3 §6: See Atoms of This Page, the open page's atoms.
 fn screen_items_emit_menu_screen() {
     use tauri::Listener;
     let got: Arc<std::sync::Mutex<Vec<String>>> = Arc::default();
@@ -257,6 +259,7 @@ fn screen_items_emit_menu_screen() {
             for id in [
                 nimw_desktop::menu::EDITOR_ID,
                 nimw_desktop::menu::GLOBAL_VIEW_ID,
+                nimw_desktop::menu::ATOMS_ID,
             ] {
                 nimw_desktop::menu::on_menu_event(
                     handle,
@@ -272,7 +275,11 @@ fn screen_items_emit_menu_screen() {
     });
     assert_eq!(
         *got.lock().unwrap(),
-        ["\"edit\"".to_string(), "\"global\"".into()]
+        [
+            "\"edit\"".to_string(),
+            "\"global\"".into(),
+            "\"atoms\"".into()
+        ]
     );
 }
 

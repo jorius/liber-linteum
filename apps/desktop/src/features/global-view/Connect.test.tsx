@@ -29,6 +29,8 @@ function card(path: string, extra: Partial<GvCard> = {}): GvCard {
     cover: null,
     coverRemote: false,
     coverY: null,
+    coverX: null,
+    coverSide: 'top',
     excerpt: '',
     hasImage: false,
     hasAudio: false,

@@ -69,6 +69,7 @@ pub struct CardRow {
     /// Where `cover:` resolves (`None`: no cover, remote or missing).
     pub cover_path: Option<String>,
     pub cover_y: Option<u8>,
+    pub cover_x: Option<u8>,
     pub excerpt: Option<String>,
     pub has_image: bool,
     pub has_audio: bool,
@@ -121,6 +122,7 @@ pub struct PageRow {
     pub subtitle: Option<String>,
     pub cover: Option<String>,
     pub cover_y: Option<u8>,
+    pub cover_x: Option<u8>,
     pub excerpt: String,
     pub has_image: bool,
     pub has_audio: bool,

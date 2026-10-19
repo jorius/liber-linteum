@@ -304,6 +304,93 @@ fn m2c_link_suggest_empty_query_lists_recent_files_first() {
     assert_eq!(paths, ["New.md", "Mid.md", "Old.md"]);
 }
 
+/// M4b part 3 §8: the vault's link format decides what a new attachment's
+/// link says; each one still resolves back to the file.
+#[test]
+fn m4b3_new_attachments_follow_the_link_format() {
+    use nimw_vault::LinkFormat;
+    let vault = tempfile::tempdir().unwrap();
+    std::fs::create_dir_all(vault.path().join("Notes/Sub")).unwrap();
+    std::fs::write(vault.path().join("Notes/Sub/a.md"), "# A\n").unwrap();
+    std::fs::create_dir(vault.path().join(".nimw")).unwrap();
+    std::fs::write(
+        vault.path().join(".nimw/vault.json"),
+        r#"{ "attachments": { "mode": "folder", "path": "Assets" } }"#,
+    )
+    .unwrap();
+    let (_c, s) = open(vault.path());
+    let page = vp("Notes/Sub/a.md");
+    let save = |format: Option<LinkFormat>, name: &str| {
+        s.vault().set_link_format(format).unwrap();
+        let a = s.save_attachment(&page, name, b"png").unwrap();
+        assert_eq!(
+            resolves_to(&s, page.as_str(), &a.link).as_deref(),
+            Some(a.path.as_str()),
+            "{format:?}: {}",
+            a.link
+        );
+        a
+    };
+    let shortest = save(None, "one.png");
+    assert_eq!((shortest.link.as_str(), shortest.url), ("one.png", None));
+    assert_eq!(
+        save(Some(LinkFormat::Vault), "two.png").link,
+        "Assets/two.png"
+    );
+    assert_eq!(
+        save(Some(LinkFormat::Relative), "three.png").link,
+        "../../Assets/three.png"
+    );
+    let absolute = save(Some(LinkFormat::Absolute), "four four.png");
+    let root = dunce::canonicalize(vault.path()).unwrap();
+    assert_eq!(
+        absolute.url.as_deref(),
+        Some(nimw_session::file_url(root.join("Assets/four four.png").to_str().unwrap()).as_str())
+    );
+    assert!(absolute.url.unwrap().ends_with("/Assets/four%20four.png"));
+}
+
+/// A relative link that an exact vault path would capture gets `./`.
+#[test]
+fn m4b3_relative_links_start_with_dot_slash_when_needed() {
+    use nimw_vault::LinkFormat;
+    let vault = tempfile::tempdir().unwrap();
+    std::fs::create_dir_all(vault.path().join("Notes")).unwrap();
+    std::fs::write(vault.path().join("Notes/a.md"), "# A\n").unwrap();
+    std::fs::create_dir_all(vault.path().join("attachments")).unwrap();
+    std::fs::write(vault.path().join("attachments/y.png"), b"root").unwrap();
+    let (_c, s) = open(vault.path());
+    s.vault()
+        .set_link_format(Some(LinkFormat::Relative))
+        .unwrap();
+    let a = s
+        .save_attachment(&vp("Notes/a.md"), "y.png", b"new")
+        .unwrap();
+    assert_eq!(a.path.as_str(), "Notes/attachments/y.png");
+    assert_eq!(a.link, "./attachments/y.png");
+    assert_eq!(
+        resolves_to(&s, "Notes/a.md", &a.link).as_deref(),
+        Some("Notes/attachments/y.png")
+    );
+}
+
+/// Obsidian's `newLinkFormat` applies while NIMW has none of its own.
+#[test]
+fn m4b3_obsidians_link_format_applies() {
+    let vault = tempfile::tempdir().unwrap();
+    std::fs::create_dir_all(vault.path().join(".obsidian")).unwrap();
+    std::fs::write(
+        vault.path().join(".obsidian/app.json"),
+        r#"{ "newLinkFormat": "absolute" }"#,
+    )
+    .unwrap();
+    std::fs::create_dir_all(vault.path().join("Notes")).unwrap();
+    std::fs::write(vault.path().join("Notes/a.md"), "# A\n").unwrap();
+    let (_c, s) = open(vault.path());
+    let a = s.save_attachment(&vp("Notes/a.md"), "z.png", b"z").unwrap();
+    assert_eq!(a.link, "Notes/attachments/z.png");
+}
+
 #[test]
 fn m2c_cover_reference_is_relative_inside_the_page_folder_else_rooted() {
     let r = |page: &str, file: &str| cover_reference(&vp(page), &vp(file));

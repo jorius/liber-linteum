@@ -163,39 +163,94 @@ describe('PageView (M2a §5)', () => {
     expect(await screen.findByText('4 words · 1 min')).toBeInTheDocument();
   });
 
-  it('M4b part 2 §1: the Full width button widens this page and remembers it', async () => {
-    let widths: Record<string, string> = {};
-    const settings = () => ({
-      attachments: { mode: 'subfolder', path: 'attachments' },
-      obsidian: null,
-      overrideObsidian: false,
-      pageWidth: null,
-      pageWidths: widths,
-    });
-    fakeDisk(
-      { 'A.md': '# A\n\nbody\n' },
-      {
-        vault_settings_get: settings,
-        page_width_set: (args) => {
-          const { path, width } = args as unknown as { path: string; width: string | null };
-          widths = width ? { ...widths, [path]: width } : {};
-          return settings();
+  describe('the page width menu (M4b part 2 §1; part 3 wide elements §2)', () => {
+    let widths: Record<string, string>;
+    const setUp = async () => {
+      widths = {};
+      const settings = () => ({
+        attachments: { mode: 'subfolder', path: 'attachments' },
+        obsidian: null,
+        overrideObsidian: false,
+        pageWidth: null,
+        pageWidths: widths,
+      });
+      fakeDisk(
+        { 'A.md': '# A\n\nbody\n' },
+        {
+          vault_settings_get: settings,
+          page_width_set: (args) => {
+            const { path, width } = args as unknown as { path: string; width: string | null };
+            widths = width ? { ...widths, [path]: width } : {};
+            return settings();
+          },
         },
-      },
-    );
-    render(<PageScreen />);
-    await open('A.md');
+      );
+      render(<PageScreen />);
+      await open('A.md');
+    };
     const host = () => document.querySelector('.cm-editor')!.parentElement!;
-    const toggle = screen.getByRole('button', { name: 'Full width' });
-    expect(toggle).toHaveAttribute('aria-pressed', 'false');
-    expect(host().dataset.width).toBe('readable');
-    await userEvent.click(toggle);
-    await waitFor(() => expect(toggle).toHaveAttribute('aria-pressed', 'true'));
-    expect(widths).toEqual({ 'A.md': 'full' });
-    expect(host().dataset.width).toBe('full');
-    await userEvent.click(toggle);
-    await waitFor(() => expect(toggle).toHaveAttribute('aria-pressed', 'false'));
-    expect(widths).toEqual({});
+    const button = () => screen.getByRole('button', { name: 'Page width' });
+
+    it('offers Readable, Wide elements and Full width; the choice is kept for the page', async () => {
+      await setUp();
+      expect(button()).toHaveAttribute('aria-haspopup', 'menu');
+      expect(button()).toHaveAttribute('aria-expanded', 'false');
+      expect(button()).toHaveAttribute('title', 'Page width: Readable');
+      expect(host().dataset.width).toBe('readable');
+      await userEvent.click(button());
+      const menu = screen.getByRole('menu', { name: 'Page width' });
+      expect(button()).toHaveAttribute('aria-expanded', 'true');
+      const items = within(menu).getAllByRole('menuitemradio');
+      expect(items.map((i) => i.textContent)).toEqual(['Readable', 'Wide elements', 'Full width']);
+      expect(items.map((i) => i.getAttribute('aria-checked'))).toEqual(['true', 'false', 'false']);
+      // Nothing of its own yet: Reset is there but unavailable.
+      expect(within(menu).getByRole('menuitem', { name: 'Reset to default' })).toHaveAttribute(
+        'aria-disabled',
+        'true',
+      );
+      await userEvent.click(items[1]);
+      expect(screen.queryByRole('menu')).not.toBeInTheDocument();
+      await waitFor(() => expect(host().dataset.width).toBe('wide'));
+      expect(widths).toEqual({ 'A.md': 'wide' });
+      expect(button()).toHaveAttribute('title', 'Page width: Wide elements');
+      expect(button()).toHaveFocus();
+      await userEvent.click(button());
+      await userEvent.click(screen.getByRole('menuitemradio', { name: 'Full width' }));
+      await waitFor(() => expect(host().dataset.width).toBe('full'));
+      expect(widths).toEqual({ 'A.md': 'full' });
+      // Reset clears the page's own width.
+      await userEvent.click(button());
+      await userEvent.click(screen.getByRole('menuitem', { name: 'Reset to default' }));
+      await waitFor(() => expect(host().dataset.width).toBe('readable'));
+      expect(widths).toEqual({});
+    });
+
+    it('works from the keyboard: arrows move, Enter chooses, Escape closes', async () => {
+      await setUp();
+      button().focus();
+      await userEvent.keyboard('{Enter}');
+      const checked = screen.getByRole('menuitemradio', { name: 'Readable' });
+      expect(checked).toHaveFocus();
+      await userEvent.keyboard('{ArrowDown}');
+      expect(screen.getByRole('menuitemradio', { name: 'Wide elements' })).toHaveFocus();
+      await userEvent.keyboard('{End}');
+      // Reset is skipped while unavailable: End lands on the last radio.
+      expect(screen.getByRole('menuitemradio', { name: 'Full width' })).toHaveFocus();
+      await userEvent.keyboard('{Escape}');
+      expect(screen.queryByRole('menu')).not.toBeInTheDocument();
+      expect(button()).toHaveFocus();
+      await userEvent.keyboard('{Enter}');
+      await userEvent.keyboard('{ArrowDown}{Enter}');
+      await waitFor(() => expect(widths).toEqual({ 'A.md': 'wide' }));
+      expect(button()).toHaveFocus();
+    });
+
+    it('has no axe violations with the menu open', async () => {
+      await setUp();
+      await userEvent.click(button());
+      const res = await axe.run(document.body, { resultTypes: ['violations'] });
+      expect(res.violations.map((v) => v.id)).toEqual([]);
+    });
   });
 
   it('save status: Saved → Saving… → Saved; failures say "Unsaved — retrying"', async () => {

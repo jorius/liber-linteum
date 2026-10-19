@@ -89,7 +89,63 @@ describe('URL policy (M2a §2.4, PG acceptance: no remote request)', () => {
         [null, null],
       ],
     );
-    expect(imgs[2].properties.dataNimw).toBe('missing');
+    // M4b part 3 §9: a Markdown path above the vault root names a file
+    // outside it (Rust decides whether it may be shown).
+    expect(imgs[2].properties.dataExternal).toBe('../../c.png');
+    expect(imgs[2].properties.dataNimw).toBeUndefined();
+  });
+
+  it('M4b part 3 §9: Markdown links and images to files outside the vault', () => {
+    const tree = render(
+      [
+        '![a](D:\\Pics\\a.png) ![b](file:///Users/j/b%20c.png) ![r](/Users/j/r.png)',
+        '[doc](file:///D:/Docs/x.pdf#p2) [up](../../Docs/y.pdf)',
+        '<img src="file:///Users/j/raw.png"> <img src="../../raw2.png">',
+        '',
+      ].join('\n'),
+      'Notes/page.md',
+    );
+    const imgs = elements(tree).filter((e) => e.tagName === 'img');
+    expect(
+      imgs.map((i) => [
+        i.properties.dataExternal ?? null,
+        i.properties.dataAssetPath ?? null,
+        i.properties.src ?? null,
+      ]),
+    ).toEqual([
+      ['D:\\Pics\\a.png', null, null],
+      ['file:///Users/j/b c.png', null, null],
+      // A leading `/` is the vault root first, then the disk.
+      ['/Users/j/r.png', 'Users/j/r.png', null],
+      // Raw HTML never reaches outside files (the index doesn't see it).
+      [null, null, null],
+      [null, null, null],
+    ]);
+    const links = elements(tree).filter((e) => e.tagName === 'a');
+    expect(
+      links.map((a) => [a.properties.dataNimw, a.properties.dataExternal, a.properties.href]),
+    ).toEqual([
+      ['link', 'file:///D:/Docs/x.pdf', undefined],
+      ['link', '../../Docs/y.pdf', undefined],
+    ]);
+  });
+
+  it('final review C1/m2: raw HTML can never name an outside file itself', () => {
+    const tree = render(
+      [
+        '<img data-external="\\\\host\\s\\x.png"> <a href="#" data-external="\\\\host\\s\\x.pdf">x</a>',
+        '<video data-external="D:\\v.mp4"></video> <audio data-external="/etc/x.wav"></audio>',
+        '',
+        '![ok](file:///Users/j/ok.png)',
+        '',
+      ].join('\n'),
+      'Notes/page.md',
+    );
+    const marked = elements(tree)
+      .filter((e) => e.properties.dataExternal !== undefined)
+      .map((e) => [e.tagName, e.properties.dataExternal]);
+    // Only the Markdown image the pipeline itself marked keeps its target.
+    expect(marked).toEqual([['img', 'file:///Users/j/ok.png']]);
   });
 
   it('marks external links and internal Markdown links', () => {

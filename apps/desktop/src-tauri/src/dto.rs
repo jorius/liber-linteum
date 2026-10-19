@@ -53,6 +53,10 @@ pub struct PageDto {
     /// Frontmatter `cover-y` (0–100), M2c §4.
     #[serde(rename = "coverY")]
     pub cover_y: Option<u8>,
+    /// Frontmatter `cover-x` (0–100), a side cover's horizontal focus (M4b
+    /// part 3 §3).
+    #[serde(rename = "coverX")]
+    pub cover_x: Option<u8>,
     pub tags: Vec<String>,
     pub links: usize,
     pub backlinks: usize,
@@ -105,6 +109,10 @@ pub struct WarningPayload {
 pub struct AttachedDto {
     pub path: String,
     pub link: String,
+    /// The `file:` URL to write instead of `link` (absolute link format,
+    /// M4b part 3 §8).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub url: Option<String>,
     pub copied: bool,
 }
 
@@ -113,6 +121,7 @@ impl From<nimw_session::Attached> for AttachedDto {
         AttachedDto {
             path: a.path.to_string(),
             link: a.link,
+            url: a.url,
             copied: a.copied,
         }
     }
@@ -167,6 +176,14 @@ pub struct VaultSettingsDto {
     pub page_widths: std::collections::BTreeMap<String, nimw_vault::PageWidth>,
     /// Pages with their own cover height in px (cover resize).
     pub cover_heights: std::collections::BTreeMap<String, u32>,
+    /// Pages whose cover sits beside the text: `"left" | "right"` (M4b part 3 §3).
+    pub cover_sides: std::collections::BTreeMap<String, &'static str>,
+    /// Side covers' own strip widths in px (§3).
+    pub cover_widths: std::collections::BTreeMap<String, u32>,
+    /// NIMW's own link format for new attachments (M4b part 3 §8).
+    pub attachment_link_format: Option<nimw_vault::LinkFormat>,
+    /// Obsidian's `newLinkFormat`, as NIMW reads it (applies while NIMW has none).
+    pub obsidian_link_format: Option<nimw_vault::LinkFormat>,
 }
 
 #[derive(Debug, Clone, serde::Deserialize)]
@@ -176,6 +193,9 @@ pub struct VaultSettingsPatch {
     pub override_obsidian: Option<bool>,
     /// `"readable"`, `"full"` or `"default"` (use the app setting).
     pub page_width: Option<String>,
+    /// `"shortest"`, `"vault"`, `"relative"`, `"absolute"` or `"default"`
+    /// (follow Obsidian's, else the shortest name; M4b part 3 §8).
+    pub attachment_link_format: Option<String>,
 }
 
 /// `gv_children`'s argument: which level to open (M3a §3).
@@ -199,6 +219,10 @@ pub struct GvCardDto {
     pub cover: Option<String>,
     pub cover_remote: bool,
     pub cover_y: Option<u8>,
+    /// `cover-x` (0–100; M4b part 3 §3).
+    pub cover_x: Option<u8>,
+    /// `"top" | "left" | "right"` (M4b part 3 §3).
+    pub cover_side: &'static str,
     pub excerpt: String,
     pub has_image: bool,
     pub has_audio: bool,
@@ -227,6 +251,8 @@ impl From<nimw_session::GvCard> for GvCardDto {
             cover: c.cover,
             cover_remote: c.cover_remote,
             cover_y: c.cover_y,
+            cover_x: c.cover_x,
+            cover_side: c.cover_side.as_str(),
             excerpt: c.excerpt,
             has_image: c.has_image,
             has_audio: c.has_audio,

@@ -41,6 +41,13 @@ export async function openPage(
   usePageStore.getState().reveal(heading ?? null);
 }
 
+/** Opens a page with the cursor on `from` and `from`–`to` flashing (an atom
+ *  in the Global View, M4b part 3 §6). */
+export async function openPageAt(path: string, from: number, to: number): Promise<void> {
+  await openPage(path);
+  usePageStore.getState().requestJump(path, from, to);
+}
+
 /** The page on screen and the heading it was opened at. */
 function here(): TrailEntry | null {
   const { path, anchor } = usePageStore.getState();

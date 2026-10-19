@@ -57,7 +57,7 @@ fn link_row(r: &Row<'_>) -> rusqlite::Result<LinkRow> {
 
 const CARD_SELECT: &str = "SELECT f.path, f.parent, f.name, f.kind, p.title, p.subtitle, p.cover, \
      (SELECT l.target_path FROM links l WHERE l.src = f.path AND l.kind = 'cover' LIMIT 1), \
-     p.cover_y, p.excerpt, p.has_image, p.has_audio \
+     p.cover_y, p.excerpt, p.has_image, p.has_audio, p.cover_x \
      FROM files f LEFT JOIN pages p ON p.path = f.path";
 
 fn card_row(r: &Row<'_>) -> rusqlite::Result<CardRow> {
@@ -74,6 +74,7 @@ fn card_row(r: &Row<'_>) -> rusqlite::Result<CardRow> {
         excerpt: r.get(9)?,
         has_image: r.get::<_, Option<bool>>(10)?.unwrap_or(false),
         has_audio: r.get::<_, Option<bool>>(11)?.unwrap_or(false),
+        cover_x: r.get::<_, Option<i64>>(12)?.map(|v| v.clamp(0, 100) as u8),
     })
 }
 
@@ -339,7 +340,7 @@ impl Index {
         let page = self
             .conn
             .query_row(
-                "SELECT title, subtitle, cover, cover_y, excerpt, has_image, has_audio, frontmatter_error FROM pages WHERE path = ?1",
+                "SELECT title, subtitle, cover, cover_y, excerpt, has_image, has_audio, frontmatter_error, cover_x FROM pages WHERE path = ?1",
                 [path],
                 |r| {
                     Ok(PageRow {
@@ -352,6 +353,7 @@ impl Index {
                         has_image: r.get(5)?,
                         has_audio: r.get(6)?,
                         frontmatter_error: r.get(7)?,
+                        cover_x: r.get::<_, Option<i64>>(8)?.map(|v| v.clamp(0, 100) as u8),
                         tags: Vec::new(),
                         links: Vec::new(),
                     })
@@ -491,12 +493,12 @@ impl Tx<'_> {
     /// New links start unresolved; call a `resolve_*` method afterwards.
     pub fn upsert_page(&self, path: &str, meta: &PageMeta) -> Result<()> {
         self.tx.prepare_cached(
-            "INSERT OR REPLACE INTO pages (path, title, subtitle, cover, cover_y, excerpt, has_image, has_audio, frontmatter_error)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
+            "INSERT OR REPLACE INTO pages (path, title, subtitle, cover, cover_y, excerpt, has_image, has_audio, frontmatter_error, cover_x)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
         )?
         .execute(params![
             path, meta.title, meta.subtitle, meta.cover, meta.cover_y.map(i64::from), meta.excerpt,
-            meta.has_image, meta.has_audio, meta.frontmatter_error
+            meta.has_image, meta.has_audio, meta.frontmatter_error, meta.cover_x.map(i64::from)
         ])?;
         self.tx
             .prepare_cached("DELETE FROM tags WHERE path = ?1")?

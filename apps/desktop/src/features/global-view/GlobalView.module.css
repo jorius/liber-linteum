@@ -204,6 +204,27 @@
   cursor: default;
 }
 
+/* Count chips (M4b part 3 §5): "12 links" on a pill at the edge's middle. */
+.edgeLabels .chip {
+  fill: var(--color-surface);
+  stroke: var(--color-card-border);
+  stroke-width: 1px;
+}
+
+/* Focus mode (M4b part 3 §5): a hovered or keyboard-focused card's edges and
+   neighbours stay lit (`data-gv-hot`, set by focusEdges), the rest dims. */
+.canvas[data-gv-focusing] .edges [data-a]:not([data-gv-hot]) {
+  opacity: 0.15;
+}
+
+.canvas[data-gv-focusing] .edges path[data-gv-hot]:not([data-gv-arrow]) {
+  stroke-width: calc(var(--w) + 1px);
+}
+
+.canvas[data-gv-focusing] :global(.react-flow__node):not([data-gv-hot]) {
+  opacity: 0.55;
+}
+
 /* Shown when only the strongest aggregated edges are drawn (edges.tsx). */
 .capNote {
   position: absolute;
@@ -267,6 +288,16 @@
   border-radius: var(--radius-pill);
   background: var(--color-surface);
   font: 500 13px var(--font-body);
+  color: var(--color-text-muted);
+}
+
+/* An atoms map of a page without blocks (M4b part 3 §6). */
+.atomsEmpty {
+  position: absolute;
+  left: 48px;
+  bottom: 48px;
+  margin: 0;
+  font: 400 15px var(--font-body);
   color: var(--color-text-muted);
 }
 

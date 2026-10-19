@@ -7,6 +7,8 @@ pub struct PageMeta {
     pub subtitle: Option<String>,
     pub cover: Option<String>,
     pub cover_y: Option<u8>,
+    /// `cover-x` (0–100): a side cover's horizontal focus (M4b part 3 §3).
+    pub cover_x: Option<u8>,
     pub tags: Vec<Tag>,
     /// Sorted by `range.start`.
     pub links: Vec<LinkRef>,

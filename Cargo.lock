@@ -2584,6 +2584,7 @@ dependencies = [
 name = "nimw-desktop"
 version = "0.1.0"
 dependencies = [
+ "dunce",
  "fontdb",
  "nimw-markdown",
  "nimw-session",

@@ -40,6 +40,13 @@ const COMMANDS: &[&str] = &[
     "text_write",
     "entry_create_text",
     "cover_height_set",
+    "cover_side_set",
+    "cover_width_set",
+    "links_external",
+    "external_open",
+    "external_reveal",
+    "external_network_allow",
+    "file_pick",
 ];
 
 fn main() {

@@ -53,6 +53,13 @@ const COMMANDS: &[&str] = &[
     "text_write",
     "entry_create_text",
     "cover_height_set",
+    "cover_side_set",
+    "cover_width_set",
+    "links_external",
+    "external_open",
+    "external_reveal",
+    "external_network_allow",
+    "file_pick",
 ];
 
 struct Harness {
@@ -728,7 +735,11 @@ fn m2c_vault_settings_round_trip_over_ipc() {
             "overrideObsidian": false,
             "pageWidth": null,
             "pageWidths": {},
-            "coverHeights": {}
+            "coverHeights": {},
+            "coverSides": {},
+            "coverWidths": {},
+            "attachmentLinkFormat": null,
+            "obsidianLinkFormat": null
         })
     );
     let saved = call(
@@ -971,6 +982,7 @@ fn m2c_link_suggest_and_cover_y_over_ipc() {
     )
     .unwrap();
     assert_eq!(page["coverY"], 40);
+    assert_eq!(page["coverX"], Value::Null);
     let welcome = call(&h.main, "page_get", json!({ "path": "Welcome.md" })).unwrap();
     assert_eq!(welcome["coverY"], Value::Null);
 }
@@ -1128,6 +1140,8 @@ fn m3a_gv_children_over_ipc() {
     let rex = &chars["cards"][2];
     assert_eq!(rex["cover"], "Character Design/assets/rex-cover.png");
     assert_eq!(rex["coverY"], 40);
+    assert_eq!(rex["coverX"], Value::Null);
+    assert_eq!(rex["coverSide"], "top");
     assert_eq!(rex["coverRemote"], false);
     assert_eq!(rex["subtitle"], "Hero redesign · v3");
     assert_eq!(rex["hasImage"], true);
@@ -1331,6 +1345,27 @@ fn m4b2_page_width_over_ipc() {
     )
     .unwrap();
     assert_eq!(saved["pageWidth"], "readable");
+    // M4b part 3 (wide elements §2): `wide` at both levels.
+    let saved = call(
+        &h.main,
+        "page_width_set",
+        json!({ "path": "Welcome.md", "width": "wide" }),
+    )
+    .unwrap();
+    assert_eq!(saved["pageWidths"], json!({ "Welcome.md": "wide" }));
+    let saved = call(
+        &h.main,
+        "vault_settings_set",
+        json!({ "patch": { "pageWidth": "wide" } }),
+    )
+    .unwrap();
+    assert_eq!(saved["pageWidth"], "wide");
+    call(
+        &h.main,
+        "page_width_set",
+        json!({ "path": "Welcome.md", "width": "full" }),
+    )
+    .unwrap();
     // The page entry follows an in-app rename.
     call(
         &h.main,
@@ -1490,6 +1525,145 @@ fn cover_height_set_is_allowed_from_main_only() {
     assert!(denied.to_string().contains("not allowed"), "{denied}");
 }
 
+/// M4b part 3 §3: a page's cover placement (`coverSides`) and strip width
+/// (`coverWidths`) live in `.nimw/vault.json`, never in the note; `top`
+/// clears the placement, widths are clamped to 160–2000 px; both follow an
+/// in-app rename; only visible, indexed pages; Global View cards carry the
+/// placement.
+#[test]
+fn cover_side_and_width_over_ipc() {
+    let h = harness();
+    let vault = open_fixture(&h, "obsidian-basic");
+    let before = std::fs::read(vault.path().join("Welcome.md")).unwrap();
+    let got = call(&h.main, "vault_settings_get", json!({})).unwrap();
+    assert_eq!(got["coverSides"], json!({}));
+    assert_eq!(got["coverWidths"], json!({}));
+    let saved = call(
+        &h.main,
+        "cover_side_set",
+        json!({ "path": "Welcome.md", "side": "left" }),
+    )
+    .unwrap();
+    assert_eq!(saved["coverSides"], json!({ "Welcome.md": "left" }));
+    let level = call(
+        &h.main,
+        "gv_children",
+        json!({ "level": { "kind": "vault" } }),
+    )
+    .unwrap();
+    let welcome = level["cards"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|c| c["path"] == "Welcome.md")
+        .unwrap();
+    assert_eq!(welcome["coverSide"], "left");
+    let saved = call(
+        &h.main,
+        "cover_width_set",
+        json!({ "path": "Welcome.md", "width": 300.4 }),
+    )
+    .unwrap();
+    assert_eq!(saved["coverWidths"], json!({ "Welcome.md": 300 }));
+    for (width, kept) in [(10, 160), (99_999, 2000)] {
+        let saved = call(
+            &h.main,
+            "cover_width_set",
+            json!({ "path": "Welcome.md", "width": width }),
+        )
+        .unwrap();
+        assert_eq!(saved["coverWidths"]["Welcome.md"], kept, "{width}");
+    }
+    assert_eq!(
+        std::fs::read(vault.path().join("Welcome.md")).unwrap(),
+        before,
+        "the note itself is never written"
+    );
+    call(
+        &h.main,
+        "entry_rename",
+        json!({ "from": "Welcome.md", "to": "Hello.md" }),
+    )
+    .unwrap();
+    let got = call(&h.main, "vault_settings_get", json!({})).unwrap();
+    assert_eq!(got["coverSides"], json!({ "Hello.md": "left" }));
+    assert_eq!(got["coverWidths"], json!({ "Hello.md": 2000 }));
+    // `top` clears the placement, `null` the width.
+    let got = call(
+        &h.main,
+        "cover_side_set",
+        json!({ "path": "Hello.md", "side": "top" }),
+    )
+    .unwrap();
+    assert_eq!(got["coverSides"], json!({}));
+    let got = call(
+        &h.main,
+        "cover_width_set",
+        json!({ "path": "Hello.md", "width": null }),
+    )
+    .unwrap();
+    assert_eq!(got["coverWidths"], json!({}));
+    // Only visible, indexed pages; unknown sides and non-numbers are refused.
+    for path in [".obsidian/x.md", "Missing.md", "../x.md"] {
+        assert!(
+            call(
+                &h.main,
+                "cover_side_set",
+                json!({ "path": path, "side": "left" })
+            )
+            .is_err(),
+            "{path}"
+        );
+        assert!(
+            call(
+                &h.main,
+                "cover_width_set",
+                json!({ "path": path, "width": 300 })
+            )
+            .is_err(),
+            "{path}"
+        );
+    }
+    let err = call(
+        &h.main,
+        "cover_side_set",
+        json!({ "path": "Hello.md", "side": "diagonal" }),
+    )
+    .unwrap_err();
+    assert_eq!(kind(err), "invalidName");
+    assert!(
+        call(
+            &h.main,
+            "cover_width_set",
+            json!({ "path": "Hello.md", "width": "wide" })
+        )
+        .is_err()
+    );
+}
+
+/// M4b part 3 §3: both commands are in the main window's capability and
+/// nowhere else (the real ACL from `capabilities/main.json`).
+#[test]
+fn cover_side_and_width_set_are_allowed_from_main_only() {
+    let h = harness();
+    let other = WebviewWindowBuilder::new(&h.app, "other", Default::default())
+        .build()
+        .unwrap();
+    for (cmd, args) in [
+        ("cover_side_set", json!({ "path": "A.md", "side": "left" })),
+        ("cover_width_set", json!({ "path": "A.md", "width": 300 })),
+    ] {
+        let main = call(&h.main, cmd, args.clone()).unwrap_err();
+        assert!(!main.to_string().contains("not allowed"), "{cmd}: {main}");
+        assert_eq!(kind(main), "noVault", "{cmd}");
+        let denied = call(&other, cmd, args).unwrap_err();
+        assert!(
+            denied.to_string().contains("not allowed"),
+            "{cmd}: {denied}"
+        );
+    }
+}
+
 /// M4b part 2 §6: text files over IPC — read, compare-and-swap write with the
 /// conflict reply, `notAText` for anything that isn't an eligible text file.
 #[test]
@@ -1636,4 +1810,188 @@ fn final_review_i3_a_conflict_with_a_non_text_file_carries_no_lossy_text() {
         std::fs::read(vault.path().join("Page.md")).unwrap(),
         b"# Caf\xe9\n"
     );
+}
+
+/// M4b part 3 §8: the link format over IPC — Obsidian's `newLinkFormat` is
+/// reported, NIMW's own choice wins, `default` clears it, nonsense is refused;
+/// a paste in the absolute format comes back with its `file:` URL.
+#[test]
+fn m4b3_link_format_over_ipc() {
+    let h = harness();
+    let vault = tempfile::tempdir().unwrap();
+    std::fs::create_dir(vault.path().join(".obsidian")).unwrap();
+    std::fs::write(
+        vault.path().join(".obsidian/app.json"),
+        r#"{ "newLinkFormat": "relative" }"#,
+    )
+    .unwrap();
+    std::fs::write(vault.path().join("a.md"), "# A\n").unwrap();
+    call(&h.main, "vault_open", json!({ "path": vault.path() })).unwrap();
+    let got = call(&h.main, "vault_settings_get", json!({})).unwrap();
+    assert_eq!(got["attachmentLinkFormat"], Value::Null);
+    assert_eq!(got["obsidianLinkFormat"], "relative");
+    let set = |value: &str| {
+        call(
+            &h.main,
+            "vault_settings_set",
+            json!({ "patch": { "attachmentLinkFormat": value } }),
+        )
+    };
+    assert_eq!(set("absolute").unwrap()["attachmentLinkFormat"], "absolute");
+    let pasted = get_ipc_response(
+        &h.main,
+        raw_request(
+            "attachment_paste",
+            b"\x89PNG".to_vec(),
+            &[("x-nimw-page", "a.md"), ("x-nimw-name", "shot.png")],
+        ),
+    )
+    .map(|r| r.deserialize::<Value>().unwrap())
+    .unwrap();
+    assert_eq!(pasted["link"], "shot.png");
+    assert!(
+        pasted["url"]
+            .as_str()
+            .is_some_and(|u| u.starts_with("file:///") && u.ends_with("/attachments/shot.png")),
+        "{pasted}"
+    );
+    assert_eq!(set("default").unwrap()["attachmentLinkFormat"], Value::Null);
+    assert_eq!(kind(set("sideways").unwrap_err()), "invalidName");
+    assert_eq!(
+        std::fs::read_to_string(vault.path().join(".obsidian/app.json")).unwrap(),
+        r#"{ "newLinkFormat": "relative" }"#
+    );
+}
+
+/// M4b part 3 §7: Rust opens the file dialog (a fake picker in tests); each
+/// picked file comes back with its `file:` URL and, when it already lives in
+/// the vault, its vault path. The picks are granted for one import each.
+#[test]
+fn m4b3_file_pick_returns_the_picks_and_grants_them_for_import() {
+    let h = harness();
+    let vault = open_fixture(&h, "obsidian-basic");
+    let outside = tempfile::Builder::new()
+        .prefix("nimw-pick")
+        .tempdir()
+        .unwrap();
+    let pdf = outside.path().join("my brief.pdf");
+    std::fs::write(&pdf, b"%PDF").unwrap();
+    let inside = vault.path().join("Character Design/assets/rex-cover.png");
+    let state = h.app.state::<nimw_desktop::state::AppState>();
+    let picks = vec![pdf.clone(), inside.clone()];
+    state.set_file_picker(Some(Arc::new(move || picks.clone())));
+    let got = call(&h.main, "file_pick", json!({ "page": "Welcome.md" })).unwrap();
+    let pdf_s = pdf.to_str().unwrap();
+    assert_eq!(got[0]["path"], pdf_s);
+    assert_eq!(got[0]["name"], "my brief.pdf");
+    assert_eq!(got[0]["inVault"], Value::Null);
+    assert!(
+        got[0]["url"].as_str().unwrap().ends_with("/my%20brief.pdf"),
+        "{got}"
+    );
+    assert_eq!(got[1]["inVault"], "Character Design/assets/rex-cover.png");
+    let imported = call(
+        &h.main,
+        "attachment_import",
+        json!({ "page": "Welcome.md", "paths": [pdf_s] }),
+    )
+    .unwrap();
+    assert_eq!(imported[0]["ok"]["copied"], true, "{imported}");
+    let again = call(
+        &h.main,
+        "attachment_import",
+        json!({ "page": "Welcome.md", "paths": [pdf_s] }),
+    )
+    .unwrap();
+    assert_eq!(again[0]["err"]["kind"], "notPermitted", "used once");
+    // Cancelled: nothing picked.
+    state.set_file_picker(Some(Arc::new(Vec::new)));
+    assert_eq!(
+        call(&h.main, "file_pick", json!({ "page": "Welcome.md" })).unwrap(),
+        json!([])
+    );
+}
+
+/// M4b part 3 §9 over IPC: `links_external` reports outside files; opening or
+/// revealing one that no page links to, or a program, is refused (the
+/// success paths would open apps on the machine running the tests).
+#[test]
+fn m4b3_outside_files_over_ipc() {
+    let h = harness();
+    let base = tempfile::Builder::new()
+        .prefix("nimw-ext")
+        .tempdir()
+        .unwrap();
+    let pics = dunce::canonicalize(base.path()).unwrap().join("Pics");
+    std::fs::create_dir_all(&pics).unwrap();
+    std::fs::write(pics.join("x.png"), b"\x89PNG").unwrap();
+    std::fs::write(pics.join("run.sh"), b"#!/bin/sh\n").unwrap();
+    std::fs::write(pics.join("other.pdf"), b"%PDF").unwrap();
+    std::fs::write(pics.join("disk.iso"), b"iso").unwrap();
+    let iso = pics.join("disk.iso").to_str().unwrap().to_string();
+    let pic = pics.join("x.png").to_str().unwrap().to_string();
+    let script = pics.join("run.sh").to_str().unwrap().to_string();
+    let other = pics.join("other.pdf").to_str().unwrap().to_string();
+    std::fs::create_dir_all(base.path().join("Vault")).unwrap();
+    let unc = r"\\nas.example\share\x.png";
+    std::fs::write(
+        base.path().join("Vault/a.md"),
+        format!("# A\n\n![[{pic}]] [[{script}]] [[b]] ![[{unc}]] [[{iso}]]\n"),
+    )
+    .unwrap();
+    std::fs::write(base.path().join("Vault/b.md"), "# B\n").unwrap();
+    call(
+        &h.main,
+        "vault_open",
+        json!({ "path": base.path().join("Vault") }),
+    )
+    .unwrap();
+    let got = call(
+        &h.main,
+        "links_external",
+        json!({ "source": "a.md", "targets": [
+            { "kind": "embed", "target": pic },
+            { "kind": "wiki", "target": "b" },
+            // As a `file:` URL: a bare `/…` is the vault root first (I1).
+            { "kind": "embed", "target": if cfg!(windows) { other.clone() } else { format!("file://{other}") } },
+            { "kind": "embed", "target": unc },
+        ] }),
+    )
+    .unwrap();
+    // An unlinked file isn't looked up; a network file waits for the user
+    // (final review C1).
+    assert_eq!(
+        got,
+        json!([
+            { "path": pic, "exists": true, "listed": true, "network": false, "askFirst": false, "openable": true },
+            null,
+            { "path": other, "exists": false, "listed": false, "network": false, "askFirst": false, "openable": true },
+            { "path": unc, "exists": false, "listed": true, "network": true, "askFirst": true, "openable": true },
+        ])
+    );
+    for cmd in ["external_open", "external_reveal"] {
+        let err = call(&h.main, cmd, json!({ "path": unc })).unwrap_err();
+        assert_eq!(kind(err), "notPermitted", "{cmd}: not loaded yet");
+    }
+    let err = call(&h.main, "external_network_allow", json!({ "path": other })).unwrap_err();
+    assert_eq!(
+        kind(err),
+        "notPermitted",
+        "only a linked path can be loaded"
+    );
+    // Loaded: looked up from now on (nas.example is nowhere, so it's missing).
+    let loaded = call(&h.main, "external_network_allow", json!({ "path": unc })).unwrap();
+    assert_eq!(
+        loaded,
+        json!({ "path": unc, "exists": false, "listed": true, "network": true, "askFirst": false, "openable": true })
+    );
+    for cmd in ["external_open", "external_reveal"] {
+        let err = call(&h.main, cmd, json!({ "path": other })).unwrap_err();
+        assert_eq!(kind(err), "notPermitted", "{cmd}");
+    }
+    let err = call(&h.main, "external_open", json!({ "path": script })).unwrap_err();
+    assert_eq!(kind(err), "invalidUrl", "a script is never opened");
+    // Final review I2: a linked disk image is no document: shown, not opened.
+    let err = call(&h.main, "external_open", json!({ "path": iso })).unwrap_err();
+    assert_eq!(kind(err), "invalidUrl", "only documents and media open");
 }

@@ -1,13 +1,28 @@
 import type { TFunction } from 'i18next';
 import { useEffect, useId, useRef, useState, type KeyboardEvent } from 'react';
 import { useTranslation } from 'react-i18next';
-import { vaultSettingsGet, vaultSettingsSet, type AttachmentMode } from '../../ipc';
+import {
+  vaultSettingsGet,
+  vaultSettingsSet,
+  type AttachmentMode,
+  type LinkFormat,
+} from '../../ipc';
 import { errorMessage } from '../../stores/messages';
 import { usePageWidthStore } from '../../stores/pageWidthStore';
 import { validateName } from '../explorer/nameRules';
 import styles from './Dialogs.module.css';
 
 const MODES: AttachmentMode[] = ['subfolder', 'same', 'vault', 'folder'];
+
+const FORMATS: LinkFormat[] = ['shortest', 'vault', 'relative', 'absolute'];
+
+/** What a new attachment's link looks like in each format (M4b part 3 §8). */
+const EXAMPLES: Record<LinkFormat, string> = {
+  shortest: '![[x.png]]',
+  vault: '![[Assets/x.png]]',
+  relative: '![[../Assets/x.png]]',
+  absolute: '![](file:///…/Assets/x.png)',
+};
 
 /** Plain words for an Obsidian `attachmentFolderPath` value. */
 function obsidianPlace(value: string, t: TFunction): string {
@@ -33,6 +48,10 @@ export function VaultSettingsSection() {
   const [own, setOwn] = useState(false);
   const vaultWidth = usePageWidthStore((s) => s.vault);
   const widthId = useId();
+  const formatId = useId();
+  const formatHintId = useId();
+  const [linkFormat, setLinkFormat] = useState<LinkFormat | null>(null);
+  const [obsidianFormat, setObsidianFormat] = useState<LinkFormat | null>(null);
   const [loaded, setLoaded] = useState(false);
   const [error, setError] = useState<string | null>(null);
   // What `.nimw/vault.json` holds (as loaded, then as last saved): saving the
@@ -48,6 +67,8 @@ export function VaultSettingsSection() {
       setPath(res.value.attachments.path);
       setObsidian(res.value.obsidian);
       setOwn(res.value.overrideObsidian === true);
+      setLinkFormat(res.value.attachmentLinkFormat ?? null);
+      setObsidianFormat(res.value.obsidianLinkFormat ?? null);
       setLoaded(true);
     });
     return () => {
@@ -118,6 +139,19 @@ export function VaultSettingsSection() {
     setError(null);
   };
 
+  /** NIMW's own link format; `default` follows Obsidian's (else shortest). */
+  const changeFormat = async (next: LinkFormat | 'default') => {
+    const res = await vaultSettingsSet({ attachmentLinkFormat: next });
+    if (!res.ok) {
+      setError(errorMessage(res.error));
+      return;
+    }
+    setLinkFormat(res.value.attachmentLinkFormat ?? null);
+    setError(null);
+  };
+  const followsObsidian = linkFormat === null && obsidianFormat !== null;
+  const effectiveFormat = linkFormat ?? obsidianFormat ?? 'shortest';
+
   const locked = obsidian !== null && !own;
   return (
     <section className={styles.section} aria-labelledby={id}>
@@ -179,6 +213,36 @@ export function VaultSettingsSection() {
         </p>
       )}
       {locked && <p className={styles.hint}>{t('vault.obsidianHint')}</p>}
+      <label className={styles.field} htmlFor={formatId}>
+        <span>{t('settings.links.label')}</span>
+        <select
+          id={formatId}
+          className={styles.select}
+          value={followsObsidian ? 'default' : effectiveFormat}
+          disabled={!loaded}
+          aria-describedby={formatHintId}
+          onChange={(e) => void changeFormat(e.target.value as LinkFormat | 'default')}
+        >
+          {FORMATS.map((f) => (
+            <option key={f} value={f}>
+              {t(`settings.links.formats.${f}`)}
+            </option>
+          ))}
+          {obsidianFormat !== null && (
+            <option value="default">{t('settings.links.useObsidian')}</option>
+          )}
+        </select>
+      </label>
+      <p id={formatHintId} className={styles.hint}>
+        {followsObsidian && (
+          <span>
+            {t('settings.links.obsidian', {
+              format: t(`settings.links.formats.${obsidianFormat}`),
+            })}
+          </span>
+        )}{' '}
+        {t('settings.links.example')} <code>{EXAMPLES[effectiveFormat]}</code>
+      </p>
       <label className={styles.field} htmlFor={widthId}>
         <span>{t('vault.pageWidth')}</span>
         <select
@@ -189,11 +253,12 @@ export function VaultSettingsSection() {
           onChange={(e) =>
             void usePageWidthStore
               .getState()
-              .setVault(e.target.value as 'readable' | 'full' | 'default')
+              .setVault(e.target.value as 'readable' | 'wide' | 'full' | 'default')
           }
         >
           <option value="default">{t('vault.pageWidthDefault')}</option>
           <option value="readable">{t('settings.pageWidthReadable')}</option>
+          <option value="wide">{t('settings.pageWidthWide')}</option>
           <option value="full">{t('settings.pageWidthFull')}</option>
         </select>
       </label>

@@ -7,6 +7,9 @@ export function installIpcMock({
   settings: overrides = {},
   remoteCover = true,
   files: vaultFiles = [],
+  coverSides = {},
+  outside = {},
+  filePicks = [],
 }: {
   pages: Record<string, string>;
   editorMode: string;
@@ -16,6 +19,22 @@ export function installIpcMock({
   remoteCover?: boolean;
   /** Vault files other than pages from the start (e.g. a cover image). */
   files?: string[];
+  /** M4b part 3 §3: pages whose cover is a side strip (`.nimw/vault.json`). */
+  coverSides?: Record<string, 'left' | 'right'>;
+  /** M4b part 3 §9: what `links_external` says about each target. */
+  outside?: Record<
+    string,
+    {
+      path: string;
+      exists: boolean;
+      listed: boolean;
+      network?: boolean;
+      askFirst?: boolean;
+      openable?: boolean;
+    }
+  >;
+  /** M4b part 3 §7: what the Attach button's file dialog picks. */
+  filePicks?: { path: string; name: string; url: string; inVault: string | null }[];
 }) {
   type Args = Record<string, unknown>;
   const w = window as unknown as Record<string, unknown>;
@@ -39,8 +58,11 @@ export function installIpcMock({
     }
     return out;
   };
+  // A first-line `# Heading` (after the frontmatter), else the file name, as
+  // the index reads it (PG-01, M4b part 3 §1).
   const titleOf = (path: string, text: string) =>
-    /^# (.+)$/m.exec(text)?.[1] ?? path.replace(/\.md$/, '').split('/').pop()!;
+    /^(?:---\n[\s\S]*?\n---\n)?\s*# ([^\n]+)/.exec(text)?.[1] ??
+    path.replace(/\.md$/, '').split('/').pop()!;
   const page = (path: string) => ({
     path,
     title: titleOf(path, pages[path] ?? ''),
@@ -49,6 +71,7 @@ export function installIpcMock({
     cover:
       front(pages[path] ?? '').cover ?? (remoteCover ? 'https://remote.example/cover.png' : null),
     coverY: front(pages[path] ?? '')['cover-y'] ? Number(front(pages[path])['cover-y']) : null,
+    coverX: front(pages[path] ?? '')['cover-x'] ? Number(front(pages[path])['cover-x']) : null,
     tags: [],
     links: 0,
     backlinks: 0,
@@ -94,7 +117,10 @@ export function installIpcMock({
       subtitle: kind === 'page' ? (front(text).subtitle ?? null) : name,
       cover: remote || !cover ? null : files.has(cover) ? cover : null,
       coverRemote: remote,
-      coverY: null,
+      coverY: front(text)['cover-y'] ? Number(front(text)['cover-y']) : null,
+      // M4b part 3 §3: a side strip, focused in both axes (seeded, or set over IPC).
+      coverX: front(text)['cover-x'] ? Number(front(text)['cover-x']) : null,
+      coverSide: kind === 'page' ? (sides()[path] ?? coverSides[path] ?? 'top') : 'top',
       excerpt:
         kind === 'page'
           ? text
@@ -145,12 +171,28 @@ export function installIpcMock({
       return {};
     }
   };
+  /** M4b part 3 §3: side covers and strip widths, kept like the heights. */
+  const stored = <T>(key: string): Record<string, T> => {
+    try {
+      return JSON.parse(sessionStorage.getItem(key) ?? '{}') as Record<string, T>;
+    } catch {
+      return {};
+    }
+  };
+  const sides = () => stored<string>('nimwMockSides');
+  const coverWidths = () => stored<number>('nimwMockCoverWidths');
+  /** M4b part 3 §8: the vault's own link format for new attachments. */
+  let linkFormat: string | null = null;
   const vaultSettings = () => ({
     attachments: { mode: 'subfolder', path: 'attachments' },
     obsidian: null,
     pageWidth: null,
     pageWidths: widths(),
     coverHeights: heights(),
+    coverSides: sides(),
+    coverWidths: coverWidths(),
+    attachmentLinkFormat: linkFormat,
+    obsidianLinkFormat: null,
   });
   const handlers: Record<string, (a: Args, options?: unknown) => unknown> = {
     app_info: () => ({ name: 'Notes In My Way', version: '0.0.0-e2e' }),
@@ -243,7 +285,59 @@ export function installIpcMock({
       ((w.__nimwCoverHeights ??= []) as unknown[]).push({ path: a.path, height });
       return vaultSettings();
     },
-    vault_settings_set: (a) => (a.patch as { attachments: unknown }) ?? null,
+    // M4b part 3 §3: placements (`top` clears) and strip widths (clamped
+    // like Rust, 160–2000), kept across a reload.
+    cover_side_set: (a) => {
+      const next = { ...sides() };
+      if (a.side === 'top') delete next[a.path as string];
+      else next[a.path as string] = a.side as string;
+      sessionStorage.setItem('nimwMockSides', JSON.stringify(next));
+      ((w.__nimwCoverSides ??= []) as unknown[]).push({ path: a.path, side: a.side });
+      return vaultSettings();
+    },
+    cover_width_set: (a) => {
+      const next = { ...coverWidths() };
+      const width = a.width as number | null;
+      if (width === null) delete next[a.path as string];
+      else next[a.path as string] = Math.min(2000, Math.max(160, Math.round(width)));
+      sessionStorage.setItem('nimwMockCoverWidths', JSON.stringify(next));
+      return vaultSettings();
+    },
+    vault_settings_set: (a) => {
+      const patch = a.patch as { attachments?: unknown; attachmentLinkFormat?: string };
+      ((w.__nimwVaultPatches ??= []) as unknown[]).push(patch);
+      if (patch.attachmentLinkFormat) {
+        linkFormat = patch.attachmentLinkFormat === 'default' ? null : patch.attachmentLinkFormat;
+      }
+      return {
+        ...vaultSettings(),
+        ...(patch.attachments ? { attachments: patch.attachments } : {}),
+      };
+    },
+    // ---- M4b part 3: files outside the vault (§9) and the Attach button (§7) ----
+    links_external: (a) =>
+      (a.targets as { kind: string; target: string }[]).map(({ target }) => {
+        const f = outside[target];
+        return f ? { network: false, askFirst: false, openable: true, ...f } : null;
+      }),
+    // Final review C1: the user loads a network file; it is found from then on.
+    external_network_allow: (a) => {
+      ((w.__nimwNetworkLoads ??= []) as unknown[]).push(a.path);
+      for (const [target, f] of Object.entries(outside)) {
+        if (f.path === a.path) outside[target] = { ...f, askFirst: false, exists: true };
+      }
+      const f = Object.values(outside).find((o) => o.path === a.path);
+      return { network: true, askFirst: false, openable: true, ...f };
+    },
+    file_pick: () => filePicks,
+    external_open: (a) => {
+      ((w.__nimwExternalOpens ??= []) as unknown[]).push(a.path);
+      return null;
+    },
+    external_reveal: (a) => {
+      ((w.__nimwReveals ??= []) as unknown[]).push(a.path);
+      return null;
+    },
     attachment_paste: (_a, options) => {
       const headers = (options as { headers?: Record<string, string> })?.headers ?? {};
       const name = decodeURIComponent(headers['x-nimw-name'] ?? 'pasted.png');

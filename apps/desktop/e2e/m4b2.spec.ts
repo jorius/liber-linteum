@@ -222,9 +222,11 @@ test('§1: Full width is kept for the page after a reload', async ({ page }) => 
   const { outside, errors } = await open(page, 'Words');
   const host = page.locator('[data-width]');
   await expect(host).toHaveAttribute('data-width', 'readable');
-  const full = page.getByRole('button', { name: 'Full width' });
-  await full.click();
-  await expect(full).toHaveAttribute('aria-pressed', 'true');
+  // M4b part 3: the toggle became the page width menu.
+  const menu = page.getByRole('button', { name: 'Page width' });
+  await menu.click();
+  await page.getByRole('menuitemradio', { name: 'Full width' }).click();
+  await expect(menu).toHaveAttribute('title', 'Page width: Full width');
   await expect(host).toHaveAttribute('data-width', 'full');
   const measure = await page.locator('.cm-content').evaluate((el) => el.clientWidth);
   expect(measure).toBeGreaterThan(760);
@@ -232,8 +234,9 @@ test('§1: Full width is kept for the page after a reload', async ({ page }) => 
   await page.getByRole('button', { name: /^vault/ }).click();
   await openItem(page, 'Words');
   await expect(page.locator('[data-width]')).toHaveAttribute('data-width', 'full');
-  await expect(page.getByRole('button', { name: 'Full width' })).toHaveAttribute(
-    'aria-pressed',
+  await page.getByRole('button', { name: 'Page width' }).click();
+  await expect(page.getByRole('menuitemradio', { name: 'Full width' })).toHaveAttribute(
+    'aria-checked',
     'true',
   );
   await stayedLocal(page, outside, errors);

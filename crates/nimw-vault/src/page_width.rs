@@ -14,6 +14,9 @@ use std::collections::{BTreeMap, HashMap};
 pub enum PageWidth {
     /// The readable measure (760 px in Live Preview).
     Readable,
+    /// Text at the readable measure; the element kinds chosen in the app's
+    /// `wideElements` span the editor (M4b part 3, wide elements §2).
+    Wide,
     /// The text spans the editor.
     Full,
 }
@@ -26,6 +29,7 @@ impl PageWidth {
     fn as_str(self) -> &'static str {
         match self {
             PageWidth::Readable => "readable",
+            PageWidth::Wide => "wide",
             PageWidth::Full => "full",
         }
     }

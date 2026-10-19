@@ -109,10 +109,17 @@ export function FormatIcon() {
 }
 
 /** Full page width: arrows pointing to both edges. */
-export function WidthIcon() {
+/** Page width (M4b part 2 §1; part 3): a narrow column (readable), a column
+ *  crossed by a wide block (wide elements), arrows to both edges (full). */
+export function WidthIcon({ width = 'full' }: { width?: 'readable' | 'wide' | 'full' }) {
+  const d = {
+    readable: 'M7 4v16M17 4v16M10 9h4M10 12h4M10 15h4',
+    wide: 'M8 5h8M8 19h8M3 9h18v6H3z',
+    full: 'M3 12h18M7 8l-4 4 4 4M17 8l4 4-4 4',
+  }[width];
   return (
     <svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true" {...stroke}>
-      <path d="M3 12h18M7 8l-4 4 4 4M17 8l4 4-4 4" />
+      <path d={d} />
     </svg>
   );
 }
@@ -220,6 +227,47 @@ export function MoveVerticalIcon() {
   return (
     <svg {...small} {...stroke}>
       <path d="M12 2v20M8 6l4-4 4 4M8 18l4 4 4-4" />
+    </svg>
+  );
+}
+
+/** Reposition a side cover: both axes (M4b part 3 §3). */
+export function MoveIcon() {
+  return (
+    <svg {...small} {...stroke}>
+      <path d="M12 2v20M2 12h20M9 5l3-3 3 3M9 19l3 3 3-3M5 9l-3 3 3 3M19 9l3 3-3 3" />
+    </svg>
+  );
+}
+
+/** Cover placements (M4b part 3 §3): a page with its cover on top, on the
+ *  left or on the right (the filled part). */
+export function CoverTopIcon() {
+  return (
+    <svg {...small} {...stroke}>
+      <rect x="3" y="3" width="18" height="18" rx="2" />
+      <path d="M3 9h18" />
+      <rect x="4" y="4" width="16" height="4" fill="currentColor" stroke="none" />
+    </svg>
+  );
+}
+
+export function CoverLeftIcon() {
+  return (
+    <svg {...small} {...stroke}>
+      <rect x="3" y="3" width="18" height="18" rx="2" />
+      <path d="M9 3v18" />
+      <rect x="4" y="4" width="4" height="16" fill="currentColor" stroke="none" />
+    </svg>
+  );
+}
+
+export function CoverRightIcon() {
+  return (
+    <svg {...small} {...stroke}>
+      <rect x="3" y="3" width="18" height="18" rx="2" />
+      <path d="M15 3v18" />
+      <rect x="16" y="4" width="4" height="16" fill="currentColor" stroke="none" />
     </svg>
   );
 }

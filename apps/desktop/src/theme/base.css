@@ -45,7 +45,8 @@ body {
   box-shadow: var(--shadow-panel);
 }
 
-.nimw-menu [role='menuitem'] {
+.nimw-menu [role='menuitem'],
+.nimw-menu [role='menuitemradio'] {
   text-align: left;
   border: 0;
   background: none;
@@ -58,12 +59,33 @@ body {
 
 /* Separate rules: WebKit before 15.4 drops a whole selector list that holds
    :focus-visible, hover included. */
-.nimw-menu [role='menuitem']:hover {
+.nimw-menu [role='menuitem']:hover,
+.nimw-menu [role='menuitemradio']:hover {
   background: var(--color-accent-soft);
 }
 
 .nimw-menu [role='menuitem']:focus-visible {
   background: var(--color-accent-soft);
+}
+
+.nimw-menu [role='menuitemradio']:focus-visible {
+  background: var(--color-accent-soft);
+}
+
+/* An item that can't be chosen now (e.g. Reset with nothing to reset). */
+.nimw-menu [aria-disabled='true'] {
+  color: var(--color-text-muted);
+  cursor: default;
+}
+
+.nimw-menu [aria-disabled='true']:hover {
+  background: none;
+}
+
+.nimw-menu [role='separator'] {
+  height: 1px;
+  margin: 4px 2px;
+  background: var(--color-border);
 }
 
 /* Text for screen readers only (live regions made outside React). */

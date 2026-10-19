@@ -2,12 +2,16 @@ import { useTranslation } from 'react-i18next';
 import {
   entryCreateFolder,
   entryCreatePage,
+  externalNetworkAllow,
+  externalOpen,
   fileOpenExternal,
   urlOpen,
   type IpcResult,
 } from '../../ipc';
+import { networkServer } from '../../markdown/externalPath';
 import { errorMessage } from '../../stores/messages';
 import { openNewPage } from '../../stores/navigate';
+import { useOutsideStore } from '../../stores/outsideStore';
 import { useToastStore } from '../../stores/toastStore';
 import { nameOf, parentOf } from '../../stores/tree';
 import { useVaultStore } from '../../stores/vaultStore';
@@ -22,6 +26,7 @@ function report(res: IpcResult<unknown>) {
 function Confirm({
   title,
   text,
+  note,
   error,
   confirm,
   onConfirm,
@@ -29,6 +34,8 @@ function Confirm({
 }: {
   title: string;
   text?: string;
+  /** A second line, under `text`. */
+  note?: string;
   /** Shown as an alert; the confirm button is disabled. */
   error?: string | null;
   confirm: string;
@@ -39,6 +46,7 @@ function Confirm({
   return (
     <Dialog title={title} onClose={onClose}>
       {text && <p className={`${styles.text} ${styles.wrap}`}>{text}</p>}
+      {note && <p className={styles.text}>{note}</p>}
       {error && (
         <p role="alert" className={`${styles.text} ${styles.wrap}`}>
           {error}
@@ -78,13 +86,47 @@ export function OpenExternalDialog({ url, onClose }: { url: string; onClose: () 
   );
 }
 
-export function OpenFileDialog({ path, onClose }: { path: string; onClose: () => void }) {
+/** A vault file, or (`external`) a linked file outside the vault, opens in
+ *  its default app after a confirmation; an outside file shows its path. A
+ *  network file (`network`) is loaded only once the user confirms here
+ *  (final review C1). */
+export function OpenFileDialog({
+  path,
+  external = false,
+  network = false,
+  onClose,
+}: {
+  path: string;
+  external?: boolean;
+  network?: boolean;
+  onClose: () => void;
+}) {
   const { t } = useTranslation();
+  const open = async () => {
+    if (!external) return report(await fileOpenExternal(path));
+    if (network) {
+      const loaded = await externalNetworkAllow(path);
+      if (!loaded.ok) return report(loaded);
+      useOutsideStore.getState().loaded();
+      if (!loaded.value.exists) {
+        useToastStore.getState().push({
+          message: t('preview.external.notFound', { path }),
+          tone: 'error',
+        });
+        return;
+      }
+    }
+    report(await externalOpen(path));
+  };
   return (
     <Confirm
-      title={t('dialogs.openFile.title', { name: nameOf(path) })}
+      title={t('dialogs.openFile.title', {
+        name: external ? path.split(/[\\/]/).pop() : nameOf(path),
+      })}
+      text={external ? path : undefined}
+      note={network ? t('dialogs.openFile.network', { server: networkServer(path) }) : undefined}
       confirm={t('dialogs.openFile.confirm')}
-      onConfirm={async () => report(await fileOpenExternal(path))}
+      onConfirm={open}
       onClose={onClose}
     />
   );

@@ -12,6 +12,7 @@ import { AudioIcon, FolderIcon, GripIcon, ImageIcon, LinkIcon } from '../../app/
 import { assetUrl, type GvCard } from '../../ipc';
 import { nameOf } from '../../stores/tree';
 import { CardMenu, type CardMenuItem } from './CardMenu';
+import { AtomIcon, BriefcaseIcon, EditIcon, FolderSmallIcon, PageIcon, StackIcon } from './gvIcons';
 import styles from './Card.module.css';
 
 /** A single click waits this long for a second one (prototype; M3a §5), so
@@ -37,6 +38,8 @@ export interface CardProps {
   onOpen: () => void;
   /** Double click / Shift+Enter / See all: the editor (GV-12). */
   onOpenEditor: () => void;
+  /** See atoms (M4b part 3 §6): a page card's Atoms button; none: none. */
+  onSeeAtoms?: () => void;
   onFocus: () => void;
 }
 
@@ -51,6 +54,7 @@ export function Card({
   wrapConnect = (button) => button,
   onOpen,
   onOpenEditor,
+  onSeeAtoms,
   onFocus,
 }: CardProps) {
   const { t } = useTranslation();
@@ -71,6 +75,7 @@ export function Card({
       ? t('gv.kindWithName', { kind, name: nameOf(card.path) })
       : kind;
   const summary = card.kind !== 'page' && !card.indexPage;
+  const side = card.coverSide ?? 'top';
 
   const click = () => {
     if (timer.current) clearTimeout(timer.current);
@@ -101,7 +106,7 @@ export function Card({
         alt=""
         loading="lazy"
         draggable={false}
-        style={{ objectPosition: `50% ${card.coverY ?? 50}%` }}
+        style={{ objectPosition: `${card.coverX ?? 50}% ${card.coverY ?? 50}%` }}
       />
     );
   } else if (summary) {
@@ -117,98 +122,135 @@ export function Card({
     );
   }
 
+  const KindIcon =
+    card.kind === 'page' ? PageIcon : card.kind === 'project' ? BriefcaseIcon : FolderSmallIcon;
+  const page = card.kind === 'page';
+
   return (
-    <div
-      className={styles.card}
-      data-open={open || undefined}
-      data-connecting={connecting || undefined}
-      role="group"
-      aria-label={t('gv.cardName', { title: card.title, kind: kind.toLocaleLowerCase() })}
-    >
-      <div className={styles.head}>
-        <span className={styles.kind}>{label}</span>
-        <span className={`${styles.grip} gv-grip`} title={t('gv.move')} aria-hidden="true">
-          <GripIcon />
-        </span>
-        {menu.length > 0 &&
-          wrapConnect(
-            <button
-              ref={menuButton}
-              type="button"
-              className={`${styles.connect} nodrag`}
-              tabIndex={focusable ? 0 : -1}
-              aria-haspopup="menu"
-              aria-expanded={menuOpen}
-              aria-label={t('gv.relations.menu', { title: card.title })}
-              title={t('gv.relations.menu', { title: card.title })}
-              data-gv-connect={card.path}
-              onClick={() => setMenuOpen((o) => !o)}
-            >
-              <LinkIcon />
-            </button>,
+    <>
+      {/* Folders and projects look like folders (M4b part 3 §4): a tab on the
+          top-left edge, outside the card's clipped box. */}
+      {!page && <span className={styles.tab} data-gv-tab="" aria-hidden="true" />}
+      <div
+        className={styles.card}
+        data-kind={card.kind}
+        data-open={open || undefined}
+        data-connecting={connecting || undefined}
+        role="group"
+        aria-label={t('gv.cardName', { title: card.title, kind: kind.toLocaleLowerCase() })}
+      >
+        <div className={styles.head}>
+          <span className={styles.kind}>
+            <span className={styles.kindIcon}>
+              <KindIcon />
+            </span>
+            {label}
+          </span>
+          <span className={`${styles.grip} gv-grip`} title={t('gv.move')} aria-hidden="true">
+            <GripIcon />
+          </span>
+          {menu.length > 0 &&
+            wrapConnect(
+              <button
+                ref={menuButton}
+                type="button"
+                className={`${styles.connect} nodrag`}
+                tabIndex={focusable ? 0 : -1}
+                aria-haspopup="menu"
+                aria-expanded={menuOpen}
+                aria-label={t('gv.relations.menu', { title: card.title })}
+                title={t('gv.relations.menu', { title: card.title })}
+                data-gv-connect={card.path}
+                onClick={() => setMenuOpen((o) => !o)}
+              >
+                <LinkIcon />
+              </button>,
+            )}
+          {menuOpen && menuButton.current && (
+            <CardMenu
+              label={t('gv.relations.menu', { title: card.title })}
+              items={menu}
+              anchor={menuButton.current}
+              onClose={(refocus) => {
+                setMenuOpen(false);
+                if (refocus) menuButton.current?.focus();
+              }}
+            />
           )}
-        {menuOpen && menuButton.current && (
-          <CardMenu
-            label={t('gv.relations.menu', { title: card.title })}
-            items={menu}
-            anchor={menuButton.current}
-            onClose={(refocus) => {
-              setMenuOpen(false);
-              if (refocus) menuButton.current?.focus();
-            }}
-          />
-        )}
-      </div>
-      <div className={styles.hit}>
-        <div
-          className={`${styles.cover} ${card.cover ? '' : summary ? styles.coverFolder : styles.coverNone}`}
-        >
-          {cover}
         </div>
-        <p className={styles.title}>{card.title}</p>
-        {card.subtitle && <p className={styles.subtitle}>{card.subtitle}</p>}
-        {card.excerpt && <p className={styles.excerpt}>{card.excerpt}</p>}
-        <span id={descId} className={styles.srOnly}>
-          {[card.subtitle, card.excerpt, connections].filter(Boolean).join(' ')}
-        </span>
-        {/* The card's button lies over the whole body and holds no text: its
+        <div
+          className={styles.hit}
+          // A side cover (M4b part 3 §3): a strip on that side, the text beside it.
+          data-cover-side={card.cover && side !== 'top' ? side : undefined}
+        >
+          <div
+            className={`${styles.cover} ${card.cover ? '' : summary ? styles.coverFolder : styles.coverNone}`}
+          >
+            {cover}
+          </div>
+          <p className={styles.title}>{card.title}</p>
+          {card.subtitle && <p className={styles.subtitle}>{card.subtitle}</p>}
+          {card.excerpt && <p className={styles.excerpt}>{card.excerpt}</p>}
+          <span id={descId} className={styles.srOnly}>
+            {[card.subtitle, card.excerpt, connections].filter(Boolean).join(' ')}
+          </span>
+          {/* The card's button lies over the whole body and holds no text: its
             name is the title, the rest is its description. Wrapping the text
             made a button named "Alpha" show "No cover Alpha …" (axe
             label-content-name-mismatch, final review m5). */}
-        <div
-          className={styles.press}
-          role="button"
-          tabIndex={focusable ? 0 : -1}
-          aria-label={card.title}
-          aria-describedby={descId}
-          data-gv-card={card.path}
-          onClick={click}
-          onDoubleClick={doubleClick}
-          onKeyDown={keyDown}
-          onFocus={onFocus}
-        />
+          <div
+            className={styles.press}
+            role="button"
+            tabIndex={focusable ? 0 : -1}
+            aria-label={card.title}
+            aria-describedby={descId}
+            data-gv-card={card.path}
+            onClick={click}
+            onDoubleClick={doubleClick}
+            onKeyDown={keyDown}
+            onFocus={onFocus}
+          />
+        </div>
+        <div className={styles.foot}>
+          {card.hasImage && (
+            <span role="img" aria-label={t('gv.hasImage')} className={styles.media}>
+              <ImageIcon />
+            </span>
+          )}
+          {card.hasAudio && (
+            <span role="img" aria-label={t('gv.hasAudio')} className={styles.media}>
+              <AudioIcon />
+            </span>
+          )}
+          {page && onSeeAtoms && (
+            <button
+              type="button"
+              className={styles.atoms}
+              tabIndex={focusable ? 0 : -1}
+              aria-label={t('gv.atoms.see', { title: card.title })}
+              title={t('gv.atoms.see', { title: card.title })}
+              onClick={onSeeAtoms}
+            >
+              <AtomIcon />
+            </button>
+          )}
+          {/* M4b part 3 §4: a page is edited; a folder's pages are seen. */}
+          <button
+            type="button"
+            className={styles.seeAll}
+            tabIndex={focusable ? 0 : -1}
+            aria-label={
+              page
+                ? t('gv.editLabel', { title: card.title })
+                : t('gv.seeAllLabel', { title: card.title })
+            }
+            onClick={onOpenEditor}
+          >
+            {page ? <EditIcon /> : <StackIcon />}
+            {t(page ? 'gv.edit' : 'gv.seeAll')}
+          </button>
+        </div>
       </div>
-      <div className={styles.foot}>
-        {card.hasImage && (
-          <span role="img" aria-label={t('gv.hasImage')} className={styles.media}>
-            <ImageIcon />
-          </span>
-        )}
-        {card.hasAudio && (
-          <span role="img" aria-label={t('gv.hasAudio')} className={styles.media}>
-            <AudioIcon />
-          </span>
-        )}
-        <button
-          type="button"
-          className={styles.seeAll}
-          tabIndex={focusable ? 0 : -1}
-          aria-label={t('gv.seeAllLabel', { title: card.title })}
-          onClick={onOpenEditor}
-        >
-          {t('gv.seeAll')}
-        </button>
-      </div>
-    </div>
+    </>
   );
 }

@@ -11,7 +11,7 @@ use crate::error::{CmdResult, CommandError, ErrorKind};
 use crate::state::AppState;
 use crate::vault_commands::blocking;
 use nimw_session::{VaultSession, cover_reference};
-use nimw_vault::{EntryKind, PageWidth, VaultPath};
+use nimw_vault::{CoverSide, EntryKind, LinkFormat, PageWidth, VaultPath};
 use percent_encoding::percent_decode_str;
 use std::path::PathBuf;
 use tauri::ipc::{InvokeBody, Request};
@@ -189,6 +189,7 @@ pub(crate) fn vault_settings_get_impl(state: &AppState) -> CmdResult<VaultSettin
     let session = state.session()?;
     let config = session.attachment_settings();
     let widths = session.vault().page_widths();
+    let formats = session.vault().link_formats();
     Ok(VaultSettingsDto {
         attachments: AttachmentsDto {
             mode: config.mode,
@@ -199,14 +200,24 @@ pub(crate) fn vault_settings_get_impl(state: &AppState) -> CmdResult<VaultSettin
         page_width: widths.vault,
         page_widths: widths.pages,
         cover_heights: session.vault().cover_heights(),
+        cover_sides: session
+            .vault()
+            .cover_sides()
+            .into_iter()
+            .map(|(path, side)| (path, side.as_str()))
+            .collect(),
+        cover_widths: session.vault().cover_widths(),
+        attachment_link_format: formats.own,
+        obsidian_link_format: formats.obsidian,
     })
 }
 
-/// `"readable"` / `"full"` / `None`; anything else is refused.
+/// `"readable"` / `"wide"` / `"full"` / `None`; anything else is refused.
 fn width_of(value: Option<&str>) -> CmdResult<Option<PageWidth>> {
     match value {
         None | Some("default") => Ok(None),
         Some("readable") => Ok(Some(PageWidth::Readable)),
+        Some("wide") => Ok(Some(PageWidth::Wide)),
         Some("full") => Ok(Some(PageWidth::Full)),
         Some(other) => Err(invalid(format!("unknown page width {other:?}"))),
     }
@@ -246,6 +257,47 @@ pub(crate) fn cover_height_set_impl(
     vault_settings_get_impl(state)
 }
 
+/// `"top"` / `"left"` / `"right"`; anything else is refused.
+fn side_of(value: &str) -> CmdResult<CoverSide> {
+    match value {
+        "top" => Ok(CoverSide::Top),
+        "left" => Ok(CoverSide::Left),
+        "right" => Ok(CoverSide::Right),
+        other => Err(invalid(format!("unknown cover side {other:?}"))),
+    }
+}
+
+/// M4b part 3 §3: where a page's cover sits; `top` clears the entry.
+pub(crate) fn cover_side_set_impl(
+    state: &AppState,
+    path: String,
+    side: String,
+) -> CmdResult<VaultSettingsDto> {
+    let session = state.session()?;
+    let side = side_of(&side)?;
+    let page = visible_page(&session, &path)?;
+    session.vault().set_cover_side(page.as_str(), side)?;
+    vault_settings_get_impl(state)
+}
+
+/// M4b part 3 §3: a side cover's strip width in px (a drag gives fractions,
+/// rounded; the vault clamps it to 160–2000); `None` clears it.
+pub(crate) fn cover_width_set_impl(
+    state: &AppState,
+    path: String,
+    width: Option<f64>,
+) -> CmdResult<VaultSettingsDto> {
+    let session = state.session()?;
+    let width = match width {
+        None => None,
+        Some(px) if px.is_finite() => Some(px.round().clamp(0.0, f64::from(u32::MAX)) as u32),
+        Some(px) => return Err(invalid(format!("not a cover width: {px}"))),
+    };
+    let page = visible_page(&session, &path)?;
+    session.vault().set_cover_width(page.as_str(), width)?;
+    vault_settings_get_impl(state)
+}
+
 pub(crate) fn vault_settings_set_impl(
     state: &AppState,
     patch: VaultSettingsPatch,
@@ -255,6 +307,16 @@ pub(crate) fn vault_settings_set_impl(
         session
             .vault()
             .set_vault_page_width(width_of(Some(width))?)?;
+    }
+    if let Some(format) = patch.attachment_link_format.as_deref() {
+        let format = match format {
+            "default" => None,
+            other => Some(
+                LinkFormat::parse(other)
+                    .ok_or_else(|| invalid(format!("unknown link format {other:?}")))?,
+            ),
+        };
+        session.vault().set_link_format(format)?;
     }
     match patch.attachments {
         Some(a) => session.set_attachment_settings(&a.mode, &a.path, patch.override_obsidian)?,
@@ -339,6 +401,30 @@ pub async fn page_width_set<R: Runtime>(
 ) -> CmdResult<VaultSettingsDto> {
     blocking(app, move |app| {
         page_width_set_impl(&app.state::<AppState>(), path, width)
+    })
+    .await
+}
+
+#[tauri::command]
+pub async fn cover_side_set<R: Runtime>(
+    app: AppHandle<R>,
+    path: String,
+    side: String,
+) -> CmdResult<VaultSettingsDto> {
+    blocking(app, move |app| {
+        cover_side_set_impl(&app.state::<AppState>(), path, side)
+    })
+    .await
+}
+
+#[tauri::command]
+pub async fn cover_width_set<R: Runtime>(
+    app: AppHandle<R>,
+    path: String,
+    width: Option<f64>,
+) -> CmdResult<VaultSettingsDto> {
+    blocking(app, move |app| {
+        cover_width_set_impl(&app.state::<AppState>(), path, width)
     })
     .await
 }

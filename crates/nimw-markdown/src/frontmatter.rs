@@ -9,22 +9,37 @@ use yaml_rust2::scanner::{Marker, TScalarStyle};
 pub(crate) struct Frontmatter {
     pub subtitle: Option<String>,
     pub cover_y: Option<u8>,
+    /// `cover-x` (0–100): a side cover's horizontal focus (M4b part 3 §3).
+    pub cover_x: Option<u8>,
     pub tags: Vec<Tag>,
     pub links: Vec<LinkRef>,
     pub cover: Option<String>,
     pub error: Option<String>,
 }
 
-/// Byte range of the YAML between the opening `---` line and the closing
-/// `---`/`...` line, and the byte offset where the body starts.
-pub(crate) fn split(src: &str) -> Option<(Range<usize>, usize)> {
-    let first_len = if src.starts_with("---\n") {
-        4
-    } else if src.starts_with("---\r\n") {
-        5
+/// Where a note's text starts: after a UTF-8 byte-order mark (Windows
+/// Notepad writes one), which is no text.
+pub(crate) fn text_start(src: &str) -> usize {
+    if src.starts_with('\u{FEFF}') {
+        '\u{FEFF}'.len_utf8()
     } else {
-        return None;
-    };
+        0
+    }
+}
+
+/// Byte range of the YAML between the opening `---` line and the closing
+/// `---`/`...` line, and the byte offset where the body starts. A
+/// byte-order mark may come before the opening line.
+pub(crate) fn split(src: &str) -> Option<(Range<usize>, usize)> {
+    let start = text_start(src);
+    let first_len = start
+        + if src[start..].starts_with("---\n") {
+            4
+        } else if src[start..].starts_with("---\r\n") {
+            5
+        } else {
+            return None;
+        };
     let mut pos = first_len;
     while pos <= src.len() {
         let line_end = src[pos..].find('\n').map(|i| pos + i).unwrap_or(src.len());
@@ -167,12 +182,8 @@ pub(crate) fn parse(src: &str, yaml: Range<usize>) -> Frontmatter {
                     fm.cover = value.as_scalar().map(str::to_string);
                 }
             }
-            Some("cover-y") => {
-                fm.cover_y = value
-                    .as_scalar()
-                    .and_then(|s| s.trim().parse::<f64>().ok())
-                    .map(|n| n.clamp(0.0, 100.0).round() as u8);
-            }
+            Some("cover-y") => fm.cover_y = percent(value),
+            Some("cover-x") => fm.cover_x = percent(value),
             Some("tags") => {
                 let raw: Vec<String> = match value {
                     Node::Seq(items) => items
@@ -210,6 +221,14 @@ pub(crate) fn parse(src: &str, yaml: Range<usize>) -> Frontmatter {
         }
     }
     fm
+}
+
+/// `cover-y` / `cover-x`: a number, clamped to 0–100 and rounded.
+fn percent(value: &Node) -> Option<u8> {
+    value
+        .as_scalar()
+        .and_then(|s| s.trim().parse::<f64>().ok())
+        .map(|n| n.clamp(0.0, 100.0).round() as u8)
 }
 
 /// Finds a scalar's value and its absolute byte range in the source.
@@ -272,6 +291,22 @@ mod tests {
         assert_eq!(split("---\n---\n").unwrap().0, 4..4);
     }
 
+    /// Windows Notepad saves UTF-8 with a byte-order mark before `---`; the
+    /// block is still the note's frontmatter (as remark and Obsidian read it),
+    /// with ranges into the text as written.
+    #[test]
+    fn split_reads_frontmatter_after_a_byte_order_mark() {
+        let src = "\u{FEFF}---\ntags: [a]\ncover: c.png\n---\n# Rex\n";
+        let (yaml, body) = split(src).expect("frontmatter after the mark");
+        assert_eq!(&src[yaml.clone()], "tags: [a]\ncover: c.png\n");
+        assert_eq!(&src[body..], "# Rex\n");
+        let f = parse(src, yaml);
+        assert_eq!(f.cover.as_deref(), Some("c.png"));
+        assert_eq!(&src[f.links[0].range.clone()], "c.png");
+        assert_eq!(f.tags[0].key, "a");
+        assert!(split("\u{FEFF}# no frontmatter\n---\n").is_none());
+    }
+
     #[test]
     fn pg_02_03_subtitle_cover_and_cover_y() {
         let src =
@@ -284,6 +319,17 @@ mod tests {
         assert_eq!(cover.kind, LinkKind::FrontmatterCover);
         assert_eq!(&src[cover.range.clone()], "assets/rex cover.png");
         assert_eq!(fm("---\ncover-y: abc\n---\n").cover_y, None);
+    }
+
+    /// M4b part 3 §3: a side cover's horizontal focus, read like `cover-y`.
+    #[test]
+    fn cover_x_is_read_like_cover_y() {
+        assert_eq!(fm("---\ncover-x: 30\n---\n").cover_x, Some(30));
+        assert_eq!(fm("---\ncover-x: 12.6\n---\n").cover_x, Some(13));
+        assert_eq!(fm("---\ncover-x: -5\n---\n").cover_x, Some(0));
+        assert_eq!(fm("---\ncover-x: 140\n---\n").cover_x, Some(100));
+        assert_eq!(fm("---\ncover-x: left\n---\n").cover_x, None);
+        assert_eq!(fm("---\ncover-y: 20\n---\n").cover_x, None);
     }
 
     #[test]

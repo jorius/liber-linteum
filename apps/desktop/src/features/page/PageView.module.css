@@ -335,6 +335,162 @@
   outline: none;
 }
 
+/* Side covers (M4b part 3 §3): the page area is a row, an optional strip
+   beside the main column (the band, notices and the editor), which keeps
+   the page's own column layout. */
+.coverLayout {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+}
+
+.coverMain {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+/* The strip: --cover-width wide (the page's own or 280 px) and the page
+   area's full height. Its image layer is a definite box, so object-position
+   crops the same way in WebKit and Chromium (WebView2). */
+.strip {
+  position: relative;
+  flex: 0 0 var(--cover-width, 280px);
+  width: var(--cover-width, 280px);
+  min-height: 0;
+  overflow: hidden;
+  background: var(--color-surface-subtle);
+}
+
+.strip[data-cover-strip='left'] {
+  border-right: 1px solid var(--color-border);
+}
+
+.strip[data-cover-strip='right'] {
+  border-left: 1px solid var(--color-border);
+}
+
+/* In a strip, the cover's controls sit at its foot, wrapping to its width,
+   shown on hover and keyboard focus like the band's. */
+.strip .coverControls {
+  left: 8px;
+  right: 8px;
+  bottom: 18px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.strip:hover .coverControls {
+  opacity: 1;
+}
+
+.strip .repositionHint {
+  background: var(--color-surface-veil);
+  border-radius: var(--radius-md);
+  padding: 4px 10px;
+}
+
+.coverSliderBoth {
+  cursor: move;
+}
+
+/* The strip's inner edge, a focusable separator (twin of .coverResize). */
+.coverWidthResize {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 10px;
+  cursor: ew-resize;
+  touch-action: none;
+  -webkit-user-select: none;
+  user-select: none;
+  opacity: 0;
+  transition: opacity 120ms ease;
+}
+
+.strip[data-cover-strip='left'] .coverWidthResize {
+  right: 0;
+}
+
+.strip[data-cover-strip='right'] .coverWidthResize {
+  left: 0;
+}
+
+.coverWidthResize::before {
+  content: '';
+  width: 4px;
+  height: 48px;
+  border-radius: 2px;
+  background: var(--color-surface);
+  box-shadow: 0 0 0 1px var(--color-border-strong);
+}
+
+.strip:hover .coverWidthResize {
+  opacity: 1;
+}
+
+.coverWidthResize[data-dragging] {
+  opacity: 1;
+}
+
+.coverWidthResize:focus {
+  opacity: 1;
+  outline: 2px solid var(--color-focus);
+  outline-offset: -2px;
+}
+
+.coverWidthResize:focus:not(:focus-visible) {
+  outline: none;
+}
+
+/* Top / Left / Right: a small segmented radio group among the controls. */
+.placement {
+  display: inline-flex;
+  gap: 2px;
+  padding: 2px;
+  border-radius: var(--radius-md);
+  background: var(--color-surface-veil);
+  box-shadow: 0 0 0 1px var(--color-border);
+}
+
+.placementOption {
+  display: inline-grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-text-body);
+  cursor: pointer;
+}
+
+.placementOption:hover {
+  background: var(--color-accent-soft);
+}
+
+.placementOption[aria-checked='true'] {
+  background: var(--color-accent);
+  color: var(--color-accent-contrast);
+}
+
+.placementOption:focus {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 1px;
+}
+
+.placementOption:focus:not(:focus-visible) {
+  outline: none;
+}
+
 /* Repositioning: only the image and Save / Cancel; the image takes the
    pointer through the rows. */
 .repositioning .coverControls {
@@ -508,9 +664,22 @@
   border-color: var(--color-accent);
 }
 
-.toolbarToggle[aria-pressed='true'] {
+.toolbarToggle[aria-pressed='true'],
+.toolbarToggle[data-active] {
   background: var(--color-surface);
   color: var(--color-text-strong);
+}
+
+/* The page width menu (M4b part 3 wide elements §2): a tick column. */
+.widthMenu {
+  z-index: 40;
+}
+
+.widthCheck {
+  display: inline-flex;
+  align-items: center;
+  width: 20px;
+  vertical-align: middle;
 }
 
 .toolbarToggle:focus-visible {

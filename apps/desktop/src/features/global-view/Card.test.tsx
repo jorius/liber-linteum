@@ -14,6 +14,8 @@ function card(extra: Partial<GvCard> = {}): GvCard {
     cover: 'Character Design/assets/rex-cover.png',
     coverRemote: false,
     coverY: 40,
+    coverX: null,
+    coverSide: 'top',
     excerpt: 'Teen agent who builds machines.',
     hasImage: true,
     hasAudio: true,
@@ -62,9 +64,14 @@ describe('Global View card (M3a §4)', () => {
     );
     expect(screen.getByRole('img', { name: 'Has images' })).toBeInTheDocument();
     expect(screen.getByRole('img', { name: 'Has audio' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'See all: Generator Rex' })).toHaveTextContent(
-      'See all',
+    // M4b part 3 §4: a page is edited, not "seen all".
+    expect(screen.getByRole('button', { name: 'Edit Generator Rex' })).toHaveTextContent('Edit');
+    expect(screen.queryByRole('button', { name: /^See all/ })).not.toBeInTheDocument();
+    expect(screen.getByRole('group', { name: 'Generator Rex, page' })).toHaveAttribute(
+      'data-kind',
+      'page',
     );
+    expect(document.querySelector('[data-gv-tab]')).toBeNull();
   });
 
   it('GV-02: a folder without an index note summarises its children', () => {
@@ -76,6 +83,8 @@ describe('Global View card (M3a §4)', () => {
         subtitle: 'Delta',
         cover: null,
         coverY: null,
+        coverX: null,
+        coverSide: 'top',
         excerpt: 'Inner · X title · y',
         hasImage: false,
         hasAudio: false,
@@ -85,6 +94,14 @@ describe('Global View card (M3a §4)', () => {
     );
     expect(screen.getByText('Project')).toBeInTheDocument();
     expect(screen.getByText('2 pages · 1 folder')).toBeInTheDocument();
+    // M4b part 3 §4: folders keep See all and look like folders.
+    expect(screen.getByRole('button', { name: 'See all: Delta' })).toHaveTextContent('See all');
+    expect(screen.queryByRole('button', { name: /^Edit/ })).not.toBeInTheDocument();
+    expect(screen.getByRole('group', { name: 'Delta, project' })).toHaveAttribute(
+      'data-kind',
+      'project',
+    );
+    expect(document.querySelector('[data-gv-tab]')).toHaveAttribute('aria-hidden', 'true');
     expect(document.querySelector('img')).toBeNull();
     expect(screen.queryByRole('img', { name: 'Has images' })).not.toBeInTheDocument();
   });
@@ -99,6 +116,22 @@ describe('Global View card (M3a §4)', () => {
     );
     expect(screen.getByText('Folder · DMC')).toBeInTheDocument();
     expect(screen.getByRole('group', { name: 'Generator Rex, folder' })).toBeInTheDocument();
+  });
+
+  it('M4b part 3 §3: a side cover is a strip on that side, focused in both axes', () => {
+    const { unmount } = show(card({ coverSide: 'left', coverX: 20, coverY: 70 }));
+    expect(document.querySelector('[data-cover-side]')).toHaveAttribute('data-cover-side', 'left');
+    expect(document.querySelector('img')!.style.objectPosition).toBe('20% 70%');
+    unmount();
+    show(card({ coverSide: 'right', coverX: null, coverY: null }));
+    expect(document.querySelector('[data-cover-side]')).toHaveAttribute('data-cover-side', 'right');
+    expect(document.querySelector('img')!.style.objectPosition).toBe('50% 50%');
+  });
+
+  it('M4b part 3 §3: a side placement without an image keeps the top placeholder', () => {
+    show(card({ cover: null, coverSide: 'left' }));
+    expect(document.querySelector('[data-cover-side]')).toBeNull();
+    expect(screen.getByText('No cover')).toBeInTheDocument();
   });
 
   it('placeholders: no cover, and a remote cover that is never loaded', () => {
@@ -129,7 +162,7 @@ describe('Global View card (M3a §4)', () => {
     expect(onOpen).toHaveBeenCalledTimes(2);
     fireEvent.keyDown(open, { key: 'Enter', shiftKey: true });
     expect(onOpenEditor).toHaveBeenCalledTimes(2);
-    fireEvent.click(screen.getByRole('button', { name: 'See all: Generator Rex' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Edit Generator Rex' }));
     expect(onOpenEditor).toHaveBeenCalledTimes(3);
     expect(onOpen).toHaveBeenCalledTimes(2);
   });

@@ -382,13 +382,78 @@ fn m4b2_page_width_setting_default_persist_and_reset() {
     assert_eq!(saved["pageWidth"], "full");
     std::fs::write(
         dir.path().join("settings.json"),
-        r#"{"pageWidth":"wide","theme":"dark"}"#,
+        r#"{"pageWidth":"huge","theme":"dark"}"#,
     )
     .unwrap();
     let (s, warning) = store(dir.path()).get();
     assert_eq!(s.page_width, PageWidth::Readable);
     assert_eq!(s.theme, Theme::Dark);
     assert!(warning.unwrap().contains("pageWidth"));
+}
+
+/// M4b part 3 (wide elements §2): `wide` is an app-wide width too.
+#[test]
+fn m4b3_page_width_wide_persists() {
+    use nimw_desktop::settings::PageWidth;
+    let dir = tempfile::tempdir().unwrap();
+    let s = store(dir.path());
+    s.update(SettingsPatch {
+        page_width: Some(PageWidth::Wide),
+        ..Default::default()
+    })
+    .unwrap();
+    let saved: serde_json::Value =
+        serde_json::from_str(&std::fs::read_to_string(dir.path().join("settings.json")).unwrap())
+            .unwrap();
+    assert_eq!(saved["pageWidth"], "wide");
+    assert_eq!(store(dir.path()).get().0.page_width, PageWidth::Wide);
+}
+
+/// M4b part 3 (wide elements §2): the kinds that go wide. Tables and
+/// diagrams by default; a missing key takes its default and an unknown one
+/// (from a newer version) survives a save.
+#[test]
+fn m4b3_wide_elements_defaults_missing_keys_and_unknown_keys() {
+    use nimw_desktop::settings::WideElements;
+    let dir = tempfile::tempdir().unwrap();
+    let wide = store(dir.path()).get().0.wide_elements;
+    assert!(wide.tables && wide.diagrams);
+    assert!(!wide.code && !wide.images && !wide.maths);
+    std::fs::write(
+        dir.path().join("settings.json"),
+        r#"{"wideElements":{"code":true,"future":1}}"#,
+    )
+    .unwrap();
+    let s = store(dir.path());
+    let (settings, warning) = s.get();
+    assert!(warning.is_none());
+    let wide = settings.wide_elements.clone();
+    assert!(wide.code && wide.tables && wide.diagrams && !wide.images && !wide.maths);
+    s.update(SettingsPatch {
+        wide_elements: Some(WideElements {
+            images: true,
+            ..wide
+        }),
+        ..Default::default()
+    })
+    .unwrap();
+    let saved: serde_json::Value =
+        serde_json::from_str(&std::fs::read_to_string(dir.path().join("settings.json")).unwrap())
+            .unwrap();
+    assert_eq!(saved["wideElements"]["images"], true);
+    assert_eq!(saved["wideElements"]["code"], true);
+    assert_eq!(saved["wideElements"]["maths"], false);
+    assert_eq!(saved["wideElements"]["future"], 1);
+    // A value that isn't an object resets only this field.
+    std::fs::write(
+        dir.path().join("settings.json"),
+        r#"{"wideElements":"all","theme":"dark"}"#,
+    )
+    .unwrap();
+    let (s, warning) = store(dir.path()).get();
+    assert!(s.wide_elements.tables && !s.wide_elements.code);
+    assert_eq!(s.theme, Theme::Dark);
+    assert!(warning.unwrap().contains("wideElements"));
 }
 
 /// M4b part 2 §5: the outline panel's state is remembered app-wide (off by
@@ -417,6 +482,34 @@ fn m4b2_outline_setting_default_persist_and_reset() {
     assert!(!s.outline);
     assert_eq!(s.theme, Theme::Dark);
     assert!(warning.unwrap().contains("outline"));
+}
+
+/// M4b part 3 §8: "Show where attachments are on disk" is an app setting,
+/// off by default; a wrong value falls back to off with a warning.
+#[test]
+fn m4b3_show_attachment_paths_default_persist_and_reset() {
+    let dir = tempfile::tempdir().unwrap();
+    let s = store(dir.path());
+    assert!(!s.get().0.show_attachment_paths);
+    s.update(SettingsPatch {
+        show_attachment_paths: Some(true),
+        ..Default::default()
+    })
+    .unwrap();
+    let saved: serde_json::Value =
+        serde_json::from_str(&std::fs::read_to_string(dir.path().join("settings.json")).unwrap())
+            .unwrap();
+    assert_eq!(saved["showAttachmentPaths"], true);
+    assert!(store(dir.path()).get().0.show_attachment_paths);
+    std::fs::write(
+        dir.path().join("settings.json"),
+        r#"{"showAttachmentPaths":1,"theme":"dark"}"#,
+    )
+    .unwrap();
+    let (s, warning) = store(dir.path()).get();
+    assert!(!s.show_attachment_paths);
+    assert_eq!(s.theme, Theme::Dark);
+    assert!(warning.unwrap().contains("showAttachmentPaths"));
 }
 
 /// Cover resize: the default cover height for pages without their own,
