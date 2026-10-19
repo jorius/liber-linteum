@@ -2,9 +2,11 @@
 //! becomes a new vault. See `docs/superpowers/specs/2026-10-18-m7-notion-import-design.md`.
 
 mod archive;
+mod markdown;
 mod names;
 
 pub use archive::{Entry, Export, Limits};
+pub use markdown::{Resolver, Target, convert, strip_properties};
 pub use names::{NameMap, clean_component};
 
 /// Why an import couldn't go on.
