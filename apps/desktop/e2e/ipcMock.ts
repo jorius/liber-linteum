@@ -744,6 +744,44 @@ export function installIpcMock({
         },
       };
     },
+    // M7: the Notion import (dialogs answered at once; the import adds its
+    // pages to the mock vault, reports progress and opens it).
+    notion_pick_zip: () => ({ name: 'Team wiki.zip', suggestedName: 'Team wiki' }),
+    notion_pick_parent: () => '/Users/e2e/Notion',
+    notion_preview: () => ({
+      pages: 2,
+      databases: 1,
+      rows: 1,
+      attachments: 1,
+      folders: 1,
+      bytes: 4096,
+      warnings: ['Home.md: the link to Gone.md points nowhere'],
+      moreWarnings: 0,
+    }),
+    notion_import: (a) => {
+      pages['Home.md'] = '# Home\n\nSee [[Child]].\n';
+      pages['Home/Child.md'] = '# Child\n';
+      pages['Notion import report.md'] = '# Notion import report\n\nNo warnings.\n';
+      (w.__nimwEmit as (e: string, p: unknown) => void)('notion:progress', { done: 4, total: 4 });
+      return {
+        vault: {
+          name: a.name,
+          root: `/Users/e2e/Notion/${a.name as string}`,
+          report: {
+            files: 3,
+            pages: 3,
+            parsed: 3,
+            skippedUnchanged: 0,
+            removed: 0,
+            warnings: [],
+            durationMs: 1,
+          },
+        },
+        report: 'Notion import report.md',
+        cancelled: false,
+      };
+    },
+    notion_cancel: () => null,
     quick_notes_state: () => ({
       folder: inScratchpad ? null : 'Scratchpad',
       autoNamed: [...autoNamed],

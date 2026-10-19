@@ -181,7 +181,9 @@ export function NotionImportDialog({ onClose }: { onClose: () => void }) {
                   ))}
                 </ul>
                 {preview.moreWarnings > 0 && (
-                  <p className={dialogs.hint}>{t('notion.moreWarnings', { count: preview.moreWarnings })}</p>
+                  <p className={dialogs.hint}>
+                    {t('notion.moreWarnings', { count: preview.moreWarnings })}
+                  </p>
                 )}
               </details>
             )}

@@ -970,7 +970,9 @@ export const onMenuQuickNote = (cb: () => void): Promise<UnlistenFn> =>
 export const onMenuNotionImport = (cb: () => void): Promise<UnlistenFn> =>
   listen<null>('menu:notionImport', () => cb(), mine());
 /** How far a Notion import is (M7 §8). */
-export const onNotionProgress = (cb: (p: { done: number; total: number }) => void): Promise<UnlistenFn> =>
+export const onNotionProgress = (
+  cb: (p: { done: number; total: number }) => void,
+): Promise<UnlistenFn> =>
   listen<{ done: number; total: number }>('notion:progress', (e) => cb(e.payload), mine());
 /** View → Search… in the app menu (M5 §4). */
 export const onMenuSearch = (cb: () => void): Promise<UnlistenFn> =>
