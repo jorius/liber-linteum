@@ -215,6 +215,9 @@ impl VaultSession {
             }
             Ok(())
         })?;
+        drop(index);
+        self.retext_renamed(&renamed)?;
+        let mut index = self.index();
         let files = index.file_set()?;
         // A removed folder takes every file inside it with it: re-resolve links
         // to all of them, not just to the folder's own name (final review I5).

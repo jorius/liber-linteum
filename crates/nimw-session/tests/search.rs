@@ -220,6 +220,26 @@ fn m4c_m5_a_quick_note_is_found_by_its_first_line_name() {
 
 /// Batch 6: text and code files are found by name and content; files that
 /// aren't readable text (not UTF-8, too large) are skipped, never an error.
+/// Batch 6 review M1: a rename that changes whether a file is text drops or
+/// loads its searchable text.
+#[test]
+fn b6_review_m1_a_rename_rechecks_whether_a_file_is_text() {
+    let dir = tempfile::tempdir().unwrap();
+    write(dir.path(), "a.txt", "dragonfruit\n");
+    write(dir.path(), "b.bin", "kiwano\n");
+    let (_c, s) = open(dir.path());
+    assert_eq!(find(&s, "dragonfruit"), vec!["a.txt"]);
+    assert!(find(&s, "kiwano").is_empty());
+    let vp = |p: &str| VaultPath::new(p).unwrap();
+    s.rename(&vp("a.txt"), &vp("a.pdf"), false).unwrap();
+    assert!(
+        find(&s, "dragonfruit").is_empty(),
+        "a .pdf isn't searched by its old text"
+    );
+    s.rename(&vp("b.bin"), &vp("b.txt"), false).unwrap();
+    assert_eq!(find(&s, "kiwano"), vec!["b.txt"]);
+}
+
 #[test]
 fn b6_text_files_are_searchable_through_the_session() {
     let dir = tempfile::tempdir().unwrap();

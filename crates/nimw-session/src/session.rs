@@ -53,6 +53,31 @@ pub(crate) fn text_of(path: &str, bytes: &[u8]) -> Option<String> {
         .then(|| String::from_utf8_lossy(bytes).into_owned())
 }
 
+impl VaultSession {
+    /// After renames: a file whose new name makes it text (or no longer
+    /// text) gets its searchable text loaded (or dropped), batch 6 review M1.
+    pub(crate) fn retext_renamed(&self, renamed: &[(String, String)]) -> Result<()> {
+        use crate::text_files::is_text_path;
+        for (old, new) in renamed {
+            if is_page_path(new) || is_text_path(old) == is_text_path(new) {
+                continue;
+            }
+            let Ok(path) = VaultPath::new(new) else {
+                continue;
+            };
+            let text = is_text_path(new)
+                .then(|| self.vault.read(&path).ok())
+                .flatten()
+                .and_then(|(bytes, _)| text_of(new, &bytes));
+            self.index().transaction(|tx| match &text {
+                Some(t) => tx.upsert_text(new, t),
+                None => tx.remove_text(new),
+            })?;
+        }
+        Ok(())
+    }
+}
+
 pub(crate) fn is_page_path(path: &str) -> bool {
     path.rsplit_once('.')
         .is_some_and(|(_, ext)| ext.eq_ignore_ascii_case("md"))

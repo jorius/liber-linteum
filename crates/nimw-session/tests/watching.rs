@@ -414,3 +414,29 @@ fn b6_an_outside_edit_to_a_text_file_reaches_search() {
     assert!(wait_until(WAIT, || find("labradorite")
         == vec!["Game Design/notes.txt"]));
 }
+
+/// Batch 6 review M1: the same through the watcher (a rename made outside).
+#[test]
+fn b6_review_m1_an_outside_rename_rechecks_whether_a_file_is_text() {
+    let (dir, _c, s, _events) = watched("obsidian-basic");
+    let find = |w: &str| {
+        s.search(&nimw_session::SearchQuery {
+            text: w.into(),
+            ..Default::default()
+        })
+        .unwrap()
+        .results
+        .into_iter()
+        .map(|h| h.path)
+        .collect::<Vec<_>>()
+    };
+    std::fs::write(dir.path().join("Game Design/notes.txt"), "labradorite\n").unwrap();
+    assert!(wait_until(WAIT, || find("labradorite")
+        == vec!["Game Design/notes.txt"]));
+    std::fs::rename(
+        dir.path().join("Game Design/notes.txt"),
+        dir.path().join("Game Design/notes.pdf"),
+    )
+    .unwrap();
+    assert!(wait_until(WAIT, || find("labradorite").is_empty()));
+}

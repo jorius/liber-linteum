@@ -577,6 +577,15 @@ impl Tx<'_> {
         Ok(())
     }
 
+    /// Drops a text file's searchable text (it was renamed to a name the
+    /// text view doesn't open, batch 6 review M1).
+    pub fn remove_text(&self, path: &str) -> Result<()> {
+        self.tx
+            .prepare_cached("DELETE FROM page_text WHERE path = ?1")?
+            .execute([path])?;
+        Ok(())
+    }
+
     /// Removes `path` and, for folders, everything inside it. Links pointing at
     /// removed files become unresolved.
     pub fn remove(&self, path: &str) -> Result<()> {
