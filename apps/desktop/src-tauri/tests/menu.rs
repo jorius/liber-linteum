@@ -143,6 +143,8 @@ fn macos_menu_quit_is_ours_and_the_standard_items_stay() {
     );
     // M4c §3: File → Open File… (⌘⇧O; ⌘O opens a folder as a vault).
     assert!(texts("File").contains(&"Open File…".to_string()));
+    // M7: File → Import from Notion….
+    assert!(texts("File").contains(&"Import from Notion…".to_string()));
     let file_at = outline.iter().position(|(t, _)| t == "File").unwrap();
     let edit_at = outline.iter().position(|(t, _)| t == "Edit").unwrap();
     assert!(file_at < edit_at, "File comes before Edit: {outline:?}");
@@ -392,6 +394,36 @@ fn quick_note_item_emits_menu_quick_note() {
     assert_eq!(*got.lock().unwrap(), ["main".to_string()]);
 }
 
+/// M7: File → Import from Notion… opens the import in the main window only.
+fn notion_import_item_emits_to_main() {
+    use tauri::Listener;
+    let got: Arc<std::sync::Mutex<Vec<String>>> = Arc::default();
+    let log = got.clone();
+    build_app("notion").run_return(move |handle, event| {
+        if let RunEvent::Ready = event {
+            let file = tauri::WebviewWindowBuilder::new(handle, "file-1", Default::default())
+                .build()
+                .unwrap();
+            for (window, name) in [(main_window(handle), "main"), (file, "file-1")] {
+                let log = log.clone();
+                window.listen(nimw_desktop::menu::NOTION_IMPORT_EVENT, move |_| {
+                    log.lock().unwrap().push(name.to_string());
+                });
+            }
+            nimw_desktop::menu::on_menu_event(
+                handle,
+                MenuEvent {
+                    id: MenuId::new(nimw_desktop::menu::NOTION_IMPORT_ID),
+                },
+            );
+            for window in handle.webview_windows().into_values() {
+                window.close().unwrap();
+            }
+        }
+    });
+    assert_eq!(*got.lock().unwrap(), ["main".to_string()]);
+}
+
 /// M5b §2.1, §2.5, §6: Settings and Save act on the focused window (the
 /// main one on the mock runtime); the vault items and the sidebar toggle go
 /// to the main window only, even with a file window open.
@@ -464,5 +496,7 @@ fn main() {
     menu_events_reach_one_window_only();
     println!("test menu_events_reach_one_window_only ... ok");
     m5b_items_emit_their_events();
+    notion_import_item_emits_to_main();
+    println!("test notion_import_item_emits_to_main ... ok");
     println!("test m5b_items_emit_their_events ... ok");
 }

@@ -50,6 +50,9 @@ pub const QUICK_NOTE_ID: &str = "nimw-quick-note";
 pub const QUICK_NOTE_EVENT: &str = "menu:quickNote";
 /// Id of File → Open File… (M4c §3).
 pub const OPEN_FILE_ID: &str = "nimw-open-file";
+/// File → Import from Notion… (M7): the import dialog, in the main window.
+pub const NOTION_IMPORT_ID: &str = "nimw-notion-import";
+pub const NOTION_IMPORT_EVENT: &str = "menu:notionImport";
 /// Event asking the page to run Open File… (it shows what couldn't open).
 pub const OPEN_FILE_EVENT: &str = "menu:open-file";
 /// ⌘⇧O: ⌘O already opens a folder as a vault (spec §3.5).
@@ -134,6 +137,13 @@ pub fn app_menu<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
         true,
         Some(OPEN_FILE_ACCELERATOR),
     )?;
+    let notion_import = MenuItem::with_id(
+        app,
+        NOTION_IMPORT_ID,
+        "Import from Notion…",
+        true,
+        None::<&str>,
+    )?;
     // ⌘S here and on the page: a second save finds nothing to write.
     let save = MenuItem::with_id(app, SAVE_ID, "Save", true, Some("CmdOrCtrl+S"))?;
     let file = Submenu::with_items(
@@ -143,6 +153,8 @@ pub fn app_menu<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
         &[
             &quick_note,
             &open_file,
+            &PredefinedMenuItem::separator(app)?,
+            &notion_import,
             &PredefinedMenuItem::separator(app)?,
             &save,
         ],
@@ -279,6 +291,14 @@ pub fn on_menu_event<R: Runtime>(app: &AppHandle<R>, event: MenuEvent) {
             let _ = main.set_focus();
         }
         let _ = app.emit_to("main", QUICK_NOTE_EVENT, ());
+    } else if id == NOTION_IMPORT_ID {
+        // An import opens a new vault, so it runs in the main window.
+        if let Some(main) = app.get_webview_window("main") {
+            let _ = main.show();
+            let _ = main.unminimize();
+            let _ = main.set_focus();
+        }
+        let _ = app.emit_to("main", NOTION_IMPORT_EVENT, ());
     } else if id == OPEN_FILE_ID {
         emit_focused(app, OPEN_FILE_EVENT, ());
     } else if id == SETTINGS_ID {

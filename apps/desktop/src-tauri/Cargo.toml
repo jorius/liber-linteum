@@ -26,6 +26,7 @@ nimw-session = { path = "../../../crates/nimw-session" }
 nimw-vault = { path = "../../../crates/nimw-vault" }
 nimw-markdown = { path = "../../../crates/nimw-markdown" }
 nimw-audio = { path = "../../../crates/nimw-audio" }
+nimw-import = { path = "../../../crates/nimw-import" }
 
 # M4c §3: files opened from Explorer or a command line while the app runs
 # reach the running app (macOS sends them to it itself: `RunEvent::Opened`).
@@ -40,6 +41,7 @@ tauri-plugin-single-instance.workspace = true
 tauri = { workspace = true, features = ["test"] }
 tempfile.workspace = true
 nimw-testkit = { path = "../../../crates/nimw-testkit" }
+zip.workspace = true
 
 # Runs on the process main thread (muda menus can only be created there).
 [[test]]

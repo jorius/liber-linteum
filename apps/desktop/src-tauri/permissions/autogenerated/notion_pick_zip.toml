@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-notion-pick-zip"
+description = "Enables the notion_pick_zip command without any pre-configured scope."
+commands.allow = ["notion_pick_zip"]
+
+[[permission]]
+identifier = "deny-notion-pick-zip"
+description = "Denies the notion_pick_zip command without any pre-configured scope."
+commands.deny = ["notion_pick_zip"]

@@ -16,6 +16,7 @@ pub mod gv_commands;
 pub mod icon_commands;
 pub mod menu;
 pub mod navigation;
+pub mod notion_commands;
 pub mod opening;
 pub mod quit_guard;
 pub mod scratchpad_commands;
@@ -69,6 +70,8 @@ pub fn configure<R: tauri::Runtime>(
         .on_webview_event(drops::on_webview_event)
         // Quick notes (M4c): the folder dialog and its grant.
         .manage(scratchpad_commands::ScratchpadState::default())
+        // The Notion import (M7): its dialogs' picks and cancel flag.
+        .manage(notion_commands::NotionState::default())
         .register_asynchronous_uri_scheme_protocol(asset::SCHEME, |ctx, request, responder| {
             let app = ctx.app_handle().clone();
             // A single-file window is served its file's folder (M4c §4).
@@ -199,6 +202,11 @@ pub fn configure<R: tauri::Runtime>(
         audio_commands::audio_record_stop,
         audio_commands::audio_record_cancel,
         audio_commands::audio_pick,
+        notion_commands::notion_pick_zip,
+        notion_commands::notion_pick_parent,
+        notion_commands::notion_preview,
+        notion_commands::notion_import,
+        notion_commands::notion_cancel,
     ])
 }
 

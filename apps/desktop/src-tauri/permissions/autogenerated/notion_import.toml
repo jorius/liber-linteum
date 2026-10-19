@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-notion-import"
+description = "Enables the notion_import command without any pre-configured scope."
+commands.allow = ["notion_import"]
+
+[[permission]]
+identifier = "deny-notion-import"
+description = "Denies the notion_import command without any pre-configured scope."
+commands.deny = ["notion_import"]

@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-notion-cancel"
+description = "Enables the notion_cancel command without any pre-configured scope."
+commands.allow = ["notion_cancel"]
+
+[[permission]]
+identifier = "deny-notion-cancel"
+description = "Denies the notion_cancel command without any pre-configured scope."
+commands.deny = ["notion_cancel"]

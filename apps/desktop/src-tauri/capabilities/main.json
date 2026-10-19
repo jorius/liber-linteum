@@ -79,6 +79,11 @@
     "allow-audio-record-stop",
     "allow-audio-record-cancel",
     "allow-audio-pick",
+    "allow-notion-pick-zip",
+    "allow-notion-pick-parent",
+    "allow-notion-preview",
+    "allow-notion-import",
+    "allow-notion-cancel",
     "core:event:allow-listen",
     "core:event:allow-unlisten",
     "dialog:allow-open"

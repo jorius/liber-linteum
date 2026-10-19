@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-notion-preview"
+description = "Enables the notion_preview command without any pre-configured scope."
+commands.allow = ["notion_preview"]
+
+[[permission]]
+identifier = "deny-notion-preview"
+description = "Denies the notion_preview command without any pre-configured scope."
+commands.deny = ["notion_preview"]

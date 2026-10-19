@@ -53,6 +53,12 @@ const VAULT_COMMANDS: &[&str] = &[
     "quick_note_autoname",
     "quick_notes_state",
     "scratch_folder_set",
+    // M7: so is the Notion import.
+    "notion_pick_zip",
+    "notion_pick_parent",
+    "notion_preview",
+    "notion_import",
+    "notion_cancel",
     // M5: search is the main window's.
     "search",
     // M5b §11.8: the main window's title; file windows keep their own.

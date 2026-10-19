@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-notion-pick-parent"
+description = "Enables the notion_pick_parent command without any pre-configured scope."
+commands.allow = ["notion_pick_parent"]
+
+[[permission]]
+identifier = "deny-notion-pick-parent"
+description = "Denies the notion_pick_parent command without any pre-configured scope."
+commands.deny = ["notion_pick_parent"]

@@ -2705,6 +2705,7 @@ dependencies = [
  "dunce",
  "fontdb",
  "nimw-audio",
+ "nimw-import",
  "nimw-markdown",
  "nimw-session",
  "nimw-testkit",
@@ -2720,6 +2721,7 @@ dependencies = [
  "tauri-plugin-single-instance",
  "tempfile",
  "thiserror 2.0.21",
+ "zip",
 ]
 
 [[package]]

@@ -89,6 +89,12 @@ const COMMANDS: &[&str] = &[
     "audio_record_stop",
     "audio_record_cancel",
     "audio_pick",
+    // M7: the Notion import (main window only).
+    "notion_pick_zip",
+    "notion_pick_parent",
+    "notion_preview",
+    "notion_import",
+    "notion_cancel",
 ];
 
 fn main() {
