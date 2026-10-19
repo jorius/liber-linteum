@@ -41,6 +41,7 @@ const FACETS = {
   hasImage: 1,
   hasAudio: 0,
   archived: 2,
+  textFiles: 3,
 };
 
 let queries: SearchQuery[];
@@ -165,6 +166,38 @@ describe('Search dialog (M5 §4)', () => {
     expect(showPage).toHaveBeenCalledWith('Game/Dragon run.md', 'Dragon run');
     expect(useUiStore.getState().screen).toBe('global');
     expect(opened).toEqual([]);
+  });
+
+  it('batch 6: a text file hit shows its type and opens in the text view, Shift+Enter too', async () => {
+    const showPage = vi.fn(async () => undefined);
+    useGvStore.setState({ showPage });
+    reply = (q) => ({
+      results: q.text ? [hit('Notes/todo.txt', { title: 'todo.txt' })] : [hit('Recent.md')],
+      total: 1,
+      facets: FACETS,
+      recent: !q.text,
+      indexing: false,
+    });
+    const field = openDialog();
+    await userEvent.type(field, 'todo');
+    const option = await screen.findByRole('option', { name: /todo\.txt/ });
+    expect(within(option).getByText('TXT')).toBeInTheDocument();
+    await userEvent.keyboard('{Shift>}{Enter}{/Shift}');
+    expect(showPage).not.toHaveBeenCalled();
+    expect(opened).toEqual(['Notes/todo.txt']);
+  });
+
+  it('batch 6: the Text files chip narrows to text files and shows their count', async () => {
+    openDialog();
+    const chip = await within(await screen.findByRole('group', { name: 'Show' })).findByRole(
+      'button',
+      { name: /Text files/ },
+    );
+    expect(chip).toHaveTextContent('3');
+    expect(lastQuery().textFiles).toBe(false);
+    await userEvent.click(chip);
+    expect(lastQuery().textFiles).toBe(true);
+    expect(chip).toHaveAttribute('aria-pressed', 'true');
   });
 
   it('highlights titles and snippets with marks, never HTML', async () => {

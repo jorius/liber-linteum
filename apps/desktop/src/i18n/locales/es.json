@@ -730,6 +730,7 @@
     "resultsLabel": "Resultados",
     "failed": "La búsqueda falló: {error}",
     "archived": "Archivadas",
+    "textFiles": "Archivos de texto",
     "show": "Mostrar"
   },
   "icons": {

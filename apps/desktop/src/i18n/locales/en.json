@@ -730,6 +730,7 @@
     "resultsLabel": "Results",
     "failed": "Search failed: {error}",
     "archived": "Archived",
+    "textFiles": "Text files",
     "show": "Show"
   },
   "icons": {

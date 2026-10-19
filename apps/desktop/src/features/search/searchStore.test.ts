@@ -23,6 +23,7 @@ const page = (paths: string[], extra: Partial<SearchPage> = {}): SearchPage => (
     hasImage: 0,
     hasAudio: 0,
     archived: 0,
+    textFiles: 0,
   },
   recent: false,
   indexing: false,

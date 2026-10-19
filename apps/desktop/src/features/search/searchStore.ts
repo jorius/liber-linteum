@@ -16,6 +16,8 @@ export interface SearchFilters {
   hasAudio: boolean;
   /** Include archived pages (M5b §5.3). */
   archived: boolean;
+  /** Only text and code files (batch 6); they're included either way. */
+  textFiles: boolean;
 }
 
 export const EMPTY_FILTERS: SearchFilters = {
@@ -27,13 +29,14 @@ export const EMPTY_FILTERS: SearchFilters = {
   hasImage: false,
   hasAudio: false,
   archived: false,
+  textFiles: false,
 };
 
 /** One removable chip per active filter, in the Active row's order. */
 export type ActiveFilter =
   | { kind: 'project' | 'folder' | 'linksTo' | 'linksFrom'; value: string }
   | { kind: 'tag'; value: string }
-  | { kind: 'hasImage' | 'hasAudio' | 'archived' };
+  | { kind: 'hasImage' | 'hasAudio' | 'archived' | 'textFiles' };
 
 export function activeFilters(f: SearchFilters): ActiveFilter[] {
   const out: ActiveFilter[] = [];
@@ -45,6 +48,7 @@ export function activeFilters(f: SearchFilters): ActiveFilter[] {
   if (f.hasImage) out.push({ kind: 'hasImage' });
   if (f.hasAudio) out.push({ kind: 'hasAudio' });
   if (f.archived) out.push({ kind: 'archived' });
+  if (f.textFiles) out.push({ kind: 'textFiles' });
   return out;
 }
 
@@ -56,6 +60,7 @@ export function withoutFilter(f: SearchFilters, chip: ActiveFilter): SearchFilte
     case 'hasImage':
     case 'hasAudio':
     case 'archived':
+    case 'textFiles':
       return { ...f, [chip.kind]: false };
     default:
       return { ...f, [chip.kind]: null };

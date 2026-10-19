@@ -14,12 +14,14 @@ import {
   ArchiveIcon,
   AudioIcon,
   CloseIcon,
+  CodeIcon,
   ImageIcon,
   SearchIcon,
   SmallCloseIcon,
 } from '../../app/icons';
 import { assetUrl, type SearchHit } from '../../ipc';
 import { openPage } from '../../stores/navigate';
+import { isTextPath } from '../../stores/textFiles';
 import { useUiStore } from '../../stores/uiStore';
 import { Dialog } from '../dialogs/Dialog';
 import { useGvStore } from '../global-view/gvStore';
@@ -221,7 +223,8 @@ export function SearchDialog({ onClose }: { onClose: () => void }) {
 
   const open = (hit: SearchHit, global: boolean) => {
     onClose();
-    if (global) {
+    // A text file has no card in the Global View: it opens in the text view (batch 6).
+    if (global && !isTextPath(hit.path)) {
       useUiStore.getState().setScreen('global');
       void useGvStore.getState().showPage(hit.path, hit.title);
     } else void openPage(hit.path);
@@ -282,6 +285,8 @@ export function SearchDialog({ onClose }: { onClose: () => void }) {
         return t('search.hasAudio');
       case 'archived':
         return t('search.archived');
+      case 'textFiles':
+        return t('search.textFiles');
     }
   };
   const chips = activeFilters(filters);
@@ -290,9 +295,11 @@ export function SearchDialog({ onClose }: { onClose: () => void }) {
     (facets.hasImage > 0 ||
       facets.hasAudio > 0 ||
       facets.archived > 0 ||
+      facets.textFiles > 0 ||
       filters.hasImage ||
       filters.hasAudio ||
-      filters.archived);
+      filters.archived ||
+      filters.textFiles);
 
   return (
     <Dialog title={t('search.title')} onClose={onClose} wide hideTitle>
@@ -420,6 +427,14 @@ export function SearchDialog({ onClose }: { onClose: () => void }) {
                 <ArchiveIcon />
                 {t('search.archived')}
               </Chip>
+              <Chip
+                pressed={filters.textFiles}
+                count={facets.textFiles}
+                onClick={() => store().setFilters({ textFiles: !filters.textFiles })}
+              >
+                <CodeIcon />
+                {t('search.textFiles')}
+              </Chip>
             </Row>
           )}
           {chips.length > 0 && (
@@ -479,6 +494,8 @@ export function SearchDialog({ onClose }: { onClose: () => void }) {
             <span className={styles.thumb}>
               {hit.cover ? (
                 <img src={assetUrl(hit.cover)} alt="" loading="lazy" />
+              ) : isTextPath(hit.path) ? (
+                <TextFileBadge path={hit.path} />
               ) : (
                 <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true">
                   <path
@@ -531,5 +548,17 @@ export function SearchDialog({ onClose }: { onClose: () => void }) {
         </button>
       )}
     </Dialog>
+  );
+}
+
+/** A text or code file's thumbnail (batch 6): its extension, or a code glyph
+ *  for a name without one (`Makefile`). */
+function TextFileBadge({ path }: { path: string }) {
+  const name = path.slice(path.lastIndexOf('/') + 1);
+  const dot = name.lastIndexOf('.');
+  return dot > 0 ? (
+    <span className={styles.ext}>{name.slice(dot + 1).toUpperCase()}</span>
+  ) : (
+    <CodeIcon />
   );
 }

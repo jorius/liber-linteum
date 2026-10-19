@@ -256,3 +256,54 @@ A fresh-context review of `ba67c0a..73f909c` found no Critical issues. Its findi
 - **M5:** `to:Name` silently picks one page when two share the name; the chip shows only the title. A later pass could show the path trail when the title is ambiguous.
 - **M8:** short query words (`the`) can earn the metadata bonus through a title prefix (`Thesis`). Counting matched words, or a two-letter minimum, can come later.
 - **Approximation:** "a character FTS5 indexes" is approximated as alphanumeric minus combining marks. Symbols with the alphabetic property, such as `Ⓐ`, can still form an empty phrase.
+
+## 12. Text files (batch 6)
+
+Jose asked for `.txt` files to be searchable (2026-10-18). This reverses ruling 5 of §10, which left text and code files out.
+
+**Which files.** A file counts when the text view opens it (M4b part 2 §6). That means `nimw_session::is_text_path` (the same extension and name list) plus `is_text_content` (UTF-8, no NUL byte, at most `TEXT_MAX_BYTES`, 2 MB). There is no second list. A `.txt` that isn't UTF-8, or that is larger than the cap, stays an ordinary attachment, with no warning and no error.
+
+**What's indexed.** Index schema **5** adds no new table. A text file gets a `page_text` row:
+- **title and name:** the file name with its extension (`todo.txt`);
+- **folders:** as for a page;
+- **tags and links:** none;
+- **body:** the whole text.
+
+Everywhere else it stays an attachment: links, the Global View, the explorer, cards. The rebuild on open (schema 4 → 5) indexes existing text files.
+
+**Keeping it in step.**
+- **When the row is written:**
+  - when the session loads a text file (open, rescan, watcher create or change, rename re-parse);
+  - when the text view saves;
+  - when a file is created or imported in the app.
+- **A rescan that finds the same hash** writes only the `files` row. `upsert_file` keeps the text: it drops `page_text` only when the content changed or the row stops being an attachment.
+- **Renames:** they carry the title, name and folders words to the new path.
+- **Deletes:** they cascade.
+
+**The query.**
+- Searches with words go hits → `files`.
+- Recent and filter-only searches read `page_text`.
+- A page's own row is a `LEFT JOIN`.
+- Filters key on `files.path`.
+
+**Rulings** (cost if wrong in brackets):
+1. **Text files are in results by default.** A **Text files** chip in the SHOW row narrows results to them (like Has image), with its count. There is no "exclude" toggle; to leave them out, type a project or folder. [A user who never wants them sees them mixed in; an exclude chip is a small addition.]
+2. **Filters that apply:** project, folder and archived. Tags and links-to never match a text file, since it has none. **Links-from keeps a text file a page links to**, because it is a link target like any other; the brief said to exclude it. [A `[[notes.txt]]` target shows up under `from:`.]
+3. **A text hit:**
+   - shows its extension (`TXT`, `JSON`) in place of a thumbnail, or a code glyph for a name without one (`Makefile`);
+   - is titled by its file name;
+   - gets a snippet like a page.
+4. **Opening:** Enter opens a text hit in the text view, as the explorer does. **Shift+Enter does the same,** because a text file has no Global View card. [Shift+Enter on a text hit never reaches the Global View.]
+5. **Recent** (empty query, no filter) lists text files with pages, by modification time.
+6. **The links-to facet rebuild skips text files** (`f.kind = 'page'`). They hold no links, so reading them only cost time.
+
+**Performance** (release, `nfr_03_search_p95_under_50_ms`, now with 1,000 text files of about 2.4 KB each added to the 10k vault, so 11,000 searchable documents):
+- **First full index:** 1.5–1.8 s, against the 30 s budget.
+- **Comparison with main:** both binaries were built from the same tree and run alternately on the same machine while other builds were running (load 3–5):
+
+  | | p95 |
+  |---|---|
+  | main (text files not indexed) | 49.5–49.8 ms |
+  | this change | 50.6–52.0 ms |
+
+  The difference, about 1–2 ms, is the 10% extra matching documents. On this loaded machine main itself sits at the budget, while M5 measured 34.8–41 ms on a quieter one. The idle-machine figure is in the batch 6 report.

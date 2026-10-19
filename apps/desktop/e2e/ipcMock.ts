@@ -600,12 +600,16 @@ export function installIpcMock({
         linksTo?: string | null;
         hasImage?: boolean;
         archived?: boolean;
+        textFiles?: boolean;
         offset?: number;
       };
+      // Batch 6: text and code files are searched by name and content too.
+      const isText = (p: string) => !/\.md$/i.test(p);
       const fold = (s: string) => s.normalize('NFD').replace(/\p{M}/gu, '').toLowerCase();
       const tokens = (s: string) => (s.match(/[\p{L}\p{N}]+/gu) ?? []).map(fold);
       const words = tokens(q.text ?? '');
       const tagsOf = (path: string) => {
+        if (isText(path)) return [];
         const text = pages[path] ?? '';
         const fm = (front(text).tags ?? '').replace(/[[\]]/g, '').split(',');
         const body = [...text.replace(FRONT, '').matchAll(/(?:^|\s)#([\p{L}\p{N}_/-]+)/gu)].map(
@@ -618,18 +622,16 @@ export function installIpcMock({
           pages[path] ?? '',
         );
       const to = q.linksTo ? (resolveName(q.linksTo.replace(/\.md$/, '')) ?? q.linksTo) : null;
-      const all = Object.keys(pages).filter((p) => /\.md$/i.test(p));
+      const all = Object.keys(pages).filter((p) =>
+        /\.(md|txt|log|csv|json|ya?ml|js|ts|py|rs)$/i.test(p),
+      );
+      const title = (p: string) => (isText(p) ? p.split('/').pop()! : titleOf(p, pages[p] ?? ''));
       const matches = all
         .filter((p) => q.archived || !p.startsWith('.archive/'))
         .filter((path) => {
           const body = (pages[path] ?? '').replace(FRONT, '');
           const hay = tokens(
-            [
-              titleOf(path, pages[path] ?? ''),
-              path.replace(/\.md$/, ''),
-              tagsOf(path).join(' '),
-              body,
-            ].join(' '),
+            [title(path), path.replace(/\.md$/, ''), tagsOf(path).join(' '), body].join(' '),
           );
           return words.every((w) => hay.some((t) => t.startsWith(w)));
         })
@@ -639,9 +641,11 @@ export function installIpcMock({
             tagsOf(p).some((x) => x.toLowerCase() === t.toLowerCase().replace(/^#/, '')),
           ),
         )
-        .filter((p) => !to || linksOf(p).includes(to))
-        .filter((p) => !q.hasImage || image(p));
-      const recent = !words.length && !q.project && !q.tags?.length && !to && !q.hasImage;
+        .filter((p) => !to || (!isText(p) && linksOf(p).includes(to)))
+        .filter((p) => !q.hasImage || image(p))
+        .filter((p) => !q.textFiles || isText(p));
+      const recent =
+        !words.length && !q.project && !q.tags?.length && !to && !q.hasImage && !q.textFiles;
       const shown = matches.slice(q.offset ?? 0, (q.offset ?? 0) + (recent ? 20 : 50));
       const snippet = (path: string) => {
         if (!words.length) return null;
@@ -664,7 +668,7 @@ export function installIpcMock({
       return {
         results: shown.map((path) => ({
           path,
-          title: titleOf(path, pages[path] ?? ''),
+          title: title(path),
           cover: null,
           tags: tagsOf(path),
           hasImage: image(path),
@@ -675,16 +679,19 @@ export function installIpcMock({
         facets: {
           projects: count(matches.filter((p) => p.includes('/')).map((p) => p.split('/')[0])),
           tags: count(matches.flatMap(tagsOf)),
-          linksTo: count(matches.flatMap(linksOf)).map(({ value, count: n }) => ({
-            path: value,
-            title: titleOf(value, pages[value] ?? ''),
-            count: n,
-            active: value === to,
-          })),
+          linksTo: count(matches.filter((p) => !isText(p)).flatMap(linksOf)).map(
+            ({ value, count: n }) => ({
+              path: value,
+              title: titleOf(value, pages[value] ?? ''),
+              count: n,
+              active: value === to,
+            }),
+          ),
           linksFrom: null,
           hasImage: matches.filter(image).length,
           hasAudio: 0,
           archived: all.filter((p) => p.startsWith('.archive/')).length,
+          textFiles: matches.filter(isText).length,
         },
         recent,
         indexing: false,

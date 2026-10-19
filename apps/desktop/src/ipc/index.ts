@@ -744,6 +744,8 @@ export interface SearchQuery {
   hasAudio?: boolean;
   /** Include archived pages (M5b §5.3). */
   archived?: boolean;
+  /** Only text and code files (batch 6). */
+  textFiles?: boolean;
   offset?: number;
   /** At most 50; 0 means 50. */
   limit?: number;
@@ -790,6 +792,8 @@ export interface Facets {
   hasAudio: number;
   /** Archived matches, included or not. */
   archived: number;
+  /** Text and code files among the matches (batch 6). */
+  textFiles: number;
 }
 
 export interface SearchPage {

@@ -212,7 +212,7 @@ struct Filter {
 /// Paths in `prefix/` (the byte after `/` is `0`).
 fn under(prefix: &str) -> (String, Vec<Value>) {
     (
-        "(p.path >= ? AND p.path < ?)".into(),
+        "(f.path >= ? AND f.path < ?)".into(),
         vec![
             Value::Text(format!("{prefix}/")),
             Value::Text(format!("{prefix}0")),
@@ -291,7 +291,7 @@ impl Index {
         for key in &tags {
             filters.push(Filter {
                 dim: Dim::Tags,
-                sql: "EXISTS (SELECT 1 FROM tags t WHERE t.path = p.path \
+                sql: "EXISTS (SELECT 1 FROM tags t WHERE t.path = f.path \
                       AND (t.tag_key = ? OR (t.tag_key >= ? AND t.tag_key < ?)))"
                     .into(),
                 params: vec![
@@ -318,7 +318,7 @@ impl Index {
                 Dim::LinksTo,
                 r,
                 // A page's link to itself doesn't count, as in the facet (review M4).
-                "EXISTS (SELECT 1 FROM links l WHERE l.src = p.path AND l.target_path = ? \
+                "EXISTS (SELECT 1 FROM links l WHERE l.src = f.path AND l.target_path = ? \
                  AND l.src != l.target_path)",
             ));
         }
@@ -326,7 +326,7 @@ impl Index {
             filters.push(page_filter(
                 Dim::LinksFrom,
                 r,
-                "p.path IN (SELECT l.target_path FROM links l \
+                "f.path IN (SELECT l.target_path FROM links l \
                  WHERE l.src = ? AND l.target_path IS NOT NULL)",
             ));
         }
@@ -362,16 +362,16 @@ impl Index {
                 params,
             });
         }
-        // `page_text` holds pages and text files (batch 6); `pg` is a page's
-        // own row, missing for a text file.
+        // What search covers is what `page_text` holds: pages and text files
+        // (batch 6); the hits already come from it. `pg` is a page's own row,
+        // missing for a text file.
         let base = match &text {
             Some(t) => {
                 self.fill_hits(t)?;
-                "temp.nimw_hits h JOIN page_text p ON p.path = h.path \
-                 JOIN files f ON f.path = p.path LEFT JOIN pages pg ON pg.path = p.path"
+                "temp.nimw_hits h JOIN files f ON f.path = h.path LEFT JOIN pages pg ON pg.path = f.path"
             }
             None => {
-                "page_text p JOIN files f ON f.path = p.path LEFT JOIN pages pg ON pg.path = p.path"
+                "page_text p JOIN files f ON f.path = p.path LEFT JOIN pages pg ON pg.path = f.path"
             }
         };
         let scored = if text.is_some() {
@@ -391,7 +391,7 @@ impl Index {
         self.conn.execute(
             &format!(
                 "INSERT INTO temp.nimw_match \
-                 SELECT p.path, {scored}, f.mtime_ns, {MEDIA} \
+                 SELECT f.path, {scored}, f.mtime_ns, {MEDIA} \
                  FROM {base} WHERE {cond}"
             ),
             params_from_iter(params.iter()),
@@ -599,7 +599,11 @@ impl Index {
         let table = if filters.iter().all(|f| f.dim != dim) {
             "temp.nimw_match"
         } else {
-            let (cond, params) = where_sql(filters, Some(dim));
+            let (mut cond, params) = where_sql(filters, Some(dim));
+            if dim == Dim::LinksTo {
+                // Text files hold no links (batch 6): they'd only be read and dropped.
+                cond.push_str(" AND f.kind = 'page'");
+            }
             self.conn.execute_batch(
                 "CREATE TEMP TABLE IF NOT EXISTS nimw_except (path TEXT PRIMARY KEY, \
                  has_image INTEGER NOT NULL, has_audio INTEGER NOT NULL, text INTEGER NOT NULL); \
@@ -608,7 +612,7 @@ impl Index {
             self.conn.execute(
                 &format!(
                     "INSERT INTO temp.nimw_except \
-                     SELECT p.path, {MEDIA} FROM {base} WHERE {cond}"
+                     SELECT f.path, {MEDIA} FROM {base} WHERE {cond}"
                 ),
                 params_from_iter(params.iter()),
             )?;

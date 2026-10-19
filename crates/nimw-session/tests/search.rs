@@ -107,6 +107,11 @@ fn nfr_03_search_p95_under_50_ms() {
     use nimw_testkit::{VaultShape, generate_vault};
     let dir = tempfile::tempdir().unwrap();
     generate_vault(dir.path(), VaultShape::TEN_K, 42);
+    // Batch 6: text and code files are indexed for search too.
+    for i in 0..1000 {
+        let body = format!("generated log {i} words paragraph topic{} note\n", i % 200).repeat(40);
+        write(dir.path(), &format!("Logs {}/log {i}.txt", i % 10), &body);
+    }
     let started = Instant::now();
     let (_c, s) = open(dir.path());
     let indexed = started.elapsed();
@@ -158,7 +163,7 @@ fn nfr_03_search_p95_under_50_ms() {
                 q.project = Some("Folder 0".into());
                 q.tags = vec!["gen".into()];
             }
-            _ => {}
+            _ => q.text_files = i % 10 == 5,
         }
         if i % 20 == 0 {
             q.text.clear();

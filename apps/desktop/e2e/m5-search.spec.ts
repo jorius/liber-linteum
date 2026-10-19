@@ -16,7 +16,11 @@ const PAGES = {
   'Welcome.md': '# Welcome\n\nStart here.\n',
 };
 
-async function open(page: Page, settings: Record<string, unknown> = {}) {
+async function open(
+  page: Page,
+  settings: Record<string, unknown> = {},
+  extra: Record<string, string> = {},
+) {
   const outside: string[] = [];
   const errors: string[] = [];
   page.on('request', (r) => {
@@ -27,7 +31,7 @@ async function open(page: Page, settings: Record<string, unknown> = {}) {
   page.on('pageerror', (e) => errors.push(e.message));
   await page.route(/^(?!http:\/\/127\.0\.0\.1)/, (route) => route.abort());
   await page.addInitScript(installIpcMock, {
-    pages: { ...PAGES },
+    pages: { ...PAGES, ...extra },
     editorMode: 'livePreview',
     remoteCover: false,
     settings,
@@ -130,3 +134,19 @@ for (const theme of ['light', 'dark']) {
     expect(violations).toEqual([]);
   });
 }
+
+test('batch 6: words inside a .txt file are found, and Enter opens it in the text view', async ({
+  page,
+}) => {
+  const { errors } = await open(page, {}, { 'Notes/todo.txt': 'buy dragonfruit and limes\n' });
+  await openSearch(page);
+  await page.keyboard.type('dragonfruit');
+  const option = dialog(page).getByRole('option', { name: /todo\.txt/ });
+  await expect(option).toBeVisible();
+  await expect(option.getByText('TXT', { exact: true })).toBeVisible();
+  await expect(option.locator('mark', { hasText: 'dragonfruit' })).toBeVisible();
+  await page.keyboard.press('Enter');
+  await expect(dialog(page)).toBeHidden();
+  await expect(page.locator('.cm-content')).toContainText('buy dragonfruit and limes');
+  expect(errors).toEqual([]);
+});
