@@ -422,7 +422,7 @@ pub(crate) mod tests {
     fn b6_review_i4_parts_count_against_the_limits_before_they_are_copied() {
         // A part padded with a zip comment: its files are tiny, the part isn't.
         let mut w = zip::ZipWriter::new(Cursor::new(Vec::new()));
-        w.set_comment("x".repeat(60_000));
+        w.set_comment("x".repeat(60_000)).unwrap();
         w.start_file("A.md", SimpleFileOptions::default()).unwrap();
         w.write_all(b"a").unwrap();
         let padded = w.finish().unwrap().into_inner();
