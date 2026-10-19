@@ -5,9 +5,15 @@ use crate::AudioError;
 use crate::host::{Device, Ended, Host, Sink, StreamFormat};
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 use cpal::{FromSample, SampleFormat, SizedSample};
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::mpsc::{self, RecvTimeoutError};
 use std::time::Duration;
+
+/// Chunks the callback may queue ahead of the writer (a few seconds at
+/// typical buffer sizes); past that, chunks are dropped and counted rather
+/// than growing memory while the disk stalls (batch 6 review M2).
+const QUEUE: usize = 512;
 
 /// The system's audio host (CoreAudio, WASAPI, ALSA).
 #[derive(Debug, Default, Clone, Copy)]
@@ -25,29 +31,34 @@ fn id_of(device: &cpal::Device) -> Option<String> {
     device.id().ok().map(|id| id.to_string())
 }
 
-/// What the stream's callback hands the capture thread.
-enum Chunk {
-    Samples(Vec<f32>),
-    Lost,
+/// What the stream's callbacks tell the capture thread besides sound.
+#[derive(Default)]
+struct Flags {
+    lost: AtomicBool,
+    dropped: AtomicU64,
 }
 
 fn stream_of<T>(
     device: &cpal::Device,
     config: cpal::StreamConfig,
-    tx: mpsc::Sender<Chunk>,
+    tx: mpsc::SyncSender<Vec<f32>>,
+    flags: Arc<Flags>,
 ) -> Result<cpal::Stream, AudioError>
 where
     T: SizedSample,
     f32: FromSample<T>,
 {
-    let lost = tx.clone();
+    let on_error = flags.clone();
     device
         .build_input_stream(
             config,
             move |data: &[T], _: &cpal::InputCallbackInfo| {
-                let _ = tx.send(Chunk::Samples(
-                    data.iter().map(|s| s.to_sample::<f32>()).collect(),
-                ));
+                // shortcut: one allocation per callback, never blocking; a
+                // buffer pool would avoid it if real devices ever glitch.
+                let chunk = data.iter().map(|s| s.to_sample::<f32>()).collect();
+                if tx.try_send(chunk).is_err() {
+                    flags.dropped.fetch_add(1, Ordering::Relaxed);
+                }
             },
             move |err| {
                 // Overruns and route changes are survivable; anything else ends the take.
@@ -57,7 +68,7 @@ where
                         | cpal::ErrorKind::DeviceChanged
                         | cpal::ErrorKind::RealtimeDenied
                 ) {
-                    let _ = lost.send(Chunk::Lost);
+                    on_error.lost.store(true, Ordering::SeqCst);
                 }
             },
             None,
@@ -107,13 +118,15 @@ impl Host for CpalHost {
             sample_rate: config.sample_rate,
             channels: config.channels,
         })?;
-        let (tx, rx) = mpsc::channel();
+        let (tx, rx) = mpsc::sync_channel(QUEUE);
+        let flags = Arc::new(Flags::default());
+        let f = flags.clone();
         // The stream stays on this thread: cpal's `Stream` isn't `Send` everywhere.
         let stream = match format {
-            SampleFormat::I16 => stream_of::<i16>(&device, config, tx)?,
-            SampleFormat::U16 => stream_of::<u16>(&device, config, tx)?,
-            SampleFormat::I32 => stream_of::<i32>(&device, config, tx)?,
-            SampleFormat::F32 => stream_of::<f32>(&device, config, tx)?,
+            SampleFormat::I16 => stream_of::<i16>(&device, config, tx, f)?,
+            SampleFormat::U16 => stream_of::<u16>(&device, config, tx, f)?,
+            SampleFormat::I32 => stream_of::<i32>(&device, config, tx, f)?,
+            SampleFormat::F32 => stream_of::<f32>(&device, config, tx, f)?,
             other => {
                 return Err(AudioError::Device(format!(
                     "unsupported sample format {other}"
@@ -125,16 +138,23 @@ impl Host for CpalHost {
             if stop.load(Ordering::SeqCst) {
                 break Ended::Stopped;
             }
+            if flags.lost.load(Ordering::SeqCst) {
+                break Ended::DeviceLost;
+            }
             match rx.recv_timeout(Duration::from_millis(20)) {
-                Ok(Chunk::Samples(samples)) => sink.frames(&samples)?,
-                Ok(Chunk::Lost) | Err(RecvTimeoutError::Disconnected) => break Ended::DeviceLost,
+                Ok(samples) => sink.frames(&samples)?,
+                Err(RecvTimeoutError::Disconnected) => break Ended::DeviceLost,
                 Err(RecvTimeoutError::Timeout) => {}
             }
         };
         drop(stream);
         // Sound that arrived before the stream closed is part of the take.
-        while let Ok(Chunk::Samples(samples)) = rx.try_recv() {
+        while let Ok(samples) = rx.try_recv() {
             sink.frames(&samples)?;
+        }
+        let dropped = flags.dropped.load(Ordering::Relaxed);
+        if dropped > 0 {
+            eprintln!("nimw-audio: {dropped} chunks dropped while the disk caught up");
         }
         Ok(ended)
     }
