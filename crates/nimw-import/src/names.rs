@@ -36,13 +36,8 @@ pub fn clean_component(raw: &str, is_file: bool) -> String {
     let mut stem = sanitize_file_name(stem)
         .trim_end_matches(['.', ' '])
         .to_string();
-    if stem.is_empty() {
-        stem = "Untitled".to_string();
-    }
-    if device_name(&stem) {
-        stem.push('-');
-    }
-    let room = MAX_NAME_BYTES - ext.map_or(0, |e| e.len() + 1);
+    // One byte kept for the `-` a device name gets.
+    let room = MAX_NAME_BYTES - 1 - ext.map_or(0, |e| e.len() + 1);
     if stem.len() > room {
         let mut cut = room;
         while !stem.is_char_boundary(cut) {
@@ -50,6 +45,13 @@ pub fn clean_component(raw: &str, is_file: bool) -> String {
         }
         stem.truncate(cut);
         stem = stem.trim_end_matches(['.', ' ']).to_string();
+    }
+    if stem.is_empty() {
+        stem = "Untitled".to_string();
+    }
+    // After the cut: cutting can leave a device name (`CON   …x` → `CON`).
+    if device_name(&stem) {
+        stem.push('-');
     }
     match ext {
         Some(ext) => format!("{stem}.{ext}"),
@@ -151,6 +153,13 @@ mod tests {
         let out = clean_component(&long, true);
         assert!(out.len() <= MAX_NAME_BYTES, "{}", out.len());
         assert!(out.ends_with(".md"));
+    }
+
+    #[test]
+    fn b6_review_m6_a_cut_never_leaves_a_device_name() {
+        let raw = format!("CON{}x", " ".repeat(240));
+        assert_eq!(clean_component(&raw, false), "CON-");
+        assert_eq!(clean_component(&format!("{raw}.md"), true), "CON-.md");
     }
 
     #[test]
