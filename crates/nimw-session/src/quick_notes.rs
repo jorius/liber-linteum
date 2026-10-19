@@ -66,7 +66,7 @@ pub fn quick_note_stem(text: &str) -> Option<String> {
 
 /// `CON`, `PRN`, `AUX`, `NUL`, `COM1`–`COM9`, `LPT1`–`LPT9` (with any
 /// extension): Windows can't hold a file of that name.
-fn device_name(stem: &str) -> bool {
+pub fn device_name(stem: &str) -> bool {
     let base = stem
         .split('.')
         .next()

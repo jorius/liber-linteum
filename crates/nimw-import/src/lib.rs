@@ -2,8 +2,10 @@
 //! becomes a new vault. See `docs/superpowers/specs/2026-10-18-m7-notion-import-design.md`.
 
 mod archive;
+mod names;
 
 pub use archive::{Entry, Export, Limits};
+pub use names::{NameMap, clean_component};
 
 /// Why an import couldn't go on.
 #[derive(Debug, thiserror::Error)]
