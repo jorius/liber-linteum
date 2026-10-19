@@ -35,7 +35,7 @@ fn invalid(message: impl Into<String>) -> CommandError {
 /// disk that the index knows as a page. A hidden or excluded path
 /// (`.obsidian/x.md`, `.git/hooks/x.md`) would steer the attachment folder
 /// policy into that folder, so it is refused like a missing page.
-fn visible_page(session: &VaultSession, page: &str) -> CmdResult<VaultPath> {
+pub(crate) fn visible_page(session: &VaultSession, page: &str) -> CmdResult<VaultPath> {
     let path = VaultPath::new(page)?;
     let on_disk = session
         .vault()

@@ -83,6 +83,12 @@ const COMMANDS: &[&str] = &[
     // M5b §19: Favorites.
     "favorites_get",
     "favorites_set",
+    // M6: audio clips (main window only).
+    "audio_devices",
+    "audio_record_start",
+    "audio_record_stop",
+    "audio_record_cancel",
+    "audio_pick",
 ];
 
 fn main() {

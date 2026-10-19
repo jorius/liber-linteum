@@ -110,6 +110,12 @@ const VAULT_COMMANDS: &[&str] = &[
     "vault_icon_set",
     "favorites_get",
     "favorites_set",
+    // M6: recording is the main window's.
+    "audio_devices",
+    "audio_record_start",
+    "audio_record_stop",
+    "audio_record_cancel",
+    "audio_pick",
 ];
 
 struct Harness {

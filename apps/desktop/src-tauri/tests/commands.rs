@@ -78,6 +78,12 @@ const COMMANDS: &[&str] = &[
     // M5b §19: Favorites.
     "favorites_get",
     "favorites_set",
+    // M6: audio clips.
+    "audio_devices",
+    "audio_record_start",
+    "audio_record_stop",
+    "audio_record_cancel",
+    "audio_pick",
 ];
 
 struct Harness {
@@ -2425,4 +2431,156 @@ fn m5b_r2_review_m9_an_unreadable_favorite_is_dropped_not_fatal() {
     );
     std::fs::set_permissions(&locked, std::fs::Permissions::from_mode(0o755)).unwrap();
     assert_eq!(out.unwrap(), json!(["Welcome.md"]));
+}
+
+/// M6 §3: the synthetic microphone (tests never open a real one) records a
+/// take into the cache; Stop imports it as the page's attachment.
+#[test]
+fn m6_a_take_becomes_an_attachment_of_its_page() {
+    let h = harness();
+    let vault = open_fixture(&h, "obsidian-basic");
+    let devices = call(&h.main, "audio_devices", json!({})).unwrap();
+    assert_eq!(devices[0]["isDefault"], true);
+    let levels = Arc::new(Mutex::new(Vec::<Value>::new()));
+    let seen = levels.clone();
+    h.app.listen_any("audio:level", move |e| {
+        seen.lock()
+            .unwrap()
+            .push(serde_json::from_str(e.payload()).unwrap());
+    });
+    let started = call(
+        &h.main,
+        "audio_record_start",
+        json!({ "page": "Welcome.md", "device": null, "name": "clip-20261018-101500" }),
+    )
+    .unwrap();
+    // One take at a time, app-wide.
+    let busy = call(
+        &h.main,
+        "audio_record_start",
+        json!({ "page": "Welcome.md", "device": null, "name": "clip-20261018-101501" }),
+    )
+    .unwrap_err();
+    assert_eq!(kind(busy), "alreadyExists");
+    std::thread::sleep(std::time::Duration::from_millis(250));
+    let id = started["recordingId"].clone();
+    let clip = call(&h.main, "audio_record_stop", json!({ "recordingId": id })).unwrap();
+    let path = clip["path"].as_str().unwrap();
+    assert!(path.ends_with("clip-20261018-101500.wav"), "{clip}");
+    assert!(
+        clip["link"]
+            .as_str()
+            .unwrap()
+            .ends_with("clip-20261018-101500.wav")
+    );
+    let on_disk = vault.path().join(path);
+    let wav = std::fs::read(&on_disk).unwrap();
+    assert_eq!(&wav[..4], b"RIFF");
+    assert!(
+        wav.len() > 44 + 48_000 * 2 / 10,
+        "about 0.25 s of 16-bit mono"
+    );
+    let levels = levels.lock().unwrap();
+    assert!(!levels.is_empty());
+    assert_eq!(levels[0]["recordingId"], id);
+    assert!(levels[0]["peak"].as_f64().unwrap() > 0.1);
+    // Stopping again: that take is over.
+    let again = call(&h.main, "audio_record_stop", json!({ "recordingId": id })).unwrap_err();
+    assert_eq!(kind(again), "notFound");
+}
+
+/// M6 §3: Cancel leaves nothing in the vault; bad input is refused.
+#[test]
+fn m6_cancel_writes_nothing_and_bad_takes_are_refused() {
+    let h = harness();
+    let vault = open_fixture(&h, "obsidian-basic");
+    let before = nimw_testkit_files(vault.path());
+    let started = call(
+        &h.main,
+        "audio_record_start",
+        json!({ "page": "Welcome.md", "device": null, "name": "clip-20261018-101500" }),
+    )
+    .unwrap();
+    call(
+        &h.main,
+        "audio_record_cancel",
+        json!({ "recordingId": started["recordingId"] }),
+    )
+    .unwrap();
+    assert_eq!(nimw_testkit_files(vault.path()), before);
+    for (body, expected) in [
+        (
+            json!({ "page": "Welcome.md", "device": null, "name": "../x" }),
+            "invalidName",
+        ),
+        (
+            json!({ "page": "Welcome.md", "device": null, "name": "clip-1.wav" }),
+            "invalidName",
+        ),
+        (
+            json!({ "page": "Nope.md", "device": null, "name": "clip-20261018-101500" }),
+            "notFound",
+        ),
+        (
+            json!({ "page": "Welcome.md", "device": "no-such-mic", "name": "clip-20261018-101500" }),
+            "notFound",
+        ),
+    ] {
+        let err = call(&h.main, "audio_record_start", body.clone()).unwrap_err();
+        assert_eq!(kind(err), expected, "{body}");
+    }
+    // Archived pages are read-only (M5b round 2).
+    call(&h.main, "entry_archive", json!({ "path": "Welcome.md" })).unwrap();
+    let err = call(
+        &h.main,
+        "audio_record_start",
+        json!({ "page": ".archive/Welcome.md", "device": null, "name": "clip-20261018-101500" }),
+    )
+    .unwrap_err();
+    assert_eq!(kind(err), "notPermitted");
+}
+
+/// M6 §1.3: Upload clip — Rust picks the file (a fake picker in tests).
+#[test]
+fn m6_audio_pick_imports_the_picked_clip() {
+    let h = harness();
+    let _vault = open_fixture(&h, "obsidian-basic");
+    let outside = tempfile::tempdir().unwrap();
+    let clip = outside.path().join("voice memo.m4a");
+    std::fs::write(&clip, b"....ftypM4A ").unwrap();
+    let state = h.app.state::<nimw_desktop::state::AppState>();
+    let picked = clip.clone();
+    state.set_cover_picker(Some(Arc::new(move || Some(picked.clone()))));
+    let attached = call(&h.main, "audio_pick", json!({ "page": "Welcome.md" })).unwrap();
+    assert!(
+        attached["path"]
+            .as_str()
+            .unwrap()
+            .ends_with("voice memo.m4a"),
+        "{attached}"
+    );
+    state.set_cover_picker(Some(Arc::new(|| None)));
+    assert_eq!(
+        call(&h.main, "audio_pick", json!({ "page": "Welcome.md" })).unwrap(),
+        Value::Null
+    );
+}
+
+/// Every file under `root`, relative, sorted.
+fn nimw_testkit_files(root: &std::path::Path) -> Vec<String> {
+    fn walk(dir: &std::path::Path, root: &std::path::Path, out: &mut Vec<String>) {
+        for e in std::fs::read_dir(dir).unwrap().flatten() {
+            let p = e.path();
+            if p.is_dir() {
+                walk(&p, root, out);
+            } else {
+                out.push(p.strip_prefix(root).unwrap().to_string_lossy().into_owned());
+            }
+        }
+    }
+    let mut out = Vec::new();
+    walk(root, root, &mut out);
+    out.retain(|p| !p.starts_with(".nimw"));
+    out.sort();
+    out
 }

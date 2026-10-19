@@ -74,6 +74,11 @@
     "allow-archive-restore",
     "allow-favorites-get",
     "allow-favorites-set",
+    "allow-audio-devices",
+    "allow-audio-record-start",
+    "allow-audio-record-stop",
+    "allow-audio-record-cancel",
+    "allow-audio-pick",
     "core:event:allow-listen",
     "core:event:allow-unlisten",
     "dialog:allow-open"

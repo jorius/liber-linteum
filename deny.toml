@@ -18,6 +18,12 @@ targets = [
 # not fixable here; revisit when tauri moves to gtk4 or updated gtk3-rs.
 ignore = [
   { id = "RUSTSEC-2024-0370", reason = "unmaintained; transitive via tauri's gtk3 on Linux, no safe upgrade" },
+  # zbus's helper crates, flagged unmaintained in 2026: transitive via
+  # tauri-plugin-opener and tauri-plugin-single-instance (D-Bus on Linux).
+  # Not fixable here; revisit when the plugins move off zbus 5.
+  { id = "RUSTSEC-2026-0370", reason = "unmaintained zvariant; transitive via tauri plugins' zbus on Linux" },
+  { id = "RUSTSEC-2026-0371", reason = "unmaintained zbus_names; transitive via tauri plugins' zbus on Linux" },
+  { id = "RUSTSEC-2026-0372", reason = "unmaintained zvariant_derive; transitive via tauri plugins' zbus on Linux" },
 ]
 
 [licenses]

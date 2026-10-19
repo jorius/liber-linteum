@@ -1,5 +1,6 @@
 pub mod asset;
 pub mod attachment_commands;
+pub mod audio_commands;
 pub mod bin_commands;
 pub mod commands;
 pub mod drops;
@@ -44,7 +45,14 @@ pub fn configure<R: tauri::Runtime>(
     builder: tauri::Builder<R>,
     dirs: Option<AppDirs>,
 ) -> tauri::Builder<R> {
+    // M6 §7: tests (the only callers that pass dirs) never open a microphone.
+    let microphone: std::sync::Arc<dyn nimw_audio::Host> = if dirs.is_some() {
+        std::sync::Arc::new(nimw_audio::SyntheticHost::tone(48_000, 1).realtime())
+    } else {
+        std::sync::Arc::new(nimw_audio::CpalHost)
+    };
     let builder = builder
+        .manage(audio_commands::AudioState::new(microphone))
         // Single-file windows' grants (M4c §3).
         .manage(file_windows::FileWindows::default())
         .plugin(tauri_plugin_dialog::init())
@@ -186,6 +194,11 @@ pub fn configure<R: tauri::Runtime>(
         icon_commands::vault_icon_set,
         favorite_commands::favorites_get,
         favorite_commands::favorites_set,
+        audio_commands::audio_devices,
+        audio_commands::audio_record_start,
+        audio_commands::audio_record_stop,
+        audio_commands::audio_record_cancel,
+        audio_commands::audio_pick,
     ])
 }
 
