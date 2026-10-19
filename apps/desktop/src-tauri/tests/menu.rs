@@ -496,7 +496,7 @@ fn main() {
     menu_events_reach_one_window_only();
     println!("test menu_events_reach_one_window_only ... ok");
     m5b_items_emit_their_events();
+    println!("test m5b_items_emit_their_events ... ok");
     notion_import_item_emits_to_main();
     println!("test notion_import_item_emits_to_main ... ok");
-    println!("test m5b_items_emit_their_events ... ok");
 }
