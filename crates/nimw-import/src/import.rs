@@ -30,7 +30,15 @@ pub struct Preview {
 }
 
 enum Body {
+    /// Text the import makes up (a row with no page, a database's index).
     Text(String),
+    /// An exported page, converted while it is written (never held: an
+    /// export can hold far more Markdown than memory); `row` is its
+    /// database and row when it is one.
+    Page {
+        entry: usize,
+        row: Option<(usize, usize)>,
+    },
     /// An export file copied as it is.
     Entry(usize),
 }
@@ -40,12 +48,50 @@ struct Out {
     body: Body,
 }
 
+/// A database's CSV as the pages need it: its table and its folder.
+struct Rows {
+    table: Table,
+    csv_dir: Vec<String>,
+}
+
 /// Every folder and file the new vault gets, in write order.
 pub struct Plan {
     folders: Vec<String>,
     files: Vec<Out>,
     report: String,
     counts: Preview,
+    targets: Targets,
+    databases: Vec<Rows>,
+}
+
+/// An exported page as the vault's: links rewritten, a row's properties made
+/// frontmatter. Also returns its warnings.
+fn page_text(
+    export: &Export,
+    entry: &Entry,
+    path: &str,
+    row: Option<(usize, usize)>,
+    databases: &[Rows],
+    targets: &Targets,
+) -> Result<(String, Vec<String>), ImportError> {
+    let mut warnings = Vec::new();
+    let (text, lossy) = export.read_text(entry)?;
+    if lossy {
+        warnings.push(format!("{path}: not valid UTF-8; odd characters replaced"));
+    }
+    let dir = &entry.path[..entry.path.len() - 1];
+    let (mut body, missing) = convert(&text, dir, targets);
+    for m in missing {
+        warnings.push(format!("{path}: the link to {m} points nowhere"));
+    }
+    if let Some((d, r)) = row {
+        let db = &databases[d];
+        body = strip_properties(&body, &db.table.headers[1..]);
+        if let Some(front) = db.table.frontmatter(r, &db.csv_dir, targets) {
+            body = format!("{front}{body}");
+        }
+    }
+    Ok((body, warnings))
 }
 
 /// What [`write`] did.
@@ -158,13 +204,12 @@ pub fn plan(export: &Export, cancel: &AtomicBool) -> Result<Plan, ImportError> {
     struct Db {
         index: String,
         title: String,
-        table: Table,
-        csv_dir: Vec<String>,
         rows: Vec<String>,
         /// Row `i`'s page in the export, if it has one.
         pages: Vec<Option<usize>>,
     }
     let mut dbs: Vec<Db> = Vec::new();
+    let mut tables: Vec<Rows> = Vec::new();
     let mut row_of: HashMap<usize, (usize, usize)> = HashMap::new();
     for db in &databases {
         stop()?;
@@ -245,10 +290,12 @@ pub fn plan(export: &Export, cancel: &AtomicBool) -> Result<Plan, ImportError> {
         dbs.push(Db {
             index,
             title,
-            table,
-            csv_dir: db.parent.clone(),
             rows,
             pages,
+        });
+        tables.push(Rows {
+            table,
+            csv_dir: db.parent.clone(),
         });
     }
 
@@ -289,6 +336,14 @@ pub fn plan(export: &Export, cancel: &AtomicBool) -> Result<Plan, ImportError> {
     }
     let targets = Targets(targets);
 
+    let text: u64 = entries.iter().filter(|e| ext(e) == "md").map(|e| e.size).sum();
+    if text > export.limits().pages {
+        return Err(ImportError::Limit(format!(
+            "the export's pages hold more than {} MiB of text",
+            export.limits().pages / (1024 * 1024)
+        )));
+    }
+
     // The files, in export order, then what databases add.
     let mut counts = Preview::default();
     let mut files = Vec::new();
@@ -300,43 +355,24 @@ pub fn plan(export: &Export, cancel: &AtomicBool) -> Result<Plan, ImportError> {
             "csv" => {}
             "md" => {
                 let path = paths[&i].clone();
-                let text = match export.read_text(e) {
-                    Ok((text, lossy)) => {
-                        if lossy {
-                            warnings
-                                .push(format!("{path}: not valid UTF-8; odd characters replaced"));
-                        }
-                        text
+                let row = row_of.get(&i).copied();
+                // Converted now for its warnings, then dropped: written later.
+                let body = match page_text(export, e, &path, row, &tables, &targets) {
+                    Ok((_, w)) => {
+                        warnings.extend(w);
+                        Body::Page { entry: i, row }
                     }
                     Err(err) => {
                         warnings.push(format!("{path}: {err}; copied unchanged"));
-                        files.push(Out {
-                            path,
-                            body: Body::Entry(i),
-                        });
-                        counts.pages += 1;
-                        continue;
+                        Body::Entry(i)
                     }
                 };
-                let dir = &e.path[..e.path.len() - 1];
-                let (mut body, missing) = convert(&text, dir, &targets);
-                for m in missing {
-                    warnings.push(format!("{path}: the link to {m} points nowhere"));
-                }
-                if let Some(&(d, r)) = row_of.get(&i) {
-                    let db = &dbs[d];
-                    body = strip_properties(&body, &db.table.headers[1..]);
-                    if let Some(front) = db.table.frontmatter(r, &db.csv_dir, &targets) {
-                        body = format!("{front}{body}");
-                    }
+                if row.is_some() && matches!(body, Body::Page { .. }) {
                     counts.rows += 1;
                 } else {
                     counts.pages += 1;
                 }
-                files.push(Out {
-                    path,
-                    body: Body::Text(body),
-                });
+                files.push(Out { path, body });
             }
             _ => {
                 counts.attachments += 1;
@@ -347,15 +383,15 @@ pub fn plan(export: &Export, cancel: &AtomicBool) -> Result<Plan, ImportError> {
             }
         }
     }
-    for d in &dbs {
+    for (d, rows) in dbs.iter().zip(&tables) {
         counts.databases += 1;
         for (r, page) in d.pages.iter().enumerate() {
             if page.is_none() {
-                let front = d
+                let front = rows
                     .table
-                    .frontmatter(r, &d.csv_dir, &targets)
+                    .frontmatter(r, &rows.csv_dir, &targets)
                     .unwrap_or_default();
-                let text = format!("{front}# {}\n", d.table.title(r));
+                let text = format!("{front}# {}\n", rows.table.title(r));
                 files.push(Out {
                     path: d.rows[r].clone(),
                     body: Body::Text(text),
@@ -370,7 +406,7 @@ pub fn plan(export: &Export, cancel: &AtomicBool) -> Result<Plan, ImportError> {
             .collect();
         files.push(Out {
             path: d.index.clone(),
-            body: Body::Text(d.table.index_page(&d.title, &links)),
+            body: Body::Text(rows.table.index_page(&d.title, &links)),
         });
     }
 
@@ -389,6 +425,8 @@ pub fn plan(export: &Export, cancel: &AtomicBool) -> Result<Plan, ImportError> {
         files,
         report,
         counts,
+        targets,
+        databases: tables,
     })
 }
 
@@ -488,6 +526,15 @@ pub fn write(
             .open(&full)?;
         let written = match &out.body {
             Body::Text(text) => file.write_all(text.as_bytes()).map_err(ImportError::from),
+            Body::Page { entry, row } => page_text(
+                export,
+                &export.entries()[*entry],
+                &out.path,
+                *row,
+                &plan.databases,
+                &plan.targets,
+            )
+            .and_then(|(text, _)| file.write_all(text.as_bytes()).map_err(ImportError::from)),
             Body::Entry(i) => export.copy_to(&export.entries()[*i], &mut file).map(|_| ()),
         };
         if written.is_err() {
@@ -717,6 +764,35 @@ mod tests {
         assert_eq!(report.written, 3, "two files and the report");
         assert!(plan.total() > 3);
         assert!(read(&dir, REPORT).contains("**Cancelled.** 2 of"));
+    }
+
+    #[test]
+    fn b6_review_i3_the_plan_holds_no_converted_page() {
+        let zip = sample();
+        let export = Export::open(zip.path(), &Limits::default()).unwrap();
+        let plan = plan(&export, &AtomicBool::new(false)).unwrap();
+        // Exported pages are converted while writing; only what the import
+        // makes up (a row with no page, the index page) is held as text.
+        let held: Vec<&str> = plan
+            .files
+            .iter()
+            .filter(|f| matches!(f.body, Body::Text(_)))
+            .map(|f| f.path.as_str())
+            .collect();
+        assert_eq!(held, ["Home/Tasks/Ship it.md", "Home/Tasks.md"]);
+        assert!(plan.files.iter().any(|f| matches!(f.body, Body::Page { .. })));
+    }
+
+    #[test]
+    fn b6_review_i3_too_much_text_is_refused_in_the_preview() {
+        let zip = sample();
+        let limits = Limits {
+            pages: 64,
+            ..Limits::default()
+        };
+        let export = Export::open(zip.path(), &limits).unwrap();
+        let err = plan(&export, &AtomicBool::new(false)).err().expect("refused");
+        assert!(matches!(err, ImportError::Limit(_)), "{err}");
     }
 
     #[test]

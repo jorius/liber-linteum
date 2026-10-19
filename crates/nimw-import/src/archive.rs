@@ -24,6 +24,9 @@ pub struct Limits {
     pub ratio: u64,
     /// A Markdown or CSV file read into memory.
     pub text: u64,
+    /// Every page's Markdown together: one page at a time is converted, but
+    /// a preview over this much text is refused rather than run for ages.
+    pub pages: u64,
 }
 
 impl Default for Limits {
@@ -34,6 +37,7 @@ impl Default for Limits {
             entry: 4 * 1024 * MIB,
             ratio: 1_000,
             text: 32 * MIB,
+            pages: 1024 * MIB,
         }
     }
 }
@@ -178,6 +182,10 @@ impl Export {
                 e.path.remove(0);
             }
         }
+    }
+
+    pub fn limits(&self) -> &Limits {
+        &self.limits
     }
 
     pub fn entries(&self) -> &[Entry] {
