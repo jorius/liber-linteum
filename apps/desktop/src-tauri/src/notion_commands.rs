@@ -15,6 +15,7 @@ use std::sync::{Arc, Mutex, MutexGuard};
 use std::time::{Duration, Instant};
 use tauri::{AppHandle, Emitter, Manager, Runtime};
 use tauri_plugin_dialog::DialogExt;
+use tauri_plugin_opener::OpenerExt;
 
 /// Import progress, to the main window: `{ done, total }`.
 pub const PROGRESS_EVENT: &str = "notion:progress";
@@ -29,6 +30,9 @@ pub struct NotionState {
     folder_picker: Mutex<Option<Pick>>,
     zip: Mutex<Option<PathBuf>>,
     parent: Mutex<Option<PathBuf>>,
+    /// The vault a failed import left behind, for Open it anyway / Show in
+    /// Finder (spec §8): Rust's own record, never a path from the page.
+    partial: Mutex<Option<PathBuf>>,
     cancel: AtomicBool,
 }
 
@@ -90,13 +94,18 @@ pub struct NotionPreviewDto {
     pub more_warnings: usize,
 }
 
-/// What the import did: the new vault, open, and its report page.
+/// What the import did: the new vault (open, unless it `failed`) and its
+/// report page.
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct NotionDoneDto {
-    pub vault: VaultInfo,
+    pub vault: Option<VaultInfo>,
     pub report: String,
     pub cancelled: bool,
+    /// Why the import stopped part-way: the vault at `root` is partly
+    /// written and not opened (`notion_open_partial` opens it).
+    pub failed: Option<String>,
+    pub root: String,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -127,7 +136,11 @@ pub(crate) fn notion_pick_zip_impl<R: Runtime>(app: &AppHandle<R>) -> Option<Not
             .blocking_pick_file()
             .and_then(|f| f.into_path().ok()),
     };
-    *lock(&state.zip) = picked.clone();
+    // A cancelled dialog keeps the export already picked (the page still
+    // shows it).
+    if picked.is_some() {
+        *lock(&state.zip) = picked.clone();
+    }
     picked.map(|p| NotionZipDto {
         name: p
             .file_name()
@@ -148,12 +161,18 @@ pub(crate) fn notion_pick_parent_impl<R: Runtime>(app: &AppHandle<R>) -> Option<
             .blocking_pick_folder()
             .and_then(|f| f.into_path().ok()),
     };
-    *lock(&state.parent) = picked.clone();
+    if picked.is_some() {
+        *lock(&state.parent) = picked.clone();
+    }
     picked.map(|p| p.to_string_lossy().into_owned())
 }
 
 pub(crate) fn notion_preview_impl<R: Runtime>(app: &AppHandle<R>) -> CmdResult<NotionPreviewDto> {
     let state = app.state::<NotionState>();
+    // A new preview starts a new run: a Stop from before it is spent. The
+    // import itself doesn't reset it, so a Stop pressed before it starts
+    // counts (spec §8).
+    state.cancel.store(false, Ordering::Relaxed);
     let export = Export::open(&picked_zip(app)?, &Limits::default())?;
     let plan = nimw_import::plan(&export, &state.cancel)?;
     let p = plan.preview();
@@ -191,7 +210,11 @@ pub(crate) fn notion_import_impl<R: Runtime>(
         .clone()
         .ok_or_else(|| not_permitted("choose where the new vault goes first"))?;
     let target = parent.join(vault_name(&name)?);
-    state.cancel.store(false, Ordering::Relaxed);
+    // Before the export is read and planned again: a taken name is said at
+    // once (the page then lets the user pick another without re-reading).
+    if target.symlink_metadata().is_ok() {
+        return Err(ImportError::Exists(target.display().to_string()).into());
+    }
     let export = Export::open(&zip, &Limits::default())?;
     let plan = nimw_import::plan(&export, &state.cancel)?;
     let source = zip
@@ -215,12 +238,44 @@ pub(crate) fn notion_import_impl<R: Runtime>(
     )?;
     *lock(&state.zip) = None;
     *lock(&state.parent) = None;
+    let root = report.root.to_string_lossy().into_owned();
+    if report.failed.is_some() {
+        *lock(&state.partial) = Some(report.root.clone());
+        return Ok(NotionDoneDto {
+            vault: None,
+            report: report.report,
+            cancelled: report.cancelled,
+            failed: report.failed,
+            root,
+        });
+    }
     let vault = open_session(app, &report.root)?;
     Ok(NotionDoneDto {
-        vault,
+        vault: Some(vault),
         report: report.report,
         cancelled: report.cancelled,
+        failed: None,
+        root,
     })
+}
+
+fn partial<R: Runtime>(app: &AppHandle<R>) -> CmdResult<PathBuf> {
+    lock(&app.state::<NotionState>().partial)
+        .clone()
+        .ok_or_else(|| not_permitted("no import was left part-way"))
+}
+
+pub(crate) fn notion_open_partial_impl<R: Runtime>(app: &AppHandle<R>) -> CmdResult<VaultInfo> {
+    let root = partial(app)?;
+    let vault = open_session(app, &root)?;
+    *lock(&app.state::<NotionState>().partial) = None;
+    Ok(vault)
+}
+
+pub(crate) fn notion_reveal_partial_impl<R: Runtime>(app: &AppHandle<R>) -> CmdResult<()> {
+    app.opener()
+        .reveal_item_in_dir(partial(app)?)
+        .map_err(|e| CommandError::new(ErrorKind::Io, e.to_string()))
 }
 
 // ---- command wrappers: run off the UI thread ----
@@ -250,6 +305,18 @@ pub async fn notion_import<R: Runtime>(
     name: String,
 ) -> CmdResult<NotionDoneDto> {
     blocking(app, move |app| notion_import_impl(&app, name)).await
+}
+
+/// Opens the vault a failed import left part-way (spec §8).
+#[tauri::command]
+pub async fn notion_open_partial<R: Runtime>(app: AppHandle<R>) -> CmdResult<VaultInfo> {
+    blocking(app, move |app| notion_open_partial_impl(&app)).await
+}
+
+/// Shows the vault a failed import left part-way in Finder / Explorer.
+#[tauri::command]
+pub async fn notion_reveal_partial<R: Runtime>(app: AppHandle<R>) -> CmdResult<()> {
+    blocking(app, move |app| notion_reveal_partial_impl(&app)).await
 }
 
 /// Asks a running import to stop after the file it is writing.

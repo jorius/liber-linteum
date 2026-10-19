@@ -59,6 +59,8 @@ const VAULT_COMMANDS: &[&str] = &[
     "notion_preview",
     "notion_import",
     "notion_cancel",
+    "notion_open_partial",
+    "notion_reveal_partial",
     // M5: search is the main window's.
     "search",
     // M5b §11.8: the main window's title; file windows keep their own.

@@ -84,6 +84,8 @@
     "allow-notion-preview",
     "allow-notion-import",
     "allow-notion-cancel",
+    "allow-notion-open-partial",
+    "allow-notion-reveal-partial",
     "core:event:allow-listen",
     "core:event:allow-unlisten",
     "dialog:allow-open"

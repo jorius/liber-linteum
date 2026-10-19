@@ -95,6 +95,8 @@ const COMMANDS: &[&str] = &[
     "notion_preview",
     "notion_import",
     "notion_cancel",
+    "notion_open_partial",
+    "notion_reveal_partial",
 ];
 
 fn main() {

@@ -22,6 +22,8 @@ const COMMANDS: &[&str] = &[
     "notion_preview",
     "notion_import",
     "notion_cancel",
+    "notion_open_partial",
+    "notion_reveal_partial",
 ];
 
 const ID: &str = "1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d";
@@ -193,4 +195,64 @@ fn m7_preview_then_import_opens_the_new_vault_at_its_report() {
     // The picks are used up.
     let err = call(&h.main, "notion_import", json!({ "name": "Again" })).unwrap_err();
     assert_eq!(kind(err), "notPermitted");
+}
+
+#[test]
+fn b6_review_i7_a_cancelled_re_pick_keeps_the_export_picked() {
+    let h = harness();
+    let files = tempfile::tempdir().unwrap();
+    picks(&h, Some(export_zip(files.path())), None);
+    call(&h.main, "notion_pick_zip", json!({})).unwrap();
+    // The dialog opened again and cancelled: the export stays picked.
+    picks(&h, None, None);
+    assert_eq!(
+        call(&h.main, "notion_pick_zip", json!({})).unwrap(),
+        Value::Null
+    );
+    let preview = call(&h.main, "notion_preview", json!({})).unwrap();
+    assert_eq!(preview["pages"], json!(2));
+}
+
+#[test]
+fn b6_review_m7_an_existing_vault_is_refused_before_the_export_is_read() {
+    let h = harness();
+    let files = tempfile::tempdir().unwrap();
+    let parent = tempfile::tempdir().unwrap();
+    // Not a zip: reading it would fail, so the refusal must come first.
+    let broken = files.path().join("broken.zip");
+    std::fs::write(&broken, b"not a zip").unwrap();
+    picks(&h, Some(broken), Some(parent.path().to_path_buf()));
+    call(&h.main, "notion_pick_zip", json!({})).unwrap();
+    call(&h.main, "notion_pick_parent", json!({})).unwrap();
+    std::fs::create_dir(parent.path().join("Taken")).unwrap();
+    let err = call(&h.main, "notion_import", json!({ "name": "Taken" })).unwrap_err();
+    assert_eq!(kind(err), "alreadyExists");
+}
+
+#[test]
+fn b6_review_m8_a_stop_before_the_import_starts_is_honoured() {
+    let h = harness();
+    let files = tempfile::tempdir().unwrap();
+    let parent = tempfile::tempdir().unwrap();
+    picks(
+        &h,
+        Some(export_zip(files.path())),
+        Some(parent.path().to_path_buf()),
+    );
+    call(&h.main, "notion_pick_zip", json!({})).unwrap();
+    call(&h.main, "notion_preview", json!({})).unwrap();
+    call(&h.main, "notion_pick_parent", json!({})).unwrap();
+    call(&h.main, "notion_cancel", json!({})).unwrap();
+    call(&h.main, "notion_import", json!({ "name": "Wiki" })).unwrap_err();
+    assert!(!parent.path().join("Wiki").exists());
+}
+
+#[test]
+fn b6_review_i8_nothing_partial_to_open_or_reveal_before_a_failed_import() {
+    let h = harness();
+    picks(&h, None, None);
+    for cmd in ["notion_open_partial", "notion_reveal_partial"] {
+        let err = call(&h.main, cmd, json!({})).unwrap_err();
+        assert_eq!(kind(err), "notPermitted", "{cmd}");
+    }
 }

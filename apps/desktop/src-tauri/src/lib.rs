@@ -207,6 +207,8 @@ pub fn configure<R: tauri::Runtime>(
         notion_commands::notion_preview,
         notion_commands::notion_import,
         notion_commands::notion_cancel,
+        notion_commands::notion_open_partial,
+        notion_commands::notion_reveal_partial,
     ])
 }
 
