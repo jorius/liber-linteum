@@ -131,6 +131,24 @@ fn iso_date(s: &str) -> Option<String> {
     (h < 24).then(|| format!("{date}T{h:02}:{min}"))
 }
 
+/// A date or a Notion date range (`A → B`) as its YAML value: a plain ISO
+/// date, or the range quoted (`"2026-10-18 → 2026-10-20"`).
+fn date_value(s: &str) -> Option<String> {
+    if let Some(date) = iso_date(s) {
+        return Some(date);
+    }
+    let (from, to) = s.split_once(" → ")?;
+    Some(quoted(&format!("{} → {}", iso_date(from)?, iso_date(to)?)))
+}
+
+/// `, ` then a year: a date or place written with a comma, never a list.
+fn comma_year(s: &str) -> bool {
+    s.match_indices(", ").any(|(i, _)| {
+        let rest = &s.as_bytes()[i + 2..];
+        rest.len() >= 4 && rest[..4].iter().all(u8::is_ascii_digit)
+    })
+}
+
 /// A plain decimal number YAML reads back as itself (no leading zeros).
 fn is_number(s: &str) -> bool {
     let body = s.strip_prefix('-').unwrap_or(s);
@@ -173,11 +191,12 @@ fn infer(values: &[&str]) -> Kind {
         Kind::Bool
     } else if all(&is_number) {
         Kind::Number
-    } else if all(&|v| iso_date(v).is_some()) {
+    } else if all(&|v| date_value(v).is_some()) {
         Kind::Date
     } else if all(&|v| relations(v).is_some()) {
         Kind::Relation
     } else if values.iter().any(|v| v.contains(", "))
+        && !values.iter().any(|v| date_value(v).is_some() || comma_year(v))
         && all(&|v| v.chars().count() <= 200 && v.split(", ").all(|p| p.chars().count() <= 60))
     {
         Kind::List
@@ -244,7 +263,7 @@ impl Table {
             let yaml = match self.kinds[col] {
                 Kind::Bool => (value == "Yes").to_string(),
                 Kind::Number => value.to_string(),
-                Kind::Date => iso_date(value).unwrap_or_else(|| quoted(value)),
+                Kind::Date => date_value(value).unwrap_or_else(|| quoted(value)),
                 Kind::Relation => {
                     let links: Vec<String> = relations(value)
                         .unwrap_or_default()
@@ -340,6 +359,23 @@ mod tests {
         assert_eq!(iso_date("2026-10-18é"), None);
         let t = Table::parse("Name,When\nA,2026-10-1é\n").unwrap();
         assert_eq!(t.kinds[1], Kind::Text);
+    }
+
+    #[test]
+    fn b6_review_i6_date_ranges_are_dates_never_lists() {
+        let csv = "Name,Due,Where\nA,\"October 18, 2026\",\"Paris, 2026\"\nB,\"October 18, 2026 → October 20, 2026\",\"Rome, 2025\"\n";
+        let t = Table::parse(csv).unwrap();
+        assert_eq!(t.kinds[1], Kind::Date);
+        assert_eq!(t.kinds[2], Kind::Text);
+        let r = Map(HashMap::new());
+        assert_eq!(
+            t.frontmatter(0, &[], &r).unwrap(),
+            "---\nDue: 2026-10-18\nWhere: \"Paris, 2026\"\n---\n"
+        );
+        assert_eq!(
+            t.frontmatter(1, &[], &r).unwrap(),
+            "---\nDue: \"2026-10-18 → 2026-10-20\"\nWhere: \"Rome, 2025\"\n---\n"
+        );
     }
 
     #[test]
