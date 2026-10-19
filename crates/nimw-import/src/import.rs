@@ -14,6 +14,9 @@ use unicode_normalization::UnicodeNormalization;
 
 /// The report page, at the new vault's root.
 const REPORT: &str = "Notion import report.md";
+/// The longest vault path written, in bytes: deep Notion trees of long names
+/// pass every OS's path limit (macOS: 1024 bytes, the vault's own included).
+const MAX_PATH_BYTES: usize = 600;
 /// Warnings listed in the preview (the report lists them all).
 pub const PREVIEW_WARNINGS: usize = 50;
 
@@ -349,7 +352,11 @@ pub fn plan(export: &Export, cancel: &AtomicBool) -> Result<Plan, ImportError> {
     }
     let targets = Targets(targets);
 
-    let text: u64 = entries.iter().filter(|e| ext(e) == "md").map(|e| e.size).sum();
+    let text: u64 = entries
+        .iter()
+        .filter(|e| ext(e) == "md")
+        .map(|e| e.size)
+        .sum();
     if text > export.limits().pages {
         return Err(ImportError::Limit(format!(
             "the export's pages hold more than {} MiB of text",
@@ -423,6 +430,13 @@ pub fn plan(export: &Export, cancel: &AtomicBool) -> Result<Plan, ImportError> {
         });
     }
 
+    files.retain(|f| {
+        let fits = f.path.len() <= MAX_PATH_BYTES;
+        if !fits {
+            warnings.push(format!("{}: the path is too long; skipped", f.path));
+        }
+        fits
+    });
     let mut folders = BTreeSet::new();
     for f in &files {
         let mut p = f.path.as_str();
@@ -557,10 +571,20 @@ pub fn write(
         written
     };
     let mut failure = None;
+    // One file that can't be written is a warning; a full disk stops it all.
+    let mut skipped: Vec<String> = Vec::new();
+    let full = |e: &ImportError| matches!(e, ImportError::Io(io) if io.kind() == std::io::ErrorKind::StorageFull);
     for folder in &plan.folders {
-        if let Err(e) = VaultPath::new(folder).map(|p| vault.create_dir_all(&p)) {
-            failure = Some(ImportError::from(e));
-            break;
+        let made = VaultPath::new(folder)
+            .and_then(|p| vault.create_dir_all(&p))
+            .map_err(ImportError::from);
+        if let Err(e) = made {
+            if full(&e) {
+                stopped = Some("Stopped: the disk is full.".to_string());
+                failure = Some(e);
+                break;
+            }
+            skipped.push(format!("{folder}: {e}; its files may be missing"));
         }
     }
     if failure.is_none() {
@@ -569,18 +593,21 @@ pub fn write(
                 stopped = Some("Cancelled.".to_string());
                 break;
             }
-            if let Err(e) = step(out) {
-                stopped = Some(format!("Stopped by an error at {}: {e}.", out.path));
-                failure = Some(e);
-                break;
+            match step(out) {
+                Ok(()) => written += 1,
+                Err(e) if full(&e) => {
+                    stopped = Some(format!("Stopped by an error at {}: {e}.", out.path));
+                    failure = Some(e);
+                    break;
+                }
+                Err(e) => skipped.push(format!("{}: {e}; not imported", out.path)),
             }
-            written += 1;
-            progress(written, total);
+            progress(written + skipped.len(), total);
         }
-    } else {
-        stopped = Some("Stopped by an error while making folders.".to_string());
     }
-    let text = report_text(source, &plan.counts, written, total, stopped.as_deref());
+    let mut counts = plan.counts.clone();
+    counts.warnings.extend(skipped);
+    let text = report_text(source, &counts, written, total, stopped.as_deref());
     vault.write_cas(&VaultPath::new(&plan.report)?, text.as_bytes(), None)?;
     written += 1;
     progress(written, total);
@@ -784,11 +811,17 @@ mod tests {
         let home = format!("# Home\n\n[sales.csv](Home%20{A}/sales.csv)\n");
         let zip = zip_file(&[
             (&format!("Home {A}.md"), home.as_bytes()),
-            (&format!("Home {A}/sales.csv"), b"Region,Total\nNorth,1\nSouth,2\n"),
+            (
+                &format!("Home {A}/sales.csv"),
+                b"Region,Total\nNorth,1\nSouth,2\n",
+            ),
         ]);
         let (dir, report, plan) = import(zip.path(), None);
         report.unwrap();
-        assert_eq!(read(&dir, "Home/sales.csv"), "Region,Total\nNorth,1\nSouth,2\n");
+        assert_eq!(
+            read(&dir, "Home/sales.csv"),
+            "Region,Total\nNorth,1\nSouth,2\n"
+        );
         assert!(!dir.path().join("Vault/Home/sales.md").exists());
         assert!(!dir.path().join("Vault/Home/sales").exists());
         assert_eq!(read(&dir, "Home.md"), "# Home\n\n[[Home/sales.csv]]\n");
@@ -809,6 +842,71 @@ mod tests {
     }
 
     #[test]
+    fn b6_review_m2_a_file_and_a_folder_of_one_name_both_import() {
+        let zip = zip_file(&[
+            ("Home", b"plain".as_slice()),
+            ("Home/a.md", b"# a\n".as_slice()),
+        ]);
+        let (dir, report, _) = import(zip.path(), None);
+        report.unwrap();
+        assert_eq!(read(&dir, "Home"), "plain");
+        assert_eq!(read(&dir, "Home 1/a.md"), "# a\n");
+    }
+
+    #[test]
+    fn b6_review_m2_a_path_too_long_is_skipped_with_a_warning() {
+        let deep = (0..6)
+            .map(|_| "d".repeat(190))
+            .collect::<Vec<_>>()
+            .join("/");
+        let long = format!("{deep}/a.md");
+        let zip = zip_file(&[
+            (long.as_str(), b"# a\n".as_slice()),
+            ("ok.md", b"# ok\n".as_slice()),
+        ]);
+        let (dir, report, plan) = import(zip.path(), None);
+        report.unwrap();
+        assert_eq!(read(&dir, "ok.md"), "# ok\n");
+        assert!(
+            plan.preview()
+                .warnings
+                .iter()
+                .any(|w| w.contains("too long")),
+            "{:?}",
+            plan.preview().warnings
+        );
+    }
+
+    #[test]
+    fn b6_review_m2_one_file_that_fails_is_a_warning_and_the_rest_imports() {
+        let zip = sample();
+        let export = Export::open(zip.path(), &Limits::default()).unwrap();
+        let mut plan = plan(&export, &AtomicBool::new(false)).unwrap();
+        // A file whose folder is a file: it can't be written.
+        plan.files.insert(
+            0,
+            Out {
+                path: "Notes.md/x.md".to_string(),
+                body: Body::Text("x".to_string()),
+            },
+        );
+        let dir = tempfile::tempdir().unwrap();
+        let report = write(
+            &export,
+            &plan,
+            "x.zip",
+            &dir.path().join("Vault"),
+            &mut |_, _| {},
+            &AtomicBool::new(false),
+        )
+        .unwrap();
+        assert!(!report.cancelled);
+        assert_eq!(read(&dir, "Notes.md"), "# Notes\n");
+        let text = read(&dir, REPORT);
+        assert!(text.contains("Notes.md/x.md"), "{text}");
+    }
+
+    #[test]
     fn b6_review_i3_the_plan_holds_no_converted_page() {
         let zip = sample();
         let export = Export::open(zip.path(), &Limits::default()).unwrap();
@@ -822,7 +920,11 @@ mod tests {
             .map(|f| f.path.as_str())
             .collect();
         assert_eq!(held, ["Home/Tasks/Ship it.md", "Home/Tasks.md"]);
-        assert!(plan.files.iter().any(|f| matches!(f.body, Body::Page { .. })));
+        assert!(
+            plan.files
+                .iter()
+                .any(|f| matches!(f.body, Body::Page { .. }))
+        );
     }
 
     #[test]
@@ -833,7 +935,9 @@ mod tests {
             ..Limits::default()
         };
         let export = Export::open(zip.path(), &limits).unwrap();
-        let err = plan(&export, &AtomicBool::new(false)).err().expect("refused");
+        let err = plan(&export, &AtomicBool::new(false))
+            .err()
+            .expect("refused");
         assert!(matches!(err, ImportError::Limit(_)), "{err}");
     }
 
@@ -841,8 +945,30 @@ mod tests {
     fn b6_review_i2_planning_stops_when_cancelled() {
         let zip = sample();
         let export = Export::open(zip.path(), &Limits::default()).unwrap();
-        let err = plan(&export, &AtomicBool::new(true)).err().expect("cancelled");
+        let err = plan(&export, &AtomicBool::new(true))
+            .err()
+            .expect("cancelled");
         assert!(matches!(err, ImportError::Cancelled), "{err}");
+    }
+
+    #[test]
+    fn b6_review_m1_a_folder_that_cant_be_made_is_reported() {
+        let zip = sample();
+        let export = Export::open(zip.path(), &Limits::default()).unwrap();
+        let mut plan = plan(&export, &AtomicBool::new(false)).unwrap();
+        let long = "d".repeat(300);
+        plan.folders.insert(0, long.clone());
+        let dir = tempfile::tempdir().unwrap();
+        let _ = write(
+            &export,
+            &plan,
+            "x.zip",
+            &dir.path().join("Vault"),
+            &mut |_, _| {},
+            &AtomicBool::new(false),
+        );
+        let text = read(&dir, REPORT);
+        assert!(text.contains(&long), "{text}");
     }
 
     #[test]

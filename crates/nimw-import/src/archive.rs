@@ -57,6 +57,9 @@ pub struct Entry {
 pub struct Export {
     parts: Vec<RefCell<ZipArchive<File>>>,
     entries: Vec<Entry>,
+    /// Paths already listed: a zip naming one path twice (`x/a`, `x\\a`)
+    /// keeps the first.
+    seen: std::collections::HashSet<Vec<String>>,
     warnings: Vec<String>,
     limits: Limits,
 }
@@ -82,6 +85,7 @@ impl Export {
         let mut export = Export {
             parts: Vec::new(),
             entries: Vec::new(),
+            seen: Default::default(),
             warnings: Vec::new(),
             limits: limits.clone(),
         };
@@ -155,6 +159,11 @@ impl Export {
                 ));
                 continue;
             };
+            if !self.seen.insert(path.clone()) {
+                self.warnings
+                    .push(format!("skipped {name:?}: the export names it twice"));
+                continue;
+            }
             check_size(&self.limits, &name, file.size(), file.compressed_size())?;
             total += file.size();
             if total > self.limits.total {
@@ -441,6 +450,18 @@ pub(crate) mod tests {
         };
         let err = Export::open(zip.path(), &limits).unwrap_err();
         assert!(matches!(err, ImportError::Limit(_)), "{err}");
+    }
+
+    #[test]
+    fn b6_review_m2_the_same_path_twice_is_listed_once() {
+        let zip = zip_file(&[("x/a.md", b"one"), ("x\\a.md", b"two")]);
+        let export = Export::open(zip.path(), &Limits::default()).unwrap();
+        assert_eq!(names(&export), ["x/a.md"]);
+        assert!(
+            export.warnings()[0].contains("twice"),
+            "{:?}",
+            export.warnings()
+        );
     }
 
     #[test]

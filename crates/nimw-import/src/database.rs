@@ -78,7 +78,10 @@ const MONTHS: [&str; 12] = [
 /// anything else after an ISO date is text (and quoted), never written raw.
 fn iso_time(rest: &str) -> bool {
     let b = rest.as_bytes();
-    let two = |i: usize| b.get(i..i + 2).is_some_and(|d| d.iter().all(u8::is_ascii_digit));
+    let two = |i: usize| {
+        b.get(i..i + 2)
+            .is_some_and(|d| d.iter().all(u8::is_ascii_digit))
+    };
     if b.first() != Some(&b'T') || !two(1) || b.get(3) != Some(&b':') || !two(4) {
         return false;
     }
@@ -102,7 +105,9 @@ fn iso_time(rest: &str) -> bool {
     match b.get(i) {
         None => true,
         Some(b'Z') => i + 1 == b.len(),
-        Some(b'+' | b'-') => two(i + 1) && b.get(i + 3) == Some(&b':') && two(i + 4) && i + 6 == b.len(),
+        Some(b'+' | b'-') => {
+            two(i + 1) && b.get(i + 3) == Some(&b':') && two(i + 4) && i + 6 == b.len()
+        }
         _ => false,
     }
 }
@@ -229,7 +234,9 @@ fn infer(values: &[&str]) -> Kind {
     } else if all(&|v| relations(v).is_some()) {
         Kind::Relation
     } else if values.iter().any(|v| v.contains(", "))
-        && !values.iter().any(|v| date_value(v).is_some() || comma_year(v))
+        && !values
+            .iter()
+            .any(|v| date_value(v).is_some() || comma_year(v))
         && all(&|v| v.chars().count() <= 200 && v.split(", ").all(|p| p.chars().count() <= 60))
     {
         Kind::List
@@ -425,7 +432,10 @@ mod tests {
 
     #[test]
     fn b6_review_m4_frontmatter_can_not_be_broken_out_of() {
-        assert_eq!(iso_date("2026-10-18T09:00").as_deref(), Some("2026-10-18T09:00"));
+        assert_eq!(
+            iso_date("2026-10-18T09:00").as_deref(),
+            Some("2026-10-18T09:00")
+        );
         assert_eq!(
             iso_date("2026-10-18T09:00:30Z").as_deref(),
             Some("2026-10-18T09:00:30Z")

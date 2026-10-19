@@ -414,7 +414,11 @@ pub(crate) mod tests {
 
     #[test]
     fn b6_review_i2_matching_still_pairs_nested_brackets() {
-        let (out, _) = convert("[[a] [Child](Child%20def.md) x](z) `[c](Child%20def.md)` [b]\n", &dir(), &map());
+        let (out, _) = convert(
+            "[[a] [Child](Child%20def.md) x](z) `[c](Child%20def.md)` [b]\n",
+            &dir(),
+            &map(),
+        );
         assert_eq!(out, "[[a] [[Child]] x](z) `[c](Child%20def.md)` [b]\n");
     }
 

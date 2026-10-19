@@ -75,7 +75,8 @@ impl NameMap {
     /// The vault path of `orig` (an export path), giving it one — and its
     /// folders — on first sight. Call in a stable order.
     pub fn assign(&mut self, orig: &[String], is_file: bool) -> String {
-        let joined = orig.join("/");
+        // A file `Home` and a folder `Home` are two things, each named once.
+        let joined = format!("{}\0{is_file}", orig.join("/"));
         if let Some(done) = self.map.get(&joined) {
             return done.clone();
         }
@@ -114,9 +115,11 @@ impl NameMap {
         }
     }
 
-    /// The vault path given to `orig`, if any.
+    /// The vault path given to the folder `orig`, if any.
     pub fn get(&self, orig: &[String]) -> Option<&str> {
-        self.map.get(&orig.join("/")).map(String::as_str)
+        self.map
+            .get(&format!("{}\0false", orig.join("/")))
+            .map(String::as_str)
     }
 }
 
