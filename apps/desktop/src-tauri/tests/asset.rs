@@ -381,3 +381,37 @@ fn m5b_r2_review_i1_a_trashed_name_with_a_colon_is_refused() {
         assert_eq!(serve(&state, refused, None).status, 403, "{refused}");
     }
 }
+
+/// Batch 6 review I6: a long clip is served in pieces — a seek reads only
+/// its range, and an open-ended range ("from here on") gets a bounded
+/// piece, never the whole file per request.
+#[test]
+fn b6_review_i6_long_media_is_served_in_bounded_pieces() {
+    let vault = copy_fixture("obsidian-basic");
+    let path = vault.path().join("long.wav");
+    let len: u64 = 64 * 1024 * 1024;
+    {
+        let f = std::fs::File::create(&path).unwrap();
+        f.set_len(len).unwrap(); // sparse: cheap to make
+        use std::io::{Seek, SeekFrom, Write};
+        let mut f = f;
+        f.seek(SeekFrom::Start(40 * 1024 * 1024)).unwrap();
+        f.write_all(b"MARK").unwrap();
+    }
+    let (app, _c, _k) = open(vault.path());
+    let state = app.state::<AppState>();
+    let seek = serve(&state, "/long.wav", Some("bytes=41943040-41943043"));
+    assert_eq!(seek.status, 206);
+    assert_eq!(seek.body, b"MARK");
+    let rest = serve(&state, "/long.wav", Some("bytes=0-"));
+    assert_eq!(rest.status, 206);
+    assert!(rest.body.len() <= 8 * 1024 * 1024, "{}", rest.body.len());
+    let end = rest.body.len() - 1;
+    assert!(
+        rest.headers
+            .iter()
+            .any(|(k, v)| k == "Content-Range" && v == &format!("bytes 0-{end}/{len}")),
+        "{:?}",
+        rest.headers
+    );
+}

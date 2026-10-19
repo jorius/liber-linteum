@@ -125,10 +125,7 @@ fn serve_external(
         }
         Err(_) => return AssetResponse::status(404),
     };
-    let Ok(bytes) = std::fs::read(&real) else {
-        return AssetResponse::status(404);
-    };
-    respond(bytes, mime_for(&path), range)
+    respond_file(&real, mime_for(&path), range)
 }
 
 /// Serves `uri_path` (the request path, percent-encoded, starting with `/`).
@@ -169,10 +166,7 @@ fn serve_trashed_image(vault: &Vault, encoded: &str, range: Option<&str>) -> Ass
     if !real_dir || !real_file {
         return AssetResponse::status(404);
     }
-    match std::fs::read(&file) {
-        Ok(bytes) => respond(bytes, mime, range),
-        Err(_) => AssetResponse::status(404),
-    }
+    respond_file(&file, mime, range)
 }
 
 /// Serves a request from the webview labelled `label`: a single-file window
@@ -210,37 +204,63 @@ fn serve_from(vault: &Vault, uri_path: &str, range: Option<&str>) -> AssetRespon
     // A symlink resolving outside the vault, or into a hidden file (or an 8.3
     // name doing so, M4c review I4) is, for the webview, a file that doesn't
     // exist (403 stays for requests that are malformed on their face).
-    if vault.visible_fs_path(&path).is_err() {
-        return AssetResponse::status(404);
-    }
-    let Ok((bytes, _)) = vault.read(&path) else {
+    let Ok(full) = vault.visible_fs_path(&path) else {
         return AssetResponse::status(404);
     };
-    respond(bytes, mime_for(path.as_str()), range)
+    respond_file(&full, mime_for(path.as_str()), range)
 }
 
-/// A file's bytes as a full (200) or partial (206/416) response.
-fn respond(bytes: Vec<u8>, mime: &'static str, range: Option<&str>) -> AssetResponse {
-    let len = bytes.len();
+/// The most one ranged response carries: a long clip is played and seeked
+/// in pieces, never read whole per request (batch 6 review I6).
+const MAX_PIECE: usize = 8 * 1024 * 1024;
+
+/// A file as a full (200) or partial (206/416) response. A range is read
+/// from its offset only, and at most [`MAX_PIECE`] of it is sent (a
+/// server may answer a range with less; the player asks for the rest).
+fn respond_file(file: &std::path::Path, mime: &'static str, range: Option<&str>) -> AssetResponse {
+    use std::io::{Read, Seek, SeekFrom};
+    let Ok(mut f) = std::fs::File::open(file) else {
+        return AssetResponse::status(404);
+    };
+    let Ok(meta) = f.metadata() else {
+        return AssetResponse::status(404);
+    };
+    if !meta.is_file() {
+        return AssetResponse::status(404);
+    }
+    let len = meta.len() as usize;
     match range.and_then(|r| parse_range(r, len)) {
-        Some(Ok((start, end))) => AssetResponse {
-            status: 206,
-            mime,
-            body: bytes[start..=end].to_vec(),
-            headers: vec![
-                ("Accept-Ranges".into(), "bytes".into()),
-                ("Content-Range".into(), format!("bytes {start}-{end}/{len}")),
-            ],
-        },
+        Some(Ok((start, end))) => {
+            let end = end.min(start + MAX_PIECE - 1);
+            let mut body = vec![0; end - start + 1];
+            if f.seek(SeekFrom::Start(start as u64)).is_err() || f.read_exact(&mut body).is_err() {
+                return AssetResponse::status(404);
+            }
+            AssetResponse {
+                status: 206,
+                mime,
+                body,
+                headers: vec![
+                    ("Accept-Ranges".into(), "bytes".into()),
+                    ("Content-Range".into(), format!("bytes {start}-{end}/{len}")),
+                ],
+            }
+        }
         Some(Err(())) => AssetResponse {
             headers: vec![("Content-Range".into(), format!("bytes */{len}"))],
             ..AssetResponse::status(416)
         },
-        None => AssetResponse {
-            status: 200,
-            mime,
-            body: bytes,
-            headers: vec![("Accept-Ranges".into(), "bytes".into())],
-        },
+        None => {
+            let mut body = Vec::with_capacity(len);
+            if f.read_to_end(&mut body).is_err() {
+                return AssetResponse::status(404);
+            }
+            AssetResponse {
+                status: 200,
+                mime,
+                body,
+                headers: vec![("Accept-Ranges".into(), "bytes".into())],
+            }
+        }
     }
 }
