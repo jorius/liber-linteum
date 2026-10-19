@@ -222,3 +222,24 @@ The page never names a path. A test hook replaces each dialog, as `ScratchpadSta
 - Importing into an existing vault.
 - Notion's page icons and covers.
 - Formula and rollup evaluation (their exported text is kept).
+
+## 15. Amendments from building it
+
+These override §4–§11 where they conflict.
+
+1. **Plain create-only writes, without fsync.**
+   - **How:** files go straight into the brand-new folder, using `create_new` with no temp file and no per-file `fsync`. This replaces `write_cas` and a temp-file rename.
+   - **Why:** nothing else reads the folder until the import ends, and a crash leaves a partial vault anyway (ruling 4).
+   - **Effect:** the 5,000-page perf test went from 49 s to **0.5 s** (release; the preview takes 75 ms).
+   - **Failures:** a file that fails mid-copy is removed, so no half-written file is left.
+2. **The import plans again rather than reusing the preview.** `notion_import` reads the export a second time and builds the same plan; nothing is cached between the two commands.
+3. **Relations resolve relative to the CSV's folder,** the same way as links in a page.
+4. **The report is written even when the import fails part-way.** It records where and why the import stopped, and the command then returns the error.
+5. **Progress events** are sent at most every 100 ms, plus once at the end.
+6. **The Welcome screen's button is now live.** It was disabled with "arrives in a later milestone", and that note and its string are removed.
+7. **Unrelated to the importer:** three new Linux-only advisories, RUSTSEC-2026-0370, -0371 and -0372, were published on 2026-10-18. They mark zbus's `zvariant` family unmaintained, reaching the app through tauri-plugin-opener and tauri-plugin-single-instance. They are ignored in `deny.toml` with a reason, as RUSTSEC-2024-0370 is.
+8. **Dependencies added:**
+   - `zip` 9.0.5 (MIT), read and write, with deflate only through flate2 + zlib-rs (MIT/Apache-2.0, Zlib);
+   - `tempfile` (MIT/Apache-2.0) at runtime, for nested part zips.
+
+   `cargo deny` passes.
