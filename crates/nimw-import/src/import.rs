@@ -494,6 +494,20 @@ fn today() -> String {
     civil((secs / 86_400) as i64)
 }
 
+/// `s` as one Markdown code span, so nothing in it (names and links from the
+/// export) formats the report: fenced by one backtick more than its longest
+/// run, padded when it starts or ends with one.
+fn code_span(s: &str) -> String {
+    let longest = s
+        .split(|c| c != '`')
+        .map(str::len)
+        .max()
+        .unwrap_or(0);
+    let fence = "`".repeat(longest + 1);
+    let pad = if s.starts_with('`') || s.ends_with('`') { " " } else { "" };
+    format!("{fence}{pad}{s}{pad}{fence}")
+}
+
 fn report_text(
     source: &str,
     counts: &Preview,
@@ -520,7 +534,7 @@ fn report_text(
     } else {
         out.push_str(&format!("\n## Warnings ({})\n\n", counts.warnings.len()));
         for w in &counts.warnings {
-            out.push_str(&format!("- {}\n", w.replace('\n', " ")));
+            out.push_str(&format!("- {}\n", code_span(&w.replace('\n', " "))));
         }
     }
     out
@@ -1019,6 +1033,19 @@ mod tests {
         assert_eq!(
             suggested_name(Path::new(&format!("/x/Team wiki {A}.zip"))),
             "Team wiki"
+        );
+    }
+
+    #[test]
+    fn b6_review_m5_a_warning_can_not_format_the_report() {
+        let counts = Preview {
+            warnings: vec!["x.md: the link to **Cancelled.** <h1>`a`</h1> points nowhere".into()],
+            ..Preview::default()
+        };
+        let text = report_text("e.zip", &counts, 1, 1, None);
+        assert!(
+            text.contains("- ``x.md: the link to **Cancelled.** <h1>`a`</h1> points nowhere``\n"),
+            "{text}"
         );
     }
 
