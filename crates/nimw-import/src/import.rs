@@ -498,13 +498,13 @@ fn today() -> String {
 /// export) formats the report: fenced by one backtick more than its longest
 /// run, padded when it starts or ends with one.
 fn code_span(s: &str) -> String {
-    let longest = s
-        .split(|c| c != '`')
-        .map(str::len)
-        .max()
-        .unwrap_or(0);
+    let longest = s.split(|c| c != '`').map(str::len).max().unwrap_or(0);
     let fence = "`".repeat(longest + 1);
-    let pad = if s.starts_with('`') || s.ends_with('`') { " " } else { "" };
+    let pad = if s.starts_with('`') || s.ends_with('`') {
+        " "
+    } else {
+        ""
+    };
     format!("{fence}{pad}{s}{pad}{fence}")
 }
 
