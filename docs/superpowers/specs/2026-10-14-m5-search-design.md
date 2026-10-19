@@ -307,3 +307,8 @@ Everywhere else it stays an attachment: links, the Global View, the explorer, ca
   | this change | 50.6–52.0 ms |
 
   The difference, about 1–2 ms, is the 10% extra matching documents. On this loaded machine main itself sits at the budget, while M5 measured 34.8–41 ms on a quieter one. The idle-machine figure is in the batch 6 report.
+
+### Batch 6 review (2026-10-19)
+
+- **I7, snippets:** a hit gets a snippet only when its body matched the text (a third FTS condition, filled with the other two in `nimw_hits`), and only from the first 64 K characters of the body. A word found further in still finds the file, with no snippet. Release perf test `b6_review_i7_perf_big_text_files_matched_by_name` (50 text files of 2 MB matched by name): p95 0.4 ms, against 45 ms with the 64 K cut alone and about 880 ms before.
+- **M1, renames:** a rename that changes whether a file is text by its extension (`a.txt` → `a.pdf`, `b.bin` → `b.txt`) drops or loads its searchable text, in the app and through the watcher.

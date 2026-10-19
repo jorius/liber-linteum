@@ -189,3 +189,31 @@ Jose confirmed the spec on 2026-10-18 ("Keep as written"). It predates M4b part 
     - **Licences:** cpal Apache-2.0, hound Apache-2.0.
 11. **The player** (§4) replaces `<audio controls>` for `![[…]]` audio embeds and for audio files outside the vault (M4b part 3). Raw HTML `<audio>` written in a note keeps the browser's player.
 12. **Microphone choice** is remembered for the app session (§9.4, unchanged).
+
+## 11. Batch 6 review (2026-10-19)
+
+The Opus review of batch 6 found one Critical and seven Important issues in audio clips; all are fixed, each with a test that failed first.
+
+**C1. No exit loses a take.**
+- `quit_guard::must_ask(auto_save, recording)`: a Dock Quit, logout or shutdown while a clip is being recorded goes through the windows' close requests, whatever the auto save setting, so the recorder stops and inserts the take first. Cost: a logout mid-take is cancelled once, as with auto save off.
+- `RunEvent::Exit`, and the main window closing or reloading, stop any running take and keep it (`stop_orphaned`).
+- The WAV header is rewritten every 2 s, so a killed app leaves a playable file up to the last 2 s.
+- **Ruling, recovery:** each take has its own cache folder (`<cache>/audio/<name>-<id>/`) with `take.json` (vault root, page). The next Start recovers every leftover: its header is repaired from the file's length, it is renamed `clip-…-recovered.wav` and imported next to the page it was recorded on when that vault is open, otherwise next to the page the new take starts on. The Start reply lists them and the app says so in a toast that stays until dismissed (with each path). A leftover that fails to import stays for the next Start; one with no sound is dropped. Recovered clips aren't inserted into any page: they're in the attachments folder, linked from nowhere. Cost if wrong: a user has to link them by hand.
+
+**I1. A failed import keeps the take.** Stop deletes the take only once it is in the vault; otherwise the error says the clip is kept and goes into the vault the next time you record. A write error mid-take (disk full) ends the take as `writeFailed`, keeping what was flushed, and the bar says so.
+
+**I2. Stop imports where the page is now.** The recorder holds the take's page document, which follows renames and moves, and passes its path to `audio_record_stop`; a page that's gone falls back to the page the take started on.
+
+**I3. Start uses the page shown.** The page and the insertion point are taken from the editor at Start, before waiting for the microphone. An idle recorder closes when another page opens.
+
+**I4. No orphaned microphone.** See C1: the main window reloading or closing stops and keeps the take. **Ruling:** no `audio_record_current` command — after a reload Rust has already stopped the take, so there is nothing to resync. Cost if wrong: none known.
+
+**I5. Length cap.** A take ends itself at 4 000 000 000 bytes of sound (about 5 h 47 min of 48 kHz stereo), as `lengthLimit`, before the WAV's 32-bit size wraps; the bar says so.
+
+**I6.** (asset server) Ranged requests read only their range, at most 8 MiB per response; an open-ended range gets an 8 MiB piece and the player asks for the rest.
+
+**I8.** `CFBundleLocalizations` (en, es) is back in `Info.plist`, beside `NSMicrophoneUsageDescription`, with a test.
+
+**Minor, also fixed:** M2 (the microphone callback feeds a bounded queue of 512 chunks and counts drops; one allocation per callback stays, marked as a shortcut), M3 (quitting asks Save / Don't Save / Cancel before stopping the take; Cancel keeps recording), M4 (a take still starting is stopped once it starts when the vault switches or the app closes), M5 (one cache folder per take; recovery skips folders a Stop is importing).
+
+**Deferred:** M6 (fallback insertion at position 0 with no view or stored state, which predates M6), M7 (one clip at a time holds only within a window).
