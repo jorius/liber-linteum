@@ -1,0 +1,296 @@
+/* Global View screen (M3a §2, §5–§7): prototype `.gvbar`, `.canvas`, `.fab`
+   (Main.dc.html lines 51-82) as theme tokens. */
+.view {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 20px;
+  border-bottom: 1px solid var(--color-border);
+  background: var(--color-surface-subtle);
+}
+
+.crumbs {
+  margin-right: auto;
+  min-width: 0;
+}
+
+.crumbs ol {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.crumbs li + li::before {
+  content: '›';
+  margin: 0 2px;
+  color: var(--color-text-faint);
+}
+
+.crumb,
+.crumbHere {
+  display: inline-block;
+  min-height: 34px;
+  padding: 6px 8px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  font: 600 14px var(--font-body);
+  color: var(--color-text-muted);
+}
+
+.crumb {
+  cursor: pointer;
+}
+
+.crumb:hover {
+  background: var(--color-accent-soft);
+}
+
+.crumbHere {
+  color: var(--color-text-strong);
+}
+
+.seg {
+  display: flex;
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  overflow: hidden;
+}
+
+.seg button {
+  min-height: 38px;
+  padding: 8px 14px;
+  border: 0;
+  background: transparent;
+  font: 600 13px var(--font-body);
+  color: var(--color-text-body);
+  cursor: pointer;
+}
+
+.seg button + button {
+  border-left: 1px solid var(--color-border);
+}
+
+.seg .segOn {
+  background: var(--color-accent);
+  color: var(--color-accent-contrast);
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 34px;
+  padding: 6px 12px;
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-pill);
+  background: var(--color-surface);
+  font: 500 13px var(--font-body);
+  color: var(--color-text-body);
+  cursor: pointer;
+}
+
+.chip[aria-pressed='true'] {
+  background: var(--color-accent-soft);
+  border-color: var(--color-accent);
+  color: var(--color-text-strong);
+}
+
+.chip[aria-pressed='false'] svg {
+  opacity: 0.35;
+}
+
+.reset {
+  min-height: 38px;
+  padding: 7px 12px;
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  font: 600 13px var(--font-body);
+  color: var(--color-text-body);
+  cursor: pointer;
+}
+
+.seg button:focus-visible,
+.chip:focus-visible,
+.reset:focus-visible,
+.crumb:focus-visible,
+.zoom button:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 2px;
+}
+
+.area {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+}
+
+.canvas {
+  position: absolute;
+  inset: 0;
+  background-color: var(--color-canvas);
+  background-image: radial-gradient(var(--color-bg-dots) 1.2px, transparent 1.4px);
+  background-size: 18px 18px;
+}
+
+/* The edge layer (edges.tsx): in the viewport, under the cards. Each style
+   group sets `color`, width and dash; its lines inherit them. */
+.edges {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 1px;
+  height: 1px;
+  overflow: visible;
+  z-index: -1;
+  pointer-events: none;
+}
+
+.edges path {
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+}
+
+.edges .edgeArrow {
+  fill: currentColor;
+  stroke: none;
+}
+
+/* Counts and manual labels: text with a surface-coloured halo, so it reads
+   over the lines it sits on. */
+.edgeLabels text {
+  font: 600 11px var(--font-body);
+  fill: var(--color-text-body);
+  stroke: var(--color-surface);
+  stroke-width: 4px;
+  stroke-linejoin: round;
+  paint-order: stroke;
+  text-anchor: middle;
+  dominant-baseline: central;
+}
+
+.edgeLabels .titled {
+  pointer-events: all;
+  cursor: default;
+}
+
+/* Shown when only the strongest aggregated edges are drawn (edges.tsx). */
+.capNote {
+  position: absolute;
+  left: 16px;
+  top: 12px;
+  z-index: 5;
+  margin: 0;
+  padding: 4px 10px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-pill);
+  background: var(--color-surface);
+  font: 500 12px var(--font-body);
+  color: var(--color-text-muted);
+}
+
+.zoom {
+  position: absolute;
+  left: 16px;
+  bottom: 16px;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  overflow: hidden;
+  z-index: 5;
+}
+
+.zoom button {
+  width: 36px;
+  height: 36px;
+  border: 0;
+  background: transparent;
+  font: 600 16px var(--font-body);
+  color: var(--color-text-body);
+  cursor: pointer;
+}
+
+.zoom button + button {
+  border-top: 1px solid var(--color-border);
+}
+
+.empty {
+  position: absolute;
+  left: 48px;
+  top: 48px;
+  margin: 0;
+  font: 400 15px var(--font-body);
+  color: var(--color-text-muted);
+}
+
+/* A capped hub page's note (final review m14). */
+.omitted {
+  position: absolute;
+  left: 20px;
+  bottom: 20px;
+  z-index: 5;
+  margin: 0;
+  padding: 6px 12px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-pill);
+  background: var(--color-surface);
+  font: 500 13px var(--font-body);
+  color: var(--color-text-muted);
+}
+
+/* It takes the keyboard on an empty level (final review I4). */
+.empty:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 4px;
+}
+
+.fab {
+  position: absolute;
+  right: 28px;
+  bottom: 28px;
+  z-index: 5;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 52px;
+  padding: 14px 28px;
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: var(--color-accent);
+  color: var(--color-accent-contrast);
+  font: 600 16px var(--font-body);
+  box-shadow: var(--shadow-panel);
+  cursor: pointer;
+}
+
+.fab:hover {
+  background: var(--color-accent-hover);
+}
+
+.fab:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 3px;
+}

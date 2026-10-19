@@ -4,6 +4,7 @@ import { followLink } from './links';
 import { goBack, goForward, installMenuNavigation, openPage } from './navigate';
 import { usePageStore } from './pageStore';
 import { useTrailStore } from './trailStore';
+import { useUiStore } from './uiStore';
 import { resetVaultStore, useVaultStore } from './vaultStore';
 
 const page = (path: string) => ({
@@ -40,6 +41,12 @@ afterEach(async () => {
 const at = () => usePageStore.getState().path;
 
 describe('navigation and the link trail (M2b §3)', () => {
+  it('M3a §2: opening a page from anywhere (Global View, explorer) shows the editor', async () => {
+    useUiStore.setState({ screen: 'global' });
+    await openPage('A.md');
+    expect(useUiStore.getState().screen).toBe('edit');
+  });
+
   it('links add to the trail; direct opens start a fresh one; back/forward walk it', async () => {
     await openPage('A.md');
     await openPage('B.md', null, 'link');

@@ -18,6 +18,17 @@ interface PageState {
   page: Page | null;
   state: PageViewState;
   anchor: Anchor | null;
+  /** Asks the title field of `path` to take focus with the name selected
+   *  (a page just made from the Global View, M3a §5); consumed once. */
+  titleFocus: { path: string } | null;
+  requestTitleFocus: (path: string) => void;
+  clearTitleFocus: () => void;
+  /** Asks the editor to take the keyboard when it next shows, unless
+   *  something else has it (leaving the Global View drops it, M3a final
+   *  review I4); consumed once. */
+  editorFocus: boolean;
+  requestEditorFocus: () => void;
+  clearEditorFocus: () => void;
   /** Scrolls the open page to `heading`. */
   reveal: (heading: string | null) => void;
   /** Opens `path` (header data + editor). */
@@ -54,6 +65,12 @@ export const usePageStore = create<PageState>((set, get) => ({
   page: null,
   state: 'empty',
   anchor: null,
+  titleFocus: null,
+  requestTitleFocus: (path) => set({ titleFocus: { path } }),
+  clearTitleFocus: () => set({ titleFocus: null }),
+  editorFocus: false,
+  requestEditorFocus: () => set({ editorFocus: true }),
+  clearEditorFocus: () => set({ editorFocus: false }),
   reveal: (heading) =>
     set({ anchor: heading ? { heading, nonce: (get().anchor?.nonce ?? 0) + 1 } : null }),
   load: async (path) => {
@@ -85,7 +102,7 @@ export const usePageStore = create<PageState>((set, get) => ({
   },
   clear: () => {
     seq++;
-    set({ path: null, page: null, state: 'empty', anchor: null });
+    set({ path: null, page: null, state: 'empty', anchor: null, editorFocus: false });
     void useEditorStore.getState().close();
   },
   follow: async (from, to) => {

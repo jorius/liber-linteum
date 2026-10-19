@@ -2,7 +2,8 @@
   "app": {
     "name": "Notes In My Way",
     "tagline": "Private notes that live on your disk. No cloud, no accounts, no telemetry.",
-    "version": "v{version}"
+    "version": "v{version}",
+    "credits": "Global View made with React Flow (MIT)."
   },
   "welcome": {
     "language": "Language",
@@ -80,7 +81,6 @@
     "view": "View",
     "edit": "Edit",
     "globalView": "Global view",
-    "globalLater": "Global view arrives in a later milestone.",
     "settings": "Settings",
     "closeVault": "Close vault"
   },
@@ -277,5 +277,51 @@
     "obsidianSame": "the page’s folder",
     "obsidianSubfolder": "the “{name}” folder next to the page",
     "obsidianFolder": "the “{name}” folder"
+  },
+  "gv": {
+    "region": "Global View",
+    "canvas": "Global View cards",
+    "a11y": {
+      "keys": "Arrow keys move between cards. Enter opens the next level, Shift+Enter opens the page in the editor, Escape goes back up.",
+      "edges": "Lines between cards show their links and relationships; each card's description lists them."
+    },
+    "vault": "Vault",
+    "kind": {
+      "project": "Project",
+      "folder": "Folder",
+      "page": "Page"
+    },
+    "kindWithName": "{kind} · {name}",
+    "cardName": "{title}, {kind}",
+    "noCover": "No cover",
+    "remoteCover": "Remote cover not loaded",
+    "counts": "{pages, plural, one {# page} other {# pages}} · {folders, plural, one {# folder} other {# folders}}",
+    "hasImage": "Has images",
+    "hasAudio": "Has audio",
+    "seeAll": "See all",
+    "seeAllLabel": "See all: {title}",
+    "move": "Move card",
+    "breadcrumb": "Global View path",
+    "mode": "Next level",
+    "drill": "Drill-down",
+    "expand": "Expand in place",
+    "edges": "Edges",
+    "edge": {
+      "links": "Text links",
+      "tree": "Parent / child",
+      "manual": "Manual",
+      "aggregated": "Links from inside folders"
+    },
+    "edgesCapped": "Showing the {shown, number} strongest of {total, number} links from inside folders.",
+    "reset": "Reset layout",
+    "layoutSaveFailed": "Card positions couldn't be saved. {error}",
+    "empty": "Empty folder.",
+    "omitted": "{count, plural, one {# more linked page isn’t shown here.} other {# more linked pages aren’t shown here.}}",
+    "zoom": "Zoom",
+    "zoomIn": "Zoom in",
+    "zoomOut": "Zoom out",
+    "fit": "Fit to screen",
+    "connections": "{links, plural, =0 {No links.} one {Linked with # card.} other {Linked with # cards.}} {manual, plural, =0 {} one {# relationship.} other {# relationships.}}",
+    "newEntry": "New entry"
   }
 }

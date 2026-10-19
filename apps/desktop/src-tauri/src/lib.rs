@@ -6,6 +6,7 @@ pub mod dto;
 pub mod editor_commands;
 pub mod error;
 pub mod fonts;
+pub mod gv_commands;
 pub mod menu;
 pub mod navigation;
 pub mod settings;
@@ -107,6 +108,10 @@ pub fn configure<R: tauri::Runtime>(
         attachment_commands::attachment_import,
         attachment_commands::cover_pick,
         attachment_commands::link_suggest,
+        gv_commands::gv_children,
+        gv_commands::gv_edges,
+        gv_commands::layout_get,
+        gv_commands::layout_set,
     ])
 }
 

@@ -1,0 +1,192 @@
+/* Global View card (M3a §4): prototype `.card` (Main.dc.html lines 64-79)
+   as theme tokens. 240 × 300 px. */
+.card {
+  box-sizing: border-box;
+  width: 240px;
+  height: 300px;
+  display: flex;
+  flex-direction: column;
+  background: var(--color-surface);
+  border: 1px solid var(--color-card-border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-card);
+  overflow: hidden;
+}
+
+.card[data-open] {
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 2px var(--color-accent);
+}
+
+.head {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 36px;
+  padding: 2px 4px 2px 12px;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.kind {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font: 600 10.5px var(--font-body);
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+}
+
+.grip {
+  display: inline-grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-sm);
+  color: var(--color-text-muted);
+  cursor: grab;
+}
+
+.grip:hover {
+  background: var(--color-accent-soft);
+}
+
+.hit {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+/* The card's button: over the whole body, holding no text (Card.tsx). */
+.press {
+  position: absolute;
+  inset: 0;
+  cursor: pointer;
+}
+
+/* The ring is on :focus, so WebKit < 15.4 (no :focus-visible) still shows
+   it; browsers that know :focus-visible hide it after a click. */
+.press:focus {
+  outline: 2px solid var(--color-focus);
+  outline-offset: -2px;
+}
+
+.press:focus:not(:focus-visible) {
+  outline: none;
+}
+
+.cover {
+  flex: 0 0 96px;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+}
+
+.coverNone {
+  background: var(--color-surface-subtle);
+  border-bottom: 1px dashed var(--color-border-strong);
+}
+
+.coverFolder {
+  background: var(--color-accent-soft);
+}
+
+.image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.none {
+  font: 500 11px var(--font-mono);
+  color: var(--color-text-muted);
+}
+
+.summary {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font: 600 12px var(--font-body);
+  color: var(--color-accent);
+}
+
+.title {
+  margin: 0;
+  padding: 10px 12px 2px;
+  font: 700 19px/1.15 var(--font-display);
+  color: var(--color-accent);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.subtitle {
+  margin: 0;
+  padding: 0 12px;
+  font: 500 12px var(--font-body);
+  color: var(--color-text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.excerpt {
+  margin: 0;
+  padding: 6px 12px 0;
+  font: 400 12px/1.45 var(--font-body);
+  color: var(--color-text-body);
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.foot {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 10px;
+  color: var(--color-text-muted);
+}
+
+.media {
+  display: inline-grid;
+  place-items: center;
+}
+
+.seeAll {
+  margin-left: auto;
+  min-height: 32px;
+  padding: 6px 14px;
+  border: 1px solid var(--color-accent);
+  border-radius: var(--radius-pill);
+  background: var(--color-surface);
+  color: var(--color-accent);
+  font: 600 12px var(--font-body);
+  cursor: pointer;
+}
+
+.seeAll:hover {
+  background: var(--color-accent);
+  color: var(--color-accent-contrast);
+}
+
+.seeAll:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 2px;
+}
+
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}

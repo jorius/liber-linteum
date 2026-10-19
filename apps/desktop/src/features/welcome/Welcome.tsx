@@ -98,6 +98,8 @@ export function Welcome({ version }: WelcomeProps) {
           <LockIcon />
           {t('privacy.localOnly')}
         </p>
+        {/* React Flow's canvas badge is hidden; it is credited here (M3a §9). */}
+        <p className={styles.credits}>{t('app.credits')}</p>
       </div>
     </main>
   );

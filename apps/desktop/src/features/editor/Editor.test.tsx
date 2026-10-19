@@ -4,7 +4,9 @@ import { act, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { clearMocks } from '../../ipc/testing';
 import { fakeDisk, type FakeDisk } from '../../test/fakeDisk';
+import { usePageStore } from '../../stores/pageStore';
 import { DEFAULT_SETTINGS, useSettingsStore } from '../../stores/settingsStore';
+import { useUiStore } from '../../stores/uiStore';
 import { Editor } from './Editor';
 import { AUTOSAVE_MS, PageDoc } from './pageDoc';
 
@@ -263,5 +265,40 @@ describe('line numbers (M2b feedback round)', () => {
     act(() => useSettingsStore.setState({ settings: { ...DEFAULT_SETTINGS, lineNumbers: true } }));
     rerender(<Editor doc={p} mode="source" label="P" />);
     expect(numbers()).toEqual(['1', '2']);
+  });
+});
+
+describe('the keyboard back in the editor (M3a final review I4)', () => {
+  afterEach(() => {
+    act(() => usePageStore.getState().clearEditorFocus());
+    useUiStore.setState({ screen: 'edit' });
+  });
+
+  it('a focus request (leaving the Global View) is taken once the Edit screen shows', async () => {
+    fakeDisk({ 'A.md': 'one\n' });
+    const doc = await load('A.md');
+    useUiStore.setState({ screen: 'global' });
+    act(() => usePageStore.getState().requestEditorFocus());
+    render(<Editor doc={doc} mode="source" label="A" />);
+    expect(viewOf().hasFocus, 'hidden: it waits').toBe(false);
+    act(() => useUiStore.getState().setScreen('edit'));
+    expect(viewOf().hasFocus).toBe(true);
+    expect(usePageStore.getState().editorFocus, 'consumed').toBe(false);
+  });
+
+  it('a page that opens later takes it when it mounts; focus elsewhere is never taken', async () => {
+    fakeDisk({ 'A.md': 'one\n' });
+    const doc = await load('A.md');
+    act(() => usePageStore.getState().requestEditorFocus());
+    const shown = render(<Editor doc={doc} mode="source" label="A" />);
+    expect(viewOf().hasFocus).toBe(true);
+    shown.unmount();
+    const button = document.body.appendChild(document.createElement('button'));
+    button.focus();
+    act(() => usePageStore.getState().requestEditorFocus());
+    render(<Editor doc={doc} mode="source" label="A" />);
+    expect(document.activeElement).toBe(button);
+    expect(usePageStore.getState().editorFocus, 'consumed').toBe(false);
+    button.remove();
   });
 });

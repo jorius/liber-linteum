@@ -53,6 +53,51 @@ export function installIpcMock({
     truncated: false,
     binary: false,
   });
+  /** Pages a page links to (`[[name]]`, resolved by file name). */
+  const linksOf = (path: string): string[] =>
+    [...(pages[path] ?? '').matchAll(/\[\[([^\]|#]+)/g)]
+      .map((m) =>
+        Object.keys(pages).find((p) => p.replace(/\.md$/, '').split('/').pop() === m[1].trim()),
+      )
+      .filter((p): p is string => !!p);
+  /** A Global View card for a page or folder (M3a §8). */
+  const gvCard = (path: string, kind: string, relation: string | null) => {
+    const text = pages[path] ?? '';
+    const cover =
+      front(text).cover ??
+      (kind === 'page' && remoteCover ? 'https://remote.example/cover.png' : null);
+    const remote = !!cover && /^[a-z][a-z0-9+.-]*:/i.test(cover);
+    const name = path.split('/').pop()!;
+    return {
+      path,
+      kind,
+      title: kind === 'page' ? titleOf(path, text) : name,
+      subtitle: kind === 'page' ? (front(text).subtitle ?? null) : name,
+      cover: remote || !cover ? null : files.has(cover) ? cover : null,
+      coverRemote: remote,
+      coverY: null,
+      excerpt:
+        kind === 'page'
+          ? text
+              .replace(/^---[\s\S]*?---\n/, '')
+              .replace(/^#.*$/m, '')
+              .trim()
+              .slice(0, 200)
+          : '',
+      hasImage: false,
+      hasAudio: false,
+      indexPage: null,
+      pages:
+        kind === 'page'
+          ? 0
+          : Object.keys(pages).filter(
+              (p) => p.startsWith(`${path}/`) && !p.slice(path.length + 1).includes('/'),
+            ).length,
+      folders: 0,
+      childTitles: [],
+      relation,
+    };
+  };
   let settings: Record<string, unknown> = {
     version: 1,
     language: 'en',
@@ -155,6 +200,79 @@ export function installIpcMock({
           target: path.replace(/\.md$/, ''),
         }))
         .filter((s) => s.title.toLowerCase().includes(q) || s.path.toLowerCase().includes(q));
+    },
+    // ---- M3a (spec §8): levels, edges and layouts from `pages` ----
+    gv_children: (a) => {
+      const level = a.level as { kind: string; path?: string };
+      const folders = new Set<string>();
+      for (const p of Object.keys(pages)) {
+        for (let i = p.indexOf('/'); i > 0; i = p.indexOf('/', i + 1)) folders.add(p.slice(0, i));
+      }
+      const parentOf = (p: string) => (p.includes('/') ? p.slice(0, p.lastIndexOf('/')) : '');
+      if (level.kind === 'page') {
+        const centre = level.path!;
+        const out = new Set(linksOf(centre));
+        const into = new Set(Object.keys(pages).filter((p) => linksOf(p).includes(centre)));
+        const others = [...new Set([...out, ...into])].filter((p) => p !== centre).sort();
+        const rel = (p: string) => (out.has(p) && into.has(p) ? 'both' : out.has(p) ? 'out' : 'in');
+        return {
+          cards: [
+            gvCard(centre, 'page', 'centre'),
+            ...others.map((p) => gvCard(p, 'page', rel(p))),
+          ],
+          centre,
+        };
+      }
+      const dir = level.kind === 'folder' ? level.path! : '';
+      if (dir && !folders.has(dir)) throw { kind: 'notFound', message: dir };
+      const kind = dir ? 'folder' : 'project';
+      const subs = [...folders].filter((f) => parentOf(f) === dir).sort();
+      const here = Object.keys(pages)
+        .filter((p) => parentOf(p) === dir)
+        .sort();
+      return {
+        cards: [
+          ...subs.map((f) => gvCard(f, kind, null)),
+          ...here.map((p) => gvCard(p, 'page', null)),
+        ],
+        centre: null,
+      };
+    },
+    gv_edges: (a) => {
+      const shown = new Set(a.visible as string[]);
+      const lift = (p: string): string | null => {
+        for (let q = p; q; q = q.includes('/') ? q.slice(0, q.lastIndexOf('/')) : '') {
+          if (shown.has(q)) return q;
+        }
+        return null;
+      };
+      const edges = new Map<
+        string,
+        { from: string; to: string; count: number; aggregated: boolean }
+      >();
+      for (const src of Object.keys(pages)) {
+        for (const target of linksOf(src)) {
+          const x = lift(src);
+          const y = lift(target);
+          if (!x || !y || x === y) continue;
+          const [from, to] = x < y ? [x, y] : [y, x];
+          const e = edges.get(`${from}|${to}`) ?? { from, to, count: 0, aggregated: false };
+          e.count++;
+          e.aggregated ||= x !== src || y !== target;
+          edges.set(`${from}|${to}`, e);
+        }
+      }
+      return [...edges.values()].map((e) => ({ ...e, kind: 'link', directed: false, label: null }));
+    },
+    layout_get: (a) => {
+      const all = JSON.parse(localStorage.getItem('nimw-e2e-layout') ?? '{}');
+      return all[a.level as string] ?? {};
+    },
+    layout_set: (a) => {
+      const all = JSON.parse(localStorage.getItem('nimw-e2e-layout') ?? '{}');
+      all[a.level as string] = a.positions;
+      localStorage.setItem('nimw-e2e-layout', JSON.stringify(all));
+      return null;
     },
     entry_create_folder: (a) => (a.parent ? `${a.parent}/${a.name}` : (a.name as string)),
     entry_create_page: (a) => {

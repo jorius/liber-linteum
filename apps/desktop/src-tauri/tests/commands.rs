@@ -42,6 +42,10 @@ const COMMANDS: &[&str] = &[
     "attachment_import",
     "cover_pick",
     "link_suggest",
+    "gv_children",
+    "gv_edges",
+    "layout_get",
+    "layout_set",
 ];
 
 struct Harness {
@@ -632,7 +636,9 @@ fn m2b_settings_round_trip_over_ipc() {
             "fontSource": "source-code-pro",
             "fontSize": 17,
             "toolbar": false,
-            "lineNumbers": true
+            "lineNumbers": true,
+            "globalViewMode": "expand",
+            "globalViewEdges": { "links": false, "tree": true, "manual": true, "aggregated": true }
         }}),
     )
     .unwrap();
@@ -643,6 +649,8 @@ fn m2b_settings_round_trip_over_ipc() {
     assert_eq!(saved["fontSize"], 17);
     assert_eq!(saved["toolbar"], false);
     assert_eq!(saved["lineNumbers"], true);
+    assert_eq!(saved["globalViewMode"], "expand");
+    assert_eq!(saved["globalViewEdges"]["links"], false);
     let got = call(&h.main, "settings_get", json!({})).unwrap();
     assert_eq!(got["settings"]["palette"], "graphite");
     assert!(
@@ -1018,4 +1026,158 @@ fn m2c_attachments_refuse_a_hidden_or_missing_page() {
     // A visible page still works.
     let cover = call(&h.main, "cover_pick", json!({ "page": "Welcome.md" })).unwrap();
     assert_eq!(cover["path"], "assets/sky.png");
+}
+
+/// M3a §8: Global View levels over IPC (camelCase cards; index notes; the
+/// Obsidian attachment folder `assets` is no card; page neighbourhoods).
+#[test]
+fn m3a_gv_children_over_ipc() {
+    let h = harness();
+    let _vault = open_fixture(&h, "obsidian-basic");
+    let level = |body: Value| call(&h.main, "gv_children", json!({ "level": body }));
+    let paths = |v: &Value| -> Vec<String> {
+        v["cards"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|c| c["path"].as_str().unwrap().to_string())
+            .collect()
+    };
+    let root = level(json!({ "kind": "vault" })).unwrap();
+    assert_eq!(
+        paths(&root),
+        ["Character Design", "Game Design", "Welcome.md"]
+    );
+    assert_eq!(root["cards"][0]["kind"], "project");
+    assert_eq!(root["cards"][1]["indexPage"], "Game Design/Game 1.md");
+    assert_eq!(root["cards"][1]["title"], "Game 1");
+    assert_eq!(root["centre"], Value::Null);
+    assert_eq!(root["omitted"], 0, "m14: neighbours over the cap");
+
+    let chars = level(json!({ "kind": "folder", "path": "Character Design" })).unwrap();
+    assert_eq!(
+        paths(&chars),
+        [
+            "Character Design/DMC",
+            "Character Design/My characters.md",
+            "Character Design/rex-draft.md"
+        ]
+    );
+    let dmc = &chars["cards"][0];
+    assert_eq!(dmc["kind"], "folder");
+    assert_eq!(dmc["indexPage"], "Character Design/DMC/Sparda.md");
+    assert_eq!(
+        (dmc["pages"].as_u64(), dmc["folders"].as_u64()),
+        (Some(1), Some(0))
+    );
+    let rex = &chars["cards"][2];
+    assert_eq!(rex["cover"], "Character Design/assets/rex-cover.png");
+    assert_eq!(rex["coverY"], 40);
+    assert_eq!(rex["coverRemote"], false);
+    assert_eq!(rex["subtitle"], "Hero redesign · v3");
+    assert_eq!(rex["hasImage"], true);
+    assert_eq!(rex["hasAudio"], true);
+
+    let page = level(json!({ "kind": "page", "path": "Character Design/rex-draft.md" })).unwrap();
+    assert_eq!(page["centre"], "Character Design/rex-draft.md");
+    let relation = |path: &str| {
+        page["cards"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|c| c["path"] == path)
+            .map(|c| c["relation"].clone())
+    };
+    assert_eq!(
+        relation("Character Design/rex-draft.md"),
+        Some(json!("centre"))
+    );
+    assert_eq!(relation("Game Design/Game 1.md"), Some(json!("both")));
+    assert_eq!(
+        relation("Character Design/My characters.md"),
+        Some(json!("in"))
+    );
+    assert_eq!(
+        relation("Character Design/DMC/Sparda.md"),
+        Some(json!("out"))
+    );
+
+    let missing = level(json!({ "kind": "folder", "path": "Nope" })).unwrap_err();
+    assert_eq!(kind(missing), "notFound");
+    assert!(level(json!({ "kind": "galaxy" })).is_err());
+}
+
+/// M3a §6, §8: aggregated edges between visible cards; at most 1,000 cards.
+#[test]
+fn m3a_gv_edges_over_ipc() {
+    let h = harness();
+    let _vault = open_fixture(&h, "obsidian-basic");
+    let edges = call(
+        &h.main,
+        "gv_edges",
+        json!({ "visible": ["Character Design", "Game Design", "Welcome.md"] }),
+    )
+    .unwrap();
+    let edges = edges.as_array().unwrap();
+    let find = |a: &str, b: &str, kind: &str| {
+        edges
+            .iter()
+            .find(|e| {
+                e["kind"] == kind
+                    && ((e["from"] == a && e["to"] == b) || (e["from"] == b && e["to"] == a))
+            })
+            .cloned()
+            .unwrap_or_else(|| panic!("no {kind} edge {a}–{b} in {edges:?}"))
+    };
+    let links = find("Character Design", "Game Design", "link");
+    assert_eq!(
+        (links["count"].as_u64(), links["aggregated"].as_bool()),
+        (Some(3), Some(true))
+    );
+    let manual = find("Character Design", "Game Design", "manual");
+    assert_eq!(manual["directed"], true);
+    assert_eq!(manual["label"], "playable version");
+    assert_eq!(
+        (manual["from"].as_str(), manual["to"].as_str()),
+        (Some("Character Design"), Some("Game Design"))
+    );
+    find("Character Design", "Welcome.md", "link");
+    assert_eq!(edges.len(), 3, "{edges:?}");
+
+    let too_many: Vec<String> = (0..1001).map(|i| format!("p{i}.md")).collect();
+    let err = call(&h.main, "gv_edges", json!({ "visible": too_many })).unwrap_err();
+    assert_eq!(kind(err), "tooLarge");
+}
+
+/// M3a §7: pinned positions round-trip per level; an empty map removes it.
+#[test]
+fn m3a_layout_get_set_over_ipc() {
+    let h = harness();
+    let vault = open_fixture(&h, "obsidian-basic");
+    assert_eq!(
+        call(&h.main, "layout_get", json!({ "level": "" })).unwrap(),
+        json!({})
+    );
+    assert!(!vault.path().join(".nimw").exists(), "VLT-02");
+    call(
+        &h.main,
+        "layout_set",
+        json!({ "level": "", "positions": { "Game Design": { "x": 12.5, "y": -40 } } }),
+    )
+    .unwrap();
+    assert_eq!(
+        call(&h.main, "layout_get", json!({ "level": "" })).unwrap(),
+        json!({ "Game Design": { "x": 12.5, "y": -40.0 } })
+    );
+    assert!(vault.path().join(".nimw/layout.json").exists());
+    call(
+        &h.main,
+        "layout_set",
+        json!({ "level": "", "positions": {} }),
+    )
+    .unwrap();
+    assert_eq!(
+        call(&h.main, "layout_get", json!({ "level": "" })).unwrap(),
+        json!({})
+    );
 }

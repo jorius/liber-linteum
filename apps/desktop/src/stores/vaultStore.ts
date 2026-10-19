@@ -25,6 +25,7 @@ import { errorMessage } from './messages';
 import { usePageStore } from './pageStore';
 import { useToastStore } from './toastStore';
 import { useTrailStore } from './trailStore';
+import { useUiStore } from './uiStore';
 import { childrenByParent, joinPath, nextFreeName, parentOf, remap } from './tree';
 
 /** External changes arriving within this window trigger one tree refresh. */
@@ -65,6 +66,17 @@ interface VaultState {
     opts?: { quiet?: boolean },
   ) => Promise<IpcResult<RenameOutcome>>;
   trash: (path: string) => Promise<IpcResult<void>>;
+}
+
+/** Work a feature must finish while its vault is still open (the Global
+ *  View's card positions waiting for their save), run before another vault
+ *  opens or this one closes. Features register it here, so this store
+ *  doesn't depend on them (M3a final review m15). */
+const beforeSwitch = new Set<() => Promise<unknown>>();
+
+export function onBeforeVaultSwitch(run: () => Promise<unknown>): () => void {
+  beforeSwitch.add(run);
+  return () => beforeSwitch.delete(run);
 }
 
 const toast = () => useToastStore.getState();
@@ -164,9 +176,11 @@ export const useVaultStore = create<VaultState>((set, get) => {
     ]);
   }
 
-  /** Saves open pages before the vault changes (M2a §3.3); if one can't be
-   *  written, says so and returns false: its text must not be dropped. */
+  /** Saves open pages (and what features registered) before the vault
+   *  changes (M2a §3.3); if a page can't be written, says so and returns
+   *  false: its text must not be dropped. */
   async function savedEverything(): Promise<boolean> {
+    await Promise.all([...beforeSwitch].map((run) => run().catch(() => undefined)));
     const unsaved = await useEditorStore.getState().saveAll();
     if (!unsaved.length) return true;
     warnUnsaved(unsaved[0], 'editor.unsavedBlocks');
@@ -184,6 +198,7 @@ export const useVaultStore = create<VaultState>((set, get) => {
       return res;
     }
     set({ info: res.value, selected: null, expanded: new Set(), renaming: null });
+    useUiStore.getState().setScreen('edit');
     useTrailStore.getState().reset();
     usePageStore.getState().clear();
     useEditorStore.getState().reset();

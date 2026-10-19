@@ -36,6 +36,7 @@
     "@lezer/highlight": "^1.2.5",
     "@tauri-apps/api": "^2.12.3",
     "@tauri-apps/plugin-dialog": "^2.8.2",
+    "@xyflow/react": "12.12.0",
     "github-slugger": "^2.0.0",
     "hast-util-raw": "^9.1.0",
     "hast-util-sanitize": "^5.0.2",

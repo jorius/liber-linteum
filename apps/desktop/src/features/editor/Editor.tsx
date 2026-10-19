@@ -8,7 +8,9 @@ import { diffIndices } from 'node-diff3';
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { EditorMode } from '../../ipc';
+import { usePageStore } from '../../stores/pageStore';
 import { useSettingsStore } from '../../stores/settingsStore';
+import { useUiStore } from '../../stores/uiStore';
 import { Preview } from '../preview/Preview';
 import styles from './Editor.module.css';
 import { followLinkAtCursor, livePreview, pagePath } from './livePreview';
@@ -299,6 +301,19 @@ export function Editor({ doc, mode, label }: EditorProps) {
   useLayoutEffect(() => {
     view.current?.dispatch({ effects: gutterSlot.reconfigure(gutter(showNumbers)) });
   }, [showNumbers]);
+
+  // Back from the Global View (a card opened in the editor, ⌘1): the keyboard
+  // comes back here, with the selection it had, once the editor shows —
+  // never taken from something else that has it (M3a final review I4).
+  const wantsFocus = usePageStore((s) => s.editorFocus);
+  const screen = useUiStore((s) => s.screen);
+  useEffect(() => {
+    const v = view.current;
+    if (!wantsFocus || screen !== 'edit' || !v) return;
+    usePageStore.getState().clearEditorFocus();
+    const active = document.activeElement;
+    if (!active || active === document.body) v.focus();
+  }, [wantsFocus, screen]);
 
   // Split: the editor and the rendered pane follow each other's scrolling.
   useEffect(() => {

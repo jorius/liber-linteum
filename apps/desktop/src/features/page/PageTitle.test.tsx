@@ -193,6 +193,17 @@ describe('editable title (M2b §2)', () => {
     expect(useToastStore.getState().toasts).toEqual([]);
   });
 
+  it('M3a §5: a title focus request (New entry) focuses and selects the name once', async () => {
+    fakeDisk({ 'Notes/Untitled.md': '' });
+    act(() => usePageStore.getState().requestTitleFocus('Notes/Untitled.md'));
+    render(<PageView />);
+    await open('Notes/Untitled.md');
+    await waitFor(() => expect(document.activeElement).toBe(title()));
+    const input = title() as HTMLInputElement;
+    expect([input.selectionStart, input.selectionEnd]).toEqual([0, 'Untitled'.length]);
+    expect(usePageStore.getState().titleFocus, 'consumed').toBeNull();
+  });
+
   it('has no axe violations', async () => {
     fakeDisk({ 'A.md': 'x\n' });
     render(<PageView />);

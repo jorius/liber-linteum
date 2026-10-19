@@ -1,6 +1,7 @@
 import { isTauri, onMenuNavigate } from '../ipc';
 import { usePageStore } from './pageStore';
 import { useTrailStore, type TrailEntry } from './trailStore';
+import { useUiStore } from './uiStore';
 import { parentOf } from './tree';
 import { useVaultStore } from './vaultStore';
 
@@ -30,6 +31,8 @@ export async function openPage(
   } else if (via === 'direct') {
     trail.reset();
   }
+  // Wherever it was opened from (Global View, explorer), the page is shown.
+  useUiStore.getState().setScreen('edit');
   const vault = useVaultStore.getState();
   const dir = parentOf(path);
   if (dir) vault.expand(dir);

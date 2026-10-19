@@ -1,7 +1,8 @@
-import { useEffect, useId, useState, type KeyboardEvent } from 'react';
+import { useEffect, useId, useRef, useState, type KeyboardEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { Page } from '../../ipc';
 import { errorMessage } from '../../stores/messages';
+import { usePageStore } from '../../stores/pageStore';
 import { nameOf, parentOf } from '../../stores/tree';
 import { useVaultStore } from '../../stores/vaultStore';
 import { validateName } from '../explorer/nameRules';
@@ -25,10 +26,19 @@ export function PageTitle({ page }: { page: Page }) {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const errorId = useId();
+  const input = useRef<HTMLInputElement>(null);
   useEffect(() => {
     setDraft(stem);
     setError(null);
   }, [stem]);
+  // A page just made from the Global View: ready to be named (M3a §5).
+  const focusRequest = usePageStore((s) => s.titleFocus);
+  useEffect(() => {
+    if (focusRequest?.path !== page.path || !input.current) return;
+    input.current.focus();
+    input.current.select();
+    usePageStore.getState().clearTitleFocus();
+  }, [focusRequest, page.path]);
 
   const taken = () => t('page.titleTaken', { name: draft.trim() });
 
@@ -81,6 +91,7 @@ export function PageTitle({ page }: { page: Page }) {
     <>
       <h1 className={styles.title}>
         <input
+          ref={input}
           className={styles.titleInput}
           aria-label={t('page.titleLabel')}
           aria-invalid={error !== null}

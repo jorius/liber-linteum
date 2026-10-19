@@ -122,6 +122,12 @@ describe('Welcome screen', () => {
     );
   });
 
+  it('credits React Flow, whose canvas badge is hidden (M3a §9, final review m6)', () => {
+    backend({ vaults_recent: () => [] });
+    render(<Welcome version="0.1.0" />);
+    expect(screen.getByText('Global View made with React Flow (MIT).')).toBeInTheDocument();
+  });
+
   it('hides the version when it is unknown', () => {
     backend({ vaults_recent: () => [] });
     render(<Welcome version={null} />);

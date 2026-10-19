@@ -1,5 +1,7 @@
 use crate::path::VaultPath;
+use crate::vault::NIMW_JSON;
 use serde::Deserialize;
+use serde_json::Value;
 
 /// Where new attachments go (Q-ED-1). Resolved from Obsidian's
 /// `attachmentFolderPath` when the vault has it (M2c §5.3: Obsidian wins), else
@@ -54,12 +56,64 @@ impl AttachmentPolicy {
 
 /// `.nimw/vault.json` (arch §3.1). Unknown fields are ignored here (and kept
 /// when NIMW writes the file, see `Vault::set_nimw_attachments`).
-#[derive(Debug, Default, Deserialize)]
+#[derive(Debug, Default)]
 pub(crate) struct NimwVaultJson {
-    #[serde(default)]
     pub exclude: Vec<String>,
-    #[serde(default)]
     pub attachments: Option<NimwAttachments>,
+    /// Folder → the page picked as its card preview (GV-02, picked in M3b).
+    pub index_picks: std::collections::HashMap<String, String>,
+}
+
+impl NimwVaultJson {
+    /// Reads each field on its own (final review m9): a malformed or
+    /// future-shaped field — or one bad item of `exclude` or `indexPicks` —
+    /// is reported and ignored, and never takes the other fields with it.
+    /// Above all `exclude`, which keeps private folders out of the index.
+    pub(crate) fn from_value(value: &Value, warnings: &mut Vec<String>) -> NimwVaultJson {
+        let mut warn = |what: String| warnings.push(format!("{NIMW_JSON}: {what}"));
+        let mut out = NimwVaultJson::default();
+        let Some(map) = value.as_object() else {
+            if !value.is_null() {
+                warn("not a JSON object".to_string());
+            }
+            return out;
+        };
+        match map.get("exclude") {
+            None | Some(Value::Null) => {}
+            Some(Value::String(glob)) => out.exclude.push(glob.clone()),
+            Some(Value::Array(globs)) => {
+                for glob in globs {
+                    match glob.as_str() {
+                        Some(glob) => out.exclude.push(glob.to_string()),
+                        None => warn(format!("bad exclude {glob}: not a glob")),
+                    }
+                }
+            }
+            Some(other) => warn(format!("exclude ignored: {other} is not a list of globs")),
+        }
+        match map.get("attachments") {
+            None | Some(Value::Null) => {}
+            Some(value) => match NimwAttachments::deserialize(value) {
+                Ok(attachments) => out.attachments = Some(attachments),
+                Err(e) => warn(format!("attachments ignored: {e}")),
+            },
+        }
+        match map.get("indexPicks") {
+            None | Some(Value::Null) => {}
+            Some(Value::Object(picks)) => {
+                for (folder, page) in picks {
+                    match page.as_str() {
+                        Some(page) => {
+                            out.index_picks.insert(folder.clone(), page.to_string());
+                        }
+                        None => warn(format!("indexPicks {folder:?} ignored: not a page path")),
+                    }
+                }
+            }
+            Some(other) => warn(format!("indexPicks ignored: {other} is not an object")),
+        }
+        out
+    }
 }
 
 #[derive(Debug, Clone, Deserialize)]

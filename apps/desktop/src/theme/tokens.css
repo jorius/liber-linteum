@@ -24,6 +24,12 @@
   --color-sidebar-selected: rgba(185, 162, 230, 0.22);
   --color-highlight-bg: #fbf1c7;
   --color-code-bg: #efe9f6;
+  /* Global View (M3a): lavender values; palettes.css derives them per palette. */
+  --color-canvas: #f8f5fa;
+  --color-card-border: #dcd3e5;
+  --color-edge-link: #4b2f86;
+  --color-edge-tree: #6b5f80;
+  --color-edge-manual: #b4501a;
   --color-warn-bg: #fff1e3;
   --color-warn-border: #efc49c;
   --color-warn-text: #7a330b;
@@ -85,6 +91,11 @@
     --color-focus: #cbb8ef;
     --color-highlight-bg: #4a3f12;
     --color-code-bg: #2a2533;
+    --color-canvas: #1a181f;
+    --color-card-border: #3b3646;
+    --color-edge-link: #b9a2e6;
+    --color-edge-tree: #a59cb5;
+    --color-edge-manual: #e8935a;
     --palette-red: #ff9d92;
     --palette-red-bg: #4a1f1c;
     --palette-orange: #ffb877;
@@ -129,6 +140,11 @@
   --color-focus: #cbb8ef;
   --color-highlight-bg: #4a3f12;
   --color-code-bg: #2a2533;
+  --color-canvas: #1a181f;
+  --color-card-border: #3b3646;
+  --color-edge-link: #b9a2e6;
+  --color-edge-tree: #a59cb5;
+  --color-edge-manual: #e8935a;
   --palette-red: #ff9d92;
   --palette-red-bg: #4a1f1c;
   --palette-orange: #ffb877;

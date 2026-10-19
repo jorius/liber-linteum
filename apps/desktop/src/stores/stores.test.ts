@@ -4,6 +4,7 @@ import type { TreeNode } from '../ipc';
 import { clearMocks, emit, mockIPC } from '../ipc/testing';
 import { usePageStore } from './pageStore';
 import { DEFAULT_SETTINGS, useSettingsStore } from './settingsStore';
+import { useGvStore } from '../features/global-view/gvStore';
 import { useTrailStore } from './trailStore';
 import { useToastStore } from './toastStore';
 import { resetVaultStore, useVaultStore } from './vaultStore';
@@ -85,6 +86,17 @@ describe('settingsStore', () => {
     expect(useSettingsStore.getState().loaded).toBe(true);
     expect(document.documentElement.dataset.theme).toBe('dark');
     expect(i18next.language).toBe('es');
+  });
+
+  it('M3a: the Global View defaults (Drill-down, every edge kind) fill in for an older backend', async () => {
+    const older: Partial<typeof DEFAULT_SETTINGS> = { ...DEFAULT_SETTINGS };
+    delete older.globalViewMode;
+    delete older.globalViewEdges;
+    backend({ settings_get: () => ({ settings: older }) });
+    await useSettingsStore.getState().load();
+    const s = useSettingsStore.getState().settings;
+    expect(s.globalViewMode).toBe('drill');
+    expect(s.globalViewEdges).toEqual({ links: true, tree: true, manual: true, aggregated: true });
   });
 
   it('falls back to defaults outside Tauri / on error', async () => {
@@ -179,6 +191,44 @@ describe('vaultStore', () => {
     await emit('vault:changed', { created: ['A.md'], modified: [], removed: [], renamed: [] });
     await vi.advanceTimersByTimeAsync(150);
     expect(useTrailStore.getState().back.map((x) => x.path)).toEqual(['A.md']);
+  });
+
+  it('M3a: opening or closing a vault starts the Global View over at level 0', async () => {
+    backend({ vault_open: () => info, vault_tree: () => [], vault_close: () => null });
+    useGvStore.setState({ stack: [{ kind: 'vault' }, { kind: 'folder', path: 'Old' }] });
+    await useVaultStore.getState().open('/v');
+    expect(useGvStore.getState().stack).toEqual([{ kind: 'vault' }]);
+    useGvStore.setState({ stack: [{ kind: 'vault' }, { kind: 'folder', path: 'Old' }] });
+    await useVaultStore.getState().close();
+    expect(useGvStore.getState().stack).toEqual([{ kind: 'vault' }]);
+  });
+
+  it('M3a: a card drag waiting for its save is written before the vault switches (final review I1/m15)', async () => {
+    const calls = backend({
+      vault_open: () => info,
+      vault_tree: () => tree,
+      vault_close: () => null,
+      gv_children: () => ({ cards: [], centre: null }),
+      gv_edges: () => [],
+      layout_get: () => ({}),
+      layout_set: () => null,
+    });
+    await useVaultStore.getState().open('/v');
+    await useGvStore.getState().load();
+    useGvStore.getState().pin('A', { x: 1, y: 2 });
+    await useVaultStore.getState().open('/w');
+    expect(calls.filter((c) => c === 'layout_set' || c === 'vault_open')).toEqual([
+      'vault_open',
+      'layout_set',
+      'vault_open',
+    ]);
+    await useGvStore.getState().load();
+    useGvStore.getState().pin('A', { x: 3, y: 4 });
+    await useVaultStore.getState().close();
+    expect(calls.filter((c) => c === 'layout_set' || c === 'vault_close').slice(-2)).toEqual([
+      'layout_set',
+      'vault_close',
+    ]);
   });
 
   it('VLT-01 open: closed → opening → open, with tree loaded', async () => {

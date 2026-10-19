@@ -40,6 +40,51 @@ describe('built-in palettes (M2b §4, §10)', () => {
   );
 });
 
+/** Global View colours (M3a §4, §6): plain hex, and every edge kind stands
+ *  out from the canvas (WCAG 1.4.11 non-text contrast, 3:1). */
+const GV_TOKENS = [
+  '--color-canvas',
+  '--color-card-border',
+  '--color-edge-link',
+  '--color-edge-tree',
+  '--color-edge-manual',
+] as const;
+
+function expectReadableGlobalView(vars: Record<string, string>, at: string) {
+  for (const key of GV_TOKENS) expect(vars[key], `${at} ${key}`).toMatch(/^#[0-9a-f]{6}$/);
+  for (const edge of ['--color-edge-link', '--color-edge-tree', '--color-edge-manual']) {
+    expect(
+      contrast(vars[edge], vars['--color-canvas']),
+      `${at} ${edge} on canvas`,
+    ).toBeGreaterThanOrEqual(3);
+  }
+  expect(
+    contrast(vars['--color-accent'], vars['--color-surface']),
+    `${at} card title`,
+  ).toBeGreaterThanOrEqual(4.5);
+}
+
+describe('Global View tokens (M3a §4, §6)', () => {
+  it.each(PALETTES.flatMap((p) => (['light', 'dark'] as const).map((m) => [p.id, m] as const)))(
+    '%s %s: canvas, card border and edges',
+    (id, mode) => {
+      expectReadableGlobalView(
+        paletteVars(
+          PALETTES.find((p) => p.id === id)!,
+          mode,
+        ),
+        `${id} ${mode}`,
+      );
+    },
+  );
+
+  it('the default tokens (before settings load) define them too, in both modes', () => {
+    for (const key of GV_TOKENS) {
+      expect(tokensCss.split(`${key}:`).length - 1, key).toBe(3);
+    }
+  });
+});
+
 describe('palette CSS', () => {
   it('maps every token and derives the in-between shades as plain hex (Safari 15)', () => {
     const vars = paletteVars(PALETTES[1], 'light');
@@ -122,6 +167,7 @@ describe('custom accent → palette (M2b §4, derive.ts)', () => {
       expect(contrast(t.accent, t.soft), `${at} accent on accent-soft`).toBeGreaterThanOrEqual(4.5);
       expect(contrast(t.contrast, t.accent), `${at} text on accent`).toBeGreaterThanOrEqual(4.5);
       expect(contrast(t.text, t.bg), `${at} text on background`).toBeGreaterThanOrEqual(7);
+      expectReadableGlobalView(paletteVars({ id: 'custom', ...p }, mode), `${hex} ${mode}`);
     }
     for (const v of Object.values(p.light).concat(Object.values(p.dark))) {
       expect(v).toMatch(/^(#[0-9a-f]{6}|rgba\(.*\))$/);

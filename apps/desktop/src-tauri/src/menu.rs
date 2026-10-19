@@ -31,10 +31,17 @@ pub const LINE_NUMBERS_ID: &str = "nimw-toggle-line-numbers";
 /// Event telling the page to flip a setting; payload `"toolbar"` or
 /// `"lineNumbers"` (the settings key).
 pub const TOGGLE_EVENT: &str = "menu:toggle";
+/// Ids of View → Editor / Global View (M3a §2).
+pub const EDITOR_ID: &str = "nimw-screen-edit";
+pub const GLOBAL_VIEW_ID: &str = "nimw-screen-global";
+/// Event telling the page which screen to show; payload `"edit"` or
+/// `"global"`.
+pub const SCREEN_EVENT: &str = "menu:screen";
 
 /// The app menu: About, Services, Hide, Hide Others, Show All, Quit (ours);
 /// Edit (Undo, Redo, Cut, Copy, Paste, Select All: macOS routes the text
-/// editing shortcuts through it); View (Back, Forward along the link trail —
+/// editing shortcuts through it); View (Editor, Global View — no
+/// accelerators: the page handles ⌘1 / ⌘2; Back, Forward along the link trail —
 /// no accelerators: the page handles ⌘[ / ⌘] itself, which also works where
 /// there is no app menu; the formatting toolbar and line-number toggles —
 /// plain items, the page owns the settings; full screen); Window (Minimize,
@@ -89,6 +96,9 @@ pub fn app_menu<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
     )?;
     let back = MenuItem::with_id(app, BACK_ID, "Back", true, None::<&str>)?;
     let forward = MenuItem::with_id(app, FORWARD_ID, "Forward", true, None::<&str>)?;
+    // No accelerators: the page handles ⌘1 / ⌘2 itself (as ⌘[ / ⌘]).
+    let editor = MenuItem::with_id(app, EDITOR_ID, "Editor", true, None::<&str>)?;
+    let global_view = MenuItem::with_id(app, GLOBAL_VIEW_ID, "Global View", true, None::<&str>)?;
     let toolbar = MenuItem::with_id(
         app,
         TOOLBAR_ID,
@@ -108,6 +118,9 @@ pub fn app_menu<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
         "View",
         true,
         &[
+            &editor,
+            &global_view,
+            &PredefinedMenuItem::separator(app)?,
             &back,
             &forward,
             &PredefinedMenuItem::separator(app)?,
@@ -148,6 +161,9 @@ pub fn on_menu_event<R: Runtime>(app: &AppHandle<R>, event: MenuEvent) {
     } else if id == BACK_ID || id == FORWARD_ID {
         let direction = if id == BACK_ID { "back" } else { "forward" };
         let _ = app.emit(NAVIGATE_EVENT, direction);
+    } else if id == EDITOR_ID || id == GLOBAL_VIEW_ID {
+        let screen = if id == EDITOR_ID { "edit" } else { "global" };
+        let _ = app.emit(SCREEN_EVENT, screen);
     } else if id == TOOLBAR_ID {
         let _ = app.emit(TOGGLE_EVENT, "toolbar");
     } else if id == LINE_NUMBERS_ID {

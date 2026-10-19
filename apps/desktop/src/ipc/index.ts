@@ -168,6 +168,20 @@ export interface Settings {
   toolbar: boolean;
   /** Line numbers in the editor gutter. */
   lineNumbers: boolean;
+  /** Global View: how a click opens the next level (M3a §5). */
+  globalViewMode: GlobalViewMode;
+  /** Global View: edge kinds shown (M3a §6). */
+  globalViewEdges: GlobalViewEdges;
+}
+
+export type GlobalViewMode = 'drill' | 'expand';
+
+export interface GlobalViewEdges {
+  links: boolean;
+  tree: boolean;
+  manual: boolean;
+  /** "Links from inside folders". */
+  aggregated: boolean;
 }
 
 /** `language: 'system'` means follow the OS again. */
@@ -184,6 +198,8 @@ export interface SettingsPatch {
   fontSize?: number;
   toolbar?: boolean;
   lineNumbers?: boolean;
+  globalViewMode?: GlobalViewMode;
+  globalViewEdges?: GlobalViewEdges;
 }
 
 export interface SettingsResponse {
@@ -267,6 +283,64 @@ export interface VaultSettingsPatch {
   attachments?: { mode: AttachmentMode; path: string };
 }
 
+/** What one Global View click opens (M3a §3). */
+export type GvLevelRef =
+  { kind: 'vault' } | { kind: 'folder'; path: string } | { kind: 'page'; path: string };
+
+export type GvCardKind = 'project' | 'folder' | 'page';
+export type GvRelation = 'centre' | 'in' | 'out' | 'both';
+
+/** One Global View card (M3a §4). */
+export interface GvCard {
+  path: string;
+  kind: GvCardKind;
+  title: string;
+  subtitle: string | null;
+  /** The cover's vault path (`null`: none, remote or missing). */
+  cover: string | null;
+  coverRemote: boolean;
+  coverY: number | null;
+  excerpt: string;
+  hasImage: boolean;
+  hasAudio: boolean;
+  /** Folders: the page previewed on the card. */
+  indexPage: string | null;
+  pages: number;
+  folders: number;
+  childTitles: string[];
+  /** Page levels: where the card sits around the centre. */
+  relation: GvRelation | null;
+}
+
+export interface GvLevel {
+  cards: GvCard[];
+  /** Page levels: the page itself. */
+  centre: string | null;
+  /**
+   * Page levels: neighbours left out because a page shows at most 200 around
+   * it (links out and relationships first, then the newest backlinks); 0
+   * elsewhere. The UI can say "+N more not shown". The backend always sends
+   * it; optional only so level fixtures written before it needn't list it.
+   */
+  omitted?: number;
+}
+
+/** One edge between visible cards (M3a §6). */
+export interface GvEdge {
+  from: string;
+  to: string;
+  kind: 'link' | 'manual';
+  count: number;
+  aggregated: boolean;
+  directed: boolean;
+  label: string | null;
+}
+
+export interface CardPosition {
+  x: number;
+  y: number;
+}
+
 // ---- commands ----
 
 const call = <T>(cmd: string, args?: Record<string, unknown>) =>
@@ -318,6 +392,12 @@ export const attachmentImport = (page: string, paths: string[]) =>
 export const coverPick = (page: string) => call<CoverPick | null>('cover_pick', { page });
 export const linkSuggest = (source: string, query: string, embed: boolean) =>
   call<LinkSuggestion[]>('link_suggest', { source, query, embed });
+export const gvChildren = (level: GvLevelRef) => call<GvLevel>('gv_children', { level });
+export const gvEdges = (visible: string[]) => call<GvEdge[]>('gv_edges', { visible });
+export const layoutGet = (level: string) =>
+  call<Record<string, CardPosition>>('layout_get', { level });
+export const layoutSet = (level: string, positions: Record<string, CardPosition>) =>
+  call<void>('layout_set', { level, positions });
 export const vaultSettingsGet = () => call<VaultSettings>('vault_settings_get');
 export const vaultSettingsSet = (patch: VaultSettingsPatch) =>
   call<VaultSettings>('vault_settings_set', { patch });
@@ -344,6 +424,9 @@ export const onMenuNavigate = (cb: (direction: 'back' | 'forward') => void): Pro
  *  the settings key to flip. */
 export const onMenuToggle = (cb: (key: string) => void): Promise<UnlistenFn> =>
   listen<string>('menu:toggle', (e) => cb(e.payload));
+/** View → Editor / Global View in the app menu (M3a §2). */
+export const onMenuScreen = (cb: (screen: string) => void): Promise<UnlistenFn> =>
+  listen<string>('menu:screen', (e) => cb(e.payload));
 export const onVaultWarning = (cb: (p: WarningPayload) => void): Promise<UnlistenFn> =>
   listen<WarningPayload>('vault:warning', (e) => cb(e.payload));
 

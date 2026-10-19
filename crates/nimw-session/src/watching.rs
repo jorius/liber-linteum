@@ -237,6 +237,10 @@ impl VaultSession {
             index.resolve_from(&files, p)?;
         }
         drop(index);
+        // One layout update for the whole batch (final review I3), before
+        // the change is announced so a Global View refresh reads the moved
+        // positions.
+        self.follow_layout(&renamed);
         for w in warnings {
             self.emit_warning(w);
         }

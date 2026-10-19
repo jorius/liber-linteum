@@ -41,4 +41,19 @@ describe('CSS on the Safari 15 floor', () => {
     );
     expect(offenders).toEqual([]);
   });
+
+  it('a focus ring is only removed where :focus-visible can bring it back', () => {
+    // `.x { outline: none }` + `.x:focus-visible { outline: … }` leaves no ring
+    // at all where :focus-visible is unknown (M3a final review m3). The ring
+    // goes on `:focus` and is removed by `:focus:not(:focus-visible)`.
+    const clean = (css: string) => css.replace(/\/\*[\s\S]*?\*\//g, '');
+    const offenders = cssFiles(src).flatMap((file) =>
+      [...clean(readFileSync(file, 'utf8')).matchAll(/([^{};]+)\{([^{}]*)\}/g)]
+        .filter(([, , body]) => /(^|;)\s*outline\s*:\s*(none|0)\s*(;|$)/.test(body!))
+        .map(([, selector]) => selector!.trim().replace(/\s+/g, ' '))
+        .filter((selector) => !selector.includes(':not(:focus-visible)'))
+        .map((selector) => `${file.slice(src.length)}: ${selector}`),
+    );
+    expect(offenders).toEqual([]);
+  });
 });

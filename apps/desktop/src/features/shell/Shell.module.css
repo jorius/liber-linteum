@@ -183,6 +183,17 @@
   display: flex;
 }
 
+.screen {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+}
+
+.screen[hidden] {
+  display: none;
+}
+
 .srOnly {
   position: absolute;
   width: 1px;
