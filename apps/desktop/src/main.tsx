@@ -8,6 +8,7 @@ import { createRoot } from 'react-dom/client';
 import { App } from './app/App';
 import { detectLanguage, initI18n } from './i18n';
 import { isFileWindowLabel } from './ipc';
+import { installRecorderEvents } from './features/audio/recorderStore';
 import { installFileDropIfTauri } from './features/editor/attachments';
 import { installSeeAtomsMenuIfTauri } from './features/global-view/seeAtomsMenu';
 import { installOpenFile, installOpenInVault } from './features/singleFile/openFile';
@@ -45,6 +46,7 @@ void initI18n(detectLanguage(navigator.languages))
       installSeeAtomsMenuIfTauri();
       installSearchMenuIfTauri();
       installFileDropIfTauri();
+      installRecorderEvents();
       installOpenInVault();
     }
     createRoot(document.getElementById('root')!).render(

@@ -658,6 +658,37 @@ export const attachmentImport = (page: string, paths: string[]) =>
   call<ImportResult[]>('attachment_import', { page, paths });
 /** Opens the native image dialog (Rust side); `null` when cancelled. */
 export const coverPick = (page: string) => call<CoverPick | null>('cover_pick', { page });
+
+// ---- audio clips (M6) ----
+
+/** An input device for the recorder bar. */
+export interface AudioDevice {
+  id: string;
+  name: string;
+  isDefault: boolean;
+}
+
+/** A level reading of the take in progress (every 50 ms). */
+export interface AudioLevel {
+  recordingId: number;
+  rms: number;
+  peak: number;
+  elapsedMs: number;
+  /** Set once, when the microphone went away mid-take. */
+  ended: 'deviceLost' | null;
+}
+
+export const audioDevices = () => call<AudioDevice[]>('audio_devices');
+/** Starts a take for `page`; `name` is `clip-YYYYMMDD-HHMMSS` in local time. */
+export const audioRecordStart = (page: string, device: string | null, name: string) =>
+  call<{ recordingId: number }>('audio_record_start', { page, device, name });
+/** Ends the take and saves it as an attachment of the page it started on. */
+export const audioRecordStop = (recordingId: number) =>
+  call<Attached>('audio_record_stop', { recordingId });
+export const audioRecordCancel = (recordingId: number) =>
+  call<null>('audio_record_cancel', { recordingId });
+/** Upload clip (AUD-03): Rust opens the dialog (WAV, MP3, M4A). */
+export const audioPick = (page: string) => call<Attached | null>('audio_pick', { page });
 export const linkSuggest = (source: string, query: string, embed: boolean) =>
   fileName !== null
     ? none<LinkSuggestion[]>([])
@@ -868,6 +899,8 @@ export function externalAssetUrl(path: string): string {
  *  (M4c §3: menu items act on the focused window only). */
 const mine = () => ({ target: { kind: 'WebviewWindow' as const, label: windowLabel() } });
 
+export const onAudioLevel = (cb: (p: AudioLevel) => void): Promise<UnlistenFn> =>
+  listen<AudioLevel>('audio:level', (e) => cb(e.payload), mine());
 export const onVaultProgress = (cb: (p: ProgressPayload) => void): Promise<UnlistenFn> =>
   listen<ProgressPayload>('vault:progress', (e) => cb(e.payload));
 export const onVaultChanged = (cb: (p: ChangedPayload) => void): Promise<UnlistenFn> =>

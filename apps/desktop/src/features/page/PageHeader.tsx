@@ -1,10 +1,12 @@
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { FormatIcon, OutlineIcon } from '../../app/icons';
-import type { EditorMode, Page } from '../../ipc';
+import { FormatIcon, MicIcon, OutlineIcon } from '../../app/icons';
+import { fileWindowName, type EditorMode, type Page } from '../../ipc';
 import { useEditorStore } from '../../stores/editorStore';
 import { useSettingsStore } from '../../stores/settingsStore';
 import { FavoriteToggle } from '../favorites/FavoriteToggle';
+import { useRecorderStore } from '../audio/recorderStore';
+import { viewOf } from '../editor/views';
 import { BackArrow } from './BackArrow';
 import { Breadcrumb } from './Breadcrumb';
 import { Cover } from './Cover';
@@ -41,6 +43,7 @@ export function PageHeader({
   const outline = useSettingsStore((s) => s.settings.outline);
   // Archived pages are read-only (M5b round 2).
   const archived = isArchived(page.path);
+  const recording = useRecorderStore((s) => s.phase !== 'closed');
   const editable = useEditorStore((s) => s.doc !== null && s.path === page.path) && !archived;
   return (
     <Cover page={page} editable={editable} body={children}>
@@ -79,6 +82,23 @@ export function PageHeader({
                 >
                   <FormatIcon />
                   <span aria-hidden="true">{t('toolbar.short')}</span>
+                </button>
+              )}
+              {/* M6 §10.2: Record clip; never on read-only pages or in a file window. */}
+              {hasDoc && !archived && fileWindowName() === null && (
+                <button
+                  type="button"
+                  className={styles.toolbarToggle}
+                  aria-label={t('audio.record')}
+                  title={t('audio.record')}
+                  data-active={recording || undefined}
+                  onClick={() => {
+                    const doc = useEditorStore.getState().doc;
+                    const view = doc && viewOf(doc);
+                    if (view) void useRecorderStore.getState().openFor(view);
+                  }}
+                >
+                  <MicIcon />
                 </button>
               )}
               {hasDoc && !archived && <WidthMenu path={page.path} />}

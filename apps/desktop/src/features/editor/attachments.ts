@@ -367,6 +367,27 @@ export function attachPaths(view: EditorView, paths: string[]): void {
   void dropFiles(originOf(view), id, paths);
 }
 
+/** Holds the cursor's place in `view`'s page for text that comes later (a
+ *  recording, M6 §1.2): a caret marks it, edits made meanwhile move it, and
+ *  the text lands in that page even if another is shown by then. Call the
+ *  returned function once, with the text or `null` to let go. */
+export function reserveInsertion(view: EditorView): (text: string | null) => void {
+  const id = ++drops;
+  const origin = originOf(view);
+  view.dispatch({ effects: addPending.of({ id, pos: view.state.selection.main.head }) });
+  return (text) =>
+    land(origin, (state) => {
+      if (!text) return { effects: endPending.of(id) };
+      const pos = pendingAt(state, id) ?? state.selection.main.head;
+      return {
+        changes: { from: pos, insert: text },
+        selection: { anchor: pos + text.length },
+        userEvent: 'input.record',
+        effects: endPending.of(id),
+      };
+    });
+}
+
 /** Inserts `text` at the cursor (replacing the selection) as one undo step. */
 export function insertAtCursor(view: EditorView, text: string): void {
   const { from, to } = view.state.selection.main;

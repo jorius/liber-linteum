@@ -8,6 +8,7 @@ import { ArchivedBanner } from '../bin/ArchivedBanner';
 import { Editor } from '../editor/Editor';
 import { isTextPath } from '../../stores/textFiles';
 import { PageHeader } from './PageHeader';
+import { RecorderBar } from '../audio/RecorderBar';
 import { TextView } from './TextView';
 import { UnwritableNotice } from './UnwritableNotice';
 import styles from './PageView.module.css';
@@ -79,6 +80,7 @@ export function PageView() {
         {orphanBanner}
         <ArchivedBanner path={path} />
         <UnwritableNotice />
+        <RecorderBar />
         {binary ? (
           <p className={`${styles.notice} ${styles.inset}`}>{t('page.binary')}</p>
         ) : editorError ? (
