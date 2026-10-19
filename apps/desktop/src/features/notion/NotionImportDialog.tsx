@@ -79,9 +79,7 @@ export function NotionImportDialog({ onClose }: { onClose: () => void }) {
     if (!importing) return;
     let stop: (() => unknown) | null = null;
     let gone = false;
-    void onNotionProgress((p) =>
-      setStep((s) => (s.kind === 'importing' ? { ...s, ...p } : s)),
-    )
+    void onNotionProgress((p) => setStep((s) => (s.kind === 'importing' ? { ...s, ...p } : s)))
       .then((un) => (gone ? quietly(un) : (stop = un)))
       .catch(() => undefined); // no event runtime (plain browser)
     return () => {

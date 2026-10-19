@@ -223,7 +223,13 @@ describe('Notion import dialog, batch 6 review', () => {
       notion_import: () => {
         tries++;
         if (tries === 1) throw { kind: 'alreadyExists', message: '/n/Team wiki already exists' };
-        return { vault, report: 'Notion import report.md', cancelled: false, failed: null, root: '/n/Wiki' };
+        return {
+          vault,
+          report: 'Notion import report.md',
+          cancelled: false,
+          failed: null,
+          root: '/n/Wiki',
+        };
       },
     });
     await readyToImport();
@@ -274,7 +280,10 @@ describe('Notion import dialog, batch 6 review', () => {
     const stop = await screen.findByRole('button', { name: 'Stop import' });
     await waitFor(() => expect(stop).toHaveFocus());
     // 12 pages + 3 rows + 4 attachments + 1 index page + the report.
-    expect(screen.getByRole('progressbar', { name: 'Import progress' })).toHaveAttribute('max', '21');
+    expect(screen.getByRole('progressbar', { name: 'Import progress' })).toHaveAttribute(
+      'max',
+      '21',
+    );
     await userEvent.keyboard('{Escape}');
     expect(calls.some(([c]) => c === 'notion_cancel')).toBe(true);
     expect(useUiStore.getState().dialog).toEqual({ type: 'notionImport' });
