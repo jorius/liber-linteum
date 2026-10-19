@@ -41,14 +41,21 @@ fn is_external(href: &str) -> bool {
         return true;
     }
     match href.find(':') {
-        Some(i) => !href[..i].contains('/') && href[..i].chars().all(|c| c.is_ascii_alphanumeric() || "+.-".contains(c)),
+        Some(i) => {
+            !href[..i].contains('/')
+                && href[..i]
+                    .chars()
+                    .all(|c| c.is_ascii_alphanumeric() || "+.-".contains(c))
+        }
         None => false,
     }
 }
 
 /// A wikilink's text, safe inside `[[…|…]]`.
 fn alias(text: &str) -> String {
-    text.replace('|', "-").replace("]]", "] ]").replace('\n', " ")
+    text.replace('|', "-")
+        .replace("]]", "] ]")
+        .replace('\n', " ")
 }
 
 fn last_name(target: &str) -> &str {
@@ -57,7 +64,14 @@ fn last_name(target: &str) -> &str {
 
 /// One link `[text](href)` (embed when `bang`) as the vault writes it, or
 /// `None` to keep it as it was.
-fn rewrite_link(bang: bool, text: &str, href: &str, dir: &[String], r: &dyn Resolver, missing: &mut Vec<String>) -> Option<String> {
+fn rewrite_link(
+    bang: bool,
+    text: &str,
+    href: &str,
+    dir: &[String],
+    r: &dyn Resolver,
+    missing: &mut Vec<String>,
+) -> Option<String> {
     let href = href.trim().trim_start_matches('<').trim_end_matches('>');
     if href.is_empty() || is_external(href) {
         return None;
@@ -83,7 +97,9 @@ fn rewrite_link(bang: bool, text: &str, href: &str, dir: &[String], r: &dyn Reso
     };
     let bang = if bang { "!" } else { "" };
     let shown = text.trim();
-    let named = shown.is_empty() || shown == last_name(&target) || (page && shown == format!("{}.md", last_name(&target)));
+    let named = shown.is_empty()
+        || shown == last_name(&target)
+        || (page && shown == format!("{}.md", last_name(&target)));
     Some(if bang == "!" || named {
         format!("{bang}[[{target}{anchor}]]")
     } else {
@@ -137,19 +153,18 @@ fn rewrite_line(line: &str, dir: &[String], r: &dyn Resolver, missing: &mut Vec<
         }
         let bang = c == '!' && chars.get(i + 1) == Some(&'[');
         let open = if bang { i + 1 } else { i };
-        if chars.get(open) == Some(&'[') && (bang || c == '[') {
-            if let Some(close) = matching(&chars, open, '[', ']') {
-                if chars.get(close + 1) == Some(&'(') {
-                    if let Some(end) = matching(&chars, close + 1, '(', ')') {
-                        let text: String = chars[open + 1..close].iter().collect();
-                        let href: String = chars[close + 2..end].iter().collect();
-                        if let Some(new) = rewrite_link(bang, &text, &href, dir, r, missing) {
-                            out.push_str(&new);
-                            i = end + 1;
-                            continue;
-                        }
-                    }
-                }
+        if chars.get(open) == Some(&'[')
+            && (bang || c == '[')
+            && let Some(close) = matching(&chars, open, '[', ']')
+            && chars.get(close + 1) == Some(&'(')
+            && let Some(end) = matching(&chars, close + 1, '(', ')')
+        {
+            let text: String = chars[open + 1..close].iter().collect();
+            let href: String = chars[close + 2..end].iter().collect();
+            if let Some(new) = rewrite_link(bang, &text, &href, dir, r, missing) {
+                out.push_str(&new);
+                i = end + 1;
+                continue;
             }
         }
         out.push(c);
@@ -180,7 +195,11 @@ pub(crate) fn callouts(text: &str) -> String {
     let mut i = 0;
     let quote = |depth: usize, line: &str| {
         let prefix = "> ".repeat(depth);
-        if line.trim().is_empty() { prefix.trim_end().to_string() } else { format!("{prefix}{line}") }
+        if line.trim().is_empty() {
+            prefix.trim_end().to_string()
+        } else {
+            format!("{prefix}{line}")
+        }
     };
     while i < lines.len() {
         let line = lines[i];
@@ -194,11 +213,11 @@ pub(crate) fn callouts(text: &str) -> String {
             }
             if t.starts_with("<details>") || t.starts_with("<details ") {
                 let mut title = summary(t);
-                if title.is_none() {
-                    if let Some(next) = lines.get(i + 1).and_then(|n| summary(n.trim())) {
-                        title = Some(next);
-                        i += 1;
-                    }
+                if title.is_none()
+                    && let Some(next) = lines.get(i + 1).and_then(|n| summary(n.trim()))
+                {
+                    title = Some(next);
+                    i += 1;
                 }
                 let head = format!("> [!note]- {}", title.unwrap_or_default());
                 out.push(quote(depth, head.trim_end()));
@@ -301,10 +320,19 @@ pub(crate) mod tests {
     fn map() -> Map {
         Map(HashMap::from([
             ("Home abc/Child def.md".into(), Target::Page("Child".into())),
-            ("Home abc/Notes.md".into(), Target::Page("Home/Notes".into())),
+            (
+                "Home abc/Notes.md".into(),
+                Target::Page("Home/Notes".into()),
+            ),
             ("Tasks 123.csv".into(), Target::Page("Tasks".into())),
-            ("Home abc/pic one.png".into(), Target::Asset("Home/pic one.png".into())),
-            ("Home abc/doc.pdf".into(), Target::Asset("Home/doc.pdf".into())),
+            (
+                "Home abc/pic one.png".into(),
+                Target::Asset("Home/pic one.png".into()),
+            ),
+            (
+                "Home abc/doc.pdf".into(),
+                Target::Asset("Home/doc.pdf".into()),
+            ),
         ]))
     }
 
@@ -319,13 +347,20 @@ pub(crate) mod tests {
             &dir(),
             &map(),
         );
-        assert_eq!(out, "See [[Child]], [[Home/Notes|my notes]] and [[Tasks]].\n");
+        assert_eq!(
+            out,
+            "See [[Child]], [[Home/Notes|my notes]] and [[Tasks]].\n"
+        );
         assert!(missing.is_empty());
     }
 
     #[test]
     fn m7_files_become_embeds_and_links() {
-        let (out, _) = convert("![pic one.png](pic%20one.png)\n[doc.pdf](doc.pdf)\n", &dir(), &map());
+        let (out, _) = convert(
+            "![pic one.png](pic%20one.png)\n[doc.pdf](doc.pdf)\n",
+            &dir(),
+            &map(),
+        );
         assert_eq!(out, "![[Home/pic one.png]]\n[[Home/doc.pdf]]\n");
     }
 
@@ -364,7 +399,10 @@ pub(crate) mod tests {
     fn m7_property_lines_move_out() {
         let keys = vec!["Status".to_string(), "Due".to_string()];
         let text = "# Write intro\n\nStatus: Done\nDue: October 1, 2026\n\nBody: stays\n";
-        assert_eq!(strip_properties(text, &keys), "# Write intro\n\nBody: stays\n");
+        assert_eq!(
+            strip_properties(text, &keys),
+            "# Write intro\n\nBody: stays\n"
+        );
         let plain = "# T\n\nNote: not a column\n";
         assert_eq!(strip_properties(plain, &keys), plain);
     }

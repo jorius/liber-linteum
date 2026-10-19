@@ -2,7 +2,7 @@ use crate::error::{Result, VaultError, io_err};
 use crate::hash::Hash;
 use crate::path::VaultPath;
 use crate::vault::Vault;
-use std::io::Write;
+use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
 
@@ -177,18 +177,6 @@ impl Vault {
     /// file and renamed into place (M2c §7.1). Create-only: `AlreadyExists` if
     /// `dest` exists, `NotFound` if its folder doesn't.
     pub fn import_file(&self, src: &Path, dest: &VaultPath) -> Result<Hash> {
-        self.import_with(dest, |out| {
-            std::io::copy(&mut std::fs::File::open(src)?, out).map(|_| ())
-        })
-    }
-
-    /// Like [`Vault::import_file`], with the bytes written by `fill` (M7: a
-    /// zip entry streamed in). A failing `fill` leaves nothing behind.
-    pub fn import_with(
-        &self,
-        dest: &VaultPath,
-        fill: impl FnOnce(&mut dyn Write) -> std::io::Result<()>,
-    ) -> Result<Hash> {
         if dest.is_root() {
             return Err(VaultError::OutsideVault(
                 "cannot write the vault root".into(),
@@ -212,23 +200,29 @@ impl Vault {
             TMP_COUNTER.fetch_add(1, Ordering::Relaxed)
         ));
         let result = (|| -> std::io::Result<Hash> {
-            let mut out = HashingWriter {
-                inner: std::fs::OpenOptions::new()
-                    .write(true)
-                    .create_new(true)
-                    .open(&tmp)?,
-                hasher: blake3::Hasher::new(),
-            };
-            fill(&mut out)?;
-            out.inner.sync_all()?;
-            let hash = Hash::from_bytes(*out.hasher.finalize().as_bytes());
+            let mut input = std::fs::File::open(src)?;
+            let mut out = std::fs::OpenOptions::new()
+                .write(true)
+                .create_new(true)
+                .open(&tmp)?;
+            let mut hasher = blake3::Hasher::new();
+            let mut buf = vec![0u8; 64 * 1024];
+            loop {
+                let n = input.read(&mut buf)?;
+                if n == 0 {
+                    break;
+                }
+                hasher.update(&buf[..n]);
+                out.write_all(&buf[..n])?;
+            }
+            out.sync_all()?;
             drop(out);
             if target.symlink_metadata().is_ok() {
                 return Err(std::io::ErrorKind::AlreadyExists.into());
             }
             std::fs::rename(&tmp, &target)?;
             sync_dir(parent);
-            Ok(hash)
+            Ok(Hash::from_bytes(*hasher.finalize().as_bytes()))
         })();
         result.map_err(|e| {
             let _ = std::fs::remove_file(&tmp);
@@ -310,24 +304,6 @@ fn sync_dir(dir: &Path) {
 
 #[cfg(not(unix))]
 fn sync_dir(_dir: &Path) {}
-
-/// Writes through to `inner`, hashing what passes.
-struct HashingWriter {
-    inner: std::fs::File,
-    hasher: blake3::Hasher,
-}
-
-impl Write for HashingWriter {
-    fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
-        let n = self.inner.write(buf)?;
-        self.hasher.update(&buf[..n]);
-        Ok(n)
-    }
-
-    fn flush(&mut self) -> std::io::Result<()> {
-        self.inner.flush()
-    }
-}
 
 #[cfg(test)]
 mod tests {

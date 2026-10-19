@@ -3,11 +3,13 @@
 
 mod archive;
 mod database;
+mod import;
 mod markdown;
 mod names;
 
 pub use archive::{Entry, Export, Limits};
 pub use database::{Table, parse_csv};
+pub use import::{PREVIEW_WARNINGS, Plan, Preview, Report, plan, suggested_name, write};
 pub use markdown::{Resolver, Target, convert, strip_properties};
 pub use names::{NameMap, clean_component};
 

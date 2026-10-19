@@ -28,7 +28,11 @@ pub(crate) fn split_ext(name: &str) -> (&str, Option<&str>) {
 /// no trailing dots or spaces, no Windows device name, at most 200 bytes.
 pub fn clean_component(raw: &str, is_file: bool) -> String {
     let stripped = strip_notion_id(raw);
-    let (stem, ext) = if is_file { split_ext(&stripped) } else { (stripped.as_str(), None) };
+    let (stem, ext) = if is_file {
+        split_ext(&stripped)
+    } else {
+        (stripped.as_str(), None)
+    };
     let mut stem = sanitize_file_name(stem)
         .trim_end_matches(['.', ' '])
         .to_string();
@@ -87,7 +91,11 @@ impl NameMap {
     /// `Name 1.ext`, `Name 2.ext`…; returns its vault path.
     pub fn claim(&mut self, folder: &str, name: &str, is_file: bool) -> String {
         let taken = self.taken.entry(folder.to_string()).or_default();
-        let (stem, ext) = if is_file { split_ext(name) } else { (name, None) };
+        let (stem, ext) = if is_file {
+            split_ext(name)
+        } else {
+            (name, None)
+        };
         let free = (0..)
             .map(|i| match (i, ext) {
                 (0, _) => name.to_string(),
@@ -97,7 +105,11 @@ impl NameMap {
             .find(|n| !taken.contains(&key(n)))
             .expect("a free name");
         taken.insert(key(&free));
-        if folder.is_empty() { free } else { format!("{folder}/{free}") }
+        if folder.is_empty() {
+            free
+        } else {
+            format!("{folder}/{free}")
+        }
     }
 
     /// The vault path given to `orig`, if any.
@@ -118,8 +130,14 @@ mod tests {
 
     #[test]
     fn m7_cleans_one_name() {
-        assert_eq!(clean_component(&format!("Plan: Q4? {ID}.md"), true), "Plan- Q4-.md");
-        assert_eq!(clean_component(&format!("Projects {ID}"), false), "Projects");
+        assert_eq!(
+            clean_component(&format!("Plan: Q4? {ID}.md"), true),
+            "Plan- Q4-.md"
+        );
+        assert_eq!(
+            clean_component(&format!("Projects {ID}"), false),
+            "Projects"
+        );
         assert_eq!(clean_component(".hidden.md", true), "-hidden.md");
         assert_eq!(clean_component("Trailing... .md", true), "Trailing.md");
         assert_eq!(clean_component("CON.md", true), "CON-.md");
@@ -138,11 +156,20 @@ mod tests {
     #[test]
     fn m7_numbers_duplicates_in_one_folder_only() {
         let mut names = NameMap::default();
-        assert_eq!(names.assign(&p(&format!("Notes {ID}.md")), true), "Notes.md");
+        assert_eq!(
+            names.assign(&p(&format!("Notes {ID}.md")), true),
+            "Notes.md"
+        );
         let other = "ffffffffffffffffffffffffffffffff";
-        assert_eq!(names.assign(&p(&format!("Notes {other}.md")), true), "Notes 1.md");
+        assert_eq!(
+            names.assign(&p(&format!("Notes {other}.md")), true),
+            "Notes 1.md"
+        );
         assert_eq!(names.assign(&p("NOTES.md"), true), "NOTES 2.md");
-        assert_eq!(names.assign(&p(&format!("A {ID}/Notes {other}.md")), true), "A/Notes.md");
+        assert_eq!(
+            names.assign(&p(&format!("A {ID}/Notes {other}.md")), true),
+            "A/Notes.md"
+        );
     }
 
     #[test]
@@ -156,7 +183,10 @@ mod tests {
     fn m7_a_page_and_its_folder_coexist() {
         let mut names = NameMap::default();
         assert_eq!(names.assign(&p(&format!("Home {ID}.md")), true), "Home.md");
-        assert_eq!(names.assign(&p(&format!("Home {ID}/Child {ID}.md")), true), "Home/Child.md");
+        assert_eq!(
+            names.assign(&p(&format!("Home {ID}/Child {ID}.md")), true),
+            "Home/Child.md"
+        );
         assert_eq!(names.get(&p(&format!("Home {ID}"))), Some("Home"));
     }
 

@@ -60,8 +60,18 @@ pub fn parse_csv(text: &str) -> Vec<Vec<String>> {
 }
 
 const MONTHS: [&str; 12] = [
-    "january", "february", "march", "april", "may", "june", "july", "august", "september", "october",
-    "november", "december",
+    "january",
+    "february",
+    "march",
+    "april",
+    "may",
+    "june",
+    "july",
+    "august",
+    "september",
+    "october",
+    "november",
+    "december",
 ];
 
 /// Notion's `October 18, 2026` (or `Oct 18, 2026`), optionally followed by a
@@ -71,7 +81,12 @@ fn iso_date(s: &str) -> Option<String> {
     let digits = |t: &str| !t.is_empty() && t.chars().all(|c| c.is_ascii_digit());
     // 2026-10-18 or 2026/10/18 (a time after ISO dates is kept as written).
     let sep = if s.len() >= 10 { s.as_bytes()[4] } else { 0 };
-    if (sep == b'-' || sep == b'/') && s.as_bytes()[7] == sep && digits(&s[..4]) && digits(&s[5..7]) && digits(&s[8..10]) {
+    if (sep == b'-' || sep == b'/')
+        && s.as_bytes()[7] == sep
+        && digits(&s[..4])
+        && digits(&s[5..7])
+        && digits(&s[8..10])
+    {
         let rest = &s[10..];
         if rest.is_empty() || (sep == b'-' && rest.starts_with('T')) {
             return Some(format!("{}-{}-{}{rest}", &s[..4], &s[5..7], &s[8..10]));
@@ -79,10 +94,10 @@ fn iso_date(s: &str) -> Option<String> {
         return None;
     }
     let (month, rest) = s.split_once(' ')?;
-    let m = MONTHS
-        .iter()
-        .position(|name| name.eq_ignore_ascii_case(month) || (month.len() == 3 && name[..3].eq_ignore_ascii_case(month)))?
-        + 1;
+    let m = MONTHS.iter().position(|name| {
+        name.eq_ignore_ascii_case(month)
+            || (month.len() == 3 && name[..3].eq_ignore_ascii_case(month))
+    })? + 1;
     let (day, rest) = rest.split_once(", ")?;
     let (year, time) = match rest.split_once(' ') {
         Some((y, t)) => (y, Some(t)),
@@ -134,14 +149,21 @@ fn relations(s: &str) -> Option<Vec<(String, String)>> {
         let end = rest.find(".md)")? + 4;
         let item = &rest[..end];
         let open = item.rfind(" (")?;
-        out.push((item[..open].trim().to_string(), item[open + 2..end - 1].to_string()));
+        out.push((
+            item[..open].trim().to_string(),
+            item[open + 2..end - 1].to_string(),
+        ));
         rest = rest[end..].trim_start_matches(',').trim_start();
     }
     (!out.is_empty()).then_some(out)
 }
 
 fn infer(values: &[&str]) -> Kind {
-    let values: Vec<&str> = values.iter().map(|v| v.trim()).filter(|v| !v.is_empty()).collect();
+    let values: Vec<&str> = values
+        .iter()
+        .map(|v| v.trim())
+        .filter(|v| !v.is_empty())
+        .collect();
     if values.is_empty() {
         return Kind::Text;
     }
@@ -183,14 +205,25 @@ impl Table {
         if rows.is_empty() {
             return None;
         }
-        let headers: Vec<String> = rows.remove(0).into_iter().map(|h| h.trim().to_string()).collect();
+        let headers: Vec<String> = rows
+            .remove(0)
+            .into_iter()
+            .map(|h| h.trim().to_string())
+            .collect();
         let kinds = (0..headers.len())
             .map(|i| {
-                let column: Vec<&str> = rows.iter().map(|r| r.get(i).map_or("", String::as_str)).collect();
+                let column: Vec<&str> = rows
+                    .iter()
+                    .map(|r| r.get(i).map_or("", String::as_str))
+                    .collect();
                 infer(&column)
             })
             .collect();
-        Some(Table { headers, rows, kinds })
+        Some(Table {
+            headers,
+            rows,
+            kinds,
+        })
     }
 
     /// The title of row `i` (its first column).
@@ -240,14 +273,21 @@ impl Table {
     /// The database's index page: its title and a table linking every row
     /// (`targets[i]`: row `i`'s vault path without `.md`).
     pub fn index_page(&self, title: &str, targets: &[String]) -> String {
-        let cell = |s: &str| s.trim().replace('|', "\\|").replace("\r\n", "<br>").replace('\n', "<br>");
+        let cell = |s: &str| {
+            s.trim()
+                .replace('|', "\\|")
+                .replace("\r\n", "<br>")
+                .replace('\n', "<br>")
+        };
         let mut out = format!("# {title}\n\n");
         let headers: Vec<String> = self.headers.iter().map(|h| cell(h)).collect();
         out.push_str(&format!("| {} |\n", headers.join(" | ")));
         out.push_str(&format!("|{}\n", " --- |".repeat(headers.len().max(1))));
         for (i, row) in self.rows.iter().enumerate() {
             let mut cells = vec![format!("[[{}\\|{}]]", targets[i], cell(self.title(i)))];
-            cells.extend((1..self.headers.len()).map(|c| cell(row.get(c).map_or("", String::as_str))));
+            cells.extend(
+                (1..self.headers.len()).map(|c| cell(row.get(c).map_or("", String::as_str))),
+            );
             out.push_str(&format!("| {} |\n", cells.join(" | ")));
         }
         out
@@ -265,17 +305,30 @@ mod tests {
         let rows = parse_csv("\u{feff}Name,Notes\r\n\"A, b\",\"line\nnext \"\"q\"\"\"\r\n\r\nC,\n");
         assert_eq!(
             rows,
-            [vec!["Name", "Notes"], vec!["A, b", "line\nnext \"q\""], vec!["C", ""]]
+            [
+                vec!["Name", "Notes"],
+                vec!["A, b", "line\nnext \"q\""],
+                vec!["C", ""]
+            ]
         );
     }
 
     #[test]
     fn m7_dates() {
         assert_eq!(iso_date("October 18, 2026").as_deref(), Some("2026-10-18"));
-        assert_eq!(iso_date("Oct 8, 2026 3:05 PM").as_deref(), Some("2026-10-08T15:05"));
-        assert_eq!(iso_date("January 1, 2026 12:30 AM").as_deref(), Some("2026-01-01T00:30"));
+        assert_eq!(
+            iso_date("Oct 8, 2026 3:05 PM").as_deref(),
+            Some("2026-10-08T15:05")
+        );
+        assert_eq!(
+            iso_date("January 1, 2026 12:30 AM").as_deref(),
+            Some("2026-01-01T00:30")
+        );
         assert_eq!(iso_date("2026/10/18").as_deref(), Some("2026-10-18"));
-        assert_eq!(iso_date("2026-10-18T09:00").as_deref(), Some("2026-10-18T09:00"));
+        assert_eq!(
+            iso_date("2026-10-18T09:00").as_deref(),
+            Some("2026-10-18T09:00")
+        );
         assert_eq!(iso_date("October 18, 2026 → October 20, 2026"), None);
         assert_eq!(iso_date("Maybe 1, 2026"), None);
     }
@@ -288,14 +341,26 @@ mod tests {
         let t = Table::parse(csv).unwrap();
         assert_eq!(
             t.kinds,
-            [Kind::Text, Kind::Bool, Kind::Number, Kind::Date, Kind::List, Kind::Text, Kind::Text, Kind::Text]
+            [
+                Kind::Text,
+                Kind::Bool,
+                Kind::Number,
+                Kind::Date,
+                Kind::List,
+                Kind::Text,
+                Kind::Text,
+                Kind::Text
+            ]
         );
         let r = Map(HashMap::new());
         assert_eq!(
             t.frontmatter(0, &[], &r).unwrap(),
             "---\nDone: true\nPoints: 3\nDue: 2026-10-01\nTags: [\"red\", \"blue\"]\nNote: \"Hello, world: a long sentence that is definitely more than sixty characters long\"\nCode: \"007\"\nOwner: \"Ana\"\n---\n"
         );
-        assert_eq!(t.frontmatter(1, &[], &r).unwrap(), "---\nDone: false\nPoints: -2.5\nTags: [\"green\"]\nNote: \"x\"\nCode: \"12\"\n---\n");
+        assert_eq!(
+            t.frontmatter(1, &[], &r).unwrap(),
+            "---\nDone: false\nPoints: -2.5\nTags: [\"green\"]\nNote: \"x\"\nCode: \"12\"\n---\n"
+        );
     }
 
     #[test]

@@ -95,7 +95,12 @@ impl Export {
                 let mut tmp = tempfile::tempfile()?;
                 {
                     let mut part = outer.by_index(i).map_err(zip_err)?;
-                    check_size(limits, &name_of(part.name()), part.size(), part.compressed_size())?;
+                    check_size(
+                        limits,
+                        &name_of(part.name()),
+                        part.size(),
+                        part.compressed_size(),
+                    )?;
                     copy_capped(&mut part, &mut tmp)?;
                 }
                 tmp.rewind()?;
@@ -120,12 +125,14 @@ impl Export {
             // A name that doesn't decode is empty, so refused below.
             let name = name_of(file.name());
             if file.is_symlink() {
-                self.warnings.push(format!("skipped {name:?}: a symbolic link"));
+                self.warnings
+                    .push(format!("skipped {name:?}: a symbolic link"));
                 continue;
             }
             let Some(path) = safe_path(&name) else {
-                self.warnings
-                    .push(format!("skipped {name:?}: not a safe path inside the export"));
+                self.warnings.push(format!(
+                    "skipped {name:?}: not a safe path inside the export"
+                ));
                 continue;
             };
             check_size(&self.limits, &name, file.size(), file.compressed_size())?;
@@ -158,10 +165,15 @@ impl Export {
         let Some(first) = self.entries.first().and_then(|e| e.path.first()).cloned() else {
             return;
         };
-        let is_export_root = first
-            .strip_prefix("Export-")
-            .is_some_and(|id| !id.is_empty() && id.chars().all(|c| c.is_ascii_hexdigit() || c == '-'));
-        if is_export_root && self.entries.iter().all(|e| e.path.len() > 1 && e.path[0] == first) {
+        let is_export_root = first.strip_prefix("Export-").is_some_and(|id| {
+            !id.is_empty() && id.chars().all(|c| c.is_ascii_hexdigit() || c == '-')
+        });
+        if is_export_root
+            && self
+                .entries
+                .iter()
+                .all(|e| e.path.len() > 1 && e.path[0] == first)
+        {
             for e in &mut self.entries {
                 e.path.remove(0);
             }
@@ -250,8 +262,16 @@ fn safe_path(name: &str) -> Option<Vec<String>> {
     if name.starts_with('/') || drive || name.contains('\0') {
         return None;
     }
-    let parts: Vec<String> = name.split('/').filter(|p| !p.is_empty()).map(String::from).collect();
-    if parts.is_empty() || parts.iter().any(|p| p == "." || p == ".." || p.contains(':')) {
+    let parts: Vec<String> = name
+        .split('/')
+        .filter(|p| !p.is_empty())
+        .map(String::from)
+        .collect();
+    if parts.is_empty()
+        || parts
+            .iter()
+            .any(|p| p == "." || p == ".." || p.contains(':'))
+    {
         return None;
     }
     Some(parts)
@@ -295,7 +315,10 @@ pub(crate) mod tests {
             (&format!("Home {ID}/pic.png"), b"png"),
         ]);
         let export = Export::open(zip.path(), &Limits::default()).unwrap();
-        assert_eq!(names(&export), [format!("Home {ID}.md"), format!("Home {ID}/pic.png")]);
+        assert_eq!(
+            names(&export),
+            [format!("Home {ID}.md"), format!("Home {ID}/pic.png")]
+        );
         let entry = &export.entries()[0];
         assert_eq!(export.read_text(entry).unwrap(), ("# Home\n".into(), false));
     }
@@ -317,7 +340,11 @@ pub(crate) mod tests {
         let zip = zip_file(&[("Export-1-Part-1.zip", &one), ("Export-1-Part-2.zip", &two)]);
         let export = Export::open(zip.path(), &Limits::default()).unwrap();
         assert_eq!(names(&export), ["A.md", "B/C.md", "B/x.png"]);
-        let c = export.entries().iter().find(|e| e.path == ["B", "C.md"]).unwrap();
+        let c = export
+            .entries()
+            .iter()
+            .find(|e| e.path == ["B", "C.md"])
+            .unwrap();
         assert_eq!(export.read_text(c).unwrap().0, "c");
     }
 
@@ -347,7 +374,8 @@ pub(crate) mod tests {
     #[test]
     fn m7_refuses_symbolic_links() {
         let mut w = zip::ZipWriter::new(Cursor::new(Vec::new()));
-        w.add_symlink("link.md", "/etc/passwd", SimpleFileOptions::default()).unwrap();
+        w.add_symlink("link.md", "/etc/passwd", SimpleFileOptions::default())
+            .unwrap();
         w.start_file("ok.md", SimpleFileOptions::default()).unwrap();
         w.write_all(b"x").unwrap();
         let tmp = tempfile::NamedTempFile::new().unwrap();
@@ -360,7 +388,10 @@ pub(crate) mod tests {
     #[test]
     fn m7_refuses_too_many_files() {
         let zip = zip_file(&[("a.md", b"a"), ("b.md", b"b"), ("c.md", b"c")]);
-        let limits = Limits { entries: 2, ..Limits::default() };
+        let limits = Limits {
+            entries: 2,
+            ..Limits::default()
+        };
         let err = Export::open(zip.path(), &limits).unwrap_err();
         assert!(matches!(err, ImportError::Limit(_)), "{err}");
     }
@@ -369,7 +400,10 @@ pub(crate) mod tests {
     fn m7_refuses_a_bomb() {
         let zeros = vec![0u8; 4 * MIB as usize];
         let zip = zip_file(&[("bomb.png", &zeros)]);
-        let limits = Limits { ratio: 100, ..Limits::default() };
+        let limits = Limits {
+            ratio: 100,
+            ..Limits::default()
+        };
         let err = Export::open(zip.path(), &limits).unwrap_err();
         assert!(err.to_string().contains("expands"), "{err}");
     }
@@ -377,11 +411,22 @@ pub(crate) mod tests {
     #[test]
     fn m7_text_over_the_limit_is_refused_and_a_bom_dropped() {
         let zip = zip_file(&[("big.md", &[b'x'; 64]), ("t.csv", b"\xEF\xBB\xBFName\n")]);
-        let limits = Limits { text: 32, ..Limits::default() };
+        let limits = Limits {
+            text: 32,
+            ..Limits::default()
+        };
         let export = Export::open(zip.path(), &limits).unwrap();
-        let big = export.entries().iter().find(|e| e.path == ["big.md"]).unwrap();
+        let big = export
+            .entries()
+            .iter()
+            .find(|e| e.path == ["big.md"])
+            .unwrap();
         assert!(export.read_text(big).is_err());
-        let csv = export.entries().iter().find(|e| e.path == ["t.csv"]).unwrap();
+        let csv = export
+            .entries()
+            .iter()
+            .find(|e| e.path == ["t.csv"])
+            .unwrap();
         assert_eq!(export.read_text(csv).unwrap().0, "Name\n");
     }
 }
