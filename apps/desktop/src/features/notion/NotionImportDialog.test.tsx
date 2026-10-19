@@ -2,8 +2,8 @@ import { act, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import axe from 'axe-core';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { emit } from '@tauri-apps/api/event';
-import { clearMocks, mockIPC } from '../../ipc/testing';
+
+import { clearMocks, emit, mockIPC } from '../../ipc/testing';
 import { useToastStore } from '../../stores/toastStore';
 import { useUiStore } from '../../stores/uiStore';
 import { resetVaultStore, useVaultStore } from '../../stores/vaultStore';
