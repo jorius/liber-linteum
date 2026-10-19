@@ -46,7 +46,7 @@ Who owns what:
   2. A **new file** gets the schema straight away.
   3. An **existing file** must pass `PRAGMA quick_check` and carry `meta.schema_version` equal to the build's `SCHEMA_VERSION` (`index.rs:130-152`).
   4. Anything else — a corrupt file, a foreign file, an older or newer schema — is **deleted together with its `-wal` and `-shm` files and rebuilt** (`index.rs:111-121`).
-- **Pragmas** (`index.rs:154-159`): `journal_mode = WAL`, `foreign_keys = ON`, `synchronous = NORMAL`. No `busy_timeout` is set; there is only ever one connection per database (below).
+- **Pragmas** (`index.rs:154-163`): `journal_mode = WAL`, `foreign_keys = ON`, `synchronous = NORMAL`, `cache_size = -32000` (32 MB; the 2 MB default made search's page reads hit the disk) and `temp_store = MEMORY` (search's temp tables), both from batch 6. No `busy_timeout` is set; there is only ever one connection per database (below).
 - **Connection ownership:** one `rusqlite::Connection` inside `Index`, inside a `Mutex<Index>` in `VaultSession` (`crates/nimw-session/src/session.rs:21`). The lock helper recovers from a poisoned mutex rather than failing (`session.rs:101-103`).
 - **Threads that touch it:**
   - **Tauri command threads.** Every command runs its session work through `blocking()`, which is `tauri::async_runtime::spawn_blocking` (`apps/desktop/src-tauri/src/vault_commands.rs:90-97`). So SQLite never runs on the async runtime or the UI thread.
