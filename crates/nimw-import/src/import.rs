@@ -104,6 +104,9 @@ pub struct Report {
     /// The report page's vault path.
     pub report: String,
     pub cancelled: bool,
+    /// Why the import stopped early (a full disk) or its report couldn't be
+    /// written: the vault at `root` is there, partly written (spec §8).
+    pub failed: Option<String>,
     /// Files written, the report included.
     pub written: usize,
 }
@@ -608,16 +611,24 @@ pub fn write(
     let mut counts = plan.counts.clone();
     counts.warnings.extend(skipped);
     let text = report_text(source, &counts, written, total, stopped.as_deref());
-    vault.write_cas(&VaultPath::new(&plan.report)?, text.as_bytes(), None)?;
-    written += 1;
+    // Best effort: a full disk may refuse the report too; the first error is
+    // the one the user hears about.
+    let saved = VaultPath::new(&plan.report)
+        .and_then(|p| vault.write_cas(&p, text.as_bytes(), None).map(|_| ()));
+    let failed = match (failure, saved) {
+        (Some(e), _) => Some(e.to_string()),
+        (None, Err(e)) => Some(format!("the report couldn't be written: {e}")),
+        (None, Ok(())) => {
+            written += 1;
+            None
+        }
+    };
     progress(written, total);
-    if let Some(e) = failure {
-        return Err(e);
-    }
     Ok(Report {
         root: target.to_path_buf(),
         report: plan.report.clone(),
-        cancelled: stopped.is_some(),
+        cancelled: failed.is_none() && stopped.is_some(),
+        failed,
         written,
     })
 }
@@ -949,6 +960,34 @@ mod tests {
             .err()
             .expect("cancelled");
         assert!(matches!(err, ImportError::Cancelled), "{err}");
+    }
+
+    #[test]
+    fn b6_review_i8_m3_a_failed_report_is_said_and_the_vault_is_returned() {
+        let zip = sample();
+        let export = Export::open(zip.path(), &Limits::default()).unwrap();
+        let mut plan = plan(&export, &AtomicBool::new(false)).unwrap();
+        // The report can't be written where a folder already is.
+        plan.report = "Home".to_string();
+        let dir = tempfile::tempdir().unwrap();
+        let report = write(
+            &export,
+            &plan,
+            "x.zip",
+            &dir.path().join("Vault"),
+            &mut |_, _| {},
+            &AtomicBool::new(false),
+        )
+        .expect("the vault is returned, not only an error");
+        assert_eq!(report.root, dir.path().join("Vault"));
+        assert!(
+            report
+                .failed
+                .as_deref()
+                .is_some_and(|f| f.contains("report")),
+            "{report:?}"
+        );
+        assert_eq!(read(&dir, "Home.md").lines().next(), Some("# Home"));
     }
 
     #[test]
