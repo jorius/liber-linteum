@@ -10,11 +10,14 @@
 //! runs the Save / Don't Save / Cancel prompt, and the app exits when the last
 //! window is gone. With auto save on nothing changes (the M2a ≤ 500 ms limit).
 //! Cost: a logout with auto save off is cancelled once by the app, which then
-//! quits; the user logs out again.
+//! quits; the user logs out again. The same holds while a clip is being
+//! recorded, whatever the setting (batch 6 review C1).
 
-/// Whether a system quit must go through the windows' close requests first.
-pub fn must_ask(auto_save: bool) -> bool {
-    !auto_save
+/// Whether a system quit must go through the windows' close requests first:
+/// with auto save off, or while a clip is being recorded (its take is
+/// stopped and inserted there, batch 6 review C1).
+pub fn must_ask(auto_save: bool, recording: bool) -> bool {
+    !auto_save || recording
 }
 
 #[cfg(target_os = "macos")]
@@ -47,7 +50,10 @@ mod mac {
         let auto_save = app
             .try_state::<AppState>()
             .is_none_or(|s| s.settings.get().0.auto_save);
-        if !super::must_ask(auto_save) {
+        let recording = app
+            .try_state::<crate::audio_commands::AudioState>()
+            .is_some_and(|a| a.recording());
+        if !super::must_ask(auto_save, recording) {
             return TERMINATE_NOW;
         }
         crate::menu::request_quit(app);
@@ -90,9 +96,20 @@ mod tests {
     #[test]
     fn m5b_final_i2_a_system_quit_asks_only_with_auto_save_off() {
         assert!(
-            must_ask(false),
+            must_ask(false, false),
             "auto save off: the windows' prompt must run first"
         );
-        assert!(!must_ask(true), "auto save on: quit at once, as before");
+        assert!(
+            !must_ask(true, false),
+            "auto save on: quit at once, as before"
+        );
+    }
+
+    #[test]
+    fn b6_review_c1_a_system_quit_mid_take_goes_through_the_windows() {
+        assert!(
+            must_ask(true, true),
+            "a take in progress is stopped and inserted before the app quits"
+        );
     }
 }

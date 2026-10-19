@@ -65,8 +65,24 @@ pub fn configure<R: tauri::Runtime>(
         // Our Quit item (macOS app menu) closes the windows through their close
         // request, so the UI saves pending pages first (see `menu`).
         .on_menu_event(menu::on_menu_event)
-        // Files dropped from the OS become importable (M2c §8).
-        .on_window_event(drops::on_window_event)
+        // Files dropped from the OS become importable (M2c §8). A take whose
+        // recorder closed is stopped and kept (batch 6 review I4).
+        .on_window_event(|window, event| {
+            drops::on_window_event(window, event);
+            if matches!(event, tauri::WindowEvent::Destroyed) && window.label() == "main" {
+                let app = window.app_handle().clone();
+                std::thread::spawn(move || audio_commands::stop_orphaned(&app));
+            }
+        })
+        // The main window reloading forgets its recorder: same (I4).
+        .on_page_load(|webview, payload| {
+            if webview.label() == "main"
+                && payload.event() == tauri::webview::PageLoadEvent::Started
+            {
+                let app = webview.app_handle().clone();
+                std::thread::spawn(move || audio_commands::stop_orphaned(&app));
+            }
+        })
         .on_webview_event(drops::on_webview_event)
         // Quick notes (M4c): the folder dialog and its grant.
         .manage(scratchpad_commands::ScratchpadState::default())
@@ -234,6 +250,8 @@ pub fn run() {
                 let cwd = std::env::current_dir().unwrap_or_default();
                 opening::open_later(app, opening::paths_from_args(&args, &cwd));
             }
+            // Whatever way the app ends, a take in progress is kept (batch 6 review C1).
+            tauri::RunEvent::Exit => audio_commands::stop_orphaned(app),
             // Finder's Open With and the Dock (M4c §3).
             #[cfg(target_os = "macos")]
             tauri::RunEvent::Opened { urls } => {

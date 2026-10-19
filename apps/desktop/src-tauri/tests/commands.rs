@@ -2489,6 +2489,197 @@ fn m6_a_take_becomes_an_attachment_of_its_page() {
     assert_eq!(kind(again), "notFound");
 }
 
+/// 16-bit mono 48 kHz WAV bytes whose header still says "no sound", as a
+/// take cut short by a killed app leaves it (batch 6 review C1).
+fn unfinished_wav(samples: usize) -> Vec<u8> {
+    let mut b = Vec::new();
+    b.extend_from_slice(b"RIFF");
+    b.extend_from_slice(&36u32.to_le_bytes());
+    b.extend_from_slice(b"WAVEfmt ");
+    b.extend_from_slice(&16u32.to_le_bytes());
+    b.extend_from_slice(&1u16.to_le_bytes()); // PCM
+    b.extend_from_slice(&1u16.to_le_bytes()); // mono
+    b.extend_from_slice(&48_000u32.to_le_bytes());
+    b.extend_from_slice(&96_000u32.to_le_bytes());
+    b.extend_from_slice(&2u16.to_le_bytes());
+    b.extend_from_slice(&16u16.to_le_bytes());
+    b.extend_from_slice(b"data");
+    b.extend_from_slice(&0u32.to_le_bytes());
+    b.extend(std::iter::repeat_n(0x11u8, samples * 2));
+    b
+}
+
+/// The samples a WAV's header claims (RIFF data chunk size / 2).
+fn wav_samples(bytes: &[u8]) -> usize {
+    let at = bytes.windows(4).position(|w| w == b"data").unwrap();
+    u32::from_le_bytes(bytes[at + 4..at + 8].try_into().unwrap()) as usize / 2
+}
+
+/// Batch 6 review C1: a take a killed app left in the cache is recovered —
+/// imported next to the page it was recorded on, its header repaired — when
+/// the next take starts. Never wiped.
+#[test]
+fn b6_review_c1_a_take_left_by_a_killed_app_is_recovered() {
+    let h = harness();
+    let vault = open_fixture(&h, "obsidian-basic");
+    let cache = h
+        .app
+        .state::<nimw_desktop::state::AppState>()
+        .cache_dir
+        .join("audio")
+        .join("clip-20261018-090000-1");
+    std::fs::create_dir_all(&cache).unwrap();
+    std::fs::write(
+        cache.join("clip-20261018-090000.wav"),
+        unfinished_wav(4_800),
+    )
+    .unwrap();
+    std::fs::write(
+        cache.join("take.json"),
+        json!({ "root": vault.path(), "page": "Game Design/Game 1.md" }).to_string(),
+    )
+    .unwrap();
+    let started = call(
+        &h.main,
+        "audio_record_start",
+        json!({ "page": "Welcome.md", "device": null, "name": "clip-20261018-101500" }),
+    )
+    .unwrap();
+    let recovered = started["recovered"].as_array().cloned().unwrap_or_default();
+    assert_eq!(recovered.len(), 1, "{started}");
+    let path = recovered[0]["path"].as_str().unwrap();
+    assert_eq!(
+        path,
+        "Game Design/assets/clip-20261018-090000-recovered.wav"
+    );
+    let wav = std::fs::read(vault.path().join(path)).unwrap();
+    assert_eq!(
+        wav_samples(&wav),
+        4_800,
+        "the header counts the sound again"
+    );
+    assert!(!cache.exists(), "a recovered take leaves the cache");
+    call(
+        &h.main,
+        "audio_record_cancel",
+        json!({ "recordingId": started["recordingId"] }),
+    )
+    .unwrap();
+}
+
+/// Batch 6 review I1: a Stop whose import fails keeps the take (the next
+/// Start recovers it); it is never deleted.
+#[test]
+#[cfg(unix)]
+fn b6_review_i1_a_failed_import_keeps_the_take() {
+    use std::os::unix::fs::PermissionsExt;
+    let h = harness();
+    let vault = open_fixture(&h, "obsidian-basic");
+    let started = call(
+        &h.main,
+        "audio_record_start",
+        json!({ "page": "Welcome.md", "device": null, "name": "clip-20261018-101500" }),
+    )
+    .unwrap();
+    std::thread::sleep(std::time::Duration::from_millis(200));
+    let root = vault.path();
+    std::fs::set_permissions(root, std::fs::Permissions::from_mode(0o555)).unwrap();
+    let err = call(
+        &h.main,
+        "audio_record_stop",
+        json!({ "recordingId": started["recordingId"], "page": "Welcome.md" }),
+    )
+    .unwrap_err();
+    std::fs::set_permissions(root, std::fs::Permissions::from_mode(0o755)).unwrap();
+    assert!(
+        err["message"].as_str().unwrap().contains("kept"),
+        "the error says the clip is kept: {err}"
+    );
+    let again = call(
+        &h.main,
+        "audio_record_start",
+        json!({ "page": "Welcome.md", "device": null, "name": "clip-20261018-101600" }),
+    )
+    .unwrap();
+    let recovered = again["recovered"].as_array().cloned().unwrap_or_default();
+    assert_eq!(recovered.len(), 1, "{again}");
+    let path = recovered[0]["path"].as_str().unwrap();
+    assert_eq!(path, "assets/clip-20261018-101500-recovered.wav");
+    assert!(wav_samples(&std::fs::read(root.join(path)).unwrap()) > 0);
+    call(
+        &h.main,
+        "audio_record_cancel",
+        json!({ "recordingId": again["recordingId"] }),
+    )
+    .unwrap();
+}
+
+/// Batch 6 review I2: Stop imports next to where the page is now, not
+/// where it was when the take started.
+#[test]
+fn b6_review_i2_stop_imports_next_to_the_page_where_it_is_now() {
+    let h = harness();
+    let _vault = open_fixture(&h, "obsidian-basic");
+    let started = call(
+        &h.main,
+        "audio_record_start",
+        json!({ "page": "Welcome.md", "device": null, "name": "clip-20261018-101500" }),
+    )
+    .unwrap();
+    call(
+        &h.main,
+        "entry_rename",
+        json!({ "from": "Welcome.md", "to": "Game Design/Welcome.md" }),
+    )
+    .unwrap();
+    std::thread::sleep(std::time::Duration::from_millis(150));
+    let clip = call(
+        &h.main,
+        "audio_record_stop",
+        json!({ "recordingId": started["recordingId"], "page": "Game Design/Welcome.md" }),
+    )
+    .unwrap();
+    assert_eq!(
+        clip["path"].as_str().unwrap(),
+        "Game Design/assets/clip-20261018-101500.wav"
+    );
+}
+
+/// Batch 6 review I4: a take whose page went away (the window reloaded or
+/// closed) is stopped and kept — the microphone is released.
+#[test]
+fn b6_review_i4_an_orphaned_take_is_stopped_and_kept() {
+    let h = harness();
+    let vault = open_fixture(&h, "obsidian-basic");
+    call(
+        &h.main,
+        "audio_record_start",
+        json!({ "page": "Welcome.md", "device": null, "name": "clip-20261018-101500" }),
+    )
+    .unwrap();
+    std::thread::sleep(std::time::Duration::from_millis(150));
+    nimw_desktop::audio_commands::stop_orphaned(h.app.handle());
+    assert!(
+        vault
+            .path()
+            .join("assets/clip-20261018-101500.wav")
+            .is_file()
+    );
+    // The microphone is free again.
+    let next = call(
+        &h.main,
+        "audio_record_start",
+        json!({ "page": "Welcome.md", "device": null, "name": "clip-20261018-101600" }),
+    )
+    .unwrap();
+    call(
+        &h.main,
+        "audio_record_cancel",
+        json!({ "recordingId": next["recordingId"] }),
+    )
+    .unwrap();
+}
+
 /// M6 §3: Cancel leaves nothing in the vault; bad input is refused.
 #[test]
 fn m6_cancel_writes_nothing_and_bad_takes_are_refused() {
