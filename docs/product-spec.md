@@ -40,10 +40,10 @@ The defining feature is the **Global View**: a navigable canvas where each proje
 
 | Persona | What they need from NIMW | Status |
 |---|---|---|
-| **Quick note-takers** | Jot something down without setting up a vault; open a single `.md`/`.txt` file from Finder. | Scratchpad and single-file mode planned as **M4c** (right after the M4b feedback round). |
-| **Writers** (books, long-form) | Chapters as pages, cross-references to a glossary, concepts, characters, ideas and brainstorming; outline and word count; a map of how ideas connect. | Links, autocomplete, Global View, relationships done; outline panel + word count in M4b. Candidates: glossary/alias tooling, unlinked mentions, word-count goals, focus mode, manuscript export. |
-| **Technical people** (local project docs) | Code snippets with syntax highlighting, diagrams, maths, plain-text and code files viewable next to the notes. | Syntax highlighting with a language picker, Mermaid, LaTeX and text/code files in M4b. Candidate: HTML export. |
-| **Artists and world-builders** | Covers, images, a visual map of places, characters and factions with typed relationships. | Covers, Global View, relationships done. Candidates: image galleries, map images with pins, timelines. |
+| **Quick note-takers** | Jot something down without setting up a vault; open a single `.md`/`.txt` file from Finder. | Done in **M4c**: a global Scratchpad, a Scratchpad folder in every vault (⌘⇧N), single-file windows (Finder Open With, ⌘⇧O). |
+| **Writers** (books, long-form) | Chapters as pages, cross-references to a glossary, concepts, characters, ideas and brainstorming; outline and word count; a map of how ideas connect. | Links, autocomplete, Global View, relationships, outline panel, word count, search, favourites done. Candidates: glossary/alias tooling, unlinked mentions, word-count goals, focus mode, manuscript export. |
+| **Technical people** (local project docs) | Code snippets with syntax highlighting, diagrams, maths, plain-text and code files viewable next to the notes. | Done in M4b: syntax highlighting with a language picker, Mermaid, LaTeX, text/code files, wide tables. Candidate: HTML export. |
+| **Artists and world-builders** | Covers, images, a visual map of places, characters and factions with typed relationships. | Covers (top or side), Global View, relationships, page and folder emoji done. Candidates: image galleries, map images with pins, timelines. |
 | **Tabletop RPG players and game masters** (D&D) | Campaign notes: NPCs, locations, sessions, lore; quick cross-references during play; stat blocks. | Links, Global View and callouts cover the basics. Candidates: templates (NPC, session), stat-block callouts, dice notation, random tables. |
 
 ---
@@ -107,7 +107,7 @@ The defining feature is the **Global View**: a navigable canvas where each proje
 | VLT-05 | **Exclusions:** dot-folders (`.obsidian`, `.git`, `.trash`, `.nimw`, …) are ignored everywhere; attachment folders are hidden from the Global View but shown in the explorer; the user can add exclude globs per vault. [DECIDED] |
 | EXP-01 | A collapsible sidebar shows the vault tree (folders and pages), Obsidian-style. |
 | EXP-02 | Create, rename, move (drag & drop), and delete pages and folders from the explorer. |
-| EXP-03 | Delete moves items to the OS trash (not permanent deletion). [DECIDED] |
+| EXP-03 | Delete moves items to the vault's own Trash (`.trash/`, as Obsidian's option), after a confirmation; the Trash view restores them or deletes them from the vault, which sends them to the OS trash — never permanent deletion (revised 2026-10-15, M5b §5). [DECIDED] |
 | EXP-04 | Renaming or moving a page updates links pointing to it. [DECIDED] |
 | EXP-05 | Clicking a page in the explorer opens it in the editor. |
 
@@ -375,3 +375,5 @@ The view is opened from the floating top toggle **[Edit | Global view]** (see re
 | 2026-10-12 | Architecture: Tauri 2 + Rust core + React/TypeScript UI (see `docs/superpowers/specs/2026-10-12-architecture-design.md`). |
 | 2026-10-13 | Roadmap: M2a feedback became **M2b** (editor UX); covers, attachments and autocomplete became **M2c**. |
 | 2026-10-14 | Personas added (§1.2). Roadmap: **M4b** feedback round (header band with cover background, title in the top bar, palette buttons, picker and autocomplete fixes, attachments override, related chips, Dock icon; part 2: full page width at app, vault and page level, syntax highlighting with a language picker, LaTeX, Mermaid, outline panel and word count, plain-text and code files) → **M4c** scratchpad and single files → M5 search → M6 audio → M7 Notion import → M8 packaging. **Version control** (page history) is planned for a later batch, not now. |
+| 2026-10-15 | PG-01 revised: the title is an H1 only when it is the body's first block, else the file name (M4b part 3). EXP-03 revised: delete goes to the vault's own Trash, with an Archive beside it (M5b). Third feedback round (M5b): no top bar, Vault menu, floating action button, collapsible sidebar, Auto save setting, optional emoji for pages/folders/vault, Favorites, per-folder sort, Settings by category. |
+| 2026-10-18 | M2c–M5b merged into `main` locally. Next batch: `.txt` files searchable, the M6 (audio) and M7 (Notion import) specs. |
