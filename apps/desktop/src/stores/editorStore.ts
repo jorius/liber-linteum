@@ -325,9 +325,10 @@ let closeWarning: number | null = null;
  *  still can't be written (failing or orphaned page) keeps the window open
  *  with a warning; closing again while it shows quits anyway (M2a §3.3). */
 export async function mayClose(): Promise<boolean> {
-  await Promise.all([...beforeClose].map((run) => run().catch(() => undefined)));
-  // Auto save off (M5b §6): Save / Don't Save / Cancel first.
+  // Auto save off (M5b §6): Save / Don't Save / Cancel first, so Cancel also
+  // keeps a recording going (batch 6 review M3).
   if (needsUnsavedPrompt() && !(await confirmUnsaved())) return false;
+  await Promise.all([...beforeClose].map((run) => run().catch(() => undefined)));
   const unsaved = await useEditorStore.getState().saveAll(QUIT_FLUSH_MS);
   if (!unsaved.length) return true;
   const warned = useToastStore.getState().toasts.some((t) => t.id === closeWarning);

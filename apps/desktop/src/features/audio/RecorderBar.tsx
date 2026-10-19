@@ -1,5 +1,6 @@
 import { useEffect, useId, useRef, useState, type KeyboardEvent } from 'react';
 import { useTranslation } from 'react-i18next';
+import { usePageStore } from '../../stores/pageStore';
 import { SILENCE_HINT_MS, useRecorderStore } from './recorderStore';
 import styles from './Audio.module.css';
 
@@ -28,6 +29,12 @@ export function RecorderBar() {
   useEffect(() => {
     if (!live) setConfirming(false);
   }, [live]);
+  // An idle bar belongs to the page it opened on (batch 6 review I3).
+  const shown = usePageStore((p) => p.path);
+  useEffect(() => {
+    const { phase, page, close } = useRecorderStore.getState();
+    if (phase === 'idle' && page !== null && shown !== page) close();
+  }, [shown]);
   if (s.phase === 'closed') return null;
 
   const tens = Math.floor(s.elapsedMs / 10_000);
@@ -144,10 +151,12 @@ export function RecorderBar() {
           </button>
         </>
       )}
-      {s.phase === 'recording' && s.silentMs >= SILENCE_HINT_MS && !s.lost && (
+      {s.phase === 'recording' && s.silentMs >= SILENCE_HINT_MS && !s.ended && (
         <p className={styles.note}>{t('audio.silent')}</p>
       )}
-      {s.lost && <p className={styles.note}>{t('audio.lost')}</p>}
+      {s.ended === 'deviceLost' && <p className={styles.note}>{t('audio.lost')}</p>}
+      {s.ended === 'writeFailed' && <p className={styles.note}>{t('audio.full')}</p>}
+      {s.ended === 'lengthLimit' && <p className={styles.note}>{t('audio.tooLong')}</p>}
       {s.error && (
         <p role="alert" className={styles.note}>
           {s.error}

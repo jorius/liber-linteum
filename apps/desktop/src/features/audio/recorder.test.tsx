@@ -10,22 +10,27 @@ import { DEFAULT_SETTINGS, useSettingsStore } from '../../stores/settingsStore';
 import { resetVaultStore, useVaultStore } from '../../stores/vaultStore';
 import { fakeDisk } from '../../test/fakeDisk';
 import { PageScreen } from '../../test/pageScreen';
-import { clipName, resetRecorder, useRecorderStore } from './recorderStore';
+import { useToastStore } from '../../stores/toastStore';
+import { useUiStore } from '../../stores/uiStore';
+import { DialogHost } from '../dialogs/DialogHost';
+import { pageDocOf } from '../editor/views';
+import { clipName, resetRecorder, stopForLeaving, useRecorderStore } from './recorderStore';
 
 const open = (path: string) => act(() => usePageStore.getState().load(path));
 const view = () => EditorView.findFromDOM(document.querySelector<HTMLElement>('.cm-editor')!)!;
 const text = () => view().state.doc.toString();
 
-const level = (elapsedMs: number, peak = 0.4, ended: 'deviceLost' | null = null) =>
+type Ended = 'deviceLost' | 'lengthLimit' | 'writeFailed' | null;
+const level = (elapsedMs: number, peak = 0.4, ended: Ended = null) =>
   act(() =>
     useRecorderStore.getState().onLevel({ recordingId: 7, rms: peak / 2, peak, elapsedMs, ended }),
   );
 
 /** A backend with one synthetic microphone; Stop saves `clip-…wav`. */
-function disk(pages: Record<string, string>) {
+function disk(pages: Record<string, string>, extra: Record<string, (args: never) => unknown> = {}) {
   return fakeDisk(pages, {
     audio_devices: () => [{ id: 'mic', name: 'Built-in Microphone', isDefault: true }],
-    audio_record_start: () => ({ recordingId: 7 }),
+    audio_record_start: () => ({ recordingId: 7, recovered: [] }),
     audio_record_stop: () => ({
       path: 'attachments/clip-20261018-101500.wav',
       link: 'clip-20261018-101500.wav',
@@ -34,7 +39,16 @@ function disk(pages: Record<string, string>) {
     audio_record_cancel: () => null,
     audio_pick: () => ({ path: 'attachments/memo.m4a', link: 'memo.m4a', copied: true }),
     vault_tree: () => [],
+    ...extra,
   });
+}
+
+async function recordOn(path: string) {
+  await open(path);
+  await userEvent.click(await screen.findByRole('button', { name: 'Record clip' }));
+  const bar = await screen.findByRole('region', { name: 'Recorder' });
+  await userEvent.click(within(bar).getByRole('button', { name: 'Start recording' }));
+  return bar;
 }
 
 beforeEach(() => {
@@ -161,5 +175,106 @@ describe('Recorder (M6 §2)', () => {
     expect(within(bar).getByRole('button', { name: 'Start recording' })).toHaveFocus();
     const violations = (await axe.run(bar)).violations;
     expect(violations.map((v) => v.id)).toEqual([]);
+  });
+
+  it('batch 6 review I2: Stop names the page where it is now', async () => {
+    const d = disk({ 'A.md': 'Body\n' });
+    render(<PageScreen />);
+    const bar = await recordOn('A.md');
+    act(() => view().state.facet(pageDocOf)!.moveTo('Sub/A.md'));
+    await userEvent.click(within(bar).getByRole('button', { name: 'Stop & insert' }));
+    await waitFor(() => expect(useRecorderStore.getState().phase).toBe('closed'));
+    expect(d.calls.find(([c]) => c === 'audio_record_stop')?.[1]).toMatchObject({
+      recordingId: 7,
+      page: 'Sub/A.md',
+    });
+  });
+
+  it('batch 6 review I3: the idle recorder closes when another page opens', async () => {
+    disk({ 'A.md': 'a\n', 'B.md': 'b\n' });
+    render(<PageScreen />);
+    await open('A.md');
+    await userEvent.click(await screen.findByRole('button', { name: 'Record clip' }));
+    await screen.findByRole('region', { name: 'Recorder' });
+    await open('B.md');
+    await waitFor(() => expect(useRecorderStore.getState().phase).toBe('closed'));
+    expect(screen.queryByRole('region', { name: 'Recorder' })).toBeNull();
+  });
+
+  it('batch 6 review C1: clips recovered from an earlier session are announced', async () => {
+    disk(
+      { 'A.md': 'Body\n' },
+      {
+        audio_record_start: () => ({
+          recordingId: 7,
+          recovered: [
+            {
+              path: 'assets/clip-20261018-090000-recovered.wav',
+              link: 'clip-20261018-090000-recovered.wav',
+              copied: true,
+            },
+          ],
+        }),
+      },
+    );
+    render(<PageScreen />);
+    await recordOn('A.md');
+    const toast = useToastStore.getState().toasts.find((t) => /earlier recording/.test(t.message));
+    expect(toast?.detail).toEqual(['assets/clip-20261018-090000-recovered.wav']);
+  });
+
+  it('batch 6 review I1, I5: a full disk or the size limit ends the take, and the bar says so', async () => {
+    disk({ 'A.md': 'Body\n' });
+    render(<PageScreen />);
+    const bar = await recordOn('A.md');
+    level(2_000, 0.3, 'writeFailed');
+    expect(within(bar).getByText(/disk is full/)).toBeInTheDocument();
+    level(2_050, 0.3, 'lengthLimit');
+    expect(within(bar).getByText(/longest a clip can be/)).toBeInTheDocument();
+  });
+
+  it('batch 6 review M3: quitting asks about unsaved pages first; Cancel keeps recording', async () => {
+    useSettingsStore.setState({ settings: { ...DEFAULT_SETTINGS, autoSave: false } });
+    useUiStore.setState({ dialog: null });
+    const d = disk({ 'A.md': 'Body\n' });
+    render(
+      <>
+        <PageScreen />
+        <DialogHost />
+      </>,
+    );
+    await recordOn('A.md');
+    act(() => view().dispatch({ changes: { from: 0, insert: 'X' }, userEvent: 'input.type' }));
+    let closing!: Promise<boolean>;
+    act(() => {
+      closing = mayClose();
+    });
+    const ask = await screen.findByRole('alertdialog');
+    await userEvent.click(within(ask).getByRole('button', { name: 'Cancel' }));
+    expect(await closing).toBe(false);
+    expect(useRecorderStore.getState().phase).toBe('recording');
+    expect(d.calls.some(([c]) => c === 'audio_record_stop')).toBe(false);
+  });
+
+  it('batch 6 review M4: leaving while a take is still starting stops it once it starts', async () => {
+    let started!: (v: unknown) => void;
+    const d = disk(
+      { 'A.md': 'Body\n' },
+      { audio_record_start: () => new Promise((r) => (started = r)) },
+    );
+    render(<PageScreen />);
+    await open('A.md');
+    await userEvent.click(await screen.findByRole('button', { name: 'Record clip' }));
+    const bar = await screen.findByRole('region', { name: 'Recorder' });
+    await userEvent.click(within(bar).getByRole('button', { name: 'Start recording' }));
+    expect(useRecorderStore.getState().phase).toBe('starting');
+    let leaving!: Promise<void>;
+    act(() => {
+      leaving = stopForLeaving();
+    });
+    await act(async () => started({ recordingId: 7, recovered: [] }));
+    await act(async () => leaving);
+    expect(d.calls.some(([c]) => c === 'audio_record_stop')).toBe(true);
+    expect(useRecorderStore.getState().phase).toBe('closed');
   });
 });

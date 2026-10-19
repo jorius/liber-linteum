@@ -13,11 +13,15 @@ import {
   type AudioDevice,
   type AudioLevel,
 } from '../../ipc';
+import i18next from 'i18next';
 import { onBeforeClose } from '../../stores/editorStore';
+import type { PageDoc } from '../editor/pageDoc';
 import { errorMessage } from '../../stores/messages';
+import { useToastStore } from '../../stores/toastStore';
 import { onBeforeVaultSwitch, useVaultStore } from '../../stores/vaultStore';
 import { markupFor, reserveInsertion } from '../editor/attachments';
 import { pagePath } from '../editor/livePreview';
+import { pageDocOf } from '../editor/views';
 
 /** Exact digital silence this long reads as a denied microphone (§10.8). */
 export const SILENCE_HINT_MS = 3000;
@@ -34,7 +38,8 @@ interface RecorderState {
   elapsedMs: number;
   peak: number;
   silentMs: number;
-  lost: boolean;
+  /** Why the take ended by itself, if it did (the bar says so). */
+  ended: AudioLevel['ended'];
   error: string | null;
   openFor: (view: EditorView) => Promise<void>;
   start: () => Promise<void>;
@@ -57,6 +62,10 @@ export function clipName(at: Date): string {
 let view: EditorView | null = null;
 let recordingId: number | null = null;
 let land: ((text: string | null) => void) | null = null;
+/** The take's page: it follows renames and moves (batch 6 review I2). */
+let takeDoc: PageDoc | null = null;
+/** A Start still waiting for the microphone (batch 6 review M4). */
+let starting: Promise<void> | null = null;
 
 const CLOSED = {
   phase: 'closed' as Phase,
@@ -64,7 +73,7 @@ const CLOSED = {
   elapsedMs: 0,
   peak: 0,
   silentMs: 0,
-  lost: false,
+  ended: null,
   error: null,
 };
 
@@ -73,6 +82,7 @@ export const useRecorderStore = create<RecorderState>((set, get) => {
   const finish = (text: string | null) => {
     land?.(text);
     land = null;
+    takeDoc = null;
     recordingId = null;
     view?.focus();
     set({ ...CLOSED });
@@ -97,22 +107,38 @@ export const useRecorderStore = create<RecorderState>((set, get) => {
       });
     },
     start: async () => {
-      const { page, deviceId, phase } = get();
-      if (!view || !page || phase !== 'idle') return;
-      set({ phase: 'starting', error: null });
-      const res = await audioRecordStart(page, deviceId, clipName(new Date()));
-      if (!res.ok) return fail(errorMessage(res.error));
-      recordingId = res.value.recordingId;
+      const { deviceId, phase } = get();
+      if (!view || phase !== 'idle') return;
+      // The page shown now, and its cursor held before waiting on the
+      // microphone (batch 6 review I3).
+      const page = view.state.facet(pagePath)();
+      if (!page) return;
+      takeDoc = view.state.facet(pageDocOf);
       land = reserveInsertion(view);
-      set({ phase: 'recording' });
+      set({ phase: 'starting', page, error: null });
+      starting = (async () => {
+        const res = await audioRecordStart(page, deviceId, clipName(new Date()));
+        if (!res.ok) {
+          land?.(null);
+          land = null;
+          takeDoc = null;
+          return fail(errorMessage(res.error));
+        }
+        recordingId = res.value.recordingId;
+        set({ phase: 'recording' });
+        announceRecovered(res.value.recovered);
+      })();
+      await starting;
+      starting = null;
     },
     stop: async () => {
       if (get().phase !== 'recording' || recordingId === null) return;
       set({ phase: 'saving' });
-      const res = await audioRecordStop(recordingId);
+      const res = await audioRecordStop(recordingId, takeDoc?.path ?? get().page);
       if (!res.ok) {
         land?.(null);
         land = null;
+        takeDoc = null;
         recordingId = null;
         return fail(errorMessage(res.error));
       }
@@ -150,15 +176,28 @@ export const useRecorderStore = create<RecorderState>((set, get) => {
         elapsedMs: l.elapsedMs,
         peak: l.peak,
         silentMs: l.peak === 0 && !l.ended ? silentMs + step : 0,
-        lost: get().lost || l.ended === 'deviceLost',
+        ended: l.ended ?? get().ended,
       });
     },
   };
 });
 
+/** Takes an earlier session left behind are in the vault now (batch 6
+ *  review C1): say where, until dismissed. */
+function announceRecovered(recovered: { path: string }[]): void {
+  if (!recovered.length) return;
+  useToastStore.getState().push({
+    message: i18next.t('audio.recovered', { count: recovered.length }),
+    detail: recovered.map((r) => r.path),
+  });
+  void useVaultStore.getState().refreshTree();
+}
+
 /** Stops a take in progress and inserts it (quitting, closing the window or
- *  the vault: §10.7, a recording is never silently dropped). */
-async function stopForLeaving(): Promise<void> {
+ *  the vault: §10.7, a recording is never silently dropped) — also one still
+ *  starting, once it has (batch 6 review M4). */
+export async function stopForLeaving(): Promise<void> {
+  if (starting) await starting;
   if (useRecorderStore.getState().phase === 'recording') await useRecorderStore.getState().stop();
 }
 onBeforeClose(stopForLeaving);
@@ -178,6 +217,8 @@ export function installRecorderEvents(): void {
 export function resetRecorder(): void {
   land = null;
   recordingId = null;
+  takeDoc = null;
+  starting = null;
   view = null;
   useRecorderStore.setState({ ...CLOSED, devices: [], deviceId: null });
 }

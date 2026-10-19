@@ -468,7 +468,7 @@ export function installIpcMock({
     audio_record_start: (a) => {
       if (w.__nimwTake) throw { kind: 'alreadyExists', message: 'already recording' };
       w.__nimwTake = { id: 7, name: a.name, page: a.page };
-      return { recordingId: 7 };
+      return { recordingId: 7, recovered: [] };
     },
     audio_record_stop: () => {
       const take = w.__nimwTake as { name: string } | undefined;

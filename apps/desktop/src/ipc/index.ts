@@ -674,17 +674,24 @@ export interface AudioLevel {
   rms: number;
   peak: number;
   elapsedMs: number;
-  /** Set once, when the microphone went away mid-take. */
-  ended: 'deviceLost' | null;
+  /** Set once, when the take ended by itself: the microphone went away,
+   *  the disk refused more, or the clip reached its size limit. */
+  ended: 'deviceLost' | 'lengthLimit' | 'writeFailed' | null;
 }
 
 export const audioDevices = () => call<AudioDevice[]>('audio_devices');
 /** Starts a take for `page`; `name` is `clip-YYYYMMDD-HHMMSS` in local time. */
+/** Starts a take; `recovered` are takes an earlier session left, now in the vault. */
 export const audioRecordStart = (page: string, device: string | null, name: string) =>
-  call<{ recordingId: number }>('audio_record_start', { page, device, name });
-/** Ends the take and saves it as an attachment of the page it started on. */
-export const audioRecordStop = (recordingId: number) =>
-  call<Attached>('audio_record_stop', { recordingId });
+  call<{ recordingId: number; recovered: Attached[] }>('audio_record_start', {
+    page,
+    device,
+    name,
+  });
+/** Ends the take and saves it as an attachment of `page` (where the take's
+ *  page is now); a failed import keeps the take for the next Start. */
+export const audioRecordStop = (recordingId: number, page: string | null) =>
+  call<Attached>('audio_record_stop', { recordingId, page });
 export const audioRecordCancel = (recordingId: number) =>
   call<null>('audio_record_cancel', { recordingId });
 /** Upload clip (AUD-03): Rust opens the dialog (WAV, MP3, M4A). */
