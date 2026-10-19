@@ -160,8 +160,15 @@ pub fn plan(export: &Export, cancel: &AtomicBool) -> Result<Plan, ImportError> {
     let mut order: Vec<usize> = (0..entries.len()).collect();
     order.sort_by(|&a, &b| entries[a].path.cmp(&entries[b].path));
 
-    // Databases: `X.csv` and `X_all.csv` beside a folder `X` of rows.
+    // Databases: `X.csv` and `X_all.csv` beside a folder `X` of rows. A
+    // CSV is one only when Notion named it (an id) or its rows' folder is
+    // there; any other CSV is a file attached to a page.
+    let folders_in_export: BTreeSet<&[String]> = entries
+        .iter()
+        .flat_map(|e| (1..e.path.len()).map(move |n| &e.path[..n]))
+        .collect();
     let mut databases: Vec<Database> = Vec::new();
+    let mut db_csvs: BTreeSet<usize> = BTreeSet::new();
     let mut by_base: HashMap<(Vec<String>, String), usize> = HashMap::new();
     for &i in &order {
         if ext(&entries[i]) != "csv" {
@@ -173,6 +180,12 @@ pub fn plan(export: &Export, cancel: &AtomicBool) -> Result<Plan, ImportError> {
             Some(b) => (b.to_string(), true),
             None => (stem.to_string(), false),
         };
+        let mut rows_folder = parent.to_vec();
+        rows_folder.push(base.clone());
+        if strip_notion_id(name) == *name && !folders_in_export.contains(rows_folder.as_slice()) {
+            continue;
+        }
+        db_csvs.insert(i);
         match by_base.get(&(parent.to_vec(), base.clone())) {
             Some(&d) => {
                 if all {
@@ -194,7 +207,7 @@ pub fn plan(export: &Export, cancel: &AtomicBool) -> Result<Plan, ImportError> {
     let mut names = NameMap::default();
     let mut paths: HashMap<usize, String> = HashMap::new();
     for &i in &order {
-        if ext(&entries[i]) != "csv" {
+        if !db_csvs.contains(&i) {
             paths.insert(i, names.assign(&entries[i].path, true));
         }
     }
@@ -321,7 +334,7 @@ pub fn plan(export: &Export, cancel: &AtomicBool) -> Result<Plan, ImportError> {
         let e = &entries[i];
         let target = match ext(e).as_str() {
             "md" => Target::Page(link_text(&paths[&i], &stems)),
-            "csv" => continue,
+            _ if db_csvs.contains(&i) => continue,
             _ => Target::Asset(paths[&i].clone()),
         };
         targets.insert(e.path.join("/"), target);
@@ -352,7 +365,7 @@ pub fn plan(export: &Export, cancel: &AtomicBool) -> Result<Plan, ImportError> {
         let e = &entries[i];
         counts.bytes += e.size;
         match ext(e).as_str() {
-            "csv" => {}
+            _ if db_csvs.contains(&i) => {}
             "md" => {
                 let path = paths[&i].clone();
                 let row = row_of.get(&i).copied();
@@ -764,6 +777,35 @@ mod tests {
         assert_eq!(report.written, 3, "two files and the report");
         assert!(plan.total() > 3);
         assert!(read(&dir, REPORT).contains("**Cancelled.** 2 of"));
+    }
+
+    #[test]
+    fn b6_review_i5_an_attached_csv_stays_a_file() {
+        let home = format!("# Home\n\n[sales.csv](Home%20{A}/sales.csv)\n");
+        let zip = zip_file(&[
+            (&format!("Home {A}.md"), home.as_bytes()),
+            (&format!("Home {A}/sales.csv"), b"Region,Total\nNorth,1\nSouth,2\n"),
+        ]);
+        let (dir, report, plan) = import(zip.path(), None);
+        report.unwrap();
+        assert_eq!(read(&dir, "Home/sales.csv"), "Region,Total\nNorth,1\nSouth,2\n");
+        assert!(!dir.path().join("Vault/Home/sales.md").exists());
+        assert!(!dir.path().join("Vault/Home/sales").exists());
+        assert_eq!(read(&dir, "Home.md"), "# Home\n\n[[Home/sales.csv]]\n");
+        assert_eq!(plan.preview().databases, 0);
+        assert_eq!(plan.preview().attachments, 1);
+    }
+
+    #[test]
+    fn b6_review_i5_a_csv_beside_its_rows_folder_is_a_database() {
+        let zip = zip_file(&[
+            ("Tasks.csv", b"Name\nA\n".as_slice()),
+            ("Tasks/A.md", b"# A\n".as_slice()),
+        ]);
+        let (dir, report, plan) = import(zip.path(), None);
+        report.unwrap();
+        assert_eq!(plan.preview().databases, 1);
+        assert!(read(&dir, "Tasks.md").starts_with("# Tasks\n"));
     }
 
     #[test]
