@@ -444,7 +444,7 @@ impl Index {
                 })
             })?;
             hit.tags = self.hit_tags(&hit.path, words, &tags)?;
-            if !words.is_empty() {
+            if !words.is_empty() && self.body_matched(&hit.path)? {
                 hit.snippet = self.snippet(&hit.path, words)?;
             }
             results.push(hit);
@@ -472,19 +472,24 @@ impl Index {
     fn fill_hits(&self, text: &FtsText) -> Result<()> {
         self.conn.execute_batch(
             "CREATE TEMP TABLE IF NOT EXISTS nimw_hits \
-             (path TEXT PRIMARY KEY, score REAL NOT NULL, meta INTEGER NOT NULL); \
+             (path TEXT PRIMARY KEY, score REAL NOT NULL, meta INTEGER NOT NULL, \
+             body INTEGER NOT NULL); \
              DELETE FROM temp.nimw_hits;",
         )?;
+        // `body`: whether the body itself matches, so a file found by its
+        // name alone gets no snippet scan (batch 6 review I7).
         self.conn
             .prepare_cached(&format!(
-                "INSERT INTO temp.nimw_hits (path, score, meta) \
+                "INSERT INTO temp.nimw_hits (path, score, meta, body) \
                  SELECT pt.path, bm25(fts, {WEIGHTS}), \
-                 fts.rowid IN (SELECT rowid FROM fts WHERE fts MATCH ?2) \
+                 fts.rowid IN (SELECT rowid FROM fts WHERE fts MATCH ?2), \
+                 fts.rowid IN (SELECT rowid FROM fts WHERE fts MATCH ?3) \
                  FROM fts JOIN page_text pt ON pt.rowid = fts.rowid WHERE fts MATCH ?1"
             ))?
             .execute(params![
                 text.all,
-                format!("{META_COLUMNS} : ({})", text.any)
+                format!("{META_COLUMNS} : ({})", text.any),
+                format!("body : ({})", text.any)
             ])?;
         Ok(())
     }
@@ -578,11 +583,23 @@ impl Index {
     /// About 12 words around the first body word a query word starts; `None`
     /// when there is none. Read from the stored body in Rust: FTS5's
     /// `snippet()` re-expands every prefix term for each call (NFR-03).
+    /// Whether `path`'s body matched the text (filled by `fill_hits`).
+    fn body_matched(&self, path: &str) -> Result<bool> {
+        Ok(self
+            .conn
+            .prepare_cached("SELECT body FROM temp.nimw_hits WHERE path = ?1")?
+            .query_row([path], |r| r.get(0))
+            .optional()?
+            .unwrap_or(false))
+    }
+
     fn snippet(&self, path: &str, words: &[String]) -> Result<Option<Vec<SnippetPart>>> {
+        // Only the start of a body: a 2 MB log matched by its name would
+        // otherwise be read and scanned whole per hit (batch 6 review I7).
         let body: Option<String> = self
             .conn
-            .prepare_cached("SELECT body FROM page_text WHERE path = ?1")?
-            .query_row([path], |r| r.get(0))
+            .prepare_cached("SELECT substr(body, 1, ?2) FROM page_text WHERE path = ?1")?
+            .query_row(params![path, SNIPPET_SCAN_CHARS], |r| r.get(0))
             .optional()?;
         Ok(body.and_then(|b| snippet_of(&b, words)))
     }
@@ -843,6 +860,9 @@ fn unresolved(raw: &str) -> FacetPage {
 
 /// About [`SNIPPET_WORDS`] words of `body` around the first word that a
 /// (folded) query word starts, matching words marked; `…` where it was cut.
+/// How much of a body a snippet is looked for in.
+const SNIPPET_SCAN_CHARS: i64 = 64 * 1024;
+
 fn snippet_of(body: &str, words: &[String]) -> Option<Vec<SnippetPart>> {
     let mut chars = body.char_indices().peekable();
     let mut next_token = || {

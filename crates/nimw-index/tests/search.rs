@@ -998,6 +998,35 @@ fn m5b_archived_pages_only_with_the_archived_chip() {
 
 // ---- Batch 6: text files are searchable ----
 
+/// Batch 6 review I7: a snippet comes from the start of a body only (64 KB),
+/// so a 2 MB log whose name matches costs no full scan per keystroke. A
+/// word further in still finds the file, with no snippet.
+#[test]
+fn b6_review_i7_snippets_come_from_the_start_of_a_body() {
+    let mut f = Fixture::new();
+    let far = format!("{} dragonfruit", "filler ".repeat(12_000));
+    f.text("Logs/far.log", &far, "t1")
+        .text("Logs/near.log", "dragonfruit at the top", "t2");
+    let page = f.ix.search(&text_query("dragonfruit")).unwrap();
+    assert_eq!(
+        sorted(paths(&page)),
+        strs(&["Logs/far.log", "Logs/near.log"])
+    );
+    let snippet = |p: &str| {
+        page.results
+            .iter()
+            .find(|h| h.path == p)
+            .unwrap()
+            .snippet
+            .clone()
+    };
+    assert!(snippet("Logs/near.log").is_some());
+    assert!(
+        snippet("Logs/far.log").is_none(),
+        "beyond 64 KB: found, no snippet"
+    );
+}
+
 #[test]
 fn b6_text_files_are_found_by_name_and_body_with_a_snippet() {
     let mut f = Fixture::new();
@@ -1096,4 +1125,36 @@ fn b6_text_files_follow_rename_and_delete() {
     f.ix.transaction(|tx| tx.remove("Lists/groceries.txt"))
         .unwrap();
     assert!(f.fts("basalt").is_empty());
+}
+
+/// Batch 6 review I7, NFR-03: 50 text files of 2 MB whose names match the
+/// query keep search under 50 ms at p95 (snippets read only the start of a
+/// body). Release only: `cargo test --release -p nimw-index --test search -- --ignored`.
+#[test]
+#[ignore = "perf: run in release with --ignored"]
+fn b6_review_i7_perf_big_text_files_matched_by_name() {
+    let mut f = Fixture::new();
+    let body = "lorem ipsum dolor sit amet consectetur ".repeat(2 * 1024 * 1024 / 40);
+    for i in 0..50 {
+        f.text(
+            &format!("Logs/dragonlog-{i:02}.log"),
+            &body,
+            &format!("h{i}"),
+        );
+    }
+    let mut times: Vec<std::time::Duration> = (0..40)
+        .map(|_| {
+            let at = std::time::Instant::now();
+            let page = f.ix.search(&text_query("dragonlog")).unwrap();
+            assert_eq!(page.total, 50);
+            at.elapsed()
+        })
+        .collect();
+    times.sort();
+    let p95 = times[times.len() * 95 / 100];
+    eprintln!(
+        "big text files matched by name: p95 {p95:?}, max {:?}",
+        times.last().unwrap()
+    );
+    assert!(p95 < std::time::Duration::from_millis(50), "p95 {p95:?}");
 }
