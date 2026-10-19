@@ -8,6 +8,7 @@ import {
   entryTrash,
   binList,
   notionImport,
+  notionOpenPartial,
   trashRestore,
   onVaultChanged,
   onVaultProgress,
@@ -61,6 +62,8 @@ interface VaultState {
   /** Imports a Notion export into a new vault `name` (M7) and opens it. The
    *  import shows its own progress, so no opening overlay. */
   importNotion: (name: string) => Promise<IpcResult<NotionDone>>;
+  /** Opens the vault a failed Notion import left part-way (M7 §8). */
+  openPartialImport: () => Promise<IpcResult<VaultInfo>>;
   create: (path: string) => Promise<IpcResult<VaultInfo>>;
   close: () => Promise<void>;
   refreshTree: () => Promise<void>;
@@ -281,9 +284,11 @@ export const useVaultStore = create<VaultState>((set, get) => {
       // The import opens the new vault: unsaved text in this one is written first.
       if (before === 'open' && !(await savedEverything())) return { ok: false, error: BUSY };
       const res = await notionImport(name);
-      if (res.ok) await opened({ ok: true, value: res.value.vault }, before);
+      // A failed import isn't opened: the dialog offers to open it anyway.
+      if (res.ok && res.value.vault) await opened({ ok: true, value: res.value.vault }, before);
       return res;
     },
+    openPartialImport: () => withProgress(() => notionOpenPartial()),
     create: (path) => withProgress(() => vaultCreate(path)),
     close: async () => {
       // Unsaved text is written before the vault goes away (M2a §3.3).

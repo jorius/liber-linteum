@@ -859,7 +859,7 @@
     "noLocation": "No folder chosen",
     "chooseLocation": "Choose location…",
     "name": "Vault name",
-    "nameInvalid": "Use a plain folder name, without / \\ : * ? \" < > | # ^ [ ] or a leading dot.",
+    "nameInvalid": "Use a plain folder name: no / \\ : * ? \" < > | # ^ [ ], no dot at the start or end, no Windows device name (CON, NUL…), at most 200 bytes.",
     "previewLabel": "Preview",
     "reading": "Reading the export…",
     "counts": "{pages, plural, one {# page} other {# pages}}, {databases, plural, one {# database} other {# databases}} with {rows, plural, one {# row} other {# rows}}, {attachments, plural, one {# attachment} other {# attachments}}.",
@@ -869,6 +869,8 @@
     "progress": "{done} of {total} files",
     "import": "Import",
     "stop": "Stop import",
-    "cancelled": "Import stopped. What was written so far is open, with a report."
+    "cancelled": "Import stopped. What was written so far is open, with a report.",
+    "partial": "The import stopped part-way: {message}. What was written is in {root}, with a report.",
+    "openAnyway": "Open it anyway"
   }
 }

@@ -23,7 +23,7 @@ const AUDIO = /\.(wav|mp3|m4a|ogg|flac)$/i;
 const nameOf = (path: string) => path.split(/[\\/]/).pop() ?? path;
 
 /** "Show in Finder" / "Show in Explorer" / "Show in folder". */
-function revealLabel(t: (key: string) => string): string {
+export function revealLabel(t: (key: string) => string): string {
   if (onWindows()) return t('preview.external.revealWindows');
   if (/Macintosh|Mac OS/i.test(navigator.userAgent)) return t('preview.external.revealMac');
   return t('preview.external.revealOther');

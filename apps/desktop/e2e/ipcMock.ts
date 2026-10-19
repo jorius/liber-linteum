@@ -779,6 +779,8 @@ export function installIpcMock({
         },
         report: 'Notion import report.md',
         cancelled: false,
+        failed: null,
+        root: `/Users/e2e/Notion/${a.name as string}`,
       };
     },
     notion_cancel: () => null,

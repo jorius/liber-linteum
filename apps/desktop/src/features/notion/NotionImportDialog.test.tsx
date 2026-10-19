@@ -179,4 +179,104 @@ describe('validVaultName', () => {
       expect(validVaultName(bad)).toBe(false);
     }
   });
+
+  it('batch 6 review M7: refuses what Rust would refuse, before the import runs', () => {
+    for (const bad of [
+      'CON',
+      'nul',
+      'Notes.',
+      'Wiki 1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d',
+      'é'.repeat(101),
+    ]) {
+      expect(validVaultName(bad), bad).toBe(false);
+    }
+    expect(validVaultName('CONsole')).toBe(true);
+  });
+});
+
+async function readyToImport() {
+  render(<NotionHost />);
+  await userEvent.click(screen.getByRole('button', { name: 'Choose export…' }));
+  await screen.findByText(/12 pages/);
+  await userEvent.click(screen.getByRole('button', { name: 'Choose location…' }));
+  await waitFor(() => expect(importButton()).toHaveAttribute('aria-disabled', 'false'));
+}
+
+describe('Notion import dialog, batch 6 review', () => {
+  it('I7: the Choose buttons wait while the export is read', async () => {
+    let finish: (v: unknown) => void = () => undefined;
+    standard({ notion_preview: () => new Promise((r) => (finish = r)) });
+    render(<NotionHost />);
+    await userEvent.click(screen.getByRole('button', { name: 'Choose export…' }));
+    expect(await screen.findByText('Reading the export…')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Choose export…' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Choose location…' })).toBeDisabled();
+    await act(async () => finish(preview));
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Choose export…' })).toBeEnabled(),
+    );
+  });
+
+  it('I8: a taken name keeps the preview, so another name imports at once', async () => {
+    let tries = 0;
+    const calls = standard({
+      notion_import: () => {
+        tries++;
+        if (tries === 1) throw { kind: 'alreadyExists', message: '/n/Team wiki already exists' };
+        return { vault, report: 'Notion import report.md', cancelled: false, failed: null, root: '/n/Wiki' };
+      },
+    });
+    await readyToImport();
+    await userEvent.click(importButton());
+    expect(await screen.findByRole('alert')).toHaveTextContent(/already exists/);
+    expect(screen.getByText(/12 pages/)).toBeInTheDocument();
+    const name = screen.getByRole('textbox', { name: 'Vault name' });
+    await userEvent.clear(name);
+    await userEvent.type(name, 'Wiki');
+    await waitFor(() => expect(importButton()).toHaveAttribute('aria-disabled', 'false'));
+    await userEvent.click(importButton());
+    await waitFor(() => expect(useUiStore.getState().dialog).toBeNull());
+    expect(calls.filter(([c]) => c === 'notion_pick_zip')).toHaveLength(1);
+  });
+
+  it('I8: a vault left part-way says so and offers to open or show it', async () => {
+    const calls = standard({
+      notion_import: () => ({
+        vault: null,
+        report: 'Notion import report.md',
+        cancelled: false,
+        failed: 'No space left on device',
+        root: '/n/Team wiki',
+      }),
+      notion_reveal_partial: () => null,
+      notion_open_partial: () => vault,
+    });
+    await readyToImport();
+    await userEvent.click(importButton());
+    expect(await screen.findByRole('alert')).toHaveTextContent(/No space left on device/);
+    expect(screen.getByRole('alert')).toHaveTextContent('/n/Team wiki');
+    expect(useVaultStore.getState().info).toBeNull();
+    await userEvent.click(screen.getByRole('button', { name: /Show in/ }));
+    expect(calls.some(([c]) => c === 'notion_reveal_partial')).toBe(true);
+    await userEvent.click(screen.getByRole('button', { name: 'Open it anyway' }));
+    await waitFor(() => expect(useUiStore.getState().dialog).toBeNull());
+    expect(useVaultStore.getState().info?.root).toBe('/n/Wiki');
+    await waitFor(() => expect(usePageStore.getState().path).toBe('Notion import report.md'));
+  });
+
+  it('M9, M10: importing moves focus to Stop, Escape stops it, and the total counts databases', async () => {
+    const calls = standard({
+      notion_import: () => new Promise(() => undefined),
+      notion_cancel: () => null,
+    });
+    await readyToImport();
+    await userEvent.click(importButton());
+    const stop = await screen.findByRole('button', { name: 'Stop import' });
+    await waitFor(() => expect(stop).toHaveFocus());
+    // 12 pages + 3 rows + 4 attachments + 1 index page + the report.
+    expect(screen.getByRole('progressbar', { name: 'Import progress' })).toHaveAttribute('max', '21');
+    await userEvent.keyboard('{Escape}');
+    expect(calls.some(([c]) => c === 'notion_cancel')).toBe(true);
+    expect(useUiStore.getState().dialog).toEqual({ type: 'notionImport' });
+  });
 });

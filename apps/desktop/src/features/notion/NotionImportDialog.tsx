@@ -1,10 +1,11 @@
-import { useEffect, useId, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   notionCancel,
   notionPickParent,
   notionPickZip,
   notionPreview,
+  notionRevealPartial,
   onNotionProgress,
   type NotionPreview,
 } from '../../ipc';
@@ -13,6 +14,7 @@ import { errorMessage } from '../../stores/messages';
 import { useToastStore } from '../../stores/toastStore';
 import { useVaultStore } from '../../stores/vaultStore';
 import { formatSize } from '../bin/BinView';
+import { revealLabel } from '../preview/ExternalFile';
 import { quietly } from '../scratchpad/ScratchpadHost';
 import { Dialog } from '../dialogs/Dialog';
 import dialogs from '../dialogs/Dialogs.module.css';
@@ -20,18 +22,35 @@ import styles from './Notion.module.css';
 
 /** Characters a vault name can't hold (the app's name rules). */
 const REFUSED = /[/\\#|^[\]:*"<>?]/;
+/** Windows device names, alone or before a dot (`CON`, `nul.txt`). */
+const DEVICE = /^(con|prn|aux|nul|com[1-9]|lpt[1-9])(\.|$)/i;
+/** A trailing Notion id, which Rust strips (so the name would change). */
+const NOTION_ID = / [0-9a-f]{32}$/;
 
+/** The name rules `notion_import` applies (Rust's `vault_name`), checked here
+ *  so a refused name is said before the export is read again. */
 export function validVaultName(name: string): boolean {
   const n = name.trim();
-  return n !== '' && !n.startsWith('.') && !REFUSED.test(n);
+  return (
+    n !== '' &&
+    !n.startsWith('.') &&
+    !n.endsWith('.') &&
+    !REFUSED.test(n) &&
+    !DEVICE.test(n) &&
+    !NOTION_ID.test(n) &&
+    new TextEncoder().encode(n).length <= 200
+  );
 }
 
 type Step =
   | { kind: 'idle' }
   | { kind: 'reading' }
-  | { kind: 'ready'; preview: NotionPreview }
-  | { kind: 'importing'; done: number; total: number }
-  | { kind: 'failed'; message: string };
+  /** `error`: a name refused (taken, invalid); the preview stays. */
+  | { kind: 'ready'; preview: NotionPreview; error?: string }
+  | { kind: 'importing'; done: number; total: number; preview: NotionPreview }
+  | { kind: 'failed'; message: string }
+  /** The import stopped part-way: its vault is at `root`, not open. */
+  | { kind: 'partial'; message: string; root: string; report: string };
 
 /** Import from Notion (M7 §3): the export and the new vault's place, picked
  *  in dialogs Rust opens; a dry-run preview; then the import, which opens
@@ -47,12 +66,22 @@ export function NotionImportDialog({ onClose }: { onClose: () => void }) {
   const nameId = useId();
   const nameErrorId = useId();
   const importing = step.kind === 'importing';
+  const reading = step.kind === 'reading';
+  const stopButton = useRef<HTMLButtonElement>(null);
+
+  // The name field is disabled while importing: focus goes to Stop, so
+  // Escape (and the keyboard) still reach the dialog.
+  useEffect(() => {
+    if (importing) stopButton.current?.focus();
+  }, [importing]);
 
   useEffect(() => {
     if (!importing) return;
     let stop: (() => unknown) | null = null;
     let gone = false;
-    void onNotionProgress((p) => setStep({ kind: 'importing', ...p }))
+    void onNotionProgress((p) =>
+      setStep((s) => (s.kind === 'importing' ? { ...s, ...p } : s)),
+    )
       .then((un) => (gone ? quietly(un) : (stop = un)))
       .catch(() => undefined); // no event runtime (plain browser)
     return () => {
@@ -86,11 +115,29 @@ export function NotionImportDialog({ onClose }: { onClose: () => void }) {
 
   const start = async () => {
     if (step.kind !== 'ready' || !canImport) return;
-    const total = step.preview.pages + step.preview.rows + step.preview.attachments + 2;
-    setStep({ kind: 'importing', done: 0, total });
+    const p = step.preview;
+    // Every file the import writes: pages, rows, attachments, each
+    // database's index page, and the report.
+    const total = p.pages + p.rows + p.attachments + p.databases + 1;
+    setStep({ kind: 'importing', done: 0, total, preview: p });
     const res = await useVaultStore.getState().importNotion(name.trim());
     if (!res.ok) {
-      setStep({ kind: 'failed', message: errorMessage(res.error) });
+      // A taken or refused name: pick another without reading the export again.
+      const nameProblem = res.error.kind === 'alreadyExists' || res.error.kind === 'invalidName';
+      setStep(
+        nameProblem
+          ? { kind: 'ready', preview: p, error: errorMessage(res.error) }
+          : { kind: 'failed', message: errorMessage(res.error) },
+      );
+      return;
+    }
+    if (res.value.failed) {
+      setStep({
+        kind: 'partial',
+        message: res.value.failed,
+        root: res.value.root,
+        report: res.value.report,
+      });
       return;
     }
     onClose();
@@ -100,8 +147,23 @@ export function NotionImportDialog({ onClose }: { onClose: () => void }) {
     await openPage(res.value.report);
   };
 
-  // A running import isn't closed from under itself: Cancel stops it.
-  const close = () => (importing ? void notionCancel() : onClose());
+  const openPartial = async (report: string) => {
+    const res = await useVaultStore.getState().openPartialImport();
+    if (!res.ok) {
+      useToastStore.getState().push({ message: errorMessage(res.error) });
+      return;
+    }
+    onClose();
+    await openPage(report);
+  };
+
+  // A running import isn't closed from under itself: Stop stops it. Closing
+  // while the export is read also asks the reading to stop.
+  const close = () => {
+    if (importing) return void notionCancel();
+    if (reading) void notionCancel();
+    onClose();
+  };
 
   const preview = step.kind === 'ready' ? step.preview : null;
   return (
@@ -116,7 +178,7 @@ export function NotionImportDialog({ onClose }: { onClose: () => void }) {
         <button
           type="button"
           className="btn btn-secondary"
-          disabled={importing}
+          disabled={importing || reading}
           data-autofocus
           onClick={() => void chooseZip()}
         >
@@ -132,7 +194,7 @@ export function NotionImportDialog({ onClose }: { onClose: () => void }) {
         <button
           type="button"
           className="btn btn-secondary"
-          disabled={importing}
+          disabled={importing || reading}
           onClick={() => void chooseParent()}
         >
           {t('notion.chooseLocation')}
@@ -202,15 +264,43 @@ export function NotionImportDialog({ onClose }: { onClose: () => void }) {
             </p>
           </>
         )}
+        {step.kind === 'ready' && step.error && (
+          <p className={dialogs.error} role="alert">
+            {step.error}
+          </p>
+        )}
         {step.kind === 'failed' && (
           <p className={dialogs.error} role="alert">
             {step.message}
           </p>
         )}
+        {step.kind === 'partial' && (
+          <>
+            <p className={dialogs.error} role="alert">
+              {t('notion.partial', { message: step.message, root: step.root })}
+            </p>
+            <div className={dialogs.buttons}>
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={() => void notionRevealPartial()}
+              >
+                {revealLabel(t)}
+              </button>
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={() => void openPartial(step.report)}
+              >
+                {t('notion.openAnyway')}
+              </button>
+            </div>
+          </>
+        )}
       </section>
 
       <div className={dialogs.buttons}>
-        <button type="button" className="btn btn-secondary" onClick={close}>
+        <button type="button" className="btn btn-secondary" ref={stopButton} onClick={close}>
           {importing ? t('notion.stop') : t('dialogs.cancel')}
         </button>
         <button

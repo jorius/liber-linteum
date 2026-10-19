@@ -769,11 +769,14 @@ export interface NotionPreview {
   warnings: string[];
   moreWarnings: number;
 }
-/** The import done: the new vault (open) and its report page. */
+/** The import done: the new vault (open, unless it `failed`) and its report
+ *  page. A failed import leaves its vault part-written at `root`, not open. */
 export interface NotionDone {
-  vault: VaultInfo;
+  vault: VaultInfo | null;
   report: string;
   cancelled: boolean;
+  failed: string | null;
+  root: string;
 }
 /** A file dialog Rust opens for the export zip; `null` when cancelled. */
 export const notionPickZip = () => call<NotionZip | null>('notion_pick_zip');
@@ -783,6 +786,10 @@ export const notionPreview = () => call<NotionPreview>('notion_preview');
 /** Imports into a new folder `name` in the folder picked, then opens it. */
 export const notionImport = (name: string) => call<NotionDone>('notion_import', { name });
 export const notionCancel = () => call<null>('notion_cancel');
+/** Opens the vault a failed import left part-way (Rust's record of it). */
+export const notionOpenPartial = () => call<VaultInfo>('notion_open_partial');
+/** Shows that vault in Finder / Explorer. */
+export const notionRevealPartial = () => call<null>('notion_reveal_partial');
 /** A new quick note named `name` in the open vault's scratch place. */
 export const quickNoteCreate = (name: string) => call<string>('quick_note_create', { name });
 /** Renames a quick note after its saved first line, while it follows it. */
