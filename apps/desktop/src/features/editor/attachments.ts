@@ -35,6 +35,29 @@ const PASTE_TYPES: Record<string, string> = {
   'image/webp': 'webp',
 };
 
+/** Image types pasted as PNG (M4b §4): TIFF from Preview or Photos, BMP,
+ *  HEIC… whatever the webview can decode. SVG is left to the editor. */
+const convertible = (type: string) =>
+  type.startsWith('image/') && !PASTE_TYPES[type] && type !== 'image/svg+xml';
+
+/** `image` drawn into a PNG through a canvas; `null` when the webview can't
+ *  decode it. */
+export async function toPng(image: Blob): Promise<Blob | null> {
+  try {
+    const bitmap = await createImageBitmap(image);
+    const canvas = document.createElement('canvas');
+    canvas.width = bitmap.width;
+    canvas.height = bitmap.height;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return null;
+    ctx.drawImage(bitmap, 0, 0);
+    bitmap.close?.();
+    return await new Promise<Blob | null>((done) => canvas.toBlob(done, 'image/png'));
+  } catch {
+    return null;
+  }
+}
+
 /** Files shown inline (`![[…]]`); anything else is linked (`[[…]]`). */
 const EMBEDDED = new Set([
   ...['png', 'jpg', 'jpeg', 'gif', 'webp', 'avif', 'svg', 'bmp', 'pdf'],
@@ -206,8 +229,13 @@ async function pasteImages(view: EditorView, files: File[]) {
   const inserted: string[] = [];
   track(1);
   try {
-    for (const file of files) {
-      const name = pastedName(new Date(), file.type)!;
+    for (const pasted of files) {
+      const file = PASTE_TYPES[pasted.type] ? pasted : await toPng(pasted);
+      if (!file) {
+        useToastStore.getState().push({ message: i18next.t('attach.cantPaste'), tone: 'error' });
+        continue;
+      }
+      const name = pastedName(new Date(), PASTE_TYPES[pasted.type] ? pasted.type : 'image/png')!;
       const res = await attachmentPaste(page, name, new Uint8Array(await file.arrayBuffer()));
       if (res.ok) inserted.push(embedFor(res.value.link));
       else useToastStore.getState().push({ message: errorMessage(res.error), tone: 'error' });
@@ -232,7 +260,7 @@ const pasteHandler = EditorView.domEventHandlers({
   paste(e, view) {
     const data = e.clipboardData;
     if (!data || data.types.includes('text/plain')) return false;
-    const files = [...data.files].filter((f) => PASTE_TYPES[f.type]);
+    const files = [...data.files].filter((f) => PASTE_TYPES[f.type] || convertible(f.type));
     if (!files.length) return false;
     e.preventDefault();
     void pasteImages(view, files);

@@ -1,4 +1,10 @@
-import { acceptCompletion, CompletionContext, startCompletion } from '@codemirror/autocomplete';
+import {
+  acceptCompletion,
+  closeCompletion,
+  CompletionContext,
+  completionStatus,
+  startCompletion,
+} from '@codemirror/autocomplete';
 import { EditorSelection, EditorState } from '@codemirror/state';
 import { EditorView } from '@codemirror/view';
 import { act } from '@testing-library/react';
@@ -182,5 +188,90 @@ describe('in the editor (M2c §6)', () => {
     });
     expect(v.state.doc.toString()).toBe('See [[rex-draft|Generator Rex]]');
     expect(acceptCompletion(v)).toBe(false);
+  });
+});
+
+describe('the search line and debounce (M4b §4)', () => {
+  const open = async (doc: string) => {
+    const v = editor(doc);
+    act(() => {
+      startCompletion(v);
+    });
+    await vi.waitFor(() =>
+      expect(document.querySelector('.cm-tooltip-autocomplete .cm-nimw-search')).not.toBeNull(),
+    );
+    return v;
+  };
+
+  it('the list opens with what was typed and how many pages match', async () => {
+    mockIPC(() => [REX, COVER]);
+    await open('See [[gen');
+    const line = document.querySelector('.cm-nimw-search')!;
+    expect(line).toHaveTextContent('Search: gen');
+    expect(line).toHaveTextContent('2 matches');
+    expect(line).toHaveAttribute('aria-hidden', 'true');
+    // Read out politely instead (the line is part of the list's visuals).
+    await vi.waitFor(() =>
+      expect(document.querySelector('[data-nimw-status]')).toHaveTextContent('2 matches for “gen”'),
+    );
+  });
+
+  it('with nothing typed yet it says to type to filter', async () => {
+    mockIPC(() => [REX]);
+    await open('See [[');
+    expect(document.querySelector('.cm-nimw-search')).toHaveTextContent('Type to filter');
+    expect(document.querySelector('.cm-nimw-search')).toHaveTextContent('1 match');
+  });
+
+  it('typing quickly asks Rust once, for the last text (80 ms debounce)', async () => {
+    const queries: string[] = [];
+    mockIPC((cmd, args) => {
+      if (cmd === 'link_suggest') queries.push((args as { query: string }).query);
+      return [REX];
+    });
+    const v = editor('See [[');
+    act(() => {
+      startCompletion(v);
+    });
+    for (const ch of ['g', 'e', 'n']) {
+      act(() =>
+        v.dispatch({
+          changes: { from: v.state.doc.length, insert: ch },
+          selection: { anchor: v.state.doc.length + 1 },
+          userEvent: 'input.type',
+        }),
+      );
+      await act(() => new Promise((r) => setTimeout(r, 20)));
+    }
+    await vi.waitFor(() =>
+      expect(document.querySelector('.cm-nimw-search')).toHaveTextContent('gen'),
+    );
+    expect(queries).toEqual(['gen']);
+  });
+
+  it('review focus: Escape while the query waits leaves the list closed and asks Rust nothing', async () => {
+    const queries: string[] = [];
+    mockIPC((cmd, args) => {
+      if (cmd === 'link_suggest') queries.push((args as { query: string }).query);
+      return [REX];
+    });
+    const v = editor('See [[');
+    act(() => {
+      startCompletion(v);
+    });
+    act(() =>
+      v.dispatch({
+        changes: { from: v.state.doc.length, insert: 'g' },
+        selection: { anchor: v.state.doc.length + 1 },
+        userEvent: 'input.type',
+      }),
+    );
+    act(() => {
+      closeCompletion(v);
+    });
+    await act(() => new Promise((r) => setTimeout(r, 200)));
+    expect(completionStatus(v.state)).toBeNull();
+    expect(document.querySelector('.cm-tooltip-autocomplete')).toBeNull();
+    expect(queries).toEqual([]);
   });
 });

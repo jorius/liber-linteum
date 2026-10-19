@@ -24,7 +24,7 @@ import { toSafeHast, vaultJoin } from '../../markdown/sanitize';
 import type { Embed, ParsedPage, WikiLink } from '../../markdown/types';
 import { rangeOf } from '../../markdown/walk';
 import { followLink } from '../../stores/links';
-import { CheckboxWidget, PreviewWidget } from './widgets';
+import { CheckboxWidget, CodeBadgeWidget, InlineMathWidget, PreviewWidget } from './widgets';
 
 import { LARGE_NOTE_CHARS } from './limits';
 import { safeDecode } from '../../markdown/decode';
@@ -64,7 +64,7 @@ const MARKS = {
 };
 const lineClass = (cls: string) => Decoration.line({ class: cls });
 
-const BLOCK_WIDGET = new Set(['table', 'callout', 'columns', 'thematicBreak']);
+const BLOCK_WIDGET = new Set(['table', 'callout', 'columns', 'thematicBreak', 'math']);
 const TASK = /^(\s*(?:[-*+]|\d+[.)])[ \t]+)\[([ xX])\]/;
 
 /** Whether an HTML block renders nothing once sanitized (comments, scripts):
@@ -203,9 +203,39 @@ function build(state: EditorState, page: ParsedPage, active: Set<number>): Decor
       case 'tag':
         if (!reduced && from < to) out.push(MARKS.tag.range(from, to));
         return;
-      case 'code':
-        if (!reduced) lines(from, to, lineClass('cm-nimw-codeblock'));
+      case 'inlineMath': {
+        // M4b part 2 §3: maths renders unless the cursor is on its line.
+        if (!reduced && !touched(from, to)) {
+          const tex = (node as unknown as { value: string }).value;
+          out.push(Decoration.replace({ widget: new InlineMathWidget(tex) }).range(from, to));
+        }
         return;
+      }
+      case 'code': {
+        if (reduced) return;
+        // M4b part 2 §4: a diagram off the cursor is drawn as a block widget.
+        if (
+          (node as unknown as { lang?: string }).lang?.toLowerCase() === 'mermaid' &&
+          !touched(from, to)
+        ) {
+          blockWidget(node);
+          return;
+        }
+        lines(from, to, lineClass('cm-nimw-codeblock'));
+        // M4b part 2 §2: a fenced block's language badge and Copy button.
+        const first = doc.lineAt(from);
+        const fence = /^\s*(`{3,}|~{3,})(\S*)/.exec(first.text);
+        if (fence && !touched(from, to) && first.number < doc.lineAt(to).number) {
+          const body = text(first.to + 1, doc.lineAt(Math.min(to, doc.length)).from);
+          const code = body.endsWith('\n') ? body.slice(0, -1) : body;
+          out.push(
+            Decoration.widget({ widget: new CodeBadgeWidget(fence[2], code), side: 1 }).range(
+              first.to,
+            ),
+          );
+        }
+        return;
+      }
       case 'yaml':
         lines(from, to, lineClass('cm-nimw-frontmatter'));
         return;
@@ -281,6 +311,15 @@ const model = StateField.define<Model>({
   },
   provide: (f) => EditorView.decorations.from(f, (m) => m.decos),
 });
+
+/** Live Preview's model of `state`'s page when it is up to date with `text`
+ *  (the outline and the word count read it rather than parse the page again,
+ *  final review M3); `null` without Live Preview or while it lags. Read
+ *  only: the page stays Live Preview's to re-parse. */
+export function livePreviewPage(state: EditorState, text: string): ParsedPage | null {
+  const m = state.field(model, false);
+  return m && !m.stale && m.text === text ? m.page : null;
+}
 
 /** Brings the model up to date now (instead of after the debounce). */
 function refresh(view: EditorView): Model {
@@ -432,6 +471,22 @@ const theme = EditorView.baseTheme({
   // Rendered HTML, not editor text: CodeMirror's pre-wrapped whitespace would
   // turn the renderer's newlines into blank lines.
   '.cm-nimw-widget': { padding: '4px 0', cursor: 'default', whiteSpace: 'normal' },
+  '.cm-nimw-codebadge': {
+    display: 'inline-flex',
+    gap: '6px',
+    marginLeft: '10px',
+    verticalAlign: 'middle',
+    fontFamily: 'var(--font-body)',
+  },
+  '.cm-nimw-codebadge button': {
+    font: '600 11.5px var(--font-body)',
+    padding: '1px 8px',
+    borderRadius: '999px',
+    border: '1px solid var(--color-border-strong)',
+    background: 'var(--color-surface)',
+    color: 'var(--color-text-body)',
+    cursor: 'pointer',
+  },
   '.cm-nimw-checkbox': { margin: '0 4px 0 0', verticalAlign: 'middle', cursor: 'pointer' },
 });
 

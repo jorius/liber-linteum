@@ -119,7 +119,10 @@ describe('Preview: every node type (M2a §4)', () => {
     const callout = screen.getByText('Careful').closest('details')!;
     expect(callout).toHaveAttribute('data-callout', 'warning');
     expect(callout).not.toHaveAttribute('open');
-    expect(screen.getByText('let x = 1;').closest('pre')).not.toBeNull();
+    // Highlighted (M4b part 2 §2): the code reads whole across its spans.
+    expect([...document.querySelectorAll('pre code')].map((c) => c.textContent)).toContain(
+      'let x = 1;\n',
+    );
     expect(screen.getByRole('table')).toHaveTextContent('12');
     const columns = screen.getByText('left').closest('[data-nimw="columns"]')!;
     expect(within(columns as HTMLElement).getByText('right')).toBeInTheDocument();
@@ -309,5 +312,83 @@ describe('heading anchors (M2c §6.2)', () => {
     usePageStore.setState({ anchor: { heading: 'Pipes and carets', nonce: 1 } });
     show('# Top\n\n## Pipes | and ^carets\n\nbody\n');
     await waitFor(() => expect(scrolled).toEqual(['Pipes | and ^carets']));
+  });
+});
+
+describe('Preview: code blocks (M4b part 2 §2)', () => {
+  it('a fenced block is highlighted by its language and shows its label', async () => {
+    show('```js\nconst answer = 42; // why\n```\n\n```\nplain\n```\n');
+    const keyword = await screen.findByText('const');
+    expect(keyword).toHaveClass('hljs-keyword');
+    expect(screen.getByText('42')).toHaveClass('hljs-number');
+    expect(screen.getByText('// why')).toHaveClass('hljs-comment');
+    // Unknown or missing languages stay plain text.
+    expect(screen.getByText('plain').querySelector('[class^="hljs"]')).toBeNull();
+    expect(screen.getByText('JavaScript')).toBeInTheDocument();
+  });
+
+  it('an unknown language is shown as written and not highlighted', async () => {
+    show('```klingon\nqapla\n```\n');
+    expect(await screen.findByText('qapla')).not.toHaveClass(/hljs/);
+    expect(screen.getByText('klingon')).toBeInTheDocument();
+  });
+});
+
+describe('Preview: copying code (M4b part 2 §2)', () => {
+  it('Copy puts the block code on the clipboard', async () => {
+    const writeText = vi.fn(() => Promise.resolve());
+    Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true });
+    show('```py\nprint(1)\n```\n');
+    await userEvent.click(await screen.findByRole('button', { name: 'Copy code' }));
+    expect(writeText).toHaveBeenCalledWith('print(1)\n');
+    await vi.waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Copy code' })).toHaveTextContent('Copied'),
+    );
+  });
+
+  it('final review M7: screen readers hear it copied, or that it couldn’t', async () => {
+    const writeText = vi.fn(() => Promise.resolve());
+    Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true });
+    show('```py\nprint(1)\n```\n');
+    const said = () => screen.queryAllByRole('status').map((s) => s.textContent?.trim());
+    await userEvent.click(await screen.findByRole('button', { name: 'Copy code' }));
+    await waitFor(() => expect(said()).toContain('Copied'));
+    writeText.mockImplementationOnce(() => Promise.reject(new Error('denied')));
+    await userEvent.click(screen.getByRole('button', { name: 'Copy code' }));
+    await waitFor(() => expect(said()).toContain('Couldn’t copy'));
+    expect(screen.getByRole('button', { name: 'Copy code' })).toHaveTextContent('Couldn’t copy');
+  });
+});
+
+describe('Preview: maths (M4b part 2 §3)', () => {
+  it('renders inline and display maths with KaTeX, MathML included', async () => {
+    const { container } = show('Inline $x^2$ here.\n\n$$\n\\frac{a}{b}\n$$\n');
+    await waitFor(() => expect(container.querySelectorAll('.katex').length).toBe(2));
+    expect(container.querySelector('.katex-display')).not.toBeNull();
+    expect(container.querySelectorAll('math').length).toBe(2);
+  });
+
+  it('broken TeX shows its source with the error, never a crash', async () => {
+    const { container } = show('Bad $\\frac{a$ maths.\n');
+    await waitFor(() => expect(container.querySelector('.katex-error')).not.toBeNull());
+    expect(container.querySelector('.katex-error')!.textContent).toContain('\\frac{a');
+  });
+});
+
+describe('Preview: diagrams (M4b part 2 §4)', () => {
+  it('a ```mermaid fence becomes a diagram, not a code block', async () => {
+    show('```mermaid\ngraph TD; A-->B\n```\n');
+    // jsdom can't lay SVG out, so Mermaid may answer with its error box:
+    // either way the fence is drawn as a diagram, never as code.
+    await waitFor(
+      () =>
+        expect(
+          document.querySelector(
+            '[aria-label="Diagram: graph TD; A-->B"], [aria-label="Diagram that couldn’t be drawn"], [aria-label="Diagram that couldn\'t be drawn"]',
+          ),
+        ).not.toBeNull(),
+      { timeout: 4000 },
+    );
+    expect(screen.queryByRole('button', { name: 'Copy code' })).not.toBeInTheDocument();
   });
 });

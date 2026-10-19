@@ -26,6 +26,9 @@ export const DEFAULT_SETTINGS: Settings = {
   fontSize: 15,
   toolbar: true,
   lineNumbers: false,
+  pageWidth: 'readable',
+  outline: false,
+  coverHeight: 200,
   globalViewMode: 'drill',
   globalViewEdges: { links: true, tree: true, manual: true, aggregated: true },
 };

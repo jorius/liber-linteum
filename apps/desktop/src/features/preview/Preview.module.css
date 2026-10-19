@@ -301,3 +301,127 @@ summary.calloutTitle {
   color: var(--color-text-muted);
   font: 400 14px/1.5 var(--font-body);
 }
+
+/* Code blocks (M4b part 2 §2): the language above the code; highlight.js
+   classes drawn with the palette's --code-* tokens. */
+.codeBlock {
+  margin: 0 0 1em;
+}
+
+.codeBlock > pre {
+  margin: 0;
+}
+
+.codeHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 4px 10px;
+  border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+  background: var(--color-code-bg);
+  border-bottom: 1px solid var(--color-border);
+  font: 600 11.5px var(--font-body);
+  color: var(--code-punct);
+}
+
+.codeBlock :global(.hljs-keyword),
+.codeBlock :global(.hljs-literal),
+.codeBlock :global(.hljs-tag),
+.codeBlock :global(.hljs-name),
+.codeBlock :global(.hljs-selector-tag),
+.codeBlock :global(.hljs-section) {
+  color: var(--code-keyword);
+}
+
+.codeBlock :global(.hljs-string),
+.codeBlock :global(.hljs-regexp),
+.codeBlock :global(.hljs-addition) {
+  color: var(--code-string);
+}
+
+.codeBlock :global(.hljs-number),
+.codeBlock :global(.hljs-symbol),
+.codeBlock :global(.hljs-bullet) {
+  color: var(--code-number);
+}
+
+.codeBlock :global(.hljs-comment),
+.codeBlock :global(.hljs-quote),
+.codeBlock :global(.hljs-doc) {
+  color: var(--code-comment);
+  font-style: italic;
+}
+
+.codeBlock :global(.hljs-title),
+.codeBlock :global(.hljs-built_in),
+.codeBlock :global(.hljs-property),
+.codeBlock :global(.hljs-attr) {
+  color: var(--code-function);
+}
+
+.codeBlock :global(.hljs-type),
+.codeBlock :global(.hljs-title.class_),
+.codeBlock :global(.hljs-attribute),
+.codeBlock :global(.hljs-selector-class) {
+  color: var(--code-type);
+}
+
+.codeBlock :global(.hljs-meta),
+.codeBlock :global(.hljs-deletion) {
+  color: var(--code-meta);
+}
+
+.codeBlock :global(.hljs-variable),
+.codeBlock :global(.hljs-params),
+.codeBlock :global(.hljs-subst),
+.codeBlock :global(.hljs-template-variable) {
+  color: var(--code-variable);
+}
+
+.codeBlock :global(.hljs-punctuation),
+.codeBlock :global(.hljs-operator) {
+  color: var(--code-punct);
+}
+
+.codeCopy {
+  font: 600 11.5px var(--font-body);
+  padding: 1px 8px;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--color-border-strong);
+  background: var(--color-surface);
+  color: var(--color-text-body);
+  cursor: pointer;
+}
+
+/* Mermaid diagrams (M4b part 2 §4). */
+.diagram {
+  margin: 0 0 1em;
+  overflow-x: auto;
+  text-align: center;
+}
+
+.diagram :global(svg) {
+  max-width: 100%;
+  height: auto;
+}
+
+.diagramError {
+  margin: 0 0 1em;
+  padding: 8px 12px;
+  border: 1px dashed var(--color-border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--color-code-bg);
+  color: var(--color-text-muted);
+}
+
+.diagramError pre {
+  margin: 0 0 6px;
+  font: 400 12.5px var(--font-source);
+  white-space: pre-wrap;
+}
+
+.diagramError p {
+  margin: 0;
+  font-size: 12.5px;
+}

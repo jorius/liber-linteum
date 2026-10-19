@@ -118,6 +118,7 @@ fn macos_menu_quit_is_ours_and_the_standard_items_stay() {
         "Forward",
         "Toggle Formatting Toolbar",
         "Toggle Line Numbers",
+        "Toggle Outline",
         "Editor",
         "Global View",
     ] {
@@ -204,7 +205,7 @@ fn back_and_forward_items_emit_menu_navigate() {
 }
 
 /// M2b feedback round: View → Toggle Formatting Toolbar / Toggle Line Numbers
-/// tell the page which setting to flip.
+/// (and Toggle Outline, M4b part 2 §5) tell the page which setting to flip.
 fn toggle_items_emit_menu_toggle() {
     use tauri::Listener;
     let got: Arc<std::sync::Mutex<Vec<String>>> = Arc::default();
@@ -218,6 +219,7 @@ fn toggle_items_emit_menu_toggle() {
             for id in [
                 nimw_desktop::menu::TOOLBAR_ID,
                 nimw_desktop::menu::LINE_NUMBERS_ID,
+                nimw_desktop::menu::OUTLINE_ID,
             ] {
                 nimw_desktop::menu::on_menu_event(
                     handle,
@@ -233,7 +235,11 @@ fn toggle_items_emit_menu_toggle() {
     });
     assert_eq!(
         *got.lock().unwrap(),
-        ["\"toolbar\"".to_string(), "\"lineNumbers\"".into()]
+        [
+            "\"toolbar\"".to_string(),
+            "\"lineNumbers\"".into(),
+            "\"outline\"".into()
+        ]
     );
 }
 

@@ -45,12 +45,12 @@ function Confirm({
         </p>
       )}
       <div className={styles.buttons}>
-        <button type="button" className={styles.button} onClick={onClose}>
+        <button type="button" className="btn btn-secondary" onClick={onClose}>
           {t('dialogs.cancel')}
         </button>
         <button
           type="button"
-          className={`${styles.button} ${styles.primary}`}
+          className="btn btn-primary"
           disabled={Boolean(error)}
           onClick={() => {
             onClose();

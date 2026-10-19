@@ -114,6 +114,11 @@ pub fn configure<R: tauri::Runtime>(
         gv_commands::layout_set,
         gv_commands::link_target,
         gv_commands::index_pick_set,
+        attachment_commands::page_width_set,
+        editor_commands::text_read,
+        editor_commands::text_write,
+        vault_commands::entry_create_text,
+        attachment_commands::cover_height_set,
     ])
 }
 

@@ -6,6 +6,7 @@ export function installIpcMock({
   editorMode,
   settings: overrides = {},
   remoteCover = true,
+  files: vaultFiles = [],
 }: {
   pages: Record<string, string>;
   editorMode: string;
@@ -13,12 +14,14 @@ export function installIpcMock({
   settings?: Record<string, unknown>;
   /** Pages without a `cover:` get a remote one (the zero-network check). */
   remoteCover?: boolean;
+  /** Vault files other than pages from the start (e.g. a cover image). */
+  files?: string[];
 }) {
   type Args = Record<string, unknown>;
   const w = window as unknown as Record<string, unknown>;
   let nextId = 1;
   /** Vault files other than pages (pasted, dropped, covers). */
-  const files = new Set<string>();
+  const files = new Set<string>(vaultFiles);
   /** `listen` registrations, so tests can emit events (e.g. tauri://drag-drop). */
   const listeners: { event: string; handler: number; id: number }[] = [];
   w.__nimwEmit = (event: string, payload: unknown) => {
@@ -124,6 +127,31 @@ export function installIpcMock({
     editorMode,
     ...overrides,
   };
+  const widths = (): Record<string, string> => {
+    try {
+      return JSON.parse(sessionStorage.getItem('nimwMockWidths') ?? '{}') as Record<string, string>;
+    } catch {
+      return {};
+    }
+  };
+  /** Cover resize: page cover heights, kept like the widths. */
+  const heights = (): Record<string, number> => {
+    try {
+      return JSON.parse(sessionStorage.getItem('nimwMockHeights') ?? '{}') as Record<
+        string,
+        number
+      >;
+    } catch {
+      return {};
+    }
+  };
+  const vaultSettings = () => ({
+    attachments: { mode: 'subfolder', path: 'attachments' },
+    obsidian: null,
+    pageWidth: null,
+    pageWidths: widths(),
+    coverHeights: heights(),
+  });
   const handlers: Record<string, (a: Args, options?: unknown) => unknown> = {
     app_info: () => ({ name: 'Notes In My Way', version: '0.0.0-e2e' }),
     settings_get: () => ({ settings }),
@@ -154,7 +182,11 @@ export function installIpcMock({
         durationMs: 1,
       },
     }),
-    vault_tree: () => Object.keys(pages).map((path) => ({ path, kind: 'page' })),
+    vault_tree: () =>
+      Object.keys(pages).map((path) => ({
+        path,
+        kind: /\.md$/i.test(path) ? 'page' : 'attachment',
+      })),
     page_get: (a) => page(a.path as string),
     page_read: (a) => ({ text: pages[a.path as string], hash: 'h' }),
     page_write: (a) => {
@@ -162,6 +194,13 @@ export function installIpcMock({
       ((w.__nimwWrites ??= []) as unknown[]).push(a);
       pages[a.path as string] = a.text as string;
       // A new hash per write: the header refreshes when the hash changes.
+      return { hash: `h${nextId++}` };
+    },
+    // ---- M4b part 2: text files (§6) ----
+    text_read: (a) => ({ text: pages[a.path as string], hash: 'h' }),
+    text_write: (a) => {
+      ((w.__nimwWrites ??= []) as unknown[]).push(a);
+      pages[a.path as string] = a.text as string;
       return { hash: `h${nextId++}` };
     },
     backlink_count: () => 0,
@@ -185,10 +224,25 @@ export function installIpcMock({
       return null;
     },
     // ---- M2c (spec §7) ----
-    vault_settings_get: () => ({
-      attachments: { mode: 'subfolder', path: 'attachments' },
-      obsidian: null,
-    }),
+    vault_settings_get: () => vaultSettings(),
+    // M4b part 2 §1: kept in sessionStorage, so a reload still has them.
+    page_width_set: (a) => {
+      const next = { ...widths() };
+      if (a.width) next[a.path as string] = a.width as string;
+      else delete next[a.path as string];
+      sessionStorage.setItem('nimwMockWidths', JSON.stringify(next));
+      return vaultSettings();
+    },
+    // Cover resize: clamped like Rust (132–2000), kept across a reload.
+    cover_height_set: (a) => {
+      const next = { ...heights() };
+      const height = a.height as number | null;
+      if (height === null) delete next[a.path as string];
+      else next[a.path as string] = Math.min(2000, Math.max(132, Math.round(height)));
+      sessionStorage.setItem('nimwMockHeights', JSON.stringify(next));
+      ((w.__nimwCoverHeights ??= []) as unknown[]).push({ path: a.path, height });
+      return vaultSettings();
+    },
     vault_settings_set: (a) => (a.patch as { attachments: unknown }) ?? null,
     attachment_paste: (_a, options) => {
       const headers = (options as { headers?: Record<string, string> })?.headers ?? {};

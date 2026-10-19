@@ -132,6 +132,8 @@ interface GvState {
   focus: string | null;
   /** Connect mode (M3b §2): the card a relationship starts from. */
   connectFrom: GvCard | null;
+  /** "Connect cards" (M4b §6): the next card picked becomes `connectFrom`. */
+  connectPick: boolean;
   loaded: boolean;
   /** Reads what the canvas shows: levels (falling back from deleted ones;
    *  any other failure keeps what is shown), edges and pinned positions. */
@@ -153,6 +155,8 @@ interface GvState {
   setFocus: (path: string | null) => void;
   /** "Connect to…": the next card picked completes the relationship. */
   startConnect: (card: GvCard) => void;
+  /** The toolbar's Connect cards: pick the source card first (M4b §6). */
+  startConnectPick: () => void;
   cancelConnect: () => void;
   /** A card picked in connect mode (click, Enter). */
   completeConnect: (target: GvCard) => Promise<void>;
@@ -289,6 +293,7 @@ export const useGvStore = create<GvState>((set, get) => {
 
   return {
     connectFrom: null,
+    connectPick: false,
     stack: [{ kind: 'vault' }],
     expanded: [],
     levels: {},
@@ -364,6 +369,13 @@ export const useGvStore = create<GvState>((set, get) => {
     open: async (card) => {
       // Connect mode: a click picks the other card (no navigation, M3b §2).
       if (get().connectFrom) return get().completeConnect(card);
+      // Connect cards: this card is the one to connect from (M4b §6).
+      // A folder without an index note can't be picked: the mode stays on.
+      if (get().connectPick) {
+        get().startConnect(card);
+        if (get().connectFrom) set({ connectPick: false });
+        return;
+      }
       if (mode() === 'drill') {
         // The page this level is about: already open (final review m2).
         if (card.path === get().canvas.centre) return;
@@ -382,7 +394,7 @@ export const useGvStore = create<GvState>((set, get) => {
       return get().load();
     },
     back: async (i) => {
-      set({ connectFrom: null });
+      set({ connectFrom: null, connectPick: false });
       const stack = get().stack.slice(0, Math.max(1, i + 1));
       // A level is opened from the card of the same path: the keyboard goes
       // back to it (final review m13).
@@ -392,7 +404,7 @@ export const useGvStore = create<GvState>((set, get) => {
       return get().load();
     },
     up: async (path) => {
-      if (get().connectFrom) return get().cancelConnect();
+      if (get().connectFrom || get().connectPick) return get().cancelConnect();
       if (mode() === 'expand') {
         const ref = get().expanded.find((r) => r.kind !== 'vault' && r.path === path);
         const card = get().canvas.cards.find((c) => c.path === path);
@@ -402,7 +414,7 @@ export const useGvStore = create<GvState>((set, get) => {
       if (get().stack.length > 1) return get().back(get().stack.length - 2);
     },
     modeChanged: async () => {
-      set({ expanded: [], focus: null, connectFrom: null });
+      set({ expanded: [], focus: null, connectFrom: null, connectPick: false });
       return get().load();
     },
     entryDir: () => {
@@ -452,7 +464,8 @@ export const useGvStore = create<GvState>((set, get) => {
       if (needsIndex(card)) return;
       set({ connectFrom: card, focus: card.path });
     },
-    cancelConnect: () => set({ connectFrom: null }),
+    startConnectPick: () => set({ connectPick: true, connectFrom: null }),
+    cancelConnect: () => set({ connectFrom: null, connectPick: false }),
     completeConnect: async (target) => {
       const from = get().connectFrom;
       // Itself, or the same page: connect mode simply stays on (§2).
@@ -477,6 +490,7 @@ export const useGvStore = create<GvState>((set, get) => {
       shownAt = null;
       set({
         connectFrom: null,
+        connectPick: false,
         stack: [{ kind: 'vault' }],
         expanded: [],
         levels: {},

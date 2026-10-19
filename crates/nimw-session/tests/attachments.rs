@@ -176,7 +176,7 @@ fn m2c_attachment_settings_respect_obsidian_and_validate_names() {
         s.attachment_settings().obsidian.as_deref(),
         Some("./assets")
     );
-    let err = s.set_attachment_settings("same", "").unwrap_err();
+    let err = s.set_attachment_settings("same", "", None).unwrap_err();
     assert!(matches!(err, SessionError::NotPermitted(_)), "{err:?}");
 
     let vault = tempfile::tempdir().unwrap();
@@ -187,13 +187,14 @@ fn m2c_attachment_settings_respect_obsidian_and_validate_names() {
         ("folder", "Media/x:y"),
         ("folder", ""),
     ] {
-        let err = s.set_attachment_settings(mode, path).unwrap_err();
+        let err = s.set_attachment_settings(mode, path, None).unwrap_err();
         assert!(
             matches!(err, SessionError::InvalidName(_)),
             "{mode} {path}: {err:?}"
         );
     }
-    s.set_attachment_settings("folder", "Media/Img").unwrap();
+    s.set_attachment_settings("folder", "Media/Img", None)
+        .unwrap();
     let settings = s.attachment_settings();
     assert_eq!(
         (settings.mode.as_str(), settings.path.as_str()),

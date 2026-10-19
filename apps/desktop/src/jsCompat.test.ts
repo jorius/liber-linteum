@@ -24,6 +24,9 @@ const NEWER: [RegExp, string][] = [
   [/\(\?<[=!]/, 'regex lookbehind (16.4)'],
   [/\b(Object|Map)\.groupBy\(/, 'Object.groupBy (17.4)'],
   [/\bPromise\.withResolvers\(/, 'Promise.withResolvers (17.4)'],
+  // Library calls known to reach one of the above (src/safari15Startup.test.tsx
+  // loads the whole startup graph that way).
+  [/\bcreateLowlight\(\s*[^)\s]/, "lowlight's map form, Object.hasOwn (15.4)"],
 ];
 
 /** Files whose offenders are being fixed elsewhere. Each must still have one
@@ -60,6 +63,12 @@ describe('TypeScript on the Safari 15 floor', () => {
       .filter((file) => !PENDING.has(file.slice(src.length)))
       .flatMap(offenders);
     expect(found).toEqual([]);
+  });
+
+  it("flags lowlight's map form, which calls Object.hasOwn (final review C1)", () => {
+    const flagged = (line: string) => NEWER.some(([re]) => re.test(line));
+    expect(flagged('const lowlight = createLowlight(common);')).toBe(true);
+    expect(flagged('const lowlight = createLowlight();')).toBe(false);
   });
 
   it('the pending list holds only files that still need it', () => {

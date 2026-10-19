@@ -13,7 +13,15 @@ export function PageSubtitle({ page, editable }: { page: Page; editable: boolean
   const [draft, setDraft] = useState(current);
   useEffect(() => setDraft(current), [current]);
 
-  if (!editable) return current ? <p className={styles.subtitle}>{current}</p> : null;
+  // A subtitle longer than the top bar ends in an ellipsis; the tooltip has
+  // it whole (final review M9).
+  if (!editable) {
+    return current ? (
+      <p className={styles.subtitle} title={current}>
+        {current}
+      </p>
+    ) : null;
+  }
 
   const commit = () => {
     const value = draft.replace(/\s*\n\s*/g, ' ').trim();
@@ -37,6 +45,7 @@ export function PageSubtitle({ page, editable }: { page: Page; editable: boolean
       className={styles.subtitleInput}
       aria-label={t('page.subtitleLabel')}
       placeholder={t('page.subtitlePlaceholder')}
+      title={draft || undefined}
       value={draft}
       onChange={(e) => setDraft(e.target.value)}
       onKeyDown={onKeyDown}

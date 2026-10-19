@@ -198,6 +198,19 @@ pub(crate) fn entry_create_page_impl(
         .to_string())
 }
 
+/// An empty text file `name` in `dir` (final review I6: "Save as new" for a
+/// text file deleted outside the app keeps its type).
+pub(crate) fn entry_create_text_impl(
+    state: &AppState,
+    dir: String,
+    name: String,
+) -> CmdResult<String> {
+    Ok(state
+        .session()?
+        .create_text_file(&dir_path(&dir)?, &name)?
+        .to_string())
+}
+
 pub(crate) fn entry_create_folder_impl(
     state: &AppState,
     parent: String,
@@ -265,6 +278,18 @@ pub async fn entry_create_page<R: Runtime>(
 ) -> CmdResult<String> {
     blocking(app, move |app| {
         entry_create_page_impl(&app.state::<AppState>(), dir, name)
+    })
+    .await
+}
+
+#[tauri::command]
+pub async fn entry_create_text<R: Runtime>(
+    app: AppHandle<R>,
+    dir: String,
+    name: String,
+) -> CmdResult<String> {
+    blocking(app, move |app| {
+        entry_create_text_impl(&app.state::<AppState>(), dir, name)
     })
     .await
 }

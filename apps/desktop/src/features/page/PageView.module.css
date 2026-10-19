@@ -19,37 +19,60 @@
   flex-direction: column;
 }
 
-.header {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  padding: 16px 40px 12px;
-  border-bottom: 1px solid var(--color-border);
-}
-
+/* The band's first row: the breadcrumb and the controls share one line, so
+   the band keeps its height (final review M9); a long path is shortened
+   with an ellipsis rather than taking lines of its own. */
 .bar {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  flex-wrap: wrap;
   gap: 8px 16px;
 }
 
 .controls {
   display: flex;
+  flex: none;
+  /* Room for 8 rem of breadcrumb, whatever its length. */
+  max-width: calc(100% - 9rem);
   align-items: center;
-  gap: 12px;
+  /* Saved, the word count and the toggles wrap in a narrow window rather
+     than widen the page (M4b part 2 §5). */
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px 12px;
+}
+
+.breadcrumb {
+  min-width: 0;
 }
 
 .breadcrumb ol {
   list-style: none;
   display: flex;
-  flex-wrap: wrap;
   align-items: center;
   margin: 0;
   padding: 0;
   font-size: 13px;
   color: var(--color-text-muted);
+}
+
+.breadcrumb li {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
+
+/* The vault keeps its name (up to a point); folders and the page shorten. */
+.breadcrumb li:first-child {
+  flex-shrink: 0;
+  max-width: 10rem;
+}
+
+.breadcrumb li > * {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .breadcrumb li + li::before {
@@ -79,9 +102,16 @@
   padding: 2px 4px;
 }
 
-.status {
+.status,
+.count {
   font-size: 12.5px;
   color: var(--color-text-muted);
+}
+
+/* Word count (M4b part 2 §5): digits that don't jiggle while typing. */
+.count {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
 }
 
 .modes {
@@ -96,6 +126,9 @@
 .mode,
 .modeOn {
   position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
   font: 600 12.5px var(--font-body);
   padding: 4px 10px;
   border-radius: var(--radius-sm);
@@ -133,14 +166,72 @@
   white-space: nowrap;
 }
 
-/* Cover band (M2c §2): image, placeholder or reposition slider, with the
-   buttons at the bottom right (shown on hover and keyboard focus). */
-.coverBand {
+/* The header band (M4b §1): one compact strip under the top bar. With a
+   cover, the image is its background and the rows sit on it in pills of
+   translucent surface (--color-surface-veil), readable on any image; without
+   one the band is just its two rows. A cover band is --cover-height tall
+   (cover resize: the page's own height or the app's default, 132 px at
+   least), its first row pinned to the top and its second to the bottom. */
+.band {
   position: relative;
-  height: 200px;
-  border-radius: var(--radius-lg);
-  overflow: hidden;
+  flex: none;
+  border-bottom: 1px solid var(--color-border);
+  background: var(--color-surface);
+}
+
+.bandCover {
+  min-height: var(--cover-height, 132px);
   background: var(--color-surface-subtle);
+}
+
+.bandRows {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 40px;
+}
+
+.bandCover .bandRows {
+  box-sizing: border-box;
+  min-height: var(--cover-height, 132px);
+  justify-content: space-between;
+}
+
+/* On the veil, muted text would fall to about 4:1 over a dark or bright
+   cover: it takes the body colour (M4b review focus). */
+.bandCover .pill {
+  --color-text-muted: var(--color-text-body);
+  background: var(--color-surface-veil);
+  border-radius: var(--radius-md);
+  padding: 4px 10px;
+  box-shadow: 0 1px 3px rgb(0 0 0 / 0.08);
+}
+
+.bandFoot {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+}
+
+.facts {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  min-width: 0;
+}
+
+/* The cover behind the rows: the image, a slider while repositioning, or a
+   muted band saying why there is none. */
+.coverLayer {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
 }
 
 .cover {
@@ -151,12 +242,7 @@
   user-select: none;
 }
 
-.coverFrame {
-  height: 100%;
-}
-
 .coverSlider {
-  height: 100%;
   cursor: ns-resize;
   touch-action: none;
 }
@@ -172,55 +258,123 @@
   height: 100%;
   margin: 0;
   color: var(--color-text-muted);
-  font-size: 14px;
+  font-size: 13px;
 }
 
+/* Change / Reposition / Remove at the band's bottom right, shown on hover
+   and keyboard focus (separate rules: WebKit before 15.4 drops a selector
+   list holding :focus-within/:focus-visible). They sit over the band, not
+   in a row of their own, so it keeps its height (final review M9). */
 .coverControls {
   position: absolute;
-  right: 12px;
-  bottom: 12px;
+  right: 40px;
+  bottom: 10px;
+  z-index: 1;
   display: flex;
+  align-items: center;
   gap: 6px;
   opacity: 0;
   transition: opacity 120ms ease;
 }
 
-.coverBand:hover .coverControls,
-.coverBand:focus-within .coverControls {
+.band:hover .coverControls {
   opacity: 1;
 }
 
-.coverButton,
-.addCover {
-  height: 28px;
-  padding: 0 10px;
-  border: 1px solid var(--color-border-strong);
-  border-radius: var(--radius-sm);
+.coverControls:focus-within {
+  opacity: 1;
+}
+
+/* Cover resize: the band's bottom edge, a focusable separator. The strip
+   covers only the band's bottom padding (the rows' pills stay clickable);
+   its grip shows on hover, on focus and while dragging (separate rules, as
+   above). The ring is for the keyboard; a click that focuses it shows none
+   where :focus-visible is known. */
+.coverResize {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 10px;
+  cursor: ns-resize;
+  touch-action: none;
+  -webkit-user-select: none;
+  user-select: none;
+  opacity: 0;
+  transition: opacity 120ms ease;
+}
+
+.coverResize::before {
+  content: '';
+  width: 48px;
+  height: 4px;
+  border-radius: 2px;
   background: var(--color-surface);
-  color: var(--color-text-body);
-  font: 600 12.5px var(--font-body);
-  cursor: pointer;
+  box-shadow: 0 0 0 1px var(--color-border-strong);
 }
 
-.coverButton:hover,
-.addCover:hover {
-  border-color: var(--color-accent);
+.band:hover .coverResize {
+  opacity: 1;
 }
 
-.coverButton:focus-visible,
-.addCover:focus-visible {
+.coverResize[data-dragging] {
+  opacity: 1;
+}
+
+.coverResize:focus {
+  opacity: 1;
   outline: 2px solid var(--color-focus);
-  outline-offset: 2px;
+  outline-offset: -2px;
 }
 
+.coverResize:focus:not(:focus-visible) {
+  outline: none;
+}
+
+/* Repositioning: only the image and Save / Cancel; the image takes the
+   pointer through the rows. */
+.repositioning .coverControls {
+  opacity: 1;
+}
+
+.repositioning .bandRows {
+  pointer-events: none;
+}
+
+.repositioning .coverControls {
+  pointer-events: auto;
+}
+
+.repositioning .bar {
+  visibility: hidden;
+}
+
+.repositioning .facts {
+  visibility: hidden;
+}
+
+.repositionHint {
+  font-size: 12.5px;
+  color: var(--color-text);
+}
+
+.band .repositionHint {
+  background: var(--color-surface-veil);
+  border-radius: var(--radius-md);
+  padding: 4px 10px;
+}
+
+/* Add cover: in the first row, shown on hover and focus, always in the Tab
+   order. */
 .addCover {
-  align-self: flex-start;
   opacity: 0;
 }
 
-/* Separate rules: WebKit before 15.4 drops a whole selector list that holds
-   :focus-visible (final review M9). Any focus shows it, even there. */
-.header:hover .addCover {
+.band:hover .addCover {
   opacity: 1;
 }
 
@@ -228,24 +382,37 @@
   opacity: 1;
 }
 
+/* In the top bar (M4b §1): one compact line each for title and subtitle. */
 .title {
-  font: 700 32px/1.1 var(--font-display);
+  font: 700 20px/1.2 var(--font-display);
   color: var(--color-text-strong);
   margin: 0;
-  overflow-wrap: anywhere;
+  min-width: 0;
+  display: flex;
+  align-items: baseline;
+}
+
+/* A text file's extension, kept on rename (M4b part 2 §6). */
+.titleExt {
+  flex: none;
+  color: var(--color-text-muted);
+  font-weight: 400;
 }
 
 .subtitle {
   margin: 0;
-  font-size: 16px;
+  font-size: 13px;
   color: var(--color-text-body);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 /* Subtitle field (M2c §3): reads like the subtitle; the placeholder shows only
    on hover and focus. */
 .subtitleInput {
   font: inherit;
-  font-size: 16px;
+  font-size: 13px;
   color: var(--color-text-body);
   width: 100%;
   margin: 0 0 0 -6px;
@@ -254,6 +421,7 @@
   border-radius: var(--radius-sm);
   background: transparent;
   outline: 1px dashed transparent;
+  text-overflow: ellipsis;
 }
 
 .subtitleInput::placeholder {
@@ -279,7 +447,7 @@
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
-  margin: 4px 0 0;
+  margin: 0;
   padding: 0;
 }
 
@@ -321,16 +489,6 @@
   padding: 16px 40px;
 }
 
-.button {
-  font: 600 13px var(--font-body);
-  color: var(--color-accent-contrast);
-  background: var(--color-accent);
-  border: none;
-  border-radius: var(--radius-md);
-  padding: 8px 14px;
-  cursor: pointer;
-}
-
 /* Shows/hides the formatting toolbar (M2b §6). */
 .toolbarToggle {
   display: inline-flex;
@@ -363,6 +521,8 @@
 /* Back arrow + breadcrumb (M2b §3). */
 .where {
   display: flex;
+  /* Gives way: the path shortens before the controls wrap. */
+  flex: 0 1 auto;
   align-items: center;
   gap: 8px;
   min-width: 0;
@@ -425,7 +585,99 @@
 }
 
 .noteTitle {
-  margin: 0;
   font-size: 13px;
   color: var(--color-text-muted);
+}
+
+/* Related pages in the band's second row (M4b §6). */
+.related {
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+}
+
+.relatedChip {
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-pill);
+  background: var(--color-surface);
+  font: 600 12px var(--font-body);
+  color: var(--color-text-body);
+}
+
+.relatedChip.missing {
+  border-style: dashed;
+  color: var(--color-text-muted);
+}
+
+.relatedOpen {
+  padding: 2px 4px 2px 10px;
+  border: 0;
+  background: none;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+}
+
+span.relatedOpen {
+  cursor: default;
+  padding-right: 10px;
+}
+
+.relatedOpen:hover {
+  color: var(--color-accent);
+}
+
+.relatedRemove {
+  display: inline-grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  margin-right: 2px;
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: none;
+  color: var(--color-text-muted);
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.relatedRemove:hover {
+  background: var(--color-accent-soft);
+  color: var(--color-text-strong);
+}
+
+.relatedAdd {
+  height: 24px;
+  padding: 0 10px;
+  border: 1px dashed var(--color-border-strong);
+  border-radius: var(--radius-pill);
+  background: none;
+  font: 600 12px var(--font-body);
+  color: var(--color-text-muted);
+  cursor: pointer;
+}
+
+.relatedAdd:hover {
+  border-color: var(--color-accent);
+  color: var(--color-accent);
+}
+
+.relatedOpen:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 1px;
+}
+
+.relatedRemove:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 1px;
+}
+
+.relatedAdd:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 2px;
 }

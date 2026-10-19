@@ -3,6 +3,7 @@ import { useEffect, useId, useRef, useState, type KeyboardEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { vaultSettingsGet, vaultSettingsSet, type AttachmentMode } from '../../ipc';
 import { errorMessage } from '../../stores/messages';
+import { usePageWidthStore } from '../../stores/pageWidthStore';
 import { validateName } from '../explorer/nameRules';
 import styles from './Dialogs.module.css';
 
@@ -19,7 +20,9 @@ function obsidianPlace(value: string, t: TFunction): string {
 }
 
 /** "This vault" (M2c §5.4): where new attachments go, stored in
- *  `.nimw/vault.json`; read-only while Obsidian's setting applies. */
+ *  `.nimw/vault.json`. When Obsidian has its own setting, it applies unless
+ *  "Use a different place in Notes In My Way" is on (M4b §5); Obsidian's file
+ *  is never written. */
 export function VaultSettingsSection() {
   const { t } = useTranslation();
   const id = useId();
@@ -27,6 +30,9 @@ export function VaultSettingsSection() {
   const [mode, setMode] = useState<AttachmentMode>('subfolder');
   const [path, setPath] = useState('attachments');
   const [obsidian, setObsidian] = useState<string | null>(null);
+  const [own, setOwn] = useState(false);
+  const vaultWidth = usePageWidthStore((s) => s.vault);
+  const widthId = useId();
   const [loaded, setLoaded] = useState(false);
   const [error, setError] = useState<string | null>(null);
   // What `.nimw/vault.json` holds (as loaded, then as last saved): saving the
@@ -41,6 +47,7 @@ export function VaultSettingsSection() {
       setMode(res.value.attachments.mode);
       setPath(res.value.attachments.path);
       setObsidian(res.value.obsidian);
+      setOwn(res.value.overrideObsidian === true);
       setLoaded(true);
     });
     return () => {
@@ -96,7 +103,22 @@ export function VaultSettingsSection() {
     }
   };
 
-  const locked = obsidian !== null;
+  /** The override switch: on stores NIMW's current place with it; off keeps
+   *  the place for next time. */
+  const toggleOwn = async (on: boolean) => {
+    const res = await vaultSettingsSet(
+      on ? { attachments: { mode, path }, overrideObsidian: true } : { overrideObsidian: false },
+    );
+    if (!res.ok) {
+      setError(errorMessage(res.error));
+      return;
+    }
+    stored.current = res.value.attachments;
+    setOwn(res.value.overrideObsidian === true);
+    setError(null);
+  };
+
+  const locked = obsidian !== null && !own;
   return (
     <section className={styles.section} aria-labelledby={id}>
       <h3 id={id} className={styles.sectionTitle}>
@@ -117,6 +139,22 @@ export function VaultSettingsSection() {
           ))}
         </select>
       </label>
+      {obsidian !== null && (
+        <>
+          <p className={styles.hint}>
+            {t('vault.obsidianSet', { value: obsidian, place: obsidianPlace(obsidian, t) })}
+          </p>
+          <label className={styles.check}>
+            <input
+              type="checkbox"
+              checked={own}
+              disabled={!loaded}
+              onChange={(e) => void toggleOwn(e.target.checked)}
+            />
+            {t('vault.override')}
+          </label>
+        </>
+      )}
       {(mode === 'subfolder' || mode === 'folder') && !locked && (
         <label className={styles.field}>
           <span>{t(mode === 'subfolder' ? 'vault.subfolderName' : 'vault.folderPath')}</span>
@@ -140,14 +178,25 @@ export function VaultSettingsSection() {
           {error}
         </p>
       )}
-      {locked && (
-        <>
-          <p className={styles.hint}>
-            {t('vault.obsidianSet', { value: obsidian, place: obsidianPlace(obsidian, t) })}
-          </p>
-          <p className={styles.hint}>{t('vault.obsidianHint')}</p>
-        </>
-      )}
+      {locked && <p className={styles.hint}>{t('vault.obsidianHint')}</p>}
+      <label className={styles.field} htmlFor={widthId}>
+        <span>{t('vault.pageWidth')}</span>
+        <select
+          id={widthId}
+          className={styles.select}
+          value={vaultWidth ?? 'default'}
+          disabled={!loaded}
+          onChange={(e) =>
+            void usePageWidthStore
+              .getState()
+              .setVault(e.target.value as 'readable' | 'full' | 'default')
+          }
+        >
+          <option value="default">{t('vault.pageWidthDefault')}</option>
+          <option value="readable">{t('settings.pageWidthReadable')}</option>
+          <option value="full">{t('settings.pageWidthFull')}</option>
+        </select>
+      </label>
     </section>
   );
 }

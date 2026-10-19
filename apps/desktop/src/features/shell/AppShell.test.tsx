@@ -1,6 +1,6 @@
 import { undo } from '@codemirror/commands';
 import { EditorView } from '@codemirror/view';
-import { act, render, screen, waitFor } from '@testing-library/react';
+import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import axe from 'axe-core';
 import { afterEach, beforeAll, describe, expect, it } from 'vitest';
@@ -62,8 +62,42 @@ describe('AppShell', () => {
       screen.getByRole('complementary', { name: 'Files · Digital Brain' }),
     ).toBeInTheDocument();
     expect(screen.getByRole('tree', { name: 'Files' })).toBeInTheDocument();
-    expect(screen.getByRole('banner')).toHaveTextContent('Digital Brain');
+    // The vault's name is in the sidebar (M4b §1).
+    expect(screen.getByRole('complementary', { name: 'Files · Digital Brain' })).toHaveTextContent(
+      'Digital Brain',
+    );
     expect(screen.getByText('Pick a page in the explorer')).toBeInTheDocument();
+  });
+
+  it('M4b §1: the sidebar names the vault; the top bar holds the page title and subtitle, the Global View its level', async () => {
+    seed();
+    fakeDisk(
+      { 'Art/rex.md': '---\nsubtitle: Hero redesign\n---\n# Generator Rex\n\nbody\n' },
+      {
+        vault_tree: () => nodes,
+        gv_children: () => ({ cards: [], centre: null }),
+        gv_edges: () => [],
+        layout_get: () => ({}),
+      },
+    );
+    render(<AppShell />);
+    const side = screen.getByRole('complementary', { name: 'Files · Digital Brain' });
+    expect(side).toHaveTextContent('Digital Brain');
+    expect(side).not.toHaveTextContent('Notes In My Way');
+    await act(() => openPage('Art/rex.md'));
+    const bar = screen.getByRole('banner');
+    const title = await within(bar).findByRole('textbox', { name: 'Page title' });
+    expect(title).toHaveValue('rex');
+    expect(within(bar).getByRole('heading', { level: 1 })).toContainElement(title);
+    expect(within(bar).getByRole('textbox', { name: 'Subtitle' })).toHaveValue('Hero redesign');
+    // The page area no longer repeats them.
+    const page = screen.getByRole('region', { name: 'Page' });
+    expect(within(page).queryByRole('textbox', { name: 'Page title' })).not.toBeInTheDocument();
+    await userEvent.click(within(bar).getByRole('button', { name: 'Global view' }));
+    expect(
+      await within(bar).findByRole('heading', { level: 1, name: 'Global view · Vault' }),
+    ).toBeInTheDocument();
+    expect(within(bar).queryByRole('textbox', { name: 'Page title' })).not.toBeInTheDocument();
   });
 
   it('M3a §2: Edit and Global view switch the screen; the editor stays mounted (undo survives)', async () => {

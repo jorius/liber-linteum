@@ -39,6 +39,7 @@
     "notPermitted": "That isn't allowed here.",
     "notAFile": "Folders can't be attached.",
     "tooLarge": "That file is too large to paste.",
+    "notAText": "This file can't be opened as text: it isn't UTF-8 text, or it's over 2 MB.",
     "io": "Something went wrong: {message}"
   },
   "toasts": {
@@ -91,6 +92,13 @@
     "deleted": "This page was deleted outside the app.",
     "binary": "This file isn't valid UTF-8 text, so it can't be shown.",
     "tags": "Tags",
+    "related": "Related pages",
+    "relatedPage": "Related page",
+    "addRelated": "Add a related page",
+    "relatedPlaceholder": "Page name",
+    "removeRelated": "Remove the relationship to {name}",
+    "relatedMissing": "Not found",
+    "alreadyRelated": "Already related to {name}",
     "meta": "{links, plural, one {# link} other {# links}} · {backlinks, plural, one {# backlink} other {# backlinks}}",
     "breadcrumb": "Breadcrumb",
     "titleLabel": "Page title",
@@ -98,7 +106,13 @@
     "titleInNote": "Title in the note: {title}",
     "frontmatterInvalid": "NIMW can’t safely change this note’s frontmatter. Edit it in Source mode.",
     "subtitleLabel": "Subtitle",
-    "subtitlePlaceholder": "Add a subtitle"
+    "subtitlePlaceholder": "Add a subtitle",
+    "fullWidth": "Full width",
+    "fullWidthOn": "Use the full width for this page",
+    "fullWidthOff": "Use the readable width for this page",
+    "fileNameLabel": "File name",
+    "textOnly": "This file opens in its default app.",
+    "openDefault": "Open in default app"
   },
   "editor": {
     "conflictCopy": "Someone else changed this page — their version was saved as “{name}”",
@@ -107,8 +121,15 @@
     "saved": "Saved",
     "saving": "Saving…",
     "retrying": "Unsaved — retrying",
+    "notSaved": "Not saved",
     "orphaned": "This page was deleted outside the app. Your text is still here.",
     "saveAsNew": "Save as new page",
+    "notText": "This file changed outside Notes In My Way and is no longer plain text it can edit. Your unsaved changes are kept here: copy them, or save them as a new file.",
+    "notTextPage": "This page changed outside Notes In My Way and is no longer text it can edit. Your unsaved changes are kept here: copy them, or save them as a new page.",
+    "notTextToast": "“{name}” changed outside Notes In My Way and is no longer plain text it can edit. Your unsaved changes are kept in the app.",
+    "tooLarge": "This text can’t be saved: a text file Notes In My Way edits holds at most 2 MB and no NUL characters. It’s kept here: shorten it to save again, or copy it.",
+    "tooLargeToast": "“{name}” is too large to save as text. Your text is kept in the app.",
+    "saveAsNewFile": "Save as new file",
     "largeNote": "Simplified preview for large notes",
     "preview": "Preview",
     "mode": "Editor mode",
@@ -248,7 +269,16 @@
     "fontSize": "Text size",
     "fontSizePx": "{px} px",
     "toolbar": "Show the formatting toolbar",
-    "lineNumbers": "Show line numbers"
+    "lineNumbers": "Show line numbers",
+    "pageWidth": "Page width",
+    "pageWidthReadable": "Readable",
+    "pageWidthFull": "Full width",
+    "coverHeight": "Default cover height",
+    "coverHeightSmall": "Small ({px} px)",
+    "coverHeightMedium": "Medium ({px} px)",
+    "coverHeightLarge": "Large ({px} px)",
+    "coverHeightExtraLarge": "Extra large ({px} px)",
+    "coverHeightPx": "{px} px"
   },
   "toolbar": {
     "label": "Formatting",
@@ -284,12 +314,24 @@
     "cancel": "Cancel",
     "position": "Cover position",
     "positionValue": "{value}% from the top",
+    "dragHint": "Drag the image to place it",
     "remote": "Remote cover not loaded (privacy)",
-    "missing": "Cover image not found"
+    "missing": "Cover image not found",
+    "height": "Cover height",
+    "heightValue": "{px} px",
+    "resizeHint": "Drag to resize the cover; double-click to reset it",
+    "heightNotSaved": "Cover height not saved: {reason}"
   },
   "attach": {
     "dropOnText": "Drop files onto the page’s text to attach them",
-    "someFailed": "Some files weren’t attached"
+    "someFailed": "Some files weren’t attached",
+    "cantPaste": "This image can’t be pasted. Save it as PNG or JPEG first."
+  },
+  "linkComplete": {
+    "search": "Search: {query}",
+    "typeToFilter": "Type to filter",
+    "matches": "{count, plural, one {# match} other {# matches}}",
+    "matchesFor": "{count, plural, one {# match} other {# matches}} for “{query}”"
   },
   "linkPicker": {
     "label": "Link to…",
@@ -307,12 +349,15 @@
     },
     "subfolderName": "Subfolder name",
     "folderPath": "Folder in the vault",
-    "obsidianSet": "Set by Obsidian: {value} — new attachments go to {place}.",
-    "obsidianHint": "Change it in Obsidian (Settings → Files and links).",
+    "obsidianSet": "Obsidian puts new attachments in {value} ({place}).",
+    "obsidianHint": "Change it in Obsidian (Settings → Files and links), or use a different place here.",
+    "override": "Use a different place in Notes In My Way",
     "obsidianRoot": "the vault root",
     "obsidianSame": "the page’s folder",
     "obsidianSubfolder": "the “{name}” folder next to the page",
-    "obsidianFolder": "the “{name}” folder"
+    "obsidianFolder": "the “{name}” folder",
+    "pageWidth": "Page width for this vault",
+    "pageWidthDefault": "Use the app setting"
   },
   "gv": {
     "indexPick": {
@@ -328,6 +373,9 @@
       "changedOnDisk": "Couldn’t update {name}: it changed on disk. Try again.",
       "connect": "Connect to…",
       "connecting": "Connecting",
+      "connectCards": "Connect cards",
+      "pickSource": "Click the card to connect from",
+      "dragHint": "(or drag from a card’s link handle)",
       "pick": "Pick the card to connect: {name} → ?",
       "noIndex": "{name} has no index note. Pick one first.",
       "samePage": "{a} and {b} stand for the same page: it can’t be related to itself.",
@@ -391,5 +439,35 @@
     "fit": "Fit to screen",
     "connections": "{links, plural, =0 {No links.} one {Linked with # card.} other {Linked with # cards.}} {manual, plural, =0 {} one {# relationship.} other {# relationships.}}",
     "newEntry": "New entry"
+  },
+  "code": {
+    "plain": "Plain text",
+    "copy": "Copy",
+    "copied": "Copied",
+    "copyFailed": "Couldn’t copy",
+    "copyCode": "Copy code",
+    "languageLabel": "Language: {name}",
+    "pickLanguage": "Code language",
+    "searchLanguage": "Search languages…",
+    "languages": "Languages"
+  },
+  "diagram": {
+    "label": "Diagram: {first}",
+    "failed": "Diagram that couldn't be drawn",
+    "newerMacos": "This diagram needs a newer macOS."
+  },
+  "outline": {
+    "title": "Outline",
+    "toggle": "Outline",
+    "show": "Show the outline",
+    "hide": "Hide the outline",
+    "empty": "No headings yet.",
+    "resize": "Outline width"
+  },
+  "count": {
+    "words": "{count, plural, one {# word} other {# words}} · {minutes, number} min",
+    "selected": "{selected, number} of {count, plural, one {# word} other {# words}}",
+    "chars": "{chars, plural, one {# character} other {# characters}} · {bare, number} without spaces",
+    "lines": "{lines, plural, one {# line} other {# lines}} · {chars, plural, one {# character} other {# characters}}"
   }
 }

@@ -49,12 +49,12 @@ export function ConfirmDeleteDialog({ path, onClose }: { path: string; onClose: 
         {t('dialogs.delete.dontAsk')}
       </label>
       <div className={styles.buttons}>
-        <button type="button" className={styles.button} onClick={onClose}>
+        <button type="button" className="btn btn-secondary" onClick={onClose}>
           {t('dialogs.cancel')}
         </button>
         <button
           type="button"
-          className={`${styles.button} ${styles.danger}`}
+          className="btn btn-danger"
           data-autofocus
           onClick={() => void confirm()}
         >

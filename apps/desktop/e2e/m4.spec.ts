@@ -156,6 +156,19 @@ test('keyboard only: ↓ to the next block, Alt+↑ moves it, Enter picks a bloc
   await expect.poll(() => source(page)).toBe('P1\n\nP3\n\nP2');
 });
 
+test('keyboard only, fast: keys pressed before the pane shows a move wait for it, none lost', async ({
+  page,
+}) => {
+  await open(page, 'P1\n\nP2\n\nP3\n');
+  await page.getByRole('button', { name: 'Drag to reorder: P1' }).focus();
+  await page.keyboard.press('ArrowDown');
+  await expect(page.getByRole('button', { name: 'Drag to reorder: P2' })).toBeFocused();
+  // No waiting between keys: the pane is still drawing the move.
+  for (const key of ['Alt+ArrowUp', 'Enter', 'ArrowDown', 'Enter']) await page.keyboard.press(key);
+  await expect.poll(() => source(page)).toBe('P1\n\nP3\n\nP2');
+  await expect(page.getByRole('button', { name: 'Drag to reorder: P2' })).toBeFocused();
+});
+
 test('final review C2: text that changes during a drag — the dragged block moves, not the one now at its index', async ({
   page,
 }) => {

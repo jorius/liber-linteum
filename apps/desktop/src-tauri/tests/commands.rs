@@ -48,6 +48,11 @@ const COMMANDS: &[&str] = &[
     "layout_set",
     "link_target",
     "index_pick_set",
+    "page_width_set",
+    "text_read",
+    "text_write",
+    "entry_create_text",
+    "cover_height_set",
 ];
 
 struct Harness {
@@ -717,7 +722,14 @@ fn m2c_vault_settings_round_trip_over_ipc() {
     let got = call(&h.main, "vault_settings_get", json!({})).unwrap();
     assert_eq!(
         got,
-        json!({ "attachments": { "mode": "subfolder", "path": "attachments" }, "obsidian": null })
+        json!({
+            "attachments": { "mode": "subfolder", "path": "attachments" },
+            "obsidian": null,
+            "overrideObsidian": false,
+            "pageWidth": null,
+            "pageWidths": {},
+            "coverHeights": {}
+        })
     );
     let saved = call(
         &h.main,
@@ -751,6 +763,47 @@ fn m2c_vault_settings_round_trip_over_ipc() {
     )
     .unwrap_err();
     assert_eq!(kind(err), "notPermitted");
+}
+
+/// M4b §5: with Obsidian's setting present, NIMW's own place applies only
+/// while `overrideObsidian` is on; turning it off restores Obsidian's.
+#[test]
+fn m4b_vault_settings_override_obsidian_over_ipc() {
+    let h = harness();
+    let vault = open_fixture(&h, "obsidian-basic");
+    let app_json = std::fs::read(vault.path().join(".obsidian/app.json")).unwrap();
+    let got = call(&h.main, "vault_settings_get", json!({})).unwrap();
+    assert_eq!(got["obsidian"], "./assets");
+    assert_eq!(got["overrideObsidian"], false);
+    let saved = call(
+        &h.main,
+        "vault_settings_set",
+        json!({ "patch": { "attachments": { "mode": "same" }, "overrideObsidian": true } }),
+    )
+    .unwrap();
+    assert_eq!(saved["overrideObsidian"], true);
+    assert_eq!(saved["attachments"], json!({ "mode": "same", "path": "" }));
+    // The override alone can be turned off; the place is kept for next time.
+    let saved = call(
+        &h.main,
+        "vault_settings_set",
+        json!({ "patch": { "overrideObsidian": false } }),
+    )
+    .unwrap();
+    assert_eq!(saved["overrideObsidian"], false);
+    assert_eq!(saved["attachments"], json!({ "mode": "same", "path": "" }));
+    // Without the override, the place can't change while Obsidian's applies.
+    let err = call(
+        &h.main,
+        "vault_settings_set",
+        json!({ "patch": { "attachments": { "mode": "vault" } } }),
+    )
+    .unwrap_err();
+    assert_eq!(kind(err), "notPermitted");
+    assert_eq!(
+        std::fs::read(vault.path().join(".obsidian/app.json")).unwrap(),
+        app_json
+    );
 }
 
 /// M2c §5.1 / §7.3: a pasted image arrives as a raw body with percent-encoded
@@ -1253,4 +1306,334 @@ fn m3b_link_target_and_index_pick_set_over_ipc() {
             "{folder} ← {page}"
         );
     }
+}
+
+/// M4b part 2 §1: a page's own width and the vault's default live in
+/// `.nimw/vault.json`; the page entry follows a rename; only visible pages.
+#[test]
+fn m4b2_page_width_over_ipc() {
+    let h = harness();
+    let vault = open_fixture(&h, "obsidian-basic");
+    let got = call(&h.main, "vault_settings_get", json!({})).unwrap();
+    assert_eq!(got["pageWidth"], serde_json::Value::Null);
+    assert_eq!(got["pageWidths"], json!({}));
+    let saved = call(
+        &h.main,
+        "page_width_set",
+        json!({ "path": "Welcome.md", "width": "full" }),
+    )
+    .unwrap();
+    assert_eq!(saved["pageWidths"], json!({ "Welcome.md": "full" }));
+    let saved = call(
+        &h.main,
+        "vault_settings_set",
+        json!({ "patch": { "pageWidth": "readable" } }),
+    )
+    .unwrap();
+    assert_eq!(saved["pageWidth"], "readable");
+    // The page entry follows an in-app rename.
+    call(
+        &h.main,
+        "entry_rename",
+        json!({ "from": "Welcome.md", "to": "Hello.md" }),
+    )
+    .unwrap();
+    let got = call(&h.main, "vault_settings_get", json!({})).unwrap();
+    assert_eq!(got["pageWidths"], json!({ "Hello.md": "full" }));
+    // Clearing: the page entry and the vault default.
+    call(
+        &h.main,
+        "page_width_set",
+        json!({ "path": "Hello.md", "width": null }),
+    )
+    .unwrap();
+    let got = call(
+        &h.main,
+        "vault_settings_set",
+        json!({ "patch": { "pageWidth": "default" } }),
+    )
+    .unwrap();
+    assert_eq!(got["pageWidth"], serde_json::Value::Null);
+    assert_eq!(got["pageWidths"], json!({}));
+    // Only visible, indexed pages; a bad width is refused.
+    for path in [".obsidian/x.md", "Missing.md"] {
+        let err = call(
+            &h.main,
+            "page_width_set",
+            json!({ "path": path, "width": "full" }),
+        )
+        .unwrap_err();
+        assert_eq!(kind(err), "notFound", "{path}");
+    }
+    assert!(
+        call(
+            &h.main,
+            "page_width_set",
+            json!({ "path": "Hello.md", "width": "huge" })
+        )
+        .is_err()
+    );
+    assert!(vault.path().join(".nimw/vault.json").exists());
+}
+
+/// Cover resize: a page's cover height lives in `.nimw/vault.json`
+/// (`coverHeights`), never in the note; clamped to 132–2000 px; the entry
+/// follows an in-app rename; only visible, indexed pages.
+#[test]
+fn cover_height_over_ipc() {
+    let h = harness();
+    let vault = open_fixture(&h, "obsidian-basic");
+    let before = std::fs::read(vault.path().join("Welcome.md")).unwrap();
+    let got = call(&h.main, "vault_settings_get", json!({})).unwrap();
+    assert_eq!(got["coverHeights"], json!({}));
+    let saved = call(
+        &h.main,
+        "cover_height_set",
+        json!({ "path": "Welcome.md", "height": 280 }),
+    )
+    .unwrap();
+    assert_eq!(saved["coverHeights"], json!({ "Welcome.md": 280 }));
+    // A fractional drag position is rounded; out-of-range values are clamped.
+    let saved = call(
+        &h.main,
+        "cover_height_set",
+        json!({ "path": "Welcome.md", "height": 300.6 }),
+    )
+    .unwrap();
+    assert_eq!(saved["coverHeights"], json!({ "Welcome.md": 301 }));
+    for (height, kept) in [(10, 132), (99_999, 2000)] {
+        let saved = call(
+            &h.main,
+            "cover_height_set",
+            json!({ "path": "Welcome.md", "height": height }),
+        )
+        .unwrap();
+        assert_eq!(saved["coverHeights"]["Welcome.md"], kept, "{height}");
+    }
+    // The note itself is never written.
+    assert_eq!(
+        std::fs::read(vault.path().join("Welcome.md")).unwrap(),
+        before
+    );
+    // The entry follows an in-app rename.
+    call(
+        &h.main,
+        "entry_rename",
+        json!({ "from": "Welcome.md", "to": "Hello.md" }),
+    )
+    .unwrap();
+    let got = call(&h.main, "vault_settings_get", json!({})).unwrap();
+    assert_eq!(got["coverHeights"], json!({ "Hello.md": 2000 }));
+    let file: Value =
+        serde_json::from_slice(&std::fs::read(vault.path().join(".nimw/vault.json")).unwrap())
+            .unwrap();
+    assert_eq!(file["coverHeights"], json!({ "Hello.md": 2000 }));
+    // `null` clears it.
+    let got = call(
+        &h.main,
+        "cover_height_set",
+        json!({ "path": "Hello.md", "height": null }),
+    )
+    .unwrap();
+    assert_eq!(got["coverHeights"], json!({}));
+    // Only visible, indexed pages; a height that isn't a number is refused.
+    for path in [".obsidian/x.md", "Missing.md", "../x.md"] {
+        assert!(
+            call(
+                &h.main,
+                "cover_height_set",
+                json!({ "path": path, "height": 200 })
+            )
+            .is_err(),
+            "{path}"
+        );
+    }
+    let err = call(
+        &h.main,
+        "cover_height_set",
+        json!({ "path": "Missing.md", "height": 200 }),
+    )
+    .unwrap_err();
+    assert_eq!(kind(err), "notFound");
+    assert!(
+        call(
+            &h.main,
+            "cover_height_set",
+            json!({ "path": "Hello.md", "height": "tall" })
+        )
+        .is_err()
+    );
+}
+
+/// Cover resize: the command is in the main window's capability and nowhere
+/// else (the real ACL from `capabilities/main.json`, not a test stand-in).
+#[test]
+fn cover_height_set_is_allowed_from_main_only() {
+    let h = harness();
+    let other = WebviewWindowBuilder::new(&h.app, "other", Default::default())
+        .build()
+        .unwrap();
+    let main = call(
+        &h.main,
+        "cover_height_set",
+        json!({ "path": "A.md", "height": 200 }),
+    )
+    .unwrap_err();
+    assert!(!main.to_string().contains("not allowed"), "{main}");
+    assert_eq!(kind(main), "noVault");
+    let denied = call(
+        &other,
+        "cover_height_set",
+        json!({ "path": "A.md", "height": 200 }),
+    )
+    .unwrap_err();
+    assert!(denied.to_string().contains("not allowed"), "{denied}");
+}
+
+/// M4b part 2 §6: text files over IPC — read, compare-and-swap write with the
+/// conflict reply, `notAText` for anything that isn't an eligible text file.
+#[test]
+fn m4b2_text_files_over_ipc() {
+    let h = harness();
+    let vault = tempfile::tempdir().unwrap();
+    std::fs::write(vault.path().join("notes.txt"), "one\n").unwrap();
+    std::fs::write(vault.path().join("data.json"), b"{\"a\":\0}").unwrap();
+    std::fs::write(vault.path().join("Page.md"), "# Page\n").unwrap();
+    call(&h.main, "vault_open", json!({ "path": vault.path() })).unwrap();
+    let got = call(&h.main, "text_read", json!({ "path": "notes.txt" })).unwrap();
+    assert_eq!(got["text"], "one\n");
+    let hash = got["hash"].as_str().unwrap().to_string();
+    let saved = call(
+        &h.main,
+        "text_write",
+        json!({ "path": "notes.txt", "text": "two\n", "expectedHash": hash }),
+    )
+    .unwrap();
+    assert_eq!(
+        std::fs::read_to_string(vault.path().join("notes.txt")).unwrap(),
+        "two\n"
+    );
+    let err = call(
+        &h.main,
+        "text_write",
+        json!({ "path": "notes.txt", "text": "lost\n", "expectedHash": hash }),
+    )
+    .unwrap_err();
+    assert_eq!(err["kind"], "conflict");
+    assert_eq!(err["currentText"], "two\n");
+    assert_eq!(err["currentHash"], saved["hash"]);
+    for path in ["data.json", "Page.md"] {
+        let err = call(&h.main, "text_read", json!({ "path": path })).unwrap_err();
+        assert_eq!(kind(err), "notAText", "{path}");
+    }
+    let err = call(&h.main, "text_read", json!({ "path": "missing.txt" })).unwrap_err();
+    assert_eq!(kind(err), "notFound");
+}
+
+/// Final review I6: recovery keeps a text file's type. An unclean merge's
+/// copy of `data.csv` is `data (conflict).csv`, and "Save as new" for a text
+/// file deleted outside the app creates `notes.json` again, not a page.
+#[test]
+fn m4b2_text_files_keep_their_type_in_recovery_over_ipc() {
+    let h = harness();
+    let vault = tempfile::tempdir().unwrap();
+    std::fs::create_dir(vault.path().join("data")).unwrap();
+    std::fs::write(vault.path().join("data/data.csv"), "a,b\n").unwrap();
+    call(&h.main, "vault_open", json!({ "path": vault.path() })).unwrap();
+    let copy = call(
+        &h.main,
+        "page_create_conflict_copy",
+        json!({ "path": "data/data.csv", "text": "theirs\n" }),
+    )
+    .unwrap();
+    assert_eq!(copy, "data/data (conflict).csv");
+    let got = call(
+        &h.main,
+        "text_read",
+        json!({ "path": "data/data (conflict).csv" }),
+    )
+    .unwrap();
+    assert_eq!(got["text"], "theirs\n");
+
+    let made = call(
+        &h.main,
+        "entry_create_text",
+        json!({ "dir": "data", "name": "notes.json" }),
+    )
+    .unwrap();
+    assert_eq!(made, "data/notes.json");
+    let got = call(&h.main, "text_read", json!({ "path": "data/notes.json" })).unwrap();
+    assert_eq!(got["text"], "");
+    call(
+        &h.main,
+        "text_write",
+        json!({ "path": "data/notes.json", "text": "{}\n", "expectedHash": got["hash"] }),
+    )
+    .unwrap();
+    assert_eq!(
+        std::fs::read_to_string(vault.path().join("data/notes.json")).unwrap(),
+        "{}\n"
+    );
+    let err = call(
+        &h.main,
+        "entry_create_text",
+        json!({ "dir": "data", "name": "notes.json" }),
+    )
+    .unwrap_err();
+    assert_eq!(kind(err), "alreadyExists");
+    let err = call(
+        &h.main,
+        "entry_create_text",
+        json!({ "dir": "", "name": "Page.md" }),
+    )
+    .unwrap_err();
+    assert_eq!(kind(err), "notAText");
+}
+
+/// Final review I3: a file rewritten outside as something the app can't edit
+/// (Windows-1252 from Excel, a NUL byte, over 2 MB; a page that isn't UTF-8)
+/// makes a stale write fail as `notAText` / `binary` — never a `conflict`
+/// carrying lossy text the merge would write back over every accent.
+#[test]
+fn final_review_i3_a_conflict_with_a_non_text_file_carries_no_lossy_text() {
+    let h = harness();
+    let vault = tempfile::tempdir().unwrap();
+    std::fs::write(vault.path().join("data.csv"), "José,Bogotá\n").unwrap();
+    std::fs::write(vault.path().join("Page.md"), "# Café\n").unwrap();
+    call(&h.main, "vault_open", json!({ "path": vault.path() })).unwrap();
+    let text_hash = call(&h.main, "text_read", json!({ "path": "data.csv" })).unwrap()["hash"]
+        .as_str()
+        .unwrap()
+        .to_string();
+    let page_hash = call(&h.main, "page_read", json!({ "path": "Page.md" })).unwrap()["hash"]
+        .as_str()
+        .unwrap()
+        .to_string();
+    let big = vec![b'a'; nimw_session::TEXT_MAX_BYTES + 1];
+    let outside: [&[u8]; 3] = [b"Jos\xe9,Bogot\xe1\n", b"Jose\0,Bogota\n", &big];
+    for bytes in outside {
+        std::fs::write(vault.path().join("data.csv"), bytes).unwrap();
+        let err = call(
+            &h.main,
+            "text_write",
+            json!({ "path": "data.csv", "text": "José,Bogotá\nmine\n", "expectedHash": text_hash }),
+        )
+        .unwrap_err();
+        assert_eq!(kind(err.clone()), "notAText", "{err}");
+        assert!(err.get("currentText").is_none(), "{err}");
+        assert_eq!(std::fs::read(vault.path().join("data.csv")).unwrap(), bytes);
+    }
+    std::fs::write(vault.path().join("Page.md"), b"# Caf\xe9\n").unwrap();
+    let err = call(
+        &h.main,
+        "page_write",
+        json!({ "path": "Page.md", "text": "# Café\nmine\n", "expectedHash": page_hash }),
+    )
+    .unwrap_err();
+    assert_eq!(kind(err.clone()), "binary", "{err}");
+    assert!(err.get("currentText").is_none(), "{err}");
+    assert_eq!(
+        std::fs::read(vault.path().join("Page.md")).unwrap(),
+        b"# Caf\xe9\n"
+    );
 }

@@ -1,7 +1,12 @@
 import i18next from 'i18next';
 import { create } from 'zustand';
 import { LARGE_NOTE_CHARS } from '../features/editor/limits';
-import { PageDoc, type PageDocHooks, type SaveStatus } from '../features/editor/pageDoc';
+import {
+  PageDoc,
+  type PageDocHooks,
+  type SaveStatus,
+  type Unwritable,
+} from '../features/editor/pageDoc';
 import { viewOf } from '../features/editor/views';
 import { isTauri, onCloseRequested, type ChangedPayload, type CommandError } from '../ipc';
 import {
@@ -27,6 +32,8 @@ interface EditorState {
   status: SaveStatus;
   dirty: boolean;
   orphaned: boolean;
+  /** Why the page's text can't be saved to its file (final review I3). */
+  unwritable: Unwritable | null;
   hash: string | null;
   /** Over 200 KB: Live Preview uses the reduced decoration set. */
   large: boolean;
@@ -78,6 +85,7 @@ const IDLE = {
   status: 'saved' as SaveStatus,
   dirty: false,
   orphaned: false,
+  unwritable: null,
   hash: null,
   large: false,
   error: null,
@@ -89,6 +97,7 @@ const snapshot = (doc: PageDoc) => ({
   status: doc.status,
   dirty: doc.dirty,
   orphaned: doc.orphaned,
+  unwritable: doc.unwritable,
   hash: doc.hash,
   large: doc.text.length > LARGE_NOTE_CHARS,
   error: null,
@@ -104,6 +113,16 @@ const hooks: PageDocHooks = {
     useToastStore.getState().push({
       message: i18next.t('editor.conflictCopy', { name: nameOf(copy).replace(/\.md$/i, '') }),
       action: { label: i18next.t('editor.openCopy'), run: () => void openPage(copy) },
+    });
+  },
+  // Final review I3: its notice shows with the page; the toast reaches a page
+  // switched away from too.
+  onUnwritable: (doc) => {
+    const key = doc.unwritable === 'text' ? 'editor.tooLargeToast' : 'editor.notTextToast';
+    useToastStore.getState().push({
+      message: i18next.t(key, { name: nameOf(doc.path) }),
+      tone: 'error',
+      action: { label: i18next.t('editor.openUnsaved'), run: () => void openPage(doc.path) },
     });
   },
 };

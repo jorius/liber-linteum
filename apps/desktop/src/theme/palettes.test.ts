@@ -219,3 +219,140 @@ describe('custom accent → palette (M2b §4, derive.ts)', () => {
     expect(pr, 'pink tints the background toward red').toBeGreaterThan(pg);
   });
 });
+
+/** Buttons and the header band (M4b §1, §3). */
+const BUTTON_TOKENS = [
+  '--color-surface-veil',
+  '--color-danger',
+  '--color-danger-contrast',
+] as const;
+
+describe('buttons and the header veil (M4b §1, §3)', () => {
+  const palettes = [
+    ...PALETTES,
+    ...['#d1477a', '#2aa198', '#f5d000', '#808080', '#ffffff', '#000000'].map((hex) => ({
+      id: 'custom' as const,
+      ...derive(hex),
+    })),
+  ];
+  it.each(
+    palettes.flatMap((p, i) => (['light', 'dark'] as const).map((m) => [i, p.id, m] as const)),
+  )(
+    '#%s %s %s: primary and danger buttons are readable; the veil is translucent surface',
+    (i, _id, mode) => {
+      const vars = paletteVars(palettes[i], mode);
+      expect(
+        contrast(vars['--color-accent-contrast'], vars['--color-accent']),
+        'primary: text on accent',
+      ).toBeGreaterThanOrEqual(4.5);
+      expect(vars['--color-danger'], 'danger').toMatch(/^#[0-9a-f]{6}$/);
+      expect(
+        contrast(vars['--color-danger-contrast'], vars['--color-danger']),
+        'danger: text on danger',
+      ).toBeGreaterThanOrEqual(4.5);
+      expect(vars['--color-surface-veil']).toMatch(/^rgba\(\d+, \d+, \d+, 0\.88\)$/);
+    },
+  );
+
+  it('the default tokens define them too, in both modes', () => {
+    for (const key of BUTTON_TOKENS) {
+      expect(tokensCss.split(`${key}:`).length - 1, key).toBe(3);
+    }
+  });
+});
+
+/** `rgba(r, g, b, a)` over an opaque `#rrggbb`, as `#rrggbb`. */
+function over(rgba: string, under: string): string {
+  const [r, g, b, a] = rgba.match(/[\d.]+/g)!.map(Number);
+  const u = [1, 3, 5].map((i) => parseInt(under.slice(i, i + 2), 16));
+  return `#${[r, g, b]
+    .map((c, i) =>
+      Math.round(c * a + u[i] * (1 - a))
+        .toString(16)
+        .padStart(2, '0'),
+    )
+    .join('')}`;
+}
+
+const pageCss = readFileSync(
+  new URL('../features/page/PageView.module.css', import.meta.url),
+  'utf8',
+);
+
+describe('review focus: text on the veil over any cover (M4b §1)', () => {
+  const palettes = [
+    ...PALETTES,
+    ...['#d1477a', '#2aa198', '#f5d000', '#808080', '#ffffff', '#000000'].map((hex) => ({
+      id: 'custom' as const,
+      ...derive(hex),
+    })),
+  ];
+  it.each(
+    palettes.flatMap((p, i) => (['light', 'dark'] as const).map((m) => [i, p.id, m] as const)),
+  )('#%s %s %s: pill text meets AA on the veil over black and over white', (i, _id, mode) => {
+    const vars = paletteVars(palettes[i], mode);
+    for (const image of ['#000000', '#ffffff']) {
+      const pill = over(vars['--color-surface-veil'], image);
+      for (const text of ['--color-text', '--color-text-body'] as const) {
+        expect(contrast(vars[text], pill), `${text} over ${image}`).toBeGreaterThanOrEqual(4.5);
+      }
+    }
+  });
+
+  it('muted text in a pill is drawn in the body colour (muted alone falls to ~4.0:1)', () => {
+    const rule = /\.bandCover \.pill \{([^}]*)\}/.exec(pageCss)?.[1] ?? '';
+    expect(rule).toContain('--color-text-muted: var(--color-text-body);');
+  });
+});
+
+/** Syntax colours (M4b part 2 §2): one set per palette and mode, every
+ *  token ≥ 4.5:1 on that palette's code background. */
+const CODE_TOKENS = [
+  '--code-keyword',
+  '--code-string',
+  '--code-number',
+  '--code-comment',
+  '--code-function',
+  '--code-type',
+  '--code-meta',
+  '--code-variable',
+  '--code-punct',
+] as const;
+
+describe('code tokens (M4b part 2 §2)', () => {
+  const check = (vars: Record<string, string>, at: string) => {
+    for (const key of CODE_TOKENS) {
+      expect(vars[key], `${at} ${key}`).toMatch(/^#[0-9a-f]{6}$/);
+      expect(
+        contrast(vars[key], vars['--color-code-bg']),
+        `${at} ${key} on code-bg`,
+      ).toBeGreaterThanOrEqual(4.5);
+    }
+    // Keywords, strings and functions are told apart by more than lightness.
+    expect(
+      new Set([vars['--code-keyword'], vars['--code-string'], vars['--code-function']]).size,
+    ).toBe(3);
+  };
+  it.each(PALETTES.flatMap((p) => (['light', 'dark'] as const).map((m) => [p.id, m] as const)))(
+    '%s %s',
+    (id, mode) =>
+      check(
+        paletteVars(
+          PALETTES.find((p) => p.id === id)!,
+          mode,
+        ),
+        `${id} ${mode}`,
+      ),
+  );
+  it.each(['#d1477a', '#ffffff', '#000000', '#ffff00', '#2aa198', '#808080'])(
+    'custom accent %s',
+    (hex) => {
+      const p = { id: 'custom', ...derive(hex) } as unknown as (typeof PALETTES)[number];
+      check(paletteVars(p, 'light'), `${hex} light`);
+      check(paletteVars(p, 'dark'), `${hex} dark`);
+    },
+  );
+  it('the default tokens define them too, in both modes', () => {
+    for (const key of CODE_TOKENS) expect(tokensCss.split(`${key}:`).length - 1, key).toBe(3);
+  });
+});

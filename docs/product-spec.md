@@ -36,6 +36,16 @@ The defining feature is the **Global View**: a navigable canvas where each proje
 | P5 | **Free and open source** (GPL-3.0-or-later), with a donations link. |
 | P6 | **Bilingual from day one:** English and Spanish, built so more languages can be added later. |
 
+### 1.2 Who it's for [DECIDED 2026-10-14]
+
+| Persona | What they need from NIMW | Status |
+|---|---|---|
+| **Quick note-takers** | Jot something down without setting up a vault; open a single `.md`/`.txt` file from Finder. | Scratchpad and single-file mode planned as **M4c** (right after the M4b feedback round). |
+| **Writers** (books, long-form) | Chapters as pages, cross-references to a glossary, concepts, characters, ideas and brainstorming; outline and word count; a map of how ideas connect. | Links, autocomplete, Global View, relationships done; outline panel + word count in M4b. Candidates: glossary/alias tooling, unlinked mentions, word-count goals, focus mode, manuscript export. |
+| **Technical people** (local project docs) | Code snippets with syntax highlighting, diagrams, maths, plain-text and code files viewable next to the notes. | Syntax highlighting with a language picker, Mermaid, LaTeX and text/code files in M4b. Candidate: HTML export. |
+| **Artists and world-builders** | Covers, images, a visual map of places, characters and factions with typed relationships. | Covers, Global View, relationships done. Candidates: image galleries, map images with pins, timelines. |
+| **Tabletop RPG players and game masters** (D&D) | Campaign notes: NPCs, locations, sessions, lore; quick cross-references during play; stat blocks. | Links, Global View and callouts cover the basics. Candidates: templates (NPC, session), stat-block callouts, dice notation, random tables. |
+
 ---
 
 ## 2. Glossary
@@ -363,3 +373,5 @@ The view is opened from the floating top toggle **[Edit | Global view]** (see re
 | 2026-10-12 | Link resolution: file name canonical (PG-05). Exclusions: dot-folders and attachment folders (VLT-05). |
 | 2026-10-12 | NFR-03 budgets set; all three platforms ship simultaneously; license GPL-3.0-or-later. |
 | 2026-10-12 | Architecture: Tauri 2 + Rust core + React/TypeScript UI (see `docs/superpowers/specs/2026-10-12-architecture-design.md`). |
+| 2026-10-13 | Roadmap: M2a feedback became **M2b** (editor UX); covers, attachments and autocomplete became **M2c**. |
+| 2026-10-14 | Personas added (§1.2). Roadmap: **M4b** feedback round (header band with cover background, title in the top bar, palette buttons, picker and autocomplete fixes, attachments override, related chips, Dock icon; part 2: full page width at app, vault and page level, syntax highlighting with a language picker, LaTeX, Mermaid, outline panel and word count, plain-text and code files) → **M4c** scratchpad and single files → M5 search → M6 audio → M7 Notion import → M8 packaging. **Version control** (page history) is planned for a later batch, not now. |

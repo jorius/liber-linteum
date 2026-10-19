@@ -109,6 +109,7 @@ export function Canvas({ mode, toggles, width, onOpen, onOpenEditor }: CanvasPro
   const expanded = useGvStore((s) => s.expanded);
   const focus = useGvStore((s) => s.focus);
   const connectFrom = useGvStore((s) => s.connectFrom);
+  const connectPick = useGvStore((s) => s.connectPick);
   const flow = useReactFlow();
   const wrapper = useRef<HTMLDivElement>(null);
 
@@ -130,7 +131,9 @@ export function Canvas({ mode, toggles, width, onOpen, onOpenEditor }: CanvasPro
     if (e.detail <= 1) {
       const path = (e.target as HTMLElement).closest<HTMLElement>('[data-gv-card]')?.dataset.gvCard;
       const card = canvas.cards.find((c) => c.path === path);
-      firstClick.current = card ? { card, opened: false, connecting: connectFrom !== null } : null;
+      firstClick.current = card
+        ? { card, opened: false, connecting: connectFrom !== null || connectPick }
+        : null;
     } else if (firstClick.current?.opened) {
       e.stopPropagation(); // no single click on the card under the pointer
     }

@@ -400,3 +400,23 @@ fn exp_04_symlinked_notes_stay_symlinks() {
     assert_eq!(read(&dir, "real.md"), "[[B]]\n");
     assert_eq!(read(&dir, "alias.md"), "[[B]]\n");
 }
+
+/// Cover resize: a page's cover height (`.nimw/vault.json` `coverHeights`)
+/// follows an in-app rename, and a folder move takes its pages' with it.
+#[test]
+fn cover_heights_follow_in_app_renames_and_folder_moves() {
+    let (_dir, _c, s) = session("obsidian-basic");
+    s.vault().set_cover_height("Welcome.md", Some(280)).unwrap();
+    s.vault()
+        .set_cover_height("Game Design/Game 1.md", Some(360))
+        .unwrap();
+    s.rename(&vp("Welcome.md"), &vp("Hello.md"), true).unwrap();
+    s.rename(&vp("Game Design"), &vp("Design"), true).unwrap();
+    assert_eq!(
+        s.vault().cover_heights().into_iter().collect::<Vec<_>>(),
+        vec![
+            ("Design/Game 1.md".to_string(), 360),
+            ("Hello.md".to_string(), 280),
+        ]
+    );
+}

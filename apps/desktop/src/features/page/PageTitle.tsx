@@ -1,12 +1,14 @@
 import { useEffect, useId, useRef, useState, type KeyboardEvent } from 'react';
 import { useTranslation } from 'react-i18next';
-import type { Page } from '../../ipc';
 import { errorMessage } from '../../stores/messages';
 import { usePageStore } from '../../stores/pageStore';
 import { nameOf, parentOf } from '../../stores/tree';
 import { useVaultStore } from '../../stores/vaultStore';
 import { validateName } from '../explorer/nameRules';
 import styles from './PageView.module.css';
+
+/** `Notes/My page.md` → `My page`. */
+export const stemOf = (path: string): string => split(path).stem;
 
 /** `Notes/My page.md` → `My page` and `.md`. */
 function split(path: string): { stem: string; ext: string } {
@@ -17,11 +19,13 @@ function split(path: string): { stem: string; ext: string } {
 
 /** The page title, editable in place (M2b §2): it is the file name, so Enter
  *  or leaving the field renames the file (links updated as for any rename);
- *  Escape puts the name back. The note's own title (first heading or
- *  `title:`) is shown under it when it differs. */
-export function PageTitle({ page }: { page: Page }) {
+ *  Escape puts the name back. It sits in the top bar (M4b §1); the note's own
+ *  title, when it differs, shows in the header band (`NoteTitle`). A text
+ *  file (M4b part 2 §6) shows its extension after the field; it is kept. */
+export function PageTitle({ path }: { path: string }) {
   const { t } = useTranslation();
-  const { stem, ext } = split(page.path);
+  const { stem, ext } = split(path);
+  const text = ext.toLowerCase() !== '.md';
   const [draft, setDraft] = useState(stem);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -34,11 +38,11 @@ export function PageTitle({ page }: { page: Page }) {
   // A page just made from the Global View: ready to be named (M3a §5).
   const focusRequest = usePageStore((s) => s.titleFocus);
   useEffect(() => {
-    if (focusRequest?.path !== page.path || !input.current) return;
+    if (focusRequest?.path !== path || !input.current) return;
     input.current.focus();
     input.current.select();
     usePageStore.getState().clearTitleFocus();
-  }, [focusRequest, page.path]);
+  }, [focusRequest, path]);
 
   const taken = () => t('page.titleTaken', { name: draft.trim() });
 
@@ -58,19 +62,19 @@ export function PageTitle({ page }: { page: Page }) {
       );
       return;
     }
-    const dir = parentOf(page.path);
+    const dir = parentOf(path);
     const to = dir ? `${dir}/${name}${ext}` : `${name}${ext}`;
     const same = (p: string) => p.toLowerCase() === to.toLowerCase();
     const clash = useVaultStore
       .getState()
-      .nodes.some((n) => same(n.path) && n.path.toLowerCase() !== page.path.toLowerCase());
+      .nodes.some((n) => same(n.path) && n.path.toLowerCase() !== path.toLowerCase());
     if (clash) {
       setError(taken());
       return;
     }
     setBusy(true);
     // Reported inline under the title, so no toast as well (final review m4).
-    const res = await useVaultStore.getState().rename(page.path, to, { quiet: true });
+    const res = await useVaultStore.getState().rename(path, to, { quiet: true });
     setBusy(false);
     if (!res.ok) setError(res.error.kind === 'alreadyExists' ? taken() : errorMessage(res.error));
     else setError(null);
@@ -93,7 +97,7 @@ export function PageTitle({ page }: { page: Page }) {
         <input
           ref={input}
           className={styles.titleInput}
-          aria-label={t('page.titleLabel')}
+          aria-label={t(text ? 'page.fileNameLabel' : 'page.titleLabel')}
           aria-invalid={error !== null}
           aria-describedby={error ? errorId : undefined}
           spellCheck={false}
@@ -109,14 +113,12 @@ export function PageTitle({ page }: { page: Page }) {
             if (document.hasFocus()) void commit();
           }}
         />
+        {text && ext && <span className={styles.titleExt}>{ext}</span>}
       </h1>
       {error && (
         <p id={errorId} role="alert" className={styles.titleError}>
           {error}
         </p>
-      )}
-      {page.title && page.title !== stem && (
-        <p className={styles.noteTitle}>{t('page.titleInNote', { title: page.title })}</p>
       )}
     </>
   );

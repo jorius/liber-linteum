@@ -180,3 +180,72 @@ describe('inline extensions keep mdast text values (I6)', () => {
     expect(shown(md).trim()).toBe(text);
   });
 });
+
+describe('parsePage — maths (M4b part 2 §3)', () => {
+  const kinds = (text: string) => [
+    ...findAll(parsePage(text).tree, 'math').map((n) => n.type),
+    ...findAll(parsePage(text).tree, 'inlineMath').map((n) => n.type),
+  ];
+
+  it('reads $inline$ and $$block$$ as maths', () => {
+    const page = parsePage('Energy is $E = mc^2$.\n\n$$\n\\int_0^1 x\\,dx\n$$\n');
+    const [inline] = findAll(page.tree, 'inlineMath');
+    const [block] = findAll(page.tree, 'math');
+    expect((inline as unknown as { value: string }).value).toBe('E = mc^2');
+    expect((block as unknown as { value: string }).value).toBe('\\int_0^1 x\\,dx');
+  });
+
+  it('prices and escaped dollars stay text, as in Obsidian', () => {
+    expect(kinds('It costs $5 and $10 today.\n')).toEqual([]);
+    expect(kinds('Not maths: \\$x\\$.\n')).toEqual([]);
+    expect(kinds('A $ x$ and $y $ too.\n')).toEqual([]);
+    expect(parsePage('It costs $5 and $10 today.\n').tree.children[0]).toMatchObject({
+      type: 'paragraph',
+    });
+  });
+
+  it('a #tag inside maths is not a tag; one outside still is', () => {
+    expect(parsePage('$a #fake$ and #real\n').tags).toEqual(['real']);
+  });
+
+  // Pandoc's rules (final review I2): a `$` opens maths before a non-space
+  // and not right after a letter or digit; the next `$` closes it only
+  // after a non-space and not before a digit — else neither is maths.
+  it.each([
+    '$10-$20',
+    '$5.99/$6.99',
+    '($5)($10)',
+    'US$5 and US$10',
+    'Pay $5 for [[Shop]]/$10',
+    'Pay 5$ or 10$ now',
+    'From $x$5 on',
+  ])('prices stay text: %s', (text) => {
+    expect(kinds(`${text}\n`)).toEqual([]);
+  });
+
+  it('a link between two prices is still a link', () => {
+    expect(parsePage('Pay $5 for [[Shop]]/$10\n').links.map((l) => l.target)).toEqual(['Shop']);
+  });
+
+  it('markup between two prices still renders', () => {
+    expect(findAll(parsePage('Was $10, **now** $20.\n').tree, 'strong')).toHaveLength(1);
+  });
+
+  it('a dollar that is no opener leaves a later pair to be maths', () => {
+    const page = parsePage('Pay $5 for $x$ today.\n');
+    expect(
+      findAll(page.tree, 'inlineMath').map((n) => (n as unknown as { value: string }).value),
+    ).toEqual(['x']);
+  });
+
+  it.each([
+    ['$x$', 'inlineMath'],
+    ['$\\alpha$', 'inlineMath'],
+    ['($x$)', 'inlineMath'],
+    ['$x$, then', 'inlineMath'],
+    ['$$10-$$', 'inlineMath'],
+    ['$$\na + b\n$$', 'math'],
+  ])('maths still reads: %s', (text, kind) => {
+    expect(kinds(`${text}\n`)).toEqual([kind]);
+  });
+});

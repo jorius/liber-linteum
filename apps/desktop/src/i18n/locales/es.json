@@ -39,6 +39,7 @@
     "notPermitted": "Eso no está permitido aquí.",
     "notAFile": "Las carpetas no se pueden adjuntar.",
     "tooLarge": "Ese archivo es demasiado grande para pegarlo.",
+    "notAText": "Este archivo no se puede abrir como texto: no es texto UTF-8 o supera los 2 MB.",
     "io": "Algo salió mal: {message}"
   },
   "toasts": {
@@ -91,6 +92,13 @@
     "deleted": "Esta página se eliminó fuera de la app.",
     "binary": "Este archivo no es texto UTF-8 válido, así que no se puede mostrar.",
     "tags": "Etiquetas",
+    "related": "Páginas relacionadas",
+    "relatedPage": "Página relacionada",
+    "addRelated": "Añadir una página relacionada",
+    "relatedPlaceholder": "Nombre de la página",
+    "removeRelated": "Quitar la relación con {name}",
+    "relatedMissing": "No se encuentra",
+    "alreadyRelated": "Ya está relacionada con {name}",
     "meta": "{links, plural, one {# enlace} other {# enlaces}} · {backlinks, plural, one {# retroenlace} other {# retroenlaces}}",
     "breadcrumb": "Ruta",
     "titleLabel": "Título de la página",
@@ -98,7 +106,13 @@
     "frontmatterInvalid": "NIMW no puede cambiar con seguridad el frontmatter de esta nota. Edítalo en el modo Código.",
     "titleInNote": "Título en la nota: {title}",
     "subtitleLabel": "Subtítulo",
-    "subtitlePlaceholder": "Añade un subtítulo"
+    "subtitlePlaceholder": "Añade un subtítulo",
+    "fullWidth": "Ancho completo",
+    "fullWidthOn": "Usar todo el ancho en esta página",
+    "fullWidthOff": "Usar el ancho de lectura en esta página",
+    "fileNameLabel": "Nombre del archivo",
+    "textOnly": "Este archivo se abre en su aplicación predeterminada.",
+    "openDefault": "Abrir en la aplicación predeterminada"
   },
   "editor": {
     "conflictCopy": "Alguien más cambió esta página — su versión se guardó como «{name}»",
@@ -107,8 +121,15 @@
     "saved": "Guardado",
     "saving": "Guardando…",
     "retrying": "Sin guardar — reintentando",
+    "notSaved": "Sin guardar",
     "orphaned": "Esta página se borró fuera de la app. Tu texto sigue aquí.",
     "saveAsNew": "Guardar como página nueva",
+    "notText": "Este archivo cambió fuera de Notes In My Way y ya no es texto plano que pueda editar. Tus cambios sin guardar siguen aquí: cópialos o guárdalos como un archivo nuevo.",
+    "notTextPage": "Esta página cambió fuera de Notes In My Way y ya no es texto que pueda editar. Tus cambios sin guardar siguen aquí: cópialos o guárdalos como una página nueva.",
+    "notTextToast": "«{name}» cambió fuera de Notes In My Way y ya no es texto plano que pueda editar. Tus cambios sin guardar siguen en la app.",
+    "tooLarge": "Este texto no se puede guardar: un archivo de texto que Notes In My Way edita tiene como máximo 2 MB y ningún carácter NUL. Sigue aquí: acórtalo para volver a guardar, o cópialo.",
+    "tooLargeToast": "«{name}» es demasiado grande para guardarse como texto. Tu texto sigue en la app.",
+    "saveAsNewFile": "Guardar como archivo nuevo",
     "largeNote": "Vista previa simplificada para notas grandes",
     "preview": "Vista previa",
     "mode": "Modo del editor",
@@ -248,7 +269,16 @@
     "fontSize": "Tamaño del texto",
     "fontSizePx": "{px} px",
     "toolbar": "Mostrar la barra de formato",
-    "lineNumbers": "Mostrar los números de línea"
+    "lineNumbers": "Mostrar los números de línea",
+    "pageWidth": "Ancho de página",
+    "pageWidthReadable": "De lectura",
+    "pageWidthFull": "Ancho completo",
+    "coverHeight": "Altura predeterminada de la portada",
+    "coverHeightSmall": "Pequeña ({px} px)",
+    "coverHeightMedium": "Mediana ({px} px)",
+    "coverHeightLarge": "Grande ({px} px)",
+    "coverHeightExtraLarge": "Muy grande ({px} px)",
+    "coverHeightPx": "{px} px"
   },
   "toolbar": {
     "label": "Formato",
@@ -284,12 +314,24 @@
     "cancel": "Cancelar",
     "position": "Posición de la portada",
     "positionValue": "{value} % desde arriba",
+    "dragHint": "Arrastra la imagen para colocarla",
     "remote": "Portada remota no cargada (privacidad)",
-    "missing": "No se encuentra la imagen de portada"
+    "missing": "No se encuentra la imagen de portada",
+    "height": "Altura de la portada",
+    "heightValue": "{px} px",
+    "resizeHint": "Arrastra para cambiar la altura de la portada; doble clic para restablecerla",
+    "heightNotSaved": "No se guardó la altura de la portada: {reason}"
   },
   "attach": {
     "dropOnText": "Suelta los archivos sobre el texto de la página para adjuntarlos",
-    "someFailed": "Algunos archivos no se adjuntaron"
+    "someFailed": "Algunos archivos no se adjuntaron",
+    "cantPaste": "Esta imagen no se puede pegar. Guárdala antes como PNG o JPEG."
+  },
+  "linkComplete": {
+    "search": "Buscar: {query}",
+    "typeToFilter": "Escribe para filtrar",
+    "matches": "{count, plural, one {# resultado} other {# resultados}}",
+    "matchesFor": "{count, plural, one {# resultado} other {# resultados}} para «{query}»"
   },
   "linkPicker": {
     "label": "Enlazar a…",
@@ -307,12 +349,15 @@
     },
     "subfolderName": "Nombre de la subcarpeta",
     "folderPath": "Carpeta de la bóveda",
-    "obsidianSet": "Definido por Obsidian: {value} — los adjuntos nuevos van a {place}.",
-    "obsidianHint": "Cámbialo en Obsidian (Ajustes → Archivos y enlaces).",
+    "obsidianSet": "Obsidian guarda los adjuntos nuevos en {value} ({place}).",
+    "obsidianHint": "Cámbialo en Obsidian (Ajustes → Archivos y enlaces) o usa otro lugar aquí.",
+    "override": "Usar otro lugar en Notes In My Way",
     "obsidianRoot": "la raíz de la bóveda",
     "obsidianSame": "la carpeta de la página",
     "obsidianSubfolder": "la carpeta «{name}» junto a la página",
-    "obsidianFolder": "la carpeta «{name}»"
+    "obsidianFolder": "la carpeta «{name}»",
+    "pageWidth": "Ancho de página en esta bóveda",
+    "pageWidthDefault": "Usar el ajuste de la app"
   },
   "gv": {
     "indexPick": {
@@ -328,6 +373,9 @@
       "changedOnDisk": "No se pudo actualizar {name}: cambió en el disco. Inténtalo de nuevo.",
       "connect": "Conectar con…",
       "connecting": "Conectando",
+      "connectCards": "Conectar tarjetas",
+      "pickSource": "Haz clic en la tarjeta desde la que conectar",
+      "dragHint": "(o arrastra desde el botón de enlace de una tarjeta)",
       "pick": "Elige la tarjeta que conectar: {name} → ?",
       "noIndex": "{name} no tiene nota índice. Elige una primero.",
       "samePage": "{a} y {b} representan la misma página: no se puede relacionar consigo misma.",
@@ -391,5 +439,35 @@
     "fit": "Ajustar a la pantalla",
     "connections": "{links, plural, =0 {Sin enlaces.} one {Enlazada con # tarjeta.} other {Enlazada con # tarjetas.}} {manual, plural, =0 {} one {# relación.} other {# relaciones.}}",
     "newEntry": "Nueva entrada"
+  },
+  "code": {
+    "plain": "Texto sin formato",
+    "copy": "Copiar",
+    "copied": "Copiado",
+    "copyFailed": "No se pudo copiar",
+    "copyCode": "Copiar el código",
+    "languageLabel": "Lenguaje: {name}",
+    "pickLanguage": "Lenguaje del código",
+    "searchLanguage": "Buscar lenguajes…",
+    "languages": "Lenguajes"
+  },
+  "diagram": {
+    "label": "Diagrama: {first}",
+    "failed": "Diagrama que no se pudo dibujar",
+    "newerMacos": "Este diagrama necesita una versión más reciente de macOS."
+  },
+  "outline": {
+    "title": "Esquema",
+    "toggle": "Esquema",
+    "show": "Mostrar el esquema",
+    "hide": "Ocultar el esquema",
+    "empty": "Aún no hay encabezados.",
+    "resize": "Ancho del esquema"
+  },
+  "count": {
+    "words": "{count, plural, one {# palabra} other {# palabras}} · {minutes, number} min",
+    "selected": "{selected, number} de {count, plural, one {# palabra} other {# palabras}}",
+    "chars": "{chars, plural, one {# carácter} other {# caracteres}} · {bare, number} sin espacios",
+    "lines": "{lines, plural, one {# línea} other {# líneas}} · {chars, plural, one {# carácter} other {# caracteres}}"
   }
 }

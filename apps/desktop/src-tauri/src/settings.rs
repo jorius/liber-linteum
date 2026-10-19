@@ -142,6 +142,10 @@ impl From<FontChoice> for String {
     }
 }
 
+/// How wide pages read by default (M4b part 2 §1); vaults and pages can
+/// override it in `.nimw/vault.json`.
+pub use nimw_vault::PageWidth;
+
 /// How a Global View click opens the next level (M3a §5, GV-13).
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
@@ -213,6 +217,44 @@ impl From<FontSize> for u8 {
     }
 }
 
+pub const MIN_COVER_HEIGHT: u16 = 132;
+pub const MAX_COVER_HEIGHT: u16 = 600;
+
+/// The default cover height in px for pages without their own (cover
+/// resize), clamped to 132–600 (an out-of-range number is clamped, not
+/// reset). Pages keep their own in `.nimw/vault.json`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(from = "u32", into = "u16")]
+pub struct CoverHeight(u16);
+
+impl CoverHeight {
+    pub fn new(px: u32) -> CoverHeight {
+        CoverHeight(px.clamp(u32::from(MIN_COVER_HEIGHT), u32::from(MAX_COVER_HEIGHT)) as u16)
+    }
+
+    pub fn get(self) -> u16 {
+        self.0
+    }
+}
+
+impl Default for CoverHeight {
+    fn default() -> CoverHeight {
+        CoverHeight(200)
+    }
+}
+
+impl From<u32> for CoverHeight {
+    fn from(px: u32) -> CoverHeight {
+        CoverHeight::new(px)
+    }
+}
+
+impl From<CoverHeight> for u16 {
+    fn from(h: CoverHeight) -> u16 {
+        h.0
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct RecentVault {
@@ -244,6 +286,12 @@ pub struct Settings {
     pub global_view_mode: GlobalViewMode,
     /// Global View: edge kinds shown (M3a §6).
     pub global_view_edges: GlobalViewEdges,
+    /// Readable measure or full width, app-wide (M4b part 2 §1).
+    pub page_width: PageWidth,
+    /// Outline panel shown beside the editor (M4b part 2 §5).
+    pub outline: bool,
+    /// Cover band height for pages without their own (cover resize).
+    pub cover_height: CoverHeight,
     pub recent_vaults: Vec<RecentVault>,
     /// Keys this build does not know (written by a newer version); kept on save.
     #[serde(flatten)]
@@ -268,6 +316,9 @@ impl Default for Settings {
             line_numbers: false,
             global_view_mode: GlobalViewMode::Drill,
             global_view_edges: GlobalViewEdges::default(),
+            page_width: PageWidth::Readable,
+            outline: false,
+            cover_height: CoverHeight::default(),
             recent_vaults: Vec::new(),
             extra: serde_json::Map::new(),
         }
@@ -292,6 +343,9 @@ pub struct SettingsPatch {
     pub line_numbers: Option<bool>,
     pub global_view_mode: Option<GlobalViewMode>,
     pub global_view_edges: Option<GlobalViewEdges>,
+    pub page_width: Option<PageWidth>,
+    pub outline: Option<bool>,
+    pub cover_height: Option<CoverHeight>,
 }
 
 /// A recent vault as shown on the welcome screen.
@@ -349,6 +403,9 @@ fn parse_lenient(text: &str) -> Result<(Settings, Vec<String>), serde_json::Erro
     field!("lineNumbers", line_numbers);
     field!("globalViewMode", global_view_mode);
     field!("globalViewEdges", global_view_edges);
+    field!("pageWidth", page_width);
+    field!("outline", outline);
+    field!("coverHeight", cover_height);
     match map.remove("recentVaults") {
         None => {}
         Some(Value::Array(items)) => {
@@ -476,6 +533,15 @@ impl SettingsStore {
         }
         if let Some(v) = patch.global_view_edges {
             next.global_view_edges = v;
+        }
+        if let Some(v) = patch.page_width {
+            next.page_width = v;
+        }
+        if let Some(v) = patch.outline {
+            next.outline = v;
+        }
+        if let Some(v) = patch.cover_height {
+            next.cover_height = v;
         }
         self.save(&next)?;
         *s = next.clone();

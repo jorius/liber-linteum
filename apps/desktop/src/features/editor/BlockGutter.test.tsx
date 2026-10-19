@@ -136,7 +136,7 @@ describe('the block gutter in the Split pane (M4 §4)', () => {
     expect(status()).toBe('Moved P2 to the top of the page.');
   });
 
-  it('after a move the pane shows it at once; a key while the pane lags the editor does nothing', async () => {
+  it('after a move the pane shows it at once; keys while the pane lags the editor wait for it, in order', async () => {
     const pane = await split('P1\n\nP2\n\nP3\n');
     act(() => grip('P1').focus());
     await key(grip('P1'), 'ArrowDown');
@@ -145,13 +145,32 @@ describe('the block gutter in the Split pane (M4 §4)', () => {
     await act(() => new Promise((r) => setTimeout(r, 30)));
     expect(pane.querySelector('[data-source-start]')!.textContent).toBe('P2');
     await vi.waitFor(() => expect(grip('P2')).toHaveFocus());
-    // Typing reaches the pane only after its delay: meanwhile a gutter key
-    // would act on blocks that have changed, so it does nothing.
+    // Typing reaches the pane only after its delay: meanwhile the gutter's
+    // blocks aren't the editor's, so gutter keys wait (M4 §10.6) — never
+    // dropped (final review: the keyboard e2e flake), never acted on blocks
+    // that have changed.
     act(() => viewOf().dispatch({ changes: { from: viewOf().state.doc.length, insert: 'x' } }));
     await key(grip('P2'), 'ArrowDown', { altKey: true });
-    await key(grip('P2'), 'Enter');
+    await key(document.activeElement!, 'Enter');
     expect(source()).toBe('P2\n\nP1\n\nP3\nx');
     expect(status()).toBe('Moved P2 to the top of the page.');
+    // The pane catches up: Alt+↓ moves P2, then Enter picks it up.
+    await vi.waitFor(() => expect(source()).toBe('P1\n\nP2\n\nP3\nx'));
+    await vi.waitFor(() => expect(status()).toMatch(/^P2 picked up\./));
+    await vi.waitFor(() => expect(grip('P2')).toHaveFocus());
+  });
+
+  it('keys pressed right after a move, before the pane shows it, act on the moved block once it does', async () => {
+    await split('P1\n\nP2\n\nP3\n');
+    act(() => grip('P1').focus());
+    await key(grip('P1'), 'ArrowDown');
+    await key(grip('P2'), 'ArrowUp', { altKey: true });
+    // At once, as a fast typist would (the pane renders on its next turn):
+    // pick P2 up, one place further, drop it.
+    for (const k of ['Enter', 'ArrowDown', 'Enter']) await key(document.activeElement!, k);
+    await vi.waitFor(() => expect(source()).toBe('P1\n\nP3\n\nP2\n'));
+    await vi.waitFor(() => expect(grip('P2')).toHaveFocus());
+    expect(status()).toBe('Moved P2 after P3.');
   });
 
   it('Enter picks a block up: arrows choose a place, Enter drops it; Escape cancels', async () => {

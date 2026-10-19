@@ -1,14 +1,24 @@
-import { history, historyKeymap } from '@codemirror/commands';
+import { defaultKeymap, history, historyKeymap } from '@codemirror/commands';
 import { markdown, markdownLanguage } from '@codemirror/lang-markdown';
-import { HighlightStyle, syntaxHighlighting, syntaxTree } from '@codemirror/language';
+import { languages } from '@codemirror/language-data';
+import { languageFor } from '../../markdown/codeHighlight';
+import {
+  HighlightStyle,
+  LanguageDescription,
+  syntaxHighlighting,
+  syntaxTree,
+} from '@codemirror/language';
 import { Compartment, EditorState, Transaction, type Extension } from '@codemirror/state';
 import { drawSelection, EditorView, keymap, lineNumbers } from '@codemirror/view';
-import { tags } from '@lezer/highlight';
+import { tagHighlighter, tags } from '@lezer/highlight';
 import { diffIndices } from 'node-diff3';
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { EditorMode } from '../../ipc';
 import { usePageStore } from '../../stores/pageStore';
+import { usePageWidth } from '../../stores/pageWidthStore';
+import { isTextPath } from '../../stores/textFiles';
+import { nameOf } from '../../stores/tree';
 import { useSettingsStore } from '../../stores/settingsStore';
 import { useUiStore } from '../../stores/uiStore';
 import { Preview } from '../preview/Preview';
@@ -19,10 +29,14 @@ import { BlockGutter, type Shown } from './BlockGutter';
 import { SplitHint } from './SplitHint';
 import { activeFormats, editorKeymap, type ActiveFormat } from './format';
 import { linkCompletion } from './linkComplete';
+import { LanguagePicker } from './LanguagePicker';
+import { setLanguagePickerOpener } from './languagePickerOpen';
 import { LinkPicker } from './LinkPicker';
 import { setLinkPickerOpener } from './linkPickerOpen';
 import type { PageDoc } from './pageDoc';
+import { Outline } from './Outline';
 import { blockForOffset, offsetAtTop, topIn } from './scrollSync';
+import { notifyViewReset, notifyViewUpdate, setCurrentView } from './viewUpdates';
 import { Toolbar } from './Toolbar';
 import { hideView, pageDocOf, showView, storedState, storeState } from './views';
 import { toggleTaskIn } from './widgets';
@@ -33,8 +47,10 @@ const paneOf = new WeakMap<EditorView, (text: string, now: boolean) => void>();
 const toolbarOf = new WeakMap<EditorView, (state: EditorState) => void>();
 const modeSlot = new Compartment();
 const labelSlot = new Compartment();
-/** Line numbers in the gutter (Settings → Editor). */
+/** Line numbers in the gutter (Settings → Editor; always in text files). */
 const gutterSlot = new Compartment();
+/** A text file's language, loaded by its name (M4b part 2 §6). */
+const languageSlot = new Compartment();
 const gutter = (on: boolean): Extension => (on ? lineNumbers() : []);
 
 const sourceHighlight = HighlightStyle.define([
@@ -51,7 +67,39 @@ const sourceHighlight = HighlightStyle.define([
   },
 ]);
 
+/** Code tokens as classes, drawn with the palette's --code-* colours (the
+ *  rendered pane uses the same tokens through highlight.js classes). */
+const codeHighlighter = tagHighlighter([
+  {
+    tag: [tags.keyword, tags.bool, tags.null, tags.atom, tags.tagName],
+    class: 'cm-nimw-code-keyword',
+  },
+  { tag: [tags.string, tags.regexp, tags.special(tags.string)], class: 'cm-nimw-code-string' },
+  { tag: [tags.number, tags.integer, tags.float], class: 'cm-nimw-code-number' },
+  { tag: tags.comment, class: 'cm-nimw-code-comment' },
+  {
+    tag: [
+      tags.function(tags.variableName),
+      tags.function(tags.propertyName),
+      tags.propertyName,
+      tags.attributeName,
+    ],
+    class: 'cm-nimw-code-function',
+  },
+  { tag: [tags.typeName, tags.className, tags.namespace], class: 'cm-nimw-code-type' },
+  { tag: [tags.annotation, tags.modifier, tags.self], class: 'cm-nimw-code-meta' },
+  { tag: [tags.operator, tags.punctuation, tags.bracket], class: 'cm-nimw-code-punct' },
+]);
+
 const theme = EditorView.theme({
+  '.cm-nimw-code-keyword': { color: 'var(--code-keyword)' },
+  '.cm-nimw-code-string': { color: 'var(--code-string)' },
+  '.cm-nimw-code-number': { color: 'var(--code-number)' },
+  '.cm-nimw-code-comment': { color: 'var(--code-comment)', fontStyle: 'italic' },
+  '.cm-nimw-code-function': { color: 'var(--code-function)' },
+  '.cm-nimw-code-type': { color: 'var(--code-type)' },
+  '.cm-nimw-code-meta': { color: 'var(--code-meta)' },
+  '.cm-nimw-code-punct': { color: 'var(--code-punct)' },
   '&': { height: '100%', color: 'var(--color-text)', backgroundColor: 'transparent' },
   '&.cm-focused': { outline: 'none' },
   '.cm-scroller': {
@@ -176,9 +224,69 @@ function applyExternal(view: EditorView, text: string) {
   });
 }
 
+/** Text files highlight by file type (language-data, loaded lazily); a
+ *  view showing `d` gets the language once it has loaded. */
+function showLanguage(v: EditorView, d: PageDoc) {
+  if (!isTextPath(d.path)) return;
+  const lang = LanguageDescription.matchFilename(languages, nameOf(d.path));
+  if (!lang) return;
+  void lang.load().then((support) => {
+    if (v.state.facet(pageDocOf) === d) v.dispatch({ effects: languageSlot.reconfigure(support) });
+  });
+}
+
+/** Shared by pages and text files: autosave, the toolbar's state and the
+ *  Split pane follow the text. */
+const followers = [
+  // Autosave also when the editor loses focus (M2a §3.3).
+  EditorView.domEventHandlers({
+    blur: (_e, v) => {
+      void v.state.facet(pageDocOf)?.flush();
+    },
+  }),
+  EditorView.updateListener.of((u) => {
+    notifyViewUpdate(u);
+    if (u.docChanged || u.selectionSet || syntaxTree(u.startState) !== syntaxTree(u.state)) {
+      toolbarOf.get(u.view)?.(u.state);
+    }
+    if (!u.docChanged) return;
+    const next = u.state.doc.toString();
+    u.state.facet(pageDocOf)?.edit(next);
+    // A block move shows in the pane at once (its gutter acts on what
+    // the pane shows, M4 §4); typing waits for the render delay.
+    paneOf.get(u.view)?.(
+      next,
+      u.transactions.some((tr) => tr.isUserEvent('move.block')),
+    );
+  }),
+];
+
+/** A text or code file (M4b part 2 §6): Source-style, wrapped, line
+ *  numbers, highlighting by file type; no Markdown, links or attachments. */
+function createTextState(d: PageDoc, label: string): EditorState {
+  return EditorState.create({
+    doc: d.text,
+    extensions: [
+      pageDocOf.of(d),
+      history(),
+      drawSelection(),
+      EditorView.lineWrapping,
+      languageSlot.of([]),
+      syntaxHighlighting(codeHighlighter),
+      keymap.of([...defaultKeymap, ...historyKeymap]),
+      theme,
+      labelSlot.of(labelled(label)),
+      modeSlot.of(modeExtensions('source')),
+      gutterSlot.of(gutter(true)),
+      followers,
+    ],
+  });
+}
+
 /** A page's editor state. Its listeners find the page through `pageDocOf`
  *  and the Split pane through the view they run in (I5). */
 function createState(d: PageDoc, mode: EditorMode, label: string, numbers: boolean): EditorState {
+  if (isTextPath(d.path)) return createTextState(d, label);
   return EditorState.create({
     doc: d.text,
     extensions: [
@@ -187,7 +295,10 @@ function createState(d: PageDoc, mode: EditorMode, label: string, numbers: boole
       drawSelection(),
       EditorView.lineWrapping,
       // GFM syntax tree: Source highlighting and the toolbar's pressed state.
-      markdown({ base: markdownLanguage }),
+      // Picker ids (`mssql`, `angulartemplate`) resolve as in the rendered pane.
+      markdown({ base: markdownLanguage, codeLanguages: languageFor }),
+      // Syntax colours inside fenced code (M4b part 2 §2), in every mode.
+      syntaxHighlighting(codeHighlighter),
       keymap.of([{ key: 'Mod-Enter', run: followLinkAtCursor }, ...editorKeymap, ...historyKeymap]),
       pagePath.of(() => d.path),
       theme,
@@ -197,26 +308,7 @@ function createState(d: PageDoc, mode: EditorMode, label: string, numbers: boole
       attachmentHandlers(),
       linkCompletion(),
       gutterSlot.of(gutter(numbers)),
-      // Autosave also when the editor loses focus (M2a §3.3).
-      EditorView.domEventHandlers({
-        blur: (_e, v) => {
-          void v.state.facet(pageDocOf)?.flush();
-        },
-      }),
-      EditorView.updateListener.of((u) => {
-        if (u.docChanged || u.selectionSet || syntaxTree(u.startState) !== syntaxTree(u.state)) {
-          toolbarOf.get(u.view)?.(u.state);
-        }
-        if (!u.docChanged) return;
-        const next = u.state.doc.toString();
-        u.state.facet(pageDocOf)?.edit(next);
-        // A block move shows in the pane at once (its gutter acts on what
-        // the pane shows, M4 §4); typing waits for the render delay.
-        paneOf.get(u.view)?.(
-          next,
-          u.transactions.some((tr) => tr.isUserEvent('move.block')),
-        );
-      }),
+      followers,
     ],
   });
 }
@@ -230,6 +322,8 @@ export interface EditorProps {
 
 /** The page editor: Live Preview, Source, or Split (Source + rendered pane). */
 export function Editor({ doc, mode, label }: EditorProps) {
+  const width = usePageWidth(doc.path);
+  const textFile = isTextPath(doc.path);
   const { t } = useTranslation();
   const host = useRef<HTMLDivElement>(null);
   const pane = useRef<HTMLDivElement>(null);
@@ -245,8 +339,10 @@ export function Editor({ doc, mode, label }: EditorProps) {
   }, []);
   const showToolbar = useSettingsStore((s) => s.settings.toolbar);
   const showNumbers = useSettingsStore((s) => s.settings.lineNumbers);
+  const showOutline = useSettingsStore((s) => s.settings.outline);
   const [toolbarView, setToolbarView] = useState<EditorView | null>(null);
   const [picker, setPicker] = useState(false);
+  const [langPicker, setLangPicker] = useState<{ at: number; anchor: HTMLElement } | null>(null);
   const [active, setActive] = useState<Set<ActiveFormat>>(() => new Set());
   const showFormats = useCallback((state: EditorState) => {
     const next = activeFormats(state);
@@ -265,14 +361,19 @@ export function Editor({ doc, mode, label }: EditorProps) {
     toolbarOf.set(v, showFormats);
     setToolbarView(v);
     setLinkPickerOpener(v, () => setPicker(true));
+    setLanguagePickerOpener(v, (at, anchor) => setLangPicker({ at, anchor }));
     showFormats(v.state);
+    setCurrentView(v);
+    showLanguage(v, current.current);
     return () => {
+      setCurrentView(null);
       hideView(current.current, v);
       storeState(current.current, v.state);
       current.current.sink = null;
       paneOf.delete(v);
       toolbarOf.delete(v);
       setLinkPickerOpener(v, null);
+      setLanguagePickerOpener(v, null);
       v.destroy();
       view.current = null;
     };
@@ -289,6 +390,8 @@ export function Editor({ doc, mode, label }: EditorProps) {
       showView(doc, v);
       v.setState(stateFor(doc));
       showFormats(v.state);
+      notifyViewReset(v);
+      showLanguage(v, doc);
     }
     doc.sink = (next) => applyExternal(v, next);
     // Changed while it was in the background (reload or merge without a view).
@@ -297,7 +400,7 @@ export function Editor({ doc, mode, label }: EditorProps) {
       effects: [
         modeSlot.reconfigure(modeExtensions(mode)),
         labelSlot.reconfigure(labelled(label)),
-        gutterSlot.reconfigure(gutter(showNumbers)),
+        gutterSlot.reconfigure(gutter(showNumbers || isTextPath(doc.path))),
       ],
     });
     setText(doc.text);
@@ -311,7 +414,9 @@ export function Editor({ doc, mode, label }: EditorProps) {
   }, [mode, label]);
 
   useLayoutEffect(() => {
-    view.current?.dispatch({ effects: gutterSlot.reconfigure(gutter(showNumbers)) });
+    view.current?.dispatch({
+      effects: gutterSlot.reconfigure(gutter(showNumbers || isTextPath(current.current.path))),
+    });
   }, [showNumbers]);
 
   // Back from the Global View (a card opened in the editor, ⌘1): the keyboard
@@ -375,23 +480,38 @@ export function Editor({ doc, mode, label }: EditorProps) {
 
   return (
     <div className={styles.frame}>
-      {showToolbar && toolbarView && <Toolbar view={toolbarView} active={active} />}
+      {showToolbar && !textFile && toolbarView && <Toolbar view={toolbarView} active={active} />}
       {picker && toolbarView && <LinkPicker view={toolbarView} onClose={() => setPicker(false)} />}
+      {langPicker && toolbarView && (
+        <LanguagePicker
+          view={toolbarView}
+          at={langPicker.at}
+          anchor={langPicker.anchor}
+          onClose={() => setLangPicker(null)}
+        />
+      )}
       {split && <SplitHint />}
-      <div className={split ? styles.split : styles.single}>
-        <div ref={host} className={mode === 'livePreview' ? styles.live : styles.source} />
-        {split && (
-          <div ref={pane} className={styles.pane} role="region" aria-label={t('editor.preview')}>
-            {toolbarView && <BlockGutter view={toolbarView} pane={pane} shown={shown} />}
-            <Preview
-              text={text}
-              path={doc.path}
-              onToggleTask={toggleTask}
-              onRendered={onRendered}
-              delay={renderNow ? 0 : undefined}
-            />
-          </div>
-        )}
+      <div className={styles.body}>
+        <div className={split ? styles.split : styles.single}>
+          <div
+            ref={host}
+            data-width={width}
+            className={`${mode === 'livePreview' ? styles.live : styles.source} ${width === 'full' ? styles.full : ''}`}
+          />
+          {split && (
+            <div ref={pane} className={styles.pane} role="region" aria-label={t('editor.preview')}>
+              {toolbarView && <BlockGutter view={toolbarView} pane={pane} shown={shown} />}
+              <Preview
+                text={text}
+                path={doc.path}
+                onToggleTask={toggleTask}
+                onRendered={onRendered}
+                delay={renderNow ? 0 : undefined}
+              />
+            </div>
+          )}
+        </div>
+        {showOutline && !textFile && toolbarView && <Outline view={toolbarView} text={text} />}
       </div>
     </div>
   );

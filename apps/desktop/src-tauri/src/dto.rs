@@ -154,15 +154,28 @@ pub struct AttachmentsDto {
 }
 
 #[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct VaultSettingsDto {
     pub attachments: AttachmentsDto,
-    /// Obsidian's `attachmentFolderPath` when set (it wins).
+    /// Obsidian's `attachmentFolderPath` when set (it wins unless overridden).
     pub obsidian: Option<String>,
+    /// NIMW's place wins over Obsidian's (M4b §5).
+    pub override_obsidian: bool,
+    /// The vault's default page width (`None`: the app's; M4b part 2 §1).
+    pub page_width: Option<nimw_vault::PageWidth>,
+    /// Pages with their own width.
+    pub page_widths: std::collections::BTreeMap<String, nimw_vault::PageWidth>,
+    /// Pages with their own cover height in px (cover resize).
+    pub cover_heights: std::collections::BTreeMap<String, u32>,
 }
 
 #[derive(Debug, Clone, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct VaultSettingsPatch {
     pub attachments: Option<AttachmentsDto>,
+    pub override_obsidian: Option<bool>,
+    /// `"readable"`, `"full"` or `"default"` (use the app setting).
+    pub page_width: Option<String>,
 }
 
 /// `gv_children`'s argument: which level to open (M3a §3).

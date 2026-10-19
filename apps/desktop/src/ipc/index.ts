@@ -35,6 +35,7 @@ export type ErrorKind =
   | 'notPermitted'
   | 'notAFile'
   | 'tooLarge'
+  | 'notAText'
   | 'io';
 
 export interface CommandError {
@@ -172,7 +173,15 @@ export interface Settings {
   globalViewMode: GlobalViewMode;
   /** Global View: edge kinds shown (M3a §6). */
   globalViewEdges: GlobalViewEdges;
+  /** Readable measure or full width, app-wide (M4b part 2 §1). */
+  pageWidth: PageWidth;
+  /** Outline panel shown beside the editor (M4b part 2 §5). */
+  outline: boolean;
+  /** Cover band height in px for pages without their own (132–600). */
+  coverHeight: number;
 }
+
+export type PageWidth = 'readable' | 'full';
 
 export type GlobalViewMode = 'drill' | 'expand';
 
@@ -200,6 +209,9 @@ export interface SettingsPatch {
   lineNumbers?: boolean;
   globalViewMode?: GlobalViewMode;
   globalViewEdges?: GlobalViewEdges;
+  pageWidth?: PageWidth;
+  outline?: boolean;
+  coverHeight?: number;
 }
 
 export interface SettingsResponse {
@@ -275,12 +287,23 @@ export type AttachmentMode = 'vault' | 'same' | 'subfolder' | 'folder';
 
 export interface VaultSettings {
   attachments: { mode: AttachmentMode; path: string };
-  /** Obsidian's `attachmentFolderPath` when set (it wins). */
+  /** Obsidian's `attachmentFolderPath` when set (it wins unless overridden). */
   obsidian: string | null;
+  /** NIMW's place wins over Obsidian's (M4b §5). */
+  overrideObsidian: boolean;
+  /** The vault's default page width (`null`: the app's; M4b part 2 §1). */
+  pageWidth: PageWidth | null;
+  /** Pages with their own width. */
+  pageWidths: Record<string, PageWidth>;
+  /** Pages with their own cover height in px (cover resize). */
+  coverHeights: Record<string, number>;
 }
 
 export interface VaultSettingsPatch {
   attachments?: { mode: AttachmentMode; path: string };
+  overrideObsidian?: boolean;
+  /** `'default'` clears the vault's own width. */
+  pageWidth?: PageWidth | 'default';
 }
 
 /** What one Global View click opens (M3a §3). */
@@ -358,6 +381,9 @@ export const pageGet = (path: string) => call<Page>('page_get', { path });
 export const backlinkCount = (path: string) => call<number>('backlink_count', { path });
 export const entryCreatePage = (dir: string, name: string) =>
   call<string>('entry_create_page', { dir, name });
+/** An empty text or code file `name` in `dir` (final review I6). */
+export const entryCreateText = (dir: string, name: string) =>
+  call<string>('entry_create_text', { dir, name });
 export const entryCreateFolder = (parent: string, name: string) =>
   call<string>('entry_create_folder', { parent, name });
 export const entryRename = (from: string, to: string) =>
@@ -370,6 +396,10 @@ export const vaultsForget = (path: string) => call<void>('vaults_forget', { path
 export const pageRead = (path: string) => call<PageText>('page_read', { path });
 export const pageWrite = (path: string, text: string, expectedHash: string) =>
   call<WriteResult>('page_write', { path, text, expectedHash });
+/** Plain-text and code files (M4b part 2 §6): `notAText` for anything else. */
+export const textRead = (path: string) => call<PageText>('text_read', { path });
+export const textWrite = (path: string, text: string, expectedHash: string) =>
+  call<WriteResult>('text_write', { path, text, expectedHash });
 export const pageCreateConflictCopy = (path: string, text: string) =>
   call<string>('page_create_conflict_copy', { path, text });
 export const linksResolve = (source: string, targets: LinkTarget[]) =>
@@ -411,6 +441,12 @@ export const indexPickSet = (folder: string, page: string | null) =>
 export const vaultSettingsGet = () => call<VaultSettings>('vault_settings_get');
 export const vaultSettingsSet = (patch: VaultSettingsPatch) =>
   call<VaultSettings>('vault_settings_set', { patch });
+/** A page's own width (`null` clears it; M4b part 2 §1). */
+export const pageWidthSet = (path: string, width: PageWidth | null) =>
+  call<VaultSettings>('page_width_set', { path, width });
+/** A page's cover height in px (Rust clamps it to 132–2000); `null` clears it. */
+export const coverHeightSet = (path: string, height: number | null) =>
+  call<VaultSettings>('cover_height_set', { path, height });
 
 /** URL of a vault file for <img>/<audio> through the `nimw-asset:` protocol
  *  (M2a §2.5); WebView2 on Windows reaches custom protocols over http. */

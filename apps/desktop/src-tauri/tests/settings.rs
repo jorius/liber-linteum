@@ -362,3 +362,98 @@ fn m3a_global_view_settings_default_persist_and_reset() {
     assert_eq!(s.theme, Theme::Dark);
     assert!(warning.unwrap().contains("globalViewMode"));
 }
+
+/// M4b part 2 §1: the app-wide page width, readable by default, persisted,
+/// and reset on its own when unreadable.
+#[test]
+fn m4b2_page_width_setting_default_persist_and_reset() {
+    use nimw_desktop::settings::PageWidth;
+    let dir = tempfile::tempdir().unwrap();
+    let s = store(dir.path());
+    assert_eq!(s.get().0.page_width, PageWidth::Readable);
+    s.update(SettingsPatch {
+        page_width: Some(PageWidth::Full),
+        ..Default::default()
+    })
+    .unwrap();
+    let saved: serde_json::Value =
+        serde_json::from_str(&std::fs::read_to_string(dir.path().join("settings.json")).unwrap())
+            .unwrap();
+    assert_eq!(saved["pageWidth"], "full");
+    std::fs::write(
+        dir.path().join("settings.json"),
+        r#"{"pageWidth":"wide","theme":"dark"}"#,
+    )
+    .unwrap();
+    let (s, warning) = store(dir.path()).get();
+    assert_eq!(s.page_width, PageWidth::Readable);
+    assert_eq!(s.theme, Theme::Dark);
+    assert!(warning.unwrap().contains("pageWidth"));
+}
+
+/// M4b part 2 §5: the outline panel's state is remembered app-wide (off by
+/// default); a wrong value falls back to off with a warning.
+#[test]
+fn m4b2_outline_setting_default_persist_and_reset() {
+    let dir = tempfile::tempdir().unwrap();
+    let s = store(dir.path());
+    assert!(!s.get().0.outline);
+    s.update(SettingsPatch {
+        outline: Some(true),
+        ..Default::default()
+    })
+    .unwrap();
+    let saved: serde_json::Value =
+        serde_json::from_str(&std::fs::read_to_string(dir.path().join("settings.json")).unwrap())
+            .unwrap();
+    assert_eq!(saved["outline"], true);
+    assert!(store(dir.path()).get().0.outline);
+    std::fs::write(
+        dir.path().join("settings.json"),
+        r#"{"outline":"yes","theme":"dark"}"#,
+    )
+    .unwrap();
+    let (s, warning) = store(dir.path()).get();
+    assert!(!s.outline);
+    assert_eq!(s.theme, Theme::Dark);
+    assert!(warning.unwrap().contains("outline"));
+}
+
+/// Cover resize: the default cover height for pages without their own,
+/// 200 px, persisted, clamped to 132–600 and reset on its own when it isn't
+/// a number.
+#[test]
+fn cover_height_setting_default_persist_clamp_and_reset() {
+    use nimw_desktop::settings::CoverHeight;
+    let dir = tempfile::tempdir().unwrap();
+    let s = store(dir.path());
+    assert_eq!(s.get().0.cover_height, CoverHeight::new(200));
+    assert_eq!(s.get().0.cover_height.get(), 200);
+    s.update(SettingsPatch {
+        cover_height: Some(CoverHeight::new(280)),
+        ..Default::default()
+    })
+    .unwrap();
+    let saved: serde_json::Value =
+        serde_json::from_str(&std::fs::read_to_string(dir.path().join("settings.json")).unwrap())
+            .unwrap();
+    assert_eq!(saved["coverHeight"], 280);
+    assert_eq!(store(dir.path()).get().0.cover_height.get(), 280);
+    for (text, px) in [
+        (r#"{"coverHeight":20}"#, 132),
+        (r#"{"coverHeight":5000}"#, 600),
+        (r#"{"coverHeight":360}"#, 360),
+    ] {
+        std::fs::write(dir.path().join("settings.json"), text).unwrap();
+        assert_eq!(store(dir.path()).get().0.cover_height.get(), px, "{text}");
+    }
+    std::fs::write(
+        dir.path().join("settings.json"),
+        r#"{"coverHeight":"huge","theme":"dark"}"#,
+    )
+    .unwrap();
+    let (s, warning) = store(dir.path()).get();
+    assert_eq!(s.cover_height.get(), 200);
+    assert_eq!(s.theme, Theme::Dark);
+    assert!(warning.unwrap().contains("coverHeight"));
+}

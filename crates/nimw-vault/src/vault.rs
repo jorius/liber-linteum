@@ -65,20 +65,26 @@ impl Vault {
     }
 
     /// Where new attachments go, re-read from disk so a config edit while the
-    /// vault is open applies at once (M2c §5.3): Obsidian's
-    /// `attachmentFolderPath` wins, then `.nimw/vault.json`, then the default.
+    /// vault is open applies at once (M2c §5.3): `.nimw/vault.json` when it
+    /// overrides Obsidian (M4b §5), else Obsidian's `attachmentFolderPath`,
+    /// then `.nimw/vault.json`, then the default.
     pub fn attachment_policy(&self) -> AttachmentPolicy {
         let (nimw, obsidian) = self.attachment_sources();
-        obsidian
-            .map(|(_, policy)| policy)
-            .or_else(|| nimw.and_then(|a| a.policy()))
-            .unwrap_or_default()
+        let overrides = nimw.as_ref().is_some_and(|a| a.override_obsidian);
+        match nimw.and_then(|a| a.policy()) {
+            Some(policy) if overrides => policy,
+            ours => obsidian
+                .map(|(_, policy)| policy)
+                .or(ours)
+                .unwrap_or_default(),
+        }
     }
 
     /// NIMW's own attachment setting (or the default) and Obsidian's, for the
     /// Settings dialog.
     pub fn attachment_config(&self) -> AttachmentConfig {
         let (nimw, obsidian) = self.attachment_sources();
+        let override_obsidian = nimw.as_ref().is_some_and(|a| a.override_obsidian);
         let (mode, path) = match nimw.filter(|a| a.policy().is_some()) {
             Some(a) => (a.mode, a.path),
             None => ("subfolder".to_string(), "attachments".to_string()),
@@ -87,13 +93,20 @@ impl Vault {
             mode,
             path,
             obsidian: obsidian.map(|(value, _)| value),
+            override_obsidian,
         }
     }
 
     /// Stores NIMW's attachment setting in `.nimw/vault.json` (created on first
     /// need, VLT-02), keeping every other key. A file that isn't a JSON object
-    /// is never overwritten.
-    pub fn set_nimw_attachments(&self, mode: &str, path: &str) -> Result<()> {
+    /// is never overwritten. `override_obsidian`: whether NIMW's place wins
+    /// over Obsidian's (M4b §5); `None` keeps what is stored.
+    pub fn set_nimw_attachments(
+        &self,
+        mode: &str,
+        path: &str,
+        override_obsidian: Option<bool>,
+    ) -> Result<()> {
         let invalid = |reason: &str| VaultError::InvalidConfig {
             file: NIMW_JSON.to_string(),
             reason: reason.to_string(),
@@ -107,6 +120,7 @@ impl Vault {
         let attachments = NimwAttachments {
             mode: mode.to_string(),
             path: stored.to_string(),
+            override_obsidian: false,
         };
         if (!stored.is_empty() || matches!(mode, "subfolder" | "folder"))
             && (attachments.policy().is_none() || stored.split('/').any(is_hidden_name))
@@ -114,10 +128,17 @@ impl Vault {
             return Err(invalid(&format!("invalid attachment folder {path:?}")));
         }
         self.update_json_object(NIMW_JSON, true, |map| {
-            map.insert(
-                "attachments".to_string(),
-                serde_json::json!({ "mode": mode, "path": stored }),
-            );
+            let kept = map
+                .get("attachments")
+                .and_then(|a| a.get("overrideObsidian"))
+                .and_then(serde_json::Value::as_bool)
+                .unwrap_or(false);
+            let mut value = serde_json::json!({ "mode": mode, "path": stored });
+            let over = override_obsidian.unwrap_or(kept);
+            if override_obsidian.is_some() || kept {
+                value["overrideObsidian"] = serde_json::Value::Bool(over);
+            }
+            map.insert("attachments".to_string(), value);
         })
     }
 

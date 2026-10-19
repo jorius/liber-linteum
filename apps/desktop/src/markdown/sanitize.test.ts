@@ -211,3 +211,22 @@ describe('malformed percent-encoding (I4)', () => {
     expect(links[2].properties.dataTarget).toBe('Notes/C%.md');
   });
 });
+
+describe('highlighted code (M4b part 2 §2)', () => {
+  const spans = (src: string) => elements(render(src)).filter((e) => e.tagName === 'span');
+
+  it("keeps highlight.js's sub-scope classes: a class name takes the type colour (final review M6)", () => {
+    const foo = spans('```js\nclass Foo extends Bar {}\n```\n').find((s) =>
+      s.children.some((c) => c.type === 'text' && c.value === 'Foo'),
+    );
+    expect(foo?.properties.className).toEqual(['hljs-title', 'class_']);
+  });
+
+  it('keeps no other class on a span', () => {
+    expect(
+      spans('<span class="evil hljs-x x_ _x X_ a-b_">s</span>\n').map(
+        (s) => s.properties.className,
+      ),
+    ).toEqual([['hljs-x', 'x_']]);
+  });
+});

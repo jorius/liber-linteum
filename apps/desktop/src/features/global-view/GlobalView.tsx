@@ -35,6 +35,8 @@ export function GlobalView() {
   const empty = useGvStore((s) => s.canvas.cards.length === 0);
   const shownKey = useGvStore((s) => s.shownKey);
   const connectFrom = useGvStore((s) => s.connectFrom);
+  const connectPick = useGvStore((s) => s.connectPick);
+  const connecting = connectPick || connectFrom !== null;
   // A hub page's neighbourhood is capped (final review m14): say how many
   // linked pages the level leaves out.
   const omitted = useGvStore((s) => (s.shownKey ? (s.levels[s.shownKey]?.omitted ?? 0) : 0));
@@ -124,21 +126,25 @@ export function GlobalView() {
 
   /** Leaves connect mode from the bar (Cancel) or with Escape anywhere in
    *  the view (M3b §2, final review m3). The bar goes away: the keyboard on
-   *  it goes back to the source card. */
+   *  it goes back to the source card, or to Connect cards while no card was
+   *  picked yet (M4b §6). */
   const leaveConnect = () => {
-    const from = useGvStore.getState().connectFrom;
-    if (!from) return;
+    const { connectFrom: from, connectPick: picking } = useGvStore.getState();
+    if (!from && !picking) return;
     const onBar = bar.current?.contains(document.activeElement) ?? false;
     useGvStore.getState().cancelConnect();
     if (onBar) {
       region.current
-        ?.querySelector<HTMLElement>(`[data-gv-card="${CSS.escape(from.path)}"]`)
+        ?.querySelector<HTMLElement>(
+          from ? `[data-gv-card="${CSS.escape(from.path)}"]` : '[data-gv-connect]',
+        )
         ?.focus({ preventScroll: true });
     }
   };
   const onKeyDown = (e: KeyboardEvent) => {
+    const { connectFrom: from, connectPick: picking } = useGvStore.getState();
     // A card's own Escape (Canvas) has already left it.
-    if (e.key !== 'Escape' || e.defaultPrevented || !useGvStore.getState().connectFrom) return;
+    if (e.key !== 'Escape' || e.defaultPrevented || (!from && !picking)) return;
     e.preventDefault();
     leaveConnect();
   };
@@ -162,17 +168,24 @@ export function GlobalView() {
       {/* The bar's live region stays mounted, empty outside connect mode: one
           mounted with its text is usually not announced (VoiceOver; final
           review m10). */}
-      <div ref={bar} className={connectFrom ? styles.connectBar : undefined}>
-        {connectFrom && <LinkIcon />}
+      <div ref={bar} className={connecting ? styles.connectBar : undefined}>
+        {connecting && <LinkIcon />}
         <p
           role="status"
-          aria-label={connectFrom ? t('gv.relations.connecting') : undefined}
+          aria-label={connecting ? t('gv.relations.connecting') : undefined}
           className={styles.connectText}
         >
           {connectFrom && t('gv.relations.pick', { name: connectFrom.title })}
+          {/* Connect cards (M4b §6): the source card first. */}
+          {!connectFrom && connectPick && (
+            <>
+              {t('gv.relations.pickSource')}{' '}
+              <span className={styles.connectHint}>{t('gv.relations.dragHint')}</span>
+            </>
+          )}
         </p>
-        {connectFrom && (
-          <button type="button" onClick={leaveConnect}>
+        {connecting && (
+          <button type="button" className="btn btn-secondary btn-sm" onClick={leaveConnect}>
             {t('dialogs.cancel')}
           </button>
         )}

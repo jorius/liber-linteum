@@ -4,9 +4,11 @@ import type { Image, Link, Parent, Root, RootContent, Text } from 'mdast';
 import type { Node, Point } from 'unist';
 import remarkFrontmatter from 'remark-frontmatter';
 import remarkGfm from 'remark-gfm';
+import remarkMath from 'remark-math';
 import remarkParse from 'remark-parse';
 import { unified } from 'unified';
 import { findComments, maskComments, remarkContainerDirectives, transformBlocks } from './blocks';
+import { remarkDollarRules } from './dollarMath';
 import { frontmatterLinks, frontmatterTags, readFrontmatter } from './frontmatter';
 import { scanText } from './inline';
 import { locator } from './locate';
@@ -17,10 +19,17 @@ import { safeDecode } from './decode';
 const processor = unified()
   .use(remarkParse)
   .use(remarkGfm)
+  .use(remarkMath)
+  .use(remarkDollarRules)
   .use(remarkFrontmatter, ['yaml'])
   .use(remarkContainerDirectives);
 /** For text without front matter. */
-const noFrontmatter = unified().use(remarkParse).use(remarkGfm).use(remarkContainerDirectives);
+const noFrontmatter = unified()
+  .use(remarkParse)
+  .use(remarkGfm)
+  .use(remarkMath)
+  .use(remarkDollarRules)
+  .use(remarkContainerDirectives);
 
 /** Whether `src` starts with a block remark-frontmatter reads as YAML: a
  *  `---` line (trailing spaces or tabs allowed) closed by a later one. Its

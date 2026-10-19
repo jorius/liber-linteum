@@ -1,7 +1,7 @@
 import { useEffect, useId, useState, type KeyboardEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { SUPPORTED_LANGUAGES } from '../../i18n';
-import { fontsList, PALETTE_IDS, type PaletteChoice, type Theme } from '../../ipc';
+import { fontsList, PALETTE_IDS, type PaletteChoice, type Theme, type PageWidth } from '../../ipc';
 import { useSettingsStore } from '../../stores/settingsStore';
 import { useVaultStore } from '../../stores/vaultStore';
 import { contrast } from '../../theme/color';
@@ -17,10 +17,17 @@ const THEMES: Theme[] = ['system', 'light', 'dark'];
 const themeKey = { system: 'themeSystem', light: 'themeLight', dark: 'themeDark' } as const;
 const PALETTE_CHOICES: PaletteChoice[] = [...PALETTE_IDS, 'custom'];
 const SIZES = [13, 14, 15, 16, 17, 18, 19, 20];
+/** Default cover heights (cover resize); a page can be dragged to its own. */
+const COVER_HEIGHTS = [
+  { px: 132, key: 'coverHeightSmall' },
+  { px: 200, key: 'coverHeightMedium' },
+  { px: 280, key: 'coverHeightLarge' },
+  { px: 360, key: 'coverHeightExtraLarge' },
+] as const;
 const HEX = /^#[0-9a-f]{6}$/i;
 
 /** Language, appearance (theme, palette, custom accent), editor (fonts, text
- *  size, toolbar), file settings and, with a vault open, where its
+ *  size, page width, default cover height, toolbar), file settings and, with a vault open, where its
  *  attachments go (M2c §5.4); every change is saved at once (M2b §7). */
 export function SettingsDialog({ onClose }: { onClose: () => void }) {
   const { t } = useTranslation();
@@ -123,6 +130,37 @@ export function SettingsDialog({ onClose }: { onClose: () => void }) {
             ))}
           </select>
         </label>
+        <label className={styles.field}>
+          <span>{t('settings.pageWidth')}</span>
+          <select
+            className={styles.select}
+            value={settings.pageWidth}
+            onChange={(e) => void update({ pageWidth: e.target.value as PageWidth })}
+          >
+            <option value="readable">{t('settings.pageWidthReadable')}</option>
+            <option value="full">{t('settings.pageWidthFull')}</option>
+          </select>
+        </label>
+        <label className={styles.field}>
+          <span>{t('settings.coverHeight')}</span>
+          <select
+            className={styles.select}
+            value={settings.coverHeight}
+            onChange={(e) => void update({ coverHeight: Number(e.target.value) })}
+          >
+            {/* A default set by hand in settings.json stays visible. */}
+            {!COVER_HEIGHTS.some((c) => c.px === settings.coverHeight) && (
+              <option value={settings.coverHeight}>
+                {t('settings.coverHeightPx', { px: settings.coverHeight })}
+              </option>
+            )}
+            {COVER_HEIGHTS.map(({ px, key }) => (
+              <option key={px} value={px}>
+                {t(`settings.${key}`, { px })}
+              </option>
+            ))}
+          </select>
+        </label>
         <label className={styles.check}>
           <input
             type="checkbox"
@@ -166,7 +204,7 @@ export function SettingsDialog({ onClose }: { onClose: () => void }) {
       {vaultOpen && <VaultSettingsSection />}
 
       <div className={styles.buttons}>
-        <button type="button" className={`${styles.button} ${styles.primary}`} onClick={onClose}>
+        <button type="button" className="btn btn-secondary" onClick={onClose}>
           {t('dialogs.close')}
         </button>
       </div>

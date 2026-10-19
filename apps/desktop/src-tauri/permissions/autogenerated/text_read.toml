@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-text-read"
+description = "Enables the text_read command without any pre-configured scope."
+commands.allow = ["text_read"]
+
+[[permission]]
+identifier = "deny-text-read"
+description = "Denies the text_read command without any pre-configured scope."
+commands.deny = ["text_read"]

@@ -502,3 +502,97 @@ describe('a page switch while a paste or drop is saved (final review I1)', () =>
     expect(viewOf().state.doc.toString()).toBe('BBB\n');
   });
 });
+
+describe('pasting other image types (M4b §4)', () => {
+  /** jsdom can't decode images: stand-ins for the webview's decoder. */
+  function decoder(ok: boolean) {
+    const png = new Uint8Array([0x89, 0x50, 0x4e, 0x47]);
+    vi.stubGlobal(
+      'createImageBitmap',
+      vi.fn(async () => {
+        if (!ok) throw new Error('cannot decode');
+        return { width: 2, height: 1, close: () => undefined };
+      }),
+    );
+    vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue({
+      drawImage: () => undefined,
+    } as unknown as CanvasRenderingContext2D);
+    vi.spyOn(HTMLCanvasElement.prototype, 'toBlob').mockImplementation(function (cb) {
+      cb(new Blob([png], { type: 'image/png' }));
+    });
+    return png;
+  }
+  afterEach(() => vi.unstubAllGlobals());
+
+  it('a TIFF (Preview, Photos) is converted to PNG before it is saved', async () => {
+    const png = decoder(true);
+    const saved: unknown[] = [];
+    fakeDisk(
+      { 'P.md': 'x\n' },
+      {
+        attachment_paste: (bytes) => {
+          saved.push(bytes);
+          return { path: 'attachments/shot.png', link: 'shot.png', copied: true };
+        },
+      },
+    );
+    await mount('P.md');
+    const e = paste([new File([new Uint8Array([1, 2])], 'clip.tiff', { type: 'image/tiff' })]);
+    expect(e.defaultPrevented).toBe(true);
+    await vi.waitFor(() => expect(viewOf().state.doc.toString()).toBe('![[shot.png]]x\n'));
+    // The PNG the decoder drew, not the TIFF's own bytes.
+    expect(saved).toEqual([png]);
+  });
+
+  it('an image the webview can’t decode says so and saves nothing', async () => {
+    decoder(false);
+    const disk = fakeDisk({ 'P.md': 'x\n' });
+    await mount('P.md');
+    paste([new File([new Uint8Array([1])], 'odd.heic', { type: 'image/heic' })]);
+    await vi.waitFor(() =>
+      expect(useToastStore.getState().toasts.at(-1)?.message).toBe(
+        'This image can’t be pasted. Save it as PNG or JPEG first.',
+      ),
+    );
+    expect(disk.calls.some(([c]) => c === 'attachment_paste')).toBe(false);
+    expect(viewOf().state.doc.toString()).toBe('x\n');
+  });
+
+  it('review focus: one undecodable image among others: the rest are saved, in order', async () => {
+    decoder(false);
+    const saved: number[][] = [];
+    fakeDisk(
+      { 'P.md': 'x\n' },
+      {
+        attachment_paste: (bytes) => {
+          saved.push([...(bytes as unknown as Uint8Array)]);
+          const link = saved.length === 1 ? 'one.png' : 'two.jpg';
+          return { path: `attachments/${link}`, link, copied: true };
+        },
+      },
+    );
+    await mount('P.md');
+    paste([
+      new File([new Uint8Array([1])], 'a.png', { type: 'image/png' }),
+      new File([new Uint8Array([2])], 'odd.heic', { type: 'image/heic' }),
+      new File([new Uint8Array([3])], 'b.jpg', { type: 'image/jpeg' }),
+    ]);
+    await vi.waitFor(() =>
+      expect(viewOf().state.doc.toString()).toBe('![[one.png]]\n![[two.jpg]]x\n'),
+    );
+    expect(saved).toEqual([[1], [3]]);
+    expect(useToastStore.getState().toasts.at(-1)?.message).toBe(
+      'This image can’t be pasted. Save it as PNG or JPEG first.',
+    );
+  });
+
+  it('SVG is left to the editor’s own paste (never decoded or saved)', async () => {
+    decoder(true);
+    const disk = fakeDisk({ 'P.md': 'x\n' });
+    await mount('P.md');
+    paste([new File(['<svg/>'], 'a.svg', { type: 'image/svg+xml' })]);
+    await act(() => new Promise((r) => setTimeout(r, 20)));
+    expect(createImageBitmap).not.toHaveBeenCalled();
+    expect(disk.calls.some(([c]) => c === 'attachment_paste')).toBe(false);
+  });
+});

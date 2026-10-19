@@ -4,6 +4,9 @@ import { createElement, type MouseEvent, type ReactNode } from 'react';
 import { assetUrl } from '../../ipc';
 import { followLink } from '../../stores/links';
 import { Callout } from './Callout';
+import { MathView } from './MathView';
+import { MermaidView } from './MermaidView';
+import { CodeBlock } from './CodeBlock';
 import { Embed } from './Embed';
 import styles from './Preview.module.css';
 import type { Resolve } from './useResolved';
@@ -94,6 +97,10 @@ function renderElement(e: Element, key: number, ctx: RenderCtx): ReactNode {
   const p = e.properties;
   const { t } = ctx;
   switch (p.dataNimw) {
+    case 'math':
+      return (
+        <MathView key={key} tex={String(p.dataTex ?? '')} display={p.dataDisplay === 'block'} />
+      );
     case 'wikilink':
     case 'link':
       return pageLink(e, key, ctx);
@@ -182,6 +189,17 @@ function renderElement(e: Element, key: number, ctx: RenderCtx): ReactNode {
         </span>
       );
   }
+  if (e.tagName === 'pre' && p.dataLang === 'mermaid') {
+    return <MermaidView key={key} source={hastText(e).replace(/\n$/, '')} />;
+  }
+  if (e.tagName === 'pre') {
+    const lang = typeof p.dataLang === 'string' ? p.dataLang : undefined;
+    return (
+      <CodeBlock key={key} lang={lang} code={hastText(e)}>
+        {createElement('pre', reactProps(p), renderChildren(e, ctx))}
+      </CodeBlock>
+    );
+  }
   if (e.tagName === 'p') {
     const embed = loneEmbed(e);
     if (embed) {
@@ -254,4 +272,11 @@ export function renderChildren(parent: Root | Element, ctx: RenderCtx): ReactNod
     if (c.type === 'element') return renderElement(c, i, ctx);
     return null;
   });
+}
+
+/** The text an element holds (a code block's code, for Copy). */
+function hastText(n: Element | ElementContent): string {
+  if (n.type === 'text') return n.value;
+  if (n.type === 'element') return n.children.map(hastText).join('');
+  return '';
 }

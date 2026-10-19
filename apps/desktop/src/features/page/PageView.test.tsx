@@ -1,5 +1,5 @@
 import { EditorView } from '@codemirror/view';
-import { act, render, screen, waitFor } from '@testing-library/react';
+import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import axe from 'axe-core';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -10,9 +10,10 @@ import { DEFAULT_SETTINGS, useSettingsStore } from '../../stores/settingsStore';
 import { resetVaultStore, useVaultStore } from '../../stores/vaultStore';
 import { fakeDisk } from '../../test/fakeDisk';
 import { AUTOSAVE_MS } from '../editor/pageDoc';
+import { COUNT_DEBOUNCE_MS } from './WordCount';
 import { LARGE_NOTE_CHARS } from '../editor/livePreview';
 import { openPage } from '../../stores/navigate';
-import { PageView } from './PageView';
+import { PageScreen } from '../../test/pageScreen';
 
 const open = (path: string) => act(() => usePageStore.getState().load(path));
 const view = () => EditorView.findFromDOM(document.querySelector<HTMLElement>('.cm-editor')!)!;
@@ -33,7 +34,7 @@ afterEach(async () => {
 
 describe('PageView (M2a §5)', () => {
   it('shows the empty state when nothing is selected', () => {
-    render(<PageView />);
+    render(<PageScreen />);
     expect(screen.getByText('Pick a page in the explorer')).toBeInTheDocument();
   });
 
@@ -56,7 +57,7 @@ describe('PageView (M2a §5)', () => {
         links_resolve: () => ['Character Design/assets/rex-cover.png'],
       },
     );
-    render(<PageView />);
+    render(<PageScreen />);
     await open('Character Design/rex.md');
     expect(screen.getByRole('navigation', { name: 'Breadcrumb' })).toHaveTextContent(
       'VaultCharacter Designrex',
@@ -78,7 +79,7 @@ describe('PageView (M2a §5)', () => {
 
   it('edits the page; the mode toggle switches modes and remembers the choice', async () => {
     const disk = fakeDisk({ 'A.md': '# A\n\nbody\n' });
-    render(<PageView />);
+    render(<PageScreen />);
     await open('A.md');
     expect(view().state.doc.toString()).toBe('# A\n\nbody\n');
     expect(screen.getByRole('radio', { name: 'Live Preview' })).toBeChecked();
@@ -91,7 +92,7 @@ describe('PageView (M2a §5)', () => {
 
   it('M2b §3: the back arrow appears after following a link and goes back', async () => {
     fakeDisk({ 'A.md': '# A\n\n[[B]]\n', 'B.md': '# B\n' });
-    render(<PageView />);
+    render(<PageScreen />);
     await open('A.md');
     expect(screen.queryByRole('button', { name: /^Back to/ })).not.toBeInTheDocument();
     await act(() => openPage('B.md', null, 'link'));
@@ -103,7 +104,7 @@ describe('PageView (M2a §5)', () => {
 
   it('M2b §6: the header button shows and hides the formatting toolbar', async () => {
     const disk = fakeDisk({ 'A.md': '# A\n\nbody\n' });
-    render(<PageView />);
+    render(<PageScreen />);
     await open('A.md');
     const toggle = screen.getByRole('button', { name: 'Formatting toolbar' });
     expect(toggle).toHaveAttribute('aria-pressed', 'true');
@@ -118,9 +119,88 @@ describe('PageView (M2a §5)', () => {
     expect(toggle).toHaveAttribute('title', 'Show the formatting toolbar');
   });
 
+  it('M4b part 2 §5: the Outline button shows the outline beside the editor', async () => {
+    const disk = fakeDisk({ 'A.md': '# A\n\n## B\n' });
+    render(<PageScreen />);
+    await open('A.md');
+    const toggle = screen.getByRole('button', { name: 'Outline' });
+    expect(toggle).toHaveAttribute('aria-pressed', 'false');
+    expect(toggle).toHaveAttribute('title', 'Show the outline');
+    expect(screen.queryByRole('tree', { name: 'Outline' })).not.toBeInTheDocument();
+    await userEvent.click(toggle);
+    expect(disk.calls).toContainEqual(['settings_set', { patch: { outline: true } }]);
+    const tree = await screen.findByRole('tree', { name: 'Outline' });
+    expect(within(tree).getAllByRole('treeitem')).toHaveLength(2);
+    expect(toggle).toHaveAttribute('aria-pressed', 'true');
+  });
+
+  it('M4b part 2 §5: the word count follows typing and the selection', async () => {
+    const src = '---\ntags: [x]\n---\n# Title\n\nOne **two** [three](https://x.y/z).\n';
+    fakeDisk({ 'A.md': src });
+    render(<PageScreen />);
+    await open('A.md');
+    const count = screen.getByText('4 words · 1 min');
+    expect(count).toHaveAttribute('title', '20 characters · 17 without spaces');
+    vi.useFakeTimers();
+    await type(' four five', src.length - 1);
+    expect(count).toHaveTextContent('4 words');
+    await act(() => vi.advanceTimersByTimeAsync(COUNT_DEBOUNCE_MS));
+    expect(count).toHaveTextContent('6 words · 1 min');
+    const view = EditorView.findFromDOM(document.querySelector<HTMLElement>('.cm-editor')!)!;
+    const text = view.state.doc.toString();
+    act(() =>
+      view.dispatch({ selection: { anchor: text.indexOf('One'), head: text.indexOf(' **two') } }),
+    );
+    expect(count).toHaveTextContent('1 of 6 words');
+  });
+
+  it('M4b part 2 §5: another page shows its own count (CJK characters are words)', async () => {
+    fakeDisk({ 'A.md': 'one two\n', 'B.md': '日本語 three\n' });
+    render(<PageScreen />);
+    await open('A.md');
+    expect(screen.getByText('2 words · 1 min')).toBeInTheDocument();
+    await act(() => openPage('B.md', null, 'link'));
+    expect(await screen.findByText('4 words · 1 min')).toBeInTheDocument();
+  });
+
+  it('M4b part 2 §1: the Full width button widens this page and remembers it', async () => {
+    let widths: Record<string, string> = {};
+    const settings = () => ({
+      attachments: { mode: 'subfolder', path: 'attachments' },
+      obsidian: null,
+      overrideObsidian: false,
+      pageWidth: null,
+      pageWidths: widths,
+    });
+    fakeDisk(
+      { 'A.md': '# A\n\nbody\n' },
+      {
+        vault_settings_get: settings,
+        page_width_set: (args) => {
+          const { path, width } = args as unknown as { path: string; width: string | null };
+          widths = width ? { ...widths, [path]: width } : {};
+          return settings();
+        },
+      },
+    );
+    render(<PageScreen />);
+    await open('A.md');
+    const host = () => document.querySelector('.cm-editor')!.parentElement!;
+    const toggle = screen.getByRole('button', { name: 'Full width' });
+    expect(toggle).toHaveAttribute('aria-pressed', 'false');
+    expect(host().dataset.width).toBe('readable');
+    await userEvent.click(toggle);
+    await waitFor(() => expect(toggle).toHaveAttribute('aria-pressed', 'true'));
+    expect(widths).toEqual({ 'A.md': 'full' });
+    expect(host().dataset.width).toBe('full');
+    await userEvent.click(toggle);
+    await waitFor(() => expect(toggle).toHaveAttribute('aria-pressed', 'false'));
+    expect(widths).toEqual({});
+  });
+
   it('save status: Saved → Saving… → Saved; failures say "Unsaved — retrying"', async () => {
     const disk = fakeDisk({ 'A.md': '# A\n' });
-    render(<PageView />);
+    render(<PageScreen />);
     await open('A.md');
     vi.useFakeTimers();
     const status = screen.getByRole('status', { name: 'Save status' });
@@ -139,7 +219,7 @@ describe('PageView (M2a §5)', () => {
 
   it('the header follows an own save (title from the new text)', async () => {
     fakeDisk({ 'A.md': '# Old\n' });
-    render(<PageView />);
+    render(<PageScreen />);
     await open('A.md');
     expect(screen.getByText('Title in the note: Old')).toBeInTheDocument();
     await act(async () => {
@@ -151,7 +231,7 @@ describe('PageView (M2a §5)', () => {
 
   it('deleted outside while dirty: the text stays and can be saved as a new page', async () => {
     const disk = fakeDisk({ 'notes/A.md': '# A\n' });
-    render(<PageView />);
+    render(<PageScreen />);
     await open('notes/A.md');
     await type('kept ', 4);
     disk.files.delete('notes/A.md');
@@ -168,9 +248,32 @@ describe('PageView (M2a §5)', () => {
     await waitFor(() => expect(usePageStore.getState().state).toBe('ready'));
   });
 
+  it('final review I3: rewritten outside as non-UTF-8 while edited, the text stays with a notice and Save as new page', async () => {
+    const disk = fakeDisk({ 'A.md': '# Café\n' });
+    render(<PageScreen />);
+    await open('A.md');
+    await type('kept ', 7);
+    disk.files.set('A.md', '# Caf\0\n'); // a NUL stands for bytes that aren't UTF-8
+    await act(() =>
+      usePageStore
+        .getState()
+        .onExternalChange({ created: [], modified: ['A.md'], removed: [], renamed: [] }),
+    );
+    expect(
+      screen.getByText(
+        'This page changed outside Notes In My Way and is no longer text it can edit. ' +
+          'Your unsaved changes are kept here: copy them, or save them as a new page.',
+      ),
+    ).toBeInTheDocument();
+    expect(view().state.doc.toString()).toBe('# Café\nkept ');
+    await userEvent.click(screen.getByRole('button', { name: 'Save as new page' }));
+    await waitFor(() => expect([...disk.files.values()]).toContain('# Café\nkept '));
+    expect(disk.files.get('A.md')).toBe('# Caf\0\n');
+  });
+
   it('C2: the orphan banner shows whenever the page is orphaned, even while it is loaded', async () => {
     fakeDisk({ 'A.md': '# A\n' });
-    render(<PageView />);
+    render(<PageScreen />);
     await open('A.md');
     await type('kept ', 4);
     expect(usePageStore.getState().state).toBe('ready');
@@ -187,7 +290,7 @@ describe('PageView (M2a §5)', () => {
         return { path: 'x.md', title: 'x', tags: [], links: 0, backlinks: 0, binary: true };
       throw { kind: 'binary', message: 'not UTF-8 text: x.md' };
     });
-    render(<PageView />);
+    render(<PageScreen />);
     act(() => usePageStore.setState({ path: 'x.md', state: 'loading' }));
     expect(screen.getByRole('status')).toHaveTextContent('Loading…');
     await open('x.md');
@@ -203,14 +306,14 @@ describe('PageView (M2a §5)', () => {
     fakeDisk({
       'big.md': `# Big\n\n${para.repeat(Math.ceil(LARGE_NOTE_CHARS / para.length) + 10)}`,
     });
-    render(<PageView />);
+    render(<PageScreen />);
     await open('big.md');
     expect(screen.getByText('Simplified preview for large notes')).toBeInTheDocument();
   }, 30_000);
 
   it('NFR-10 has no axe violations', async () => {
     fakeDisk({ 'A.md': '# A\n\n- [x] done\n\n[[B]]\n' });
-    const { container } = render(<PageView />);
+    const { container } = render(<PageScreen />);
     await open('A.md');
     const results = await axe.run(container, { rules: { 'color-contrast': { enabled: false } } });
     expect(results.violations).toEqual([]);

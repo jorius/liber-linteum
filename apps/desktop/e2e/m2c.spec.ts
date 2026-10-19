@@ -52,7 +52,9 @@ const lastWrite = (page: Page) =>
     return writes.at(-1)?.text ?? null;
   });
 
-test('cover: add, reposition with the keyboard, remove', async ({ page }) => {
+test('cover: add (straight into reposition, M4b §2), place with the keyboard, remove', async ({
+  page,
+}) => {
   const outside = await open(page, 'A');
   await page.getByRole('button', { name: 'Add cover' }).click();
   await expect
@@ -60,7 +62,7 @@ test('cover: add, reposition with the keyboard, remove', async ({ page }) => {
     .toMatch(/^---\ncover: attachments\/sky\.png\n---\n# Alpha/);
   const cover = page.getByRole('group', { name: 'Cover' });
   await expect(cover.locator('img[data-cover]')).toHaveAttribute('src', /\/attachments\/sky\.png$/);
-  await cover.getByRole('button', { name: 'Reposition' }).click();
+  // A new cover opens in reposition mode at once: one Save position places it.
   await expect(page.getByRole('slider', { name: 'Cover position' })).toBeFocused();
   await page.keyboard.press('ArrowDown');
   await page.getByRole('button', { name: 'Save position' }).click();

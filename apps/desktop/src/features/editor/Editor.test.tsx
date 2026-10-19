@@ -1,6 +1,7 @@
 import { undo } from '@codemirror/commands';
 import { EditorView } from '@codemirror/view';
 import { act, render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { clearMocks } from '../../ipc/testing';
 import { fakeDisk, type FakeDisk } from '../../test/fakeDisk';
@@ -323,5 +324,77 @@ describe('block moves from the keyboard (M4 §5)', () => {
     expect(viewOf().state.doc.toString()).toBe('- b\n- a\n  - a1\n');
     act(() => undo(viewOf()));
     expect(viewOf().state.doc.toString()).toBe('- a\n  - a1\n- b\n');
+  });
+});
+
+describe('code highlighting in the editor (M4b part 2 §2)', () => {
+  it('a fenced block is highlighted by its language in Source and Live Preview', async () => {
+    disk = fakeDisk({ 'C.md': 'x\n\n```js\nconst a = 1;\n```\n' });
+    const doc = await load('C.md');
+    for (const mode of ['source', 'livePreview'] as const) {
+      const { unmount } = render(<Editor doc={doc} mode={mode} label="C" />);
+      await vi.waitFor(
+        () => {
+          const kw = [...viewOf().contentDOM.querySelectorAll('.cm-nimw-code-keyword')];
+          expect(kw.map((e) => e.textContent)).toContain('const');
+        },
+        { timeout: 3000 },
+      );
+      unmount();
+    }
+  });
+});
+
+describe('picker ids read back in the editor (final review I1 follow-up)', () => {
+  it('fence ids the picker writes are highlighted in the editor too (`mssql`, `angulartemplate`)', async () => {
+    disk = fakeDisk({
+      'Q.md':
+        'x\n\n```mssql\nSELECT name FROM t;\n```\n\n```angulartemplate\n<div class="a"></div>\n```\n',
+    });
+    const doc = await load('Q.md');
+    render(<Editor doc={doc} mode="source" label="Q" />);
+    await vi.waitFor(
+      () => {
+        const kw = [...viewOf().contentDOM.querySelectorAll('.cm-nimw-code-keyword')];
+        expect(kw.map((e) => e.textContent?.toUpperCase())).toContain('SELECT');
+        const angular = [...viewOf().contentDOM.querySelectorAll('.cm-line')].find((l) =>
+          l.textContent?.startsWith('<div'),
+        );
+        expect(angular?.querySelector('[class*="cm-nimw-code-"]')).not.toBeNull();
+      },
+      { timeout: 3000 },
+    );
+  });
+});
+
+describe('code block badge and language picker (M4b part 2 §2)', () => {
+  it('shows the language; picking another rewrites the fence in one undo step', async () => {
+    disk = fakeDisk({ 'K.md': 'x\n\n```js\nconst a = 1;\n```\n' });
+    const doc = await load('K.md');
+    render(<Editor doc={doc} mode="livePreview" label="K" />);
+    const badge = await screen.findByRole('button', { name: 'Language: JavaScript' });
+    await userEvent.click(badge);
+    const search = await screen.findByRole('combobox', { name: 'Code language' });
+    await userEvent.type(search, 'pyth');
+    expect(await screen.findByRole('option', { name: 'Python' })).toBeInTheDocument();
+    await userEvent.keyboard('{Enter}');
+    expect(viewOf().state.doc.toString()).toBe('x\n\n```python\nconst a = 1;\n```\n');
+    expect(screen.queryByRole('combobox', { name: 'Code language' })).not.toBeInTheDocument();
+    act(() => undo(viewOf()));
+    expect(viewOf().state.doc.toString()).toBe('x\n\n```js\nconst a = 1;\n```\n');
+  });
+
+  it('Copy puts the code (without its fences) on the clipboard', async () => {
+    const writeText = vi.fn(() => Promise.resolve());
+    Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true });
+    disk = fakeDisk({ 'K.md': 'x\n\n```\nplain text\nline 2\n```\n' });
+    const doc = await load('K.md');
+    render(<Editor doc={doc} mode="livePreview" label="K" />);
+    expect(await screen.findByRole('button', { name: 'Language: Plain text' })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Copy code' }));
+    expect(writeText).toHaveBeenCalledWith('plain text\nline 2');
+    await vi.waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Copy code' })).toHaveTextContent('Copied'),
+    );
   });
 });

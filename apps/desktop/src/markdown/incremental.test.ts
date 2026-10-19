@@ -62,6 +62,10 @@ const REFERENCE_PIECES = [
 ];
 const DEFS = 'See [ref] and a note[^1].\n\n[ref]: https://e.x\n\n[^1]: A footnote.\n\n';
 const NONLOCAL_PIECES = ['`', '```', '%%', '<b>', '[x]: y', ':::'];
+/** Dollars (final review I2): whether a `$` is maths depends on its
+ *  neighbours, never on another block. */
+const DOLLAR_PIECES = ['$', '$5', '$x$', ' $', '$ ', '7', 'US$', '\\$', '$$'];
+const PRICES = 'Was $10-$20, now $5.99/$6.99 for [[Shop]]; $x$ and US$5.\n\n';
 
 /** Applies `steps` seeded random edits; after each, the incremental model must
  *  equal a full parse. Returns how often untouched blocks were reused. */
@@ -102,6 +106,37 @@ describe('incremental re-parse (M2a §7: typing in a 5,000-line note)', () => {
     // Same order as the plain fuzz (seed 42: 139 plain, 122 here; the rest are
     // edits that legitimately need a full parse).
     expect(fuzz(42, LOCAL_PIECES, 200, HEAD, true)).toBeGreaterThan(110);
+  }, 60_000);
+
+  it('M4b part 2 §3: opening or closing a $$ block re-parses as the full parse does', () => {
+    const base = '# M\n\nBefore.\n\n$$\na + b\n$$\n\nAfter $x$.\n\nEnd.\n';
+    const edits: [number, string][] = [
+      [base.indexOf('Before'), '$$\n'], // opens a block that swallows the rest
+      [base.indexOf('$$\na'), 'x'], // breaks the opening fence
+      [base.indexOf('End'), '$$ '], // a stray $$ in a paragraph
+    ];
+    for (const [at, insert] of edits) {
+      const typed = base.slice(0, at) + insert + base.slice(at);
+      expect(reparse(parsePage(base), base, typed), JSON.stringify(insert)).toEqual(
+        parsePage(typed),
+      );
+      expect(reparse(parsePage(typed), typed, base)).toEqual(parsePage(base));
+    }
+  });
+
+  it('final review I2: typing prices and maths equals the full parse', () => {
+    fuzz(33, [...LOCAL_PIECES, ...DOLLAR_PIECES], 200, PRICES);
+    const base = '# P\n\nIntro.\n\nPay $5 for [[Shop]]/$10 now.\n\nMiddle.\n\nEnd.\n';
+    for (const [from, to] of [
+      ['/$10', '/$x$'], // the second dollar now closes nothing: `$x$` is maths
+      ['$5 for', '$5for'], // the pair still fails: `$` before a digit
+      ['$10 now', '$ 10 now'],
+      ['Pay $5', 'Pay US$5'],
+    ]) {
+      const typed = base.replace(from, to);
+      expect(reparse(parsePage(base), base, typed), to).toEqual(parsePage(typed));
+      expect(reparse(parsePage(typed), typed, base), to).toEqual(parsePage(base));
+    }
   }, 60_000);
 
   it('reference links and footnotes resolve as in the full parse', () => {

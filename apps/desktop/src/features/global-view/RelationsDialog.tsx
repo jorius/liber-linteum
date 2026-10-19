@@ -124,7 +124,7 @@ export function RelationsDialog({
       <div className={styles.buttons}>
         <button
           type="button"
-          className={styles.button}
+          className="btn btn-secondary"
           disabled={closing}
           onClick={() => void close()}
         >
@@ -200,7 +200,7 @@ function RelationRow({
       <div className={styles.buttons}>
         <button
           type="button"
-          className={`${styles.button} ${styles.danger}`}
+          className="btn btn-danger"
           disabled={busy}
           onClick={() => void remove()}
         >
@@ -208,7 +208,7 @@ function RelationRow({
         </button>
         <button
           type="button"
-          className={`${styles.button} ${styles.primary}`}
+          className="btn btn-primary"
           disabled={!dirty || busy}
           onClick={() => void save()}
         >

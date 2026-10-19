@@ -3,9 +3,10 @@ use crate::vault::NIMW_JSON;
 use serde::Deserialize;
 use serde_json::Value;
 
-/// Where new attachments go (Q-ED-1). Resolved from Obsidian's
-/// `attachmentFolderPath` when the vault has it (M2c §5.3: Obsidian wins), else
-/// `.nimw/vault.json`, else the default `attachments/` subfolder.
+/// Where new attachments go (Q-ED-1). Resolved from `.nimw/vault.json` when it
+/// says to override Obsidian (M4b §5), else Obsidian's `attachmentFolderPath`
+/// when the vault has it (M2c §5.3), else `.nimw/vault.json`, else the default
+/// `attachments/` subfolder.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum AttachmentPolicy {
     /// Vault root.
@@ -121,6 +122,9 @@ pub(crate) struct NimwAttachments {
     pub mode: String,
     #[serde(default)]
     pub path: String,
+    /// NIMW's place wins over Obsidian's `attachmentFolderPath` (M4b §5).
+    #[serde(default, rename = "overrideObsidian")]
+    pub override_obsidian: bool,
 }
 
 impl NimwAttachments {
@@ -146,13 +150,15 @@ impl NimwAttachments {
 }
 
 /// NIMW's attachment setting as stored (or the default), plus Obsidian's
-/// `attachmentFolderPath` when the vault has a usable one — which then wins.
+/// `attachmentFolderPath` when the vault has a usable one — which then wins,
+/// unless NIMW's says to override it (M4b §5).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct AttachmentConfig {
     /// `vault` | `same` | `subfolder` | `folder`.
     pub mode: String,
     pub path: String,
     pub obsidian: Option<String>,
+    pub override_obsidian: bool,
 }
 
 #[derive(Debug, Default, Deserialize)]
@@ -188,6 +194,7 @@ mod tests {
             NimwAttachments {
                 mode: mode.into(),
                 path: path.into(),
+                override_obsidian: false,
             }
             .policy()
         };

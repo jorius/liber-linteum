@@ -7,6 +7,7 @@ import { joinPath, parentOf, remap } from '../../stores/tree';
 import { useVaultStore } from '../../stores/vaultStore';
 import styles from './Explorer.module.css';
 import { displayName, keptExtension, TreeRow } from './TreeRow';
+import { isTextPath } from '../../stores/textFiles';
 
 export interface Row {
   node: TreeNode;
@@ -97,7 +98,8 @@ export function ExplorerTree({
     vault.select(node.path);
     setFocused(node.path);
     if (node.kind === 'folder') vault.toggle(node.path);
-    else if (node.kind === 'page') {
+    else if (node.kind === 'page' || isTextPath(node.path)) {
+      // Pages, and text and code files in the text view (M4b part 2 §6).
       // Opening from the explorer starts a fresh link trail (M2b §3).
       useTrailStore.getState().reset();
       void usePageStore.getState().load(node.path);

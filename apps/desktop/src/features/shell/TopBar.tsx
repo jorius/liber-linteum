@@ -2,19 +2,36 @@ import { useTranslation } from 'react-i18next';
 import { CloseIcon, GearIcon, GraphIcon, PencilIcon } from '../../app/icons';
 import { useUiStore } from '../../stores/uiStore';
 import { useVaultStore } from '../../stores/vaultStore';
+import { useGvStore } from '../global-view/gvStore';
+import { levelLabel } from '../global-view/Toolbar';
+import { PageHeading } from '../page/PageHeading';
 import styles from './Shell.module.css';
 
-/** Vault name, the [Edit · Global view] switch (M3a §2), settings and close. */
+/** "Global view · <level>" while the Global View shows (M4b §1). */
+function GvHeading() {
+  const { t } = useTranslation();
+  const level = useGvStore((s) => s.stack[s.stack.length - 1]);
+  const titles = useGvStore((s) => s.titles);
+  return (
+    <h1 className={styles.screenTitle}>
+      {level ? `${t('shell.globalView')} · ` : t('shell.globalView')}
+      {level && <span className={styles.screenLevel}>{levelLabel(level, titles, t)}</span>}
+    </h1>
+  );
+}
+
+/** The page's title and subtitle (or the Global View's level), the [Edit ·
+ *  Global view] switch (M3a §2), settings and close. The vault's name is in
+ *  the sidebar (M4b §1). */
 export function TopBar() {
   const { t } = useTranslation();
-  const name = useVaultStore((s) => s.info?.name ?? '');
   const close = useVaultStore((s) => s.close);
   const openDialog = useUiStore((s) => s.openDialog);
   const current = useUiStore((s) => s.screen);
   const setScreen = useUiStore((s) => s.setScreen);
   return (
     <header className={styles.topbar}>
-      <span className={styles.vaultName}>{name}</span>
+      <div className={styles.heading}>{current === 'global' ? <GvHeading /> : <PageHeading />}</div>
       <div className={styles.toggle} role="group" aria-label={t('shell.view')}>
         <button
           type="button"

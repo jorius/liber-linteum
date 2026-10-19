@@ -326,6 +326,17 @@ impl VaultSession {
         path: &VaultPath,
         before_os_call: &dyn Fn(),
     ) -> Result<()> {
+        self.trash_via(path, before_os_call, &|p| self.vault.trash(p))
+    }
+
+    /// `trash_with_hook` with the OS call passed in (tests never use the real
+    /// trash).
+    pub(crate) fn trash_via(
+        &self,
+        path: &VaultPath,
+        before_os_call: &dyn Fn(),
+        os_trash: &dyn Fn(&VaultPath) -> nimw_vault::Result<()>,
+    ) -> Result<()> {
         let keys: Vec<String> = self
             .index()
             .file_set()?
@@ -334,12 +345,28 @@ impl VaultSession {
             .map(|p| link_key(p))
             .collect();
         before_os_call();
-        self.vault.trash(path)?;
+        os_trash(path)?;
         let mut index = self.index();
         index.transaction(|tx| tx.remove(path.as_str()))?;
         let files = index.file_set()?;
         index.resolve_affected(&files, &keys)?;
+        drop(index);
+        self.forget_page_sizes(&[path.to_string()]);
         Ok(())
+    }
+
+    /// Deleted pages and folders take their page widths (final review M10)
+    /// and cover heights with them. A convenience: a failure is reported,
+    /// never fails the deletion.
+    pub(crate) fn forget_page_sizes(&self, removed: &[String]) {
+        let widths = self.vault.forget_page_widths(removed);
+        let heights = self.vault.forget_cover_heights(removed);
+        if let Err(e) = widths.and(heights) {
+            self.emit(SessionEvent::Warning(format!(
+                "Page widths or cover heights not updated for {} removed entries: {e}",
+                removed.len()
+            )));
+        }
     }
 }
 
@@ -422,6 +449,78 @@ mod tests {
 
     /// M1b (M1a hand-off §11 n): the OS trash call may block on a permission
     /// prompt, so the index must not be locked while it runs.
+    /// Final review M10: an in-app delete forgets the page's width, and a
+    /// folder's its pages' (the OS call is a plain removal here).
+    #[test]
+    fn m4b2_trashed_pages_forget_their_width() {
+        let vault = tempfile::tempdir().unwrap();
+        let root = vault.path().to_path_buf();
+        std::fs::write(root.join("a.md"), "# a").unwrap();
+        std::fs::create_dir(root.join("F")).unwrap();
+        std::fs::write(root.join("F/b.md"), "# b").unwrap();
+        std::fs::write(root.join("keep.md"), "# keep").unwrap();
+        let cache = tempfile::tempdir().unwrap();
+        let (s, _) = VaultSession::open(vault.path(), cache.path(), |_| {}).unwrap();
+        for page in ["a.md", "F/b.md", "keep.md"] {
+            s.vault
+                .set_page_width(page, Some(nimw_vault::PageWidth::Full))
+                .unwrap();
+        }
+        let remove = |p: &VaultPath| {
+            let full = root.join(p.as_str());
+            if full.is_dir() {
+                std::fs::remove_dir_all(full)
+            } else {
+                std::fs::remove_file(full)
+            }
+            .map_err(|source| nimw_vault::VaultError::Io {
+                path: p.to_string(),
+                source,
+            })
+        };
+        s.trash_via(&VaultPath::new("a.md").unwrap(), &|| {}, &remove)
+            .unwrap();
+        s.trash_via(&VaultPath::new("F").unwrap(), &|| {}, &remove)
+            .unwrap();
+        let pages: Vec<String> = s.vault.page_widths().pages.into_keys().collect();
+        assert_eq!(pages, ["keep.md"]);
+    }
+
+    /// Cover resize: an in-app delete forgets the page's cover height, and a
+    /// folder's its pages' (the OS call is a plain removal here).
+    #[test]
+    fn trashed_pages_forget_their_cover_height() {
+        let vault = tempfile::tempdir().unwrap();
+        let root = vault.path().to_path_buf();
+        std::fs::write(root.join("a.md"), "# a").unwrap();
+        std::fs::create_dir(root.join("F")).unwrap();
+        std::fs::write(root.join("F/b.md"), "# b").unwrap();
+        std::fs::write(root.join("keep.md"), "# keep").unwrap();
+        let cache = tempfile::tempdir().unwrap();
+        let (s, _) = VaultSession::open(vault.path(), cache.path(), |_| {}).unwrap();
+        for page in ["a.md", "F/b.md", "keep.md"] {
+            s.vault.set_cover_height(page, Some(280)).unwrap();
+        }
+        let remove = |p: &VaultPath| {
+            let full = root.join(p.as_str());
+            if full.is_dir() {
+                std::fs::remove_dir_all(full)
+            } else {
+                std::fs::remove_file(full)
+            }
+            .map_err(|source| nimw_vault::VaultError::Io {
+                path: p.to_string(),
+                source,
+            })
+        };
+        s.trash_via(&VaultPath::new("a.md").unwrap(), &|| {}, &remove)
+            .unwrap();
+        s.trash_via(&VaultPath::new("F").unwrap(), &|| {}, &remove)
+            .unwrap();
+        let pages: Vec<String> = s.vault.cover_heights().into_keys().collect();
+        assert_eq!(pages, ["keep.md"]);
+    }
+
     #[test]
     fn exp_03_trash_does_not_hold_the_index_lock_during_the_os_call() {
         let vault = tempfile::tempdir().unwrap();

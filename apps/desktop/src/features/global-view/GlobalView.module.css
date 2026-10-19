@@ -331,17 +331,40 @@
   font: 600 14px var(--font-body);
 }
 
-.connectBar button {
-  min-height: 34px;
-  padding: 6px 12px;
+.connectText {
+  margin: 0;
+}
+
+.connectHint {
+  font-weight: 400;
+}
+
+/* Connect cards (M4b §6): pressed while picking or connecting. */
+.connect {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 38px;
+  padding: 7px 12px;
   border: 1px solid var(--color-border-strong);
   border-radius: var(--radius-md);
   background: var(--color-surface);
-  color: var(--color-text);
   font: 600 13px var(--font-body);
+  color: var(--color-text-body);
   cursor: pointer;
 }
 
-.connectText {
-  margin: 0;
+.connect:hover {
+  border-color: var(--color-accent);
+}
+
+.connect[aria-pressed='true'] {
+  border-color: var(--color-accent);
+  background: var(--color-accent-soft);
+  color: var(--color-text-strong);
+}
+
+.connect:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 2px;
 }

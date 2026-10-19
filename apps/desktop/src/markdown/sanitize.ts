@@ -20,6 +20,7 @@ import type {
   Tag,
   WikiLink,
 } from './types';
+import { highlightCode } from './codeHighlight';
 import { safeDecode } from './decode';
 
 /** Colors allowed in `data-color` / `data-bg` (theme-aware tokens). */
@@ -76,6 +77,18 @@ const handlers: Record<string, Handler> = {
       dataHeight: node.height ?? undefined,
     });
     state.patch(node, out);
+    return out;
+  },
+  // M4b part 2 §3: maths become placeholders the renderer draws with KaTeX
+  // after sanitizing (KaTeX's own markup would not pass the schema).
+  inlineMath(state: State, node: { value: string }) {
+    const out = el('span', { dataNimw: 'math', dataTex: node.value });
+    state.patch(node as unknown as MdastNodes, out);
+    return out;
+  },
+  math(state: State, node: { value: string }) {
+    const out = el('div', { dataNimw: 'math', dataTex: node.value, dataDisplay: 'block' });
+    state.patch(node as unknown as MdastNodes, out);
     return out;
   },
   highlight(state: State, node: Highlight) {
@@ -225,8 +238,22 @@ const schema: Schema = {
       'dataWidth',
       'dataHeight',
       'dataTag',
+      'dataTex',
+      // Syntax highlighting (M4b part 2 §2): highlight.js classes only — its
+      // scopes (`hljs-title`) and their sub-scopes (`class_`, `function_`;
+      // final review M6).
+      ['className', /^(?:hljs-[\w-]+|[a-z][a-z0-9]*_+)$/],
     ],
-    div: ['dataColor', 'dataBg', 'dataCallout', 'dataTitle', 'dataFoldable', 'dataFolded'],
+    div: [
+      'dataColor',
+      'dataBg',
+      'dataCallout',
+      'dataTitle',
+      'dataFoldable',
+      'dataFolded',
+      'dataTex',
+      'dataDisplay',
+    ],
     img: ['src', 'alt', 'width', 'height'],
     audio: ['src', 'controls'],
     video: ['src', 'controls', 'width', 'height'],
@@ -236,6 +263,7 @@ const schema: Schema = {
     li: ['className'],
     ul: ['className'],
     code: ['className'],
+    pre: ['dataLang'],
     td: ['align'],
     th: ['align'],
     input: [['type', 'checkbox'], 'checked', 'disabled'],
@@ -373,6 +401,7 @@ const POSITIONS = { file: { toString: () => '' } } as unknown as Parameters<type
 export function toSafeHast(page: ParsedPage, ctx: RenderContext): Root {
   const hast = toHast(page.tree, { allowDangerousHtml: true, handlers }) as Root;
   markSourceRanges(hast);
+  highlightCode(hast);
   const blocks = htmlBlocks(hast);
   const parsed = raw(hast, POSITIONS) as Root;
   const clean = sanitize(parsed, schema) as Root;

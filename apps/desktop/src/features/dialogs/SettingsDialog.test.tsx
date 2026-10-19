@@ -147,7 +147,31 @@ describe('Settings dialog (M2b §4, §5, §7)', () => {
         { lineNumbers: true },
       ]),
     );
+    await userEvent.selectOptions(screen.getByRole('combobox', { name: 'Page width' }), 'full');
+    await waitFor(() => expect(patches.at(-1)).toEqual({ pageWidth: 'full' }));
     expect(document.documentElement.style.getPropertyValue('--font-source')).toContain('"Menlo"');
+  });
+
+  it('cover resize: the default cover height is a choice of four sizes, saved at once', async () => {
+    open();
+    const select = screen.getByRole('combobox', { name: 'Default cover height' });
+    expect(select).toHaveValue('200');
+    expect(
+      within(select)
+        .getAllByRole('option')
+        .map((o) => o.textContent),
+    ).toEqual(['Small (132 px)', 'Medium (200 px)', 'Large (280 px)', 'Extra large (360 px)']);
+    await userEvent.selectOptions(select, '280');
+    await waitFor(() => expect(patches).toEqual([{ coverHeight: 280 }]));
+    expect(select).toHaveValue('280');
+  });
+
+  it('cover resize: a default set by hand outside the four sizes is still shown', () => {
+    useSettingsStore.setState({ settings: { ...DEFAULT_SETTINGS, coverHeight: 250 } });
+    open();
+    const select = screen.getByRole('combobox', { name: 'Default cover height' });
+    expect(select).toHaveValue('250');
+    expect(within(select).getByRole('option', { name: '250 px' })).toBeInTheDocument();
   });
 
   it('without the installed list (outside the app) the bundled fonts still work', async () => {
@@ -164,20 +188,38 @@ describe('Settings dialog (M2b §4, §5, §7)', () => {
 describe('Settings → This vault (M2c §5.4)', () => {
   let vaultPatches: unknown[];
   let obsidian: string | null;
+  let overrideObsidian: boolean;
   let stored: { mode: string; path: string };
+  let vaultWidth: string | null;
 
   beforeEach(() => {
+    vaultWidth = null;
     vaultPatches = [];
     obsidian = null;
+    overrideObsidian = false;
     stored = { mode: 'subfolder', path: 'attachments' };
     useVaultStore.setState({ info: { name: 'Vault', root: '/v', report: {} as never } });
     mockIPC((cmd, raw) => {
       const args = (raw ?? {}) as Record<string, unknown>;
-      if (cmd === 'vault_settings_get') return { attachments: stored, obsidian };
+      const reply = () => ({
+        attachments: stored,
+        obsidian,
+        overrideObsidian,
+        pageWidth: vaultWidth,
+        pageWidths: {},
+      });
+      if (cmd === 'vault_settings_get') return reply();
       if (cmd === 'vault_settings_set') {
         vaultPatches.push(args.patch);
-        stored = (args.patch as { attachments: typeof stored }).attachments;
-        return { attachments: stored, obsidian };
+        const patch = args.patch as {
+          attachments?: typeof stored;
+          overrideObsidian?: boolean;
+          pageWidth?: string;
+        };
+        if (patch.attachments) stored = patch.attachments;
+        if (patch.overrideObsidian !== undefined) overrideObsidian = patch.overrideObsidian;
+        if (patch.pageWidth) vaultWidth = patch.pageWidth === 'default' ? null : patch.pageWidth;
+        return reply();
       }
       if (cmd === 'fonts_list') return [];
       return null;
@@ -203,6 +245,16 @@ describe('Settings → This vault (M2c §5.4)', () => {
       expect(vaultPatches).toEqual([{ attachments: { mode: 'same', path: '' } }]),
     );
     expect(screen.queryByRole('textbox', { name: 'Subfolder name' })).not.toBeInTheDocument();
+  });
+
+  it('M4b part 2 §1: the vault can set its own page width or use the app setting', async () => {
+    open();
+    const width = await screen.findByRole('combobox', { name: 'Page width for this vault' });
+    await waitFor(() => expect(width).toHaveValue('default'));
+    await userEvent.selectOptions(width, 'full');
+    await waitFor(() => expect(vaultPatches).toEqual([{ pageWidth: 'full' }]));
+    await userEvent.selectOptions(width, 'default');
+    await waitFor(() => expect(vaultPatches.at(-1)).toEqual({ pageWidth: 'default' }));
   });
 
   it('a folder is saved on Enter; an unusable name is explained and not saved', async () => {
@@ -259,15 +311,38 @@ describe('Settings → This vault (M2c §5.4)', () => {
     await waitFor(() => expect(where).toBeDisabled());
     expect(
       screen.getByText(
-        'Set by Obsidian: ./assets — new attachments go to the “assets” folder next to the page.',
+        'Obsidian puts new attachments in ./assets (the “assets” folder next to the page).',
       ),
     ).toBeInTheDocument();
     expect(
-      screen.getByText('Change it in Obsidian (Settings → Files and links).'),
-    ).toBeInTheDocument();
+      screen.getByRole('checkbox', { name: 'Use a different place in Notes In My Way' }),
+    ).not.toBeChecked();
     const violations = await axe
       .run(screen.getByRole('dialog'), { rules: { 'color-contrast': { enabled: false } } })
       .then((r) => r.violations);
     expect(violations).toEqual([]);
+  });
+
+  it("M4b §5: a switch lets NIMW use its own place; off restores Obsidian's", async () => {
+    obsidian = './assets';
+    open();
+    const where = await screen.findByRole('combobox', { name: 'New attachments go to' });
+    await waitFor(() => expect(where).toBeDisabled());
+    const own = screen.getByRole('checkbox', { name: 'Use a different place in Notes In My Way' });
+    await userEvent.click(own);
+    await waitFor(() =>
+      expect(vaultPatches).toEqual([
+        { attachments: { mode: 'subfolder', path: 'attachments' }, overrideObsidian: true },
+      ]),
+    );
+    expect(own).toBeChecked();
+    expect(where).toBeEnabled();
+    await userEvent.selectOptions(where, 'same');
+    await waitFor(() => expect(vaultPatches).toHaveLength(2));
+    expect(vaultPatches[1]).toEqual({ attachments: { mode: 'same', path: '' } });
+    await userEvent.click(own);
+    await waitFor(() => expect(vaultPatches[2]).toEqual({ overrideObsidian: false }));
+    expect(where).toBeDisabled();
+    expect(where).toHaveValue('same');
   });
 });
