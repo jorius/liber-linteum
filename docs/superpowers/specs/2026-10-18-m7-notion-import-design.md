@@ -243,3 +243,48 @@ These override §4–§11 where they conflict.
    - `tempfile` (MIT/Apache-2.0) at runtime, for nested part zips.
 
    `cargo deny` passes.
+
+## 16. Batch 6 review
+
+Fixes from the Opus review of `de2378e..1000f4e` (2026-10-18), each with a test that failed first. These override §3–§15 where they conflict.
+
+**Fixed:**
+- **I1:** a multi-byte character where a date's digits would be (`2026-10-1é`) no longer panics; the ISO check reads its parts with `str::get`.
+- **I2:** link rewriting is linear: brackets are paired in one stack pass, and code spans are found without copying the rest of the line. A 1 MiB line of `[` converts in milliseconds. `plan()` checks the cancel flag between files.
+- **I3:** the plan holds no converted page. Each page is converted once for its warnings, then again as it is written. An export whose pages hold more than `Limits.pages` (1 GiB) of Markdown is refused in the preview.
+- **I4:** a multi-part export's parts count against `Limits.total` before each is copied to a temp file, and their number against `Limits.entries`.
+- **I5:** a CSV is a database only when Notion named it (an id in its name) or its rows' folder is in the export. Any other CSV is an attachment, linked as a file.
+- **I6:** `A → B` date ranges are dates, written quoted as ISO ranges. A column holding a date, or `, ` then a year, is never a list.
+- **I7:** a cancelled re-pick keeps the export or place already picked; both Choose buttons are disabled while the export is read.
+- **I8:**
+  - A taken or refused vault name goes back to the preview with the error, with no re-pick.
+  - An import that stops part-way (a full disk, or a report that can't be written) returns its vault unopened, with `failed` and `root`.
+  - The dialog then offers **Open it anyway** and **Show in Finder / Explorer**, through `notion_open_partial` and `notion_reveal_partial`. Both act on the vault Rust recorded, never on a path from the page.
+- **M1:** a folder that can't be made is a warning in the report, not silently ignored.
+- **M2:**
+  - A path the zip names twice (`x/a.md`, `x\a.md`) is listed once.
+  - A file and a folder of one name each get a name.
+  - A vault path over 600 bytes is skipped with a warning.
+  - A file that can't be written is a warning, and the import goes on.
+- **M3:** the report is written best-effort, and the first error is the one reported.
+- **M4:**
+  - A date's time part is validated strictly (`THH:MM[:SS[.f]][Z|±HH:MM]`), else it is quoted text.
+  - Keys YAML reads as booleans, nulls or numbers are quoted.
+  - Repeated headers get ` 2`, ` 3`.
+- **M5:** each report warning is one Markdown code span, so export names can't format the report.
+- **M6:** the device-name check runs after the 200-byte cut.
+- **M7:**
+  - The page checks the name rules Rust applies as you type.
+  - An existing target is refused before the export is read again.
+- **M8:** the cancel flag is reset when a preview starts, not when the import starts, so a Stop pressed in between is honoured.
+- **M9:** importing moves focus to Stop, so Escape stops it.
+- **M10:** the starting total counts each database's index page.
+
+**Rulings (cost if wrong):**
+1. **Only a full disk stops the import.** Every other per-file error is a warning, and the import goes on. Cost: an import with many failing files is reported as finished, though the report lists every failure.
+2. **Long paths are skipped, not shortened.** A vault path over 600 bytes is skipped at plan time with a warning, rather than renamed to fit. Cost: very deep Notion trees lose their deepest pages; the report names them.
+3. **A partial vault isn't opened automatically.** The dialog offers to open it instead. Cost: one click.
+4. **The name rules live in two places.** The page mirrors Rust's rules rather than calling a separate check command. Rust still enforces them, so a mismatch only shows the error later.
+5. **Pages are read and converted twice,** once while planning (for warnings) and once while writing. Cost: about twice the conversion time, still well under the budget (see §10).
+
+**Deferred:** none from this review.
