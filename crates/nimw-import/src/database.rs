@@ -74,6 +74,39 @@ const MONTHS: [&str; 12] = [
     "december",
 ];
 
+/// `THH:MM`, then optionally `:SS` (with a fraction), then `Z` or `±HH:MM`:
+/// anything else after an ISO date is text (and quoted), never written raw.
+fn iso_time(rest: &str) -> bool {
+    let b = rest.as_bytes();
+    let two = |i: usize| b.get(i..i + 2).is_some_and(|d| d.iter().all(u8::is_ascii_digit));
+    if b.first() != Some(&b'T') || !two(1) || b.get(3) != Some(&b':') || !two(4) {
+        return false;
+    }
+    let mut i = 6;
+    if b.get(i) == Some(&b':') {
+        if !two(i + 1) {
+            return false;
+        }
+        i += 3;
+        if b.get(i) == Some(&b'.') {
+            i += 1;
+            let start = i;
+            while b.get(i).is_some_and(u8::is_ascii_digit) {
+                i += 1;
+            }
+            if i == start {
+                return false;
+            }
+        }
+    }
+    match b.get(i) {
+        None => true,
+        Some(b'Z') => i + 1 == b.len(),
+        Some(b'+' | b'-') => two(i + 1) && b.get(i + 3) == Some(&b':') && two(i + 4) && i + 6 == b.len(),
+        _ => false,
+    }
+}
+
 /// Notion's `October 18, 2026` (or `Oct 18, 2026`), optionally followed by a
 /// time (`3:15 PM`, `15:15`), and ISO / `2026/10/18` dates, as ISO 8601.
 fn iso_date(s: &str) -> Option<String> {
@@ -89,7 +122,7 @@ fn iso_date(s: &str) -> Option<String> {
         && s.get(8..10).is_some_and(digits)
     {
         let rest = &s[10..];
-        if rest.is_empty() || (sep == b'-' && rest.starts_with('T')) {
+        if rest.is_empty() || (sep == b'-' && iso_time(rest)) {
             return Some(format!("{}-{}-{}{rest}", &s[..4], &s[5..7], &s[8..10]));
         }
         return None;
@@ -210,11 +243,14 @@ fn quoted(s: &str) -> String {
     serde_json::to_string(s).expect("a string serializes")
 }
 
-/// A key written plain when that is unambiguous, else quoted.
+/// A key written plain when that is unambiguous, else quoted: a key YAML
+/// would read as a boolean, null or number (`true`, `1`) is quoted.
 fn yaml_key(k: &str) -> String {
-    let plain = k.chars().next().is_some_and(|c| c.is_alphanumeric())
+    const RESERVED: [&str; 9] = ["true", "false", "yes", "no", "on", "off", "null", "y", "n"];
+    let plain = k.chars().next().is_some_and(|c| c.is_alphabetic())
         && k.chars().all(|c| c.is_alphanumeric() || " _-".contains(c))
-        && !k.ends_with(' ');
+        && !k.ends_with(' ')
+        && !RESERVED.iter().any(|r| r.eq_ignore_ascii_case(k));
     if plain { k.to_string() } else { quoted(k) }
 }
 
@@ -255,6 +291,8 @@ impl Table {
     /// property is empty. Relations resolve against `dir`, the CSV's folder.
     pub fn frontmatter(&self, i: usize, dir: &[String], r: &dyn Resolver) -> Option<String> {
         let mut lines = Vec::new();
+        // A header that repeats gets ` 2`, ` 3`…: YAML keys must differ.
+        let mut seen: Vec<String> = Vec::new();
         for (col, header) in self.headers.iter().enumerate().skip(1) {
             let value = self.rows[i].get(col).map_or("", |v| v.trim());
             if value.is_empty() || header.is_empty() {
@@ -285,7 +323,14 @@ impl Table {
                 }
                 Kind::Text => quoted(value),
             };
-            lines.push(format!("{}: {yaml}", yaml_key(header)));
+            let mut key = header.clone();
+            let mut n = 1;
+            while seen.iter().any(|k| k.eq_ignore_ascii_case(&key)) {
+                n += 1;
+                key = format!("{header} {n}");
+            }
+            seen.push(key.clone());
+            lines.push(format!("{}: {yaml}", yaml_key(&key)));
         }
         (!lines.is_empty()).then(|| format!("---\n{}\n---\n", lines.join("\n")))
     }
@@ -375,6 +420,28 @@ mod tests {
         assert_eq!(
             t.frontmatter(1, &[], &r).unwrap(),
             "---\nDue: \"2026-10-18 → 2026-10-20\"\nWhere: \"Rome, 2025\"\n---\n"
+        );
+    }
+
+    #[test]
+    fn b6_review_m4_frontmatter_can_not_be_broken_out_of() {
+        assert_eq!(iso_date("2026-10-18T09:00").as_deref(), Some("2026-10-18T09:00"));
+        assert_eq!(
+            iso_date("2026-10-18T09:00:30Z").as_deref(),
+            Some("2026-10-18T09:00:30Z")
+        );
+        assert_eq!(
+            iso_date("2026-10-18T09:00+02:00").as_deref(),
+            Some("2026-10-18T09:00+02:00")
+        );
+        assert_eq!(iso_date("2026-10-18T\n---\ncover: x"), None);
+        assert_eq!(iso_date("2026-10-18Tbad"), None);
+        let csv = "Name,When,true,1,null,Tag,Tag\nA,\"2026-10-18T\n---\ncover: https://evil/x.png\",a,b,c,d,e\n";
+        let t = Table::parse(csv).unwrap();
+        let front = t.frontmatter(0, &[], &Map(HashMap::new())).unwrap();
+        assert_eq!(
+            front,
+            "---\nWhen: \"2026-10-18T\\n---\\ncover: https://evil/x.png\"\n\"true\": \"a\"\n\"1\": \"b\"\n\"null\": \"c\"\nTag: \"d\"\nTag 2: \"e\"\n---\n"
         );
     }
 
