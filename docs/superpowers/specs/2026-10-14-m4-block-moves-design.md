@@ -2,7 +2,7 @@
 
 **Status:** written on 2026-10-14 without Jose's review. He asked to "carry on with everything that's missing" and review features in bulk later.
 - **Grounding:** product spec §8 (DND-01–DND-08, Q-DND-1 and Q-A11Y-1, all DECIDED), architecture §4.3, and the prototype's Split-pane block gutter (`design/prototype/Main.dc.html`: grip plus Move up / Move down, the hint "Drag blocks in the preview to reorder them; the Markdown on the left follows.").
-- **Builds on:** M3b (`feat/m3b-relationships`).
+- **Builds on:** M3b (`feat/m3b-relationships`, after its final-review fix pass).
 - **Judgement calls** are listed in §9.
 
 ---
@@ -142,3 +142,56 @@ Non-negotiables as before: no network; i18n en + es; axe-clean; Safari 15 floor;
 5. **Only blank lines and a list item's indent and number change in a move.** A re-parse guard refuses anything else.
 6. **A one-time, dismissible hint bar,** copied from the prototype.
 7. **Live Preview gets the keyboard moves but no drag gutter,** following DND-01's "preview pane only".
+
+## 10. Amendments from planning (plan `docs/superpowers/plans/2026-10-14-m4-block-moves.md`, replayed end to end)
+
+These override the sections above where they conflict.
+
+1. **The guard (§3) parses windows, not the note.**
+   - It re-parses the top-level blocks each edit touches, plus one more on each side, before and after the move, and compares their signatures: block texts (indentation, `>` and list markers aside), containers, task states, `%%` comments and top-level kinds.
+   - A full parse of 200 KB takes ~450 ms in jsdom, while a move with its guard takes ~2.5 ms.
+   - A window that doesn't start the note gets a leading blank line, so a `---` there reads as a rule, not front matter. The sweep found this.
+2. **List items (§3):**
+   - **Markers:** an item takes the marker of the list it joins (its bullet character, or ordered with that list's delimiter), because a different marker would start a new list. Its checkbox stays.
+   - **Numbering:** ordered lists are renumbered only when they were sequential, or all one number; others keep each item's number. When a marker's width changes (9. → 10.), the item's other lines shift with it, so nested items stay nested.
+   - **Becoming its own list:** an item dropped among top-level blocks keeps its own marker. A new nested ordered list starts at 1 (the M2b rule).
+3. **Slots and refusals:**
+   - A list, or an item becoming one, is never offered a slot next to a list with the same marker (the two would merge).
+   - Moves the guard refuses are refused with "This block can't be moved here." That covers lists merging after a block between them leaves, and an indented code block or paragraph taken into a list. A refused move changes nothing.
+4. **Editor keys (§5):**
+   - Alt+↑/↓ moves the heading's section, the list item or the table row holding the selection. Anywhere else it stays CodeMirror's line move. At the edge nothing moves.
+   - Alt+←/→ (word moves on macOS) and Alt+Shift+↑/↓ (copy line) are **not** taken in the editor. Those moves live on the gutter's grip; Tab/⇧Tab still indent and outdent list items in the editor.
+   - A section's Move up passes the previous heading of its level or higher. Move down passes the next section at its level.
+5. **The gutter (§4):**
+   - **Hover:** it shows only the deepest block under the pointer. A whole list shows its own gutter from its margin (outside its items) and is always reachable by keyboard.
+   - **Buttons:** at rest a gutter is just the grip. Its buttons open while it's hovered or holds the keyboard (React state; WebKit before 15.4 and jsdom ignore `:hover` rules for this).
+   - **Keyboard:** one tab stop; ↑/↓ go from block to block; Enter picks a block up (the first place after it is preselected); Tab or Escape cancels.
+   - **Anchors:** the first element an HTML block renders carries the block's source range, so it has a gutter. Nothing is wrapped: a `<details>` opened in one block still holds the Markdown blocks after it, as in M3b (final review I1). A block that renders no element (a comment, a closing tag) has no gutter. Blocks of an embedded note never get one, because their offsets are the other note's.
+6. **The pane after a move:** it renders at once, without the 150 ms typing delay. A gutter key that arrives while the pane still lags the editor does nothing, and a pick-up made on blocks that have since changed is cancelled. The e2e test found this: keys pressed right after a move acted on the old blocks. A move from a button or a drop finds its block and slot again in the editor's text as it is then: a unit of the same kind spanning the same text, past the edit made since (typing, a reload, a merge, a re-render during a drag). Ids are never carried from the pane's model to the editor's. A block that changed or is gone cancels the move with "That block changed, so it wasn't moved" (final review C2).
+7. **Pointer drag:** the nearest slot is chosen by |dy| + 0.3·|dx| for list slots, so pointing further right picks a deeper level.
+8. **The hint bar:** dismissing it is remembered in `localStorage` (try/catch), not in settings. Losing it shows the hint once more.
+9. **The block model** is cached per editor document and re-parsed incrementally. The first move in a large note opened in Source pays a full parse (~1.5 s in jsdom at 200 KB). Later moves take ~10 ms. Making the top-level slots linear time (they were O(n²)) brought a list item's move from ~110 ms to well under 100 ms.
+10. **Live Preview's "HTML renders nothing" check** (M2c §7.7) is M3b's again: there is no HTML wrapper to look through (final review I1).
+11. **Safari 15:** the app's TypeScript uses no API newer than Safari 15.0. The build lowers syntax but polyfills nothing, so `.at()`, `Object.hasOwn`, `structuredClone`, `findLast` and the like would throw on 15.0–15.3. `src/jsCompat.test.ts` guards this (final review M7). Its pending list holds `markdown/incremental.ts` until the re-parse fix that removes its `.at()` lands.
+12. **Tests:** the fake disk now resolves a wiki target to a page it holds, so embeds render in jsdom.
+
+## 11. Amendments from the final review: the move engine and its guard
+
+These override the sections above where they conflict.
+
+1. **Front matter (C1).**
+   - A move never gives the note a head it didn't have. The head is what some front matter reader may take as one: a leading `---` line (trailing spaces or tabs allowed, after a byte-order mark too) through the first later `---` or `...` line, or that line alone when nothing closes it. Such a move is refused with the toast. Losing a head is allowed: a block moved above an unclosed leading rule, or the rule moved down.
+   - The slots stay offered; the refusal explains itself. (Filtering them would mean computing every result when slots are listed.)
+   - The parser runs remark-frontmatter only when the note starts with a closed block. Its construct, failing at the end of a note that opens with an unclosed `---`, kept micromark from seeing lists and quotes on every line it held.
+2. **The guard compares more than block texts.**
+   - **Nesting (I3):** each list item's entry carries the item holding it (by first line). The moved item takes the parent its slot gives; nothing else may change parent, so a list indented 2+ spaces can't be taken into another list's item.
+   - **Comments (M1):** the block model keeps the page's comments. No guard window edge falls inside one, so a window pairs them as the page does. A window left with a `%%` that pairs with nothing is refused when another `%%` follows; the stray `%%` after the page's last comment (outside code blocks) may not get a `%%` after it that it didn't have.
+   - **Where a window starts:** never right after indented code (micromark keeps it open across blank lines: an ordered list not at 1, or an empty item, can't start there), on an indented line, or after a block with a comment starting a line (masked, it can end a list early, while the page pairs comments on the unmasked text).
+   - **Edits (I4):** a move whose edits aren't in order, apart and inside the text is refused, so the guard never judges a text CodeMirror wouldn't produce.
+3. **Byte-order mark (I4).** Positions index the text the editor holds, mark included: `parsePage` parses without it and shifts every position past it. The block model's content starts after it, so moves keep it first.
+4. **Code in list items (M4).** Moving an item keeps whitespace-only lines past its own indentation (inside code they are content) and shifts them with the item when its marker's width changes.
+5. **Alt+↑/↓ on a table's header or delimiter row (M3)** does nothing, as at an edge: those rows aren't blocks. The whole table moves from its gutter.
+6. **The incremental re-parse** reads a slice past the page's start without front matter. It takes a full parse after indented code (or when the slice's last block becomes or stops being indented code), when the line after the slice opens a `%%` comment, and for a slice holding a byte-order mark. A chain of 8,000 random edits per seed now keeps the full parse's block model.
+7. **Timings (200 KB, Node):** a move with its guard takes 1–7 ms after the first (plain, comments, BOM, front matter). The model's next re-parse takes 3–7 ms, or ~350 ms when it falls back to a full parse (an edit next to a comment or the mark).
+8. **Tests:** the sweep gets the review's fuzz with fixed seeds: random notes × random moves checked by oracles that don't use the guard's windows (lines, a full parse's structure, item parents, list membership, front matter, change set and inverse, placement), with generators for front-matter rules, indented lists, byte-order marks, `%%` comments and code with blank lines (that one strict: no refusal of a move that would have kept the note).
+

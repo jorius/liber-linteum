@@ -11,6 +11,7 @@ import {
   type StateCommand,
 } from '@codemirror/state';
 import type { KeyBinding } from '@codemirror/view';
+import { blockKeymap } from './blockCommands';
 import { openLinkPicker } from './linkPickerOpen';
 
 export type InlineFormat = 'bold' | 'italic' | 'strike' | 'highlight' | 'code';
@@ -458,5 +459,7 @@ export const formatKeymap: readonly KeyBinding[] = [
  *  ⌘[ / ⌘] (they go back and forward along the link trail, M2b §3). */
 export const editorKeymap: readonly KeyBinding[] = [
   ...formatKeymap,
+  // Alt+↑ / Alt+↓ move a heading's section, a list item or a table row (M4 §5).
+  ...blockKeymap,
   ...defaultKeymap.filter((b) => b.key !== 'Mod-[' && b.key !== 'Mod-]'),
 ];

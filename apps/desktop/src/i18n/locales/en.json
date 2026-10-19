@@ -120,7 +120,43 @@
     "saveStatus": "Save status",
     "unsavedBlocks": "Unsaved changes in “{name}” couldn’t be written, so the vault stays open.",
     "unsavedKeepsWindow": "Unsaved changes in “{name}” couldn’t be written, so the window stays open. Close it again to quit without them.",
-    "copying": "Copying files…"
+    "copying": "Copying files…",
+    "blocks": {
+      "refused": "This block can’t be moved here.",
+      "grip": "Drag to reorder: {block}",
+      "moveUp": "Move up",
+      "moveDown": "Move down",
+      "indent": "Indent",
+      "outdent": "Outdent",
+      "help": "Up and Down go from block to block. Alt+Up or Alt+Down moves the block, Alt+Right or Alt+Left indents or outdents a list item, and Alt+Shift moves a heading without its section. Enter picks the block up to choose where it goes.",
+      "moved": "Moved {block}.",
+      "movedAfter": "Moved {block} after {after}.",
+      "movedBefore": "Moved {block} before {before}.",
+      "movedInto": "Moved {block} into {parent}.",
+      "movedFirst": "Moved {block} to the top of the page.",
+      "picked": "{block} picked up. Arrow keys choose where, Enter drops it, Escape cancels.",
+      "cancelled": "Move cancelled.",
+      "changed": "That block changed, so it wasn’t moved. Try again.",
+      "slot": {
+        "before": "Before {block}",
+        "end": "At the end of the page",
+        "endOfList": "At the end of the list",
+        "inside": "Inside {block}",
+        "endOfTable": "At the end of the table"
+      },
+      "kinds": {
+        "list": "List",
+        "code": "Code block",
+        "table": "Table",
+        "rule": "Divider",
+        "embed": "Embed",
+        "html": "HTML block",
+        "columns": "Columns",
+        "other": "Block"
+      },
+      "hint": "Drag blocks in the preview to reorder them; the Markdown on the left follows.",
+      "dismissHint": "Dismiss the hint"
+    }
   },
   "preview": {
     "remoteBlocked": "Remote image blocked (privacy)",

@@ -96,8 +96,9 @@ function activeLines(state: EditorState): Set<number> {
 
 const childRange = (node: Parent): [number, number] | null => {
   const kids = node.children as Node[];
-  if (!kids.length || !kids[0].position || !kids.at(-1)!.position) return null;
-  return [rangeOf(kids[0])[0], rangeOf(kids.at(-1)!)[1]];
+  const last = kids[kids.length - 1] as Node | undefined;
+  if (!last || !kids[0].position || !last.position) return null;
+  return [rangeOf(kids[0])[0], rangeOf(last)[1]];
 };
 
 function build(state: EditorState, page: ParsedPage, active: Set<number>): DecorationSet {

@@ -15,6 +15,8 @@ import { Preview } from '../preview/Preview';
 import styles from './Editor.module.css';
 import { followLinkAtCursor, livePreview, pagePath } from './livePreview';
 import { attachmentHandlers } from './attachments';
+import { BlockGutter, type Shown } from './BlockGutter';
+import { SplitHint } from './SplitHint';
 import { activeFormats, editorKeymap, type ActiveFormat } from './format';
 import { linkCompletion } from './linkComplete';
 import { LinkPicker } from './LinkPicker';
@@ -26,7 +28,7 @@ import { hideView, pageDocOf, showView, storedState, storeState } from './views'
 import { toggleTaskIn } from './widgets';
 
 /** The Split pane of the component currently showing each view. */
-const paneOf = new WeakMap<EditorView, (text: string) => void>();
+const paneOf = new WeakMap<EditorView, (text: string, now: boolean) => void>();
 /** The toolbar's pressed state of the component currently showing each view. */
 const toolbarOf = new WeakMap<EditorView, (state: EditorState) => void>();
 const modeSlot = new Compartment();
@@ -208,7 +210,12 @@ function createState(d: PageDoc, mode: EditorMode, label: string, numbers: boole
         if (!u.docChanged) return;
         const next = u.state.doc.toString();
         u.state.facet(pageDocOf)?.edit(next);
-        paneOf.get(u.view)?.(next);
+        // A block move shows in the pane at once (its gutter acts on what
+        // the pane shows, M4 §4); typing waits for the render delay.
+        paneOf.get(u.view)?.(
+          next,
+          u.transactions.some((tr) => tr.isUserEvent('move.block')),
+        );
       }),
     ],
   });
@@ -231,6 +238,11 @@ export function Editor({ doc, mode, label }: EditorProps) {
   const split = mode === 'split';
   // The text for the Split pane (cheap to track: the pane renders only in Split).
   const [text, setText] = useState(doc.text);
+  const [renderNow, setRenderNow] = useState(false);
+  const toPane = useCallback((next: string, now: boolean) => {
+    setText(next);
+    setRenderNow(now);
+  }, []);
   const showToolbar = useSettingsStore((s) => s.settings.toolbar);
   const showNumbers = useSettingsStore((s) => s.settings.lineNumbers);
   const [toolbarView, setToolbarView] = useState<EditorView | null>(null);
@@ -249,7 +261,7 @@ export function Editor({ doc, mode, label }: EditorProps) {
     const v = new EditorView({ parent: host.current!, state: stateFor(current.current) });
     view.current = v;
     showView(current.current, v);
-    paneOf.set(v, setText);
+    paneOf.set(v, toPane);
     toolbarOf.set(v, showFormats);
     setToolbarView(v);
     setLinkPickerOpener(v, () => setPicker(true));
@@ -354,15 +366,30 @@ export function Editor({ doc, mode, label }: EditorProps) {
     if (view.current) toggleTaskIn(view.current, at);
   }, []);
 
+  // What the Split pane shows, for its block gutter (M4 §4).
+  const [shown, setShown] = useState<Shown | null>(null);
+  const onRendered = useCallback(
+    (text: string, page: Shown['page']) => setShown({ text, page }),
+    [],
+  );
+
   return (
     <div className={styles.frame}>
       {showToolbar && toolbarView && <Toolbar view={toolbarView} active={active} />}
       {picker && toolbarView && <LinkPicker view={toolbarView} onClose={() => setPicker(false)} />}
+      {split && <SplitHint />}
       <div className={split ? styles.split : styles.single}>
         <div ref={host} className={mode === 'livePreview' ? styles.live : styles.source} />
         {split && (
           <div ref={pane} className={styles.pane} role="region" aria-label={t('editor.preview')}>
-            <Preview text={text} path={doc.path} onToggleTask={toggleTask} />
+            {toolbarView && <BlockGutter view={toolbarView} pane={pane} shown={shown} />}
+            <Preview
+              text={text}
+              path={doc.path}
+              onToggleTask={toggleTask}
+              onRendered={onRendered}
+              delay={renderNow ? 0 : undefined}
+            />
           </div>
         )}
       </div>

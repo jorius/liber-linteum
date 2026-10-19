@@ -175,3 +175,21 @@ test('zero network requests: relationships in the Global View', async ({ page })
   expect(csp).toEqual([]);
   expect(outside).toEqual([]);
 });
+
+// M4: moving blocks in the Split pane loads nothing from outside either.
+test('zero network requests: moving blocks in Split', async ({ page }) => {
+  const { outside, problems } = await openRemotePage(page, 'split');
+  const pane = page.getByRole('region', { name: 'Preview' });
+  await expect(pane.locator('[data-source-start]').first()).toBeVisible();
+  const first = page.getByRole('button', { name: /^Drag to reorder:/ }).first();
+  await first.focus();
+  await page.keyboard.press('Alt+ArrowDown');
+  await page.waitForLoadState('networkidle');
+  await page.waitForTimeout(300);
+  const csp = await page.evaluate(
+    () => (window as unknown as { __nimwCspViolations: string[] }).__nimwCspViolations,
+  );
+  expect(problems).toEqual([]);
+  expect(csp).toEqual([]);
+  expect(outside).toEqual([]);
+});

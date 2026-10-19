@@ -22,7 +22,7 @@ export function PageHeader({ page, mode }: { page: Page; mode: EditorMode }) {
   const hasDoc = useEditorStore((s) => s.doc !== null);
   const large = useEditorStore((s) => s.large);
   const toolbar = useSettingsStore((s) => s.settings.toolbar);
-  const previous = useTrailStore((s) => s.back.at(-1) ?? null);
+  const previous = useTrailStore((s) => s.back[s.back.length - 1] ?? null);
   const editable = useEditorStore((s) => s.doc !== null && s.path === page.path);
   return (
     <header className={styles.header}>

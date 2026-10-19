@@ -120,7 +120,43 @@
     "saveStatus": "Estado de guardado",
     "unsavedBlocks": "Los cambios sin guardar en «{name}» no se pudieron escribir, así que la bóveda sigue abierta.",
     "unsavedKeepsWindow": "Los cambios sin guardar en «{name}» no se pudieron escribir, así que la ventana sigue abierta. Ciérrala otra vez para salir sin ellos.",
-    "copying": "Copiando archivos…"
+    "copying": "Copiando archivos…",
+    "blocks": {
+      "refused": "Este bloque no se puede mover aquí.",
+      "grip": "Arrastrar para reordenar: {block}",
+      "moveUp": "Subir",
+      "moveDown": "Bajar",
+      "indent": "Sangrar",
+      "outdent": "Quitar sangría",
+      "help": "Arriba y Abajo van de un bloque a otro. Alt+Arriba o Alt+Abajo mueven el bloque, Alt+Derecha o Alt+Izquierda sangran o quitan la sangría de un elemento de lista, y Alt+Mayús mueve un encabezado sin su sección. Intro toma el bloque para elegir dónde va.",
+      "moved": "Se movió {block}.",
+      "movedAfter": "Se movió {block} después de {after}.",
+      "movedBefore": "Se movió {block} antes de {before}.",
+      "movedInto": "Se movió {block} dentro de {parent}.",
+      "movedFirst": "Se movió {block} al principio de la página.",
+      "picked": "Tomaste {block}. Las flechas eligen dónde, Intro lo suelta y Escape cancela.",
+      "cancelled": "Movimiento cancelado.",
+      "changed": "Ese bloque cambió, así que no se movió. Vuelve a intentarlo.",
+      "slot": {
+        "before": "Antes de {block}",
+        "end": "Al final de la página",
+        "endOfList": "Al final de la lista",
+        "inside": "Dentro de {block}",
+        "endOfTable": "Al final de la tabla"
+      },
+      "kinds": {
+        "list": "Lista",
+        "code": "Bloque de código",
+        "table": "Tabla",
+        "rule": "Separador",
+        "embed": "Incrustación",
+        "html": "Bloque HTML",
+        "columns": "Columnas",
+        "other": "Bloque"
+      },
+      "hint": "Arrastra los bloques en la vista previa para reordenarlos; el Markdown de la izquierda los sigue.",
+      "dismissHint": "Cerrar la sugerencia"
+    }
   },
   "preview": {
     "remoteBlocked": "Imagen remota bloqueada (privacidad)",

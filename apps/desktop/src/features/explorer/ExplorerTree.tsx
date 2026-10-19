@@ -149,7 +149,7 @@ export function ExplorerTree({
         moveFocus(rows[0]?.node.path);
         break;
       case 'End':
-        moveFocus(rows.at(-1)?.node.path);
+        moveFocus(rows[rows.length - 1]?.node.path);
         break;
       case 'Enter':
         activate(row.node);

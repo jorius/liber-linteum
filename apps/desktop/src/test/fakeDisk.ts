@@ -113,7 +113,17 @@ export function fakeDisk(initial: Record<string, string>, extra: Extra = {}): Fa
         case 'vault_tree':
           return [...files.keys()].map((path) => ({ path, kind: 'page' }));
         case 'links_resolve':
-          return (raw as { targets: unknown[] }).targets.map(() => null);
+          // A wiki target names a page on the disk by its name (enough for
+          // embeds in tests); anything else resolves to nothing.
+          return (raw as { targets: { kind: string; target: string }[] }).targets.map(
+            ({ kind, target }) => {
+              if (kind !== 'wiki' && kind !== 'embed') return null;
+              const name = `${target.replace(/#.*$/, '')}.md`.toLowerCase();
+              return (
+                [...files.keys()].find((f) => f.split('/').pop()!.toLowerCase() === name) ?? null
+              );
+            },
+          );
         case 'settings_set':
           return { version: 1, ...(raw as { patch: object }).patch };
         default:

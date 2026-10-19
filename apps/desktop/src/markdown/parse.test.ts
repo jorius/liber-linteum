@@ -100,6 +100,29 @@ describe('parsePage — frontmatter', () => {
     expect(p.frontmatter?.error).toBeTruthy();
     expect(p.links.map((l) => l.target)).toEqual(['target']);
   });
+
+  it('a note opening with a `---` rule that nothing closes keeps its lists and quotes (final review C1)', () => {
+    // remark-frontmatter's construct, failing at the end of the note, left
+    // every later line without its containers: lists and quotes read as
+    // paragraphs.
+    const types = (src: string) => parsePage(src).tree.children.map((n) => n.type);
+    expect(types('---\n\n> quote\n\n- item\n\n# h\n')).toEqual([
+      'thematicBreak',
+      'blockquote',
+      'list',
+      'heading',
+    ]);
+    expect(types('---\r\nPara\r\n\r\n1. one\r\n')).toEqual(['thematicBreak', 'paragraph', 'list']);
+    expect(types('---  \n```\ncode\n```\n\n> q\n')).toEqual([
+      'thematicBreak',
+      'code',
+      'blockquote',
+    ]);
+    // A closed block is front matter, as before (trailing spaces allowed).
+    expect(types('---\na: 1\n---  \n> q\n')).toEqual(['yaml', 'blockquote']);
+    expect(types('---\n---\n- x\n')).toEqual(['yaml', 'list']);
+    expect(parsePage('---\r\na: 1\r\n---\r\nBody\r\n').frontmatter?.data).toEqual({ a: 1 });
+  });
 });
 
 describe('review focus: offsets', () => {
@@ -115,6 +138,21 @@ describe('review focus: offsets', () => {
     const src = '# Title\r\n\r\nText [[A]]\r\nmore [[B|b]]\r\n';
     const links = findAll<WikiLink>(parsePage(src).tree, 'wikiLink');
     expect(links.map((l) => slice(src, l))).toEqual(['[[A]]', '[[B|b]]']);
+  });
+
+  it('a file starting with a byte-order mark keeps exact positions: the mark is no text (final review I4)', () => {
+    const src = '\uFEFF# Title [[A]]\n\nText %%c%% [[B]] #tag\n';
+    const page = parsePage(src);
+    expect(page.tree.children.map((n) => slice(src, n))).toEqual([
+      '# Title [[A]]',
+      'Text %%c%% [[B]] #tag',
+    ]);
+    expect(page.links.map((l) => src.slice(...l.range))).toEqual(['[[A]]', '[[B]]']);
+    expect(page.comments.map(([s, e]) => src.slice(s, e))).toEqual(['%%c%%']);
+    expect(page.tree.children[0].position!.start).toEqual({ line: 1, column: 2, offset: 1 });
+    // Front matter after the mark.
+    const fm = '\uFEFF---\na: 1\n---\nBody\n';
+    expect(fm.slice(...parsePage(fm).frontmatter!.range)).toBe('---\na: 1\n---');
   });
 });
 

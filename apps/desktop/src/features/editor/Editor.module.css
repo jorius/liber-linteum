@@ -47,6 +47,8 @@
 }
 
 .pane {
+  /* The block gutter (M4 §4) is placed in the pane's scroll coordinates. */
+  position: relative;
   overflow: auto;
   padding: 20px 28px;
 }
