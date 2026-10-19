@@ -155,6 +155,10 @@ impl Index {
         conn.pragma_update(None, "journal_mode", "WAL")?;
         conn.pragma_update(None, "foreign_keys", "ON")?;
         conn.pragma_update(None, "synchronous", "NORMAL")?;
+        // Search re-reads page_text/FTS pages on every query: 2 MB (SQLite's
+        // default) made them disk reads; its temp tables (nimw_hits, …) stay in RAM.
+        conn.pragma_update(None, "cache_size", -32_000)?;
+        conn.pragma_update(None, "temp_store", "MEMORY")?;
         Ok(())
     }
 
