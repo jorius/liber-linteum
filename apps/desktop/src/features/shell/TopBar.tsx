@@ -1,5 +1,5 @@
 import { useTranslation } from 'react-i18next';
-import { CloseIcon, GearIcon, GraphIcon, PencilIcon } from '../../app/icons';
+import { CloseIcon, GearIcon, GraphIcon, PencilIcon, SearchIcon } from '../../app/icons';
 import { useUiStore } from '../../stores/uiStore';
 import { useVaultStore } from '../../stores/vaultStore';
 import { useGvStore } from '../global-view/gvStore';
@@ -20,8 +20,11 @@ function GvHeading() {
   );
 }
 
+/** The search shortcut as this platform writes it. */
+const SEARCH_KEYS = /Mac/i.test(navigator.platform) ? '⌘⇧F' : 'Ctrl+Shift+F';
+
 /** The page's title and subtitle (or the Global View's level), the [Edit ·
- *  Global view] switch (M3a §2), settings and close. The vault's name is in
+ *  Global view] switch (M3a §2), search (M5 §4), settings and close. The vault's name is in
  *  the sidebar (M4b §1). */
 export function TopBar() {
   const { t } = useTranslation();
@@ -55,6 +58,18 @@ export function TopBar() {
         </button>
       </div>
       <div className={styles.tright}>
+        <button
+          type="button"
+          className={styles.searchButton}
+          aria-keyshortcuts="Meta+Shift+F Control+Shift+F"
+          onClick={() => openDialog({ type: 'search' })}
+        >
+          <SearchIcon />
+          {t('search.button')}
+          <kbd className={styles.kbd} aria-hidden="true">
+            {SEARCH_KEYS}
+          </kbd>
+        </button>
         <button
           type="button"
           className={styles.iconButtonLight}

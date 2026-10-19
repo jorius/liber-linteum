@@ -11,6 +11,7 @@ nimw-markdown = { path = "../nimw-markdown" }
 rusqlite.workspace = true
 sha2.workspace = true
 thiserror.workspace = true
+unicode-normalization.workspace = true
 [dev-dependencies]
 tempfile.workspace = true
 

@@ -690,6 +690,79 @@ export const quickNotesState = () => call<QuickNotesState>('quick_notes_state');
 export const scratchFolderSet = (name: string) =>
   call<ScratchFolderResult>('scratch_folder_set', { name });
 
+// ---- search (M5 §3; mirrors src-tauri/src/search_commands.rs) ----
+
+export interface SearchQuery {
+  text?: string;
+  /** A top-level folder. */
+  project?: string | null;
+  /** A folder path, or a folder name anywhere in the vault. */
+  folder?: string | null;
+  /** All must be present; a tag also matches its nested tags. */
+  tags?: string[];
+  /** A page path, or a name resolved like `[[name]]`, else a title. */
+  linksTo?: string | null;
+  linksFrom?: string | null;
+  hasImage?: boolean;
+  hasAudio?: boolean;
+  offset?: number;
+  /** At most 50; 0 means 50. */
+  limit?: number;
+}
+
+/** A run of snippet text; `hit` words matched the query. Never HTML. */
+export interface SnippetPart {
+  text: string;
+  hit: boolean;
+}
+
+export interface SearchHit {
+  path: string;
+  title: string;
+  /** The cover's vault path (`null`: none, remote or missing). */
+  cover: string | null;
+  /** As written, matching ones first. */
+  tags: string[];
+  hasImage: boolean;
+  hasAudio: boolean;
+  /** About 12 words around the first body match. */
+  snippet: SnippetPart[] | null;
+}
+
+export interface FacetCount {
+  value: string;
+  count: number;
+}
+
+export interface FacetPage {
+  path: string;
+  title: string;
+  count: number;
+  active: boolean;
+}
+
+export interface Facets {
+  projects: FacetCount[];
+  tags: FacetCount[];
+  linksTo: FacetPage[];
+  /** The active `linksFrom` filter, resolved. */
+  linksFrom: FacetPage | null;
+  hasImage: number;
+  hasAudio: number;
+}
+
+export interface SearchPage {
+  results: SearchHit[];
+  total: number;
+  facets: Facets;
+  /** No text and no filters: the 20 most recently modified pages. */
+  recent: boolean;
+  /** A full re-index is running; results may be partial. */
+  indexing: boolean;
+}
+
+export const search = (query: SearchQuery) => call<SearchPage>('search', { query });
+
 /** URL of a vault file for <img>/<audio> through the `nimw-asset:` protocol
  *  (M2a §2.5); WebView2 on Windows reaches custom protocols over http. */
 export function assetUrl(path: string): string {
@@ -747,6 +820,9 @@ export const onSettingsChanged = (cb: (s: Settings) => void): Promise<UnlistenFn
 /** File → New Quick Note in the app menu (M4c §2). */
 export const onMenuQuickNote = (cb: () => void): Promise<UnlistenFn> =>
   listen('menu:quickNote', () => cb(), mine());
+/** View → Search… in the app menu (M5 §4). */
+export const onMenuSearch = (cb: () => void): Promise<UnlistenFn> =>
+  listen<null>('menu:search', () => cb(), mine());
 export const onVaultWarning = (cb: (p: WarningPayload) => void): Promise<UnlistenFn> =>
   listen<WarningPayload>('vault:warning', (e) => cb(e.payload));
 

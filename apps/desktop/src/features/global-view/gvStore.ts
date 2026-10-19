@@ -173,6 +173,8 @@ interface GvState {
   closeAtoms: () => void;
   /** The atoms' page crumb: its own level (Drill-down), or back. */
   atomsPageLevel: () => Promise<void>;
+  /** A page's own level, under the vault (Search's Shift+Enter, M5 §10.19). */
+  showPage: (path: string, title: string) => Promise<void>;
   reset: () => void;
 }
 
@@ -524,6 +526,18 @@ export const useGvStore = create<GvState>((set, get) => {
         atoms: null,
         stack: [...stack, { kind: 'page', path: atoms.path }],
         titles: { ...get().titles, [atoms.path]: atoms.title },
+        focus: null,
+      });
+      return get().load();
+    },
+    showPage: async (path, title) => {
+      set({
+        atoms: null,
+        connectFrom: null,
+        connectPick: false,
+        stack: [{ kind: 'vault' }, { kind: 'page', path }],
+        expanded: [],
+        titles: { ...get().titles, [path]: title },
         focus: null,
       });
       return get().load();

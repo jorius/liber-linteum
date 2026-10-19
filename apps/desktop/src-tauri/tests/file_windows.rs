@@ -53,6 +53,8 @@ const VAULT_COMMANDS: &[&str] = &[
     "quick_note_autoname",
     "quick_notes_state",
     "scratch_folder_set",
+    // M5: search is the main window's.
+    "search",
     "vault_create",
     "vault_close",
     "vault_tree",

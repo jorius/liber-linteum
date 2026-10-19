@@ -186,6 +186,34 @@
   gap: 8px;
 }
 
+/* Search (M5 §4): the prototype's button with its shortcut. */
+.searchButton {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 40px;
+  padding: 0 10px 0 12px;
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font: 600 14px var(--font-body);
+  cursor: pointer;
+}
+
+.searchButton:hover {
+  border-color: var(--color-accent);
+}
+
+.kbd {
+  font: 500 12px var(--font-body);
+  color: var(--color-text-muted);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  padding: 1px 6px;
+  background: var(--color-surface-subtle);
+}
+
 .iconButtonLight {
   display: inline-flex;
   align-items: center;

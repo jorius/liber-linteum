@@ -12,13 +12,17 @@ const FOCUSABLE =
  *  `dismissible` (Settings, whose changes save as they're made; M4b part 3):
  *  Escape closes even when nothing inside has focus (WebKit doesn't focus a
  *  clicked checkbox or button), a click on the backdrop closes, and closing
- *  first blurs the focused field so a value typed but not confirmed is saved. */
+ *  first blurs the focused field so a value typed but not confirmed is saved.
+ *  `wide` (Search, M5 §4): 780 px; `hideTitle`: the title names the dialog
+ *  for screen readers only. */
 export function Dialog({
   title,
   onClose,
   onConfirm,
   returnFocus,
   dismissible = false,
+  wide = false,
+  hideTitle = false,
   children,
 }: {
   title: string;
@@ -26,6 +30,8 @@ export function Dialog({
   onConfirm?: () => void;
   returnFocus?: () => HTMLElement | null | undefined;
   dismissible?: boolean;
+  wide?: boolean;
+  hideTitle?: boolean;
   children: ReactNode;
 }) {
   const box = useRef<HTMLDivElement>(null);
@@ -126,10 +132,10 @@ export function Dialog({
         role="dialog"
         aria-modal="true"
         aria-labelledby="dialog-title"
-        className={styles.dialog}
+        className={wide ? `${styles.dialog} ${styles.wide}` : styles.dialog}
         onKeyDown={onKeyDown}
       >
-        <h2 id="dialog-title" className={styles.title}>
+        <h2 id="dialog-title" className={hideTitle ? styles.srOnly : styles.title}>
           {title}
         </h2>
         {children}

@@ -14,6 +14,7 @@ pub mod menu;
 pub mod navigation;
 pub mod opening;
 pub mod scratchpad_commands;
+pub mod search_commands;
 pub mod settings;
 pub mod settings_commands;
 pub mod state;
@@ -166,6 +167,7 @@ pub fn configure<R: tauri::Runtime>(
         file_commands::file_follow,
         file_commands::file_open_in_vault,
         file_commands::file_open_dialog,
+        search_commands::search,
     ])
 }
 

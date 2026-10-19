@@ -1,15 +1,23 @@
 //! SQLite cache of one vault (spec §5): files, pages, tags, links.
 //! Never reads or writes vault files; `nimw-session` feeds it.
 
+mod fold;
 mod index;
 mod rows;
 mod schema;
+mod search;
+mod text;
 
+pub use fold::fold;
 pub use index::{Index, IndexError, Result, Tx};
 pub use rows::{
     CardRow, FileKind, FileRow, LinkCandidate, LinkRow, PageLink, PageRow, Stat, TreeNode,
 };
 pub use schema::SCHEMA_VERSION;
+pub use search::{
+    FacetCount, FacetPage, Facets, FtsText, MAX_LIMIT, RECENT, SearchHit, SearchPage, SearchQuery,
+    SnippetPart, fts_query,
+};
 
 use sha2::{Digest, Sha256};
 use std::path::Path;

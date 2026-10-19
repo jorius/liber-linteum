@@ -68,6 +68,7 @@ const COMMANDS: &[&str] = &[
     "file_follow",
     "file_open_in_vault",
     "file_open_dialog",
+    "search",
 ];
 
 fn main() {

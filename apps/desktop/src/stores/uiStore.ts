@@ -20,6 +20,8 @@ export type DialogState =
    *  the quick note that asked. Rendered by `ScratchpadHost` (it also shows
    *  on the Welcome screen). */
   | { type: 'scratchpadSetup'; then: 'quickNote' | 'none' }
+  /** Search (M5 §4). */
+  | { type: 'search' }
   | null;
 
 /** Which screen the open vault shows (M3a §2). */

@@ -77,6 +77,17 @@ describe('M4c single-file window', () => {
     expect(calls.filter(([c]) => /quick_note|scratchpad/.test(c))).toEqual([]);
   });
 
+  it('⌘⇧F in a file window opens no search (search lives in the main window)', async () => {
+    const calls = backend(PAGE, '# Hello\n');
+    render(<SingleFileApp />);
+    await screen.findByRole('textbox', { name: 'Page title' });
+    await userEvent.keyboard('{Meta>}{Shift>}f{/Shift}{/Meta}');
+    await new Promise((r) => setTimeout(r, 20));
+    expect(screen.queryByRole('dialog', { name: 'Search' })).toBeNull();
+    expect(screen.queryByRole('button', { name: /^Search/ })).toBeNull();
+    expect(calls.filter(([c]) => c === 'search')).toEqual([]);
+  });
+
   it('shows the file: its name, subtitle, the compact band and the editor; no vault features', async () => {
     backend(PAGE, '---\nsubtitle: Draft\n---\n# Hello\n');
     const { container } = render(<SingleFileApp />);

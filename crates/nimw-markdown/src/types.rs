@@ -1,4 +1,5 @@
 use std::ops::Range;
+use unicode_normalization::UnicodeNormalization;
 
 /// Everything the index needs from one Markdown page.
 #[derive(Debug, Clone, Default, PartialEq)]
@@ -13,6 +14,10 @@ pub struct PageMeta {
     /// Sorted by `range.start`.
     pub links: Vec<LinkRef>,
     pub excerpt: String,
+    /// The body's words for search (M5 §2): Markdown, the frontmatter,
+    /// comments, HTML, URLs and embeds dropped; wikilinks read as their alias
+    /// or target; code kept.
+    pub body_text: String,
     pub has_image: bool,
     pub has_audio: bool,
     pub frontmatter_error: Option<String>,
@@ -30,7 +35,8 @@ impl Tag {
     pub fn new(text: &str) -> Tag {
         Tag {
             text: text.to_string(),
-            key: text.to_lowercase(),
+            // NFC, so a tag typed composed matches one saved decomposed (M5 review M2).
+            key: text.nfc().collect::<String>().to_lowercase(),
         }
     }
 }

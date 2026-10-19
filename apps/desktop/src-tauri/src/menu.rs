@@ -38,6 +38,9 @@ pub const EDITOR_ID: &str = "nimw-screen-edit";
 pub const GLOBAL_VIEW_ID: &str = "nimw-screen-global";
 /// Id of View → See Atoms of This Page (M4b part 3 §6).
 pub const ATOMS_ID: &str = "nimw-see-atoms";
+/// Id of View → Search… (M5 §4); the page answers `menu:search`.
+pub const SEARCH_ID: &str = "nimw-search";
+pub const SEARCH_EVENT: &str = "menu:search";
 /// Event telling the page which screen to show; payload `"edit"`,
 /// `"global"`, or `"atoms"` (the open page's atoms in the Global View).
 pub const SCREEN_EVENT: &str = "menu:screen";
@@ -131,6 +134,8 @@ pub fn app_menu<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
     // No accelerators: the page handles ⌘1 / ⌘2 itself (as ⌘[ / ⌘]).
     let editor = MenuItem::with_id(app, EDITOR_ID, "Editor", true, None::<&str>)?;
     let global_view = MenuItem::with_id(app, GLOBAL_VIEW_ID, "Global View", true, None::<&str>)?;
+    // No accelerator: the page handles ⌘⇧F itself (as ⌘1 / ⌘2).
+    let search = MenuItem::with_id(app, SEARCH_ID, "Search…", true, None::<&str>)?;
     let atoms = MenuItem::with_id(app, ATOMS_ID, "See Atoms of This Page", true, None::<&str>)?;
     let toolbar = MenuItem::with_id(
         app,
@@ -152,6 +157,8 @@ pub fn app_menu<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
         "View",
         true,
         &[
+            &search,
+            &PredefinedMenuItem::separator(app)?,
             &editor,
             &global_view,
             &atoms,
@@ -204,6 +211,13 @@ pub fn on_menu_event<R: Runtime>(app: &AppHandle<R>, event: MenuEvent) {
             _ => "atoms",
         };
         emit_focused(app, SCREEN_EVENT, screen);
+    } else if id == SEARCH_ID {
+        // Search lives in the main window only (file windows have no vault).
+        if let Some(main) = app.get_webview_window("main") {
+            let _ = main.show();
+            let _ = main.set_focus();
+        }
+        let _ = app.emit_to("main", SEARCH_EVENT, ());
     } else if id == TOOLBAR_ID {
         emit_focused(app, TOGGLE_EVENT, "toolbar");
     } else if id == LINE_NUMBERS_ID {

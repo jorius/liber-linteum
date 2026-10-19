@@ -3,6 +3,7 @@ use crate::rows::{
     split_path,
 };
 use crate::schema::{SCHEMA, SCHEMA_VERSION};
+use crate::text::{folders_column, name_column, text_columns};
 use nimw_markdown::{FileSet, LinkKind, PageMeta, Tag, link_key, name_key, resolve};
 use rusqlite::{Connection, OptionalExtension, Row, params};
 use std::collections::HashMap;
@@ -20,7 +21,7 @@ pub type Result<T> = std::result::Result<T, IndexError>;
 
 /// The SQLite cache of one vault (spec §5). Never touches vault files.
 pub struct Index {
-    conn: Connection,
+    pub(crate) conn: Connection,
 }
 
 impl std::fmt::Debug for Index {
@@ -480,6 +481,9 @@ impl Tx<'_> {
                 .prepare_cached("DELETE FROM pages WHERE path = ?1")?
                 .execute([&row.path])?;
             self.tx
+                .prepare_cached("DELETE FROM page_text WHERE path = ?1")?
+                .execute([&row.path])?;
+            self.tx
                 .prepare_cached("DELETE FROM tags WHERE path = ?1")?
                 .execute([&row.path])?;
             self.tx
@@ -500,6 +504,15 @@ impl Tx<'_> {
             path, meta.title, meta.subtitle, meta.cover, meta.cover_y.map(i64::from), meta.excerpt,
             meta.has_image, meta.has_audio, meta.frontmatter_error, meta.cover_x.map(i64::from)
         ])?;
+        let [title, name, folders, tags, links, body] = text_columns(path, meta);
+        self.tx
+            .prepare_cached(
+                "INSERT INTO page_text (path, title, name, folders, tags, links, body)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)
+                 ON CONFLICT(path) DO UPDATE SET title = ?2, name = ?3, folders = ?4,
+                 tags = ?5, links = ?6, body = ?7",
+            )?
+            .execute(params![path, title, name, folders, tags, links, body])?;
         self.tx
             .prepare_cached("DELETE FROM tags WHERE path = ?1")?
             .execute([path])?;
@@ -562,11 +575,17 @@ impl Tx<'_> {
         let mut retarget = self
             .tx
             .prepare_cached("UPDATE links SET target_path = ?2 WHERE target_path = ?1")?;
+        // The path cascades into `page_text`; the name and folder words that
+        // search finds a page by follow here.
+        let mut words = self
+            .tx
+            .prepare_cached("UPDATE page_text SET name = ?2, folders = ?3 WHERE path = ?1")?;
         for old in paths {
             let new = format!("{to}{}", &old[from.len()..]);
             let (parent, name) = split_path(&new);
             update.execute(params![old, new, parent, name, ext_of(name)])?;
             retarget.execute(params![old, new])?;
+            words.execute(params![new, name_column(&new), folders_column(&new)])?;
         }
         Ok(())
     }
