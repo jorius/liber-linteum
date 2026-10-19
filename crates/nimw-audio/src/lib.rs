@@ -11,7 +11,7 @@ mod record;
 pub use cpal_host::CpalHost;
 pub use host::{Device, Ended, Host, SYNTHETIC_DEVICE, Sink, StreamFormat, SyntheticHost};
 pub use level::{Level, level};
-pub use record::{Take, record};
+pub use record::{MAX_DATA_BYTES, Take, record, record_with};
 
 use serde::{Deserialize, Serialize};
 

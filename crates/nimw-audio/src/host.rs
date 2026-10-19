@@ -29,6 +29,10 @@ pub enum Ended {
     Stopped,
     /// The device went away (unplugged); what came before is kept.
     DeviceLost,
+    /// The clip reached the size a WAV can hold (batch 6 review I5).
+    LengthLimit,
+    /// The disk refused more sound; what was flushed before is kept (I1).
+    WriteFailed,
 }
 
 /// Receives a capture: its format once, then samples in -1.0..=1.0.
