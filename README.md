@@ -7,7 +7,8 @@ network requests.
 
 > Status: **M0–M5b merged on `main`** (2026-10-18): vault, editor, covers and
 > attachments, Global View, block moves, Scratchpad and single-file windows,
-> search, Trash and Archive, Favorites. Next: M6 audio, M7 Notion import, M8
+> search, Trash and Archive, Favorites. Batch 6 (`feat/batch6`, unmerged):
+> text files in search, M6 audio clips (WAV), M7 Notion import. Next: M8
 > packaging. Start at `docs/README.md`; `docs/product-spec.md` is the *what*,
 > `docs/superpowers/specs/2026-10-12-architecture-design.md` the *how*.
 
@@ -54,7 +55,8 @@ The installer lands in `target/x86_64-pc-windows-msvc/release/bundle/nsis/` and 
   - `nimw-markdown`: parsing a page (title, frontmatter, tags, links, body text)
   - `nimw-index`: the SQLite index and search (see `docs/architecture/index-and-database.md`)
   - `nimw-session`: one open vault, composing the three above
-  - `nimw-audio`, `nimw-import`: stubs for M6 and M7
+  - `nimw-audio`: microphone capture (`cpal`), WAV writing (`hound`), level meter (M6). On Linux, `cpal` needs ALSA headers: `sudo apt install libasound2-dev`
+  - `nimw-import`: the Notion Markdown & CSV importer: safe zip reading, names, links, databases (M7)
   - `nimw-testkit`: fixtures and the generated test vaults
 - `design/prototype`: clickable design reference (not shipped)
 

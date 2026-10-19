@@ -24,7 +24,8 @@ Where to start, depending on what you need.
 | M4c Scratchpad and single-file windows | `2026-10-14-m4c-scratchpad-design.md` | `2026-10-15-m4c-scratchpad-handoff.md` |
 | M5 search | `2026-10-14-m5-search-design.md` | `2026-10-15-m5-search-handoff.md` |
 | M5b third feedback round | `2026-10-15-m5b-feedback-design.md` | `2026-10-15-m5b-feedback-handoff.md` |
-| M6 audio | `2026-10-14-m6-audio-design.md` (draft) | — |
-| M7 Notion import, M8 packaging | — | — |
+| M6 audio | `2026-10-14-m6-audio-design.md` (§10: batch-6 amendments) | — (batch 6) |
+| M7 Notion import | `2026-10-18-m7-notion-import-design.md` | — (batch 6) |
+| M8 packaging | — | — |
 
 All of M0–M5b is merged on `main` (2026-10-18).

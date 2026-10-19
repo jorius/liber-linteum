@@ -18,7 +18,7 @@
 | File watching | `notify` + a debouncer crate | `notify` with the app's own batching (200 ms quiet, 2 s cap), because the debouncer crates drop macOS deletes or rescan signals. |
 | Trash (EXP-03) | OS trash via the `trash` crate | Delete moves items to the vault's own **`.trash/`** with a record in `.nimw/trash.json` (M5b §5); **Delete from vault** and **Empty Trash** send them on to the OS trash. **Archive** moves items to `.archive/` and keeps them indexed, read-only. |
 | Asset protocol | `asset:` | A custom **`nimw-asset:`** scheme (CSP `img-src`/`media-src`), scoped per window: the vault for the main window, the file's folder for a single-file window; outside files only when a saved note links them (M4b part 3 §15). |
-| Index schema (§3.2) | v1 sketch | **Schema 4**: `files`, `pages` (incl. `cover_x`, `icon`), `tags`, `links` (byte offsets, resolved `target_path`), `page_text` + FTS5 external-content `fts`, `meta`. See `docs/architecture/index-and-database.md`. |
+| Index schema (§3.2) | v1 sketch | **Schema 5** (batch 6: text files in `page_text`/`fts`): `files`, `pages` (incl. `cover_x`, `icon`), `tags`, `links` (byte offsets, resolved `target_path`), `page_text` + FTS5 external-content `fts`, `meta`. See `docs/architecture/index-and-database.md`. |
 | `vault.json` (§3.1) | `version`, `viewMode`, `indexPicks`, `exclude`, `attachments` | Also `attachmentLinkFormat`, `pageWidth`, `pageWidths`, `coverHeights`, `coverSides`, `coverWidths`, `autoNamed`, `scratchpadFolder`, `icon`, `folderIcons`, `favorites`, `folderSorts`; unknown keys are kept. Plus `.nimw/trash.json` and `.nimw/archive.json`. |
 | Frontmatter keys (§3.3) | `cover`, `cover-y`, `subtitle`, `tags`, `related` | Also `cover-x` (side covers) and `icon` (the page's emoji). |
 | Windows | one window | The vault window (`main`) plus **single-file windows** (`file-<n>`) with their own capability file `capabilities/file.json` and per-window path grants (M4c). |
@@ -108,7 +108,7 @@ notes-in-my-way/
 
 ### 3.2 Index schema (SQLite)
 
-> **Superseded** by schema 4; the full schema, the indexing pipeline and search are documented as built in `docs/architecture/index-and-database.md`. The v1 sketch is kept for history:
+> **Superseded** by schema 5; the full schema, the indexing pipeline and search are documented as built in `docs/architecture/index-and-database.md`. The v1 sketch is kept for history:
 
 - `files(path PK, kind, parent, mtime, size, hash)`
 - `pages(path PK, title, subtitle, cover, cover_y, excerpt, has_image, has_audio)`
@@ -287,8 +287,8 @@ Checked by a nightly benchmark job.
 | M3 | Global View | GV-* | Done (M3a, M3b relationships) |
 | M4 | Block drag-and-drop | DND-* | Done, plus the M4b feedback rounds (parts 1–3) and **M4c** (Scratchpad, single-file windows) |
 | M5 | Search | SR-* | Done, plus the **M5b** feedback round (shell, auto save, icons, Trash and Archive, Favorites, sort, Settings categories) |
-| M6 | Audio | AUD-* | Spec drafted (`2026-10-14-m6-audio-design.md`) |
-| M7 | Notion importer | IMP-* | Not started |
+| M6 | Audio | AUD-* | Built in batch 6 (`feat/batch6`): WAV recording via `cpal` + `hound`, Upload clip, player; MP3 deferred (spec §10) |
+| M7 | Notion importer | IMP-* | Built in batch 6 (`feat/batch6`): Markdown & CSV zip into a new vault (`2026-10-18-m7-notion-import-design.md`) |
 | M8 | Packaging, signing, dark theme polish, a11y audit, perf budgets | NFR-* | Not started |
 
 ### M0 scaffold contents

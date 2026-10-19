@@ -54,7 +54,7 @@ Who owns what:
   - **Rayon workers** read and parse files in parallel during a full pass, but they **never touch SQLite**. All writes happen afterwards, on the calling thread, under the mutex (`session.rs:150-206`).
 - **Transactions:** `Index::transaction` wraps a closure; it commits on `Ok`, and rolls back on `Err` by dropping the transaction (`index.rs:172-179`). The full pass writes in chunks of 500 rows per transaction (`BATCH_ROWS`, `session.rs:14`).
 
-## 3. The schema (version 4)
+## 3. The schema (version 5)
 
 Defined in one string, `crates/nimw-index/src/schema.rs:9-93`, and created in one batch by `Index::init`.
 
@@ -186,6 +186,7 @@ These live in files, not SQLite:
 | 2 | M4b part 3 | Titles follow the first-block H1 rule; `pages.cover_x`; `target_key` follows `\`; Markdown `file:` links indexed |
 | 3 | M5 | `page_text` and `fts` (search) |
 | 4 | M5b | `pages.icon` |
+| 5 | Batch 6 | Text and code files get a `page_text` row (name, title = file name, folders, body), so search finds them; no tags or links |
 
 (Source: the comment at `schema.rs:1-7`.)
 
@@ -323,7 +324,7 @@ The watcher's later event for the same file sees an unchanged `mtime_ns` and `si
 | `x.md`, valid UTF-8 | `page` | yes | |
 | `x.md`, not UTF-8 | `attachment` | no | warning in the report |
 | images, audio, PDFs, other files | `attachment` | no | link targets; `has_image`/`has_audio` come from links, not from these rows |
-| `.txt`, code and other text files | `attachment` | **no** | opened in the app's text view (M4b part 2), but **not searchable** at `de2378e`; a batch-6 item |
+| `.txt`, code and other text files | `attachment` | `page_text`/`fts` only (schema 5) | the text view's rule: UTF-8, no NUL, ≤ 2 MB. Searchable by name and body (a **Text files** filter narrows to them); never in `pages`, tags or links. A file that stops reading as text loses its row |
 | folders | `folder` | no | |
 | `.trash/…`, `.git`, `.obsidian`, `.nimw` | not indexed | | hidden |
 | `.archive/…` | as above | yes (flagged by path) | excluded from search and the tree unless asked |
