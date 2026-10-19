@@ -19,6 +19,7 @@ thiserror.workspace = true
 criterion.workspace = true
 nimw-testkit = { path = "../nimw-testkit" }
 proptest.workspace = true
+serde_json.workspace = true
 tempfile.workspace = true
 
 [[bench]]

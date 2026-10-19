@@ -8,6 +8,12 @@ export type DialogState =
   | { type: 'createPage'; source: string; target: string }
   | { type: 'openExternal'; url: string }
   | { type: 'openFile'; path: string }
+  /** A page's relationships, or (with `other`) those between two cards'
+   *  pages (M3b §3). */
+  | { type: 'relations'; page: string; other?: string }
+  /** A folder's index note (M3b §4); `current`: the page picked now;
+   *  `only`: the folder's single page, its index note already (GV-02 rule 4). */
+  | { type: 'indexPick'; folder: string; current: string | null; only?: string }
   | null;
 
 /** Which screen the open vault shows (M3a §2). */

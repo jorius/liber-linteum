@@ -1,7 +1,14 @@
 import { ReactFlowProvider } from '@xyflow/react';
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type KeyboardEvent,
+} from 'react';
 import { useTranslation } from 'react-i18next';
-import { PlusIcon } from '../../app/icons';
+import { LinkIcon, PlusIcon } from '../../app/icons';
 import { entryCreatePage, type GvCard } from '../../ipc';
 import { useEditorStore } from '../../stores/editorStore';
 import { errorMessage } from '../../stores/messages';
@@ -27,10 +34,12 @@ export function GlobalView() {
   const loaded = useGvStore((s) => s.loaded);
   const empty = useGvStore((s) => s.canvas.cards.length === 0);
   const shownKey = useGvStore((s) => s.shownKey);
+  const connectFrom = useGvStore((s) => s.connectFrom);
   // A hub page's neighbourhood is capped (final review m14): say how many
   // linked pages the level leaves out.
   const omitted = useGvStore((s) => (s.shownKey ? (s.levels[s.shownKey]?.omitted ?? 0) : 0));
   const region = useRef<HTMLElement>(null);
+  const bar = useRef<HTMLDivElement>(null);
   const area = useRef<HTMLDivElement>(null);
   const emptyNote = useRef<HTMLParagraphElement>(null);
   const [width, setWidth] = useState(1220);
@@ -57,6 +66,10 @@ export function GlobalView() {
     const lost = !active || active === document.body || active.closest('[hidden]') !== null;
     if (lost || area.current?.contains(active)) emptyNote.current?.focus();
   }, [loaded, empty, shownKey]);
+
+  // Connect mode ends with the view (⌘1, a page opened elsewhere; final
+  // review m8).
+  useEffect(() => () => useGvStore.getState().cancelConnect(), []);
 
   // Load on show; re-read when the vault or a saved page changes.
   useEffect(() => {
@@ -97,12 +110,38 @@ export function GlobalView() {
 
   const onOpen = useCallback((card: GvCard) => void useGvStore.getState().open(card), []);
   /** Double click / See all (GV-12): the page, or a folder's index note; a
-   *  folder without one opens as the next level. */
+   *  folder without one opens as the next level. In connect mode it picks
+   *  the card (M3b §2). */
   const onOpenEditor = useCallback((card: GvCard) => {
+    if (useGvStore.getState().connectFrom) {
+      void useGvStore.getState().completeConnect(card);
+      return;
+    }
     const page = card.kind === 'page' ? card.path : card.indexPage;
     if (page) void openPage(page);
     else void useGvStore.getState().open(card);
   }, []);
+
+  /** Leaves connect mode from the bar (Cancel) or with Escape anywhere in
+   *  the view (M3b §2, final review m3). The bar goes away: the keyboard on
+   *  it goes back to the source card. */
+  const leaveConnect = () => {
+    const from = useGvStore.getState().connectFrom;
+    if (!from) return;
+    const onBar = bar.current?.contains(document.activeElement) ?? false;
+    useGvStore.getState().cancelConnect();
+    if (onBar) {
+      region.current
+        ?.querySelector<HTMLElement>(`[data-gv-card="${CSS.escape(from.path)}"]`)
+        ?.focus({ preventScroll: true });
+    }
+  };
+  const onKeyDown = (e: KeyboardEvent) => {
+    // A card's own Escape (Canvas) has already left it.
+    if (e.key !== 'Escape' || e.defaultPrevented || !useGvStore.getState().connectFrom) return;
+    e.preventDefault();
+    leaveConnect();
+  };
 
   /** GV-17: "Untitled" in the folder shown, opened with its name selected. */
   const newEntry = async () => {
@@ -118,8 +157,26 @@ export function GlobalView() {
   };
 
   return (
-    <section ref={region} className={styles.view} aria-label={t('gv.region')}>
+    <section ref={region} className={styles.view} aria-label={t('gv.region')} onKeyDown={onKeyDown}>
       <Toolbar />
+      {/* The bar's live region stays mounted, empty outside connect mode: one
+          mounted with its text is usually not announced (VoiceOver; final
+          review m10). */}
+      <div ref={bar} className={connectFrom ? styles.connectBar : undefined}>
+        {connectFrom && <LinkIcon />}
+        <p
+          role="status"
+          aria-label={connectFrom ? t('gv.relations.connecting') : undefined}
+          className={styles.connectText}
+        >
+          {connectFrom && t('gv.relations.pick', { name: connectFrom.title })}
+        </p>
+        {connectFrom && (
+          <button type="button" onClick={leaveConnect}>
+            {t('dialogs.cancel')}
+          </button>
+        )}
+      </div>
       <div ref={area} className={styles.area}>
         <ReactFlowProvider>
           <Canvas

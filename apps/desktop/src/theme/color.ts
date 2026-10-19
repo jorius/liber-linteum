@@ -30,6 +30,13 @@ export function mix(a: string, b: string, amount: number): string {
   return rgbToHex([0, 1, 2].map((i) => x[i] + (y[i] - x[i]) * amount) as Rgb);
 }
 
+/** `#rrggbb` at `alpha` (0–1) as `rgba()`: a translucent shade without
+ *  `color-mix()`, which Safari before 16.2 lacks (M3b §7). */
+export function alpha(hex: string, a: number): string {
+  const [r, g, b] = hexToRgb(hex).map((c) => Math.round(c * 255));
+  return `rgba(${r}, ${g}, ${b}, ${a})`;
+}
+
 function luminance(hex: string): number {
   const [r, g, b] = hexToRgb(hex).map(toLinear);
   return 0.2126 * r + 0.7152 * g + 0.0722 * b;

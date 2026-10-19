@@ -42,6 +42,20 @@ describe('CSS on the Safari 15 floor', () => {
     expect(offenders).toEqual([]);
   });
 
+  it('no color-mix(): Safari before 16.2 drops the whole declaration (M3b §7)', () => {
+    // A backdrop declared with color-mix() had no background at all there,
+    // and the sidebar lost its hover colours. Mixed shades are generated
+    // tokens (paletteCss.ts) instead.
+    const offenders = cssFiles(src).flatMap((file) =>
+      readFileSync(file, 'utf8')
+        .replace(/\/\*[\s\S]*?\*\//g, '')
+        .split('\n')
+        .filter((line) => line.includes('color-mix('))
+        .map((line) => `${file.slice(src.length)}: ${line.trim()}`),
+    );
+    expect(offenders).toEqual([]);
+  });
+
   it('a focus ring is only removed where :focus-visible can bring it back', () => {
     // `.x { outline: none }` + `.x:focus-visible { outline: … }` leaves no ring
     // at all where :focus-visible is unknown (M3a final review m3). The ring

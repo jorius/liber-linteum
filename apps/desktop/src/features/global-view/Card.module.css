@@ -18,6 +18,12 @@
   box-shadow: 0 0 0 2px var(--color-accent);
 }
 
+/* Connect mode starts here (M3b §2, prototype `.card.from`). */
+.card[data-connecting] {
+  border-color: var(--color-edge-manual);
+  box-shadow: 0 0 0 2px var(--color-edge-manual);
+}
+
 .head {
   display: flex;
   align-items: center;
@@ -51,6 +57,35 @@
 
 .grip:hover {
   background: var(--color-accent-soft);
+}
+
+/* The connect / relationships button (M3b §2, prototype `.ib` link). */
+.connect {
+  display: inline-grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-text-muted);
+  cursor: pointer;
+}
+
+.connect:hover,
+.connect[aria-expanded='true'] {
+  background: var(--color-accent-soft);
+  color: var(--color-accent);
+}
+
+.connect:focus {
+  outline: 2px solid var(--color-focus);
+  outline-offset: -2px;
+}
+
+.connect:focus:not(:focus-visible) {
+  outline: none;
 }
 
 .hit {

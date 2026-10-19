@@ -23,7 +23,7 @@
 }
 
 .row:hover {
-  background: color-mix(in srgb, var(--color-sidebar-text) 10%, transparent);
+  background: var(--color-sidebar-hover);
 }
 
 .row:focus-visible {
@@ -145,5 +145,5 @@
 }
 
 .more:hover {
-  background: color-mix(in srgb, var(--color-sidebar-text) 16%, transparent);
+  background: var(--color-sidebar-active);
 }

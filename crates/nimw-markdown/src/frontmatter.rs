@@ -194,11 +194,15 @@ pub(crate) fn parse(src: &str, yaml: Range<usize>) -> Frontmatter {
                 }
             }
             Some("related") => {
-                if let Node::Seq(items) = value {
-                    for item in items {
-                        if let Some(link) = related_link(item, &locate) {
-                            fm.links.push(link);
-                        }
+                // A list of relationships, or one written without the list
+                // (M3b §5: parity with the TS reader).
+                let items: &[Node] = match value {
+                    Node::Seq(items) => items,
+                    single => std::slice::from_ref(single),
+                };
+                for item in items {
+                    if let Some(link) = related_link(item, &locate) {
+                        fm.links.push(link);
                     }
                 }
             }
@@ -316,6 +320,39 @@ mod tests {
         assert_eq!(game.label.as_deref(), Some("playable version"));
         assert!(game.directed);
         assert!(!f.links[0].directed);
+    }
+
+    #[test]
+    fn m3b_a_scalar_related_counts_as_a_one_item_list() {
+        let one = fm("---\nrelated: \"[[Beta]]\"\n---\n");
+        assert_eq!(one.links.len(), 1);
+        assert_eq!(one.links[0].target, "Beta");
+        assert!(!one.links[0].directed);
+        let map = fm("---\nrelated: { link: \"[[Gamma]]\", label: why, directed: true }\n---\n");
+        assert_eq!(map.links.len(), 1);
+        assert_eq!(map.links[0].target, "Gamma");
+        assert_eq!(map.links[0].label.as_deref(), Some("why"));
+        assert!(map.links[0].directed);
+        assert!(fm("---\nrelated: not a link\n---\n").links.is_empty());
+    }
+
+    /// Final review m4: NIMW writes a link holding `"` or `\` single-quoted
+    /// (no escapes), so its target is found in the source and indexed with
+    /// its range; an escaped (double-quoted) one isn't.
+    #[test]
+    fn m3b_single_quoted_links_with_quotes_or_backslashes_are_indexed() {
+        let src = "---\nrelated:\n  - '[[say \"hi\"]]'\n  - { link: '[[a\\b]]', label: x }\n  - \"[[It's \\\"fun\\\"]]\"\n---\n";
+        let f = fm(src);
+        let targets: Vec<_> = f
+            .links
+            .iter()
+            .map(|l| (&src[l.range.clone()], l.target.as_str()))
+            .collect();
+        assert_eq!(
+            targets,
+            vec![("say \"hi\"", "say \"hi\""), ("a\\b", "a\\b")]
+        );
+        assert_eq!(f.links[1].label.as_deref(), Some("x"));
     }
 
     #[test]

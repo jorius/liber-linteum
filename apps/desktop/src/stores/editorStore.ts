@@ -4,7 +4,11 @@ import { LARGE_NOTE_CHARS } from '../features/editor/limits';
 import { PageDoc, type PageDocHooks, type SaveStatus } from '../features/editor/pageDoc';
 import { viewOf } from '../features/editor/views';
 import { isTauri, onCloseRequested, type ChangedPayload, type CommandError } from '../ipc';
-import { setFrontmatter, type FrontmatterPatch } from '../markdown/frontmatterEdit';
+import {
+  setFrontmatter,
+  type FrontmatterEdit,
+  type FrontmatterPatch,
+} from '../markdown/frontmatterEdit';
 import { errorMessage } from './messages';
 import { openNewPage, openPage } from './navigate';
 import { useToastStore } from './toastStore';
@@ -12,6 +16,9 @@ import { nameOf, remap } from './tree';
 
 /** How long closing the window waits for pending saves (M2a §3.3). */
 export const QUIT_FLUSH_MS = 2000;
+
+/** How a frontmatter edit of a live document ended. */
+export type LiveEdit = 'saved' | 'pending' | 'refused';
 
 interface EditorState {
   /** The page being edited, or `null`. */
@@ -48,6 +55,16 @@ interface EditorState {
    *  there is no editable page or its frontmatter can't be edited safely (invalid
    *  YAML, or a form the byte-minimal edit refuses; toast). */
   editFrontmatter: (patch: FrontmatterPatch) => Promise<boolean>;
+  /** A frontmatter edit of `path` while it has a live document (M3b §5):
+   *  the current page as an undoable editor change, a background page as a
+   *  text change; saved at once. `null` when the page has no live document
+   *  (the caller writes the file); `refused` (with the toast); `pending`
+   *  when made but not on disk yet: its save is retrying, or the page was
+   *  deleted outside (final review m6). */
+  editPage: (path: string, edit: (text: string) => FrontmatterEdit) => Promise<LiveEdit | null>;
+  /** The text of `path`'s live document (the current page or a background
+   *  one), as `editPage` would edit it; `null` without one (final review m7). */
+  liveText: (path: string) => string | null;
 }
 
 /** Every page with a live document: the current one plus pages switched away
@@ -91,6 +108,28 @@ const hooks: PageDocHooks = {
   },
 };
 
+/** A live document's text: its view's when it has one. */
+const textOf = (doc: PageDoc) => viewOf(doc)?.state.doc.toString() ?? doc.text;
+
+/** A frontmatter edit of a live document: through its view when it has one
+ *  (undoable), else its text; saved at once. Refused: toast. */
+async function applyEdit(doc: PageDoc, edit: (text: string) => FrontmatterEdit): Promise<LiveEdit> {
+  const view = viewOf(doc);
+  const text = textOf(doc);
+  const res = edit(text);
+  if (!res.ok) {
+    useToastStore.getState().push({ message: i18next.t('page.frontmatterInvalid'), tone: 'error' });
+    return 'refused';
+  }
+  const c = res.change;
+  if (c) {
+    if (view) view.dispatch({ changes: c, userEvent: 'input.frontmatter' });
+    else doc.edit(text.slice(0, c.from) + c.insert + text.slice(c.to));
+  }
+  await doc.flush();
+  return doc.status === 'saved' && !doc.orphaned ? 'saved' : 'pending';
+}
+
 /** A background page is dropped once it's saved. An orphaned one (deleted
  *  outside with unsaved text) is kept: its text must not be dropped silently,
  *  so it still blocks closing the vault or the window (M2a §3.3). */
@@ -118,22 +157,15 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   editFrontmatter: async (patch) => {
     const doc = get().doc;
     if (!doc) return false;
-    const view = viewOf(doc);
-    const text = view ? view.state.doc.toString() : doc.text;
-    const res = setFrontmatter(text, patch);
-    if (!res.ok) {
-      useToastStore
-        .getState()
-        .push({ message: i18next.t('page.frontmatterInvalid'), tone: 'error' });
-      return false;
-    }
-    const c = res.change;
-    if (c) {
-      if (view) view.dispatch({ changes: c, userEvent: 'input.frontmatter' });
-      else doc.edit(text.slice(0, c.from) + c.insert + text.slice(c.to));
-    }
-    await doc.flush();
-    return true;
+    return (await applyEdit(doc, (text) => setFrontmatter(text, patch))) !== 'refused';
+  },
+  editPage: async (path, edit) => {
+    const doc = get().doc?.path === path ? get().doc : docs.get(path);
+    return doc ? applyEdit(doc, edit) : null;
+  },
+  liveText: (path) => {
+    const doc = get().doc?.path === path ? get().doc : docs.get(path);
+    return doc ? textOf(doc) : null;
   },
   open: async (path) => {
     const prev = get().doc;

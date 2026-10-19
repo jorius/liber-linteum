@@ -2,14 +2,15 @@
 // reference vault has ~2,600 aggregated edges, nearly all with a count:
 // drawn as React Flow edges with HTML count labels they took 1.5–2.5 s in
 // WebKit against NFR-03's 300 ms (final review I2).
-import { render, screen, waitFor } from '@testing-library/react';
-import { beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { ReactFlow, ReactFlowProvider, type Node } from '@xyflow/react';
+import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { GvCard, GvEdge, GvLevel, GvLevelRef } from '../../ipc';
 import { clearMocks, mockIPC } from '../../ipc/testing';
 import { DEFAULT_SETTINGS, useSettingsStore } from '../../stores/settingsStore';
 import { useUiStore } from '../../stores/uiStore';
 import { installReactFlowStubs } from '../../test/reactFlow';
-import { MAX_AGGREGATED } from './edges';
+import { EdgeLayer, MAX_AGGREGATED, type DrawnEdge } from './edges';
 import { GlobalView } from './GlobalView';
 import { levelKey, useGvStore } from './gvStore';
 
@@ -160,5 +161,113 @@ describe('Global View edges (M3a §6, final review I2)', () => {
     render(<GlobalView />);
     await waitFor(() => expect(drawn()).toHaveLength(1));
     expect(screen.queryByText(/strongest/)).toBeNull();
+  });
+
+  it('M3b: a manual edge opens the relationships between its two cards', async () => {
+    level0 = { cards: [card('A.md', 'page'), card('B.md', 'page'), card('C')], centre: null };
+    edges = [
+      edge('A.md', 'B.md', { kind: 'manual', aggregated: false, label: 'why' }),
+      edge('A.md', 'C', { kind: 'manual', aggregated: true }),
+    ];
+    render(<GlobalView />);
+    await waitFor(() => expect(drawn()).toHaveLength(2));
+    // Only the direct relationship takes the pointer: an aggregated one stands
+    // for many inside folders.
+    const hits = document.querySelectorAll<SVGPathElement>('[data-gv-hit]');
+    expect(hits).toHaveLength(1);
+    expect(hits[0].classList).toContain('nopan');
+    fireEvent.click(hits[0]);
+    expect(useUiStore.getState().dialog).toEqual({
+      type: 'relations',
+      page: 'A.md',
+      other: 'B.md',
+    });
+  });
+
+  it('a relationship of a folder card is direct: drawn without the inside-folders toggle, and opens its index note’s dialog (final review I3)', async () => {
+    useSettingsStore.setState({
+      settings: {
+        ...DEFAULT_SETTINGS,
+        globalViewEdges: { ...DEFAULT_SETTINGS.globalViewEdges, aggregated: false },
+      },
+    });
+    const gamma = { ...card('Gamma'), indexPage: 'Gamma/b.md', indexFrom: 'picked' as const };
+    const alpha = { ...card('Alpha'), indexPage: 'Alpha/Alpha.md', indexFrom: 'named' as const };
+    level0 = { cards: [alpha, gamma, card('Delta'), card('zeta.md', 'page')], centre: null };
+    edges = [
+      edge('Gamma', 'Alpha', { kind: 'manual', aggregated: false, directed: true }),
+      edge('Gamma', 'zeta.md', { kind: 'manual', aggregated: false }),
+      edge('Delta', 'zeta.md', { kind: 'manual', aggregated: true }),
+    ];
+    render(<GlobalView />);
+    await waitFor(() => expect(drawn('[data-gv-edge="manual"]')).toHaveLength(2));
+    expect(drawn('[data-gv-edge="manual-aggregated"]')).toHaveLength(0);
+    const hits = document.querySelectorAll<SVGPathElement>('[data-gv-hit]');
+    expect(hits).toHaveLength(2);
+    fireEvent.click(hits[0]);
+    expect(useUiStore.getState().dialog).toEqual({
+      type: 'relations',
+      page: 'Gamma/b.md',
+      other: 'Alpha/Alpha.md',
+    });
+    fireEvent.click(hits[1]);
+    expect(useUiStore.getState().dialog).toEqual({
+      type: 'relations',
+      page: 'Gamma/b.md',
+      other: 'zeta.md',
+    });
+  });
+});
+
+describe('EdgeLayer hit paths (final review m16)', () => {
+  it('a card that moves leaves the other edges’ hit paths alone (they are memoised)', () => {
+    // Counts the edge layer's reads of each card's position (React Flow
+    // reads every position on each change itself): a hit path that
+    // re-renders reads its two cards' positions to draw itself.
+    const reads = new Map<string, number>();
+    const at = (id: string, x: number, y: number) => ({
+      get x() {
+        if (/edges\.tsx/.test(new Error().stack ?? '')) reads.set(id, (reads.get(id) ?? 0) + 1);
+        return x;
+      },
+      get y() {
+        return y;
+      },
+    });
+    const node = (id: string, position: { x: number; y: number }): Node => ({
+      id,
+      position,
+      data: { card: card(id, 'page') },
+      style: { width: 240, height: 300 },
+    });
+    const manual = (source: string, target: string): DrawnEdge => ({
+      id: `manual:${source}→${target}`,
+      source,
+      target,
+      kind: 'manual',
+      aggregated: false,
+      directed: false,
+      count: 1,
+      label: null,
+    });
+    const onRelations = vi.fn();
+    const view = (nodes: Node[]) => (
+      <ReactFlowProvider>
+        <ReactFlow nodes={nodes} edges={[]}>
+          <EdgeLayer edges={[manual('A.md', 'B.md')]} onRelations={onRelations} />
+        </ReactFlow>
+      </ReactFlowProvider>
+    );
+    const a = node('A.md', at('A.md', 0, 0));
+    const b = node('B.md', at('B.md', 400, 0));
+    const { rerender } = render(view([a, b, node('C.md', at('C.md', 0, 400))]));
+    expect(document.querySelectorAll('[data-gv-hit]')).toHaveLength(1);
+    reads.clear();
+    // C is dragged: a drag frame.
+    rerender(view([a, b, node('C.md', at('C.md', 40, 400))]));
+    expect(reads.get('A.md') ?? 0).toBe(0);
+    expect(reads.get('B.md') ?? 0).toBe(0);
+    fireEvent.click(document.querySelector('[data-gv-hit]')!);
+    expect(onRelations).toHaveBeenCalledWith('A.md', 'B.md');
   });
 });

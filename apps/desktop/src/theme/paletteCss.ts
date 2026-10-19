@@ -1,5 +1,5 @@
 // `.ts` extension: scripts/gen-palettes.ts runs this file directly in Node.
-import { mix } from './color.ts';
+import { alpha, mix } from './color.ts';
 import type { Palette, PaletteTokens } from './palettes';
 
 /** A palette's mode as app CSS custom properties (M2b §4 mapping table). The
@@ -27,6 +27,14 @@ export function paletteVars(p: Palette, mode: 'light' | 'dark'): Record<string, 
     '--color-sidebar-bg': t.side,
     '--color-sidebar-text': t.sideText,
     '--color-sidebar-selected': t.sideSel,
+    // Hover, pressed and divider shades on the (always dark) sidebar, and the
+    // backdrops behind dialogs and the opening overlay: generated here, not
+    // with color-mix(), which Safari before 16.2 drops (M3b §7).
+    '--color-sidebar-hover': mix(t.side, t.sideText, 0.12),
+    '--color-sidebar-active': mix(t.side, t.sideText, 0.16),
+    '--color-sidebar-divider': mix(t.side, t.sideText, 0.15),
+    '--color-backdrop': alpha(t.bg, 0.6),
+    '--color-overlay': alpha(t.bg, 0.7),
     // The sidebar is dark in both modes: its drop feedback uses the dark accent.
     '--color-drop-bg': t.sideSel,
     '--color-drop-ring': p.dark.accent,

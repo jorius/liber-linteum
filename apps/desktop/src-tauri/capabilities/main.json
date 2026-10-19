@@ -36,6 +36,8 @@
     "allow-gv-edges",
     "allow-layout-get",
     "allow-layout-set",
+    "allow-link-target",
+    "allow-index-pick-set",
     "core:event:allow-listen",
     "core:event:allow-unlisten",
     "core:window:allow-destroy",

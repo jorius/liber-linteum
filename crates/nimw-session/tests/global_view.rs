@@ -2,7 +2,8 @@
 //! cards (index notes, folder summaries, covers), edges and layouts.
 
 use nimw_session::{
-    CardKind, EdgeKind, GvCard, GvEdge, GvLevel, Relation, SessionEvent, VaultSession,
+    CardKind, EdgeKind, GvCard, GvEdge, GvLevel, IndexFrom, Relation, SessionError, SessionEvent,
+    VaultSession,
 };
 use nimw_vault::VaultPath;
 use std::path::Path;
@@ -526,4 +527,339 @@ fn m3a_an_external_move_of_1000_pinned_notes_writes_the_layout_once() {
     assert!(pinned.keys().all(|k| k.starts_with("B/")), "{pinned:?}");
     eprintln!("external move of {N} pinned notes, watcher batch: {took:?}");
     assert!(took < std::time::Duration::from_secs(1), "{took:?}");
+}
+
+/// M3b §4: which GV-02 rule chose a folder's index note — a pick is offered
+/// only where rules 1–2 (named like the folder, `index.md`) give nothing.
+#[test]
+fn m3b_index_from_tells_which_rule_chose_the_index_note() {
+    let dir = vault();
+    let (_c, s) = open(dir.path());
+    let level = s.gv_children(&GvLevel::Vault).unwrap();
+    assert_eq!(
+        card(&level.cards, "Alpha").index_from,
+        Some(IndexFrom::Named)
+    );
+    assert_eq!(card(&level.cards, "Beta").index_from, Some(IndexFrom::Only));
+    assert_eq!(
+        card(&level.cards, "Gamma").index_from,
+        Some(IndexFrom::Picked)
+    );
+    assert_eq!(card(&level.cards, "Delta").index_from, None);
+    assert_eq!(card(&level.cards, "Welcome.md").index_from, None);
+    let alpha = s.gv_children(&GvLevel::Folder(vp("Alpha"))).unwrap();
+    assert_eq!(
+        card(&alpha.cards, "Alpha/Sub").index_from,
+        Some(IndexFrom::Index)
+    );
+}
+
+/// M3b §4, §6: picking a folder's index note writes `.nimw/vault.json`
+/// (other keys kept) and answers the folder's new card; clearing removes it.
+#[test]
+fn m3b_index_pick_set_writes_the_pick_and_answers_the_card() {
+    let dir = vault();
+    std::fs::write(
+        dir.path().join(".nimw/vault.json"),
+        r#"{"version":1,"exclude":["Private/**"],"indexPicks":{"Gamma":"Gamma/b.md"},"future":{"x":1}}"#,
+    )
+    .unwrap();
+    let (_c, s) = open(dir.path());
+    let card = s
+        .index_pick_set(&vp("Delta"), Some(&vp("Delta/x.md")))
+        .unwrap();
+    assert_eq!(card.path, "Delta");
+    assert_eq!(card.kind, CardKind::Project);
+    assert_eq!(card.index_page.as_deref(), Some("Delta/x.md"));
+    assert_eq!(card.index_from, Some(IndexFrom::Picked));
+    let json: serde_json::Value = serde_json::from_str(
+        &std::fs::read_to_string(dir.path().join(".nimw/vault.json")).unwrap(),
+    )
+    .unwrap();
+    assert_eq!(json["indexPicks"]["Delta"], "Delta/x.md");
+    assert_eq!(json["indexPicks"]["Gamma"], "Gamma/b.md");
+    assert_eq!(json["exclude"][0], "Private/**");
+    assert_eq!(json["future"]["x"], 1);
+
+    let cleared = s.index_pick_set(&vp("Delta"), None).unwrap();
+    assert_eq!(cleared.index_page, None);
+    let json: serde_json::Value = serde_json::from_str(
+        &std::fs::read_to_string(dir.path().join(".nimw/vault.json")).unwrap(),
+    )
+    .unwrap();
+    assert!(json["indexPicks"].get("Delta").is_none());
+
+    // Only a visible folder, and a page directly inside it.
+    for (folder, page) in [
+        ("Delta", "Delta/Inner/i.md"),
+        ("Delta", "Alpha/note.md"),
+        ("Delta", "Delta/attachments/pic.png"),
+        ("Nope", "Nope/a.md"),
+        ("Welcome.md", "Welcome.md"),
+    ] {
+        assert!(
+            s.index_pick_set(&vp(folder), Some(&vp(page))).is_err(),
+            "{folder} ← {page}"
+        );
+    }
+}
+
+/// A vault with no `.nimw/` gets one only when something is picked (VLT-02).
+#[test]
+fn m3b_a_pick_creates_vault_json_lazily() {
+    let dir = vault();
+    std::fs::remove_dir_all(dir.path().join(".nimw")).unwrap();
+    let (_c, s) = open(dir.path());
+    s.index_pick_set(&vp("Delta"), None).unwrap();
+    assert!(
+        !dir.path().join(".nimw").exists(),
+        "clearing nothing writes nothing"
+    );
+    s.index_pick_set(&vp("Delta"), Some(&vp("Delta/y.md")))
+        .unwrap();
+    assert!(dir.path().join(".nimw/vault.json").exists());
+}
+
+/// M3b §4: picks follow renames of the folder and of the page.
+#[test]
+fn m3b_index_picks_follow_renames() {
+    let dir = vault();
+    let (_c, s) = open(dir.path());
+    s.rename(&vp("Gamma"), &vp("Gamma 2"), false).unwrap();
+    assert_eq!(
+        s.vault().index_picks().get("Gamma 2").map(String::as_str),
+        Some("Gamma 2/b.md")
+    );
+    s.rename(&vp("Gamma 2/b.md"), &vp("Gamma 2/home.md"), false)
+        .unwrap();
+    assert_eq!(
+        s.vault().index_picks().get("Gamma 2").map(String::as_str),
+        Some("Gamma 2/home.md")
+    );
+    let level = s.gv_children(&GvLevel::Vault).unwrap();
+    assert_eq!(
+        card(&level.cards, "Gamma 2").index_page.as_deref(),
+        Some("Gamma 2/home.md")
+    );
+}
+
+/// Final review I4: a pick holds only while its page sits directly in its
+/// folder. Moved out in the app, the pick is dropped (not carried along to
+/// the page's new folder), and the folder falls back to the other rules.
+#[test]
+fn m3b_a_pick_is_dropped_when_its_page_moves_out_of_the_folder_in_app() {
+    let dir = vault();
+    let (_c, s) = open(dir.path());
+    s.rename(&vp("Gamma/b.md"), &vp("Alpha/b.md"), false)
+        .unwrap();
+    assert_eq!(s.vault().index_picks().get("Gamma"), None, "dropped");
+    let gamma = s.gv_children(&GvLevel::Vault).unwrap().cards;
+    let gamma = card(&gamma, "Gamma");
+    // Gamma/a.md is now its only page (rule 4).
+    assert_eq!(gamma.index_page.as_deref(), Some("Gamma/a.md"));
+    assert_eq!(gamma.index_from, Some(IndexFrom::Only));
+}
+
+/// Final review I4: the same when another program moves the page (the
+/// watcher reports a delete and a create with the same content).
+#[test]
+fn m3b_a_pick_is_dropped_when_its_page_moves_out_of_the_folder_externally() {
+    use nimw_vault::WatchEvent;
+    let dir = vault();
+    write(dir.path(), "Gamma/c.md", "# Gamma C\n");
+    let (_c, s) = open(dir.path());
+    std::fs::rename(dir.path().join("Gamma/b.md"), dir.path().join("Delta/b.md")).unwrap();
+    s.apply(vec![
+        WatchEvent::Removed(vp("Gamma/b.md")),
+        WatchEvent::Changed(vp("Delta/b.md")),
+    ])
+    .unwrap();
+    assert_eq!(s.vault().index_picks().get("Gamma"), None, "dropped");
+    let cards = s.gv_children(&GvLevel::Vault).unwrap().cards;
+    let gamma = card(&cards, "Gamma");
+    assert_eq!(
+        (gamma.index_page.as_deref(), gamma.index_from),
+        (None, None)
+    );
+    // A move within the folder still follows.
+    s.vault()
+        .set_index_pick("Gamma", Some("Gamma/c.md"))
+        .unwrap();
+    s.rename(&vp("Gamma/c.md"), &vp("Gamma/home.md"), false)
+        .unwrap();
+    assert_eq!(
+        s.vault().index_picks().get("Gamma").map(String::as_str),
+        Some("Gamma/home.md")
+    );
+}
+
+/// Final review I4: a hand-edited pick naming a page outside its folder is
+/// ignored when read, and dropped by the next write of the picks.
+#[test]
+fn m3b_a_hand_written_pick_outside_its_folder_is_ignored() {
+    let dir = vault();
+    write(
+        dir.path(),
+        ".nimw/vault.json",
+        r#"{"version":1,"indexPicks":{"Gamma":"Gamma/b.md","Delta":"Welcome.md","Alpha/Sub":"Alpha/Sub/deep.md"}}"#,
+    );
+    let (_c, s) = open(dir.path());
+    let cards = s.gv_children(&GvLevel::Vault).unwrap().cards;
+    let delta = card(&cards, "Delta");
+    assert_eq!(
+        (delta.index_page.as_deref(), delta.index_from),
+        (None, None)
+    );
+    assert_eq!(
+        card(&cards, "Gamma").index_page.as_deref(),
+        Some("Gamma/b.md")
+    );
+    // A pick of a page in a subfolder isn't one either.
+    s.vault()
+        .set_index_pick("Delta/Inner", Some("Delta/x.md"))
+        .unwrap();
+    let delta = s.gv_children(&GvLevel::Folder(vp("Delta"))).unwrap().cards;
+    assert_eq!(
+        card(&delta, "Delta/Inner").index_from,
+        Some(IndexFrom::Only)
+    );
+    assert_eq!(
+        card(&delta, "Delta/Inner").index_page.as_deref(),
+        Some("Delta/Inner/i.md")
+    );
+    // The next write of the picks drops the invalid ones.
+    s.index_pick_set(&vp("Delta"), Some(&vp("Delta/y.md")))
+        .unwrap();
+    let picks = s.vault().index_picks();
+    assert_eq!(picks.get("Delta").map(String::as_str), Some("Delta/y.md"));
+    assert_eq!(picks.get("Delta/Inner"), None);
+    assert_eq!(picks.get("Gamma").map(String::as_str), Some("Gamma/b.md"));
+    assert_eq!(
+        picks.get("Alpha/Sub").map(String::as_str),
+        Some("Alpha/Sub/deep.md")
+    );
+}
+
+/// Final review I3: a folder card stands for its index note in a
+/// relationship (M3b §2), so a relationship whose two ends are the visible
+/// cards' own pages or index notes is a direct manual edge between those
+/// cards (clickable, never hidden or capped as "from inside folders"). One
+/// from any other page inside a folder stays aggregated; text links keep
+/// their rules.
+#[test]
+fn m3b_relationships_of_folder_cards_index_notes_are_direct_edges() {
+    let dir = vault();
+    let r = dir.path();
+    // Gamma's index note (picked) → a root page and Alpha's index note.
+    write(
+        r,
+        "Gamma/b.md",
+        "---\nrelated:\n  - \"[[zeta]]\"\n  - { link: \"[[Alpha]]\", label: sibling, directed: true }\n---\n# Gamma B\n",
+    );
+    // A root page → Beta's index note (its only page).
+    write(
+        r,
+        "zeta.md",
+        "---\nrelated:\n  - \"[[only]]\"\n---\n# Zeta\n\nBack to [[Welcome]].\n",
+    );
+    // Inside Alpha, the index note and another page both relate to zeta.
+    write(
+        r,
+        "Alpha/Alpha.md",
+        "---\nrelated:\n  - { link: \"[[zeta]]\", label: direct }\n---\n# Alpha home\n",
+    );
+    write(
+        r,
+        "Alpha/note.md",
+        "---\nrelated:\n  - { link: \"[[zeta]]\", label: inside }\n---\n# A note\n",
+    );
+    let (_c, s) = open(r);
+    let shown: Vec<String> = s
+        .gv_children(&GvLevel::Vault)
+        .unwrap()
+        .cards
+        .iter()
+        .map(|c| c.path.clone())
+        .collect();
+    let edges = s.gv_edges(&shown).unwrap();
+
+    let gz = edge(&edges, "Gamma", "zeta.md", EdgeKind::Manual);
+    assert_eq!((gz.count, gz.aggregated), (1, false));
+    let ga = edge(&edges, "Gamma", "Alpha", EdgeKind::Manual);
+    assert_eq!((ga.from.as_str(), ga.to.as_str()), ("Gamma", "Alpha"));
+    assert!(!ga.aggregated && ga.directed);
+    assert_eq!(ga.label.as_deref(), Some("sibling"));
+    let zb = edge(&edges, "zeta.md", "Beta", EdgeKind::Manual);
+    assert_eq!((zb.count, zb.aggregated), (1, false));
+    // Alpha's index note and a page inside it: one direct edge, counting
+    // both, labelled from the direct relationship.
+    let az = edge(&edges, "Alpha", "zeta.md", EdgeKind::Manual);
+    assert_eq!((az.count, az.aggregated), (2, false));
+    assert_eq!(az.label.as_deref(), Some("direct"));
+    // Pages inside folders that aren't their index notes: aggregated.
+    assert!(edge(&edges, "Gamma", "Welcome.md", EdgeKind::Manual).aggregated);
+    assert!(edge(&edges, "Delta", "Welcome.md", EdgeKind::Manual).aggregated);
+    // A text link from an index note is still a link from inside a folder.
+    assert!(edge(&edges, "Beta", "Welcome.md", EdgeKind::Link).aggregated);
+
+    // Only the inside page relates to zeta: aggregated, its own label.
+    write(r, "Alpha/Alpha.md", "# Alpha home\n");
+    s.apply(vec![nimw_vault::WatchEvent::Changed(vp("Alpha/Alpha.md"))])
+        .unwrap();
+    let edges = s.gv_edges(&shown).unwrap();
+    let az = edge(&edges, "Alpha", "zeta.md", EdgeKind::Manual);
+    assert_eq!((az.count, az.aggregated), (1, true));
+    assert_eq!(az.label.as_deref(), Some("inside"));
+}
+
+/// Final review m4: a page name holding `"` is linked single-quoted
+/// (`'[[say "hi"]]'`, as the app writes it); nimw-markdown indexes it, and
+/// the relationship resolves to the page: a direct manual edge.
+#[test]
+fn m3b_a_single_quoted_link_with_double_quotes_is_indexed_and_resolves() {
+    let dir = tempfile::tempdir().unwrap();
+    let r = dir.path();
+    write(r, "say \"hi\".md", "# Hi\n");
+    write(
+        r,
+        "A.md",
+        "---\nrelated:\n  - '[[say \"hi\"]]'\n  - { link: '[[say \"hi\"]]', label: x, directed: true }\n---\n# A\n",
+    );
+    let (_c, s) = open(r);
+    assert_eq!(
+        s.link_target(&vp("A.md"), &vp("say \"hi\".md")).unwrap(),
+        "say \"hi\""
+    );
+    let edges = s.gv_edges(&visible(&["A.md", "say \"hi\".md"])).unwrap();
+    let e = edge(&edges, "A.md", "say \"hi\".md", EdgeKind::Manual);
+    assert_eq!((e.count, e.aggregated, e.directed), (2, false, true));
+    assert_eq!(e.label.as_deref(), Some("x"));
+}
+
+/// M3b §6: the wiki target a relationship writes — the shortest unique one.
+#[test]
+fn m3b_link_target_is_the_shortest_unique_wiki_target() {
+    let dir = vault();
+    write(dir.path(), "Beta/note.md", "# Another note\n");
+    let (_c, s) = open(dir.path());
+    assert_eq!(
+        s.link_target(&vp("Welcome.md"), &vp("zeta.md")).unwrap(),
+        "zeta"
+    );
+    // Two `note` pages: `[[note]]` resolves to the first by path order, so
+    // the other one needs its folder (as `link_suggest` writes it).
+    assert_eq!(
+        s.link_target(&vp("Welcome.md"), &vp("Alpha/note.md"))
+            .unwrap(),
+        "note"
+    );
+    assert_eq!(
+        s.link_target(&vp("Welcome.md"), &vp("Beta/note.md"))
+            .unwrap(),
+        "Beta/note"
+    );
+    assert!(matches!(
+        s.link_target(&vp("Welcome.md"), &vp("missing.md")),
+        Err(SessionError::NotIndexed(_))
+    ));
 }

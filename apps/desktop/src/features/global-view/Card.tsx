@@ -1,8 +1,17 @@
-import { useEffect, useId, useRef, type KeyboardEvent } from 'react';
+import {
+  useEffect,
+  useId,
+  useRef,
+  useState,
+  type KeyboardEvent,
+  type ReactElement,
+  type ReactNode,
+} from 'react';
 import { useTranslation } from 'react-i18next';
-import { AudioIcon, FolderIcon, GripIcon, ImageIcon } from '../../app/icons';
+import { AudioIcon, FolderIcon, GripIcon, ImageIcon, LinkIcon } from '../../app/icons';
 import { assetUrl, type GvCard } from '../../ipc';
 import { nameOf } from '../../stores/tree';
+import { CardMenu, type CardMenuItem } from './CardMenu';
 import styles from './Card.module.css';
 
 /** A single click waits this long for a second one (prototype; M3a §5), so
@@ -17,6 +26,13 @@ export interface CardProps {
   focusable: boolean;
   /** Its edges in plain words, for screen readers (M3a §6). */
   connections: string;
+  /** The connect button's menu (M3b §3); none: no button. */
+  menu?: CardMenuItem[];
+  /** Connect mode starts from this card (M3b §2): manual-colour ring. */
+  connecting?: boolean;
+  /** Wraps the connect button (the canvas makes it a drag-to-connect
+   *  handle, M3b §2). */
+  wrapConnect?: (button: ReactElement) => ReactNode;
   /** Single click / Enter: the next level (GV-11). */
   onOpen: () => void;
   /** Double click / Shift+Enter / See all: the editor (GV-12). */
@@ -30,12 +46,17 @@ export function Card({
   open,
   focusable,
   connections,
+  menu = [],
+  connecting = false,
+  wrapConnect = (button) => button,
   onOpen,
   onOpenEditor,
   onFocus,
 }: CardProps) {
   const { t } = useTranslation();
   const descId = useId();
+  const menuButton = useRef<HTMLButtonElement>(null);
+  const [menuOpen, setMenuOpen] = useState(false);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(
     () => () => {
@@ -100,6 +121,7 @@ export function Card({
     <div
       className={styles.card}
       data-open={open || undefined}
+      data-connecting={connecting || undefined}
       role="group"
       aria-label={t('gv.cardName', { title: card.title, kind: kind.toLocaleLowerCase() })}
     >
@@ -108,6 +130,34 @@ export function Card({
         <span className={`${styles.grip} gv-grip`} title={t('gv.move')} aria-hidden="true">
           <GripIcon />
         </span>
+        {menu.length > 0 &&
+          wrapConnect(
+            <button
+              ref={menuButton}
+              type="button"
+              className={`${styles.connect} nodrag`}
+              tabIndex={focusable ? 0 : -1}
+              aria-haspopup="menu"
+              aria-expanded={menuOpen}
+              aria-label={t('gv.relations.menu', { title: card.title })}
+              title={t('gv.relations.menu', { title: card.title })}
+              data-gv-connect={card.path}
+              onClick={() => setMenuOpen((o) => !o)}
+            >
+              <LinkIcon />
+            </button>,
+          )}
+        {menuOpen && menuButton.current && (
+          <CardMenu
+            label={t('gv.relations.menu', { title: card.title })}
+            items={menu}
+            anchor={menuButton.current}
+            onClose={(refocus) => {
+              setMenuOpen(false);
+              if (refocus) menuButton.current?.focus();
+            }}
+          />
+        )}
       </div>
       <div className={styles.hit}>
         <div

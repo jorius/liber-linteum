@@ -28,6 +28,20 @@ pub enum CardKind {
     Page,
 }
 
+/// Which GV-02 rule chose a folder's index note (M3b §4): a pick is offered
+/// only where rules 1–2 give nothing.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum IndexFrom {
+    /// Rule 1: a page named like the folder.
+    Named,
+    /// Rule 2: `index.md`.
+    Index,
+    /// Rule 3: `.nimw/vault.json` `indexPicks`.
+    Picked,
+    /// Rule 4: the folder's only page.
+    Only,
+}
+
 /// Where a page sits in another page's neighbourhood (layout side, §7).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Relation {
@@ -55,6 +69,8 @@ pub struct GvCard {
     pub has_audio: bool,
     /// Folders: the page previewed on the card (GV-02).
     pub index_page: Option<String>,
+    /// Folders: the rule that chose `index_page`.
+    pub index_from: Option<IndexFrom>,
     /// Folders: direct pages and (visible) subfolders.
     pub pages: u32,
     pub folders: u32,
@@ -155,35 +171,80 @@ impl Ctx<'_> {
         Ok(cards)
     }
 
-    /// A folder card: its index note's preview, else a summary (GV-02).
-    fn folder_card(&self, folder: &CardRow, kind: CardKind) -> Result<GvCard> {
-        let children = self.index.card_children(&folder.path)?;
-        let subfolders: Vec<&CardRow> = children
-            .iter()
-            .filter(|r| r.kind == FileKind::Folder && !is_attachment_folder(self.policy, &r.path))
-            .collect();
-        let pages: Vec<&CardRow> = children
-            .iter()
-            .filter(|r| r.kind == FileKind::Page)
-            .collect();
-        let child_titles: Vec<String> = subfolders
-            .iter()
-            .map(|r| r.name.clone())
-            .chain(pages.iter().map(|r| title_of(r)))
-            .take(SUMMARY_TITLES)
-            .collect();
+    /// A folder's direct pages and visible subfolders.
+    fn contents(&self, folder: &str) -> Result<(Vec<CardRow>, Vec<CardRow>)> {
+        let (mut pages, mut subfolders) = (Vec::new(), Vec::new());
+        for row in self.index.card_children(folder)? {
+            match row.kind {
+                FileKind::Page => pages.push(row),
+                FileKind::Folder if !is_attachment_folder(self.policy, &row.path) => {
+                    subfolders.push(row);
+                }
+                _ => {}
+            }
+        }
+        Ok((pages, subfolders))
+    }
+
+    /// A folder's index note and the GV-02 rule that chose it, from its
+    /// direct pages and visible subfolders.
+    fn index_note(
+        &self,
+        folder: &CardRow,
+        pages: &[CardRow],
+        subfolders: &[CardRow],
+    ) -> (Option<CardRow>, Option<IndexFrom>) {
         let own = name_key(&folder.name);
         let named_like = pages.iter().find(|r| name_key(stem(&r.name)) == own);
         let index_md = pages.iter().find(|r| name_key(&r.name) == "index.md");
-        let picked = match self.picks.get(&folder.path) {
-            Some(p) => self.index.card(p)?.filter(|r| r.kind == FileKind::Page),
-            None => None,
+        // A pick holds only for a page directly in the folder; one that
+        // points elsewhere (hand-edited, or left by an older version) is
+        // ignored (final review I4).
+        let picked = self
+            .picks
+            .get(&folder.path)
+            .and_then(|p| pages.iter().find(|r| &r.path == p));
+        let only = (pages.len() == 1 && subfolders.is_empty()).then(|| &pages[0]);
+        let (row, from) = if let Some(r) = named_like {
+            (Some(r), Some(IndexFrom::Named))
+        } else if let Some(r) = index_md {
+            (Some(r), Some(IndexFrom::Index))
+        } else if let Some(r) = picked {
+            (Some(r), Some(IndexFrom::Picked))
+        } else if let Some(r) = only {
+            (Some(r), Some(IndexFrom::Only))
+        } else {
+            (None, None)
         };
-        let index_row: Option<CardRow> = named_like
-            .or(index_md)
-            .map(|r| (*r).clone())
-            .or(picked)
-            .or_else(|| (pages.len() == 1 && subfolders.is_empty()).then(|| pages[0].clone()));
+        (row.cloned(), from)
+    }
+
+    /// The index note of the folder at `path`, if it is one and has one.
+    fn index_page_of(&self, path: &str) -> Result<Option<String>> {
+        let Some(folder) = self
+            .index
+            .card(path)?
+            .filter(|r| r.kind == FileKind::Folder)
+        else {
+            return Ok(None);
+        };
+        let (pages, subfolders) = self.contents(path)?;
+        Ok(self
+            .index_note(&folder, &pages, &subfolders)
+            .0
+            .map(|r| r.path))
+    }
+
+    /// A folder card: its index note's preview, else a summary (GV-02).
+    fn folder_card(&self, folder: &CardRow, kind: CardKind) -> Result<GvCard> {
+        let (pages, subfolders) = self.contents(&folder.path)?;
+        let child_titles: Vec<String> = subfolders
+            .iter()
+            .map(|r| r.name.clone())
+            .chain(pages.iter().map(title_of))
+            .take(SUMMARY_TITLES)
+            .collect();
+        let (index_row, index_from) = self.index_note(folder, &pages, &subfolders);
         let mut card = match &index_row {
             Some(row) => page_card(row, None),
             None => GvCard {
@@ -198,6 +259,7 @@ impl Ctx<'_> {
                 has_image: false,
                 has_audio: false,
                 index_page: None,
+                index_from: None,
                 pages: 0,
                 folders: 0,
                 child_titles: Vec::new(),
@@ -207,10 +269,69 @@ impl Ctx<'_> {
         card.path = folder.path.clone();
         card.kind = kind;
         card.index_page = index_row.map(|r| r.path);
+        card.index_from = index_from;
         card.pages = pages.len() as u32;
         card.folders = subfolders.len() as u32;
         card.child_titles = child_titles;
         Ok(card)
+    }
+}
+
+impl VaultSession {
+    /// Picks (`Some`) or clears (`None`) the index note of `folder`, a
+    /// visible folder; the page must be a page directly inside it (M3b §4,
+    /// §6). Answers the folder's card as the Global View now shows it.
+    pub fn index_pick_set(&self, folder: &VaultPath, page: Option<&VaultPath>) -> Result<GvCard> {
+        let row = {
+            let index = self.index();
+            let row = index
+                .card(folder.as_str())?
+                .filter(|r| r.kind == FileKind::Folder)
+                .ok_or_else(|| SessionError::NotIndexed(folder.to_string()))?;
+            if let Some(page) = page {
+                let inside = page.parent().is_some_and(|p| p.as_str() == folder.as_str());
+                let is_page = index
+                    .card(page.as_str())?
+                    .is_some_and(|r| r.kind == FileKind::Page);
+                if !inside || !is_page {
+                    return Err(SessionError::NotIndexed(page.to_string()));
+                }
+            }
+            row
+        };
+        self.vault
+            .set_index_pick(folder.as_str(), page.map(VaultPath::as_str))?;
+        let policy = self.vault.attachment_policy();
+        let picks = self.vault.index_picks();
+        let index = self.index();
+        let ctx = Ctx {
+            index: &index,
+            policy: &policy,
+            picks: &picks,
+        };
+        let kind = if folder.as_str().contains('/') {
+            CardKind::Folder
+        } else {
+            CardKind::Project
+        };
+        ctx.folder_card(&row, kind)
+    }
+
+    /// The wiki target a relationship from `source` to `target` writes: the
+    /// shortest one that resolves back to `target` (M3b §2, §6).
+    pub fn link_target(&self, source: &VaultPath, target: &VaultPath) -> Result<String> {
+        let index = self.index();
+        if index.card(target.as_str())?.is_none() {
+            return Err(SessionError::NotIndexed(target.to_string()));
+        }
+        let files = index.file_set()?;
+        Ok(nimw_markdown::shortest_unique_target(
+            target.as_str(),
+            source.as_str(),
+            &files,
+            LinkKind::FrontmatterRelated,
+            false,
+        ))
     }
 }
 
@@ -229,6 +350,7 @@ fn page_card(row: &CardRow, relation: Option<Relation>) -> GvCard {
         has_image: row.has_image,
         has_audio: row.has_audio,
         index_page: None,
+        index_from: None,
         pages: 0,
         folders: 0,
         child_titles: Vec::new(),
@@ -358,7 +480,9 @@ impl VaultSession {
     /// one layout update (final review I3). The layout is a convenience: a
     /// failure is reported, never fails the rename.
     pub(crate) fn follow_layout(&self, renames: &[(String, String)]) {
-        if let Err(e) = self.vault.remap_layout_many(renames) {
+        // Index-note picks follow too (M3b §4).
+        let picks = self.vault.remap_index_picks_many(renames);
+        if let Err(e) = self.vault.remap_layout_many(renames).and(picks) {
             let what = match renames {
                 [(from, to)] => format!("{from} → {to}"),
                 _ => format!("{} renamed entries", renames.len()),
@@ -403,6 +527,12 @@ impl VaultSession {
     /// Edges between `visible` cards: every resolved page-to-page link and
     /// relationship, each end moved to its nearest visible ancestor-or-self,
     /// one edge per card pair and kind with a count (GV-20, GV-25).
+    ///
+    /// A folder card stands for its index note in a relationship (M3b §2),
+    /// so a relationship whose ends are both the cards' own pages or index
+    /// notes is direct, not "from inside folders" (final review I3). An edge
+    /// that holds one is direct: it is labelled and oriented by its direct
+    /// relationships, and counts the others too.
     pub fn gv_edges(&self, visible: &[String]) -> Result<Vec<GvEdge>> {
         if visible.is_empty() {
             return Ok(Vec::new());
@@ -417,10 +547,30 @@ impl VaultSession {
                 p = &p[..p.rfind('/')?];
             }
         };
+        let policy = self.vault.attachment_policy();
+        let picks = self.vault.index_picks();
+        let index = self.index();
+        let ctx = Ctx {
+            index: &index,
+            policy: &policy,
+            picks: &picks,
+        };
+        // Folder cards' index notes, read when a relationship needs one.
+        let mut index_pages: HashMap<String, Option<String>> = HashMap::new();
+        let mut stands_for = |card: &str, page: &str| -> Result<bool> {
+            if card == page {
+                return Ok(true);
+            }
+            if !index_pages.contains_key(card) {
+                index_pages.insert(card.to_string(), ctx.index_page_of(card)?);
+            }
+            Ok(index_pages[card].as_deref() == Some(page))
+        };
         // A link whose source isn't shown (or inside a shown folder) can't
         // become an edge, so only those are read.
-        let links = self.index().page_links_from(visible)?;
-        let mut edges: BTreeMap<(String, String, EdgeKind), GvEdge> = BTreeMap::new();
+        let links = index.page_links_from(visible)?;
+        // Each edge, and whether it holds a direct relationship.
+        let mut edges: BTreeMap<(String, String, EdgeKind), (GvEdge, bool)> = BTreeMap::new();
         for l in links {
             let (Some(a), Some(b)) = (lift(&l.src), lift(&l.target)) else {
                 continue;
@@ -433,32 +583,58 @@ impl VaultSession {
             } else {
                 EdgeKind::Link
             };
-            let aggregated = a != l.src || b != l.target;
+            let lifted = a != l.src || b != l.target;
+            let direct =
+                kind == EdgeKind::Manual && stands_for(&a, &l.src)? && stands_for(&b, &l.target)?;
             let (lo, hi) = if a < b { (&a, &b) } else { (&b, &a) };
-            let edge = edges
-                .entry((lo.clone(), hi.clone(), kind))
-                .or_insert_with(|| GvEdge {
-                    from: lo.clone(),
-                    to: hi.clone(),
-                    kind,
-                    count: 0,
-                    aggregated: false,
-                    directed: false,
-                    label: None,
-                });
+            let (edge, has_direct) =
+                edges
+                    .entry((lo.clone(), hi.clone(), kind))
+                    .or_insert_with(|| {
+                        let edge = GvEdge {
+                            from: lo.clone(),
+                            to: hi.clone(),
+                            kind,
+                            count: 0,
+                            aggregated: false,
+                            directed: false,
+                            label: None,
+                        };
+                        (edge, false)
+                    });
             edge.count += 1;
-            edge.aggregated |= aggregated;
-            if kind == EdgeKind::Manual {
-                if edge.label.is_none() {
-                    edge.label = l.label.clone().filter(|s| !s.trim().is_empty());
-                }
-                if l.directed && !edge.directed {
-                    edge.directed = true;
-                    edge.from = a.clone();
-                    edge.to = b.clone();
-                }
+            if kind == EdgeKind::Link {
+                edge.aggregated |= lifted;
+                continue;
+            }
+            if direct && !*has_direct {
+                // The first direct relationship: from now on only those
+                // label and orient the edge.
+                *has_direct = true;
+                edge.label = None;
+                edge.directed = false;
+                edge.from = lo.clone();
+                edge.to = hi.clone();
+            } else if !direct && *has_direct {
+                continue;
+            }
+            if edge.label.is_none() {
+                edge.label = l.label.clone().filter(|s| !s.trim().is_empty());
+            }
+            if l.directed && !edge.directed {
+                edge.directed = true;
+                edge.from = a.clone();
+                edge.to = b.clone();
             }
         }
-        Ok(edges.into_values().collect())
+        Ok(edges
+            .into_values()
+            .map(|(mut edge, has_direct)| {
+                if edge.kind == EdgeKind::Manual {
+                    edge.aggregated = !has_direct;
+                }
+                edge
+            })
+            .collect())
     }
 }

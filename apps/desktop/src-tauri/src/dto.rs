@@ -190,6 +190,8 @@ pub struct GvCardDto {
     pub has_image: bool,
     pub has_audio: bool,
     pub index_page: Option<String>,
+    /// Folders: `"named" | "index" | "picked" | "only"` (M3b §4).
+    pub index_from: Option<&'static str>,
     pub pages: u32,
     pub folders: u32,
     pub child_titles: Vec<String>,
@@ -199,7 +201,7 @@ pub struct GvCardDto {
 
 impl From<nimw_session::GvCard> for GvCardDto {
     fn from(c: nimw_session::GvCard) -> GvCardDto {
-        use nimw_session::{CardKind, Relation};
+        use nimw_session::{CardKind, IndexFrom, Relation};
         GvCardDto {
             path: c.path,
             kind: match c.kind {
@@ -216,6 +218,12 @@ impl From<nimw_session::GvCard> for GvCardDto {
             has_image: c.has_image,
             has_audio: c.has_audio,
             index_page: c.index_page,
+            index_from: c.index_from.map(|f| match f {
+                IndexFrom::Named => "named",
+                IndexFrom::Index => "index",
+                IndexFrom::Picked => "picked",
+                IndexFrom::Only => "only",
+            }),
             pages: c.pages,
             folders: c.folders,
             child_titles: c.child_titles,

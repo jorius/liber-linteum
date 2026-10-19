@@ -279,6 +279,38 @@
     "obsidianFolder": "the “{name}” folder"
   },
   "gv": {
+    "indexPick": {
+      "title": "Index note for {name}",
+      "hint": "The page this folder’s card shows in the Global View.",
+      "only": "{page} is this folder’s only page, so its card already uses it. Pick it to keep it when more pages are added.",
+      "search": "Find a page",
+      "legend": "Index note",
+      "none": "No index note",
+      "pick": "Pick index note…"
+    },
+    "relations": {
+      "changedOnDisk": "Couldn’t update {name}: it changed on disk. Try again.",
+      "connect": "Connect to…",
+      "connecting": "Connecting",
+      "pick": "Pick the card to connect: {name} → ?",
+      "noIndex": "{name} has no index note. Pick one first.",
+      "samePage": "{a} and {b} stand for the same page: it can’t be related to itself.",
+      "created": "Relationship created.",
+      "createdPending": "Relationship added; saving…",
+      "unlinkable": "Can’t link to {name}: links can’t hold # | ^ [ ] or both kinds of quote in a page or folder name. Rename it first.",
+      "of": "Relationships of {name}",
+      "between": "Relationships between {a} and {b}",
+      "loading": "Loading…",
+      "none": "No relationships yet. Use “Connect to…” on a card to add one.",
+      "edge": "{from} → {to}",
+      "label": "Label",
+      "arrow": "Arrow to {to}",
+      "closeHint": "Close saves the changes you haven’t saved yet; Escape discards them.",
+      "save": "Save",
+      "delete": "Delete relationship",
+      "menu": "Connections of {title}",
+      "open": "Relationships…"
+    },
     "region": "Global View",
     "canvas": "Global View cards",
     "a11y": {

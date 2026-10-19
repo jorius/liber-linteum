@@ -33,6 +33,8 @@ const COMMANDS: &[&str] = &[
     "gv_edges",
     "layout_get",
     "layout_set",
+    "link_target",
+    "index_pick_set",
 ];
 
 fn main() {

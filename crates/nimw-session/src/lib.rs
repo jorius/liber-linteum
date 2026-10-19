@@ -14,7 +14,7 @@ pub use attachments::{Attached, LinkSuggestion, cover_reference, sanitize_file_n
 pub use error::{Result, SessionError};
 pub use events::{IndexReport, RenameOutcome, SessionEvent};
 pub use global_view::{
-    CardKind, EdgeKind, GvCard, GvChildren, GvEdge, GvLevel, MAX_NEIGHBOURS, MAX_VISIBLE, Relation,
-    SUMMARY_TITLES,
+    CardKind, EdgeKind, GvCard, GvChildren, GvEdge, GvLevel, IndexFrom, MAX_NEIGHBOURS,
+    MAX_VISIBLE, Relation, SUMMARY_TITLES,
 };
 pub use session::{VaultSession, index_db_path};

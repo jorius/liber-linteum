@@ -8,8 +8,10 @@
 // 1.5–2.5 s to render in WebKit, against NFR-03's 300 ms. Edges are
 // decorative for screen readers (each card's description lists its
 // connections), so the layer is aria-hidden.
-import { useStore, ViewportPortal, type ReactFlowState } from '@xyflow/react';
+import { useStore, ViewportPortal, type Node, type ReactFlowState } from '@xyflow/react';
 import { memo, useMemo } from 'react';
+import type { GvCard } from '../../ipc';
+import { pageOf } from './gvStore';
 import { CARD_H, CARD_W, type XY } from './layout';
 import styles from './GlobalView.module.css';
 
@@ -191,17 +193,53 @@ export function strongest(edges: DrawnEdge[], max = MAX_AGGREGATED) {
 
 export interface EdgeLayerProps {
   edges: DrawnEdge[];
+  /** A direct relationship edge was clicked (M3b §3): the pages its two
+   *  cards stand for (a page card itself, a folder card its index note;
+   *  final review I3). */
+  onRelations?: (a: string, b: string) => void;
 }
+
+/** The page a card node stands for in a relationship (M3b §2). */
+const pageOfNode = (n: Node): string | null => {
+  const card = (n.data as { card?: GvCard } | undefined)?.card;
+  return card ? pageOf(card) : null;
+};
+
+/** A wide, invisible stroke over a direct relationship that takes the
+ *  pointer (the layer itself ignores it); `nopan`, so pressing on it doesn't
+ *  pan the canvas. Its props are plain values and the layer's one callback,
+ *  so it redraws only when one of its cards moved (final review m16). */
+const EdgeHit = memo(function EdgeHit({
+  from,
+  to,
+  a,
+  b,
+  onRelations,
+}: EndsProps & { a: string; b: string; onRelations: (a: string, b: string) => void }) {
+  const { s, t } = line(from, to);
+  return (
+    <path
+      className={`${styles.edgeHit} nopan`}
+      d={`M${s.x},${s.y}L${t.x},${t.y}`}
+      data-gv-hit=""
+      onClick={() => onRelations(a, b)}
+    />
+  );
+});
 
 /** Every edge of the canvas, in the viewport under the cards: one group per
  *  style (strokes inherit), counts and labels on top. Card positions come
  *  from React Flow's store, so edges appear with their cards and follow a
  *  drag; a card that stays put keeps its position object, so only a moved
  *  card's edges redraw. */
-export const EdgeLayer = memo(function EdgeLayer({ edges }: EdgeLayerProps) {
+export const EdgeLayer = memo(function EdgeLayer({ edges, onRelations }: EdgeLayerProps) {
   const nodes = useStore(nodesOf);
   const positions = useMemo(
     () => new Map<string, XY>(nodes.map((n) => [n.id, n.position])),
+    [nodes],
+  );
+  const pages = useMemo(
+    () => new Map<string, string | null>(nodes.map((n) => [n.id, pageOfNode(n)])),
     [nodes],
   );
   const groups = useMemo(() => {
@@ -239,6 +277,21 @@ export const EdgeLayer = memo(function EdgeLayer({ edges }: EdgeLayerProps) {
             </g>
           );
         })}
+        {onRelations && (
+          <g>
+            {edges.map((e) => {
+              if (e.kind !== 'manual' || e.aggregated) return null;
+              const from = positions.get(e.source);
+              const to = positions.get(e.target);
+              const a = pages.get(e.source);
+              const b = pages.get(e.target);
+              if (!from || !to || !a || !b) return null;
+              return (
+                <EdgeHit key={e.id} from={from} to={to} a={a} b={b} onRelations={onRelations} />
+              );
+            })}
+          </g>
+        )}
         <g className={styles.edgeLabels}>
           {labelled.map(({ e, text }) => {
             const from = positions.get(e.source);
