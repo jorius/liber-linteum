@@ -476,20 +476,20 @@ impl Index {
              body INTEGER NOT NULL); \
              DELETE FROM temp.nimw_hits;",
         )?;
-        // `body`: whether the body itself matches, so a file found by its
-        // name alone gets no snippet scan (batch 6 review I7).
+        // `body`: a score from the body column alone is below zero only when
+        // the body itself matched — a file found by its name alone gets no
+        // snippet scan (batch 6 review I7). Same scan as the ranking.
         self.conn
             .prepare_cached(&format!(
                 "INSERT INTO temp.nimw_hits (path, score, meta, body) \
                  SELECT pt.path, bm25(fts, {WEIGHTS}), \
                  fts.rowid IN (SELECT rowid FROM fts WHERE fts MATCH ?2), \
-                 fts.rowid IN (SELECT rowid FROM fts WHERE fts MATCH ?3) \
+                 bm25(fts, 0, 0, 0, 0, 0, 1.0) < 0 \
                  FROM fts JOIN page_text pt ON pt.rowid = fts.rowid WHERE fts MATCH ?1"
             ))?
             .execute(params![
                 text.all,
-                format!("{META_COLUMNS} : ({})", text.any),
-                format!("body : ({})", text.any)
+                format!("{META_COLUMNS} : ({})", text.any)
             ])?;
         Ok(())
     }
@@ -583,7 +583,7 @@ impl Index {
     /// About 12 words around the first body word a query word starts; `None`
     /// when there is none. Read from the stored body in Rust: FTS5's
     /// `snippet()` re-expands every prefix term for each call (NFR-03).
-    /// Whether `path`'s body matched the text (filled by `fill_hits`).
+    /// Whether `path`'s body itself matched (`fill_hits`).
     fn body_matched(&self, path: &str) -> Result<bool> {
         Ok(self
             .conn
