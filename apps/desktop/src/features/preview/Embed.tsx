@@ -2,6 +2,7 @@ import type { Element } from 'hast';
 import { assetUrl } from '../../ipc';
 import { looksExternal } from '../../markdown/externalPath';
 import { followLink } from '../../stores/links';
+import { AudioPlayer } from '../audio/AudioPlayer';
 import { ExternalEmbed, WithDiskPath } from './ExternalFile';
 import { nameOf } from '../../stores/tree';
 import styles from './Preview.module.css';
@@ -81,12 +82,7 @@ export function Embed({ e, ctx, block }: { e: Element; ctx: RenderCtx; block: bo
   if (AUDIO.has(ext)) {
     return (
       <WithDiskPath vaultPath={resolved}>
-        <audio
-          className={styles.embedAudio}
-          controls
-          src={assetUrl(resolved)}
-          aria-label={nameOf(resolved)}
-        />
+        <AudioPlayer src={assetUrl(resolved)} name={nameOf(resolved)} />
       </WithDiskPath>
     );
   }

@@ -1,4 +1,5 @@
 import { useRef, type ReactNode } from 'react';
+import { AudioPlayer } from '../audio/AudioPlayer';
 import { useTranslation } from 'react-i18next';
 import {
   externalAssetUrl,
@@ -134,14 +135,7 @@ export function ExternalEmbed({
       />
     );
   } else if (AUDIO.test(file.path)) {
-    body = (
-      <audio
-        className={styles.embedAudio}
-        controls
-        src={externalAssetUrl(file.path)}
-        aria-label={nameOf(file.path)}
-      />
-    );
+    body = <AudioPlayer src={externalAssetUrl(file.path)} name={nameOf(file.path)} />;
   } else {
     const reveal = async () => {
       const res = await externalReveal(file.path);

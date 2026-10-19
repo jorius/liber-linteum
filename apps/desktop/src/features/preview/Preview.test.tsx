@@ -198,7 +198,7 @@ describe('Preview: embeds (M2a §4, §1.1)', () => {
     expect(img).toHaveAttribute('loading', 'lazy');
   });
 
-  it('audio gets native controls', async () => {
+  it('audio gets the app’s player (M6 §4), not the browser’s controls', async () => {
     show('![[voice.mp3]]\n');
     await waitFor(() =>
       expect(document.querySelector('audio')).toHaveAttribute(
@@ -206,7 +206,8 @@ describe('Preview: embeds (M2a §4, §1.1)', () => {
         'nimw-asset://localhost/assets/voice.mp3',
       ),
     );
-    expect(document.querySelector('audio')).toHaveAttribute('controls');
+    expect(document.querySelector('audio')).not.toHaveAttribute('controls');
+    expect(screen.getByRole('button', { name: 'Play voice.mp3' })).toBeInTheDocument();
   });
 
   it('notes are transcluded with a title and "Open"; a heading embeds its section only', async () => {

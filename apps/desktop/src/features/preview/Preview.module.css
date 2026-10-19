@@ -245,10 +245,6 @@ summary.calloutTitle {
   border-radius: var(--radius-md);
 }
 
-.embedAudio {
-  width: min(100%, 420px);
-}
-
 .noteEmbed {
   border: 1px solid var(--color-border-strong);
   border-radius: var(--radius-md);
