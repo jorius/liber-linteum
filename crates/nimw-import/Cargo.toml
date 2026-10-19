@@ -7,6 +7,14 @@ license.workspace = true
 publish.workspace = true
 
 [dependencies]
+nimw-session = { path = "../nimw-session" }
+nimw-vault = { path = "../nimw-vault" }
+percent-encoding.workspace = true
+serde_json.workspace = true
+tempfile.workspace = true
+thiserror.workspace = true
+unicode-normalization.workspace = true
+zip.workspace = true
 
 [lints]
 workspace = true

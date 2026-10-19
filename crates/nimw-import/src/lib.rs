@@ -1,4 +1,25 @@
-//! Notion export importer.
+//! Notion export importer (M7): a Notion "Markdown & CSV" export zip
+//! becomes a new vault. See `docs/superpowers/specs/2026-10-18-m7-notion-import-design.md`.
+
+mod archive;
+
+pub use archive::{Entry, Export, Limits};
+
+/// Why an import couldn't go on.
+#[derive(Debug, thiserror::Error)]
+pub enum ImportError {
+    #[error("not a readable zip: {0}")]
+    Zip(String),
+    /// A limit or a safety rule refused the export.
+    #[error("{0}")]
+    Limit(String),
+    #[error("{0} already exists")]
+    Exists(String),
+    #[error(transparent)]
+    Io(#[from] std::io::Error),
+    #[error(transparent)]
+    Vault(#[from] nimw_vault::VaultError),
+}
 
 const NOTION_ID_LEN: usize = 32;
 

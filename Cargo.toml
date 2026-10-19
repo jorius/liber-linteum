@@ -36,6 +36,8 @@ tauri-plugin-dialog = "2.8.2"
 tauri-plugin-opener = "2.7.1"
 # M4c: a second launch hands its files to the running app (Windows, Linux)
 tauri-plugin-single-instance = "2.5.4"
+# M7: Notion export zips (read; deflate only, pure-Rust zlib)
+zip = { version = "9.0.5", default-features = false, features = ["deflate-flate2-zlib-rs"] }
 # M2b: installed font families (local files only)
 fontdb = "0.24.0"
 # M6 audio clips: capture and WAV (MP3 deferred: LAME does not cross-build for Windows)
