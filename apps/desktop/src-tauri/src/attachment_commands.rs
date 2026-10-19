@@ -86,6 +86,7 @@ pub(crate) fn attachment_paste_impl(
     name: String,
     bytes: Vec<u8>,
 ) -> CmdResult<AttachedDto> {
+    crate::vault_commands::not_archived(&page)?;
     let session = state.session()?;
     let page = visible_page(&session, &page)?;
     let ext = name
@@ -106,6 +107,7 @@ pub(crate) fn attachment_import_impl(
     page: String,
     paths: Vec<String>,
 ) -> CmdResult<Vec<ImportResultDto>> {
+    crate::vault_commands::not_archived(&page)?;
     let session = state.session()?;
     let page = visible_page(&session, &page)?;
     Ok(paths
@@ -143,6 +145,7 @@ pub(crate) fn cover_pick_impl<R: Runtime>(
     app: &AppHandle<R>,
     page: String,
 ) -> CmdResult<Option<CoverDto>> {
+    crate::vault_commands::not_archived(&page)?;
     let state = app.state::<AppState>();
     let session = state.session()?;
     let page = visible_page(&session, &page)?;
@@ -228,6 +231,7 @@ pub(crate) fn page_width_set_impl(
     path: String,
     width: Option<String>,
 ) -> CmdResult<VaultSettingsDto> {
+    crate::vault_commands::not_archived(&path)?;
     let session = state.session()?;
     let width = width_of(width.as_deref())?;
     let page = visible_page(&session, &path)?;
@@ -250,6 +254,7 @@ pub(crate) fn cover_height_set_impl(
     path: String,
     height: Option<f64>,
 ) -> CmdResult<VaultSettingsDto> {
+    crate::vault_commands::not_archived(&path)?;
     let session = state.session()?;
     let height = height_of(height)?;
     let page = visible_page(&session, &path)?;
@@ -273,6 +278,7 @@ pub(crate) fn cover_side_set_impl(
     path: String,
     side: String,
 ) -> CmdResult<VaultSettingsDto> {
+    crate::vault_commands::not_archived(&path)?;
     let session = state.session()?;
     let side = side_of(&side)?;
     let page = visible_page(&session, &path)?;
@@ -287,6 +293,7 @@ pub(crate) fn cover_width_set_impl(
     path: String,
     width: Option<f64>,
 ) -> CmdResult<VaultSettingsDto> {
+    crate::vault_commands::not_archived(&path)?;
     let session = state.session()?;
     let width = match width {
         None => None,

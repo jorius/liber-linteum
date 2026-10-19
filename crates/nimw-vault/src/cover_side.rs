@@ -101,7 +101,7 @@ impl Vault {
     }
 
     /// The readable entries of one page-keyed map.
-    fn page_entries<T>(
+    pub(crate) fn page_entries<T>(
         &self,
         key: &str,
         parse: impl Fn(&serde_json::Value) -> Option<T>,
@@ -120,7 +120,7 @@ impl Vault {
 
     /// Sets (`Some`) or clears (`None`) one entry of a page-keyed map,
     /// keeping every other key; an emptied map is removed.
-    fn set_page_entry(
+    pub(crate) fn set_page_entry(
         &self,
         key: &str,
         path: &str,

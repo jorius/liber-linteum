@@ -13,8 +13,9 @@ const FOCUSABLE =
  *  Escape closes even when nothing inside has focus (WebKit doesn't focus a
  *  clicked checkbox or button), a click on the backdrop closes, and closing
  *  first blurs the focused field so a value typed but not confirmed is saved.
- *  `wide` (Search, M5 §4): 780 px; `hideTitle`: the title names the dialog
- *  for screen readers only. */
+ *  `wide` (Search, M5 §4): 780 px; `panes` (Settings, M5b §18): a menu and
+ *  a pane side by side; `hideTitle`: the title names the dialog for screen
+ *  readers only. */
 export function Dialog({
   title,
   onClose,
@@ -22,7 +23,10 @@ export function Dialog({
   returnFocus,
   dismissible = false,
   wide = false,
+  panes = false,
   hideTitle = false,
+  alert = false,
+  describedBy,
   children,
 }: {
   title: string;
@@ -31,7 +35,12 @@ export function Dialog({
   returnFocus?: () => HTMLElement | null | undefined;
   dismissible?: boolean;
   wide?: boolean;
+  panes?: boolean;
   hideTitle?: boolean;
+  /** A question that interrupts (M5b final review M4): `alertdialog`. */
+  alert?: boolean;
+  /** The id of the text that explains the question. */
+  describedBy?: string;
   children: ReactNode;
 }) {
   const box = useRef<HTMLDivElement>(null);
@@ -61,7 +70,7 @@ export function Dialog({
       if (e.key !== 'Escape' || e.defaultPrevented || !box_) return;
       if (e.target instanceof Node && box_.contains(e.target)) return;
       // Only the topmost dialog answers.
-      const dialogs = document.querySelectorAll('[role="dialog"]');
+      const dialogs = document.querySelectorAll('[role="dialog"], [role="alertdialog"]');
       if (dialogs[dialogs.length - 1] !== box_) return;
       e.preventDefault();
       closeRef.current();
@@ -97,7 +106,11 @@ export function Dialog({
       return;
     }
     if (e.key !== 'Tab' || !box.current) return;
-    const nodes = [...box.current.querySelectorAll<HTMLElement>(FOCUSABLE)];
+    // Controls in hidden parts (Settings' other categories, M5b §18, and those a
+    // search hides, round-2 review I3) can't take focus.
+    const nodes = [...box.current.querySelectorAll<HTMLElement>(FOCUSABLE)].filter(
+      (n) => !n.closest('[hidden], [data-no-match], [inert]'),
+    );
     if (nodes.length === 0) return;
     const first = nodes[0];
     const last = nodes[nodes.length - 1];
@@ -129,10 +142,11 @@ export function Dialog({
     >
       <div
         ref={box}
-        role="dialog"
+        role={alert ? 'alertdialog' : 'dialog'}
         aria-modal="true"
         aria-labelledby="dialog-title"
-        className={wide ? `${styles.dialog} ${styles.wide}` : styles.dialog}
+        aria-describedby={describedBy}
+        className={`${styles.dialog} ${wide ? styles.wide : ''} ${panes ? styles.panes : ''}`}
         onKeyDown={onKeyDown}
       >
         <h2 id="dialog-title" className={hideTitle ? styles.srOnly : styles.title}>

@@ -93,6 +93,8 @@ export interface VaultInfo {
   report: IndexReport;
   /** The global Scratchpad (M4c §2). */
   scratchpad?: boolean;
+  /** The vault's emoji (M5b §4). */
+  icon?: string;
 }
 
 export type NodeKind = 'page' | 'folder' | 'attachment';
@@ -100,6 +102,8 @@ export type NodeKind = 'page' | 'folder' | 'attachment';
 export interface TreeNode {
   path: string;
   kind: NodeKind;
+  /** A page's frontmatter emoji or a folder's (M5b §4). */
+  icon?: string;
 }
 
 export interface Page {
@@ -136,6 +140,8 @@ export interface RecentVault {
   missing: boolean;
   /** The global Scratchpad (M4c §2): shown as "Quick notes". */
   scratchpad?: boolean;
+  /** The vault's emoji (M5b §4). */
+  icon?: string;
 }
 
 export type EditorMode = 'livePreview' | 'source' | 'split';
@@ -194,7 +200,15 @@ export interface Settings {
   /** The global Scratchpad's folder (M4c §2); `null` until the first quick
    *  note. Changed only through `scratchpadSet`, never a settings patch. */
   scratchpadPath?: string | null;
+  /** Pages save as you type (M5b §6); off: only on ⌘S. */
+  autoSave: boolean;
+  /** The sidebar is collapsed (M5b §2.5). */
+  sidebarCollapsed: boolean;
+  /** Where the floating Edit / Global View / Search button sits (M5b §2.2). */
+  actionButton: ActionButtonPlace;
 }
+
+export type ActionButtonPlace = 'bottomRight' | 'bottomLeft' | 'topRight';
 
 /** `wide`: text at the readable measure, the chosen elements span the editor. */
 export type PageWidth = 'readable' | 'wide' | 'full';
@@ -243,6 +257,9 @@ export interface SettingsPatch {
   outline?: boolean;
   coverHeight?: number;
   showAttachmentPaths?: boolean;
+  autoSave?: boolean;
+  sidebarCollapsed?: boolean;
+  actionButton?: ActionButtonPlace;
 }
 
 export interface SettingsResponse {
@@ -554,6 +571,8 @@ export const fileOpenDialog = () => call<string[]>('file_open_dialog');
 /** Closes this window without asking (its pages are saved first). Not the
  *  window plugin's `destroy`, which takes any window's label (M4c review I2). */
 export const destroyWindow = () => call<void>('window_close_self');
+/** Names this window (M5b §2.3: "Page — Vault"). */
+export const windowTitleSet = (title: string) => call<void>('window_title_set', { title });
 
 export const vaultOpen = (path: string) => call<VaultInfo>('vault_open', { path });
 export const vaultCreate = (path: string) => call<VaultInfo>('vault_create', { path });
@@ -576,7 +595,8 @@ export const entryCreateFolder = (parent: string, name: string) =>
   call<string>('entry_create_folder', { parent, name });
 export const entryRename = (from: string, to: string) =>
   call<RenameOutcome>('entry_rename', { from, to });
-export const entryTrash = (path: string) => call<void>('entry_trash', { path });
+/** Moves an item into the vault's Trash (M5b §5.1); its path there. */
+export const entryTrash = (path: string) => call<string>('entry_trash', { path });
 export const settingsGet = () => call<SettingsResponse>('settings_get');
 export const settingsSet = (patch: SettingsPatch) => call<Settings>('settings_set', { patch });
 export const vaultsRecent = () => call<RecentVault[]>('vaults_recent');
@@ -670,6 +690,23 @@ export const coverSideSet = (path: string, side: CoverSide) =>
  *  clears it. */
 export const coverWidthSet = (path: string, width: number | null) =>
   call<VaultSettings>('cover_width_set', { path, width });
+/** A folder's emoji (M5b §4); `null` removes it. Page icons are frontmatter. */
+export const folderIconSet = (path: string, icon: string | null) =>
+  call<null>('folder_icon_set', { path, icon });
+/** How a folder lists its entries (M5b round 2); folders always come first. */
+export type FolderSort =
+  'name-asc' | 'name-desc' | 'modified-desc' | 'modified-asc' | 'created-desc';
+/** A folder's order (`""`: the vault root). */
+export const folderSortGet = (path: string) => call<FolderSort>('folder_sort_get', { path });
+export const folderSortSet = (path: string, sort: FolderSort) =>
+  call<null>('folder_sort_set', { path, sort });
+/** The vault's own emoji (M5b §4); `null` removes it. */
+export const vaultIconSet = (icon: string | null) => call<null>('vault_icon_set', { icon });
+/** The vault's favorites, in the order they were added (M5b §19). */
+export const favoritesGet = () => call<string[]>('favorites_get');
+/** Replaces the favorites; Rust drops missing entries and repeats and
+ *  returns what it stored. */
+export const favoritesSet = (paths: string[]) => call<string[]>('favorites_set', { paths });
 
 // ---- quick notes (M4c §2, §7) ----
 
@@ -705,6 +742,8 @@ export interface SearchQuery {
   linksFrom?: string | null;
   hasImage?: boolean;
   hasAudio?: boolean;
+  /** Include archived pages (M5b §5.3). */
+  archived?: boolean;
   offset?: number;
   /** At most 50; 0 means 50. */
   limit?: number;
@@ -749,6 +788,8 @@ export interface Facets {
   linksFrom: FacetPage | null;
   hasImage: number;
   hasAudio: number;
+  /** Archived matches, included or not. */
+  archived: number;
 }
 
 export interface SearchPage {
@@ -762,6 +803,40 @@ export interface SearchPage {
 }
 
 export const search = (query: SearchQuery) => call<SearchPage>('search', { query });
+
+// ---- the vault's Trash and Archive (M5b §5; mirrors src-tauri/src/bin_commands.rs) ----
+
+export interface BinItem {
+  /** Its path now (`.trash/…` or `.archive/…`). */
+  path: string;
+  /** Where it was; `null` when unrecorded (Obsidian's own trash). */
+  from: string | null;
+  /** When it went in (ms since epoch). */
+  at: number | null;
+  folder: boolean;
+  /** Bytes; a folder's whole contents (Trash items, M5b round 2). */
+  size?: number;
+  /** A folder's pages, however deep. */
+  pages?: number;
+  /** A page's frontmatter emoji, or a folder's. */
+  icon?: string;
+}
+
+export interface BinLists {
+  trash: BinItem[];
+  archive: BinItem[];
+}
+
+export const binList = () => call<BinLists>('bin_list');
+/** Back to where it was; `alreadyExists` unless `keepBoth`. Its path now. */
+export const trashRestore = (path: string, keepBoth: boolean) =>
+  call<string>('trash_restore', { path, keepBoth });
+/** Out of the vault, to the system Trash. */
+export const trashDelete = (paths: string[]) => call<void>('trash_delete', { paths });
+export const trashEmpty = () => call<void>('trash_empty');
+export const entryArchive = (path: string) => call<RenameOutcome>('entry_archive', { path });
+export const archiveRestore = (path: string, keepBoth: boolean) =>
+  call<RenameOutcome>('archive_restore', { path, keepBoth });
 
 /** URL of a vault file for <img>/<audio> through the `nimw-asset:` protocol
  *  (M2a §2.5); WebView2 on Windows reaches custom protocols over http. */
@@ -823,6 +898,18 @@ export const onMenuQuickNote = (cb: () => void): Promise<UnlistenFn> =>
 /** View → Search… in the app menu (M5 §4). */
 export const onMenuSearch = (cb: () => void): Promise<UnlistenFn> =>
   listen<null>('menu:search', () => cb(), mine());
+/** Notes In My Way → Settings… (M5b §2.1). */
+export const onMenuSettings = (cb: () => void): Promise<UnlistenFn> =>
+  listen<null>('menu:settings', () => cb(), mine());
+/** Vault → Open Vault… / Close Vault (M5b §2.1). */
+export const onMenuVault = (cb: (what: string) => void): Promise<UnlistenFn> =>
+  listen<string>('menu:vault', (e) => cb(e.payload), mine());
+/** File → Save (M5b §6). */
+export const onMenuSave = (cb: () => void): Promise<UnlistenFn> =>
+  listen<null>('menu:save', () => cb(), mine());
+/** View → Toggle Sidebar (M5b §2.5). */
+export const onMenuSidebar = (cb: () => void): Promise<UnlistenFn> =>
+  listen<null>('menu:sidebar', () => cb(), mine());
 export const onVaultWarning = (cb: (p: WarningPayload) => void): Promise<UnlistenFn> =>
   listen<WarningPayload>('vault:warning', (e) => cb(e.payload));
 

@@ -206,6 +206,42 @@ impl Vault {
         })
     }
 
+    /// Forgets the positions, levels and index-note picks of deleted pages
+    /// and folders (and of what was inside them); one write per file, none
+    /// when nothing named them.
+    pub fn forget_layout(&self, removed: &[String]) -> Result<()> {
+        let gone: HashSet<&str> = removed.iter().map(String::as_str).collect();
+        if gone.is_empty() {
+            return Ok(());
+        }
+        let layout = self.update_json_object(LAYOUT_JSON, false, |map| {
+            let Some(levels) = map
+                .get_mut("levels")
+                .and_then(serde_json::Value::as_object_mut)
+            else {
+                return;
+            };
+            levels.retain(|key, _| !at_or_below(level_path(key), &gone));
+            for cards in levels.values_mut() {
+                if let Some(cards) = cards.as_object_mut() {
+                    cards.retain(|path, _| !at_or_below(path, &gone));
+                }
+            }
+        });
+        let picks = self.update_json_object(crate::vault::NIMW_JSON, false, |map| {
+            if let Some(picks) = map
+                .get_mut("indexPicks")
+                .and_then(serde_json::Value::as_object_mut)
+            {
+                picks.retain(|folder, page| {
+                    !at_or_below(folder, &gone)
+                        && page.as_str().is_none_or(|p| !at_or_below(p, &gone))
+                });
+            }
+        });
+        layout.and(picks)
+    }
+
     /// True when `path` names something on disk (`""`: the vault).
     fn path_exists(&self, path: &str) -> bool {
         path.is_empty()

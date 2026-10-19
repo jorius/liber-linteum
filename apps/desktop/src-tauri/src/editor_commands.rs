@@ -76,6 +76,7 @@ pub(crate) fn page_write_impl(
     text: String,
     expected_hash: String,
 ) -> CmdResult<WriteResult> {
+    crate::vault_commands::not_archived(&path)?;
     let session = state.session()?;
     let vp = VaultPath::new(&path)?;
     let expected = Hash::from_hex(&expected_hash)
@@ -111,6 +112,7 @@ pub(crate) fn text_write_impl(
     text: String,
     expected_hash: String,
 ) -> CmdResult<WriteResult> {
+    crate::vault_commands::not_archived(&path)?;
     let session = state.session()?;
     let vp = VaultPath::new(&path)?;
     let expected = Hash::from_hex(&expected_hash)
@@ -136,6 +138,7 @@ pub(crate) fn page_create_conflict_copy_impl(
     path: String,
     text: String,
 ) -> CmdResult<String> {
+    crate::vault_commands::not_archived(&path)?;
     let session = state.session()?;
     Ok(session
         .create_conflict_copy(&VaultPath::new(&path)?, &text)?

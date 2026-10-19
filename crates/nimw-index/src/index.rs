@@ -230,7 +230,7 @@ impl Index {
     /// accent-insensitive key).
     pub fn tree(&self) -> Result<Vec<TreeNode>> {
         let mut stmt = self.conn.prepare(
-            "SELECT f.path, f.parent, f.name, f.kind, p.title FROM files f LEFT JOIN pages p ON p.path = f.path",
+            "SELECT f.path, f.parent, f.name, f.kind, p.title, p.icon, f.mtime_ns FROM files f LEFT JOIN pages p ON p.path = f.path",
         )?;
         let mut nodes = stmt
             .query_map([], |r| {
@@ -240,6 +240,8 @@ impl Index {
                     name: r.get(2)?,
                     kind: FileKind::parse(&r.get::<_, String>(3)?),
                     title: r.get(4)?,
+                    icon: r.get(5)?,
+                    mtime_ns: r.get(6)?,
                 })
             })?
             .collect::<rusqlite::Result<Vec<_>>>()?;
@@ -497,12 +499,13 @@ impl Tx<'_> {
     /// New links start unresolved; call a `resolve_*` method afterwards.
     pub fn upsert_page(&self, path: &str, meta: &PageMeta) -> Result<()> {
         self.tx.prepare_cached(
-            "INSERT OR REPLACE INTO pages (path, title, subtitle, cover, cover_y, excerpt, has_image, has_audio, frontmatter_error, cover_x)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
+            "INSERT OR REPLACE INTO pages (path, title, subtitle, cover, cover_y, excerpt, has_image, has_audio, frontmatter_error, cover_x, icon)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)",
         )?
         .execute(params![
             path, meta.title, meta.subtitle, meta.cover, meta.cover_y.map(i64::from), meta.excerpt,
-            meta.has_image, meta.has_audio, meta.frontmatter_error, meta.cover_x.map(i64::from)
+            meta.has_image, meta.has_audio, meta.frontmatter_error, meta.cover_x.map(i64::from),
+            meta.icon
         ])?;
         let [title, name, folders, tags, links, body] = text_columns(path, meta);
         self.tx

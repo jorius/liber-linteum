@@ -19,7 +19,9 @@ import { linkSuggest, linksResolve, pageRead, type LinkSuggestion } from '../../
 import { headingLinkText } from '../../markdown/headings';
 import { parsePage } from '../../markdown/parse';
 import { text as nodeText } from '../../markdown/section';
+import { iconsOf } from '../icons/ItemIcon';
 import { announce } from './announce';
+import { useVaultStore } from '../../stores/vaultStore';
 import { pagePath } from './livePreview';
 
 export type LinkQuery =
@@ -84,8 +86,12 @@ function applyText(text: string, closed: boolean) {
 
 function fileOption(s: LinkSuggestion, q: LinkQuery): Completion {
   const alias = q.embed ? null : aliasFor(s);
+  const label = s.title ?? baseName(s.path);
+  // The page's optional emoji (M5b §4) shows; matching stays on the name.
+  const icon = iconsOf(useVaultStore.getState().nodes).get(s.path);
   return {
-    label: s.title ?? baseName(s.path),
+    label,
+    ...(icon ? { displayLabel: `${icon} ${label}` } : {}),
     detail: s.path,
     type: s.kind === 'page' ? 'text' : 'variable',
     apply: applyText(alias ? `${s.target}|${alias}` : s.target, q.closed),

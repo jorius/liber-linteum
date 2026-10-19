@@ -4,6 +4,7 @@ import { errorMessage } from '../../stores/messages';
 import { usePageStore } from '../../stores/pageStore';
 import { useSettingsStore } from '../../stores/settingsStore';
 import { nameOf } from '../../stores/tree';
+import { ArchivedBanner } from '../bin/ArchivedBanner';
 import { Editor } from '../editor/Editor';
 import { isTextPath } from '../../stores/textFiles';
 import { PageHeader } from './PageHeader';
@@ -76,6 +77,7 @@ export function PageView() {
       {/* A side cover (M4b part 3 §3) runs beside the header and the text. */}
       <PageHeader page={page} mode={mode}>
         {orphanBanner}
+        <ArchivedBanner path={path} />
         <UnwritableNotice />
         {binary ? (
           <p className={`${styles.notice} ${styles.inset}`}>{t('page.binary')}</p>

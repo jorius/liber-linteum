@@ -5,6 +5,7 @@
 // the CSP is the second layer, so a violation here is a sanitizer bug).
 import { expect, test, type Page } from '@playwright/test';
 import { readFileSync } from 'node:fs';
+import { showGlobalView } from './shell';
 import { installIpcMock } from './ipcMock';
 
 const REMOTE = readFileSync(new URL('./remote.md', import.meta.url), 'utf8');
@@ -130,7 +131,7 @@ for (const palette of [
 // neighbourhood and Expand — loads nothing from outside either.
 test('zero network requests: the Global View', async ({ page }) => {
   const { outside, problems } = await openRemotePage(page, 'livePreview');
-  await page.getByRole('button', { name: 'Global view' }).click();
+  await showGlobalView(page);
   const remote = page.getByRole('button', { name: 'Remote references', exact: true });
   await expect(remote).toBeVisible();
   const gv = page.getByRole('region', { name: 'Global View' });
@@ -158,7 +159,7 @@ test('zero network requests: the Global View', async ({ page }) => {
 // load nothing from outside either.
 test('zero network requests: relationships in the Global View', async ({ page }) => {
   const { outside, problems } = await openRemotePage(page, 'livePreview');
-  await page.getByRole('button', { name: 'Global view' }).click();
+  await showGlobalView(page);
   await page.getByRole('button', { name: 'Connections of Other' }).click();
   await page.getByRole('menuitem', { name: 'Connect to…' }).click();
   await page.getByRole('button', { name: 'Remote references', exact: true }).click();

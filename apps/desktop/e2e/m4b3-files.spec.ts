@@ -5,6 +5,7 @@
 // machine.
 import { readFileSync } from 'node:fs';
 import { expect, test, type Page } from '@playwright/test';
+import { openSettings } from './shell';
 import { installIpcMock } from './ipcMock';
 
 const AXE = readFileSync(new URL('../node_modules/axe-core/axe.min.js', import.meta.url), 'utf8');
@@ -149,7 +150,7 @@ test('§7 Attach → Link to where it is writes file: URLs; Escape cancels', asy
 
 test('§8 the link format for new attachments, in Settings → This vault', async ({ page }) => {
   const outside = await open(page, 'A');
-  await page.getByRole('button', { name: 'Settings' }).click();
+  await openSettings(page, 'This vault');
   const format = page.getByRole('combobox', { name: 'Link format for new attachments' });
   await expect(format).toHaveValue('shortest');
   await expect(page.getByText('![[x.png]]')).toBeVisible();

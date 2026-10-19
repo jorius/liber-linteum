@@ -70,7 +70,9 @@
       "notAllowed": "{name} can't be moved there.",
       "cancelled": "Move of {name} cancelled."
     },
-    "scratchFolder": "{name}, quick notes, {count, plural, one {# note} other {# notes}}"
+    "scratchFolder": "{name}, quick notes, {count, plural, one {# note} other {# notes}}",
+    "newPageIn": "New page in {name}",
+    "trash": "Move {name} to Trash"
   },
   "opening": {
     "title": "Opening vault…",
@@ -81,11 +83,15 @@
     "files": "Files · {name}",
     "newPage": "New page",
     "newFolder": "New folder",
-    "view": "View",
     "edit": "Edit",
     "globalView": "Global view",
     "settings": "Settings",
-    "closeVault": "Close vault"
+    "closeVault": "Close vault",
+    "actions": "Actions",
+    "hideSidebar": "Hide sidebar",
+    "showSidebar": "Show sidebar",
+    "settingsItem": "Settings…",
+    "openAnother": "Open another vault…"
   },
   "page": {
     "region": "Page",
@@ -192,7 +198,8 @@
       "copy": "Copy into the vault",
       "link": "Link to where it is",
       "cancel": "Cancel"
-    }
+    },
+    "unsaved": "Unsaved"
   },
   "preview": {
     "tableScroll": "Table, scrolls sideways",
@@ -225,7 +232,12 @@
     "newFolder": "New folder",
     "rename": "Rename",
     "move": "Move to…",
-    "delete": "Delete"
+    "delete": "Delete",
+    "icon": "Icon…",
+    "archive": "Archive",
+    "sortBy": "Sort by",
+    "open": "Open",
+    "unarchive": "Unarchive"
   },
   "dialogs": {
     "cancel": "Cancel",
@@ -258,6 +270,15 @@
       "where": "It will be created in {folder}.",
       "confirm": "Create page",
       "invalid": "“{name}” can’t be used as a name. {reason}"
+    },
+    "unsaved": {
+      "titleOne": "Save changes to “{name}”?",
+      "titleMany": "{count, plural, one {Save changes to # page?} other {Save changes to # pages?}}",
+      "body": "Auto save is off. Changes you don't save are lost.",
+      "discard": "Don’t Save",
+      "save": "Save",
+      "saveAll": "Save all",
+      "list": "Unsaved pages"
     }
   },
   "settings": {
@@ -271,9 +292,6 @@
     "rewriteLinks": "Update links when renaming or moving",
     "confirmDelete": "Ask before moving to Trash",
     "sections": {
-      "appearance": "Appearance",
-      "editor": "Editor",
-      "files": "Files",
       "vault": "This vault"
     },
     "palette": "Palette",
@@ -332,6 +350,83 @@
       "obsidian": "Following Obsidian’s setting ({format}). Choose a format to use your own.",
       "useObsidian": "Use Obsidian’s setting",
       "showPaths": "Show where attachments are on disk"
+    },
+    "autoSave": "Auto save",
+    "autoSaveHint": "When off, {save} saves. Changing the title, subtitle, cover or relationships, and moving a page to the Trash, also save its text.",
+    "actionButton": "Action button",
+    "actionButtonBottomRight": "Bottom right",
+    "actionButtonBottomLeft": "Bottom left",
+    "actionButtonTopRight": "Top right",
+    "categoriesLabel": "Settings categories",
+    "search": "Search settings",
+    "searchResults": "Search results",
+    "noMatch": "No settings match.",
+    "savedAsYouChange": "Saved as you change",
+    "groups": {
+      "app": "App"
+    },
+    "categories": {
+      "general": {
+        "title": "General",
+        "description": "The language of the app."
+      },
+      "appearance": {
+        "title": "Appearance",
+        "description": "Theme, colours and where the action button sits."
+      },
+      "editor": {
+        "title": "Editor",
+        "description": "Fonts, page width, covers and saving."
+      },
+      "files": {
+        "title": "Files and quick notes",
+        "description": "Renaming, deleting and where quick notes live."
+      },
+      "shortcuts": {
+        "title": "Keyboard shortcuts",
+        "description": "What the keyboard does, everywhere in the app."
+      },
+      "vault": {
+        "title": "This vault",
+        "description": "Settings kept with this vault, in .nimw/vault.json."
+      }
+    },
+    "shortcuts": {
+      "groups": {
+        "navigation": "Navigation",
+        "editing": "Editing",
+        "vault": "Vault",
+        "view": "View"
+      },
+      "items": {
+        "back": "Back",
+        "forward": "Forward",
+        "edit": "Edit",
+        "globalView": "Global View",
+        "search": "Search",
+        "files": "Go to the files",
+        "newPage": "New page",
+        "quickNote": "New quick note",
+        "save": "Save",
+        "link": "Insert a link",
+        "bold": "Bold",
+        "italic": "Italic",
+        "code": "Inline code",
+        "strike": "Strikethrough",
+        "highlight": "Highlight",
+        "numbered": "Numbered list",
+        "bullet": "Bulleted list",
+        "task": "Task list",
+        "quote": "Quote",
+        "favorite": "Add to or remove from Favorites",
+        "openVault": "Open a vault",
+        "closeVault": "Close the vault",
+        "openFile": "Open a file",
+        "sidebar": "Show or hide the sidebar",
+        "actions": "Show the actions",
+        "settings": "Settings",
+        "quit": "Quit"
+      }
     }
   },
   "toolbar": {
@@ -616,11 +711,11 @@
     "project": "Project",
     "tags": "Tags",
     "linksTo": "Links to",
-    "media": "Media",
     "hasImage": "Has image",
     "hasAudio": "Has audio",
     "active": "Active",
     "clearAll": "Clear all",
+    "moreChips": "+{count} more",
     "chipProject": "Project: {name}",
     "chipFolder": "In: {name}",
     "chipLinksTo": "Links to: {name}",
@@ -633,6 +728,102 @@
     "indexing": "Still indexing: results may be incomplete.",
     "showMore": "Show more",
     "resultsLabel": "Results",
-    "failed": "Search failed: {error}"
+    "failed": "Search failed: {error}",
+    "archived": "Archived",
+    "show": "Show"
+  },
+  "icons": {
+    "pickFor": "Icon for {name}",
+    "remove": "Remove icon",
+    "search": "Search emoji",
+    "grid": "Emoji",
+    "recent": "Recent",
+    "none": "No emoji found",
+    "groups": {
+      "smileys-emotion": "Smileys & emotion",
+      "people-body": "People & body",
+      "animals-nature": "Animals & nature",
+      "food-drink": "Food & drink",
+      "travel-places": "Travel & places",
+      "activities": "Activities",
+      "objects": "Objects",
+      "symbols": "Symbols",
+      "flags": "Flags"
+    },
+    "addFor": "Add an icon to {name}",
+    "changeFor": "Change the icon of {name}"
+  },
+  "bin": {
+    "trash": "Trash",
+    "archived": "Archived",
+    "trashCount": "{count, plural, one {Trash, # item} other {Trash, # items}}",
+    "archivedCount": "{count, plural, one {Archived, # item} other {Archived, # items}}",
+    "root": "the vault root",
+    "unknownFrom": "From another app",
+    "restore": "Restore",
+    "restoreName": "Restore {name}",
+    "unarchive": "Unarchive",
+    "delete": "Delete",
+    "deleteName": "Delete {name} from the vault",
+    "empty": "Empty Trash",
+    "deleteTitle": "{count, plural, one {Delete # item from the vault?} other {Delete # items from the vault?}}",
+    "emptyTitle": "{count, plural, one {Empty the Trash (# item)?} other {Empty the Trash (# items)?}}",
+    "deleteBody": "The files leave the vault and go to the system Trash, where you can still recover them.",
+    "clashTitle": "{name} already exists",
+    "clashBody": "Something new is where it was. Keep both, with a number added to the restored one?",
+    "keepBoth": "Keep both",
+    "archivedPage": "This page is archived. Unarchive it to edit it.",
+    "archivedToast": "Archived",
+    "undo": "Undo",
+    "undoGone": "That item is no longer in the Trash.",
+    "summary": "{count, plural, one {# item} other {# items}} · {size}. They stay inside the vault until you delete them; deleting sends them to the system Trash.",
+    "filter": "Filter the Trash",
+    "filterPlaceholder": "Filter by name or folder",
+    "sort": "Sort",
+    "sortNewest": "Deleted, newest first",
+    "sortOldest": "Deleted, oldest first",
+    "sortName": "Name, A → Z",
+    "sortFolder": "Original folder",
+    "selection": "Selection",
+    "selected": "{count} selected",
+    "select": "Select {name}",
+    "today": "Today",
+    "yesterday": "Yesterday",
+    "thisWeek": "Earlier this week",
+    "unknownDate": "Date unknown",
+    "allItems": "All items",
+    "kind": {
+      "page": "Page",
+      "folder": "Folder",
+      "image": "Image",
+      "file": "File"
+    },
+    "pages": "{count, plural, one {# page} other {# pages}}",
+    "fromLower": "from {folder}",
+    "deletedAt": "deleted {when}",
+    "restoreTo": "Restore to {folder}",
+    "deleteTitleShort": "Delete from the vault",
+    "emptyTitleState": "The Trash is empty",
+    "emptyHelp": "Pages, folders and attachments you delete wait here, inside the vault, until you delete them for good.",
+    "noMatch": "Nothing in the Trash matches “{query}”."
+  },
+  "sort": {
+    "label": "Sort {name} by",
+    "vault": "Sort the vault",
+    "name-asc": "Name, A → Z",
+    "name-desc": "Name, Z → A",
+    "modified-desc": "Modified, newest first",
+    "modified-asc": "Modified, oldest first",
+    "created-desc": "Created, newest first"
+  },
+  "favorites": {
+    "title": "Favorites",
+    "add": "Add to Favorites",
+    "remove": "Remove from Favorites",
+    "removeNamed": "Remove {name} from Favorites",
+    "moveUp": "Move up in Favorites",
+    "moveDown": "Move down in Favorites",
+    "movedTo": "{name} moved to {position} of {count} in Favorites",
+    "scratchTree": "Quick notes"
   }
 }

@@ -31,9 +31,56 @@ pub async fn window_close_self<R: tauri::Runtime>(
         .map_err(|e| crate::error::CommandError::new(crate::error::ErrorKind::Io, e.to_string()))
 }
 
+/// The longest window title kept (M5b §11.8).
+const TITLE_MAX_CHARS: usize = 200;
+
+/// A page-supplied title, cleaned: no control characters, at most 200
+/// characters.
+/// Bidi controls and zero-width characters (M5b final review M11): a synced
+/// file name holding them could reorder or hide part of the window title.
+fn is_invisible_format(c: char) -> bool {
+    matches!(c, '\u{200B}'..='\u{200F}' | '\u{202A}'..='\u{202E}' | '\u{2060}'..='\u{2069}' | '\u{FEFF}' | '\u{061C}')
+}
+
+pub fn clean_title(title: &str) -> String {
+    title
+        .chars()
+        .filter(|c| !c.is_control() && !is_invisible_format(*c))
+        .take(TITLE_MAX_CHARS)
+        .collect()
+}
+
+/// Names the calling window, and only it (M5b §2.3: "Page — Vault" once the
+/// top bar is gone). The window plugin isn't granted (M4c review I2).
+#[tauri::command]
+pub async fn window_title_set<R: tauri::Runtime>(
+    window: tauri::WebviewWindow<R>,
+    title: String,
+) -> crate::error::CmdResult<()> {
+    window
+        .set_title(&clean_title(&title))
+        .map_err(|e| crate::error::CommandError::new(crate::error::ErrorKind::Io, e.to_string()))
+}
+
 #[cfg(test)]
 mod tests {
     use super::build_app_info;
+
+    #[test]
+    fn m5b_titles_lose_control_characters_and_stop_at_200() {
+        assert_eq!(super::clean_title("Ranks — Galaxy"), "Ranks — Galaxy");
+        let long = format!("a\u{7}b\n{}", "é".repeat(300));
+        let t = super::clean_title(&long);
+        assert!(t.starts_with("abé"), "{t}");
+        assert_eq!(t.chars().count(), 200);
+    }
+
+    #[test]
+    fn m5b_final_m11_titles_lose_bidi_and_zero_width_characters() {
+        // A synced file name can't reorder the title in the Dock or taskbar.
+        let spoof = "inv\u{202E}fdp.exe\u{2066}x\u{2069}\u{200B}y\u{FEFF}z\u{200D}";
+        assert_eq!(super::clean_title(spoof), "invfdp.exexyz");
+    }
 
     #[test]
     fn app_info_reports_name_and_crate_version() {

@@ -4,6 +4,7 @@
 // folder's index note.
 import { readFileSync } from 'node:fs';
 import { expect, test, type Page } from '@playwright/test';
+import { showGlobalView } from './shell';
 import { installIpcMock } from './ipcMock';
 
 const AXE = readFileSync(new URL('../node_modules/axe-core/axe.min.js', import.meta.url), 'utf8');
@@ -25,7 +26,7 @@ async function globalView(page: Page, pages: Record<string, string> = PAGES) {
   });
   await page.goto('/');
   await page.getByRole('button', { name: /^vault/ }).click();
-  await page.getByRole('button', { name: 'Global view' }).click();
+  await showGlobalView(page);
   await expect(page.getByRole('button', { name: 'Welcome', exact: true })).toBeVisible();
   // The level is fitted in view once its cards are placed: boxes measured
   // before that move, and the move closes an open card menu (m9).

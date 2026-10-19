@@ -53,7 +53,15 @@ export class PreviewWidget extends WidgetType {
     // The widget's text starts where the widget does, so a task offset inside
     // it maps to the page by adding the widget's position.
     const toggle = (at: number) => toggleTaskIn(view, view.posAtDOM(dom) + at);
-    this.root.render(<Preview text={this.text} path={this.path} embedded onToggleTask={toggle} />);
+    // A read-only page (archived) shows its tasks, unticked by clicks (round-2 review M4).
+    this.root.render(
+      <Preview
+        text={this.text}
+        path={this.path}
+        embedded
+        onToggleTask={view.state.readOnly ? undefined : toggle}
+      />,
+    );
     return dom;
   }
 
@@ -89,8 +97,10 @@ export class CheckboxWidget extends WidgetType {
     box.tabIndex = -1;
     box.className = 'cm-nimw-checkbox';
     box.setAttribute('aria-label', this.label);
+    box.disabled = view.state.readOnly; // archived (round-2 review M4)
     box.addEventListener('mousedown', (e) => {
       e.preventDefault();
+      if (view.state.readOnly) return;
       const at = view.posAtDOM(box) + 1; // the character inside the brackets
       view.dispatch({
         changes: { from: at, to: at + 1, insert: this.checked ? ' ' : 'x' },

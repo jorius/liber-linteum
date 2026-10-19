@@ -86,7 +86,8 @@ pub struct PageLink {
     pub directed: bool,
 }
 
-/// An explorer row (EXP-01). `title` is set for pages.
+/// An explorer row (EXP-01). `title` is set for pages, `icon` for pages with
+/// a frontmatter emoji (M5b §4).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TreeNode {
     pub path: String,
@@ -94,6 +95,9 @@ pub struct TreeNode {
     pub name: String,
     pub kind: FileKind,
     pub title: Option<String>,
+    pub icon: Option<String>,
+    /// Last modified, for folders sorted by date (M5b round 2).
+    pub mtime_ns: i64,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

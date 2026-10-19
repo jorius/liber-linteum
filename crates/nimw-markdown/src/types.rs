@@ -21,6 +21,8 @@ pub struct PageMeta {
     pub has_image: bool,
     pub has_audio: bool,
     pub frontmatter_error: Option<String>,
+    /// Frontmatter `icon:`, an emoji (M5b §4); anything else is left out.
+    pub icon: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

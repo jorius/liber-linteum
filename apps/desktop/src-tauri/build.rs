@@ -3,6 +3,7 @@
 const COMMANDS: &[&str] = &[
     "app_info",
     "window_close_self",
+    "window_title_set",
     "vault_open",
     "vault_create",
     "vault_close",
@@ -69,6 +70,19 @@ const COMMANDS: &[&str] = &[
     "file_open_in_vault",
     "file_open_dialog",
     "search",
+    "folder_icon_set",
+    "folder_sort_get",
+    "folder_sort_set",
+    "vault_icon_set",
+    "bin_list",
+    "trash_restore",
+    "trash_delete",
+    "trash_empty",
+    "entry_archive",
+    "archive_restore",
+    // M5b §19: Favorites.
+    "favorites_get",
+    "favorites_set",
 ];
 
 fn main() {

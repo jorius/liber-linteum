@@ -325,3 +325,59 @@ fn m4b3_missing_outside_files_are_404() {
         404
     );
 }
+
+/// M5b round 2: the Trash view shows trashed images as thumbnails: images
+/// directly in `.trash` are served; nothing else in it, and never through a
+/// link out of it.
+#[test]
+fn m5b_r2_trashed_images_are_served_for_their_thumbnails() {
+    let vault = copy_fixture("obsidian-basic");
+    let trash = vault.path().join(".trash");
+    std::fs::create_dir_all(trash.join("Old")).unwrap();
+    std::fs::write(trash.join("map.png"), b"png!").unwrap();
+    std::fs::write(trash.join("notes.md"), "# secret").unwrap();
+    std::fs::write(trash.join("Old/inner.png"), b"png!").unwrap();
+    std::fs::write(trash.join(".hidden.png"), b"png!").unwrap();
+    let (app, _c, _k) = open(vault.path());
+    let state = app.state::<AppState>();
+    let r = serve(&state, "/.trash/map.png", None);
+    assert_eq!((r.status, r.mime), (200, "image/png"));
+    assert_eq!(r.body, b"png!");
+    for refused in [
+        "/.trash/notes.md",
+        "/.trash/Old/inner.png",
+        "/.trash/.hidden.png",
+        "/.trash/../x.png",
+    ] {
+        assert_ne!(serve(&state, refused, None).status, 200, "{refused}");
+    }
+    #[cfg(unix)]
+    {
+        std::os::unix::fs::symlink(
+            vault.path().join("Character Design/assets/rex-cover.png"),
+            trash.join("link.png"),
+        )
+        .unwrap();
+        assert_ne!(serve(&state, "/.trash/link.png", None).status, 200);
+    }
+}
+
+/// Round-2 review I1: a name holding `:` is refused — on Windows
+/// `D:photo.png` joined onto `.trash` would leave it for drive D.
+#[test]
+fn m5b_r2_review_i1_a_trashed_name_with_a_colon_is_refused() {
+    let vault = copy_fixture("obsidian-basic");
+    let trash = vault.path().join(".trash");
+    std::fs::create_dir_all(&trash).unwrap();
+    #[cfg(unix)]
+    std::fs::write(trash.join("D:photo.png"), b"png!").unwrap();
+    let (app, _c, _k) = open(vault.path());
+    let state = app.state::<AppState>();
+    for refused in [
+        "/.trash/D%3Aphoto.png",
+        "/.trash/D:photo.png",
+        "/.trash/C%3A%5Cx.png",
+    ] {
+        assert_eq!(serve(&state, refused, None).status, 403, "{refused}");
+    }
+}

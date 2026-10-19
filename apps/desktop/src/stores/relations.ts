@@ -69,8 +69,12 @@ export async function relationsOf(page: string): Promise<Relation[]> {
 
 /** Applies `edit` to `page`'s frontmatter: `saved`, `pending` (made in its
  *  live document, whose save is still retrying), or `false` when refused or
- *  failed (with a toast, except for a stale list). */
-async function editRelations(page: string, edit: Edit): Promise<'saved' | 'pending' | false> {
+ *  failed (with a toast, except for a stale list). Also how a page's icon is
+ *  set (M5b §4). */
+export async function editRelations(
+  page: string,
+  edit: Edit,
+): Promise<'saved' | 'pending' | false> {
   let stale = false;
   const guarded = (text: string): FrontmatterEdit => {
     const res = edit(text);

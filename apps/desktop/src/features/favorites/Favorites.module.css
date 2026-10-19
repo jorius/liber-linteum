@@ -1,0 +1,89 @@
+/* Favorites (M5b §19): a labelled list under the pinned Scratchpad, rows
+   styled as the explorer's. */
+.section {
+  margin: 6px 0 2px;
+}
+
+.heading {
+  margin: 0;
+  font: inherit;
+}
+
+.toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 6px 8px;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: none;
+  color: var(--color-sidebar-text);
+  font: 600 11.5px var(--font-body);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.toggle:hover {
+  background: var(--color-sidebar-active);
+}
+
+.toggle:focus-visible,
+.name:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: -2px;
+}
+
+.chevron {
+  flex: none;
+  transition: transform 120ms ease;
+}
+
+.open {
+  transform: rotate(90deg);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .chevron {
+    transition: none;
+  }
+}
+
+.list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+/* The page or folder name: the row's own button, as plain text. */
+.name {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 0;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.star {
+  color: var(--color-accent);
+}
+
+/* Where a dragged favorite lands. */
+.dropAbove {
+  box-shadow: inset 0 2px 0 var(--color-accent);
+}
+
+.dropEnd {
+  height: 2px;
+  margin: 0 8px;
+  background: var(--color-accent);
+}

@@ -10,6 +10,7 @@ export function installIpcMock({
   coverSides = {},
   outside = {},
   filePicks = [],
+  folders = [],
 }: {
   pages: Record<string, string>;
   editorMode: string;
@@ -35,6 +36,8 @@ export function installIpcMock({
   >;
   /** M4b part 3 §7: what the Attach button's file dialog picks. */
   filePicks?: { path: string; name: string; url: string; inVault: string | null }[];
+  /** M5b: folders the tree lists (besides those quick notes create). */
+  folders?: string[];
 }) {
   type Args = Record<string, unknown>;
   const w = window as unknown as Record<string, unknown>;
@@ -201,6 +204,7 @@ export function installIpcMock({
   const autoNamed = new Set<string>();
   /** Folders quick notes created (the mock's tree lists no other folders). */
   const madeFolders = new Set<string>();
+  const folderIcons: Record<string, string> = {};
   const scratchDir = () => (inScratchpad ? '' : 'Scratchpad');
   const join = (dir: string, name: string) => (dir ? `${dir}/${name}` : name);
   const freeName = (dir: string, stem: string, self?: string) => {
@@ -217,6 +221,8 @@ export function installIpcMock({
       .trim()
       .slice(0, 60)
       .trim();
+  /** M5b §5: pages moved into the vault's Trash, by their path there. */
+  const trashed: Record<string, { text: string; from: string; at: number }> = {};
   const handlers: Record<string, (a: Args, options?: unknown) => unknown> = {
     app_info: () => ({ name: 'Notes In My Way', version: '0.0.0-e2e' }),
     settings_get: () => ({ settings }),
@@ -233,6 +239,59 @@ export function installIpcMock({
       ((w.__nimwRenames ??= []) as unknown[]).push({ from, to });
       return { moved: [[from, to]], updatedFiles: [], updatedLinks: 0, failed: [] };
     },
+    // ---- M5b §5: the vault's Trash and Archive (pages only) ----
+    entry_trash: (a) => {
+      const from = a.path as string;
+      const inner = `.trash/${from.split('/').pop()}`;
+      trashed[inner] = { text: pages[from], from, at: Date.now() };
+      delete pages[from];
+      return inner;
+    },
+    trash_restore: (a) => {
+      const { text, from } = trashed[a.path as string];
+      pages[from] = text;
+      delete trashed[a.path as string];
+      return from;
+    },
+    trash_delete: (a) => {
+      for (const p of a.paths as string[]) delete trashed[p];
+      return null;
+    },
+    trash_empty: () => {
+      for (const p of Object.keys(trashed)) delete trashed[p];
+      return null;
+    },
+    entry_archive: (a) => {
+      const from = a.path as string;
+      const to = `.archive/${from}`;
+      pages[to] = pages[from];
+      delete pages[from];
+      return { moved: [[from, to]], updatedFiles: [], updatedLinks: 0, failed: [] };
+    },
+    archive_restore: (a) => {
+      const from = a.path as string;
+      const to = from.slice('.archive/'.length);
+      pages[to] = pages[from];
+      delete pages[from];
+      return { moved: [[from, to]], updatedFiles: [], updatedLinks: 0, failed: [] };
+    },
+    bin_list: () => ({
+      trash: Object.entries(trashed).map(([path, t]) => ({
+        path,
+        from: t.from,
+        at: t.at,
+        folder: false,
+        size: (t.text ?? '').length,
+      })),
+      archive: Object.keys(pages)
+        .filter((p) => p.startsWith('.archive/'))
+        .map((path) => ({
+          path,
+          from: path.slice('.archive/'.length),
+          at: 1_760_000_000_000,
+          folder: false,
+        })),
+    }),
     vaults_recent: () => [{ path: '/vault', name: 'vault', openedAt: '', missing: false }],
     vault_open: () => ({
       name: 'vault',
@@ -248,12 +307,40 @@ export function installIpcMock({
       },
     }),
     vault_tree: () => [
-      ...[...madeFolders].map((path) => ({ path, kind: 'folder' })),
-      ...Object.keys(pages).map((path) => ({
+      ...[...new Set([...folders, ...madeFolders])].map((path) => ({
         path,
-        kind: /\.md$/i.test(path) ? 'page' : 'attachment',
+        kind: 'folder',
+        ...(folderIcons[path] ? { icon: folderIcons[path] } : {}),
       })),
+      // M5b round 2: the Archive comes with the tree, as its own folder.
+      ...(Object.keys(pages).some((p) => p.startsWith('.archive/'))
+        ? [{ path: '.archive', kind: 'folder' }]
+        : []),
+      ...Object.keys(pages).map((path) => {
+        // M5b §4: a page's frontmatter emoji, as the index reads it.
+        const icon = /^---\n(?:[^\n]*\n)*?icon: (\S+)\n/.exec(pages[path] ?? '')?.[1];
+        return {
+          path,
+          kind: /\.md$/i.test(path) ? 'page' : 'attachment',
+          ...(icon ? { icon } : {}),
+        };
+      }),
     ],
+    // ---- M5b §4: folder and vault icons ----
+    folder_icon_set: (a) => {
+      if (a.icon) folderIcons[a.path as string] = a.icon as string;
+      else delete folderIcons[a.path as string];
+      return null;
+    },
+    vault_icon_set: () => null,
+    // M5b §19: kept in sessionStorage, so a reload still has them.
+    favorites_get: () =>
+      JSON.parse(sessionStorage.getItem('nimwMockFavorites') ?? '[]') as string[],
+    favorites_set: (a) => {
+      const next = (a.paths as string[]).filter((p, i, all) => all.indexOf(p) === i);
+      sessionStorage.setItem('nimwMockFavorites', JSON.stringify(next));
+      return next;
+    },
     page_get: (a) => page(a.path as string),
     page_read: (a) => ({ text: pages[a.path as string], hash: 'h' }),
     page_write: (a) => {
@@ -512,6 +599,7 @@ export function installIpcMock({
         tags?: string[];
         linksTo?: string | null;
         hasImage?: boolean;
+        archived?: boolean;
         offset?: number;
       };
       const fold = (s: string) => s.normalize('NFD').replace(/\p{M}/gu, '').toLowerCase();
@@ -530,8 +618,9 @@ export function installIpcMock({
           pages[path] ?? '',
         );
       const to = q.linksTo ? (resolveName(q.linksTo.replace(/\.md$/, '')) ?? q.linksTo) : null;
-      const matches = Object.keys(pages)
-        .filter((p) => /\.md$/i.test(p))
+      const all = Object.keys(pages).filter((p) => /\.md$/i.test(p));
+      const matches = all
+        .filter((p) => q.archived || !p.startsWith('.archive/'))
         .filter((path) => {
           const body = (pages[path] ?? '').replace(FRONT, '');
           const hay = tokens(
@@ -595,6 +684,7 @@ export function installIpcMock({
           linksFrom: null,
           hasImage: matches.filter(image).length,
           hasAudio: 0,
+          archived: all.filter((p) => p.startsWith('.archive/')).length,
         },
         recent,
         indexing: false,

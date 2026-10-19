@@ -108,6 +108,16 @@ describe('M4c single-file window', () => {
     expect(results.violations).toEqual([]);
   });
 
+  it('the file header keeps its styles after the top bar went (M5b final review I3)', async () => {
+    backend(PAGE, '# Hello\n');
+    render(<SingleFileApp />);
+    await screen.findByRole('textbox', { name: 'Page title' });
+    const header = screen.getByRole('banner');
+    expect(header.className).not.toBe('');
+    expect(header.firstElementChild!.className).not.toBe('');
+    expect(header.lastElementChild!.className).not.toBe('');
+  });
+
   it('a text file shows the text view: lines, no mode switch or subtitle', async () => {
     backend({ ...PAGE, name: 'list.txt', kind: 'text' }, 'one\ntwo\n');
     render(<SingleFileApp />);

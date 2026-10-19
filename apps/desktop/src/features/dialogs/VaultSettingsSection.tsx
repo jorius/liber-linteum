@@ -194,7 +194,7 @@ export function VaultSettingsSection() {
         <label className={styles.field}>
           <span>{t(mode === 'subfolder' ? 'vault.subfolderName' : 'vault.folderPath')}</span>
           <input
-            className={styles.hexInput}
+            className={styles.textInput}
             value={path}
             spellCheck={false}
             aria-invalid={error !== null}

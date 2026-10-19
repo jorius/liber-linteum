@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import type { IpcResult } from '../../ipc';
 import { errorMessage } from '../../stores/messages';
 import { usePageStore } from '../../stores/pageStore';
-import { nameOf, parentOf } from '../../stores/tree';
+import { isArchived, nameOf, parentOf } from '../../stores/tree';
 import { useVaultStore } from '../../stores/vaultStore';
 import { validateName } from '../explorer/nameRules';
 import styles from './PageView.module.css';
@@ -20,7 +20,7 @@ function split(path: string): { stem: string; ext: string } {
 
 /** The page title, editable in place (M2b §2): it is the file name, so Enter
  *  or leaving the field renames the file (links updated as for any rename);
- *  Escape puts the name back. It sits in the top bar (M4b §1); the note's own
+ *  Escape puts the name back. It sits at the top of the page (M5b §2.3); the note's own
  *  title, when it differs, shows in the header band (`NoteTitle`). A text
  *  file (M4b part 2 §6) shows its extension after the field; it is kept. */
 export function PageTitle({
@@ -116,6 +116,10 @@ export function PageTitle({
           aria-invalid={error !== null}
           aria-describedby={error ? errorId : undefined}
           spellCheck={false}
+          // Archived pages are read-only (M5b round 2).
+          readOnly={isArchived(path)}
+          // As wide as its text, so the heading's pill fits it (Safari 15 has no field-sizing).
+          size={Math.max(8, draft.length + 1)}
           value={draft}
           onChange={(e) => {
             setDraft(e.target.value);

@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-bin-list"
+description = "Enables the bin_list command without any pre-configured scope."
+commands.allow = ["bin_list"]
+
+[[permission]]
+identifier = "deny-bin-list"
+description = "Denies the bin_list command without any pre-configured scope."
+commands.deny = ["bin_list"]

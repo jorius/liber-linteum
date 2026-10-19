@@ -3,6 +3,10 @@
 
 use crate::fold::fold;
 use crate::index::{Index, Result};
+
+/// The vault's Archive folder (`nimw_vault::ARCHIVE_DIR`; this crate has no
+/// vault dependency).
+const ARCHIVE_DIR: &str = ".archive";
 use nimw_markdown::{LinkKind, Tag, resolve};
 use rusqlite::types::Value;
 use rusqlite::{OptionalExtension, params, params_from_iter};
@@ -40,6 +44,8 @@ pub struct SearchQuery {
     pub links_from: Option<String>,
     pub has_image: bool,
     pub has_audio: bool,
+    /// Include archived pages (M5b §5.3); they're left out otherwise.
+    pub archived: bool,
     pub offset: u32,
     /// Clamped to 1–[`MAX_LIMIT`]; 0 means [`MAX_LIMIT`].
     pub limit: u32,
@@ -85,6 +91,8 @@ pub struct Facets {
     pub links_from: Option<FacetPage>,
     pub has_image: u32,
     pub has_audio: u32,
+    /// Archived matches, whether or not they're included.
+    pub archived: u32,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -185,6 +193,7 @@ enum Dim {
     LinksFrom,
     Image,
     Audio,
+    Archived,
 }
 
 struct Filter {
@@ -329,7 +338,15 @@ impl Index {
             });
         }
 
-        let recent = text.is_none() && filters.is_empty();
+        let recent = text.is_none() && filters.is_empty() && !q.archived;
+        if !q.archived {
+            let (sql, params) = under(ARCHIVE_DIR);
+            filters.push(Filter {
+                dim: Dim::Archived,
+                sql: format!("NOT {sql}"),
+                params,
+            });
+        }
         let base = match &text {
             Some(t) => {
                 self.fill_hits(t)?;
@@ -615,7 +632,7 @@ impl Index {
         let (src, _) = self.matches_except(base, filters, Dim::Project)?;
         let mut stmt = self.conn.prepare_cached(&format!(
             "SELECT substr(m.path, 1, instr(m.path, '/') - 1) AS proj, count(*) AS n \
-             FROM {src} m WHERE instr(m.path, '/') > 0 \
+             FROM {src} m WHERE instr(m.path, '/') > 0 AND m.path NOT LIKE '.archive/%' \
              GROUP BY proj ORDER BY n DESC, proj LIMIT {TOP_PROJECTS}"
         ))?;
         facets.projects = stmt
@@ -758,6 +775,15 @@ impl Index {
             },
             None => unresolved(raw),
         });
+
+        let (src, _) = self.matches_except(base, filters, Dim::Archived)?;
+        let (_, range) = under(ARCHIVE_DIR);
+        let n: i64 = self.conn.query_row(
+            &format!("SELECT count(*) FROM {src} m WHERE m.path >= ? AND m.path < ?"),
+            params_from_iter(range.iter()),
+            |r| r.get(0),
+        )?;
+        facets.archived = n as u32;
 
         for dim in [Dim::Image, Dim::Audio] {
             let (src, _) = self.matches_except(base, filters, dim)?;

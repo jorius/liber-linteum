@@ -28,6 +28,10 @@ nimw-markdown = { path = "../../../crates/nimw-markdown" }
 
 # M4c §3: files opened from Explorer or a command line while the app runs
 # reach the running app (macOS sends them to it itself: `RunEvent::Opened`).
+# M5b final review I2: the Dock's Quit, logout and shutdown reach the windows.
+[target.'cfg(target_os = "macos")'.dependencies]
+objc2 = "0.6.5"
+
 [target.'cfg(not(target_os = "macos"))'.dependencies]
 tauri-plugin-single-instance.workspace = true
 

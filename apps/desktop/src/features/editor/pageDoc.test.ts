@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { setFileWindow } from '../../ipc';
 import { clearMocks } from '../../ipc/testing';
+import { DEFAULT_SETTINGS, useSettingsStore } from '../../stores/settingsStore';
 import { fakeDisk, hashOf } from '../../test/fakeDisk';
 import { AUTOSAVE_MS, PageDoc, type PageDocHooks } from './pageDoc';
 
@@ -74,6 +75,72 @@ describe('PageDoc autosave (ED-08, M2a §3.3)', () => {
     doc.edit('one\nTWO\n');
     await doc.flush();
     expect(disk.files.get('W.md')).toBe('one\r\nTWO\r\n');
+  });
+});
+
+describe('PageDoc with auto save off (M5b §6)', () => {
+  beforeEach(() =>
+    useSettingsStore.setState({ settings: { ...DEFAULT_SETTINGS, autoSave: false } }),
+  );
+  afterEach(() => useSettingsStore.setState({ settings: DEFAULT_SETTINGS }));
+
+  it('writes nothing while typing; says Unsaved; ⌘S (flush) writes', async () => {
+    const disk = fakeDisk({ 'A.md': 'one\n' });
+    const doc = await load('A.md');
+    doc.edit('one\ntwo');
+    await vi.advanceTimersByTimeAsync(10_000);
+    expect(disk.writes()).toEqual([]);
+    expect(doc.status).toBe('unsaved');
+    await doc.flush();
+    expect(disk.writes()).toEqual([{ path: 'A.md', text: 'one\ntwo' }]);
+    expect(doc.status).toBe('saved');
+  });
+
+  it('leaving the editor (blur) writes nothing; auto save on, it saves', async () => {
+    const disk = fakeDisk({ 'A.md': 'one\n' });
+    const doc = await load('A.md');
+    doc.edit('one\ntwo');
+    await doc.autoFlush();
+    expect(disk.writes()).toEqual([]);
+    useSettingsStore.setState({ settings: DEFAULT_SETTINGS });
+    await doc.autoFlush();
+    expect(disk.writes()).toEqual([{ path: 'A.md', text: 'one\ntwo' }]);
+  });
+
+  it('merges a change made outside in memory only', async () => {
+    const disk = fakeDisk({ 'A.md': 'one\ntwo\nthree\n' });
+    const doc = await load('A.md');
+    doc.edit('ONE\ntwo\nthree\n');
+    disk.files.set('A.md', 'one\ntwo\nTHREE\n');
+    await doc.sync();
+    await vi.advanceTimersByTimeAsync(10_000);
+    expect(doc.text).toBe('ONE\ntwo\nTHREE\n');
+    expect(disk.writes()).toEqual([]);
+    expect(doc.status).toBe('unsaved');
+  });
+
+  it('revert drops the unsaved text and shows the saved one', async () => {
+    const disk = fakeDisk({ 'A.md': 'one\n' });
+    const doc = await load('A.md');
+    const seen: string[] = [];
+    doc.sink = (t) => seen.push(t);
+    doc.edit('one\nscrap');
+    doc.revert();
+    expect(doc.text).toBe('one\n');
+    expect(doc.dirty).toBe(false);
+    expect(seen).toEqual(['one\n']);
+    await doc.flush();
+    expect(disk.writes()).toEqual([]);
+  });
+
+  it('turning auto save back on saves within the autosave delay', async () => {
+    const disk = fakeDisk({ 'A.md': 'one\n' });
+    const doc = await load('A.md');
+    doc.edit('one\ntwo');
+    useSettingsStore.setState({ settings: DEFAULT_SETTINGS });
+    doc.settle();
+    await vi.advanceTimersByTimeAsync(AUTOSAVE_MS);
+    expect(disk.writes()).toEqual([{ path: 'A.md', text: 'one\ntwo' }]);
   });
 });
 

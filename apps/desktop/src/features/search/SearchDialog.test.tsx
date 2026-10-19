@@ -7,9 +7,10 @@ import { clearMocks, mockIPC } from '../../ipc/testing';
 import { useUiStore } from '../../stores/uiStore';
 import { useVaultStore } from '../../stores/vaultStore';
 import { useGvStore } from '../global-view/gvStore';
-import { TopBar } from '../shell/TopBar';
-import { isSearchKey, useGlobalShortcuts } from '../shell/useGlobalShortcuts';
+import { ActionButton } from '../shell/ActionButton';
+import { installNoFindBar, isSearchKey, useGlobalShortcuts } from '../shell/useGlobalShortcuts';
 import { DialogHost } from '../dialogs/DialogHost';
+import { openSearch } from './searchMenu';
 import { useSearchStore } from './searchStore';
 
 const opened = vi.hoisted(() => [] as string[]);
@@ -39,6 +40,7 @@ const FACETS = {
   linksFrom: null,
   hasImage: 1,
   hasAudio: 0,
+  archived: 2,
 };
 
 let queries: SearchQuery[];
@@ -81,7 +83,7 @@ beforeEach(() => {
   reply = defaultReply;
   useSearchStore.getState().reset();
   useUiStore.setState({ dialog: null, screen: 'edit' });
-  useVaultStore.setState({ status: 'open' });
+  useVaultStore.setState({ status: 'open', nodes: [] });
   mockIPC((cmd, raw) => {
     if (cmd !== 'search') return null;
     const q = (raw as { query: SearchQuery }).query;
@@ -100,6 +102,12 @@ function openDialog() {
 const lastQuery = () => queries[queries.length - 1];
 
 describe('Search dialog (M5 §4)', () => {
+  it('shows a hit’s emoji before its title (M5b §4)', async () => {
+    useVaultStore.setState({ nodes: [{ path: 'Recent.md', kind: 'page', icon: '🚀' }] });
+    openDialog();
+    expect(await screen.findByRole('option', { name: /Recent/ })).toHaveTextContent(/🚀Recent/);
+  });
+
   it('opens with the keyboard in the field and shows Recent', async () => {
     const field = openDialog();
     expect(field).toHaveFocus();
@@ -194,11 +202,19 @@ describe('Search dialog (M5 §4)', () => {
     );
     expect(lastQuery()).toMatchObject({ linksTo: 'Lore/Smaug.md' });
     await userEvent.click(
-      within(screen.getByRole('group', { name: 'Media' })).getByRole('button', {
+      within(screen.getByRole('group', { name: 'Show' })).getByRole('button', {
         name: /Has image/,
       }),
     );
     expect(lastQuery()).toMatchObject({ tags: ['lore'], hasImage: true });
+    // M5b §5.3: archived pages only when asked for, counted either way.
+    expect(lastQuery().archived).toBe(false);
+    const archived = within(screen.getByRole('group', { name: 'Show' })).getByRole('button', {
+      name: /Archived/,
+    });
+    expect(archived).toHaveTextContent('2');
+    await userEvent.click(archived);
+    expect(lastQuery()).toMatchObject({ hasImage: true, archived: true });
   });
 
   it('active filters show as removable chips; Clear all and Backspace remove them', async () => {
@@ -314,7 +330,10 @@ describe('opening Search (M5 §4)', () => {
     expect(key({ metaKey: true, shiftKey: true, key: 'F', code: 'KeyF' })).toBe(true);
     expect(key({ ctrlKey: true, shiftKey: true, key: 'f', code: 'KeyF' })).toBe(true);
     expect(key({ metaKey: true, shiftKey: true, key: 'А', code: 'KeyF' })).toBe(true);
-    expect(key({ metaKey: true, key: 'f', code: 'KeyF' })).toBe(false);
+    // ⌘F too (M5b §7.3): there is no find-in-note to displace.
+    expect(key({ metaKey: true, key: 'f', code: 'KeyF' })).toBe(true);
+    expect(key({ ctrlKey: true, key: 'f', code: 'KeyF' })).toBe(true);
+    expect(key({ metaKey: true, key: 'g', code: 'KeyG' })).toBe(false);
     expect(key({ metaKey: true, shiftKey: true, altKey: true, key: 'f', code: 'KeyF' })).toBe(
       false,
     );
@@ -326,10 +345,70 @@ describe('opening Search (M5 §4)', () => {
     expect(useUiStore.getState().dialog).toEqual({ type: 'search' });
   });
 
-  it('the top bar has a Search button with its shortcut', async () => {
-    render(<TopBar />);
+  it('final review M12: on macOS only ⌘ counts (Ctrl+F stays forward-a-character)', () => {
+    const key = (init: KeyboardEventInit, mac: boolean) =>
+      isSearchKey(new KeyboardEvent('keydown', init), mac);
+    expect(key({ ctrlKey: true, key: 'f', code: 'KeyF' }, true)).toBe(false);
+    expect(key({ metaKey: true, key: 'f', code: 'KeyF' }, true)).toBe(true);
+    expect(key({ ctrlKey: true, key: 'f', code: 'KeyF' }, false)).toBe(true);
+  });
+
+  it('final review M12: elsewhere Ctrl+F never reaches the webview’s find bar', () => {
+    const stop = installNoFindBar(false);
+    const e = new KeyboardEvent('keydown', { ctrlKey: true, key: 'f', cancelable: true });
+    window.dispatchEvent(e);
+    expect(e.defaultPrevented).toBe(true);
+    stop();
+    const mac = installNoFindBar(true);
+    const c = new KeyboardEvent('keydown', { ctrlKey: true, key: 'f', cancelable: true });
+    window.dispatchEvent(c);
+    expect(c.defaultPrevented).toBe(false);
+    mac();
+  });
+
+  it('⌘F in the editor opens Search with a short one-line selection as its text (M5b §7.3)', () => {
+    useVaultStore.setState({ status: 'open' });
+    render(
+      <>
+        <Shortcuts />
+        <div className="cm-content" contentEditable suppressContentEditableWarning>
+          The red wyrm sleeps
+        </div>
+      </>,
+    );
+    const content = document.querySelector<HTMLElement>('.cm-content')!;
+    const select = (from: number, to: number) => {
+      const range = document.createRange();
+      range.setStart(content.firstChild!, from);
+      range.setEnd(content.firstChild!, to);
+      document.getSelection()!.removeAllRanges();
+      document.getSelection()!.addRange(range);
+    };
+    content.focus();
+    select(8, 12);
+    fireEvent.keyDown(content, { metaKey: true, key: 'f', code: 'KeyF' });
+    expect(useUiStore.getState().dialog).toEqual({ type: 'search' });
+    expect(useSearchStore.getState().text).toBe('wyrm');
+  });
+
+  it('a second open while Search shows (menu and page both answering ⌘F) keeps it as it is', () => {
+    useVaultStore.setState({ status: 'open' });
+    openSearch();
+    useSearchStore.getState().setText('typed');
+    openSearch();
+    expect(useSearchStore.getState().text).toBe('typed');
+    expect(useUiStore.getState().dialog).toEqual({ type: 'search' });
+    // Nor does it replace another dialog (the menu's ⌘F over Settings).
+    useUiStore.getState().openDialog({ type: 'settings' });
+    openSearch();
+    expect(useUiStore.getState().dialog).toEqual({ type: 'settings' });
+  });
+
+  it('the floating button has Search with its shortcut (M5b §2.2)', async () => {
+    render(<ActionButton />);
+    await userEvent.click(screen.getByRole('button', { name: 'Actions' }));
     const button = screen.getByRole('button', { name: 'Search' });
-    expect(button).toHaveAttribute('aria-keyshortcuts', 'Meta+Shift+F Control+Shift+F');
+    expect(button).toHaveAttribute('aria-keyshortcuts', 'Meta+F Control+F');
     await userEvent.click(button);
     expect(useUiStore.getState().dialog).toEqual({ type: 'search' });
   });

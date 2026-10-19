@@ -447,3 +447,51 @@ fn cover_sides_and_widths_follow_in_app_renames_and_folder_moves() {
         vec![("Hello.md".to_string(), 320)]
     );
 }
+
+/// M5b §4: a folder's icon follows an in-app rename.
+#[test]
+fn m5b_folder_icons_follow_renames() {
+    let (_dir, _c, s) = session("obsidian-basic");
+    s.vault()
+        .set_folder_icon("Game Design", Some("🎮"))
+        .unwrap();
+    s.rename(&vp("Game Design"), &vp("Design"), true).unwrap();
+    assert_eq!(
+        s.vault().folder_icons().into_iter().collect::<Vec<_>>(),
+        vec![("Design".to_string(), "🎮".to_string())]
+    );
+}
+
+/// Round-2 review M1 (ruling, spec §17): link maintenance is exempt from the
+/// read-only Archive — renaming a live page rewrites links inside archived
+/// pages too, so they keep working once unarchived.
+#[test]
+fn m5b_r2_review_m1_a_rename_rewrites_links_inside_archived_pages() {
+    let vault = copy_fixture("obsidian-basic");
+    std::fs::create_dir_all(vault.path().join(".archive")).unwrap();
+    std::fs::write(
+        vault.path().join(".archive/Old notes.md"),
+        "See [[Sparda]].\n",
+    )
+    .unwrap();
+    let cache = tempfile::tempdir().unwrap();
+    let (s, _) = VaultSession::open(vault.path(), cache.path(), |_: SessionEvent| {}).unwrap();
+    let out = s
+        .rename(
+            &vp("Character Design/DMC/Sparda.md"),
+            &vp("Character Design/DMC/Sparda the Dark Knight.md"),
+            true,
+        )
+        .unwrap();
+    assert!(
+        out.updated_files
+            .iter()
+            .any(|f| f == ".archive/Old notes.md"),
+        "{:?}",
+        out.updated_files
+    );
+    assert_eq!(
+        read(&vault, ".archive/Old notes.md"),
+        "See [[Sparda the Dark Knight]].\n"
+    );
+}

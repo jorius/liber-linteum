@@ -1,22 +1,27 @@
 pub mod asset;
 pub mod attachment_commands;
+pub mod bin_commands;
 pub mod commands;
 pub mod drops;
 pub mod dto;
 pub mod editor_commands;
 pub mod error;
 pub mod external_commands;
+pub mod favorite_commands;
 pub mod file_commands;
 pub mod file_windows;
 pub mod fonts;
 pub mod gv_commands;
+pub mod icon_commands;
 pub mod menu;
 pub mod navigation;
 pub mod opening;
+pub mod quit_guard;
 pub mod scratchpad_commands;
 pub mod search_commands;
 pub mod settings;
 pub mod settings_commands;
+pub mod sort_commands;
 pub mod state;
 pub mod vault_commands;
 
@@ -102,7 +107,14 @@ pub fn configure<R: tauri::Runtime>(
     builder.invoke_handler(tauri::generate_handler![
         commands::app_info,
         commands::window_close_self,
+        commands::window_title_set,
         vault_commands::vault_open,
+        bin_commands::bin_list,
+        bin_commands::trash_restore,
+        bin_commands::trash_delete,
+        bin_commands::trash_empty,
+        bin_commands::entry_archive,
+        bin_commands::archive_restore,
         vault_commands::vault_create,
         vault_commands::vault_close,
         vault_commands::vault_tree,
@@ -168,6 +180,12 @@ pub fn configure<R: tauri::Runtime>(
         file_commands::file_open_in_vault,
         file_commands::file_open_dialog,
         search_commands::search,
+        icon_commands::folder_icon_set,
+        sort_commands::folder_sort_get,
+        sort_commands::folder_sort_set,
+        icon_commands::vault_icon_set,
+        favorite_commands::favorites_get,
+        favorite_commands::favorites_set,
     ])
 }
 
@@ -188,6 +206,7 @@ pub fn run() {
         .run(|app, event| match event {
             // Files named on the command line that started the app.
             tauri::RunEvent::Ready => {
+                quit_guard::install(app);
                 let args: Vec<std::ffi::OsString> = std::env::args_os().skip(1).collect();
                 let cwd = std::env::current_dir().unwrap_or_default();
                 opening::open_later(app, opening::paths_from_args(&args, &cwd));

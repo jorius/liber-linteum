@@ -49,6 +49,7 @@
   --color-surface-veil: rgba(255, 255, 255, 0.88);
   --color-danger: #b42318;
   --color-danger-contrast: #ffffff;
+  --color-success: #157123;
   --color-warn-bg: #fff1e3;
   --color-warn-border: #efc49c;
   --color-warn-text: #7a330b;
@@ -132,6 +133,7 @@
     --color-surface-veil: rgba(31, 29, 38, 0.88);
     --color-danger: #ff9d92;
     --color-danger-contrast: #1b1426;
+    --color-success: #7acf7e;
     --palette-red: #ff9d92;
     --palette-red-bg: #4a1f1c;
     --palette-orange: #ffb877;
@@ -198,6 +200,7 @@
   --color-surface-veil: rgba(31, 29, 38, 0.88);
   --color-danger: #ff9d92;
   --color-danger-contrast: #1b1426;
+  --color-success: #7acf7e;
   --palette-red: #ff9d92;
   --palette-red-bg: #4a1f1c;
   --palette-orange: #ffb877;

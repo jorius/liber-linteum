@@ -2,6 +2,7 @@
 // its own, outside any vault. The editor store edits it as it edits a page;
 // the IPC layer sends the page commands to the window's own file.
 import { create } from 'zustand';
+import { confirmUnsaved, needsUnsavedPrompt } from '../editor/unsavedPrompt';
 import {
   destroyWindow,
   fileInfo,
@@ -86,6 +87,8 @@ export const useSingleFileStore = create<SingleFileState>((set, get) => ({
     }
   },
   openInVault: async () => {
+    // Auto save off (M5b §6): Save / Don't Save / Cancel first.
+    if (needsUnsavedPrompt() && !(await confirmUnsaved())) return;
     set({ handingOff: true });
     const unsaved = await useEditorStore.getState().saveAll(QUIT_FLUSH_MS);
     if (unsaved.length) {

@@ -55,7 +55,7 @@ export function ScratchFolderSetting() {
       <label className={dialogs.field}>
         <span>{t('scratchpad.folderSetting')}</span>
         <input
-          className={dialogs.hexInput}
+          className={dialogs.textInput}
           value={value}
           spellCheck={false}
           aria-invalid={error !== null}

@@ -53,15 +53,15 @@ function FileTopBar({ info }: { info: FileInfo }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [doc, hash]);
   return (
-    <header className={shell.topbar}>
-      <div className={shell.heading}>
+    <header className={styles.topbar}>
+      <div className={styles.heading}>
         <PageTitle path={info.name} rename={(to) => useSingleFileStore.getState().rename(to)} />
         {info.kind === 'page' && doc && (
           <PageSubtitle page={pageWith(info.name, subtitle)} editable />
         )}
       </div>
       <div />
-      <div className={shell.tright}>
+      <div className={styles.tright}>
         <button
           type="button"
           className={shell.iconButtonLight}
@@ -183,6 +183,7 @@ function FileView({ info }: { info: FileInfo }) {
                   <span
                     role="status"
                     aria-label={t('editor.saveStatus')}
+                    data-status={status}
                     className={`${page.status} ${page.pill}`}
                   >
                     {t(`editor.${status}`)}

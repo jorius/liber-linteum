@@ -1,11 +1,22 @@
-import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react';
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type FocusEvent,
+  type KeyboardEvent,
+  type MouseEvent,
+} from 'react';
 import { useTranslation } from 'react-i18next';
 import type { TreeNode } from '../../ipc';
 import { usePageStore } from '../../stores/pageStore';
 import { useTrailStore } from '../../stores/trailStore';
-import { joinPath, parentOf, remap } from '../../stores/tree';
+import { isArchived, joinPath, parentOf, remap } from '../../stores/tree';
 import { useVaultStore } from '../../stores/vaultStore';
+import { useUiStore } from '../../stores/uiStore';
 import { useScratchpadStore } from '../scratchpad/scratchpadStore';
+import { FavoritesSection } from '../favorites/FavoritesSection';
+import { shownFavorites, useFavoritesStore } from '../favorites/favoritesStore';
 import styles from './Explorer.module.css';
 import { displayName, keptExtension, TreeRow } from './TreeRow';
 import { isTextPath } from '../../stores/textFiles';
@@ -16,11 +27,14 @@ export interface Row {
 }
 
 /** Rows of the root and of expanded folders only (others are not rendered).
- *  `pinned`: the vault's scratch folder, first at the root (M4c §7.2). */
+ *  `pinned`: the vault's scratch folder, first at the root (M4c §7.2).
+ *  `root`: the folder whose contents are listed; the vault's tree leaves the
+ *  Archive out, which the sidebar's foot lists itself (M5b round 2). */
 export function visibleRows(
   children: Map<string, TreeNode[]>,
   expanded: Set<string>,
   pinned: string | null = null,
+  root = '',
 ): Row[] {
   const out: Row[] = [];
   const pin = (list: TreeNode[]) => {
@@ -29,12 +43,12 @@ export function visibleRows(
   };
   const walk = (parent: string, level: number) => {
     const list = children.get(parent) ?? [];
-    for (const node of parent ? list : pin(list)) {
+    for (const node of parent ? list : pin(list.filter((n) => !isArchived(n.path)))) {
       out.push({ node, level });
       if (node.kind === 'folder' && expanded.has(node.path)) walk(node.path, level + 1);
     }
   };
-  walk('', 1);
+  walk(root, 1);
   return out;
 }
 
@@ -45,6 +59,8 @@ export interface ExplorerTreeProps {
   dropTarget?: string | null;
   /** A drag is in progress: arrow keys belong to the drag, not the tree. */
   dragging?: boolean;
+  /** Lists this folder's contents instead of the vault's: the Archive, read-only. */
+  root?: string;
 }
 
 /** ARIA tree (one Tab stop, roving focus, arrow keys, type-ahead, inline rename). */
@@ -53,7 +69,9 @@ export function ExplorerTree({
   onRequestMenu,
   dropTarget,
   dragging,
+  root = '',
 }: ExplorerTreeProps) {
+  const archive = isArchived(root);
   const { t } = useTranslation();
   const children = useVaultStore((s) => s.children);
   const expanded = useVaultStore((s) => s.expanded);
@@ -63,8 +81,8 @@ export function ExplorerTree({
   const scratch = useScratchpadStore((s) => s.folder);
   const nodes = useVaultStore((s) => s.nodes);
   const rows = useMemo(
-    () => visibleRows(children, expanded, scratch),
-    [children, expanded, scratch],
+    () => visibleRows(children, expanded, archive ? null : scratch, root),
+    [children, expanded, scratch, archive, root],
   );
   // The pinned folder's note count, and the first root row after it.
   const pinned = scratch !== null && rows[0]?.node.path === scratch;
@@ -76,6 +94,12 @@ export function ExplorerTree({
     [nodes, scratch],
   );
   const divider = pinned ? rows.findIndex((r, i) => i > 0 && r.level === 1) : -1;
+  // Favorites (M5b §19) sit under the pinned Scratchpad (or first): the tree
+  // splits in two around them, one Tab stop and one arrow-key order still.
+  const hasFavorites = useFavoritesStore((s) => shownFavorites(s.paths, nodes).length > 0);
+  // The Archive's own tree (M5b round 2) has no Favorites.
+  const favorites = !archive && hasFavorites;
+  const split = !favorites || !pinned ? 0 : divider > 0 ? divider : rows.length;
   const [focused, setFocused] = useState<string | null>(null);
   const refs = useRef(new Map<string, HTMLLIElement>());
 
@@ -128,6 +152,9 @@ export function ExplorerTree({
       // Pages, and text and code files in the text view (M4b part 2 §6).
       // Opening from the explorer starts a fresh link trail (M2b §3).
       useTrailStore.getState().reset();
+      // The Trash view takes the editor's place (M5b §5).
+      const ui = useUiStore.getState();
+      if (ui.screen === 'trash') ui.setScreen('edit');
       void usePageStore.getState().load(node.path);
     }
   };
@@ -183,7 +210,7 @@ export function ExplorerTree({
         activate(row.node);
         break;
       case 'F2':
-        vault.startRename(row.node.path);
+        if (!archive) vault.startRename(row.node.path);
         break;
       case 'Delete':
       case 'Backspace':
@@ -212,62 +239,80 @@ export function ExplorerTree({
     e.preventDefault();
   };
 
+  const tree = {
+    onFocus: () => {
+      hadFocus.current = true;
+    },
+    onBlur: (e: FocusEvent<HTMLUListElement>) => {
+      // Focus moving to another element outside the tree ends "tree has focus";
+      // a removed row blurs with no related target, which keeps it.
+      if (e.relatedTarget && !e.currentTarget.contains(e.relatedTarget as Node)) {
+        hadFocus.current = false;
+      }
+    },
+    role: 'tree',
+    className: styles.tree,
+    onKeyDown,
+    onContextMenu: (e: MouseEvent<HTMLUListElement>) => {
+      const li = (e.target as HTMLElement).closest('li[data-path]');
+      const path = li?.getAttribute('data-path');
+      if (path && onRequestMenu) {
+        e.preventDefault();
+        setFocused(path);
+        onRequestMenu(path, { x: e.clientX, y: e.clientY });
+      }
+    },
+  };
+
+  const renderRow = ({ node, level }: (typeof rows)[number], i: number) => (
+    <TreeRow
+      pinnedCount={pinned && i === 0 ? notes : undefined}
+      divider={i === divider}
+      key={node.path}
+      ref={(el) => {
+        if (el) refs.current.set(node.path, el);
+        else refs.current.delete(node.path);
+      }}
+      node={node}
+      level={level}
+      expanded={expanded.has(node.path)}
+      selected={selected === node.path}
+      focused={focusPath === node.path}
+      renaming={renaming === node.path}
+      dropTarget={dropTarget === node.path}
+      onActivate={activate}
+      onFocusRow={setFocused}
+      onCommitRename={commitRename}
+      onCancelRename={cancelRename}
+      onMenu={
+        onRequestMenu
+          ? (path, anchor) => {
+              setFocused(path);
+              onRequestMenu(path, anchor);
+            }
+          : undefined
+      }
+    />
+  );
+
+  if (!favorites) {
+    return (
+      <ul {...tree} aria-label={archive ? t('bin.archived') : t('explorer.tree')}>
+        {rows.map(renderRow)}
+      </ul>
+    );
+  }
   return (
-    <ul
-      onFocus={() => {
-        hadFocus.current = true;
-      }}
-      onBlur={(e) => {
-        // Focus moving to another element outside the tree ends "tree has focus";
-        // a removed row blurs with no related target, which keeps it.
-        if (e.relatedTarget && !e.currentTarget.contains(e.relatedTarget as Node)) {
-          hadFocus.current = false;
-        }
-      }}
-      role="tree"
-      aria-label={t('explorer.tree')}
-      className={styles.tree}
-      onKeyDown={onKeyDown}
-      onContextMenu={(e) => {
-        const li = (e.target as HTMLElement).closest('li[data-path]');
-        const path = li?.getAttribute('data-path');
-        if (path && onRequestMenu) {
-          e.preventDefault();
-          setFocused(path);
-          onRequestMenu(path, { x: e.clientX, y: e.clientY });
-        }
-      }}
-    >
-      {rows.map(({ node, level }, i) => (
-        <TreeRow
-          pinnedCount={pinned && i === 0 ? notes : undefined}
-          divider={i === divider}
-          key={node.path}
-          ref={(el) => {
-            if (el) refs.current.set(node.path, el);
-            else refs.current.delete(node.path);
-          }}
-          node={node}
-          level={level}
-          expanded={expanded.has(node.path)}
-          selected={selected === node.path}
-          focused={focusPath === node.path}
-          renaming={renaming === node.path}
-          dropTarget={dropTarget === node.path}
-          onActivate={activate}
-          onFocusRow={setFocused}
-          onCommitRename={commitRename}
-          onCancelRename={cancelRename}
-          onMenu={
-            onRequestMenu
-              ? (path, anchor) => {
-                  setFocused(path);
-                  onRequestMenu(path, anchor);
-                }
-              : undefined
-          }
-        />
-      ))}
-    </ul>
+    <>
+      {split > 0 && (
+        <ul {...tree} aria-label={t('favorites.scratchTree')}>
+          {rows.slice(0, split).map(renderRow)}
+        </ul>
+      )}
+      <FavoritesSection onRequestMenu={onRequestMenu} />
+      <ul {...tree} aria-label={t('explorer.tree')}>
+        {rows.slice(split).map((row, i) => renderRow(row, i + split))}
+      </ul>
+    </>
   );
 }

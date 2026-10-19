@@ -72,14 +72,16 @@ const saved = (page: Page) =>
     () => (window as unknown as { __nimwCoverHeights?: unknown[] }).__nimwCoverHeights ?? [],
   );
 
-/** The first row (breadcrumb) hugs the band's top, the second (link counts)
- *  its bottom, whatever the height. */
+/** The first row (the title, then the breadcrumb under it) hugs the band's
+ *  top, the last (link counts) its bottom, whatever the height. */
 async function rowsPinned(page: Page) {
   const b = (await band(page).boundingBox())!;
-  const top = (await band(page).getByRole('navigation', { name: 'Breadcrumb' }).boundingBox())!;
+  const top = (await band(page).getByRole('textbox', { name: 'Page title' }).boundingBox())!;
+  const crumbs = (await band(page).getByRole('navigation', { name: 'Breadcrumb' }).boundingBox())!;
   const foot = (await band(page).getByText('0 links · 0 backlinks').boundingBox())!;
   expect(top.y - b.y).toBeGreaterThanOrEqual(0);
   expect(top.y - b.y).toBeLessThan(24);
+  expect(crumbs.y).toBeGreaterThan(top.y + top.height);
   expect(b.y + b.height - (foot.y + foot.height)).toBeGreaterThanOrEqual(0);
   expect(b.y + b.height - (foot.y + foot.height)).toBeLessThan(24);
 }

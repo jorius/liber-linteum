@@ -4,13 +4,16 @@ import { FormatIcon, OutlineIcon } from '../../app/icons';
 import type { EditorMode, Page } from '../../ipc';
 import { useEditorStore } from '../../stores/editorStore';
 import { useSettingsStore } from '../../stores/settingsStore';
+import { FavoriteToggle } from '../favorites/FavoriteToggle';
 import { BackArrow } from './BackArrow';
 import { Breadcrumb } from './Breadcrumb';
 import { Cover } from './Cover';
 import { ModeToggle } from './ModeToggle';
 import { NoteTitle } from './NoteTitle';
+import { PageHeading } from './PageHeading';
 import { RelatedChips } from './RelatedChips';
 import { WidthMenu } from './WidthMenu';
+import { isArchived } from '../../stores/tree';
 import { WordCount } from './WordCount';
 import styles from './PageView.module.css';
 
@@ -18,7 +21,7 @@ import styles from './PageView.module.css';
  *  the save status, Format and the mode switch; second row, tags, link
  *  counts and the note's own title, with the cover's controls at the right.
  *  With a cover the rows sit on it in veiled pills. The title and subtitle
- *  are in the top bar. */
+ *  head the band, above the breadcrumb (on the cover when there is one). */
 export function PageHeader({
   page,
   mode,
@@ -36,11 +39,17 @@ export function PageHeader({
   const large = useEditorStore((s) => s.large);
   const toolbar = useSettingsStore((s) => s.settings.toolbar);
   const outline = useSettingsStore((s) => s.settings.outline);
-  const editable = useEditorStore((s) => s.doc !== null && s.path === page.path);
+  // Archived pages are read-only (M5b round 2).
+  const archived = isArchived(page.path);
+  const editable = useEditorStore((s) => s.doc !== null && s.path === page.path) && !archived;
   return (
     <Cover page={page} editable={editable} body={children}>
       {({ addCover, controls }) => (
         <>
+          {/* The title and subtitle, on the cover above the breadcrumb (Jose, M5b). */}
+          <div className={`${styles.heading} ${styles.pill}`}>
+            <PageHeading />
+          </div>
           <div className={styles.bar}>
             <div className={`${styles.where} ${styles.pill}`}>
               <BackArrow />
@@ -52,6 +61,7 @@ export function PageHeader({
                 <span
                   role="status"
                   aria-label={t('editor.saveStatus')}
+                  data-status={status}
                   className={`${styles.status} ${styles.pill}`}
                 >
                   {copying ? t('editor.copying') : t(`editor.${status}`)}
@@ -71,7 +81,7 @@ export function PageHeader({
                   <span aria-hidden="true">{t('toolbar.short')}</span>
                 </button>
               )}
-              {hasDoc && <WidthMenu path={page.path} />}
+              {hasDoc && !archived && <WidthMenu path={page.path} />}
               {hasDoc && (
                 <button
                   type="button"
@@ -84,6 +94,7 @@ export function PageHeader({
                   <OutlineIcon />
                 </button>
               )}
+              {!archived && <FavoriteToggle path={page.path} />}
               <ModeToggle mode={mode} />
             </div>
           </div>

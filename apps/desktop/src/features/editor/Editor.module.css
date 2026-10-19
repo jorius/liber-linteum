@@ -54,8 +54,8 @@
 /* Wide elements (M4b part 3): on a `wide` page the kinds named on the host
    (data-wide-*) escape the measure. Editor.tsx measures how far past the
    text they may reach: --nimw-wide-m on both sides, then --nimw-wide-r on
-   the right (with line numbers beside the measure there is no room on the
-   left: m is 0). A rendered block is a frame reaching m past the text on
+   the right (the two match since M5b §7.2 moved the line numbers to the
+   editor's edge). A rendered block is a frame reaching m past the text on
    both sides, and its content is centred in it by auto margins: a block
    that fits the text stays aligned with it, a wider one grows evenly, and
    one wider than the frame keeps its left edge and grows right, up to r
@@ -86,6 +86,27 @@
 .live[data-wide-diagrams] :global(.cm-nimw-widget[data-wide-kind='diagrams'] > *) {
   flex: 1 1 auto;
   min-width: 0;
+}
+
+/* A table wider than the measure takes the whole frame (M5b §7.2): from the
+   editor's left padding to its right one, its columns sharing the room.
+   TableScroll marks its frame (data-wide-full) once it measures wider than
+   the text. */
+.live[data-wide-tables] :global(.cm-nimw-widget[data-wide-kind='tables'][data-wide-full] > *) {
+  width: 100%;
+  max-width: 100%;
+}
+
+.live[data-wide-tables] :global(.cm-nimw-widget[data-wide-kind='tables'][data-wide-full] table) {
+  width: 100%;
+}
+
+/* On a Wide-elements page the text's auto margins take all the free room,
+   so the line numbers sit at the editor's left edge, where a full-width
+   block never covers them, and the room beside the text is even on both
+   sides (M5b §7.2, replacing wide §6.6). */
+.live[data-width='wide'] :global(.cm-content) {
+  margin: 0 auto;
 }
 
 /* Code, and a table, maths or diagram being edited: its lines share one
@@ -119,7 +140,8 @@
   /* The block gutter (M4 §4) is placed in the pane's scroll coordinates. */
   position: relative;
   overflow: auto;
-  padding: 20px 28px;
+  /* Room under the last line for the floating button (M5b final review I4). */
+  padding: 20px 28px 88px;
 }
 
 /* Editor frame: optional toolbar above the editor (M2b §6). */

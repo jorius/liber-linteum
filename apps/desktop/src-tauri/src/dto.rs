@@ -37,6 +37,9 @@ pub struct VaultInfo {
     pub report: IndexReportDto,
     /// The global Scratchpad (M4c §2).
     pub scratchpad: bool,
+    /// The vault's emoji (M5b §4).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub icon: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -44,6 +47,9 @@ pub struct TreeNodeDto {
     pub path: String,
     /// `"page" | "folder" | "attachment"`.
     pub kind: &'static str,
+    /// A page's frontmatter emoji or a folder's (M5b §4).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub icon: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize)]

@@ -9,6 +9,7 @@ import {
   textWrite,
   type IpcResult,
 } from '../../ipc';
+import { useSettingsStore } from '../../stores/settingsStore';
 import { isTextPath } from '../../stores/textFiles';
 import { nameOf, parentOf } from '../../stores/tree';
 import { detectEol, fromLf, toLf, type Eol } from './eol';
@@ -20,8 +21,12 @@ export const AUTOSAVE_MS = 500;
 export const RETRY_MIN_MS = 1000;
 export const RETRY_MAX_MS = 30_000;
 
-/** `notSaved`: kept, but not being saved (see `PageDoc.unwritable`). */
-export type SaveStatus = 'saved' | 'saving' | 'retrying' | 'notSaved';
+/** `notSaved`: kept, but not being saved (see `PageDoc.unwritable`);
+ *  `unsaved`: edited, waiting for ⌘S (auto save off, M5b §6). */
+export type SaveStatus = 'saved' | 'saving' | 'retrying' | 'notSaved' | 'unsaved';
+
+/** Pages save themselves as you type unless the user turned it off (M5b §6). */
+const autoSave = () => useSettingsStore.getState().settings.autoSave !== false;
 
 /** Why a document's text can't be saved to its file (final review I3):
  *  - `disk`: the file was rewritten outside as something the app can't edit
@@ -113,7 +118,9 @@ export class PageDoc {
   get status(): SaveStatus {
     if (this.failing) return 'retrying';
     if (this.unwritable && this.dirty) return 'notSaved';
-    return this.writing || this.dirty ? 'saving' : 'saved';
+    if (this.writing) return 'saving';
+    if (!this.dirty) return 'saved';
+    return autoSave() ? 'saving' : 'unsaved';
   }
 
   /** The editor's text changed. */
@@ -123,7 +130,7 @@ export class PageDoc {
     this.text = text;
     const fits = this.unwritable === 'text' && fitsTextFile(fromLf(text, this.eol));
     if (fits) this.unwritable = null;
-    if (!this.orphaned && !this.unwritable) this.schedule(AUTOSAVE_MS);
+    if (!this.orphaned && !this.unwritable && autoSave()) this.schedule(AUTOSAVE_MS);
     if (wasDirty !== this.dirty || fits) this.hooks.onChange(this);
   }
 
@@ -131,6 +138,12 @@ export class PageDoc {
   flush(): Promise<void> {
     this.cancelTimer();
     return this.enqueue(() => this.save());
+  }
+
+  /** Saves now only when auto save is on (the editor losing focus, M2a
+   *  §3.3); with it off nothing is written until ⌘S (M5b §6). */
+  autoFlush(): Promise<void> {
+    return autoSave() ? this.flush() : Promise.resolve();
   }
 
   /** The file changed on disk: reload or merge (M2a §3.3). */
@@ -194,6 +207,22 @@ export class PageDoc {
     return created;
   }
 
+  /** Don't Save (M5b §6): back to the last saved text; nothing is written. */
+  revert(): void {
+    this.cancelTimer();
+    this.replace(this.base);
+    this.hooks.onChange(this);
+  }
+
+  /** Auto save was turned on or off: unsaved text saves soon, or waits. */
+  settle(): void {
+    this.cancelTimer();
+    if (autoSave() && this.dirty && !this.orphaned && !this.unwritable && !this.failing) {
+      this.schedule(AUTOSAVE_MS);
+    }
+    this.hooks.onChange(this);
+  }
+
   dispose(): void {
     this.cancelTimer();
     this.sink = null;
@@ -217,7 +246,7 @@ export class PageDoc {
   /** Saves soon if there is anything unsaved (a new path, the file is back). */
   private resume(): void {
     this.retryDelay = 0;
-    if (this.dirty) this.schedule(0);
+    if (this.dirty && autoSave()) this.schedule(0);
     this.hooks.onChange(this);
   }
 
@@ -245,7 +274,7 @@ export class PageDoc {
       this.hash = res.value.hash;
       this.failing = false;
       this.retryDelay = 0;
-      if (this.dirty) this.schedule(AUTOSAVE_MS); // typed while saving
+      if (this.dirty && autoSave()) this.schedule(AUTOSAVE_MS); // typed while saving
     } else if (res.error.kind === 'conflict' && res.error.currentText !== undefined) {
       await this.reconcile(res.error.currentText, res.error.currentHash ?? '');
     } else if (notText(res.error.kind)) {
@@ -296,7 +325,7 @@ export class PageDoc {
       this.hash = hash;
       this.hooks.onConflictCopy(this, copy.value);
     }
-    if (this.dirty) this.schedule(0);
+    if (this.dirty && autoSave()) this.schedule(0);
     this.hooks.onChange(this);
   }
 

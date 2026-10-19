@@ -1,6 +1,6 @@
 //! M5: the search index (`page_text` + FTS5) and the search query.
 
-use nimw_index::{FileKind, FileRow, Index, SCHEMA_VERSION};
+use nimw_index::{FileKind, FileRow, Index};
 use nimw_markdown::parse_page;
 use std::path::{Path, PathBuf};
 
@@ -85,11 +85,6 @@ fn fts_paths(db: &Path, q: &str) -> Vec<String> {
 }
 
 // ---- Task 2: the index keeps page_text and fts in sync ----
-
-#[test]
-fn m5_schema_is_3() {
-    assert_eq!(SCHEMA_VERSION, 3);
-}
 
 #[test]
 fn m5_pages_are_searchable_by_every_column() {
@@ -949,4 +944,30 @@ fn m5_review_m7_a_late_match_in_a_long_note() {
     assert!(text.contains("w4999  the WYRM w0"), "{text:?}");
     let n = text.split_whitespace().count();
     assert!((8..=16).contains(&n), "{text:?}");
+}
+
+/// M5b §5.3: archived pages are left out of search unless asked for; the
+/// facet counts them either way, and the Archive is never a project.
+#[test]
+fn m5b_archived_pages_only_with_the_archived_chip() {
+    let mut f = Fixture::new();
+    f.page("P/dragon.md", "# Dragon\n\nfire");
+    f.page(".archive/P/old dragon.md", "# Old dragon\n\nfire");
+    let mut q = text_query("dragon");
+    let page = f.ix.search(&q).unwrap();
+    assert_eq!(paths(&page), strs(&["P/dragon.md"]));
+    assert_eq!(page.facets.archived, 1);
+    assert!(page.facets.projects.iter().all(|p| p.value != ".archive"));
+    q.archived = true;
+    let page = f.ix.search(&q).unwrap();
+    assert_eq!(
+        sorted(paths(&page)),
+        strs(&[".archive/P/old dragon.md", "P/dragon.md"])
+    );
+    assert_eq!(page.facets.archived, 1);
+    assert!(page.facets.projects.iter().all(|p| p.value != ".archive"));
+    // Recent leaves them out too.
+    let recent = f.ix.search(&SearchQuery::default()).unwrap();
+    assert!(recent.recent);
+    assert_eq!(paths(&recent), strs(&["P/dragon.md"]));
 }

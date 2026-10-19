@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-entry-archive"
+description = "Enables the entry_archive command without any pre-configured scope."
+commands.allow = ["entry_archive"]
+
+[[permission]]
+identifier = "deny-entry-archive"
+description = "Denies the entry_archive command without any pre-configured scope."
+commands.deny = ["entry_archive"]

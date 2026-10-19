@@ -512,6 +512,50 @@ fn m4b3_show_attachment_paths_default_persist_and_reset() {
     assert!(warning.unwrap().contains("showAttachmentPaths"));
 }
 
+/// M5b §2.2, §2.5, §6: auto save (on), the sidebar's collapsed state (off)
+/// and the floating button's place (bottom right) persist, and a wrong value
+/// resets only its own field.
+#[test]
+fn m5b_auto_save_sidebar_and_action_button_default_persist_and_reset() {
+    use nimw_desktop::settings::ActionButton;
+    let dir = tempfile::tempdir().unwrap();
+    let s = store(dir.path());
+    let d = s.get().0;
+    assert!(d.auto_save);
+    assert!(!d.sidebar_collapsed);
+    assert_eq!(d.action_button, ActionButton::BottomRight);
+    s.update(SettingsPatch {
+        auto_save: Some(false),
+        sidebar_collapsed: Some(true),
+        action_button: Some(ActionButton::TopRight),
+        ..Default::default()
+    })
+    .unwrap();
+    let saved: serde_json::Value =
+        serde_json::from_str(&std::fs::read_to_string(dir.path().join("settings.json")).unwrap())
+            .unwrap();
+    assert_eq!(saved["autoSave"], false);
+    assert_eq!(saved["sidebarCollapsed"], true);
+    assert_eq!(saved["actionButton"], "topRight");
+    let back = store(dir.path()).get().0;
+    assert!(!back.auto_save && back.sidebar_collapsed);
+    assert_eq!(back.action_button, ActionButton::TopRight);
+    std::fs::write(
+        dir.path().join("settings.json"),
+        r#"{"autoSave":"no","actionButton":"middle","sidebarCollapsed":true}"#,
+    )
+    .unwrap();
+    let (s, warning) = store(dir.path()).get();
+    assert!(s.auto_save);
+    assert_eq!(s.action_button, ActionButton::BottomRight);
+    assert!(s.sidebar_collapsed);
+    let warning = warning.unwrap();
+    assert!(
+        warning.contains("autoSave") && warning.contains("actionButton"),
+        "{warning}"
+    );
+}
+
 /// Cover resize: the default cover height for pages without their own,
 /// 200 px, persisted, clamped to 132–600 and reset on its own when it isn't
 /// a number.

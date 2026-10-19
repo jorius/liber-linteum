@@ -183,8 +183,10 @@ impl Ctx<'_> {
     /// then pages; attachments and attachment folders are left out.
     fn children(&self, parent: &str, folder_kind: CardKind) -> Result<Vec<GvCard>> {
         let mut cards = Vec::new();
+        // The Archive isn't shown (M5b §5.3).
         for row in self.index.card_children(parent)? {
             match row.kind {
+                _ if nimw_vault::is_archived(&row.path) => {}
                 FileKind::Folder if !is_attachment_folder(self.policy, &row.path) => {
                     cards.push(self.folder_card(&row, folder_kind)?);
                 }
@@ -412,6 +414,9 @@ fn neighbours(centre: &str, links: &[PageLink]) -> Vec<Neighbour> {
         } else {
             continue;
         };
+        if nimw_vault::is_archived(other) {
+            continue;
+        }
         let file = other.rsplit('/').next().unwrap_or(other);
         let entry = sides
             .entry((name_key(file), other.clone()))
@@ -518,6 +523,12 @@ impl VaultSession {
         let heights = self.vault.remap_cover_heights_many(renames);
         let sides = self.vault.remap_cover_sides_many(renames);
         let strips = self.vault.remap_cover_widths_many(renames);
+        // Folder icons too (M5b §4).
+        let icons = self.vault.remap_folder_icons_many(renames);
+        // And folder orders (M5b round 2).
+        let sorts = self.vault.remap_folder_sorts_many(renames);
+        // And favorites, keeping their place (M5b §19).
+        let favorites = self.vault.remap_favorites_many(renames);
         // Quick notes (M4c §7): a rename that isn't the auto-name's own ends
         // naming from the first line, and the scratch folder follows a
         // top-level rename.
@@ -532,6 +543,9 @@ impl VaultSession {
             .and(heights)
             .and(sides)
             .and(strips)
+            .and(icons)
+            .and(sorts)
+            .and(favorites)
             .and(quick)
             .and(scratch)
         {

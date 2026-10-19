@@ -1,7 +1,7 @@
 use crate::error::{Result, io_err};
-use crate::is_hidden_name;
 use crate::path::VaultPath;
 use crate::vault::Vault;
+use crate::{ARCHIVE_DIR, is_hidden_name, is_hidden_path};
 use std::path::Path;
 use std::time::UNIX_EPOCH;
 
@@ -56,10 +56,7 @@ impl Vault {
     /// Stat of one visible entry; `None` if it does not exist, is hidden,
     /// excluded, or a symlink that `scan` would skip.
     pub fn stat(&self, path: &VaultPath) -> Result<Option<Entry>> {
-        if path.is_root()
-            || path.as_str().split('/').any(is_hidden_name)
-            || self.is_excluded(path.as_str())
-        {
+        if path.is_root() || is_hidden_path(path.as_str()) || self.is_excluded(path.as_str()) {
             return Ok(None);
         }
         let full = path.to_fs_path(&self.root);
@@ -97,7 +94,7 @@ impl Vault {
                         .push(format!("{}: name is not UTF-8", item.path().display()));
                     continue;
                 };
-                if is_hidden_name(name) {
+                if is_hidden_name(name) && !(dir.is_root() && name == ARCHIVE_DIR) {
                     continue;
                 }
                 let Ok(path) = dir.join(name) else {

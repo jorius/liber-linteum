@@ -379,3 +379,18 @@ fn cover_sides_and_widths_of_pages_deleted_outside_are_forgotten() {
         kept
     );
 }
+
+/// M5b §4: a folder deleted outside the app takes its icon, and its
+/// subfolders', with it.
+#[test]
+fn m5b_folder_icons_of_folders_deleted_outside_are_forgotten() {
+    let (dir, _c, s) = unwatched(&[("Lore/A.md", "# a"), ("Kept/B.md", "# b")]);
+    s.vault().set_folder_icon("Lore", Some("🐉")).unwrap();
+    s.vault().set_folder_icon("Kept", Some("📌")).unwrap();
+    std::fs::remove_dir_all(dir.path().join("Lore")).unwrap();
+    s.apply(vec![WatchEvent::Removed(vp("Lore"))]).unwrap();
+    assert_eq!(
+        s.vault().folder_icons().into_keys().collect::<Vec<_>>(),
+        vec!["Kept".to_string()]
+    );
+}

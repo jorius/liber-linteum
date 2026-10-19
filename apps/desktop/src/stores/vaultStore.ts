@@ -1,10 +1,13 @@
 import i18next from 'i18next';
+import { confirmUnsaved, needsUnsavedPrompt } from '../features/editor/unsavedPrompt';
 import { create } from 'zustand';
 import {
   entryCreateFolder,
   entryCreatePage,
   entryRename,
   entryTrash,
+  binList,
+  trashRestore,
   onVaultChanged,
   onVaultProgress,
   onVaultWarning,
@@ -21,13 +24,14 @@ import {
   type TreeNode,
   type VaultInfo,
 } from '../ipc';
+import { useBinStore } from '../features/bin/binStore';
 import { useEditorStore, warnUnsaved } from './editorStore';
 import { errorMessage } from './messages';
 import { usePageStore } from './pageStore';
 import { useToastStore } from './toastStore';
 import { useTrailStore } from './trailStore';
 import { useUiStore } from './uiStore';
-import { childrenByParent, joinPath, nextFreeName, parentOf, remap } from './tree';
+import { childrenByParent, isArchived, joinPath, nextFreeName, parentOf, remap } from './tree';
 
 /** External changes arriving within this window trigger one tree refresh. */
 export const COALESCE_MS = 100;
@@ -68,7 +72,8 @@ interface VaultState {
     to: string,
     opts?: { quiet?: boolean },
   ) => Promise<IpcResult<RenameOutcome>>;
-  trash: (path: string) => Promise<IpcResult<void>>;
+  /** Moves into the vault's Trash (M5b §5.1); its path there. */
+  trash: (path: string) => Promise<IpcResult<string>>;
   /** What follows a rename done in the backend (`rename`, a quick note's
    *  auto-name, the scratch folder's new name): selection, trail, tree, the
    *  open page and pages whose links changed, and toasts (`quiet`: none for
@@ -193,6 +198,8 @@ export const useVaultStore = create<VaultState>((set, get) => {
    *  changes (M2a §3.3); if a page can't be written, says so and returns
    *  false: its text must not be dropped. */
   async function savedEverything(): Promise<boolean> {
+    // Auto save off (M5b §6): Save / Don't Save / Cancel first.
+    if (needsUnsavedPrompt() && !(await confirmUnsaved())) return false;
     await Promise.all([...beforeSwitch].map((run) => run().catch(() => undefined)));
     const unsaved = await useEditorStore.getState().saveAll();
     if (!unsaved.length) return true;
@@ -279,8 +286,12 @@ export const useVaultStore = create<VaultState>((set, get) => {
       const mine = ++treeSeq;
       const res = await vaultTree();
       if (mine !== treeSeq || !res.ok) return; // a newer refresh won, or no vault
-      const nodes = res.value;
-      const exists = new Set(nodes.map((n) => n.path));
+      // The Archive comes with the tree: its own read-only folder in the
+      // sidebar (M5b round 2), kept out of `nodes` (the vault's pages and
+      // folders everywhere else), but in `children` for its rows.
+      const all = res.value;
+      const nodes = all.filter((n) => !isArchived(n.path));
+      const exists = new Set(all.map((n) => n.path));
       let { selected } = get();
       // Selection falls back to the nearest ancestor that still exists.
       while (selected && !exists.has(selected)) {
@@ -288,7 +299,9 @@ export const useVaultStore = create<VaultState>((set, get) => {
         selected = parent || null;
       }
       const expanded = new Set([...get().expanded].filter((p) => exists.has(p)));
-      set({ nodes, children: childrenByParent(nodes), selected, expanded });
+      set({ nodes, children: childrenByParent(all), selected, expanded });
+      // The Trash and Archive change with the tree (M5b §5).
+      void useBinStore.getState().refresh();
     },
     select: (selected) => set({ selected }),
     toggle: (path) => {
@@ -340,7 +353,7 @@ export const useVaultStore = create<VaultState>((set, get) => {
       return res;
     },
     rename: async (from, to, opts) => {
-      await useEditorStore.getState().flushAll(); // the move takes the latest text
+      await useEditorStore.getState().flushBefore(); // the move takes the latest text
       const res = await entryRename(from, to);
       if (!res.ok) {
         if (!opts?.quiet) toast().push({ message: errorMessage(res.error), tone: 'error' });
@@ -379,7 +392,7 @@ export const useVaultStore = create<VaultState>((set, get) => {
       const siblings = get().children.get(parentOf(path)) ?? [];
       const i = siblings.findIndex((n) => n.path === path);
       const next = siblings[i + 1]?.path ?? (parentOf(path) || null);
-      await useEditorStore.getState().flushAll(); // the Trash gets the latest text
+      await useEditorStore.getState().flushBefore(path); // the Trash gets the latest text
       const res = await entryTrash(path);
       if (!res.ok) {
         toast().push({ message: errorMessage(res.error), tone: 'error' });
@@ -391,7 +404,28 @@ export const useVaultStore = create<VaultState>((set, get) => {
       const selected = get().selected;
       if (selected && remap(selected, path, path)) set({ selected: next });
       await get().refreshTree();
-      toast().push({ message: i18next.t('toasts.trashed') });
+      const inner = res.value;
+      toast().push({
+        message: i18next.t('toasts.trashed'),
+        action: {
+          label: i18next.t('bin.undo'),
+          run: () =>
+            void (async () => {
+              // Only the item this toast trashed (final review M5): it may
+              // have been restored, and another taken its name since.
+              const list = await binList();
+              const still =
+                list.ok && list.value?.trash.some((i) => i.path === inner && i.from === path);
+              if (!still) {
+                toast().push({ message: i18next.t('bin.undoGone') });
+                return;
+              }
+              const back = await trashRestore(inner, false);
+              if (!back.ok) toast().push({ message: errorMessage(back.error), tone: 'error' });
+              await get().refreshTree();
+            })(),
+        },
+      });
       return res;
     },
   };

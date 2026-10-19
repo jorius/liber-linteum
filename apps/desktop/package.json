@@ -13,7 +13,8 @@
     "typecheck": "tsc --noEmit",
     "check:i18n": "node scripts/check-i18n.ts",
     "test:e2e": "vite build && playwright test",
-    "gen:palettes": "node scripts/gen-palettes.ts"
+    "gen:palettes": "node scripts/gen-palettes.ts",
+    "gen:emoji": "node scripts/gen-emoji.ts"
   },
   "dependencies": {
     "@codemirror/autocomplete": "^6.20.3",

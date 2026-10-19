@@ -70,7 +70,9 @@
       "notAllowed": "{name} no se puede mover ahí.",
       "cancelled": "Se canceló mover {name}."
     },
-    "scratchFolder": "{name}, notas rápidas, {count, plural, one {# nota} other {# notas}}"
+    "scratchFolder": "{name}, notas rápidas, {count, plural, one {# nota} other {# notas}}",
+    "newPageIn": "Nueva página en {name}",
+    "trash": "Mover {name} a la papelera"
   },
   "opening": {
     "title": "Abriendo bóveda…",
@@ -81,11 +83,15 @@
     "files": "Archivos · {name}",
     "newPage": "Nueva página",
     "newFolder": "Nueva carpeta",
-    "view": "Vista",
     "edit": "Editar",
     "globalView": "Vista global",
     "settings": "Ajustes",
-    "closeVault": "Cerrar bóveda"
+    "closeVault": "Cerrar bóveda",
+    "actions": "Acciones",
+    "hideSidebar": "Ocultar la barra lateral",
+    "showSidebar": "Mostrar la barra lateral",
+    "settingsItem": "Ajustes…",
+    "openAnother": "Abrir otra bóveda…"
   },
   "page": {
     "region": "Página",
@@ -192,7 +198,8 @@
       "copy": "Copiar a la bóveda",
       "link": "Enlazar donde está",
       "cancel": "Cancelar"
-    }
+    },
+    "unsaved": "Sin guardar"
   },
   "preview": {
     "tableScroll": "Tabla, se desplaza de lado",
@@ -225,7 +232,12 @@
     "newFolder": "Nueva carpeta",
     "rename": "Renombrar",
     "move": "Mover a…",
-    "delete": "Eliminar"
+    "delete": "Eliminar",
+    "icon": "Icono…",
+    "archive": "Archivar",
+    "sortBy": "Ordenar por",
+    "open": "Abrir",
+    "unarchive": "Desarchivar"
   },
   "dialogs": {
     "cancel": "Cancelar",
@@ -258,6 +270,15 @@
       "where": "Se creará en {folder}.",
       "confirm": "Crear página",
       "invalid": "«{name}» no se puede usar como nombre. {reason}"
+    },
+    "unsaved": {
+      "titleOne": "¿Guardar los cambios en «{name}»?",
+      "titleMany": "{count, plural, one {¿Guardar los cambios en # página?} other {¿Guardar los cambios en # páginas?}}",
+      "body": "El guardado automático está desactivado. Los cambios que no guardes se pierden.",
+      "discard": "No guardar",
+      "save": "Guardar",
+      "saveAll": "Guardar todo",
+      "list": "Páginas sin guardar"
     }
   },
   "settings": {
@@ -271,9 +292,6 @@
     "rewriteLinks": "Actualizar enlaces al renombrar o mover",
     "confirmDelete": "Preguntar antes de mover a la papelera",
     "sections": {
-      "appearance": "Apariencia",
-      "editor": "Editor",
-      "files": "Archivos",
       "vault": "Esta bóveda"
     },
     "palette": "Paleta",
@@ -332,6 +350,83 @@
       "obsidian": "Sigue la configuración de Obsidian ({format}). Elige un formato para usar el tuyo.",
       "useObsidian": "Usar la configuración de Obsidian",
       "showPaths": "Mostrar dónde están los adjuntos en el disco"
+    },
+    "autoSave": "Guardado automático",
+    "autoSaveHint": "Si está desactivado, {save} guarda. Cambiar el título, el subtítulo, la portada o las relaciones, y mover una página a la Papelera, también guardan su texto.",
+    "actionButton": "Botón de acciones",
+    "actionButtonBottomRight": "Abajo a la derecha",
+    "actionButtonBottomLeft": "Abajo a la izquierda",
+    "actionButtonTopRight": "Arriba a la derecha",
+    "categoriesLabel": "Categorías de los ajustes",
+    "search": "Buscar en los ajustes",
+    "searchResults": "Resultados",
+    "noMatch": "Ningún ajuste coincide.",
+    "savedAsYouChange": "Se guarda al cambiar",
+    "groups": {
+      "app": "App"
+    },
+    "categories": {
+      "general": {
+        "title": "General",
+        "description": "El idioma de la app."
+      },
+      "appearance": {
+        "title": "Apariencia",
+        "description": "Tema, colores y dónde va el botón de acciones."
+      },
+      "editor": {
+        "title": "Editor",
+        "description": "Fuentes, ancho de página, portadas y guardado."
+      },
+      "files": {
+        "title": "Archivos y notas rápidas",
+        "description": "Renombrar, borrar y dónde viven las notas rápidas."
+      },
+      "shortcuts": {
+        "title": "Atajos de teclado",
+        "description": "Lo que hace el teclado en toda la app."
+      },
+      "vault": {
+        "title": "Esta bóveda",
+        "description": "Ajustes guardados con esta bóveda, en .nimw/vault.json."
+      }
+    },
+    "shortcuts": {
+      "groups": {
+        "navigation": "Navegación",
+        "editing": "Edición",
+        "vault": "Bóveda",
+        "view": "Vista"
+      },
+      "items": {
+        "back": "Atrás",
+        "forward": "Adelante",
+        "edit": "Editar",
+        "globalView": "Vista global",
+        "search": "Buscar",
+        "files": "Ir a los archivos",
+        "newPage": "Nueva página",
+        "quickNote": "Nueva nota rápida",
+        "save": "Guardar",
+        "link": "Insertar un enlace",
+        "bold": "Negrita",
+        "italic": "Cursiva",
+        "code": "Código en línea",
+        "strike": "Tachado",
+        "highlight": "Resaltar",
+        "numbered": "Lista numerada",
+        "bullet": "Lista con viñetas",
+        "task": "Lista de tareas",
+        "quote": "Cita",
+        "favorite": "Añadir o quitar de Favoritos",
+        "openVault": "Abrir una bóveda",
+        "closeVault": "Cerrar la bóveda",
+        "openFile": "Abrir un archivo",
+        "sidebar": "Mostrar u ocultar la barra lateral",
+        "actions": "Mostrar las acciones",
+        "settings": "Ajustes",
+        "quit": "Salir"
+      }
     }
   },
   "toolbar": {
@@ -616,11 +711,11 @@
     "project": "Proyecto",
     "tags": "Etiquetas",
     "linksTo": "Enlaza a",
-    "media": "Medios",
     "hasImage": "Con imagen",
     "hasAudio": "Con audio",
     "active": "Activos",
     "clearAll": "Limpiar todo",
+    "moreChips": "+{count} más",
     "chipProject": "Proyecto: {name}",
     "chipFolder": "En: {name}",
     "chipLinksTo": "Enlaza a: {name}",
@@ -633,6 +728,102 @@
     "indexing": "Aún se está indexando: puede que falten resultados.",
     "showMore": "Mostrar más",
     "resultsLabel": "Resultados",
-    "failed": "La búsqueda falló: {error}"
+    "failed": "La búsqueda falló: {error}",
+    "archived": "Archivadas",
+    "show": "Mostrar"
+  },
+  "icons": {
+    "pickFor": "Icono de {name}",
+    "remove": "Quitar icono",
+    "search": "Buscar emoji",
+    "grid": "Emoji",
+    "recent": "Recientes",
+    "none": "No se encontró ningún emoji",
+    "groups": {
+      "smileys-emotion": "Caras y emociones",
+      "people-body": "Personas y cuerpo",
+      "animals-nature": "Animales y naturaleza",
+      "food-drink": "Comida y bebida",
+      "travel-places": "Viajes y lugares",
+      "activities": "Actividades",
+      "objects": "Objetos",
+      "symbols": "Símbolos",
+      "flags": "Banderas"
+    },
+    "addFor": "Añadir un icono a {name}",
+    "changeFor": "Cambiar el icono de {name}"
+  },
+  "bin": {
+    "trash": "Papelera",
+    "archived": "Archivado",
+    "trashCount": "{count, plural, one {Papelera, # elemento} other {Papelera, # elementos}}",
+    "archivedCount": "{count, plural, one {Archivado, # elemento} other {Archivado, # elementos}}",
+    "root": "la raíz de la bóveda",
+    "unknownFrom": "De otra aplicación",
+    "restore": "Restaurar",
+    "restoreName": "Restaurar {name}",
+    "unarchive": "Desarchivar",
+    "delete": "Eliminar",
+    "deleteName": "Eliminar {name} de la bóveda",
+    "empty": "Vaciar papelera",
+    "deleteTitle": "{count, plural, one {¿Eliminar # elemento de la bóveda?} other {¿Eliminar # elementos de la bóveda?}}",
+    "emptyTitle": "{count, plural, one {¿Vaciar la papelera (# elemento)?} other {¿Vaciar la papelera (# elementos)?}}",
+    "deleteBody": "Los archivos salen de la bóveda y van a la papelera del sistema, donde aún puedes recuperarlos.",
+    "clashTitle": "{name} ya existe",
+    "clashBody": "Hay algo nuevo donde estaba. ¿Conservar ambos, añadiendo un número al restaurado?",
+    "keepBoth": "Conservar ambos",
+    "archivedPage": "Esta página está archivada. Desarchívala para editarla.",
+    "archivedToast": "Archivado",
+    "undo": "Deshacer",
+    "undoGone": "Ese elemento ya no está en la Papelera.",
+    "summary": "{count, plural, one {# elemento} other {# elementos}} · {size}. Se quedan dentro de la bóveda hasta que los elimines; al eliminarlos van a la Papelera del sistema.",
+    "filter": "Filtrar la Papelera",
+    "filterPlaceholder": "Filtrar por nombre o carpeta",
+    "sort": "Ordenar",
+    "sortNewest": "Eliminado, más reciente primero",
+    "sortOldest": "Eliminado, más antiguo primero",
+    "sortName": "Nombre, A → Z",
+    "sortFolder": "Carpeta de origen",
+    "selection": "Selección",
+    "selected": "{count} seleccionados",
+    "select": "Seleccionar {name}",
+    "today": "Hoy",
+    "yesterday": "Ayer",
+    "thisWeek": "Antes esta semana",
+    "unknownDate": "Fecha desconocida",
+    "allItems": "Todos los elementos",
+    "kind": {
+      "page": "Página",
+      "folder": "Carpeta",
+      "image": "Imagen",
+      "file": "Archivo"
+    },
+    "pages": "{count, plural, one {# página} other {# páginas}}",
+    "fromLower": "de {folder}",
+    "deletedAt": "eliminado {when}",
+    "restoreTo": "Restaurar en {folder}",
+    "deleteTitleShort": "Eliminar de la bóveda",
+    "emptyTitleState": "La Papelera está vacía",
+    "emptyHelp": "Las páginas, carpetas y adjuntos que eliminas esperan aquí, dentro de la bóveda, hasta que los eliminas definitivamente.",
+    "noMatch": "Nada en la Papelera coincide con «{query}»."
+  },
+  "sort": {
+    "label": "Ordenar {name} por",
+    "vault": "Ordenar la bóveda",
+    "name-asc": "Nombre, A → Z",
+    "name-desc": "Nombre, Z → A",
+    "modified-desc": "Modificado, más reciente primero",
+    "modified-asc": "Modificado, más antiguo primero",
+    "created-desc": "Creado, más reciente primero"
+  },
+  "favorites": {
+    "title": "Favoritos",
+    "add": "Añadir a Favoritos",
+    "remove": "Quitar de Favoritos",
+    "removeNamed": "Quitar {name} de Favoritos",
+    "moveUp": "Subir en Favoritos",
+    "moveDown": "Bajar en Favoritos",
+    "movedTo": "{name} pasó a la posición {position} de {count} en Favoritos",
+    "scratchTree": "Notas rápidas"
   }
 }

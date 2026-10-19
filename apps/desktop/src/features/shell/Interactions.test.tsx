@@ -60,6 +60,60 @@ afterEach(async () => {
   clearMocks();
 });
 
+describe('the Archive (M5b round 2)', () => {
+  it('is its own read-only folder at the foot, kept out of the vault tree', async () => {
+    const all: TreeNode[] = [
+      ...nodes,
+      { path: '.archive', kind: 'folder' },
+      { path: '.archive/Camp', kind: 'folder' },
+      { path: '.archive/Camp/a.md', kind: 'page' },
+      { path: '.archive/Old.md', kind: 'page' },
+    ];
+    const calls = backend({
+      vault_tree: () => all,
+      bin_list: () => ({ trash: [], archive: [] }),
+      archive_restore: () => ({ ...outcome, moved: [['.archive/Old.md', 'Old.md']] }),
+    });
+    seed();
+    render(<AppShell />);
+    await act(() => useVaultStore.getState().refreshTree());
+    expect(useVaultStore.getState().nodes.some((n) => n.path.startsWith('.archive'))).toBe(false);
+    const files = screen.getByRole('tree', { name: 'Files' });
+    expect(within(files).queryByText('.archive')).not.toBeInTheDocument();
+    const toggle = screen.getByRole('button', { name: /^Archived/ });
+    expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.queryByRole('tree', { name: 'Archived' })).not.toBeInTheDocument();
+    await userEvent.click(toggle);
+    expect(toggle).toHaveAttribute('aria-expanded', 'true');
+    const archived = screen.getByRole('tree', { name: 'Archived' });
+    expect(
+      within(archived)
+        .getAllByRole('treeitem')
+        .map((r) => r.getAttribute('data-path')),
+    ).toEqual(['.archive/Camp', '.archive/Old.md']);
+    // Read-only: no new page inside, no icon; 🗑 and … stay.
+    expect(within(archived).queryByRole('button', { name: /New page in|icon/i })).toBeNull();
+    expect(within(archived).getByRole('button', { name: 'Move Old to Trash' })).toBeInTheDocument();
+    // F2 renames nothing here.
+    within(archived).getByRole('treeitem', { name: 'Old' }).focus();
+    await userEvent.keyboard('{F2}');
+    expect(useVaultStore.getState().renaming).toBeNull();
+    fireEvent.contextMenu(within(archived).getByRole('treeitem', { name: 'Old' }));
+    const menu = screen.getByRole('menu', { name: 'Actions for Old' });
+    expect(
+      within(menu)
+        .getAllByRole('menuitem')
+        .map((i) => i.textContent),
+    ).toEqual(['Open', 'Unarchive', 'Sort by', 'Delete']);
+    await userEvent.click(within(menu).getByRole('menuitem', { name: 'Unarchive' }));
+    await waitFor(() =>
+      expect(calls.filter(([c]) => c === 'archive_restore')).toEqual([
+        ['archive_restore', { path: '.archive/Old.md', keepBoth: false }],
+      ]),
+    );
+  });
+});
+
 describe('context menu', () => {
   it('opens with Shift+F10, navigates with arrows and closes with Escape', async () => {
     backend({});
@@ -74,7 +128,11 @@ describe('context menu', () => {
       'New folder',
       'Rename',
       'Move to…',
+      'Icon…',
+      'Sort by',
+      'Archive',
       'Delete',
+      'Add to Favorites',
     ]);
     expect(items[0]).toHaveFocus();
     await userEvent.keyboard('{ArrowDown}{ArrowDown}');
@@ -84,6 +142,93 @@ describe('context menu', () => {
     await userEvent.keyboard('{Escape}');
     expect(screen.queryByRole('menu')).not.toBeInTheDocument();
     expect(await axeRun(document.body)).toEqual([]);
+  });
+
+  it('Sort by: → opens the orders with the current one checked; a choice saves it and reloads the tree (M5b round 2)', async () => {
+    const calls = backend({
+      folder_sort_get: () => 'modified-desc',
+      folder_sort_set: () => null,
+      vault_tree: () => nodes,
+    });
+    seed();
+    render(<AppShell />);
+    screen.getByRole('treeitem', { name: 'Art' }).focus();
+    await userEvent.keyboard('{Shift>}{F10}{/Shift}');
+    const sortBy = screen.getByRole('menuitem', { name: 'Sort by' });
+    expect(sortBy).toHaveAttribute('aria-haspopup', 'menu');
+    sortBy.focus();
+    await userEvent.keyboard('{ArrowRight}');
+    const orders = await screen.findByRole('menu', { name: 'Sort Art by' });
+    const radios = within(orders).getAllByRole('menuitemradio');
+    expect(radios.map((r) => r.textContent)).toEqual([
+      'Name, A → Z',
+      'Name, Z → A',
+      'Modified, newest first',
+      'Modified, oldest first',
+      'Created, newest first',
+    ]);
+    await waitFor(() => expect(radios[2]).toHaveAttribute('aria-checked', 'true'));
+    expect(radios[0]).toHaveAttribute('aria-checked', 'false');
+    // ← goes back to the actions.
+    await userEvent.keyboard('{ArrowLeft}');
+    expect(screen.getByRole('menuitem', { name: 'Sort by' })).toHaveFocus();
+    await userEvent.keyboard('{Enter}');
+    await userEvent.click(await screen.findByRole('menuitemradio', { name: 'Name, Z → A' }));
+    await waitFor(() =>
+      expect(calls.filter(([c]) => c === 'folder_sort_set')).toEqual([
+        ['folder_sort_set', { path: 'Art', sort: 'name-desc' }],
+      ]),
+    );
+    await waitFor(() => expect(calls.filter(([c]) => c === 'vault_tree').length).toBe(1));
+    expect(screen.queryByRole('menu')).not.toBeInTheDocument();
+  });
+
+  it("a page's Sort by orders its folder; the files header sorts the vault root (M5b round 2)", async () => {
+    const calls = backend({
+      folder_sort_get: () => 'name-asc',
+      folder_sort_set: () => null,
+      vault_tree: () => nodes,
+    });
+    seed();
+    render(<AppShell />);
+    fireEvent.contextMenu(screen.getByRole('treeitem', { name: 'Welcome' }));
+    await userEvent.click(screen.getByRole('menuitem', { name: 'Sort by' }));
+    await userEvent.click(
+      await screen.findByRole('menuitemradio', { name: 'Modified, newest first' }),
+    );
+    await userEvent.click(screen.getByRole('button', { name: 'Sort the vault' }));
+    expect(await screen.findByRole('menu', { name: 'Sort Vault by' })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('menuitemradio', { name: 'Created, newest first' }));
+    await waitFor(() =>
+      expect(calls.filter(([c]) => c === 'folder_sort_set').map(([, a]) => a)).toEqual([
+        { path: '', sort: 'modified-desc' },
+        { path: '', sort: 'created-desc' },
+      ]),
+    );
+  });
+
+  it('Archive moves the item into the Archive and offers Undo (M5b §5.3)', async () => {
+    const calls = backend({
+      entry_archive: (a) => ({ ...outcome, moved: [[a.path, `.archive/${String(a.path)}`]] }),
+      vault_tree: () => nodes.filter((n) => n.path !== 'Welcome.md'),
+      bin_list: () => ({ trash: [], archive: [] }),
+    });
+    seed();
+    render(<AppShell />);
+    fireEvent.contextMenu(screen.getByRole('treeitem', { name: 'Welcome' }));
+    await userEvent.click(screen.getByRole('menuitem', { name: 'Archive' }));
+    await waitFor(() =>
+      expect(calls.filter(([c]) => c === 'entry_archive')).toEqual([
+        ['entry_archive', { path: 'Welcome.md' }],
+      ]),
+    );
+    await waitFor(() =>
+      expect(screen.queryByRole('treeitem', { name: 'Welcome' })).not.toBeInTheDocument(),
+    );
+    expect(useToastStore.getState().toasts.at(-1)).toMatchObject({
+      message: 'Archived',
+      action: { label: 'Undo' },
+    });
   });
 
   it('right-click opens the menu; Rename starts inline rename', async () => {
@@ -205,11 +350,21 @@ describe('settings dialog', () => {
     });
     seed();
     render(<AppShell />);
-    await userEvent.click(screen.getByRole('button', { name: 'Settings' }));
+    // M5b §11.1: Settings… in the vault menu.
+    await userEvent.click(
+      screen.getByRole('button', { name: useVaultStore.getState().info!.name }),
+    );
+    await userEvent.click(screen.getByRole('menuitem', { name: 'Settings…' }));
     const dialog = screen.getByRole('dialog', { name: 'Settings' });
     expect(await axeRun(dialog)).toEqual([]);
+    // M5b §18: one category at a time, from the left menu.
+    const category = (name: RegExp) =>
+      userEvent.click(within(dialog).getByRole('button', { name }));
+    await category(/^Appearance$/);
     await userEvent.click(within(dialog).getByRole('radio', { name: 'Dark' }));
+    await category(/^General$/);
     await userEvent.selectOptions(within(dialog).getByRole('combobox', { name: 'Language' }), 'es');
+    await category(/^(Files and quick notes|Archivos y notas rápidas)$/);
     await userEvent.click(
       within(dialog).getByRole('checkbox', { name: /Actualizar enlaces|Update links/ }),
     );

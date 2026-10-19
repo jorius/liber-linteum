@@ -55,6 +55,15 @@ const VAULT_COMMANDS: &[&str] = &[
     "scratch_folder_set",
     // M5: search is the main window's.
     "search",
+    // M5b §11.8: the main window's title; file windows keep their own.
+    "window_title_set",
+    // M5b §5: so are the Trash and Archive.
+    "bin_list",
+    "trash_restore",
+    "trash_delete",
+    "trash_empty",
+    "entry_archive",
+    "archive_restore",
     "vault_create",
     "vault_close",
     "vault_tree",
@@ -95,6 +104,12 @@ const VAULT_COMMANDS: &[&str] = &[
     "external_reveal",
     "external_network_allow",
     "file_pick",
+    "folder_icon_set",
+    "folder_sort_get",
+    "folder_sort_set",
+    "vault_icon_set",
+    "favorites_get",
+    "favorites_set",
 ];
 
 struct Harness {

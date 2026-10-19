@@ -88,6 +88,28 @@ export function PencilIcon() {
   );
 }
 
+/** The sidebar, as a panel (M5b §2.5). */
+export function SidebarIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true" {...stroke}>
+      <rect x="3" y="4" width="18" height="16" rx="2" />
+      <path d="M9 4v16" />
+    </svg>
+  );
+}
+
+/** The floating button's mark (M5b §2.2): four squares. */
+export function ActionsIcon() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true" {...stroke}>
+      <rect x="4" y="4" width="6.5" height="6.5" rx="1.5" />
+      <rect x="13.5" y="4" width="6.5" height="6.5" rx="1.5" />
+      <rect x="4" y="13.5" width="6.5" height="6.5" rx="1.5" />
+      <rect x="13.5" y="13.5" width="6.5" height="6.5" rx="1.5" />
+    </svg>
+  );
+}
+
 export function GraphIcon() {
   return (
     <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true" {...stroke}>
@@ -145,6 +167,25 @@ export function NewFolderIcon() {
     <svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true" {...stroke}>
       <path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
       <path d="M12 10v6M9 13h6" />
+    </svg>
+  );
+}
+
+/** Sort (M5b round 2): lines shortening downward, with an arrow. */
+export function SortIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true" {...stroke}>
+      <path d="M4 6h10M4 12h7M4 18h4M17 5v14M14 16l3 3 3-3" />
+    </svg>
+  );
+}
+
+/** Restore (M5b round 2): a counter-clockwise arrow. */
+export function RestoreIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" aria-hidden="true" {...stroke}>
+      <path d="M3 12a9 9 0 1 0 3-6.7L3 8" />
+      <path d="M3 3v5h5" />
     </svg>
   );
 }
@@ -286,6 +327,15 @@ export function TrashIcon() {
   return (
     <svg {...small} {...stroke}>
       <path d="M3 6h18M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6M10 11v6M14 11v6" />
+    </svg>
+  );
+}
+
+/** A box with a lid (the Archive, M5b §5.3). */
+export function ArchiveIcon() {
+  return (
+    <svg {...small} {...stroke}>
+      <path d="M3 4h18v4H3zM5 8v11a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8M10 12h4" />
     </svg>
   );
 }

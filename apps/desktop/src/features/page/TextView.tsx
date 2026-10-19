@@ -9,6 +9,7 @@ import { onViewUpdate, useCurrentView } from '../editor/viewUpdates';
 import { BackArrow } from './BackArrow';
 import { Breadcrumb } from './Breadcrumb';
 import styles from './PageView.module.css';
+import { PageTitle } from './PageTitle';
 import { UnwritableNotice } from './UnwritableNotice';
 import { COUNT_DEBOUNCE_MS } from './WordCount';
 
@@ -58,6 +59,9 @@ export function TextView({ path }: { path: string }) {
     <section className={styles.page} aria-label={t('page.region')}>
       <div data-band="plain" className={styles.band}>
         <div className={styles.bandRows}>
+          <div className={styles.heading}>
+            <PageTitle path={path} />
+          </div>
           <div className={styles.bar}>
             <div className={`${styles.where} ${styles.pill}`}>
               <BackArrow />
@@ -68,6 +72,7 @@ export function TextView({ path }: { path: string }) {
                 <span
                   role="status"
                   aria-label={t('editor.saveStatus')}
+                  data-status={status}
                   className={`${styles.status} ${styles.pill}`}
                 >
                   {t(`editor.${status}`)}

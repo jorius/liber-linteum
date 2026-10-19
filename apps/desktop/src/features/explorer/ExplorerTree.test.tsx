@@ -5,9 +5,11 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { TreeNode } from '../../ipc';
 import { clearMocks, mockIPC } from '../../ipc/testing';
 import { usePageStore } from '../../stores/pageStore';
+import { useUiStore } from '../../stores/uiStore';
 import { childrenByParent } from '../../stores/tree';
 import { resetVaultStore, useVaultStore } from '../../stores/vaultStore';
 import { useScratchpadStore } from '../scratchpad/scratchpadStore';
+import { ContextMenu } from './ContextMenu';
 import { ExplorerTree, visibleRows } from './ExplorerTree';
 
 const nodes: TreeNode[] = [
@@ -271,5 +273,129 @@ describe('the pinned scratch folder (M4c §7.2)', () => {
     render(<ExplorerTree />);
     expect(screen.getAllByRole('treeitem')[0]).toHaveAttribute('data-path', 'Art');
     expect(screen.getByRole('treeitem', { name: 'Scratchpad' })).toBeInTheDocument();
+  });
+});
+
+describe('row quick actions (M5b §3)', () => {
+  const actions = (name: string) =>
+    within(screen.getByRole('treeitem', { name }))
+      .getAllByRole('button')
+      .map((b) => b.getAttribute('aria-label'));
+
+  it('folders get + ☺ 🗑 …, pages ☺ 🗑 …, attachments 🗑 …; none is a Tab stop', () => {
+    seed(nodes, { expanded: new Set(['Art']) });
+    render(<ExplorerTree onRequestMenu={() => undefined} />);
+    expect(actions('Games')).toEqual([
+      'New page in Games',
+      'Icon for Games',
+      'Move Games to Trash',
+      'Actions for Games',
+    ]);
+    expect(actions('Welcome')).toEqual([
+      'Icon for Welcome',
+      'Move Welcome to Trash',
+      'Actions for Welcome',
+    ]);
+    expect(actions('cover.png')).toEqual(['Move cover.png to Trash', 'Actions for cover.png']);
+    for (const b of within(screen.getByRole('tree')).getAllByRole('button')) {
+      expect(b).toHaveAttribute('tabindex', '-1');
+    }
+  });
+
+  it('+ makes a page inside the folder without opening the row', async () => {
+    const calls = backend({
+      entry_create_page: (a) => `${a.dir}/Untitled.md`,
+      vault_tree: () => nodes,
+    });
+    seed();
+    render(<ExplorerTree />);
+    await userEvent.click(screen.getByRole('button', { name: 'New page in Games' }));
+    await waitFor(() =>
+      expect(calls.find(([c]) => c === 'entry_create_page')?.[1]).toMatchObject({ dir: 'Games' }),
+    );
+    expect(useVaultStore.getState().expanded.has('Games')).toBe(true);
+  });
+
+  it('🗑 asks for confirmation through the trash action', async () => {
+    seed();
+    render(<ExplorerTree />);
+    await userEvent.click(screen.getByRole('button', { name: 'Move Welcome to Trash' }));
+    expect(useUiStore.getState().dialog).toEqual({ type: 'delete', path: 'Welcome.md' });
+    act(() => useUiStore.getState().closeDialog());
+  });
+
+  it('☺ opens the picker; picking sets a folder’s icon; keys in it don’t move the tree', async () => {
+    const calls = backend({ folder_icon_set: () => null });
+    seed();
+    render(<ExplorerTree />);
+    await userEvent.click(
+      within(screen.getByRole('treeitem', { name: 'Games' })).getByRole('button', {
+        name: 'Icon for Games',
+      }),
+    );
+    const search = await screen.findByRole('searchbox', { name: 'Search emoji' });
+    await userEvent.type(search, 'joystick');
+    await waitFor(() =>
+      expect(screen.getAllByRole('gridcell')[0]).toHaveAccessibleName('joystick'),
+    );
+    await userEvent.keyboard('{ArrowDown}{ArrowRight}{ArrowLeft}{Enter}');
+    expect(calls).toContainEqual(['folder_icon_set', { path: 'Games', icon: '🕹️' }]);
+    expect(useVaultStore.getState().selected).toBeNull();
+  });
+
+  it('final review M6: after the picker the keyboard is back on the row, so ↑ / ↓ move again', async () => {
+    seed();
+    render(<ExplorerTree />);
+    const row = screen.getByRole('treeitem', { name: 'Games' });
+    await userEvent.click(within(row).getByRole('button', { name: 'Icon for Games' }));
+    await screen.findByRole('searchbox', { name: 'Search emoji' });
+    await userEvent.keyboard('{Escape}');
+    await waitFor(() => expect(row).toHaveFocus());
+  });
+});
+
+describe('the Trash view (M5b §5)', () => {
+  afterEach(() => useUiStore.setState({ screen: 'edit' }));
+
+  it('a page clicked in the files leaves the Trash view for the editor', async () => {
+    backend({ page_read: () => ({ text: '# rex\n', hash: 'h' }) });
+    for (const view of ['trash'] as const) {
+      seed(nodes, { expanded: new Set(['Art']) });
+      useUiStore.setState({ screen: view });
+      render(<ExplorerTree />);
+      await userEvent.click(screen.getByRole('treeitem', { name: 'rex' }));
+      expect(useUiStore.getState().screen).toBe('edit');
+      document.body.innerHTML = '';
+    }
+  });
+});
+
+describe('the row menu (M5b §3, §4)', () => {
+  it('offers Icon… for pages and folders, which opens the picker in its place', async () => {
+    const calls = backend({ folder_icon_set: () => null });
+    seed();
+    const onClose = vi.fn();
+    render(<ContextMenu menu={{ path: 'Games', anchor: { x: 10, y: 10 } }} onClose={onClose} />);
+    expect(screen.getAllByRole('menuitem').map((i) => i.textContent)).toContain('Icon…');
+    await userEvent.click(screen.getByRole('menuitem', { name: 'Icon…' }));
+    const search = await screen.findByRole('searchbox', { name: 'Search emoji' });
+    expect(screen.queryByRole('menu')).toBeNull();
+    await userEvent.type(search, 'joystick{Enter}');
+    expect(calls).toContainEqual(['folder_icon_set', { path: 'Games', icon: '🕹️' }]);
+    expect(onClose).toHaveBeenCalled();
+  });
+
+  it('has no Icon… for attachments; Delete goes through the trash action', async () => {
+    seed(nodes, { expanded: new Set(['Art']) });
+    render(
+      <ContextMenu
+        menu={{ path: 'Art/cover.png', anchor: { x: 0, y: 0 } }}
+        onClose={() => undefined}
+      />,
+    );
+    expect(screen.queryByRole('menuitem', { name: 'Icon…' })).toBeNull();
+    await userEvent.click(screen.getByRole('menuitem', { name: 'Delete' }));
+    expect(useUiStore.getState().dialog).toEqual({ type: 'delete', path: 'Art/cover.png' });
+    act(() => useUiStore.getState().closeDialog());
   });
 });

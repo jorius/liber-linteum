@@ -14,8 +14,10 @@ import {
   type FrontmatterEdit,
   type FrontmatterPatch,
 } from '../markdown/frontmatterEdit';
+import { confirmUnsaved, needsUnsavedPrompt } from '../features/editor/unsavedPrompt';
 import { errorMessage } from './messages';
 import { openNewPage, openPage } from './navigate';
+import { useSettingsStore } from './settingsStore';
 import { useToastStore } from './toastStore';
 import { nameOf, remap } from './tree';
 
@@ -46,6 +48,9 @@ interface EditorState {
   close: () => Promise<void>;
   /** Saves every open page (current and background); capped at `timeoutMs`. */
   flushAll: (timeoutMs?: number) => Promise<void>;
+  /** Before a move or trash: everything with auto save on; with it off only
+   *  the pages under `under` (a trash), never others (M5b final review I1). */
+  flushBefore: (under?: string) => Promise<void>;
   onExternalChange: (c: ChangedPayload, exists?: (path: string) => boolean) => Promise<void>;
   follow: (from: string, to: string) => void;
   /** Re-reads pages rewritten by our own link updates (rename/move). */
@@ -57,6 +62,13 @@ interface EditorState {
   saveAll: (timeoutMs?: number) => Promise<string[]>;
   /** Drops every page (after `saveAll` left nothing unsaved). */
   reset: () => void;
+  /** Pages with text not written yet (auto save off, failing, orphaned). */
+  dirtyPaths: () => string[];
+  /** Unsaved pages Save / Don't Save can act on: a page deleted outside the
+   *  app has its own banner (M5b final review M3). */
+  askPaths: () => string[];
+  /** Don't Save (M5b §6): every page back to its saved text; nothing written. */
+  discardAll: () => void;
   /** Header edits (cover, subtitle, M2c §4): changes the current page's
    *  frontmatter as an undoable editor change and saves at once. `false` when
    *  there is no editable page or its frontmatter can't be edited safely (invalid
@@ -219,6 +231,13 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     await (timeoutMs === undefined ? all : Promise.race([all, delay(timeoutMs)]));
     docs.forEach((d) => dropIfDone(d));
   },
+  flushBefore: async (under) => {
+    if (useSettingsStore.getState().settings.autoSave !== false) return get().flushAll();
+    if (under === undefined) return; // a moved page follows its file, unsaved
+    const docsUnder = [...docs.values()].filter((d) => remap(d.path, under, under) !== null);
+    await Promise.all(docsUnder.map((d) => d.flush()));
+    docsUnder.forEach((d) => dropIfDone(d));
+  },
   onExternalChange: async (c, exists) => {
     for (const [from, to] of c.renamed) get().follow(from, to);
     for (const doc of [...docs.values()]) {
@@ -252,6 +271,14 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     return [...docs.values()].filter((d) => d.dirty).map((d) => d.path);
   },
   reset: () => resetEditorStore(),
+  dirtyPaths: () => [...docs.values()].filter((d) => d.dirty).map((d) => d.path),
+  askPaths: () => [...docs.values()].filter((d) => d.dirty && !d.orphaned).map((d) => d.path),
+  discardAll: () => {
+    for (const doc of [...docs.values()]) {
+      if (doc.dirty && !doc.orphaned) doc.revert();
+      dropIfDone(doc);
+    }
+  },
   saveAsNew: async () => {
     const doc = get().doc;
     if (!doc) return;
@@ -289,6 +316,8 @@ let closeWarning: number | null = null;
  *  still can't be written (failing or orphaned page) keeps the window open
  *  with a warning; closing again while it shows quits anyway (M2a §3.3). */
 export async function mayClose(): Promise<boolean> {
+  // Auto save off (M5b §6): Save / Don't Save / Cancel first.
+  if (needsUnsavedPrompt() && !(await confirmUnsaved())) return false;
   const unsaved = await useEditorStore.getState().saveAll(QUIT_FLUSH_MS);
   if (!unsaved.length) return true;
   const warned = useToastStore.getState().toasts.some((t) => t.id === closeWarning);
@@ -306,3 +335,9 @@ export async function installQuitGuard(): Promise<void> {
 export function installQuitGuardIfTauri(): void {
   if (isTauri()) void installQuitGuard().catch(() => undefined);
 }
+
+// Auto save turned on or off (M5b §6): unsaved pages save soon, or wait.
+useSettingsStore.subscribe((s, prev) => {
+  if (s.settings.autoSave === prev.settings.autoSave) return;
+  docs.forEach((d) => d.settle());
+});

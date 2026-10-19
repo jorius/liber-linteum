@@ -1,4 +1,4 @@
-/* Layout values from the prototype (.shell, .side, .topbar, .toggle, .tg). */
+/* Layout values from the prototype (.shell, .side, .toggle, .tg); no top bar since M5b. */
 .shell {
   display: flex;
   height: 100%;
@@ -19,14 +19,33 @@
   min-height: 0;
 }
 
-.brand {
+/* The vault's name, a menu button (M5b §11.1), and the collapse button. */
+.brandRow {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 4px 8px 12px;
+  gap: 4px;
+  padding: 0 0 8px;
+}
+
+.brand {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  padding: 6px 8px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: none;
   font: 700 16px var(--font-display);
   color: #fff;
-  min-width: 0;
+  text-align: left;
+  cursor: pointer;
+}
+
+.brand:hover,
+.brand[aria-expanded='true'] {
+  background: var(--color-sidebar-hover);
 }
 
 /* The vault's name (M4b §1): long names end in an ellipsis; the full name is
@@ -86,17 +105,6 @@
   overflow: auto;
 }
 
-.sideFoot {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 12px;
-  color: var(--color-text-faint);
-  padding: 12px 8px 4px;
-  margin: 0;
-  border-top: 1px solid var(--color-sidebar-divider);
-}
-
 .main {
   flex: 1;
   min-width: 0;
@@ -105,104 +113,125 @@
   background: var(--color-bg);
 }
 
-.topbar {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
-  align-items: center;
-  gap: 12px;
-  padding: 10px 20px;
-  background: var(--color-surface-subtle);
-  border-bottom: 1px solid var(--color-border);
+.main {
+  position: relative;
 }
 
-/* The page's title and subtitle, or the Global View's level (M4b §1). */
-.heading {
-  min-width: 0;
+/* The collapsed sidebar's way back (M5b §2.5), over the page's top left. */
+.reopen {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  z-index: 5;
+}
+
+/* Room for it, so it covers no breadcrumb (final review M8). */
+.main[data-collapsed] .content {
+  padding-left: 56px;
+}
+
+/* The floating Edit / Global view / Search button (M5b §2.2). */
+.fab {
+  position: absolute;
+  z-index: 20;
   display: flex;
   flex-direction: column;
-  justify-content: center;
+  align-items: flex-end;
+  gap: 10px;
 }
 
-.screenTitle {
-  margin: 0;
-  font: 700 18px/1.2 var(--font-display);
-  color: var(--color-text-strong);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+.fab[data-place='bottomRight'] {
+  right: 24px;
+  bottom: 24px;
 }
 
-.screenLevel {
-  font-weight: 600;
-  color: var(--color-text-muted);
+.fab[data-place='bottomLeft'] {
+  left: 24px;
+  bottom: 24px;
+  align-items: flex-start;
 }
 
-/* Same box as the settings / close buttons (.iconButtonLight): 40 px high,
-   thin strong border, medium radius, surface background. */
-.toggle {
-  box-sizing: border-box;
-  display: flex;
+.fab[data-place='topRight'] {
+  right: 24px;
+  top: 12px;
+  flex-direction: column-reverse;
+}
+
+/* The Global View has its own controls in those corners (final review I4):
+   New entry bottom right, zoom bottom left, its toolbar along the top. */
+.main[data-screen='global'] .fab[data-place='bottomRight'] {
+  bottom: 96px;
+}
+
+.main[data-screen='global'] .fab[data-place='bottomLeft'] {
+  left: 68px;
+}
+
+.main[data-screen='global'] .fab[data-place='topRight'] {
+  top: 76px;
+}
+
+.fabButton {
+  display: inline-flex;
   align-items: center;
-  gap: 2px;
-  height: 40px;
-  padding: 3px;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  border: 1px solid var(--color-border-strong);
+  border-radius: 50%;
+  background: var(--color-surface);
+  color: var(--color-text);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.18);
+  cursor: pointer;
+}
+
+.fabButton:hover,
+.fabButton[aria-expanded='true'] {
+  border-color: var(--color-accent);
+  color: var(--color-accent);
+}
+
+.fabStack {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 6px;
   border: 1px solid var(--color-border-strong);
   border-radius: var(--radius-md);
   background: var(--color-surface);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.18);
 }
 
-.tg {
+.fabItem {
   display: flex;
   align-items: center;
-  gap: 8px;
-  height: 32px;
-  padding: 0 14px;
-  border-radius: var(--radius-sm);
+  gap: 10px;
+  min-width: 190px;
+  height: 36px;
+  padding: 0 10px;
   border: 0;
+  border-radius: var(--radius-sm);
   background: transparent;
   font: 600 14px var(--font-body);
   color: var(--color-text-body);
   cursor: pointer;
 }
 
-.tg:not(.on):not([aria-disabled='true']):hover {
+.fabItem:hover {
   background: var(--color-surface-subtle);
 }
 
-.tg[aria-disabled='true'] {
-  opacity: 0.5;
-  cursor: not-allowed;
+.fabItem:focus-visible {
+  background: var(--color-surface-subtle);
 }
 
-.on {
+.fabItem[aria-pressed='true'] {
   background: var(--color-accent-soft);
   color: var(--color-text-strong);
 }
 
-.tright {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 8px;
-}
-
-/* Search (M5 §4): the prototype's button with its shortcut. */
-.searchButton {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  height: 40px;
-  padding: 0 10px 0 12px;
-  border: 1px solid var(--color-border-strong);
-  border-radius: var(--radius-md);
-  background: var(--color-surface);
-  color: var(--color-text);
-  font: 600 14px var(--font-body);
-  cursor: pointer;
-}
-
-.searchButton:hover {
-  border-color: var(--color-accent);
+.fabItem .kbd {
+  margin-left: auto;
 }
 
 .kbd {
@@ -231,6 +260,24 @@
   border-color: var(--color-accent);
 }
 
+/* Room under the last line of text so the floating button never covers it
+   (M5b §2.2). */
+.content :global(.cm-content) {
+  padding-bottom: 88px;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .side {
+    animation: nimw-side-in 120ms ease-out;
+  }
+  @keyframes nimw-side-in {
+    from {
+      transform: translateX(-12px);
+      opacity: 0.6;
+    }
+  }
+}
+
 .content {
   flex: 1;
   min-height: 0;
@@ -255,4 +302,10 @@
   overflow: hidden;
   clip: rect(0 0 0 0);
   white-space: nowrap;
+}
+
+/* The vault's optional emoji (M5b §4), before its name. */
+.vaultIcon {
+  font-size: 20px;
+  color: inherit;
 }

@@ -71,12 +71,17 @@ pub(crate) fn open_session<R: Runtime>(app: &AppHandle<R>, root: &Path) -> CmdRe
             .warnings
             .push(format!("recent vaults could not be saved: {e}"));
     }
+    let icon = session
+        .vault()
+        .vault_icon()
+        .filter(|i| nimw_markdown::is_icon(i));
     state.set_session(Some(session));
     let scratchpad = state.settings.is_scratchpad(&root);
     state.set_scratchpad_root(scratchpad.then(|| root.clone()));
     Ok(VaultInfo {
         name,
         scratchpad,
+        icon,
         root: root.to_string_lossy().into_owned(),
         report,
     })
@@ -121,14 +126,42 @@ pub(crate) fn vault_close_impl(state: &AppState) {
     state.set_session(None);
 }
 
+/// Archived pages are read-only (M5b round 2): anything that would change
+/// one, or put something in the Archive, is refused. Unarchive and Move to
+/// Trash have their own commands.
+pub(crate) fn not_archived(path: &str) -> CmdResult<()> {
+    // Any letter case: on a case-insensitive disk `.ARCHIVE/x` is the Archive (round-2 review M3).
+    let first = path.split('/').next().unwrap_or_default();
+    if first.eq_ignore_ascii_case(nimw_vault::ARCHIVE_DIR) {
+        return Err(CommandError::new(
+            ErrorKind::NotPermitted,
+            format!("{path} is archived; unarchive it to change it"),
+        ));
+    }
+    Ok(())
+}
+
 pub(crate) fn vault_tree_impl(state: &AppState) -> CmdResult<Vec<TreeNodeDto>> {
-    Ok(state
-        .session()?
-        .tree()?
+    let session = state.session()?;
+    let mut folders = session.vault().folder_icons();
+    Ok(session
+        .tree_with_archive()?
         .into_iter()
-        .map(|n| TreeNodeDto {
-            path: n.path,
-            kind: n.kind.as_str(),
+        .map(|n| {
+            // Pages: the indexed frontmatter emoji; folders: vault.json (M5b §4).
+            let kind = n.kind.as_str();
+            let icon = if kind == "folder" {
+                folders
+                    .remove(&n.path)
+                    .filter(|i| nimw_markdown::is_icon(i))
+            } else {
+                n.icon
+            };
+            TreeNodeDto {
+                path: n.path,
+                kind,
+                icon,
+            }
         })
         .collect())
 }
@@ -197,6 +230,7 @@ pub(crate) fn entry_create_page_impl(
     dir: String,
     name: String,
 ) -> CmdResult<String> {
+    crate::vault_commands::not_archived(&dir)?;
     Ok(state
         .session()?
         .create_page(&dir_path(&dir)?, &name)?
@@ -210,6 +244,7 @@ pub(crate) fn entry_create_text_impl(
     dir: String,
     name: String,
 ) -> CmdResult<String> {
+    crate::vault_commands::not_archived(&dir)?;
     Ok(state
         .session()?
         .create_text_file(&dir_path(&dir)?, &name)?
@@ -221,6 +256,7 @@ pub(crate) fn entry_create_folder_impl(
     parent: String,
     name: String,
 ) -> CmdResult<String> {
+    crate::vault_commands::not_archived(&parent)?;
     Ok(state
         .session()?
         .create_folder(&dir_path(&parent)?, &name)?
@@ -232,6 +268,8 @@ pub(crate) fn entry_rename_impl(
     from: String,
     to: String,
 ) -> CmdResult<RenameOutcomeDto> {
+    crate::vault_commands::not_archived(&from)?;
+    crate::vault_commands::not_archived(&to)?;
     let rewrite = state.settings.get().0.rewrite_links;
     Ok(state
         .session()?
@@ -239,8 +277,9 @@ pub(crate) fn entry_rename_impl(
         .into())
 }
 
-pub(crate) fn entry_trash_impl(state: &AppState, path: String) -> CmdResult<()> {
-    Ok(state.session()?.trash(&VaultPath::new(&path)?)?)
+/// Moves an item into the vault's Trash (M5b §5.1); its path there.
+pub(crate) fn entry_trash_impl(state: &AppState, path: String) -> CmdResult<String> {
+    Ok(state.session()?.trash(&VaultPath::new(&path)?)?.to_string())
 }
 
 // ---- command wrappers: run off the UI thread (final review I2) ----
@@ -324,7 +363,7 @@ pub async fn entry_rename<R: Runtime>(
 }
 
 #[tauri::command]
-pub async fn entry_trash<R: Runtime>(app: AppHandle<R>, path: String) -> CmdResult<()> {
+pub async fn entry_trash<R: Runtime>(app: AppHandle<R>, path: String) -> CmdResult<String> {
     blocking(app, move |app| {
         entry_trash_impl(&app.state::<AppState>(), path)
     })

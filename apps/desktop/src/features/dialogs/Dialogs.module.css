@@ -23,11 +23,17 @@
   gap: 14px;
 }
 
-/* Search (M5 §4). */
+/* Search (M5 §4). Its own regions scroll (M5b §7.1): the box never does,
+   so no engine can shrink the filters under the results. */
 .wide {
   width: min(780px, calc(100% - 32px));
   padding: 0;
   gap: 0;
+  overflow: hidden;
+}
+
+.wide > * {
+  flex: none;
 }
 
 .srOnly {
@@ -182,7 +188,8 @@
   padding: 6px 8px;
 }
 
-.hexInput[aria-invalid='true'] {
+.hexInput[aria-invalid='true'],
+.textInput[aria-invalid='true'] {
   border-color: var(--color-warn-border);
 }
 
@@ -214,4 +221,296 @@
   margin: 0;
   font-size: 12px;
   color: var(--color-text-muted);
+}
+
+/* Settings in categories (M5b §18): a menu like the file explorer beside the
+   chosen category; the dialog keeps its size, the pane scrolls. */
+.panes {
+  width: min(960px, calc(100% - 32px));
+  min-width: min(720px, calc(100% - 16px));
+  height: min(680px, calc(100% - 64px));
+  min-height: min(520px, calc(100% - 16px));
+  max-height: none;
+  flex-direction: row;
+  padding: 0;
+  gap: 0;
+  overflow: hidden;
+}
+
+.nav {
+  flex: none;
+  width: 240px;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 22px 12px 12px;
+  overflow-y: auto;
+  background: var(--color-sidebar-bg);
+  color: var(--color-sidebar-text);
+}
+
+.navTitle {
+  margin: 0 10px 14px;
+  font: 700 18px var(--font-display);
+}
+
+.navSearch {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 4px 12px;
+  padding: 6px 10px;
+  border: 1px solid var(--color-sidebar-divider);
+  border-radius: var(--radius-md);
+  background: var(--color-sidebar-hover);
+}
+
+.navSearch input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: 400 13px var(--font-body);
+}
+
+.navSearch svg,
+.navItem svg {
+  flex: none;
+  width: 16px;
+  height: 16px;
+}
+
+.navGroup {
+  margin: 10px 10px 4px;
+  font: 600 11px var(--font-body);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.navItem {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border: 0;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: inherit;
+  font: 400 14px var(--font-body);
+  text-align: left;
+  cursor: pointer;
+}
+
+.navItem:hover {
+  background: var(--color-sidebar-hover);
+}
+
+.navItem[aria-current='page'] {
+  background: var(--color-sidebar-selected);
+  font-weight: 600;
+}
+
+.navItem:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: -2px;
+}
+
+.navFoot {
+  margin: auto 0 0;
+  padding: 10px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+}
+
+.navFoot svg {
+  flex: none;
+  width: 13px;
+  height: 13px;
+}
+
+.paneMain {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.paneHead {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 22px 24px 14px 32px;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.paneHeadText {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.paneTitle {
+  margin: 0;
+  font: 700 20px var(--font-display);
+  color: var(--color-text-strong);
+}
+
+.paneTitle:focus:not(:focus-visible) {
+  outline: none;
+}
+
+.paneClose {
+  flex: none;
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  color: var(--color-text);
+  cursor: pointer;
+}
+
+.paneClose:hover {
+  background: var(--color-surface-subtle);
+}
+
+.paneBody {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 20px 32px 28px;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+/* Rows and categories that search leaves out (classes set display). */
+.paneBody [hidden],
+.paneBody [data-no-match] {
+  display: none !important;
+}
+
+.panel {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.panelTitle {
+  margin: 0;
+  font: 700 12px var(--font-body);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+}
+
+/* This vault: its section sits in the pane, which already names it. */
+.panel > .section {
+  border-top: 0;
+  padding-top: 0;
+  gap: 14px;
+}
+
+.panel > .section > .sectionTitle {
+  display: none;
+}
+
+.panel .palettes {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.themes {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.themeCard {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  font-size: 13px;
+  color: var(--color-text-body);
+  cursor: pointer;
+}
+
+.chosen {
+  border: 2px solid var(--color-accent);
+  padding: 9px;
+  font-weight: 600;
+}
+
+.themePreview {
+  grid-column: 1 / -1;
+  height: 56px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+}
+
+.themePreview[data-theme-preview='light'] {
+  background: #f6f5f3;
+}
+
+.themePreview[data-theme-preview='dark'] {
+  background: #1f1d24;
+}
+
+.themePreview[data-theme-preview='system'] {
+  background: linear-gradient(90deg, #f6f5f3 50%, #1f1d24 50%);
+}
+
+.shortcutGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.shortcutTitle {
+  margin: 0;
+  font: 600 13px var(--font-body);
+  color: var(--color-text-strong);
+}
+
+.shortcuts {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.shortcut {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--color-border);
+  font-size: 14px;
+  color: var(--color-text-body);
+}
+
+.shortcut dd {
+  margin: 0;
+}
+
+.shortcut kbd {
+  font: 500 12px var(--font-mono);
+  padding: 2px 6px;
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-subtle);
 }

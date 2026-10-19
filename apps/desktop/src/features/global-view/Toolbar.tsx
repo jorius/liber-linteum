@@ -16,7 +16,7 @@ const TOGGLES: { key: keyof GlobalViewEdges; kind: GvEdgeKind; aggregated: boole
 ];
 
 /** A level's name: "Vault", a folder's name, or a page's title (its file
- *  name until the level has loaded). The breadcrumb and the top bar (M4b §1). */
+ *  name until the level has loaded), as the breadcrumb shows it (M4b §1). */
 export function levelLabel(ref: GvLevelRef, titles: Record<string, string>, t: TFunction): string {
   if (ref.kind === 'vault') return t('gv.vault');
   if (ref.kind === 'folder') return nameOf(ref.path);

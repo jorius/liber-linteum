@@ -1,6 +1,8 @@
 import {
+  Children,
   useEffect,
   useId,
+  useLayoutEffect,
   useRef,
   useState,
   type ChangeEvent,
@@ -8,12 +10,20 @@ import {
   type ReactNode,
 } from 'react';
 import { useTranslation } from 'react-i18next';
-import { AudioIcon, CloseIcon, ImageIcon, SearchIcon, SmallCloseIcon } from '../../app/icons';
+import {
+  ArchiveIcon,
+  AudioIcon,
+  CloseIcon,
+  ImageIcon,
+  SearchIcon,
+  SmallCloseIcon,
+} from '../../app/icons';
 import { assetUrl, type SearchHit } from '../../ipc';
 import { openPage } from '../../stores/navigate';
 import { useUiStore } from '../../stores/uiStore';
 import { Dialog } from '../dialogs/Dialog';
 import { useGvStore } from '../global-view/gvStore';
+import { ItemIcon, useIcons } from '../icons/ItemIcon';
 import {
   highlightParts,
   pathTrail,
@@ -36,14 +46,88 @@ function Marked({ parts }: { parts: TextPart[] }) {
   );
 }
 
+/** Lines of chips a row shows before "+N more" (M5b §7.1). */
+const ROW_LINES = 2;
+
+/** The distinct line tops of a box's children, in order. */
+function lineTops(box: HTMLElement): number[] {
+  return [...new Set([...box.children].map((c) => (c as HTMLElement).offsetTop))].sort(
+    (a, b) => a - b,
+  );
+}
+
+/** A labelled group of chips that keeps to two lines; "+N more" shows the
+ *  rest. A pressed chip is never hidden. */
 function Row({ label, children }: { label: string; children: ReactNode }) {
+  const { t } = useTranslation();
   const id = useId();
+  const box = useRef<HTMLDivElement>(null);
+  const items = Children.toArray(children);
+  const [open, setOpen] = useState(false);
+  // How many chips show; null = all of them (also while measuring).
+  const [shown, setShown] = useState<number | null>(null);
+  const [width, setWidth] = useState(0);
+  const keys = items.map((c) => (c as { key?: unknown }).key).join('|');
+
+  useEffect(() => {
+    const el = box.current;
+    if (!el || typeof ResizeObserver === 'undefined') return;
+    const ro = new ResizeObserver(() => setWidth(el.clientWidth));
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+  // A new set of chips or a new width is measured again from all of them.
+  useLayoutEffect(() => setShown(null), [keys, width]);
+  useLayoutEffect(() => {
+    const el = box.current;
+    if (!el || open) return;
+    const tops = lineTops(el);
+    if (tops.length <= ROW_LINES) return;
+    const kids = [...el.children] as HTMLElement[];
+    if (shown === null) {
+      const cut = kids.findIndex((k) => k.offsetTop >= tops[ROW_LINES]!);
+      // One chip less leaves room for "+N more" on the last line.
+      const next = Math.max(1, cut - 1);
+      const pressedLater = kids.slice(next).some((k) => k.getAttribute('aria-pressed') === 'true');
+      if (pressedLater) setOpen(true);
+      else setShown(next);
+    } else if (shown > 1) {
+      // "+N more" itself wrapped to a third line: hide one more chip.
+      setShown(shown - 1);
+    }
+  }, [shown, open, keys, width]);
+
+  const visible = open || shown === null ? items : items.slice(0, shown);
+  const hidden = items.length - visible.length;
   return (
     <div className={styles.row} role="group" aria-labelledby={id}>
       <span id={id} className={styles.rowLabel}>
         {label}
       </span>
-      <div className={styles.chips}>{children}</div>
+      <div ref={box} className={styles.chips}>
+        {visible}
+        {hidden > 0 && (
+          <button
+            type="button"
+            className={styles.moreChip}
+            aria-expanded={false}
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={(e) => {
+              // From the keyboard, focus goes to the first chip it shows, not to
+              // nothing as the button leaves (final review M9).
+              const first = e.currentTarget === document.activeElement ? visible.length : -1;
+              setOpen(true);
+              if (first >= 0) {
+                requestAnimationFrame(() =>
+                  box.current?.querySelectorAll<HTMLElement>('button')[first]?.focus(),
+                );
+              }
+            }}
+          >
+            {t('search.moreChips', { count: hidden })}
+          </button>
+        )}
+      </div>
     </div>
   );
 }
@@ -74,11 +158,12 @@ function Chip({
 }
 
 /** Search (M5 §4): a field with filter chips over the vault's pages, opened
- *  by the top bar, ⌘⇧F and View → Search…. ↑/↓ move through the results
+ *  by the floating button, ⌘F / ⌘⇧F and View → Search…. ↑/↓ move through the results
  *  with the keyboard kept in the field; Enter opens the page, Shift+Enter
  *  its level in the Global View; Escape clears the text, then closes. */
 export function SearchDialog({ onClose }: { onClose: () => void }) {
   const { t } = useTranslation();
+  const icons = useIcons();
   const text = useSearchStore((s) => s.text);
   const filters = useSearchStore((s) => s.filters);
   const page = useSearchStore((s) => s.page);
@@ -195,12 +280,19 @@ export function SearchDialog({ onClose }: { onClose: () => void }) {
         return t('search.hasImage');
       case 'hasAudio':
         return t('search.hasAudio');
+      case 'archived':
+        return t('search.archived');
     }
   };
   const chips = activeFilters(filters);
   const showMedia =
     !!facets &&
-    (facets.hasImage > 0 || facets.hasAudio > 0 || filters.hasImage || filters.hasAudio);
+    (facets.hasImage > 0 ||
+      facets.hasAudio > 0 ||
+      facets.archived > 0 ||
+      filters.hasImage ||
+      filters.hasAudio ||
+      filters.archived);
 
   return (
     <Dialog title={t('search.title')} onClose={onClose} wide hideTitle>
@@ -303,7 +395,7 @@ export function SearchDialog({ onClose }: { onClose: () => void }) {
             </Row>
           )}
           {showMedia && (
-            <Row label={t('search.media')}>
+            <Row label={t('search.show')}>
               <Chip
                 pressed={filters.hasImage}
                 count={facets.hasImage}
@@ -319,6 +411,14 @@ export function SearchDialog({ onClose }: { onClose: () => void }) {
               >
                 <AudioIcon />
                 {t('search.hasAudio')}
+              </Chip>
+              <Chip
+                pressed={filters.archived}
+                count={facets.archived}
+                onClick={() => store().setFilters({ archived: !filters.archived })}
+              >
+                <ArchiveIcon />
+                {t('search.archived')}
               </Chip>
             </Row>
           )}
@@ -393,6 +493,7 @@ export function SearchDialog({ onClose }: { onClose: () => void }) {
             </span>
             <span className={styles.body}>
               <span className={styles.title}>
+                <ItemIcon icon={icons.get(hit.path)} />
                 <Marked parts={highlightParts(hit.title, words)} />
               </span>
               <span className={styles.path}>{pathTrail(hit.path)}</span>

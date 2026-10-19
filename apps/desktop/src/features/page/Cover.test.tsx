@@ -292,7 +292,7 @@ describe('Cover (M2c §2)', () => {
     await open('Rex.md');
     await screen.findByRole('group', { name: 'Cover' });
     await userEvent.click(screen.getByRole('button', { name: 'Reposition' }));
-    const header = document.querySelector('header')!;
+    const header = screen.getByRole('region', { name: 'Page' });
     const violations = await axe
       .run(header, { rules: { 'color-contrast': { enabled: false } } })
       .then((r) => r.violations);

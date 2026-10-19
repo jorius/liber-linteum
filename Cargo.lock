@@ -2590,6 +2590,7 @@ dependencies = [
  "nimw-session",
  "nimw-testkit",
  "nimw-vault",
+ "objc2",
  "percent-encoding",
  "serde",
  "serde_json",
@@ -2626,6 +2627,7 @@ dependencies = [
  "pulldown-cmark",
  "serde_json",
  "unicode-normalization",
+ "unicode-segmentation",
  "yaml-rust2",
 ]
 

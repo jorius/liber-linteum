@@ -3,6 +3,7 @@
 // run here (final review m5).
 import { readFileSync } from 'node:fs';
 import { expect, test } from '@playwright/test';
+import { showGlobalView } from './shell';
 import { installIpcMock } from './ipcMock';
 
 const AXE = readFileSync(new URL('../node_modules/axe-core/axe.min.js', import.meta.url), 'utf8');
@@ -24,7 +25,7 @@ for (const theme of ['light', 'dark']) {
     });
     await page.goto('/');
     await page.getByRole('button', { name: /^vault/ }).click();
-    await page.getByRole('button', { name: 'Global view' }).click();
+    await showGlobalView(page);
     await expect(page.getByRole('button', { name: 'Alpha', exact: true })).toBeVisible();
     await page.evaluate(AXE);
     const violations = await page.evaluate(async () => {

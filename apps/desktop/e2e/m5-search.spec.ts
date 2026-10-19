@@ -3,6 +3,7 @@
 // snippets, axe in both themes, and nothing leaving the machine.
 import { expect, test, type Page } from '@playwright/test';
 import { readFileSync } from 'node:fs';
+import { openSearch } from './shell';
 import { installIpcMock } from './ipcMock';
 
 const AXE = readFileSync(new URL('../node_modules/axe-core/axe.min.js', import.meta.url), 'utf8');
@@ -33,7 +34,7 @@ async function open(page: Page, settings: Record<string, unknown> = {}) {
   });
   await page.goto('/');
   await page.getByRole('button', { name: /^vault/ }).click();
-  await expect(page.getByRole('button', { name: 'Search' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Actions', exact: true })).toBeVisible();
   return { outside, errors };
 }
 
@@ -59,7 +60,7 @@ test('⌘⇧F, type, Enter opens the page in the editor', async ({ page }) => {
 
 test('a tag chip filters, and removing it restores Recent', async ({ page }) => {
   await open(page);
-  await page.getByRole('button', { name: 'Search' }).click();
+  await openSearch(page);
   const tags = dialog(page).getByRole('group', { name: 'Tags' });
   await tags.getByRole('button', { name: /#villain/ }).click();
   await expect(dialog(page).getByRole('option')).toHaveCount(1);

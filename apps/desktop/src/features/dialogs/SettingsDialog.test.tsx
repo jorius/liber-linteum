@@ -5,11 +5,13 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { clearMocks, mockIPC } from '../../ipc/testing';
 import { DEFAULT_SETTINGS, useSettingsStore } from '../../stores/settingsStore';
 import { resetVaultStore, useVaultStore } from '../../stores/vaultStore';
-import { SettingsDialog } from './SettingsDialog';
+import styles from './Dialogs.module.css';
+import { resetSettingsCategory, SettingsDialog } from './SettingsDialog';
 
 let patches: Record<string, unknown>[];
 
 beforeEach(() => {
+  resetSettingsCategory();
   patches = [];
   useSettingsStore.setState({ settings: DEFAULT_SETTINGS });
   mockIPC((cmd, raw) => {
@@ -30,13 +32,34 @@ afterEach(() => {
 
 const open = () => render(<SettingsDialog onClose={() => undefined} />);
 
+/** Shows a category of the left menu (M5b §18). */
+const show = (name: string) =>
+  userEvent.click(
+    within(screen.getByRole('navigation', { name: 'Settings categories' })).getByRole('button', {
+      name,
+    }),
+  );
+
 describe('Settings dialog (M2b §4, §5, §7)', () => {
-  it('is grouped into Appearance, Editor and Files, and has no axe violations', async () => {
+  it('M5b §18: categories in a left menu, one shown at a time, and no axe violations', async () => {
     open();
     const dialog = screen.getByRole('dialog', { name: 'Settings' });
-    for (const name of ['Appearance', 'Editor', 'Files']) {
-      expect(within(dialog).getByRole('heading', { name, level: 3 })).toBeInTheDocument();
-    }
+    const nav = within(dialog).getByRole('navigation', { name: 'Settings categories' });
+    expect(
+      within(nav)
+        .getAllByRole('button')
+        .map((b) => b.textContent),
+    ).toEqual(['General', 'Appearance', 'Editor', 'Files and quick notes', 'Keyboard shortcuts']);
+    expect(within(nav).getByRole('button', { name: 'General' })).toHaveAttribute(
+      'aria-current',
+      'page',
+    );
+    expect(screen.getByRole('combobox', { name: 'Language' })).toBeInTheDocument();
+    expect(screen.queryByRole('radio', { name: 'Graphite' })).not.toBeInTheDocument();
+    await show('Appearance');
+    expect(screen.getByRole('heading', { name: 'Appearance', level: 3 })).toHaveFocus();
+    expect(screen.getByRole('radio', { name: 'Graphite' })).toBeInTheDocument();
+    expect(screen.queryByRole('combobox', { name: 'Language' })).not.toBeInTheDocument();
     await screen.findByRole('option', { name: 'Avenir Next' }, { timeout: 2000 }).catch(() => null);
     const violations = await axe
       .run(dialog, { rules: { 'color-contrast': { enabled: false } } })
@@ -44,8 +67,65 @@ describe('Settings dialog (M2b §4, §5, §7)', () => {
     expect(violations).toEqual([]);
   });
 
+  it('M5b §18: ↑ and ↓ move through the categories; the last one is kept for the session', async () => {
+    const view = open();
+    const nav = screen.getByRole('navigation', { name: 'Settings categories' });
+    within(nav).getByRole('button', { name: 'General' }).focus();
+    await userEvent.keyboard('{ArrowDown}{ArrowDown}');
+    expect(within(nav).getByRole('button', { name: 'Editor' })).toHaveFocus();
+    expect(within(nav).getByRole('button', { name: 'Editor' })).toHaveAttribute(
+      'aria-current',
+      'page',
+    );
+    expect(screen.getByRole('combobox', { name: 'Text size' })).toBeInTheDocument();
+    await userEvent.keyboard('{ArrowUp}{ArrowUp}{ArrowUp}');
+    expect(within(nav).getByRole('button', { name: 'Keyboard shortcuts' })).toHaveFocus();
+    view.unmount();
+    open();
+    expect(
+      screen.getByRole('heading', { name: 'Keyboard shortcuts', level: 3 }),
+    ).toBeInTheDocument();
+    expect(screen.getByText('New quick note')).toBeInTheDocument();
+  });
+
+  it('M5b §18: search shows the matching rows of every category, accents ignored', async () => {
+    open();
+    await userEvent.type(screen.getByRole('searchbox', { name: 'Search settings' }), 'líne');
+    expect(screen.getByRole('heading', { name: 'Search results', level: 3 })).toBeInTheDocument();
+    // "Show line numbers" (Editor), nothing from General.
+    expect(screen.getByRole('checkbox', { name: 'Show line numbers' })).toBeVisible();
+    expect(screen.queryByRole('combobox', { name: 'Language' })).not.toBeInTheDocument();
+    await userEvent.clear(screen.getByRole('searchbox', { name: 'Search settings' }));
+    await userEvent.type(screen.getByRole('searchbox', { name: 'Search settings' }), 'zzzz');
+    expect(screen.getByText('No settings match.')).toBeInTheDocument();
+    await userEvent.clear(screen.getByRole('searchbox', { name: 'Search settings' }));
+    expect(screen.getByRole('combobox', { name: 'Language' })).toBeVisible();
+    expect(screen.queryByText('No settings match.')).not.toBeInTheDocument();
+  });
+
+  it('round-2 review I3: Tab from the last shown control wraps, past a category search hides', async () => {
+    open();
+    const search = screen.getByRole('searchbox', { name: 'Search settings' });
+    await userEvent.type(search, 'theme');
+    const dialog = screen.getByRole('dialog', { name: 'Settings' });
+    // A row that arrives after the search ran (a vault row loading late) stays
+    // unhidden inside its hidden category: it must not be the trap's last stop.
+    const late = document.createElement('button');
+    late.textContent = 'late';
+    [...dialog.querySelectorAll('[data-no-match]')].pop()?.append(late);
+    const shown = [
+      ...dialog.querySelectorAll<HTMLElement>(
+        'button, input, select, [tabindex]:not([tabindex="-1"])',
+      ),
+    ].filter((n) => !n.closest('[hidden], [data-no-match]'));
+    shown[shown.length - 1].focus();
+    fireEvent.keyDown(document.activeElement as HTMLElement, { key: 'Tab' });
+    expect(document.activeElement).toBe(shown[0]);
+  });
+
   it('a palette applies at once and is saved', async () => {
     open();
+    await show('Appearance');
     await userEvent.click(screen.getByRole('radio', { name: 'Graphite' }));
     await waitFor(() => expect(patches).toEqual([{ palette: 'graphite' }]));
     expect(document.documentElement.dataset.palette).toBe('graphite');
@@ -53,6 +133,7 @@ describe('Settings dialog (M2b §4, §5, §7)', () => {
 
   it('a custom accent from the hex field: invalid input is explained and not saved', async () => {
     open();
+    await show('Appearance');
     await userEvent.click(screen.getByRole('radio', { name: 'Custom accent' }));
     const hex = screen.getByRole('textbox', { name: 'Accent colour (hex)' });
     await userEvent.clear(hex);
@@ -70,6 +151,7 @@ describe('Settings dialog (M2b §4, §5, §7)', () => {
   it('the colour picker saves the accent too', async () => {
     useSettingsStore.setState({ settings: { ...DEFAULT_SETTINGS, palette: 'custom' } });
     open();
+    await show('Appearance');
     fireEvent.change(screen.getByLabelText('Accent colour'), { target: { value: '#6d28d9' } });
     await waitFor(() => expect(patches).toEqual([{ accentColor: '#6d28d9' }]));
   });
@@ -77,6 +159,7 @@ describe('Settings dialog (M2b §4, §5, §7)', () => {
   it('the hex error clears once the value is valid again, typed or picked', async () => {
     useSettingsStore.setState({ settings: { ...DEFAULT_SETTINGS, palette: 'custom' } });
     open();
+    await show('Appearance');
     const hex = screen.getByRole('textbox', { name: 'Accent colour (hex)' });
     await userEvent.clear(hex);
     await userEvent.type(hex, 'pink{Enter}');
@@ -106,6 +189,7 @@ describe('Settings dialog (M2b §4, §5, §7)', () => {
       return { ...useSettingsStore.getState().settings, ...patch };
     });
     open();
+    await show('Appearance');
     const picker = screen.getByLabelText('Accent colour');
     const colours = Array.from(
       { length: 20 },
@@ -129,6 +213,7 @@ describe('Settings dialog (M2b §4, §5, §7)', () => {
 
   it('fonts: bundled and installed families per mode, text size, toolbar and line numbers', async () => {
     open();
+    await show('Editor');
     const live = screen.getByRole('combobox', { name: 'Live Preview font' });
     const source = screen.getByRole('combobox', { name: 'Source font' });
     expect(within(live).getByRole('option', { name: 'Atkinson Hyperlegible' })).toBeInTheDocument();
@@ -154,6 +239,7 @@ describe('Settings dialog (M2b §4, §5, §7)', () => {
 
   it('M4b part 3: page width offers Wide elements; the kinds that go wide are checkboxes', async () => {
     open();
+    await show('Editor');
     const width = screen.getByRole('combobox', { name: 'Page width' });
     expect(
       within(width)
@@ -190,6 +276,7 @@ describe('Settings dialog (M2b §4, §5, §7)', () => {
 
   it('cover resize: the default cover height is a choice of four sizes, saved at once', async () => {
     open();
+    await show('Editor');
     const select = screen.getByRole('combobox', { name: 'Default cover height' });
     expect(select).toHaveValue('200');
     expect(
@@ -204,15 +291,35 @@ describe('Settings dialog (M2b §4, §5, §7)', () => {
 
   it('M4b part 3 §8: "Show where attachments are on disk" is off until turned on', async () => {
     open();
+    await show('Editor');
     const box = screen.getByRole('checkbox', { name: 'Show where attachments are on disk' });
     expect(box).not.toBeChecked();
     await userEvent.click(box);
     await waitFor(() => expect(patches).toEqual([{ showAttachmentPaths: true }]));
   });
 
-  it('cover resize: a default set by hand outside the four sizes is still shown', () => {
+  it('M5b §6, §2.2: Auto save (on) and where the floating button sits are saved at once', async () => {
+    open();
+    await show('Editor');
+    const autoSave = screen.getByRole('checkbox', { name: 'Auto save' });
+    expect(autoSave).toBeChecked();
+    await userEvent.click(autoSave);
+    await show('Appearance');
+    const place = screen.getByRole('combobox', { name: 'Action button' });
+    expect(place).toHaveValue('bottomRight');
+    await userEvent.selectOptions(place, 'topRight');
+    await waitFor(() =>
+      expect(patches).toEqual([{ autoSave: false }, { actionButton: 'topRight' }]),
+    );
+    expect(screen.getAllByRole('option').map((o) => o.textContent)).toEqual(
+      expect.arrayContaining(['Bottom right', 'Bottom left', 'Top right']),
+    );
+  });
+
+  it('cover resize: a default set by hand outside the four sizes is still shown', async () => {
     useSettingsStore.setState({ settings: { ...DEFAULT_SETTINGS, coverHeight: 250 } });
     open();
+    await show('Editor');
     const select = screen.getByRole('combobox', { name: 'Default cover height' });
     expect(select).toHaveValue('250');
     expect(within(select).getByRole('option', { name: '250 px' })).toBeInTheDocument();
@@ -224,6 +331,7 @@ describe('Settings dialog (M2b §4, §5, §7)', () => {
       return null;
     });
     open();
+    await show('Editor');
     const live = screen.getByRole('combobox', { name: 'Live Preview font' });
     expect(within(live).getAllByRole('option').length).toBe(6);
   });
@@ -291,9 +399,12 @@ describe('Settings → This vault (M2c §5.4)', () => {
 
   it("shows NIMW's setting and saves another mode at once", async () => {
     open();
+    await show('This vault');
     const where = await screen.findByRole('combobox', { name: 'New attachments go to' });
     await waitFor(() => expect(where).toHaveValue('subfolder'));
     expect(screen.getByRole('textbox', { name: 'Subfolder name' })).toHaveValue('attachments');
+    // M5b round 2: as wide as the selects around it, not a 10-character box.
+    expect(screen.getByRole('textbox', { name: 'Subfolder name' })).toHaveClass(styles.textInput);
     await userEvent.selectOptions(where, 'same');
     await waitFor(() =>
       expect(vaultPatches).toEqual([{ attachments: { mode: 'same', path: '' } }]),
@@ -303,6 +414,7 @@ describe('Settings → This vault (M2c §5.4)', () => {
 
   it('M4b part 2 §1: the vault can set its own page width or use the app setting', async () => {
     open();
+    await show('This vault');
     const width = await screen.findByRole('combobox', { name: 'Page width for this vault' });
     await waitFor(() => expect(width).toHaveValue('default'));
     await userEvent.selectOptions(width, 'full');
@@ -316,6 +428,7 @@ describe('Settings → This vault (M2c §5.4)', () => {
 
   it('M4b part 3 §8: the link format for new attachments is saved at once, with an example', async () => {
     open();
+    await show('This vault');
     const format = await screen.findByRole('combobox', {
       name: 'Link format for new attachments',
     });
@@ -340,6 +453,7 @@ describe('Settings → This vault (M2c §5.4)', () => {
   it("M4b part 3 §8: Obsidian's newLinkFormat is followed until NIMW has its own", async () => {
     obsidianLinkFormat = 'relative';
     open();
+    await show('This vault');
     const format = await screen.findByRole('combobox', {
       name: 'Link format for new attachments',
     });
@@ -360,6 +474,7 @@ describe('Settings → This vault (M2c §5.4)', () => {
 
   it('a folder is saved on Enter; an unusable name is explained and not saved', async () => {
     open();
+    await show('This vault');
     const where = await screen.findByRole('combobox', { name: 'New attachments go to' });
     await waitFor(() => expect(where).toHaveValue('subfolder'));
     await userEvent.selectOptions(where, 'folder');
@@ -379,6 +494,7 @@ describe('Settings → This vault (M2c §5.4)', () => {
   it('M4b part 3: a folder typed but not confirmed is saved when a click outside closes Settings', async () => {
     const closed: string[] = [];
     render(<SettingsDialog onClose={() => closed.push('closed')} />);
+    await show('This vault');
     const where = await screen.findByRole('combobox', { name: 'New attachments go to' });
     await waitFor(() => expect(where).toHaveValue('subfolder'));
     await userEvent.selectOptions(where, 'folder');
@@ -395,6 +511,7 @@ describe('Settings → This vault (M2c §5.4)', () => {
 
   it('tabbing through the untouched field writes nothing (no .nimw/ for nothing; final review M5)', async () => {
     open();
+    await show('This vault');
     const where = await screen.findByRole('combobox', { name: 'New attachments go to' });
     await waitFor(() => expect(where).toBeEnabled());
     const field = screen.getByRole('textbox', { name: 'Subfolder name' });
@@ -409,6 +526,7 @@ describe('Settings → This vault (M2c §5.4)', () => {
 
   it('a value saved on Enter is not saved again on blur (final review M5)', async () => {
     open();
+    await show('This vault');
     const where = await screen.findByRole('combobox', { name: 'New attachments go to' });
     await waitFor(() => expect(where).toBeEnabled());
     const field = screen.getByRole('textbox', { name: 'Subfolder name' });
@@ -425,6 +543,7 @@ describe('Settings → This vault (M2c §5.4)', () => {
   it("Obsidian's setting wins: shown read-only with where files go", async () => {
     obsidian = './assets';
     open();
+    await show('This vault');
     const where = await screen.findByRole('combobox', { name: 'New attachments go to' });
     await waitFor(() => expect(where).toBeDisabled());
     expect(
@@ -444,6 +563,7 @@ describe('Settings → This vault (M2c §5.4)', () => {
   it("M4b §5: a switch lets NIMW use its own place; off restores Obsidian's", async () => {
     obsidian = './assets';
     open();
+    await show('This vault');
     const where = await screen.findByRole('combobox', { name: 'New attachments go to' });
     await waitFor(() => expect(where).toBeDisabled());
     const own = screen.getByRole('checkbox', { name: 'Use a different place in Notes In My Way' });
@@ -501,6 +621,7 @@ describe('M4b part 3: Escape and a click outside save and close Settings', () =>
 
   it('a hex accent typed but not confirmed is saved by Escape before closing', async () => {
     const closed = openWith();
+    await show('Appearance');
     await userEvent.click(screen.getByRole('radio', { name: 'Custom accent' }));
     const hex = screen.getByRole('textbox', { name: 'Accent colour (hex)' });
     await userEvent.clear(hex);

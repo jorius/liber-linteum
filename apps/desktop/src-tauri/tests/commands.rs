@@ -16,6 +16,7 @@ use tauri::{
 /// Every command M1b adds (spec §2.4).
 const COMMANDS: &[&str] = &[
     "window_close_self",
+    "window_title_set",
     "vault_open",
     "vault_create",
     "vault_close",
@@ -62,6 +63,21 @@ const COMMANDS: &[&str] = &[
     "external_network_allow",
     "file_pick",
     "search",
+    "folder_icon_set",
+    "vault_icon_set",
+    // M5b §5: the vault's Trash and Archive.
+    "bin_list",
+    "trash_restore",
+    "trash_delete",
+    "trash_empty",
+    "entry_archive",
+    "archive_restore",
+    // M5b round 2: folder orders.
+    "folder_sort_get",
+    "folder_sort_set",
+    // M5b §19: Favorites.
+    "favorites_get",
+    "favorites_set",
 ];
 
 struct Harness {
@@ -614,6 +630,19 @@ fn ed_08_main_window_may_flush_then_close_itself() {
     let err = call(&h.main, "plugin:window|destroy", json!({ "label": "main" })).expect_err("main");
     assert!(err.to_string().contains("not allowed"), "{err}");
     call(&h.main, "window_close_self", json!({})).expect("main closes itself");
+}
+
+/// M5b §11.8: the page names its own window ("Page — Vault"); the mock
+/// runtime keeps no title, so the cleaning is a unit test (`clean_title`).
+#[test]
+fn m5b_window_title_set_is_the_main_windows() {
+    let h = harness();
+    call(
+        &h.main,
+        "window_title_set",
+        json!({ "title": "Military Ranks — Dark Galaxy" }),
+    )
+    .expect("main sets its title");
 }
 
 /// M1b hand-off §10 j: a read-only config dir must not stop a vault from
@@ -2041,4 +2070,359 @@ fn m4b3_outside_files_over_ipc() {
     // Final review I2: a linked disk image is no document: shown, not opened.
     let err = call(&h.main, "external_open", json!({ "path": iso })).unwrap_err();
     assert_eq!(kind(err), "invalidUrl", "only documents and media open");
+}
+
+/// M5b §4: folder and vault icons over IPC; the tree, vault info and recent
+/// vaults carry them, page icons come from frontmatter; text is refused.
+#[test]
+fn m5b_icons_over_ipc() {
+    let h = harness();
+    let vault = copy_fixture("obsidian-basic");
+    std::fs::write(vault.path().join("Rocket.md"), "---\nicon: 🚀\n---\n# R\n").unwrap();
+    call(&h.main, "vault_open", json!({ "path": vault.path() })).unwrap();
+    call(
+        &h.main,
+        "folder_icon_set",
+        json!({ "path": "Game Design", "icon": "🎮" }),
+    )
+    .unwrap();
+    let tree = call(&h.main, "vault_tree", json!({})).unwrap();
+    let icon = |path: &str| {
+        tree.as_array()
+            .unwrap()
+            .iter()
+            .find(|n| n["path"] == path)
+            .map(|n| n["icon"].clone())
+            .unwrap()
+    };
+    assert_eq!(icon("Game Design"), json!("🎮"));
+    assert_eq!(icon("Rocket.md"), json!("🚀"));
+    assert_eq!(icon("Welcome.md"), Value::Null);
+    call(&h.main, "vault_icon_set", json!({ "icon": "🌌" })).unwrap();
+    let info = call(&h.main, "vault_open", json!({ "path": vault.path() })).unwrap();
+    assert_eq!(info["icon"], "🌌");
+    let recent = call(&h.main, "vaults_recent", json!({})).unwrap();
+    assert_eq!(recent[0]["icon"], "🌌");
+    for bad in ["x", "🚀🚀", ""] {
+        let err = call(&h.main, "vault_icon_set", json!({ "icon": bad })).unwrap_err();
+        assert_eq!(kind(err), "invalidName", "{bad:?}");
+        let err = call(
+            &h.main,
+            "folder_icon_set",
+            json!({ "path": "Game Design", "icon": bad }),
+        )
+        .unwrap_err();
+        assert_eq!(kind(err), "invalidName", "{bad:?}");
+    }
+    for path in ["Welcome.md", "Missing", ".obsidian", "../x"] {
+        assert!(
+            call(
+                &h.main,
+                "folder_icon_set",
+                json!({ "path": path, "icon": "🎮" })
+            )
+            .is_err(),
+            "{path}"
+        );
+    }
+    // Clearing.
+    call(
+        &h.main,
+        "folder_icon_set",
+        json!({ "path": "Game Design", "icon": null }),
+    )
+    .unwrap();
+    call(&h.main, "vault_icon_set", json!({ "icon": null })).unwrap();
+    let tree = call(&h.main, "vault_tree", json!({})).unwrap();
+    assert!(
+        tree.as_array()
+            .unwrap()
+            .iter()
+            .all(|n| n["path"] != "Game Design" || n.get("icon").is_none())
+    );
+}
+
+/// M5b round 2: a folder (or the root, `""`) lists its entries in its own
+/// order; the default isn't stored; files and unknown orders are refused.
+#[test]
+fn m5b_r2_folder_sorts_over_ipc() {
+    let h = harness();
+    let vault = copy_fixture("obsidian-basic");
+    call(&h.main, "vault_open", json!({ "path": vault.path() })).unwrap();
+    let get = |path: &str| call(&h.main, "folder_sort_get", json!({ "path": path })).unwrap();
+    assert_eq!(get(""), "name-asc");
+    call(
+        &h.main,
+        "folder_sort_set",
+        json!({ "path": "", "sort": "name-desc" }),
+    )
+    .unwrap();
+    call(
+        &h.main,
+        "folder_sort_set",
+        json!({ "path": "Game Design", "sort": "modified-desc" }),
+    )
+    .unwrap();
+    assert_eq!(get(""), "name-desc");
+    assert_eq!(get("Game Design"), "modified-desc");
+    let tree = call(&h.main, "vault_tree", json!({})).unwrap();
+    let roots: Vec<&str> = tree
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|n| n["path"].as_str().unwrap())
+        .filter(|p| !p.contains('/'))
+        .collect();
+    let mut names = roots.clone();
+    names.sort_by_key(|p| std::cmp::Reverse(p.to_lowercase()));
+    names.sort_by_key(|p| !vault.path().join(p).is_dir());
+    assert_eq!(roots, names);
+    for (path, sort) in [
+        ("Welcome.md", "name-asc"),
+        ("Missing", "name-asc"),
+        (".obsidian", "name-asc"),
+        ("", "size"),
+    ] {
+        assert!(
+            call(
+                &h.main,
+                "folder_sort_set",
+                json!({ "path": path, "sort": sort })
+            )
+            .is_err(),
+            "{path} {sort}"
+        );
+    }
+    call(
+        &h.main,
+        "folder_sort_set",
+        json!({ "path": "", "sort": "name-asc" }),
+    )
+    .unwrap();
+    assert_eq!(get(""), "name-asc");
+}
+
+/// M5b round 2: archived pages are read-only. Every command that would
+/// change one, or put something in the Archive, is refused; Unarchive and
+/// Move to Trash still work.
+#[test]
+fn m5b_r2_the_archive_is_read_only() {
+    let h = harness();
+    let vault = open_fixture(&h, "obsidian-basic");
+    call(&h.main, "entry_archive", json!({ "path": "Welcome.md" })).unwrap();
+    let a = ".archive/Welcome.md";
+    let read = call(&h.main, "page_read", json!({ "path": a })).unwrap();
+    let hash = read["hash"].clone();
+    let refused: Vec<(&str, Value)> = vec![
+        (
+            "page_write",
+            json!({ "path": a, "text": "x", "expectedHash": hash }),
+        ),
+        (
+            "text_write",
+            json!({ "path": a, "text": "x", "expectedHash": hash }),
+        ),
+        (
+            "page_create_conflict_copy",
+            json!({ "path": a, "text": "x" }),
+        ),
+        (
+            "entry_rename",
+            json!({ "from": a, "to": ".archive/Other.md" }),
+        ),
+        (
+            "entry_rename",
+            json!({ "from": "Game Design", "to": ".archive/Game Design" }),
+        ),
+        (
+            "entry_create_page",
+            json!({ "dir": ".archive", "name": "New" }),
+        ),
+        (
+            "entry_create_folder",
+            json!({ "parent": ".archive", "name": "New" }),
+        ),
+        (
+            "entry_create_text",
+            json!({ "dir": ".archive", "name": "n.txt" }),
+        ),
+        ("attachment_import", json!({ "page": a, "paths": [] })),
+        ("cover_pick", json!({ "page": a })),
+        ("page_width_set", json!({ "path": a, "width": "full" })),
+        ("cover_height_set", json!({ "path": a, "height": 200.0 })),
+        ("cover_side_set", json!({ "path": a, "side": "left" })),
+        ("cover_width_set", json!({ "path": a, "width": 300.0 })),
+    ];
+    for (cmd, args) in refused {
+        let err = call(&h.main, cmd, args.clone()).unwrap_err();
+        assert_eq!(kind(err), "notPermitted", "{cmd} {args}");
+    }
+    assert!(vault.path().join(a).exists());
+    // Sorting it is fine; Unarchive and Move to Trash still work.
+    std::fs::create_dir_all(vault.path().join(".archive/Old")).unwrap();
+    call(
+        &h.main,
+        "folder_sort_set",
+        json!({ "path": ".archive/Old", "sort": "name-desc" }),
+    )
+    .unwrap();
+    call(
+        &h.main,
+        "archive_restore",
+        json!({ "path": a, "keepBoth": false }),
+    )
+    .unwrap();
+    call(&h.main, "entry_archive", json!({ "path": "Welcome.md" })).unwrap();
+    call(&h.main, "entry_trash", json!({ "path": a })).unwrap();
+}
+
+/// M5b §5: delete moves into the vault's Trash and comes back; archive moves
+/// into `.archive/` and back; search leaves archived pages out unless asked.
+/// (Never `trash_delete`/`trash_empty` here: they reach the OS trash.)
+#[test]
+fn m5b_trash_and_archive_over_ipc() {
+    let h = harness();
+    let vault = open_fixture(&h, "obsidian-basic");
+    let inner = call(&h.main, "entry_trash", json!({ "path": "Welcome.md" })).unwrap();
+    assert_eq!(inner, ".trash/Welcome.md");
+    let bins = call(&h.main, "bin_list", json!({})).unwrap();
+    assert_eq!(bins["trash"][0]["path"], ".trash/Welcome.md");
+    assert_eq!(bins["trash"][0]["from"], "Welcome.md");
+    assert!(bins["trash"][0]["at"].is_u64());
+    assert_eq!(bins["trash"][0]["folder"], false);
+    // M5b round 2: its size, for the Trash view.
+    assert!(bins["trash"][0]["size"].as_u64().unwrap() > 0);
+    let back = call(
+        &h.main,
+        "trash_restore",
+        json!({ "path": ".trash/Welcome.md", "keepBoth": false }),
+    )
+    .unwrap();
+    assert_eq!(back, "Welcome.md");
+    assert!(vault.path().join("Welcome.md").exists());
+
+    let out = call(&h.main, "entry_archive", json!({ "path": "Welcome.md" })).unwrap();
+    assert_eq!(out["moved"][0][1], ".archive/Welcome.md");
+    let bins = call(&h.main, "bin_list", json!({})).unwrap();
+    assert_eq!(bins["archive"][0]["path"], ".archive/Welcome.md");
+    // M5b round 2: the tree carries the Archive too, for its own read-only
+    // folder in the sidebar; the UI keeps it out of the vault's tree.
+    let tree = call(&h.main, "vault_tree", json!({})).unwrap();
+    assert!(
+        tree.as_array()
+            .unwrap()
+            .iter()
+            .any(|n| n["path"] == ".archive/Welcome.md")
+    );
+    let page = call(
+        &h.main,
+        "page_get",
+        json!({ "path": ".archive/Welcome.md" }),
+    );
+    assert!(page.is_ok(), "an archived page still opens: {page:?}");
+    let hidden = call(&h.main, "search", json!({ "query": { "text": "welcome" } })).unwrap();
+    assert!(hidden["facets"]["archived"].as_u64().unwrap() >= 1);
+    let shown = call(
+        &h.main,
+        "search",
+        json!({ "query": { "text": "welcome", "archived": true } }),
+    )
+    .unwrap();
+    assert!(
+        shown["results"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|r| r["path"] == ".archive/Welcome.md")
+    );
+    let out = call(
+        &h.main,
+        "archive_restore",
+        json!({ "path": ".archive/Welcome.md", "keepBoth": false }),
+    )
+    .unwrap();
+    assert_eq!(out["moved"][0][1], "Welcome.md");
+    // Refused: the bins themselves.
+    assert!(call(&h.main, "entry_trash", json!({ "path": ".nimw" })).is_err());
+}
+
+/// M5b §19: Favorites are one ordered list; escaping or hidden paths are
+/// refused, missing ones and repeats dropped, and the list follows renames.
+#[test]
+fn m5b_favorites_over_ipc() {
+    let h = harness();
+    let vault = copy_fixture("obsidian-basic");
+    call(&h.main, "vault_open", json!({ "path": vault.path() })).unwrap();
+    assert_eq!(
+        call(&h.main, "favorites_get", json!({})).unwrap(),
+        json!([])
+    );
+    let stored = call(
+        &h.main,
+        "favorites_set",
+        json!({ "paths": ["Welcome.md", "Game Design", "Missing.md", "Welcome.md"] }),
+    )
+    .unwrap();
+    assert_eq!(stored, json!(["Welcome.md", "Game Design"]));
+    for bad in [
+        "../x.md",
+        ".obsidian/app.json",
+        ".nimw/vault.json",
+        ".trash/.x",
+        "/abs.md",
+    ] {
+        assert!(
+            call(&h.main, "favorites_set", json!({ "paths": [bad] })).is_err(),
+            "{bad}"
+        );
+    }
+    call(
+        &h.main,
+        "entry_rename",
+        json!({ "from": "Game Design", "to": "Design" }),
+    )
+    .unwrap();
+    assert_eq!(
+        call(&h.main, "favorites_get", json!({})).unwrap(),
+        json!(["Welcome.md", "Design"])
+    );
+}
+
+/// Round-2 review M3: the Archive's write guard ignores letter case — on a
+/// case-insensitive disk `.ARCHIVE/x.md` is the archived file.
+#[test]
+fn m5b_r2_review_m3_the_archive_guard_ignores_case() {
+    let h = harness();
+    let _vault = open_fixture(&h, "obsidian-basic");
+    call(&h.main, "entry_archive", json!({ "path": "Welcome.md" })).unwrap();
+    for path in [".ARCHIVE/Welcome.md", ".Archive/x.md"] {
+        let err = call(
+            &h.main,
+            "page_write",
+            json!({ "path": path, "text": "x", "expectedHash": "0" }),
+        )
+        .unwrap_err();
+        assert_eq!(kind(err.clone()), "notPermitted", "{path}: {err}");
+    }
+}
+
+/// Round-2 review M9: a favourite that can't be checked (no permission)
+/// counts as missing; it doesn't fail the whole list.
+#[cfg(unix)]
+#[test]
+fn m5b_r2_review_m9_an_unreadable_favorite_is_dropped_not_fatal() {
+    use std::os::unix::fs::PermissionsExt;
+    let h = harness();
+    let vault = open_fixture(&h, "obsidian-basic");
+    let locked = vault.path().join("Locked");
+    std::fs::create_dir(&locked).unwrap();
+    std::fs::write(locked.join("x.md"), "x").unwrap();
+    std::fs::set_permissions(&locked, std::fs::Permissions::from_mode(0o000)).unwrap();
+    let out = call(
+        &h.main,
+        "favorites_set",
+        json!({ "paths": ["Welcome.md", "Locked/x.md"] }),
+    );
+    std::fs::set_permissions(&locked, std::fs::Permissions::from_mode(0o755)).unwrap();
+    assert_eq!(out.unwrap(), json!(["Welcome.md"]));
 }

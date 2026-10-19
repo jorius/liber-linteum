@@ -2,6 +2,7 @@
 //! `nimw-vault` (filesystem), `nimw-markdown` (parsing) and `nimw-index` (cache).
 
 mod attachments;
+mod bin;
 mod editing;
 mod error;
 mod events;
@@ -15,6 +16,7 @@ mod text_files;
 mod watching;
 
 pub use attachments::{Attached, LinkSuggestion, cover_reference, sanitize_file_name};
+pub use bin::BinItem;
 pub use error::{Result, SessionError};
 pub use events::{IndexReport, RenameOutcome, SessionEvent};
 pub use external::{ExternalFile, file_url, opens_from_notes};

@@ -287,8 +287,66 @@ impl VaultSession {
 
     // ---- reads ----
 
+    /// Every indexed entry but the Archive's (M5b §5.3).
     pub fn tree(&self) -> Result<Vec<nimw_index::TreeNode>> {
-        Ok(self.index().tree()?)
+        let mut nodes = self.tree_with_archive()?;
+        nodes.retain(|n| !nimw_vault::is_archived(&n.path));
+        Ok(nodes)
+    }
+
+    /// The tree with the Archive (`.archive` and what's in it), which the
+    /// sidebar shows as its own read-only folder (M5b round 2).
+    pub fn tree_with_archive(&self) -> Result<Vec<nimw_index::TreeNode>> {
+        let mut nodes = self.index().tree()?;
+        self.order_folders(&mut nodes);
+        Ok(nodes)
+    }
+
+    /// Lists each folder's entries in its own order (M5b round 2). The index
+    /// gives them by parent, folders first, then by name; folders with an
+    /// order of their own are re-sorted in place, folders still first.
+    fn order_folders(&self, nodes: &mut [nimw_index::TreeNode]) {
+        use nimw_vault::FolderSort::*;
+        let sorts = self.vault.folder_sorts();
+        if sorts.is_empty() {
+            return;
+        }
+        let created = |path: &str| {
+            let full = VaultPath::new(path)
+                .ok()
+                .and_then(|p| self.vault.fs_path(&p).ok());
+            full.and_then(|f| std::fs::metadata(f).ok()?.created().ok())
+        };
+        for run in nodes.chunk_by_mut(|a, b| a.parent == b.parent) {
+            let Some(&sort) = sorts.get(&run[0].parent) else {
+                continue;
+            };
+            let born: HashMap<String, _> = if sort == CreatedDesc {
+                run.iter()
+                    .map(|n| (n.path.clone(), created(&n.path)))
+                    .collect()
+            } else {
+                HashMap::new()
+            };
+            // Keys made once per entry, not per comparison (round-2 review M14).
+            let keys: HashMap<String, String> = run
+                .iter()
+                .map(|n| (n.path.clone(), nimw_markdown::name_key(&n.name)))
+                .collect();
+            run.sort_by(|a, b| {
+                let folders = (a.kind != FileKind::Folder).cmp(&(b.kind != FileKind::Folder));
+                let name = keys[&a.path].cmp(&keys[&b.path]);
+                let order = match (sort, a.kind == FileKind::Folder) {
+                    (NameDesc, _) => name.reverse(),
+                    // Folders keep their names' order under a date order.
+                    (_, true) | (NameAsc, _) => name,
+                    (ModifiedDesc, _) => b.mtime_ns.cmp(&a.mtime_ns).then(name),
+                    (ModifiedAsc, _) => a.mtime_ns.cmp(&b.mtime_ns).then(name),
+                    (CreatedDesc, _) => born[&b.path].cmp(&born[&a.path]).then(name),
+                };
+                folders.then(order)
+            });
+        }
     }
 
     pub fn page(&self, path: &VaultPath) -> Result<Option<nimw_index::PageRow>> {
@@ -342,14 +400,12 @@ impl VaultSession {
         Ok(path)
     }
 
-    /// Moves a file or folder to the OS trash (EXP-03). Links to it become unresolved.
-    pub fn trash(&self, path: &VaultPath) -> Result<()> {
-        self.trash_with_hook(path, &|| {})
-    }
-
-    /// `trash` with a hook that runs just before the OS call. The index lock is
-    /// released during that call: the OS may block on a permission prompt and
-    /// reads/the watcher must not stall meanwhile.
+    /// Moves a file or folder to the OS trash (EXP-03; since M5b only items
+    /// already in the vault's Trash), with a hook that runs just before the
+    /// OS call. The index lock is released during that call: the OS may
+    /// block on a permission prompt and reads/the watcher must not stall
+    /// meanwhile.
+    #[cfg(test)]
     pub(crate) fn trash_with_hook(
         &self,
         path: &VaultPath,
@@ -358,8 +414,9 @@ impl VaultSession {
         self.trash_via(path, before_os_call, &|p| self.vault.trash(p))
     }
 
-    /// `trash_with_hook` with the OS call passed in (tests never use the real
-    /// trash).
+    /// Removes `path` through `os_trash` (the OS trash; a plain removal in
+    /// tests, which never use the real trash). Links to it become
+    /// unresolved, and its sizes are forgotten.
     pub(crate) fn trash_via(
         &self,
         path: &VaultPath,
@@ -392,9 +449,25 @@ impl VaultSession {
         let heights = self.vault.forget_cover_heights(removed);
         let sides = self.vault.forget_cover_sides(removed);
         let strips = self.vault.forget_cover_widths(removed);
+        // And folder icons (M5b §4).
+        let icons = self.vault.forget_folder_icons(removed);
+        let sorts = self.vault.forget_folder_sorts(removed);
+        // And favorites (M5b §19).
+        let favorites = self.vault.forget_favorites(removed);
         // Deleted quick notes stop being named after their first line (M4c).
         let quick = self.vault.forget_auto_named(removed);
-        if let Err(e) = widths.and(heights).and(sides).and(strips).and(quick) {
+        // And Global View positions and index-note picks (M5b final review M6).
+        let layout = self.vault.forget_layout(removed);
+        if let Err(e) = widths
+            .and(layout)
+            .and(heights)
+            .and(sides)
+            .and(strips)
+            .and(icons)
+            .and(sorts)
+            .and(favorites)
+            .and(quick)
+        {
             self.emit(SessionEvent::Warning(format!(
                 "Page widths or cover sizes not updated for {} removed entries: {e}",
                 removed.len()

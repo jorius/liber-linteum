@@ -34,6 +34,9 @@ export const DEFAULT_SETTINGS: Settings = {
   coverHeight: 200,
   showAttachmentPaths: false,
   scratchpadPath: null,
+  autoSave: true,
+  sidebarCollapsed: false,
+  actionButton: 'bottomRight',
   globalViewMode: 'drill',
   globalViewEdges: { links: true, tree: true, manual: true, aggregated: true },
 };

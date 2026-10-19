@@ -3,7 +3,14 @@ import { useTranslation } from 'react-i18next';
 import { parentOf } from '../../stores/tree';
 import { useUiStore } from '../../stores/uiStore';
 import { useVaultStore } from '../../stores/vaultStore';
-import { requestDelete } from './deleteFlow';
+import { EmojiPicker } from '../icons/EmojiPicker';
+import { setIcon } from '../icons/setIcon';
+import { archiveItem, restoreItem } from '../bin/binActions';
+import { isArchived } from '../../stores/tree';
+import { openPage } from '../../stores/navigate';
+import { SortMenu } from './SortMenu';
+import { requestTrash } from './trashAction';
+import { nudgeFavorite, shownFavorites, useFavoritesStore } from '../favorites/favoritesStore';
 import { displayName } from './TreeRow';
 
 export interface MenuState {
@@ -14,22 +21,31 @@ export interface MenuState {
 /** Explorer actions for one item (right-click, "…" or Shift+F10). */
 export function ContextMenu({ menu, onClose }: { menu: MenuState; onClose: () => void }) {
   const { t } = useTranslation();
-  const node = useVaultStore((s) => s.nodes.find((n) => n.path === menu.path));
+  // From its folder's rows, which also hold the Archive's (M5b round 2).
+  const node = useVaultStore((s) =>
+    s.children.get(parentOf(menu.path))?.find((n) => n.path === menu.path),
+  );
+  const favorites = useFavoritesStore((s) => s.paths);
   const [active, setActive] = useState(0);
+  // Icon… swaps the menu for the emoji picker at the same place (M5b §4).
+  const [picking, setPicking] = useState(false);
+  // Sort by ▸ swaps the menu for the folder's orders (M5b round 2).
+  const [sorting, setSorting] = useState(false);
   const items = useRef<(HTMLButtonElement | null)[]>([]);
   const box = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     items.current[active]?.focus();
-  }, [active]);
+  }, [active, sorting]);
 
   useEffect(() => {
+    if (picking || sorting) return;
     const onDown = (e: MouseEvent) => {
       if (box.current && !box.current.contains(e.target as Node)) onClose();
     };
     document.addEventListener('mousedown', onDown);
     return () => document.removeEventListener('mousedown', onDown);
-  }, [onClose]);
+  }, [onClose, picking, sorting]);
 
   // Its item vanished (deleted or renamed outside the app): close instead of
   // lingering invisibly with global shortcuts disabled (final review, upgraded M3).
@@ -40,20 +56,81 @@ export function ContextMenu({ menu, onClose }: { menu: MenuState; onClose: () =>
   if (!node) return null;
   const dir = node.kind === 'folder' ? node.path : parentOf(node.path);
   const vault = useVaultStore.getState;
-  const actions: [string, () => void][] = [
-    [t('menu.newPage'), () => void vault().createPage(dir)],
-    [t('menu.newFolder'), () => void vault().createFolder(dir)],
-    [t('menu.rename'), () => vault().startRename(node.path)],
-    [t('menu.move'), () => useUiStore.getState().openDialog({ type: 'move', path: node.path })],
-    [t('menu.delete'), () => requestDelete(node.path)],
-  ];
+  // The Archive is read-only (M5b round 2): open, unarchive, sort or trash.
+  const archived = isArchived(node.path);
+  const actions: [string, () => void][] = archived
+    ? [
+        ...(node.kind === 'folder'
+          ? []
+          : [[t('menu.open'), () => void openPage(node.path)] as [string, () => void]]),
+        [t('menu.unarchive'), () => void restoreItem('archive', node.path)],
+        [t('menu.sortBy'), () => setSorting(true)],
+        [t('menu.delete'), () => requestTrash(node.path)],
+      ]
+    : [
+        [t('menu.newPage'), () => void vault().createPage(dir)],
+        [t('menu.newFolder'), () => void vault().createFolder(dir)],
+        [t('menu.rename'), () => vault().startRename(node.path)],
+        [t('menu.move'), () => useUiStore.getState().openDialog({ type: 'move', path: node.path })],
+        ...(node.kind === 'attachment'
+          ? []
+          : [[t('menu.icon'), () => setPicking(true)] as [string, () => void]]),
+        [t('menu.sortBy'), () => setSorting(true)],
+        [t('menu.archive'), () => void archiveItem(node.path)],
+        [t('menu.delete'), () => requestTrash(node.path)],
+        // Favorites (M5b §19): pages and folders; a favorite also moves in the list.
+        ...favoriteActions(node.path, node.kind, favorites, t),
+      ];
+
+  const sortIndex = actions.findIndex(([label]) => label === t('menu.sortBy'));
+  if (sorting) {
+    const vault = useVaultStore.getState();
+    const folder = vault.children.get(parentOf(dir))?.find((n) => n.path === dir);
+    const name =
+      dir === '.archive'
+        ? t('bin.archived')
+        : folder && dir
+          ? displayName(folder)
+          : (vault.info?.name ?? '');
+    return (
+      <SortMenu
+        path={dir}
+        name={name}
+        anchor={menu.anchor}
+        onClose={onClose}
+        onBack={() => {
+          setActive(sortIndex);
+          setSorting(false);
+        }}
+      />
+    );
+  }
+
+  if (picking) {
+    const kind = node.kind === 'folder' ? 'folder' : 'page';
+    return (
+      <EmojiPicker
+        anchor={() => ({ top: menu.anchor.y, bottom: menu.anchor.y, left: menu.anchor.x })}
+        label={t('icons.pickFor', { name: displayName(node) })}
+        hasIcon={!!node.icon}
+        onClose={onClose}
+        onPick={(emoji) => {
+          onClose();
+          void setIcon({ kind, path: node.path }, emoji);
+        }}
+      />
+    );
+  }
 
   const onKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
     if (e.key === 'ArrowDown') setActive((a) => (a + 1) % actions.length);
     else if (e.key === 'ArrowUp') setActive((a) => (a - 1 + actions.length) % actions.length);
     else if (e.key === 'Home') setActive(0);
     else if (e.key === 'End') setActive(actions.length - 1);
-    else if (e.key === 'Escape' || e.key === 'Tab') onClose();
+    else if (e.key === 'ArrowRight' && document.activeElement === items.current[sortIndex]) {
+      setActive(sortIndex);
+      setSorting(true);
+    } else if (e.key === 'Escape' || e.key === 'Tab') onClose();
     else return;
     e.preventDefault();
     e.stopPropagation();
@@ -77,8 +154,9 @@ export function ContextMenu({ menu, onClose }: { menu: MenuState; onClose: () =>
           type="button"
           role="menuitem"
           tabIndex={i === active ? 0 : -1}
+          aria-haspopup={i === sortIndex ? 'menu' : undefined}
           onClick={() => {
-            onClose();
+            if (label !== t('menu.icon') && i !== sortIndex) onClose();
             run();
           }}
         >
@@ -87,4 +165,26 @@ export function ContextMenu({ menu, onClose }: { menu: MenuState; onClose: () =>
       ))}
     </div>
   );
+}
+
+function favoriteActions(
+  path: string,
+  kind: string,
+  favorites: string[],
+  t: (key: string) => string,
+): [string, () => void][] {
+  if (kind === 'attachment') return [];
+  const toggle = () => void useFavoritesStore.getState().toggle(path);
+  if (!favorites.includes(path)) return [[t('favorites.add'), toggle]];
+  const shown = shownFavorites(favorites, useVaultStore.getState().nodes).map((n) => n.path);
+  const i = shown.indexOf(path);
+  return [
+    [t('favorites.remove'), toggle],
+    ...(i > 0
+      ? [[t('favorites.moveUp'), () => nudgeFavorite(path, -1)] as [string, () => void]]
+      : []),
+    ...(i >= 0 && i < shown.length - 1
+      ? [[t('favorites.moveDown'), () => nudgeFavorite(path, 1)] as [string, () => void]]
+      : []),
+  ];
 }

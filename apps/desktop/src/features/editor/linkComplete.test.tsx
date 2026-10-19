@@ -12,6 +12,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { clearMocks, mockIPC } from '../../ipc/testing';
 import type { LinkSuggestion } from '../../ipc';
 import { headingLinkText, sameHeading } from '../../markdown/headings';
+import { useVaultStore } from '../../stores/vaultStore';
 import { linkCompletion, linkQueryAt, linkSource } from './linkComplete';
 import { pagePath } from './livePreview';
 
@@ -107,6 +108,19 @@ describe('linkSource (M2c §6, PG-05)', () => {
     expect(result!.options[0]).toMatchObject({ label: 'Generator Rex', detail: REX.path });
     expect(v.state.doc.toString()).toBe('See [[rex-draft|Generator Rex]]');
     expect(v.state.selection.main.head).toBe(v.state.doc.length);
+  });
+
+  it('M5b §4: a page’s emoji shows before its name; matching and inserting stay on the name', async () => {
+    useVaultStore.setState({ nodes: [{ path: REX.path, kind: 'page', icon: '🦖' }] });
+    mockIPC((cmd) => (cmd === 'link_suggest' ? [REX] : null));
+    const v = editor('See [[gen');
+    const result = await complete(v);
+    expect(result!.options[0]).toMatchObject({
+      label: 'Generator Rex',
+      displayLabel: '🦖 Generator Rex',
+    });
+    expect(v.state.doc.toString()).toBe('See [[rex-draft|Generator Rex]]');
+    useVaultStore.setState({ nodes: [] });
   });
 
   it('keeps an existing ]] and moves past it; no alias when the title is the name', async () => {

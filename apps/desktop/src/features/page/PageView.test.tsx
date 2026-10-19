@@ -7,6 +7,7 @@ import { clearMocks, mockIPC } from '../../ipc/testing';
 import { resetEditorStore, useEditorStore } from '../../stores/editorStore';
 import { usePageStore } from '../../stores/pageStore';
 import { DEFAULT_SETTINGS, useSettingsStore } from '../../stores/settingsStore';
+import { useToastStore } from '../../stores/toastStore';
 import { resetVaultStore, useVaultStore } from '../../stores/vaultStore';
 import { fakeDisk } from '../../test/fakeDisk';
 import { AUTOSAVE_MS } from '../editor/pageDoc';
@@ -63,7 +64,11 @@ describe('PageView (M2a §5)', () => {
       'VaultCharacter Designrex',
     );
     // M2b §2: the title is the file name; the note's own title is shown under it.
-    expect(screen.getByRole('heading', { level: 1, name: 'rex' })).toBeInTheDocument();
+    const title = screen.getByRole('heading', { level: 1, name: 'rex' });
+    // Jose (M5b): the title heads the cover band, above the breadcrumb.
+    const crumbs = screen.getByRole('navigation', { name: 'Breadcrumb' });
+    expect(title.compareDocumentPosition(crumbs) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(title.closest('[data-band]')).toBe(crumbs.closest('[data-band]'));
     expect(screen.getByText('Title in the note: Generator Rex')).toBeInTheDocument();
     // M2c §3: the subtitle is editable in place.
     expect(screen.getByRole('textbox', { name: 'Subtitle' })).toHaveValue('Hero redesign · v3');
@@ -272,6 +277,24 @@ describe('PageView (M2a §5)', () => {
     expect(status).toHaveTextContent('Saved');
   });
 
+  it('M5b §6: Saved is green, Unsaved red; with auto save off nothing is written until ⌘S', async () => {
+    useSettingsStore.setState({ settings: { ...DEFAULT_SETTINGS, autoSave: false } });
+    const disk = fakeDisk({ 'A.md': '# A\n' });
+    render(<PageScreen />);
+    await open('A.md');
+    vi.useFakeTimers();
+    const status = screen.getByRole('status', { name: 'Save status' });
+    expect(status).toHaveAttribute('data-status', 'saved');
+    await type('x');
+    await act(() => vi.advanceTimersByTimeAsync(5000));
+    expect(status).toHaveTextContent('Unsaved');
+    expect(status).toHaveAttribute('data-status', 'unsaved');
+    expect(disk.writes()).toEqual([]);
+    await act(() => useEditorStore.getState().doc!.flush());
+    expect(status).toHaveTextContent('Saved');
+    expect(disk.writes()).toHaveLength(1);
+  });
+
   it('the header follows an own save (title from the new text)', async () => {
     fakeDisk({ 'A.md': '# Old\n' });
     render(<PageScreen />);
@@ -372,5 +395,53 @@ describe('PageView (M2a §5)', () => {
     await open('A.md');
     const results = await axe.run(container, { rules: { 'color-contrast': { enabled: false } } });
     expect(results.violations).toEqual([]);
+  });
+});
+
+// M5b round 2: archived pages are read-only, everywhere on the page.
+describe('an archived page', () => {
+  it('opens read-only: no typing, no edits from the toolbar or keys, a read-only header', async () => {
+    useSettingsStore.setState({ settings: { ...DEFAULT_SETTINGS, toolbar: true } });
+    const disk = fakeDisk({
+      '.archive/Old.md': '---\ncover: a.png\n---\n# Old\n\nKept for the record.\n',
+    });
+    render(<PageScreen />);
+    await open('.archive/Old.md');
+    expect(screen.getByText('This page is archived. Unarchive it to edit it.')).toBeInTheDocument();
+    const content = document.querySelector('.cm-content')!;
+    expect(content).toHaveAttribute('contenteditable', 'false');
+    // Edits that don't come from the disk are dropped (toolbar commands, keys).
+    type('Changed ');
+    expect(view().state.doc.toString()).not.toContain('Changed');
+    expect(screen.queryByRole('toolbar', { name: 'Formatting' })).not.toBeInTheDocument();
+    expect(screen.getByRole('textbox', { name: 'Page title' })).toHaveAttribute('readonly');
+    expect(screen.queryByRole('textbox', { name: 'Subtitle' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Add an icon|Icon for/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Related page/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Page width/ })).not.toBeInTheDocument();
+    await act(() => new Promise((r) => setTimeout(r, 50)));
+    expect(disk.calls.filter(([c]) => c === 'page_write')).toEqual([]);
+  });
+
+  it('round-2 review M4, M5: its task boxes are disabled; a pasted image is left alone, quietly', async () => {
+    useToastStore.getState().clear();
+    const disk = fakeDisk({ '.archive/Old.md': '# Old\n\n- [ ] a task\n' });
+    render(<PageScreen />);
+    await open('.archive/Old.md');
+    const box = await waitFor(() => {
+      const el = document.querySelector<HTMLInputElement>('.cm-nimw-checkbox');
+      expect(el).not.toBeNull();
+      return el!;
+    });
+    expect(box).toBeDisabled();
+    const paste = new Event('paste', { bubbles: true, cancelable: true });
+    const image = new File([new Uint8Array([1])], 'x.png', { type: 'image/png' });
+    Object.defineProperty(paste, 'clipboardData', {
+      value: { types: ['Files'], files: [image] },
+    });
+    document.querySelector('.cm-content')!.dispatchEvent(paste);
+    await act(() => new Promise((r) => setTimeout(r, 20)));
+    expect(disk.calls.filter(([c]) => c === 'attachment_paste')).toEqual([]);
+    expect(useToastStore.getState().toasts).toEqual([]);
   });
 });

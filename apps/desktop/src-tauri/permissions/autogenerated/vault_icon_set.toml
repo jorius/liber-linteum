@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-vault-icon-set"
+description = "Enables the vault_icon_set command without any pre-configured scope."
+commands.allow = ["vault_icon_set"]
+
+[[permission]]
+identifier = "deny-vault-icon-set"
+description = "Denies the vault_icon_set command without any pre-configured scope."
+commands.deny = ["vault_icon_set"]

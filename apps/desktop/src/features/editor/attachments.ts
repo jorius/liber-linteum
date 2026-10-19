@@ -275,8 +275,9 @@ async function pasteImages(view: EditorView, files: File[]) {
 
 const pasteHandler = EditorView.domEventHandlers({
   paste(e, view) {
-    // No vault to save the image in: a single-file window (M4c §3).
-    if (fileWindowName() !== null) return false;
+    // No vault to save the image in (a single-file window, M4c §3), or the
+    // page can't change (archived, round-2 review M5).
+    if (fileWindowName() !== null || view.state.readOnly) return false;
     const data = e.clipboardData;
     if (!data || data.types.includes('text/plain')) return false;
     const files = [...data.files].filter((f) => PASTE_TYPES[f.type] || convertible(f.type));
@@ -360,6 +361,7 @@ async function dropFiles(origin: Origin, id: number, paths: string[]) {
 /** Imports `paths` (granted by a drop or the Attach dialog) for the page in
  *  `view` and inserts them at the cursor, one per line (M4b part 3 §7). */
 export function attachPaths(view: EditorView, paths: string[]): void {
+  if (view.state.readOnly) return;
   const id = ++drops;
   view.dispatch({ effects: addPending.of({ id, pos: view.state.selection.main.head }) });
   void dropFiles(originOf(view), id, paths);
@@ -404,6 +406,7 @@ function onDrag(e: DragDropPayload) {
     useToastStore.getState().push({ message: i18next.t('attach.dropOnText') });
     return;
   }
+  if (hit.view.state.readOnly) return; // archived: nothing to add to (round-2 review M5)
   const id = ++drops;
   hit.view.dispatch({ effects: addPending.of({ id, pos: hit.pos }) });
   void dropFiles(originOf(hit.view), id, paths);

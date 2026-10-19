@@ -2,9 +2,13 @@ import { useDraggable, useDroppable } from '@dnd-kit/core';
 import { forwardRef, useEffect, useId, useRef, useState, type KeyboardEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { TreeNode } from '../../ipc';
+import { isArchived } from '../../stores/tree';
+import { useVaultStore } from '../../stores/vaultStore';
+import { IconButton, ItemIcon } from '../icons/ItemIcon';
 import { QuickNoteIcon } from '../scratchpad/QuickNoteIcon';
 import styles from './Explorer.module.css';
 import { validateName } from './nameRules';
+import { requestTrash } from './trashAction';
 
 /** Name shown in the tree: pages without their `.md`. */
 export function displayName(node: TreeNode): string {
@@ -37,6 +41,24 @@ interface TreeRowProps {
   pinnedCount?: number;
   /** The first root row under the pinned scratch folder. */
   divider?: boolean;
+}
+
+function TrashGlyph() {
+  return (
+    <svg
+      width="13"
+      height="13"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3" />
+    </svg>
+  );
 }
 
 export function Icon({ node, expanded }: { node: TreeNode; expanded: boolean }) {
@@ -165,6 +187,8 @@ export const TreeRow = forwardRef<HTMLLIElement, TreeRowProps>(function TreeRow(
 ) {
   const { t } = useTranslation();
   const name = displayName(node);
+  // The Archive is read-only (M5b round 2): no new page inside, no icon.
+  const archived = isArchived(node.path);
   // Drag source (any item) and drop target (folders). Only the listeners are
   // spread: dnd-kit's attributes would replace the treeitem role and tabindex.
   const drag = useDraggable({ id: node.path, disabled: renaming });
@@ -204,7 +228,14 @@ export const TreeRow = forwardRef<HTMLLIElement, TreeRowProps>(function TreeRow(
       onClick={() => onActivate(node)}
       onFocus={() => onFocusRow(node.path)}
     >
-      <Icon node={node} expanded={expanded} />
+      {/* An optional emoji (M5b §4) stands in for the page glyph, and
+          follows a folder's chevron. */}
+      {node.kind === 'page' && node.icon ? (
+        <ItemIcon icon={node.icon} />
+      ) : (
+        <Icon node={node} expanded={expanded} />
+      )}
+      {node.kind === 'folder' && <ItemIcon icon={node.icon} />}
       {pinnedCount !== undefined && (
         <span className={styles.pinIcon} data-quick-note-icon>
           <QuickNoteIcon size={14} />
@@ -226,6 +257,51 @@ export const TreeRow = forwardRef<HTMLLIElement, TreeRowProps>(function TreeRow(
       {pinnedCount !== undefined && !renaming && (
         <span className={styles.count} aria-hidden>
           {pinnedCount}
+        </span>
+      )}
+      {!renaming && (
+        // Quick actions (M5b §3), for the pointer: shown on hover, focus and
+        // selection; the keyboard has Delete, the menu and its keys. Their
+        // clicks and keys (the picker's too) stay out of the row and tree.
+        <span
+          className={styles.actions}
+          onClick={(e) => e.stopPropagation()}
+          onPointerDown={(e) => e.stopPropagation()}
+          onKeyDown={(e) => e.stopPropagation()}
+        >
+          {node.kind === 'folder' && !archived && (
+            <button
+              type="button"
+              tabIndex={-1}
+              className={styles.action}
+              aria-label={t('explorer.newPageIn', { name })}
+              title={t('explorer.newPageIn', { name })}
+              onClick={() => void useVaultStore.getState().createPage(node.path)}
+            >
+              +
+            </button>
+          )}
+          {node.kind !== 'attachment' && !archived && (
+            <IconButton
+              target={{ kind: node.kind, path: node.path }}
+              icon={node.icon}
+              name={name}
+              glyph="☺"
+              label={t('icons.pickFor', { name })}
+              tabIndex={-1}
+              className={styles.action}
+            />
+          )}
+          <button
+            type="button"
+            tabIndex={-1}
+            className={styles.action}
+            aria-label={t('explorer.trash', { name })}
+            title={t('explorer.trash', { name })}
+            onClick={() => requestTrash(node.path)}
+          >
+            <TrashGlyph />
+          </button>
         </span>
       )}
       {onMenu && !renaming && (
