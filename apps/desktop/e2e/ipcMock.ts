@@ -463,6 +463,29 @@ export function installIpcMock({
         files.add(`attachments/${name}`);
         return { source, ok: { path: `attachments/${name}`, link: name, copied: true } };
       }),
+    // ---- M6: audio clips (a synthetic microphone; levels come from the test) ----
+    audio_devices: () => [{ id: 'mic', name: 'Test microphone', isDefault: true }],
+    audio_record_start: (a) => {
+      if (w.__nimwTake) throw { kind: 'alreadyExists', message: 'already recording' };
+      w.__nimwTake = { id: 7, name: a.name, page: a.page };
+      return { recordingId: 7 };
+    },
+    audio_record_stop: () => {
+      const take = w.__nimwTake as { name: string } | undefined;
+      if (!take) throw { kind: 'notFound', message: 'no recording' };
+      delete w.__nimwTake;
+      const name = `${take.name}.wav`;
+      files.add(`attachments/${name}`);
+      return { path: `attachments/${name}`, link: name, copied: true };
+    },
+    audio_record_cancel: () => {
+      delete w.__nimwTake;
+      return null;
+    },
+    audio_pick: () => {
+      files.add('attachments/memo.wav');
+      return { path: 'attachments/memo.wav', link: 'memo.wav', copied: true };
+    },
     cover_pick: () => {
       files.add('attachments/sky.png');
       return { path: 'attachments/sky.png', reference: 'attachments/sky.png' };
