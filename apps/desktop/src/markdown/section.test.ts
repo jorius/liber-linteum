@@ -16,6 +16,11 @@ describe('sectionOf (embeds of ![[Note#Heading]])', () => {
     expect(JSON.stringify(section)).not.toContain('cast text');
   });
 
+  it('M2c §6.2: a link-safe heading (brackets, pipes, # and ^ dropped) finds its section', () => {
+    const tree = parsePage('## Pipes | and ^carets\nbody\n## Next\n').tree;
+    expect(JSON.stringify(sectionOf(tree, 'pipes and carets'))).toContain('body');
+  });
+
   it('returns null for a missing heading', () => {
     expect(sectionOf(parsePage(src).tree, 'Nope')).toBeNull();
   });

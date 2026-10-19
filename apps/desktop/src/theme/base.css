@@ -56,7 +56,12 @@ body {
   cursor: pointer;
 }
 
-.nimw-menu [role='menuitem']:hover,
+/* Separate rules: WebKit before 15.4 drops a whole selector list that holds
+   :focus-visible, hover included. */
+.nimw-menu [role='menuitem']:hover {
+  background: var(--color-accent-soft);
+}
+
 .nimw-menu [role='menuitem']:focus-visible {
   background: var(--color-accent-soft);
 }

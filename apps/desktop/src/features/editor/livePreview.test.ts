@@ -196,3 +196,35 @@ describe('Live Preview (M2a §3.2)', () => {
     await vi.waitFor(() => expect(asked).toHaveLength(1));
   });
 });
+
+describe('raw HTML blocks (M2c §7.7)', () => {
+  it('render sanitized like a table; the cursor on them shows the source', async () => {
+    const v = editor(
+      'x\n\n<div align="center">\n<b>Hi</b> <script>alert(1)</script>\n</div>\n\npara\n',
+      0,
+    );
+    const widget = v.contentDOM.querySelector('.cm-nimw-widget')!;
+    expect(widget).not.toBeNull();
+    expect(widget.querySelector('b')).toHaveTextContent('Hi');
+    expect(widget.querySelector('script')).toBeNull();
+    expect(v.contentDOM.textContent).not.toContain('<div');
+    await moveTo(v, v.state.doc.line(3).from);
+    expect(v.contentDOM.querySelector('.cm-nimw-widget')).toBeNull();
+    expect(line(v, 3)).toBe('<div align="center">');
+  });
+
+  it('comments and blocks that sanitize to nothing keep their source, muted', () => {
+    const v = editor('x\n\n<!-- a note -->\n\n<script>alert(1)</script>\n\npara\n', 0);
+    expect(v.contentDOM.querySelector('.cm-nimw-widget')).toBeNull();
+    expect(line(v, 3)).toBe('<!-- a note -->');
+    expect(v.contentDOM.querySelectorAll('.cm-line')[2]).toHaveClass('cm-nimw-muted');
+    expect(line(v, 5)).toBe('<script>alert(1)</script>');
+    expect(v.contentDOM.querySelectorAll('.cm-line')[4]).toHaveClass('cm-nimw-muted');
+  });
+
+  it('inline HTML inside a paragraph stays text', () => {
+    const v = editor('x\n\na <b>bold</b> c\n', 0);
+    expect(v.contentDOM.querySelector('.cm-nimw-widget')).toBeNull();
+    expect(line(v, 3)).toBe('a <b>bold</b> c');
+  });
+});

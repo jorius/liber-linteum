@@ -296,3 +296,18 @@ describe('callout titles (I7)', () => {
     expect(screen.getByText('body').closest('summary')).toBeNull();
   });
 });
+
+describe('heading anchors (M2c §6.2)', () => {
+  it('a link-safe heading from [[Page#…]] completion scrolls to its heading', async () => {
+    const scrolled: string[] = [];
+    Object.defineProperty(Element.prototype, 'scrollIntoView', {
+      configurable: true,
+      value(this: Element) {
+        scrolled.push(this.textContent ?? '');
+      },
+    });
+    usePageStore.setState({ anchor: { heading: 'Pipes and carets', nonce: 1 } });
+    show('# Top\n\n## Pipes | and ^carets\n\nbody\n');
+    await waitFor(() => expect(scrolled).toEqual(['Pipes | and ^carets']));
+  });
+});

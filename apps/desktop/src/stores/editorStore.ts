@@ -2,7 +2,9 @@ import i18next from 'i18next';
 import { create } from 'zustand';
 import { LARGE_NOTE_CHARS } from '../features/editor/limits';
 import { PageDoc, type PageDocHooks, type SaveStatus } from '../features/editor/pageDoc';
+import { viewOf } from '../features/editor/views';
 import { isTauri, onCloseRequested, type ChangedPayload, type CommandError } from '../ipc';
+import { setFrontmatter, type FrontmatterPatch } from '../markdown/frontmatterEdit';
 import { errorMessage } from './messages';
 import { openNewPage, openPage } from './navigate';
 import { useToastStore } from './toastStore';
@@ -23,6 +25,8 @@ interface EditorState {
   large: boolean;
   /** Why the requested page can't be edited (e.g. `binary`). */
   error: CommandError | null;
+  /** Pastes/drops being saved into the vault (M2c §5): the status says so. */
+  copying: number;
   open: (path: string) => Promise<void>;
   /** Saves and closes the current page. */
   close: () => Promise<void>;
@@ -39,6 +43,11 @@ interface EditorState {
   saveAll: (timeoutMs?: number) => Promise<string[]>;
   /** Drops every page (after `saveAll` left nothing unsaved). */
   reset: () => void;
+  /** Header edits (cover, subtitle, M2c §4): changes the current page's
+   *  frontmatter as an undoable editor change and saves at once. `false` when
+   *  there is no editable page or its frontmatter can't be edited safely (invalid
+   *  YAML, or a form the byte-minimal edit refuses; toast). */
+  editFrontmatter: (patch: FrontmatterPatch) => Promise<boolean>;
 }
 
 /** Every page with a live document: the current one plus pages switched away
@@ -100,11 +109,32 @@ export function resetEditorStore() {
   seq++;
   docs.forEach((d) => d.dispose());
   docs.clear();
-  useEditorStore.setState({ ...IDLE });
+  useEditorStore.setState({ ...IDLE, copying: 0 });
 }
 
 export const useEditorStore = create<EditorState>((set, get) => ({
   ...IDLE,
+  copying: 0,
+  editFrontmatter: async (patch) => {
+    const doc = get().doc;
+    if (!doc) return false;
+    const view = viewOf(doc);
+    const text = view ? view.state.doc.toString() : doc.text;
+    const res = setFrontmatter(text, patch);
+    if (!res.ok) {
+      useToastStore
+        .getState()
+        .push({ message: i18next.t('page.frontmatterInvalid'), tone: 'error' });
+      return false;
+    }
+    const c = res.change;
+    if (c) {
+      if (view) view.dispatch({ changes: c, userEvent: 'input.frontmatter' });
+      else doc.edit(text.slice(0, c.from) + c.insert + text.slice(c.to));
+    }
+    await doc.flush();
+    return true;
+  },
   open: async (path) => {
     const prev = get().doc;
     if (prev?.path === path) return;

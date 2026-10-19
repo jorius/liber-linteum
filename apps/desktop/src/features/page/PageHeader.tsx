@@ -1,44 +1,29 @@
-import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { FormatIcon } from '../../app/icons';
-import { assetUrl, linksResolve, type EditorMode, type Page } from '../../ipc';
+import type { EditorMode, Page } from '../../ipc';
 import { useEditorStore } from '../../stores/editorStore';
 import { goBack } from '../../stores/navigate';
 import { useSettingsStore } from '../../stores/settingsStore';
 import { useTrailStore } from '../../stores/trailStore';
 import { nameOf } from '../../stores/tree';
 import { Breadcrumb } from './Breadcrumb';
+import { Cover } from './Cover';
 import { ModeToggle } from './ModeToggle';
+import { PageSubtitle } from './PageSubtitle';
 import { PageTitle } from './PageTitle';
 import styles from './PageView.module.css';
 
-/** The cover's vault path (`null`: none, remote or missing). */
-function useCover(page: Page): string | null {
-  const [cover, setCover] = useState<string | null>(null);
-  useEffect(() => {
-    setCover(null);
-    if (!page.cover || /^[a-z][a-z0-9+.-]*:/i.test(page.cover)) return;
-    let live = true;
-    void linksResolve(page.path, [{ kind: 'cover', target: page.cover }]).then((res) => {
-      if (live && res.ok) setCover(res.value[0] ?? null);
-    });
-    return () => {
-      live = false;
-    };
-  }, [page.path, page.cover]);
-  return cover;
-}
-
-/** Breadcrumb, cover (read-only), title, subtitle, tags, link counts, the mode
- *  toggle and the save status (M2a §5). */
+/** Breadcrumb, cover, title, subtitle, tags, link counts, the mode toggle and
+ *  the save status (M2a §5); cover and subtitle are editable (M2c §2–3). */
 export function PageHeader({ page, mode }: { page: Page; mode: EditorMode }) {
   const { t } = useTranslation();
   const status = useEditorStore((s) => s.status);
+  const copying = useEditorStore((s) => s.copying > 0);
   const hasDoc = useEditorStore((s) => s.doc !== null);
   const large = useEditorStore((s) => s.large);
   const toolbar = useSettingsStore((s) => s.settings.toolbar);
   const previous = useTrailStore((s) => s.back.at(-1) ?? null);
-  const cover = useCover(page);
+  const editable = useEditorStore((s) => s.doc !== null && s.path === page.path);
   return (
     <header className={styles.header}>
       <div className={styles.bar}>
@@ -59,7 +44,7 @@ export function PageHeader({ page, mode }: { page: Page; mode: EditorMode }) {
         <div className={styles.controls}>
           {hasDoc && (
             <span role="status" aria-label={t('editor.saveStatus')} className={styles.status}>
-              {t(`editor.${status}`)}
+              {copying ? t('editor.copying') : t(`editor.${status}`)}
             </span>
           )}
           {hasDoc && (
@@ -78,11 +63,9 @@ export function PageHeader({ page, mode }: { page: Page; mode: EditorMode }) {
           <ModeToggle mode={mode} />
         </div>
       </div>
-      {cover && (
-        <img data-cover className={styles.cover} src={assetUrl(cover)} alt="" loading="lazy" />
-      )}
+      <Cover page={page} editable={editable} />
       <PageTitle page={page} />
-      {page.subtitle && <p className={styles.subtitle}>{page.subtitle}</p>}
+      <PageSubtitle page={page} editable={editable} />
       {page.tags.length > 0 && (
         <ul className={styles.tags} aria-label={t('page.tags')}>
           {page.tags.map((tag) => (

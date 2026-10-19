@@ -20,7 +20,7 @@ import type { Heading, Image, Link, ListItem, Node, Parent, RootContent } from '
 import { linksResolve, type LinkKind } from '../../ipc';
 import { reparse } from '../../markdown/incremental';
 import { parsePage } from '../../markdown/parse';
-import { vaultJoin } from '../../markdown/sanitize';
+import { toSafeHast, vaultJoin } from '../../markdown/sanitize';
 import type { Embed, ParsedPage, WikiLink } from '../../markdown/types';
 import { rangeOf } from '../../markdown/walk';
 import { followLink } from '../../stores/links';
@@ -66,6 +66,24 @@ const lineClass = (cls: string) => Decoration.line({ class: cls });
 
 const BLOCK_WIDGET = new Set(['table', 'callout', 'columns', 'thematicBreak']);
 const TASK = /^(\s*(?:[-*+]|\d+[.)])[ \t]+)\[([ xX])\]/;
+
+/** Whether an HTML block renders nothing once sanitized (comments, scripts):
+ *  such blocks keep their source, muted, so nothing silently disappears
+ *  (M2c §7.7). Memoized by source text. */
+const emptyHtml = new Map<string, boolean>();
+function rendersEmpty(source: string): boolean {
+  let empty = emptyHtml.get(source);
+  if (empty === undefined) {
+    const visible = (n: { type: string; value?: unknown; children?: unknown[] }): boolean =>
+      n.type === 'element' ||
+      (n.type === 'text' && typeof n.value === 'string' && n.value.trim() !== '') ||
+      (n.children ?? []).some((c) => visible(c as never));
+    empty = !visible(toSafeHast(parsePage(source), { sourcePath: '' }) as never);
+    if (emptyHtml.size > 200) emptyHtml.clear();
+    emptyHtml.set(source, empty);
+  }
+  return empty;
+}
 
 function activeLines(state: EditorState): Set<number> {
   const lines = new Set<number>();
@@ -216,7 +234,18 @@ function build(state: EditorState, page: ParsedPage, active: Set<number>): Decor
     const kids = (node as Parent).children as Node[] | undefined;
     if (kids) kids.forEach(visit);
   };
-  page.tree.children.forEach(visit);
+  /** Flow HTML (a root-level `html` node) renders like a table; inline HTML
+   *  inside a paragraph stays text. */
+  const visitHtml = (node: Node) => {
+    if (!node.position) return;
+    const [from, to] = rangeOf(node);
+    if (reduced || touched(from, to)) return;
+    if (rendersEmpty(text(from, to))) lines(from, to, lineClass('cm-nimw-muted'));
+    else blockWidget(node);
+  };
+  page.tree.children.forEach((node) =>
+    (node.type as string) === 'html' ? visitHtml(node) : visit(node),
+  );
   return Decoration.set(out, true);
 }
 
@@ -394,6 +423,11 @@ const theme = EditorView.baseTheme({
   '.cm-nimw-codeblock': { fontFamily: 'var(--font-source)', fontSize: '0.9em' },
   '.cm-nimw-quote': { borderLeft: '3px solid var(--color-border-strong)', paddingLeft: '12px' },
   '.cm-nimw-frontmatter': { color: 'var(--color-text-muted)', fontFamily: 'var(--font-source)' },
+  '.cm-nimw-muted': {
+    color: 'var(--color-text-muted)',
+    fontFamily: 'var(--font-source)',
+    fontSize: '0.9em',
+  },
   // Rendered HTML, not editor text: CodeMirror's pre-wrapped whitespace would
   // turn the renderer's newlines into blank lines.
   '.cm-nimw-widget': { padding: '4px 0', cursor: 'default', whiteSpace: 'normal' },

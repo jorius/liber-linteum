@@ -1,18 +1,18 @@
 import type { Heading, Root, RootContent } from 'mdast';
+import { sameHeading } from './headings';
 
-function text(node: RootContent): string {
+export function text(node: RootContent): string {
   if ('value' in node && typeof node.value === 'string') return node.value;
   if ('children' in node) return (node.children as RootContent[]).map(text).join('');
   return '';
 }
 
-const norm = (s: string) => s.trim().toLowerCase();
-
-/** The section under `heading` (case-insensitive): the heading itself and
- *  everything until the next heading of the same or a higher level. */
+/** The section under `heading` (case-insensitive, link-safe form matches
+ *  too): the heading itself and everything until the next heading of the same
+ *  or a higher level. */
 export function sectionOf(tree: Root, heading: string): Root | null {
   const start = tree.children.findIndex(
-    (n) => n.type === 'heading' && norm(text(n)) === norm(heading),
+    (n) => n.type === 'heading' && sameHeading(text(n), heading),
   );
   if (start < 0) return null;
   const depth = (tree.children[start] as Heading).depth;

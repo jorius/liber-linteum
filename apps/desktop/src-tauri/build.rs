@@ -23,6 +23,12 @@ const COMMANDS: &[&str] = &[
     "url_open",
     "file_open_external",
     "fonts_list",
+    "vault_settings_get",
+    "vault_settings_set",
+    "attachment_paste",
+    "attachment_import",
+    "cover_pick",
+    "link_suggest",
 ];
 
 fn main() {

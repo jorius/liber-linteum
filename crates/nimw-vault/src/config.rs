@@ -1,8 +1,9 @@
 use crate::path::VaultPath;
 use serde::Deserialize;
 
-/// Where new attachments go (Q-ED-1). Resolved from `.nimw/vault.json`, else
-/// Obsidian's `attachmentFolderPath`, else the default `attachments/` subfolder.
+/// Where new attachments go (Q-ED-1). Resolved from Obsidian's
+/// `attachmentFolderPath` when the vault has it (M2c §5.3: Obsidian wins), else
+/// `.nimw/vault.json`, else the default `attachments/` subfolder.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum AttachmentPolicy {
     /// Vault root.
@@ -22,6 +23,17 @@ impl Default for AttachmentPolicy {
 }
 
 impl AttachmentPolicy {
+    /// The folder new attachments of `page` go to.
+    pub fn dir_for(&self, page: &VaultPath) -> crate::Result<VaultPath> {
+        let here = page.parent().unwrap_or_else(VaultPath::root);
+        match self {
+            AttachmentPolicy::VaultRoot => Ok(VaultPath::root()),
+            AttachmentPolicy::Folder(folder) => Ok(folder.clone()),
+            AttachmentPolicy::SameAsNote => Ok(here),
+            AttachmentPolicy::Subfolder(sub) => here.join(sub),
+        }
+    }
+
     /// Obsidian `attachmentFolderPath`: `/` root, `./` same folder, `./x` subfolder, `x` folder.
     pub(crate) fn from_obsidian(value: &str) -> Option<AttachmentPolicy> {
         let v = value.trim();
@@ -40,8 +52,8 @@ impl AttachmentPolicy {
     }
 }
 
-/// `.nimw/vault.json` (arch §3.1). Unknown fields are ignored; M1a only reads
-/// `exclude` and `attachments`.
+/// `.nimw/vault.json` (arch §3.1). Unknown fields are ignored here (and kept
+/// when NIMW writes the file, see `Vault::set_nimw_attachments`).
 #[derive(Debug, Default, Deserialize)]
 pub(crate) struct NimwVaultJson {
     #[serde(default)]
@@ -50,7 +62,7 @@ pub(crate) struct NimwVaultJson {
     pub attachments: Option<NimwAttachments>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 pub(crate) struct NimwAttachments {
     pub mode: String,
     #[serde(default)]
@@ -64,6 +76,9 @@ impl NimwAttachments {
             "vault" => VaultPath::new(self.path.trim_matches('/'))
                 .ok()
                 .map(AttachmentPolicy::Folder),
+            "folder" => VaultPath::new(self.path.trim_matches('/'))
+                .ok()
+                .map(AttachmentPolicy::Folder),
             "same" => Some(AttachmentPolicy::SameAsNote),
             "subfolder" => {
                 let sub = self.path.trim_matches('/');
@@ -74,6 +89,16 @@ impl NimwAttachments {
             _ => None,
         }
     }
+}
+
+/// NIMW's attachment setting as stored (or the default), plus Obsidian's
+/// `attachmentFolderPath` when the vault has a usable one — which then wins.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AttachmentConfig {
+    /// `vault` | `same` | `subfolder` | `folder`.
+    pub mode: String,
+    pub path: String,
+    pub obsidian: Option<String>,
 }
 
 #[derive(Debug, Default, Deserialize)]

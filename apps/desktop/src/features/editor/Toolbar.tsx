@@ -3,6 +3,7 @@ import type { EditorView } from '@codemirror/view';
 import { useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import styles from './Editor.module.css';
+import { openLinkPicker } from './linkPickerOpen';
 import {
   insertDivider,
   insertLink,
@@ -15,6 +16,8 @@ import {
 interface Item {
   id: string;
   run: StateCommand;
+  /** Tried first with the view (e.g. opening the Link picker). */
+  open?: (view: EditorView) => boolean;
   /** Pressed when the cursor is inside this format. */
   pressed?: ActiveFormat;
   icon: ReactNode;
@@ -45,6 +48,7 @@ const INLINE: Item[] = [
   {
     id: 'link',
     run: insertLink,
+    open: openLinkPicker,
     icon: svg('M6.5 9.5l3-3M7 4.5l1-1a2.8 2.8 0 0 1 4 4l-1 1M9 11.5l-1 1a2.8 2.8 0 0 1-4-4l1-1'),
   },
 ];
@@ -127,7 +131,9 @@ export function Toolbar({ view, active }: { view: EditorView; active: Set<Active
         // Keep the editor's selection: the click runs on it.
         onMouseDown={(e) => e.preventDefault()}
         onFocus={() => setFocusIndex(i)}
-        onClick={() => run(item.run)}
+        onClick={() => {
+          if (!item.open?.(view)) run(item.run);
+        }}
       >
         {item.icon}
       </button>

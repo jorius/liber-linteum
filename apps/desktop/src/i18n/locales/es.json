@@ -35,6 +35,9 @@
     "watch": "Falló la vigilancia de cambios en la bóveda.",
     "binary": "Este archivo no es texto UTF-8 válido.",
     "invalidUrl": "Ese enlace no se puede abrir.",
+    "notPermitted": "Eso no está permitido aquí.",
+    "notAFile": "Las carpetas no se pueden adjuntar.",
+    "tooLarge": "Ese archivo es demasiado grande para pegarlo.",
     "io": "Algo salió mal: {message}"
   },
   "toasts": {
@@ -92,7 +95,10 @@
     "breadcrumb": "Ruta",
     "titleLabel": "Título de la página",
     "titleTaken": "Ya hay una página llamada «{name}» en esta carpeta.",
-    "titleInNote": "Título en la nota: {title}"
+    "frontmatterInvalid": "NIMW no puede cambiar con seguridad el frontmatter de esta nota. Edítalo en el modo Código.",
+    "titleInNote": "Título en la nota: {title}",
+    "subtitleLabel": "Subtítulo",
+    "subtitlePlaceholder": "Añade un subtítulo"
   },
   "editor": {
     "conflictCopy": "Alguien más cambió esta página — su versión se guardó como «{name}»",
@@ -113,7 +119,8 @@
     },
     "saveStatus": "Estado de guardado",
     "unsavedBlocks": "Los cambios sin guardar en «{name}» no se pudieron escribir, así que la bóveda sigue abierta.",
-    "unsavedKeepsWindow": "Los cambios sin guardar en «{name}» no se pudieron escribir, así que la ventana sigue abierta. Ciérrala otra vez para salir sin ellos."
+    "unsavedKeepsWindow": "Los cambios sin guardar en «{name}» no se pudieron escribir, así que la ventana sigue abierta. Ciérrala otra vez para salir sin ellos.",
+    "copying": "Copiando archivos…"
   },
   "preview": {
     "remoteBlocked": "Imagen remota bloqueada (privacidad)",
@@ -159,8 +166,10 @@
     },
     "createPage": {
       "title": "¿Crear la página «{name}»?",
+      "titleIn": "¿Crear la página «{name}» en {folder}/?",
       "where": "Se creará en {folder}.",
-      "confirm": "Crear página"
+      "confirm": "Crear página",
+      "invalid": "«{name}» no se puede usar como nombre. {reason}"
     }
   },
   "settings": {
@@ -176,7 +185,8 @@
     "sections": {
       "appearance": "Apariencia",
       "editor": "Editor",
-      "files": "Archivos"
+      "files": "Archivos",
+      "vault": "Esta bóveda"
     },
     "palette": "Paleta",
     "palettes": {
@@ -227,5 +237,45 @@
   },
   "trail": {
     "back": "Volver a {name}"
+  },
+  "cover": {
+    "label": "Portada",
+    "add": "Añadir portada",
+    "change": "Cambiar portada",
+    "reposition": "Reposicionar",
+    "remove": "Quitar",
+    "save": "Guardar posición",
+    "cancel": "Cancelar",
+    "position": "Posición de la portada",
+    "positionValue": "{value} % desde arriba",
+    "remote": "Portada remota no cargada (privacidad)",
+    "missing": "No se encuentra la imagen de portada"
+  },
+  "attach": {
+    "dropOnText": "Suelta los archivos sobre el texto de la página para adjuntarlos",
+    "someFailed": "Algunos archivos no se adjuntaron"
+  },
+  "linkPicker": {
+    "label": "Enlazar a…",
+    "placeholder": "Nombre de página o dirección web",
+    "results": "Páginas",
+    "url": "Enlazar a {url}"
+  },
+  "vault": {
+    "attachmentsLabel": "Los adjuntos nuevos van a",
+    "modes": {
+      "subfolder": "Una subcarpeta junto a la página",
+      "same": "La carpeta de la página",
+      "vault": "La raíz de la bóveda",
+      "folder": "Una carpeta de la bóveda"
+    },
+    "subfolderName": "Nombre de la subcarpeta",
+    "folderPath": "Carpeta de la bóveda",
+    "obsidianSet": "Definido por Obsidian: {value} — los adjuntos nuevos van a {place}.",
+    "obsidianHint": "Cámbialo en Obsidian (Ajustes → Archivos y enlaces).",
+    "obsidianRoot": "la raíz de la bóveda",
+    "obsidianSame": "la carpeta de la página",
+    "obsidianSubfolder": "la carpeta «{name}» junto a la página",
+    "obsidianFolder": "la carpeta «{name}»"
   }
 }

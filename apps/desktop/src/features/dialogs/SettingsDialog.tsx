@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { SUPPORTED_LANGUAGES } from '../../i18n';
 import { fontsList, PALETTE_IDS, type PaletteChoice, type Theme } from '../../ipc';
 import { useSettingsStore } from '../../stores/settingsStore';
+import { useVaultStore } from '../../stores/vaultStore';
 import { contrast } from '../../theme/color';
 import { derive } from '../../theme/derive';
 import { LIVE_FONTS, SOURCE_FONTS, systemChoice, type FontOption } from '../../theme/fonts';
@@ -10,6 +11,7 @@ import { PALETTES } from '../../theme/palettes';
 import { Dialog } from './Dialog';
 import styles from './Dialogs.module.css';
 import { useLatestSave } from './useLatestSave';
+import { VaultSettingsSection } from './VaultSettingsSection';
 
 const THEMES: Theme[] = ['system', 'light', 'dark'];
 const themeKey = { system: 'themeSystem', light: 'themeLight', dark: 'themeDark' } as const;
@@ -18,13 +20,15 @@ const SIZES = [13, 14, 15, 16, 17, 18, 19, 20];
 const HEX = /^#[0-9a-f]{6}$/i;
 
 /** Language, appearance (theme, palette, custom accent), editor (fonts, text
- *  size, toolbar) and file settings; every change is saved at once (M2b §7). */
+ *  size, toolbar), file settings and, with a vault open, where its
+ *  attachments go (M2c §5.4); every change is saved at once (M2b §7). */
 export function SettingsDialog({ onClose }: { onClose: () => void }) {
   const { t } = useTranslation();
   const settings = useSettingsStore((s) => s.settings);
   const update = useSettingsStore((s) => s.update);
   const installed = useInstalledFonts();
   const ids = { appearance: useId(), editor: useId(), files: useId() };
+  const vaultOpen = useVaultStore((s) => s.info !== null);
 
   return (
     <Dialog title={t('settings.title')} onClose={onClose}>
@@ -158,6 +162,8 @@ export function SettingsDialog({ onClose }: { onClose: () => void }) {
           {t('settings.confirmDelete')}
         </label>
       </section>
+
+      {vaultOpen && <VaultSettingsSection />}
 
       <div className={styles.buttons}>
         <button type="button" className={`${styles.button} ${styles.primary}`} onClick={onClose}>

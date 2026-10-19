@@ -117,3 +117,62 @@
   border-radius: 3px;
   padding: 0 3px;
 }
+
+/* "Link to…" picker (M2c §6.3), anchored under the selection. */
+.linkPicker {
+  position: fixed;
+  z-index: 20;
+  width: 320px;
+  max-width: calc(100vw - 32px);
+  padding: 6px;
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  box-shadow: 0 8px 24px rgb(0 0 0 / 0.14);
+}
+
+.linkPickerInput {
+  box-sizing: border-box;
+  width: 100%;
+  height: 32px;
+  padding: 0 8px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font: 14px var(--font-body);
+}
+
+.linkPickerInput:focus {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 1px;
+}
+
+.linkPickerList {
+  list-style: none;
+  margin: 4px 0 0;
+  padding: 0;
+  max-height: 260px;
+  overflow: auto;
+}
+
+.linkPickerOption {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 6px 8px;
+  border-radius: var(--radius-sm);
+  color: var(--color-text);
+  font: 14px var(--font-body);
+  cursor: pointer;
+}
+
+.linkPickerOption[aria-selected='true'] {
+  background: var(--color-accent-soft);
+  color: var(--color-text-strong);
+}
+
+.linkPickerPath {
+  color: var(--color-text-muted);
+  font-size: 12px;
+}

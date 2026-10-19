@@ -1,5 +1,7 @@
 pub mod asset;
+pub mod attachment_commands;
 pub mod commands;
+pub mod drops;
 pub mod dto;
 pub mod editor_commands;
 pub mod error;
@@ -40,6 +42,9 @@ pub fn configure<R: tauri::Runtime>(
         // Our Quit item (macOS app menu) closes the windows through their close
         // request, so the UI saves pending pages first (see `menu`).
         .on_menu_event(menu::on_menu_event)
+        // Files dropped from the OS become importable (M2c §8).
+        .on_window_event(drops::on_window_event)
+        .on_webview_event(drops::on_webview_event)
         .register_asynchronous_uri_scheme_protocol(asset::SCHEME, |ctx, request, responder| {
             let app = ctx.app_handle().clone();
             std::thread::spawn(move || {
@@ -96,6 +101,12 @@ pub fn configure<R: tauri::Runtime>(
         editor_commands::url_open,
         editor_commands::file_open_external,
         fonts::fonts_list,
+        attachment_commands::vault_settings_get,
+        attachment_commands::vault_settings_set,
+        attachment_commands::attachment_paste,
+        attachment_commands::attachment_import,
+        attachment_commands::cover_pick,
+        attachment_commands::link_suggest,
     ])
 }
 

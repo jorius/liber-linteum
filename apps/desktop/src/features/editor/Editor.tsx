@@ -1,7 +1,7 @@
 import { history, historyKeymap } from '@codemirror/commands';
 import { markdown, markdownLanguage } from '@codemirror/lang-markdown';
 import { HighlightStyle, syntaxHighlighting, syntaxTree } from '@codemirror/language';
-import { Compartment, EditorState, Facet, Transaction, type Extension } from '@codemirror/state';
+import { Compartment, EditorState, Transaction, type Extension } from '@codemirror/state';
 import { drawSelection, EditorView, keymap, lineNumbers } from '@codemirror/view';
 import { tags } from '@lezer/highlight';
 import { diffIndices } from 'node-diff3';
@@ -12,20 +12,17 @@ import { useSettingsStore } from '../../stores/settingsStore';
 import { Preview } from '../preview/Preview';
 import styles from './Editor.module.css';
 import { followLinkAtCursor, livePreview, pagePath } from './livePreview';
+import { attachmentHandlers } from './attachments';
 import { activeFormats, editorKeymap, type ActiveFormat } from './format';
+import { linkCompletion } from './linkComplete';
+import { LinkPicker } from './LinkPicker';
+import { setLinkPickerOpener } from './linkPickerOpen';
 import type { PageDoc } from './pageDoc';
 import { blockForOffset, offsetAtTop, topIn } from './scrollSync';
 import { Toolbar } from './Toolbar';
+import { hideView, pageDocOf, showView, storedState, storeState } from './views';
 import { toggleTaskIn } from './widgets';
 
-/** Each page keeps its CodeMirror state (text, selection, undo) while the app
- *  runs, so switching pages or modes never loses history (ED-07). */
-const states = new WeakMap<PageDoc, EditorState>();
-/** The page a state belongs to: a cached state is reused by whichever editor
- *  shows the page next, so nothing in it may close over a component. */
-const pageDocOf = Facet.define<PageDoc, PageDoc | null>({
-  combine: (values) => values[0] ?? null,
-});
 /** The Split pane of the component currently showing each view. */
 const paneOf = new WeakMap<EditorView, (text: string) => void>();
 /** The toolbar's pressed state of the component currently showing each view. */
@@ -192,6 +189,9 @@ function createState(d: PageDoc, mode: EditorMode, label: string, numbers: boole
       theme,
       labelSlot.of(labelled(label)),
       modeSlot.of(modeExtensions(mode)),
+      // Pasted images and dropped files (M2c §5), `[[` autocomplete (§6).
+      attachmentHandlers(),
+      linkCompletion(),
       gutterSlot.of(gutter(numbers)),
       // Autosave also when the editor loses focus (M2a §3.3).
       EditorView.domEventHandlers({
@@ -232,6 +232,7 @@ export function Editor({ doc, mode, label }: EditorProps) {
   const showToolbar = useSettingsStore((s) => s.settings.toolbar);
   const showNumbers = useSettingsStore((s) => s.settings.lineNumbers);
   const [toolbarView, setToolbarView] = useState<EditorView | null>(null);
+  const [picker, setPicker] = useState(false);
   const [active, setActive] = useState<Set<ActiveFormat>>(() => new Set());
   const showFormats = useCallback((state: EditorState) => {
     const next = activeFormats(state);
@@ -239,21 +240,25 @@ export function Editor({ doc, mode, label }: EditorProps) {
   }, []);
 
   const stateFor = (d: PageDoc): EditorState =>
-    states.get(d) ?? createState(d, mode, label, showNumbers);
+    storedState(d) ?? createState(d, mode, label, showNumbers);
 
   // One view for the component's lifetime; page states are swapped into it.
   useLayoutEffect(() => {
     const v = new EditorView({ parent: host.current!, state: stateFor(current.current) });
     view.current = v;
+    showView(current.current, v);
     paneOf.set(v, setText);
     toolbarOf.set(v, showFormats);
     setToolbarView(v);
+    setLinkPickerOpener(v, () => setPicker(true));
     showFormats(v.state);
     return () => {
-      states.set(current.current, v.state);
+      hideView(current.current, v);
+      storeState(current.current, v.state);
       current.current.sink = null;
       paneOf.delete(v);
       toolbarOf.delete(v);
+      setLinkPickerOpener(v, null);
       v.destroy();
       view.current = null;
     };
@@ -263,9 +268,11 @@ export function Editor({ doc, mode, label }: EditorProps) {
   useLayoutEffect(() => {
     const v = view.current!;
     if (current.current !== doc) {
-      states.set(current.current, v.state);
+      storeState(current.current, v.state);
       current.current.sink = null;
+      hideView(current.current, v);
       current.current = doc;
+      showView(doc, v);
       v.setState(stateFor(doc));
       showFormats(v.state);
     }
@@ -335,6 +342,7 @@ export function Editor({ doc, mode, label }: EditorProps) {
   return (
     <div className={styles.frame}>
       {showToolbar && toolbarView && <Toolbar view={toolbarView} active={active} />}
+      {picker && toolbarView && <LinkPicker view={toolbarView} onClose={() => setPicker(false)} />}
       <div className={split ? styles.split : styles.single}>
         <div ref={host} className={mode === 'livePreview' ? styles.live : styles.source} />
         {split && (

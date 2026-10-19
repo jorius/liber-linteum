@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-link-suggest"
+description = "Enables the link_suggest command without any pre-configured scope."
+commands.allow = ["link_suggest"]
+
+[[permission]]
+identifier = "deny-link-suggest"
+description = "Denies the link_suggest command without any pre-configured scope."
+commands.deny = ["link_suggest"]

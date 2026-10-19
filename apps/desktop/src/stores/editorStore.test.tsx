@@ -1,6 +1,9 @@
+import { undo } from '@codemirror/commands';
+import { EditorView } from '@codemirror/view';
 import { act, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { Editor } from '../features/editor/Editor';
 import { Toaster } from '../features/toasts/Toaster';
 import { clearMocks, emit, mockIPC, mockWindows } from '../ipc/testing';
 import { fakeDisk } from '../test/fakeDisk';
@@ -234,5 +237,72 @@ describe('editorStore (M2a §3.3)', () => {
     await vi.waitFor(() => expect(editor().path).toBe('A.md'));
     expect(editor().orphaned).toBe(true);
     expect(editor().doc!.text).toBe('keep me\n');
+  });
+});
+
+describe('frontmatter edits from the header (M2c §4)', () => {
+  it('apply as an undoable editor change and save at once', async () => {
+    const disk = fakeDisk({ 'A.md': '# A\n\nBody\n' });
+    await act(() => editor().open('A.md'));
+    render(<Editor doc={editor().doc!} mode="source" label="A" />);
+    const view = EditorView.findFromDOM(document.querySelector<HTMLElement>('.cm-editor')!)!;
+    let ok = false;
+    await act(async () => {
+      ok = await editor().editFrontmatter({ subtitle: 'Hero' });
+    });
+    expect(ok).toBe(true);
+    expect(view.state.doc.toString()).toBe('---\nsubtitle: Hero\n---\n# A\n\nBody\n');
+    expect(disk.files.get('A.md')).toBe('---\nsubtitle: Hero\n---\n# A\n\nBody\n');
+    act(() => {
+      undo(view);
+    });
+    expect(view.state.doc.toString()).toBe('# A\n\nBody\n');
+  });
+
+  it('without a live editor the text still changes and saves', async () => {
+    const disk = fakeDisk({ 'A.md': '---\ncover: a.png\ncover-y: 20\n---\nBody\n' });
+    await editor().open('A.md');
+    expect(await editor().editFrontmatter({ cover: null, 'cover-y': null })).toBe(true);
+    expect(disk.files.get('A.md')).toBe('Body\n');
+    expect(editor().doc!.text).toBe('Body\n');
+  });
+
+  it('review focus: a CRLF note keeps CRLF line endings after a header edit', async () => {
+    const disk = fakeDisk({ 'A.md': '# A\r\n\r\nBody\r\n' });
+    await editor().open('A.md');
+    expect(await editor().editFrontmatter({ subtitle: 'Hero' })).toBe(true);
+    expect(disk.files.get('A.md')).toBe('---\r\nsubtitle: Hero\r\n---\r\n# A\r\n\r\nBody\r\n');
+  });
+
+  it('review focus: typing then a header edit — undo reverts only the header edit', async () => {
+    const disk = fakeDisk({ 'A.md': '# A\n' });
+    await act(() => editor().open('A.md'));
+    render(<Editor doc={editor().doc!} mode="source" label="A" />);
+    const view = EditorView.findFromDOM(document.querySelector<HTMLElement>('.cm-editor')!)!;
+    act(() => view.dispatch({ changes: { from: 4, insert: 'typed\n' }, userEvent: 'input.type' }));
+    await act(async () => {
+      await editor().editFrontmatter({ subtitle: 'S' });
+    });
+    expect(disk.files.get('A.md')).toBe('---\nsubtitle: S\n---\n# A\ntyped\n');
+    act(() => {
+      undo(view);
+    });
+    expect(view.state.doc.toString()).toBe('# A\ntyped\n');
+  });
+
+  it('frontmatter it can’t edit safely is never rewritten: a toast says to use Source', async () => {
+    // Invalid YAML, and valid YAML the guard refuses (a flow map), get the same advice.
+    for (const text of [
+      '---\nsubtitle: [oops\n---\nBody\n',
+      '---\n{subtitle: a, cover: x.png}\n---\nBody\n',
+    ]) {
+      const disk = fakeDisk({ 'A.md': text });
+      await editor().open('A.md');
+      expect(await editor().editFrontmatter({ subtitle: null })).toBe(false);
+      expect(disk.writes()).toEqual([]);
+      expect(useToastStore.getState().toasts.at(-1)?.message).toBe(
+        'NIMW can’t safely change this note’s frontmatter. Edit it in Source mode.',
+      );
+    }
   });
 });

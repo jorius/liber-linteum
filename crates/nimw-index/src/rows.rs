@@ -45,6 +45,15 @@ pub struct Stat {
     pub hash: Option<String>,
 }
 
+/// A file `[[` autocomplete can offer (M2c §7.2). `title` is set for pages.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct LinkCandidate {
+    pub path: String,
+    pub kind: FileKind,
+    pub title: Option<String>,
+    pub mtime_ns: i64,
+}
+
 /// An explorer row (EXP-01). `title` is set for pages.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TreeNode {

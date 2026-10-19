@@ -35,6 +35,9 @@
     "watch": "Watching the vault for changes failed.",
     "binary": "This file isn't valid UTF-8 text.",
     "invalidUrl": "That link can't be opened.",
+    "notPermitted": "That isn't allowed here.",
+    "notAFile": "Folders can't be attached.",
+    "tooLarge": "That file is too large to paste.",
     "io": "Something went wrong: {message}"
   },
   "toasts": {
@@ -92,7 +95,10 @@
     "breadcrumb": "Breadcrumb",
     "titleLabel": "Page title",
     "titleTaken": "A page named “{name}” is already in this folder.",
-    "titleInNote": "Title in the note: {title}"
+    "titleInNote": "Title in the note: {title}",
+    "frontmatterInvalid": "NIMW can’t safely change this note’s frontmatter. Edit it in Source mode.",
+    "subtitleLabel": "Subtitle",
+    "subtitlePlaceholder": "Add a subtitle"
   },
   "editor": {
     "conflictCopy": "Someone else changed this page — their version was saved as “{name}”",
@@ -113,7 +119,8 @@
     },
     "saveStatus": "Save status",
     "unsavedBlocks": "Unsaved changes in “{name}” couldn’t be written, so the vault stays open.",
-    "unsavedKeepsWindow": "Unsaved changes in “{name}” couldn’t be written, so the window stays open. Close it again to quit without them."
+    "unsavedKeepsWindow": "Unsaved changes in “{name}” couldn’t be written, so the window stays open. Close it again to quit without them.",
+    "copying": "Copying files…"
   },
   "preview": {
     "remoteBlocked": "Remote image blocked (privacy)",
@@ -159,8 +166,10 @@
     },
     "createPage": {
       "title": "Create page “{name}”?",
+      "titleIn": "Create page “{name}” in {folder}/?",
       "where": "It will be created in {folder}.",
-      "confirm": "Create page"
+      "confirm": "Create page",
+      "invalid": "“{name}” can’t be used as a name. {reason}"
     }
   },
   "settings": {
@@ -176,7 +185,8 @@
     "sections": {
       "appearance": "Appearance",
       "editor": "Editor",
-      "files": "Files"
+      "files": "Files",
+      "vault": "This vault"
     },
     "palette": "Palette",
     "palettes": {
@@ -227,5 +237,45 @@
   },
   "trail": {
     "back": "Back to {name}"
+  },
+  "cover": {
+    "label": "Cover",
+    "add": "Add cover",
+    "change": "Change cover",
+    "reposition": "Reposition",
+    "remove": "Remove",
+    "save": "Save position",
+    "cancel": "Cancel",
+    "position": "Cover position",
+    "positionValue": "{value}% from the top",
+    "remote": "Remote cover not loaded (privacy)",
+    "missing": "Cover image not found"
+  },
+  "attach": {
+    "dropOnText": "Drop files onto the page’s text to attach them",
+    "someFailed": "Some files weren’t attached"
+  },
+  "linkPicker": {
+    "label": "Link to…",
+    "placeholder": "Page name or web address",
+    "results": "Pages",
+    "url": "Link to {url}"
+  },
+  "vault": {
+    "attachmentsLabel": "New attachments go to",
+    "modes": {
+      "subfolder": "A subfolder next to the page",
+      "same": "The page’s folder",
+      "vault": "The vault root",
+      "folder": "A folder in the vault"
+    },
+    "subfolderName": "Subfolder name",
+    "folderPath": "Folder in the vault",
+    "obsidianSet": "Set by Obsidian: {value} — new attachments go to {place}.",
+    "obsidianHint": "Change it in Obsidian (Settings → Files and links).",
+    "obsidianRoot": "the vault root",
+    "obsidianSame": "the page’s folder",
+    "obsidianSubfolder": "the “{name}” folder next to the page",
+    "obsidianFolder": "the “{name}” folder"
   }
 }

@@ -10,7 +10,7 @@ mod scan;
 mod vault;
 mod watch;
 
-pub use config::AttachmentPolicy;
+pub use config::{AttachmentConfig, AttachmentPolicy};
 pub use error::{Result, VaultError};
 pub use fsops::TMP_MARKER;
 pub use hash::Hash;
