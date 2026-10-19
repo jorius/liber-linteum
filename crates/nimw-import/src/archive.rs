@@ -95,6 +95,15 @@ impl Export {
                     .is_ok_and(|f| name_of(f.name()).to_ascii_lowercase().ends_with(".zip"))
             });
         if all_zips {
+            if files.len() > limits.entries {
+                return Err(ImportError::Limit(format!(
+                    "the export holds more than {} parts",
+                    limits.entries
+                )));
+            }
+            // Every part goes to a temp file: their sizes count against the
+            // total before any is copied, as the files inside them do.
+            let mut parts: u64 = 0;
             for i in files {
                 let mut tmp = tempfile::tempfile()?;
                 {
@@ -105,6 +114,13 @@ impl Export {
                         part.size(),
                         part.compressed_size(),
                     )?;
+                    parts += part.size();
+                    if parts > limits.total {
+                        return Err(ImportError::Limit(format!(
+                            "the export's parts unpack to more than {} MiB",
+                            limits.total / MIB
+                        )));
+                    }
                     copy_capped(&mut part, &mut tmp)?;
                 }
                 tmp.rewind()?;
@@ -391,6 +407,40 @@ pub(crate) mod tests {
         let export = Export::open(tmp.path(), &Limits::default()).unwrap();
         assert_eq!(names(&export), ["ok.md"]);
         assert!(export.warnings()[0].contains("symbolic link"));
+    }
+
+    #[test]
+    fn b6_review_i4_parts_count_against_the_limits_before_they_are_copied() {
+        // A part padded with a zip comment: its files are tiny, the part isn't.
+        let mut w = zip::ZipWriter::new(Cursor::new(Vec::new()));
+        w.set_comment("x".repeat(60_000));
+        w.start_file("A.md", SimpleFileOptions::default()).unwrap();
+        w.write_all(b"a").unwrap();
+        let padded = w.finish().unwrap().into_inner();
+        let zip = zip_file(&[
+            ("Export-1-Part-1.zip", &padded),
+            ("Export-1-Part-2.zip", &padded),
+            ("Export-1-Part-3.zip", &padded),
+        ]);
+        let limits = Limits {
+            total: 100_000,
+            ..Limits::default()
+        };
+        let err = Export::open(zip.path(), &limits).unwrap_err();
+        assert!(matches!(err, ImportError::Limit(_)), "{err}");
+
+        let empty = zip_bytes(&[]);
+        let zip = zip_file(&[
+            ("Export-1-Part-1.zip", &empty),
+            ("Export-1-Part-2.zip", &empty),
+            ("Export-1-Part-3.zip", &empty),
+        ]);
+        let limits = Limits {
+            entries: 2,
+            ..Limits::default()
+        };
+        let err = Export::open(zip.path(), &limits).unwrap_err();
+        assert!(matches!(err, ImportError::Limit(_)), "{err}");
     }
 
     #[test]
