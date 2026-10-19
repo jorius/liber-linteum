@@ -13,7 +13,6 @@
     "importNotion": "Importar una exportación de Notion",
     "recent": "Recientes",
     "noRecent": "Aún no hay bóvedas recientes.",
-    "notionLater": "La importación de Notion llega en un hito posterior.",
     "forget": "Quitar {name} de recientes",
     "missing": "Carpeta no encontrada",
     "quickNote": "Tomar una nota rápida"
@@ -849,5 +848,27 @@
     "moveDown": "Bajar en Favoritos",
     "movedTo": "{name} pasó a la posición {position} de {count} en Favoritos",
     "scratchTree": "Notas rápidas"
+  },
+  "notion": {
+    "title": "Importar desde Notion",
+    "intro": "Convierte una exportación de Notion «Markdown y CSV» en una bóveda nueva. No se escribe nada hasta que pulses Importar.",
+    "export": "Exportación de Notion (.zip)",
+    "noExport": "Ningún archivo elegido",
+    "chooseExport": "Elegir exportación…",
+    "location": "Dónde va la bóveda nueva",
+    "noLocation": "Ninguna carpeta elegida",
+    "chooseLocation": "Elegir ubicación…",
+    "name": "Nombre de la bóveda",
+    "nameInvalid": "Usa un nombre de carpeta sencillo, sin / \\ : * ? \" < > | # ^ [ ] ni un punto al inicio.",
+    "previewLabel": "Vista previa",
+    "reading": "Leyendo la exportación…",
+    "counts": "{pages, plural, one {# página} other {# páginas}}, {databases, plural, one {# base de datos} other {# bases de datos}} con {rows, plural, one {# fila} other {# filas}}, {attachments, plural, one {# adjunto} other {# adjuntos}}.",
+    "warnings": "{count, plural, one {# aviso} other {# avisos}}",
+    "moreWarnings": "…y {count} más, todos en el informe de la importación.",
+    "progressLabel": "Progreso de la importación",
+    "progress": "{done} de {total} archivos",
+    "import": "Importar",
+    "stop": "Detener la importación",
+    "cancelled": "Importación detenida. Lo escrito hasta ahora está abierto, con un informe."
   }
 }

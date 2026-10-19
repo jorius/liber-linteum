@@ -1,4 +1,5 @@
 import { OpeningOverlay } from '../features/opening/OpeningOverlay';
+import { NotionHost } from '../features/notion/NotionHost';
 import { ScratchpadHost } from '../features/scratchpad/ScratchpadHost';
 import { AppShell } from '../features/shell/AppShell';
 import { Toaster } from '../features/toasts/Toaster';
@@ -15,6 +16,7 @@ export function App() {
       {status === 'open' ? <AppShell /> : <Welcome version={version} />}
       {status === 'opening' && <OpeningOverlay />}
       <ScratchpadHost />
+      <NotionHost />
       <Toaster />
     </>
   );

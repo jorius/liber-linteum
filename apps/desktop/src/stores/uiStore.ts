@@ -22,6 +22,9 @@ export type DialogState =
   | { type: 'scratchpadSetup'; then: 'quickNote' | 'none' }
   /** Search (M5 §4). */
   | { type: 'search' }
+  /** Import from Notion (M7 §3). Rendered by `NotionHost` (it also shows on
+   *  the Welcome screen). */
+  | { type: 'notionImport' }
   /** Save / Don't Save / Cancel before unsaved text is left (M5b §6, auto
    *  save off). `id` tells two questions apart. */
   | { type: 'unsaved'; id: number; paths: string[]; answer: (c: UnsavedChoice) => void }

@@ -34,7 +34,7 @@ export const resetTrashView = () => {
 };
 
 /** Bytes as `512 byte`, `840 kB` or `1.2 MB` (1024-based). */
-function formatSize(bytes: number, lang: string) {
+export function formatSize(bytes: number, lang: string) {
   const [value, unit, digits] =
     bytes < 1024
       ? [bytes, 'byte', 0]

@@ -13,7 +13,6 @@
     "importNotion": "Import a Notion export",
     "recent": "Recent",
     "noRecent": "No recent vaults yet.",
-    "notionLater": "Notion import arrives in a later milestone.",
     "forget": "Remove {name} from recent",
     "missing": "Folder not found",
     "quickNote": "Take a quick note"
@@ -849,5 +848,27 @@
     "moveDown": "Move down in Favorites",
     "movedTo": "{name} moved to {position} of {count} in Favorites",
     "scratchTree": "Quick notes"
+  },
+  "notion": {
+    "title": "Import from Notion",
+    "intro": "Turns a Notion “Markdown & CSV” export into a new vault. Nothing is written until you press Import.",
+    "export": "Notion export (.zip)",
+    "noExport": "No file chosen",
+    "chooseExport": "Choose export…",
+    "location": "Where the new vault goes",
+    "noLocation": "No folder chosen",
+    "chooseLocation": "Choose location…",
+    "name": "Vault name",
+    "nameInvalid": "Use a plain folder name, without / \\ : * ? \" < > | # ^ [ ] or a leading dot.",
+    "previewLabel": "Preview",
+    "reading": "Reading the export…",
+    "counts": "{pages, plural, one {# page} other {# pages}}, {databases, plural, one {# database} other {# databases}} with {rows, plural, one {# row} other {# rows}}, {attachments, plural, one {# attachment} other {# attachments}}.",
+    "warnings": "{count, plural, one {# warning} other {# warnings}}",
+    "moreWarnings": "…and {count} more, all listed in the import report.",
+    "progressLabel": "Import progress",
+    "progress": "{done} of {total} files",
+    "import": "Import",
+    "stop": "Stop import",
+    "cancelled": "Import stopped. What was written so far is open, with a report."
   }
 }

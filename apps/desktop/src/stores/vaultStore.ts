@@ -7,6 +7,7 @@ import {
   entryRename,
   entryTrash,
   binList,
+  notionImport,
   trashRestore,
   onVaultChanged,
   onVaultProgress,
@@ -19,6 +20,7 @@ import {
   type ChangedPayload,
   type CommandError,
   type IpcResult,
+  type NotionDone,
   type ProgressPayload,
   type RenameOutcome,
   type TreeNode,
@@ -56,6 +58,9 @@ interface VaultState {
   open: (path: string) => Promise<IpcResult<VaultInfo>>;
   /** Opens the global Scratchpad (M4c §2): Rust knows its folder. */
   openScratchpad: () => Promise<IpcResult<VaultInfo>>;
+  /** Imports a Notion export into a new vault `name` (M7) and opens it. The
+   *  import shows its own progress, so no opening overlay. */
+  importNotion: (name: string) => Promise<IpcResult<NotionDone>>;
   create: (path: string) => Promise<IpcResult<VaultInfo>>;
   close: () => Promise<void>;
   refreshTree: () => Promise<void>;
@@ -270,6 +275,15 @@ export const useVaultStore = create<VaultState>((set, get) => {
     ...EMPTY,
     open: (path) => withProgress(() => vaultOpen(path)),
     openScratchpad: () => withProgress(() => scratchpadOpen()),
+    importNotion: async (name) => {
+      const before = get().status;
+      if (before === 'opening') return { ok: false, error: BUSY };
+      // The import opens the new vault: unsaved text in this one is written first.
+      if (before === 'open' && !(await savedEverything())) return { ok: false, error: BUSY };
+      const res = await notionImport(name);
+      if (res.ok) await opened({ ok: true, value: res.value.vault }, before);
+      return res;
+    },
     create: (path) => withProgress(() => vaultCreate(path)),
     close: async () => {
       // Unsaved text is written before the vault goes away (M2a §3.3).

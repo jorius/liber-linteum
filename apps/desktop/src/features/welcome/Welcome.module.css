@@ -132,12 +132,6 @@
   background: var(--color-accent-hover);
 }
 
-.note {
-  font-size: 13px;
-  color: var(--color-text-muted);
-  margin: 0;
-}
-
 .recent {
   display: flex;
   flex-direction: column;

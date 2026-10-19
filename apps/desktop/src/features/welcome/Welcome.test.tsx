@@ -25,7 +25,7 @@ afterEach(async () => {
 });
 
 describe('Welcome screen', () => {
-  it('shows the app name, tagline, the vault actions and Notion as later', () => {
+  it('shows the app name, tagline and the vault actions, Notion import included', async () => {
     backend({ vaults_recent: () => [] });
     render(<Welcome version="0.1.0" />);
     expect(screen.getByRole('heading', { level: 1, name: 'Notes In My Way' })).toBeInTheDocument();
@@ -33,10 +33,11 @@ describe('Welcome screen', () => {
     for (const name of ['Create a new vault', 'Open a folder as vault', 'Open an Obsidian vault']) {
       expect(screen.getByRole('button', { name })).toBeEnabled();
     }
-    const notion = screen.getByRole('button', { name: 'Import a Notion export' });
-    expect(notion).toBeDisabled();
-    expect(notion).toHaveAccessibleDescription('Notion import arrives in a later milestone.');
     expect(screen.getByText('v0.1.0')).toBeInTheDocument();
+    // M7: the Notion import opens its dialog.
+    await userEvent.click(screen.getByRole('button', { name: 'Import a Notion export' }));
+    expect(useUiStore.getState().dialog).toEqual({ type: 'notionImport' });
+    useUiStore.setState({ dialog: null });
   });
 
   it('VLT-01 create picks a folder and creates the vault', async () => {

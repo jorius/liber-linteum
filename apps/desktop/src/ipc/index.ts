@@ -749,6 +749,40 @@ export const scratchpadChoose = () => call<string | null>('scratchpad_choose');
 export const scratchpadSet = (path: string) => call<Settings>('scratchpad_set', { path });
 /** Opens the global Scratchpad as the vault (no path: Rust knows it). */
 export const scratchpadOpen = () => call<VaultInfo>('scratchpad_open');
+
+// ---- Notion import (M7) ----
+
+/** The Notion export just picked. */
+export interface NotionZip {
+  name: string;
+  suggestedName: string;
+}
+/** The dry run: nothing is written (M7 §3). */
+export interface NotionPreview {
+  pages: number;
+  databases: number;
+  rows: number;
+  attachments: number;
+  folders: number;
+  bytes: number;
+  /** The first warnings; `moreWarnings` counts the rest. */
+  warnings: string[];
+  moreWarnings: number;
+}
+/** The import done: the new vault (open) and its report page. */
+export interface NotionDone {
+  vault: VaultInfo;
+  report: string;
+  cancelled: boolean;
+}
+/** A file dialog Rust opens for the export zip; `null` when cancelled. */
+export const notionPickZip = () => call<NotionZip | null>('notion_pick_zip');
+/** A folder dialog Rust opens for where the new vault goes. */
+export const notionPickParent = () => call<string | null>('notion_pick_parent');
+export const notionPreview = () => call<NotionPreview>('notion_preview');
+/** Imports into a new folder `name` in the folder picked, then opens it. */
+export const notionImport = (name: string) => call<NotionDone>('notion_import', { name });
+export const notionCancel = () => call<null>('notion_cancel');
 /** A new quick note named `name` in the open vault's scratch place. */
 export const quickNoteCreate = (name: string) => call<string>('quick_note_create', { name });
 /** Renames a quick note after its saved first line, while it follows it. */
@@ -932,6 +966,12 @@ export const onSettingsChanged = (cb: (s: Settings) => void): Promise<UnlistenFn
 /** File → New Quick Note in the app menu (M4c §2). */
 export const onMenuQuickNote = (cb: () => void): Promise<UnlistenFn> =>
   listen('menu:quickNote', () => cb(), mine());
+/** File → Import from Notion… (M7). */
+export const onMenuNotionImport = (cb: () => void): Promise<UnlistenFn> =>
+  listen<null>('menu:notionImport', () => cb(), mine());
+/** How far a Notion import is (M7 §8). */
+export const onNotionProgress = (cb: (p: { done: number; total: number }) => void): Promise<UnlistenFn> =>
+  listen<{ done: number; total: number }>('notion:progress', (e) => cb(e.payload), mine());
 /** View → Search… in the app menu (M5 §4). */
 export const onMenuSearch = (cb: () => void): Promise<UnlistenFn> =>
   listen<null>('menu:search', () => cb(), mine());

@@ -67,5 +67,7 @@ export function DialogHost() {
       );
     case 'scratchpadSetup':
       return null; // ScratchpadHost shows it, on the Welcome screen too
+    case 'notionImport':
+      return null; // NotionHost shows it, on the Welcome screen too
   }
 }

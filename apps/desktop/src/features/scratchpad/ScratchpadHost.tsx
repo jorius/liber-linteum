@@ -7,7 +7,7 @@ import { ScratchpadSetupDialog } from './ScratchpadSetupDialog';
 import { installScratchpadSync } from './scratchpadStore';
 
 /** Unsubscribes without ever throwing (the event runtime may be gone). */
-function quietly(un: () => unknown) {
+export function quietly(un: () => unknown) {
   try {
     void Promise.resolve(un()).catch(() => undefined);
   } catch {

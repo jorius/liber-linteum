@@ -13,6 +13,7 @@ import { SUPPORTED_LANGUAGES, type Language } from '../../i18n';
 import { pickFolder } from '../../ipc';
 import { useSettingsStore } from '../../stores/settingsStore';
 import { useVaultStore } from '../../stores/vaultStore';
+import { openNotionImport } from '../notion/NotionHost';
 import { newQuickNote } from '../scratchpad/quickNote';
 import { QuickNoteIcon } from '../scratchpad/QuickNoteIcon';
 import { RecentList } from './RecentList';
@@ -98,18 +99,10 @@ export function Welcome({ version }: WelcomeProps) {
             <NewPageIcon />
             {t('singleFile.openFile')}
           </button>
-          <button
-            type="button"
-            className={styles.button}
-            disabled
-            aria-describedby="welcome-notion-later"
-          >
+          <button type="button" className={styles.button} onClick={openNotionImport}>
             <ImportIcon />
             {t('welcome.importNotion')}
           </button>
-          <p className={styles.note} id="welcome-notion-later">
-            {t('welcome.notionLater')}
-          </p>
         </div>
 
         <RecentList />

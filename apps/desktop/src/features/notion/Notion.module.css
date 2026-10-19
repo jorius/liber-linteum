@@ -1,0 +1,59 @@
+/* The Notion import dialog (M7 §3). */
+.place {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.label {
+  font: 600 13px var(--font-body);
+  color: var(--color-text-body);
+  flex-basis: 100%;
+}
+
+.value {
+  flex: 1 1 220px;
+  min-width: 0;
+  font-size: 13px;
+  color: var(--color-text);
+  background: var(--color-surface-subtle);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: 6px 8px;
+  overflow-wrap: anywhere;
+}
+
+.preview {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-height: 24px;
+}
+
+.size {
+  color: var(--color-text-muted);
+}
+
+.warnings {
+  font-size: 13px;
+  color: var(--color-text-body);
+}
+
+.warnings summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.warnings ul {
+  margin: 6px 0 0;
+  padding-left: 20px;
+  max-height: 160px;
+  overflow: auto;
+  overflow-wrap: anywhere;
+}
+
+.progress {
+  width: 100%;
+  accent-color: var(--color-accent);
+}
