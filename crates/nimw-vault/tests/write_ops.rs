@@ -158,3 +158,29 @@ proptest! {
         prop_assert_eq!(count, 1);
     }
 }
+
+/// M4c review I4: a visible name that resolves (a symlink; on Windows an 8.3
+/// short name such as `SSH~1`) into a hidden folder or file is refused.
+#[cfg(unix)]
+#[test]
+fn m4c_review_i4_visible_paths_never_resolve_into_hidden_ones() {
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::create_dir(dir.path().join(".secret")).unwrap();
+    std::fs::write(dir.path().join(".secret/key.png"), "k").unwrap();
+    std::fs::write(dir.path().join(".hidden.png"), "h").unwrap();
+    std::fs::write(dir.path().join("ok.png"), "o").unwrap();
+    std::os::unix::fs::symlink(
+        dir.path().join(".secret/key.png"),
+        dir.path().join("pic.png"),
+    )
+    .unwrap();
+    std::os::unix::fs::symlink(dir.path().join(".hidden.png"), dir.path().join("h.png")).unwrap();
+    std::os::unix::fs::symlink(dir.path().join(".secret"), dir.path().join("d")).unwrap();
+    let vault = nimw_vault::Vault::open(dir.path()).unwrap();
+    let p = |s: &str| nimw_vault::VaultPath::new(s).unwrap();
+    for refused in ["pic.png", "h.png", "d/key.png"] {
+        assert!(vault.visible_fs_path(&p(refused)).is_err(), "{refused}");
+    }
+    assert!(vault.visible_fs_path(&p("ok.png")).is_ok());
+    assert!(vault.visible_fs_path(&p("missing.png")).is_ok());
+}

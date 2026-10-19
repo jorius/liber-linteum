@@ -33,6 +33,28 @@ impl Vault {
         }
     }
 
+    /// [`Vault::fs_path`] for a path the webview names, also refusing one
+    /// whose real location is hidden: a visible name can resolve into a
+    /// hidden folder through a symlink or, on Windows, an 8.3 short name
+    /// (`SSH~1`). A missing file is left to the read that follows.
+    pub fn visible_fs_path(&self, path: &VaultPath) -> Result<PathBuf> {
+        let full = self.fs_path(path)?;
+        if full.symlink_metadata().is_err() {
+            return Ok(full);
+        }
+        let real = dunce::canonicalize(&full).map_err(|e| io_err(path.as_str(), e))?;
+        let inside = real
+            .strip_prefix(&self.root)
+            .map_err(|_| VaultError::OutsideVault(path.to_string()))?;
+        if inside
+            .components()
+            .any(|c| c.as_os_str().to_str().is_none_or(crate::is_hidden_name))
+        {
+            return Err(VaultError::OutsideVault(path.to_string()));
+        }
+        Ok(full)
+    }
+
     pub fn read(&self, path: &VaultPath) -> Result<(Vec<u8>, Hash)> {
         let bytes = std::fs::read(self.fs_path(path)?).map_err(|e| io_err(path.as_str(), e))?;
         let hash = Hash::of(&bytes);

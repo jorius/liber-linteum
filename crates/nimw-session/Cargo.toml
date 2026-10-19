@@ -14,6 +14,7 @@ nimw-vault = { path = "../nimw-vault" }
 percent-encoding.workspace = true
 rayon.workspace = true
 thiserror.workspace = true
+unicode-segmentation.workspace = true
 
 [dev-dependencies]
 criterion.workspace = true

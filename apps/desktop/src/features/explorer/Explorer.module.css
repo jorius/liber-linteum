@@ -147,3 +147,37 @@
 .more:hover {
   background: var(--color-sidebar-active);
 }
+
+/* The vault's scratch folder, pinned first (M4c §7.2): a pencil, its note
+   count, and a divider under it and its open contents. */
+.pinIcon {
+  display: inline-flex;
+  flex: none;
+  opacity: 0.85;
+}
+
+.count {
+  margin-left: auto;
+  flex: none;
+  font: 600 11.5px var(--font-body);
+  font-variant-numeric: tabular-nums;
+  opacity: 0.75;
+}
+
+.count + .more {
+  margin-left: 0;
+}
+
+.divider {
+  margin-top: 6px;
+  position: relative;
+}
+
+.divider::before {
+  content: '';
+  position: absolute;
+  left: 8px;
+  right: 8px;
+  top: -4px;
+  border-top: 1px solid var(--color-sidebar-divider);
+}

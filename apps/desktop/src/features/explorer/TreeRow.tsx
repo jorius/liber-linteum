@@ -2,6 +2,7 @@ import { useDraggable, useDroppable } from '@dnd-kit/core';
 import { forwardRef, useEffect, useId, useRef, useState, type KeyboardEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { TreeNode } from '../../ipc';
+import { QuickNoteIcon } from '../scratchpad/QuickNoteIcon';
 import styles from './Explorer.module.css';
 import { validateName } from './nameRules';
 
@@ -32,6 +33,10 @@ interface TreeRowProps {
   onCancelRename: () => void;
   /** Opens the row's context menu (the "…" button). */
   onMenu?: (path: string, anchor: { x: number; y: number }) => void;
+  /** The vault's scratch folder, pinned first (M4c §7.2): its note count. */
+  pinnedCount?: number;
+  /** The first root row under the pinned scratch folder. */
+  divider?: boolean;
 }
 
 export function Icon({ node, expanded }: { node: TreeNode; expanded: boolean }) {
@@ -153,6 +158,8 @@ export const TreeRow = forwardRef<HTMLLIElement, TreeRowProps>(function TreeRow(
     onCommitRename,
     onCancelRename,
     onMenu,
+    pinnedCount,
+    divider,
   },
   ref,
 ) {
@@ -173,6 +180,7 @@ export const TreeRow = forwardRef<HTMLLIElement, TreeRowProps>(function TreeRow(
     selected ? styles.selected : '',
     dropTarget ? styles.drop : '',
     drag.isDragging ? styles.dragSource : '',
+    divider ? styles.divider : '',
   ]
     .filter(Boolean)
     .join(' ');
@@ -181,19 +189,27 @@ export const TreeRow = forwardRef<HTMLLIElement, TreeRowProps>(function TreeRow(
       ref={setRefs}
       {...drag.listeners}
       role="treeitem"
-      aria-label={name}
+      aria-label={
+        pinnedCount === undefined ? name : t('explorer.scratchFolder', { name, count: pinnedCount })
+      }
       aria-level={level}
       aria-selected={selected}
       aria-expanded={node.kind === 'folder' ? expanded : undefined}
       tabIndex={focused ? 0 : -1}
       data-path={node.path}
       data-name={name}
+      data-divider={divider || undefined}
       className={classes}
       style={{ paddingLeft: 8 + (level - 1) * 16 }}
       onClick={() => onActivate(node)}
       onFocus={() => onFocusRow(node.path)}
     >
       <Icon node={node} expanded={expanded} />
+      {pinnedCount !== undefined && (
+        <span className={styles.pinIcon} data-quick-note-icon>
+          <QuickNoteIcon size={14} />
+        </span>
+      )}
       {renaming ? (
         <RenameInput
           node={node}
@@ -205,6 +221,11 @@ export const TreeRow = forwardRef<HTMLLIElement, TreeRowProps>(function TreeRow(
           className={node.kind === 'folder' ? `${styles.label} ${styles.folder}` : styles.label}
         >
           {name}
+        </span>
+      )}
+      {pinnedCount !== undefined && !renaming && (
+        <span className={styles.count} aria-hidden>
+          {pinnedCount}
         </span>
       )}
       {onMenu && !renaming && (

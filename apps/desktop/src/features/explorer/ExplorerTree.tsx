@@ -5,6 +5,7 @@ import { usePageStore } from '../../stores/pageStore';
 import { useTrailStore } from '../../stores/trailStore';
 import { joinPath, parentOf, remap } from '../../stores/tree';
 import { useVaultStore } from '../../stores/vaultStore';
+import { useScratchpadStore } from '../scratchpad/scratchpadStore';
 import styles from './Explorer.module.css';
 import { displayName, keptExtension, TreeRow } from './TreeRow';
 import { isTextPath } from '../../stores/textFiles';
@@ -14,11 +15,21 @@ export interface Row {
   level: number;
 }
 
-/** Rows of the root and of expanded folders only (others are not rendered). */
-export function visibleRows(children: Map<string, TreeNode[]>, expanded: Set<string>): Row[] {
+/** Rows of the root and of expanded folders only (others are not rendered).
+ *  `pinned`: the vault's scratch folder, first at the root (M4c §7.2). */
+export function visibleRows(
+  children: Map<string, TreeNode[]>,
+  expanded: Set<string>,
+  pinned: string | null = null,
+): Row[] {
   const out: Row[] = [];
+  const pin = (list: TreeNode[]) => {
+    const i = list.findIndex((n) => n.path === pinned && n.kind === 'folder');
+    return i <= 0 ? list : [list[i], ...list.slice(0, i), ...list.slice(i + 1)];
+  };
   const walk = (parent: string, level: number) => {
-    for (const node of children.get(parent) ?? []) {
+    const list = children.get(parent) ?? [];
+    for (const node of parent ? list : pin(list)) {
       out.push({ node, level });
       if (node.kind === 'folder' && expanded.has(node.path)) walk(node.path, level + 1);
     }
@@ -49,7 +60,22 @@ export function ExplorerTree({
   const selected = useVaultStore((s) => s.selected);
   const renaming = useVaultStore((s) => s.renaming);
   const focusRequest = useVaultStore((s) => s.focusRequest);
-  const rows = useMemo(() => visibleRows(children, expanded), [children, expanded]);
+  const scratch = useScratchpadStore((s) => s.folder);
+  const nodes = useVaultStore((s) => s.nodes);
+  const rows = useMemo(
+    () => visibleRows(children, expanded, scratch),
+    [children, expanded, scratch],
+  );
+  // The pinned folder's note count, and the first root row after it.
+  const pinned = scratch !== null && rows[0]?.node.path === scratch;
+  const notes = useMemo(
+    () =>
+      scratch === null
+        ? 0
+        : nodes.filter((n) => n.kind === 'page' && n.path.startsWith(`${scratch}/`)).length,
+    [nodes, scratch],
+  );
+  const divider = pinned ? rows.findIndex((r, i) => i > 0 && r.level === 1) : -1;
   const [focused, setFocused] = useState<string | null>(null);
   const refs = useRef(new Map<string, HTMLLIElement>());
 
@@ -212,8 +238,10 @@ export function ExplorerTree({
         }
       }}
     >
-      {rows.map(({ node, level }) => (
+      {rows.map(({ node, level }, i) => (
         <TreeRow
+          pinnedCount={pinned && i === 0 ? notes : undefined}
+          divider={i === divider}
           key={node.path}
           ref={(el) => {
             if (el) refs.current.set(node.path, el);

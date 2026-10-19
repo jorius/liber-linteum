@@ -28,7 +28,7 @@ fn dir_path(s: &str) -> CmdResult<VaultPath> {
     }
 }
 
-fn open_session<R: Runtime>(app: &AppHandle<R>, root: &Path) -> CmdResult<VaultInfo> {
+pub(crate) fn open_session<R: Runtime>(app: &AppHandle<R>, root: &Path) -> CmdResult<VaultInfo> {
     let state = app.state::<AppState>();
     let emitter = app.clone();
     let (session, report) = VaultSession::open(root, &state.cache_dir, move |event| match event {
@@ -72,8 +72,11 @@ fn open_session<R: Runtime>(app: &AppHandle<R>, root: &Path) -> CmdResult<VaultI
             .push(format!("recent vaults could not be saved: {e}"));
     }
     state.set_session(Some(session));
+    let scratchpad = state.settings.is_scratchpad(&root);
+    state.set_scratchpad_root(scratchpad.then(|| root.clone()));
     Ok(VaultInfo {
         name,
+        scratchpad,
         root: root.to_string_lossy().into_owned(),
         report,
     })

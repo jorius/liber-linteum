@@ -15,7 +15,8 @@
     "noRecent": "Aún no hay bóvedas recientes.",
     "notionLater": "La importación de Notion llega en un hito posterior.",
     "forget": "Quitar {name} de recientes",
-    "missing": "Carpeta no encontrada"
+    "missing": "Carpeta no encontrada",
+    "quickNote": "Tomar una nota rápida"
   },
   "languages": {
     "en": "English",
@@ -68,7 +69,8 @@
       "moved": "{name} se movió a {target}.",
       "notAllowed": "{name} no se puede mover ahí.",
       "cancelled": "Se canceló mover {name}."
-    }
+    },
+    "scratchFolder": "{name}, notas rápidas, {count, plural, one {# nota} other {# notas}}"
   },
   "opening": {
     "title": "Abriendo bóveda…",
@@ -572,5 +574,35 @@
     "selected": "{selected, number} de {count, plural, one {# palabra} other {# palabras}}",
     "chars": "{chars, plural, one {# carácter} other {# caracteres}} · {bare, number} sin espacios",
     "lines": "{lines, plural, one {# línea} other {# líneas}} · {chars, plural, one {# carácter} other {# caracteres}}"
+  },
+  "scratchpad": {
+    "title": "Notas rápidas",
+    "noteName": "Nota rápida {stamp}",
+    "setupTitle": "¿Dónde guardar las notas rápidas?",
+    "setupBody": "Las notas rápidas son archivos Markdown en una carpeta tuya. Se abre como cualquier bóveda, como «Notas rápidas».",
+    "setupHint": "Puedes cambiarla más tarde en Ajustes → Archivos. Las notas ya tomadas se quedan donde están.",
+    "folder": "Carpeta",
+    "chooseFolder": "Elegir carpeta…",
+    "create": "Crear",
+    "location": "Carpeta de notas rápidas (sin bóveda abierta)",
+    "notYet": "Se elige la primera vez que tomas una nota rápida.",
+    "change": "Cambiar…",
+    "choose": "Elegir…",
+    "folderSetting": "Carpeta de notas rápidas"
+  },
+  "singleFile": {
+    "openFile": "Abrir un archivo",
+    "cantOpen": "{count, plural, one {Este archivo se abre} other {Estos archivos se abren}} en otras aplicaciones, no aquí.",
+    "noSuchFile": "No hay ningún archivo llamado «{target}» en esta carpeta.",
+    "inVaultRegion": "Bóveda",
+    "inVault": "Este archivo está en tu bóveda «{name}».",
+    "openInVault": "Abrir en su bóveda",
+    "deleted": "Este archivo se eliminó o se movió fuera de la aplicación. Tu texto sigue aquí.",
+    "saveAgain": "Guardar de nuevo",
+    "gone": "Este archivo se eliminó o se movió fuera de la aplicación.",
+    "closeWindow": "Cerrar ventana",
+    "saveCopy": "Guardar una copia",
+    "copySaved": "Guardado como «{name}» junto al archivo.",
+    "notText": "Este archivo no se puede editar aquí."
   }
 }

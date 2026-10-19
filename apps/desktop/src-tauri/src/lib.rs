@@ -6,10 +6,14 @@ pub mod dto;
 pub mod editor_commands;
 pub mod error;
 pub mod external_commands;
+pub mod file_commands;
+pub mod file_windows;
 pub mod fonts;
 pub mod gv_commands;
 pub mod menu;
 pub mod navigation;
+pub mod opening;
+pub mod scratchpad_commands;
 pub mod settings;
 pub mod settings_commands;
 pub mod state;
@@ -35,6 +39,8 @@ pub fn configure<R: tauri::Runtime>(
     dirs: Option<AppDirs>,
 ) -> tauri::Builder<R> {
     let builder = builder
+        // Single-file windows' grants (M4c §3).
+        .manage(file_windows::FileWindows::default())
         .plugin(tauri_plugin_dialog::init())
         // Used only from our own commands (url_open, file_open_external); the
         // webview gets no opener permission.
@@ -47,19 +53,31 @@ pub fn configure<R: tauri::Runtime>(
         // Files dropped from the OS become importable (M2c §8).
         .on_window_event(drops::on_window_event)
         .on_webview_event(drops::on_webview_event)
+        // Quick notes (M4c): the folder dialog and its grant.
+        .manage(scratchpad_commands::ScratchpadState::default())
         .register_asynchronous_uri_scheme_protocol(asset::SCHEME, |ctx, request, responder| {
             let app = ctx.app_handle().clone();
+            // A single-file window is served its file's folder (M4c §4).
+            let label = ctx.webview_label().to_string();
             std::thread::spawn(move || {
-                let response = match app.try_state::<AppState>() {
-                    Some(state) => {
+                let state = app.try_state::<AppState>();
+                let files = app.try_state::<file_windows::FileWindows>();
+                let response = match (state, files) {
+                    (Some(state), Some(files)) => {
                         let range = request
                             .headers()
                             .get("range")
                             .and_then(|v| v.to_str().ok())
                             .map(str::to_owned);
-                        asset::serve(&state, request.uri().path(), range.as_deref())
+                        asset::serve_window(
+                            &state,
+                            &files,
+                            &label,
+                            request.uri().path(),
+                            range.as_deref(),
+                        )
                     }
-                    None => asset::AssetResponse {
+                    _ => asset::AssetResponse {
                         status: 404,
                         mime: "text/plain",
                         body: Vec::new(),
@@ -82,6 +100,7 @@ pub fn configure<R: tauri::Runtime>(
     };
     builder.invoke_handler(tauri::generate_handler![
         commands::app_info,
+        commands::window_close_self,
         vault_commands::vault_open,
         vault_commands::vault_create,
         vault_commands::vault_close,
@@ -127,11 +146,55 @@ pub fn configure<R: tauri::Runtime>(
         external_commands::external_reveal,
         external_commands::external_network_allow,
         external_commands::file_pick,
+        scratchpad_commands::scratchpad_default,
+        scratchpad_commands::scratchpad_choose,
+        scratchpad_commands::scratchpad_set,
+        scratchpad_commands::scratchpad_open,
+        scratchpad_commands::quick_note_create,
+        scratchpad_commands::quick_note_autoname,
+        scratchpad_commands::quick_notes_state,
+        scratchpad_commands::scratch_folder_set,
+        // Single-file windows (M4c §3, §4).
+        file_commands::file_info,
+        file_commands::file_read,
+        file_commands::file_write,
+        file_commands::file_conflict_copy,
+        file_commands::file_recreate,
+        file_commands::file_rename,
+        file_commands::file_links_resolve,
+        file_commands::file_note_read,
+        file_commands::file_follow,
+        file_commands::file_open_in_vault,
+        file_commands::file_open_dialog,
     ])
 }
 
 pub fn run() {
-    menu::with_app_menu(configure(tauri::Builder::default(), None))
-        .run(tauri::generate_context!())
-        .expect("error while running Notes In My Way");
+    let builder = tauri::Builder::default();
+    // M4c §3: a second launch (a file opened from Explorer, a command line)
+    // hands its files to this one. Registered first, as the plugin asks;
+    // never in tests (a second app in the test process would exit it).
+    #[cfg(not(target_os = "macos"))]
+    let builder = builder.plugin(tauri_plugin_single_instance::init(|app, args, cwd| {
+        let args: Vec<std::ffi::OsString> = args.into_iter().skip(1).map(Into::into).collect();
+        let cwd = std::path::Path::new(&cwd);
+        opening::open_later(app, opening::paths_from_args(&args, cwd));
+    }));
+    menu::with_app_menu(configure(builder, None))
+        .build(tauri::generate_context!())
+        .expect("error while building Notes In My Way")
+        .run(|app, event| match event {
+            // Files named on the command line that started the app.
+            tauri::RunEvent::Ready => {
+                let args: Vec<std::ffi::OsString> = std::env::args_os().skip(1).collect();
+                let cwd = std::env::current_dir().unwrap_or_default();
+                opening::open_later(app, opening::paths_from_args(&args, &cwd));
+            }
+            // Finder's Open With and the Dock (M4c §3).
+            #[cfg(target_os = "macos")]
+            tauri::RunEvent::Opened { urls } => {
+                opening::open_later(app, opening::paths_from_urls(&urls));
+            }
+            _ => {}
+        });
 }

@@ -10,6 +10,7 @@ import {
 import { errorMessage } from '../../stores/messages';
 import { usePageWidthStore } from '../../stores/pageWidthStore';
 import { validateName } from '../explorer/nameRules';
+import { ScratchFolderSetting } from '../scratchpad/ScratchFolderSetting';
 import styles from './Dialogs.module.css';
 
 const MODES: AttachmentMode[] = ['subfolder', 'same', 'vault', 'folder'];
@@ -262,6 +263,7 @@ export function VaultSettingsSection() {
           <option value="full">{t('settings.pageWidthFull')}</option>
         </select>
       </label>
+      <ScratchFolderSetting />
     </section>
   );
 }

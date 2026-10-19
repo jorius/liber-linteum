@@ -13,7 +13,7 @@ import { UnwritableNotice } from './UnwritableNotice';
 import { COUNT_DEBOUNCE_MS } from './WordCount';
 
 /** Lines and characters of the file in the editor (in place of words). */
-function TextStats() {
+export function TextStats() {
   const { t } = useTranslation();
   const view = useCurrentView();
   const [stats, setStats] = useState<{ lines: number; chars: number } | null>(null);

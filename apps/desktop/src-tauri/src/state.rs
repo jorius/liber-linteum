@@ -24,12 +24,17 @@ pub struct AppState {
     drop_grants: Mutex<DropGrants>,
     cover_picker: Mutex<Option<CoverPicker>>,
     file_picker: Mutex<Option<FilePicker>>,
+    /// The open vault's root when it opened as the global Scratchpad; kept
+    /// for the session, so Change… doesn't turn it into a vault (M4c final
+    /// review M9).
+    scratchpad_root: Mutex<Option<PathBuf>>,
 }
 
 impl AppState {
     pub fn new(settings: SettingsStore, cache_dir: PathBuf) -> AppState {
         AppState {
             session: Mutex::new(None),
+            scratchpad_root: Mutex::new(None),
             settings,
             cache_dir,
             drop_grants: Mutex::new(DropGrants::default()),
@@ -77,6 +82,16 @@ impl AppState {
         if let Some(old) = old {
             old.stop_watching();
         }
+    }
+
+    /// Records whether the vault at `root`, just opened, is the Scratchpad.
+    pub fn set_scratchpad_root(&self, root: Option<PathBuf>) {
+        *lock(&self.scratchpad_root) = root;
+    }
+
+    /// The vault at `root` opened as the Scratchpad.
+    pub fn opened_as_scratchpad(&self, root: &Path) -> bool {
+        lock(&self.scratchpad_root).as_deref() == Some(root)
     }
 
     fn slot(&self) -> std::sync::MutexGuard<'_, Option<Arc<VaultSession>>> {

@@ -1,7 +1,7 @@
 // The only module allowed to talk to the Rust backend. Every backend
 // capability the UI uses is a typed function here (M1b spec §3.2).
 import { invoke, isTauri } from '@tauri-apps/api/core';
-import { listen, type UnlistenFn } from '@tauri-apps/api/event';
+import { listen, TauriEvent, type UnlistenFn } from '@tauri-apps/api/event';
 import { open } from '@tauri-apps/plugin-dialog';
 import { getCurrentWebview } from '@tauri-apps/api/webview';
 import { getCurrentWindow } from '@tauri-apps/api/window';
@@ -91,6 +91,8 @@ export interface VaultInfo {
   name: string;
   root: string;
   report: IndexReport;
+  /** The global Scratchpad (M4c §2). */
+  scratchpad?: boolean;
 }
 
 export type NodeKind = 'page' | 'folder' | 'attachment';
@@ -132,6 +134,8 @@ export interface RecentVault {
   name: string;
   openedAt: string;
   missing: boolean;
+  /** The global Scratchpad (M4c §2): shown as "Quick notes". */
+  scratchpad?: boolean;
 }
 
 export type EditorMode = 'livePreview' | 'source' | 'split';
@@ -187,6 +191,9 @@ export interface Settings {
   coverHeight: number;
   /** A caption with each attachment's place on disk (M4b part 3 §8). */
   showAttachmentPaths: boolean;
+  /** The global Scratchpad's folder (M4c §2); `null` until the first quick
+   *  note. Changed only through `scratchpadSet`, never a settings patch. */
+  scratchpadPath?: string | null;
 }
 
 /** `wide`: text at the readable measure, the chosen elements span the editor. */
@@ -374,6 +381,30 @@ export interface VaultSettingsPatch {
   attachmentLinkFormat?: LinkFormat | 'default';
 }
 
+/** What `quickNoteAutoname` did (M4c §2): where the note is now, whether it
+ *  still follows its first line, and the rename when there was one. */
+export interface AutoName {
+  path: string;
+  autoNamed: boolean;
+  outcome: RenameOutcome | null;
+}
+
+/** The open vault's quick notes (M4c §7): its scratch folder (`null` in the
+ *  global Scratchpad, whose root is the scratch place) and the notes still
+ *  named after their first line. */
+export interface QuickNotesState {
+  folder: string | null;
+  autoNamed: string[];
+}
+
+/** What renaming the scratch folder did: its name now, and the rename on
+ *  disk when the folder existed (`from` → `folder`). */
+export interface ScratchFolderResult {
+  folder: string;
+  from: string | null;
+  outcome: RenameOutcome | null;
+}
+
 /** What one Global View click opens (M3a §3). */
 export type GvLevelRef =
   { kind: 'vault' } | { kind: 'folder'; path: string } | { kind: 'page'; path: string };
@@ -445,17 +476,102 @@ export interface CardPosition {
 const call = <T>(cmd: string, args?: Record<string, unknown>) =>
   ipcCall(() => invoke<T>(cmd, args));
 
+/** An answer that needs no backend. */
+const none = <T>(value: T): Promise<IpcResult<T>> => Promise.resolve({ ok: true, value });
+
+// ---- single-file windows (M4c §3, §4) ----
+
+/** This window's label (`main`, `file-1`…); `main` outside Tauri. */
+export function windowLabel(): string {
+  const w = window as unknown as {
+    __TAURI_INTERNALS__?: { metadata?: { currentWindow?: { label?: string } } };
+  };
+  return w.__TAURI_INTERNALS__?.metadata?.currentWindow?.label ?? 'main';
+}
+
+/** Whether this window shows one file opened on its own. */
+export const isFileWindowLabel = (label = windowLabel()) => label.startsWith('file-');
+
+/** The file a single-file window shows (its name in its folder), else `null`. */
+let fileName: string | null = null;
+
+/** Set once `file_info` answers, and after each rename. While it is set, the
+ *  page commands act on the window's own file (`file_*`): `PageDoc`, the
+ *  editor and the preview work unchanged, and nothing they send names a
+ *  file to write. */
+export function setFileWindow(name: string | null): void {
+  fileName = name;
+}
+
+export function fileWindowName(): string | null {
+  return fileName;
+}
+
+/** The window's file, or (read only) another note in its folder (an embed). */
+const fileText = (path: string) =>
+  path === fileName ? call<PageText>('file_read') : call<PageText>('file_note_read', { path });
+
+const fileWrite = (
+  path: string,
+  text: string,
+  expectedHash: string,
+): Promise<IpcResult<WriteResult>> =>
+  path === fileName
+    ? call<WriteResult>('file_write', { text, expectedHash })
+    : Promise.resolve({
+        ok: false,
+        error: { kind: 'notPermitted', message: `${path} is not this window's file` },
+      });
+
+export type FileKind = 'page' | 'text';
+
+/** A recent vault holding the window's file ("Open in its vault"). */
+export interface HomeVault {
+  root: string;
+  name: string;
+  /** The file's path in that vault. */
+  page: string;
+}
+
+export interface FileInfo {
+  name: string;
+  kind: FileKind;
+  /** The file's folder, absolute (shown only). */
+  folder: string;
+  vault: HomeVault | null;
+}
+
+export const fileInfo = () => call<FileInfo>('file_info');
+/** Same folder, same extension; answers the new name. */
+export const fileRename = (newName: string) => call<string>('file_rename', { newName });
+/** A link to a file in the folder: a note opens in its own window, a
+ *  document or media file in its default app. */
+export const fileFollow = (path: string) => call<'window' | 'opened'>('file_follow', { path });
+/** The main window opens the vault holding the file, at its page. */
+export const fileOpenInVault = () => call<void>('file_open_in_vault');
+/** File → Open File…: answers the names it couldn't open. */
+export const fileOpenDialog = () => call<string[]>('file_open_dialog');
+/** Closes this window without asking (its pages are saved first). Not the
+ *  window plugin's `destroy`, which takes any window's label (M4c review I2). */
+export const destroyWindow = () => call<void>('window_close_self');
+
 export const vaultOpen = (path: string) => call<VaultInfo>('vault_open', { path });
 export const vaultCreate = (path: string) => call<VaultInfo>('vault_create', { path });
 export const vaultClose = () => call<void>('vault_close');
 export const vaultTree = () => call<TreeNode[]>('vault_tree');
 export const pageGet = (path: string) => call<Page>('page_get', { path });
 export const backlinkCount = (path: string) => call<number>('backlink_count', { path });
+/** In a single-file window: its file again, where it was ("Save again"
+ *  after it was deleted outside; the page's "Save as new" path). */
 export const entryCreatePage = (dir: string, name: string) =>
-  call<string>('entry_create_page', { dir, name });
+  fileName !== null
+    ? call<string>('file_recreate')
+    : call<string>('entry_create_page', { dir, name });
 /** An empty text or code file `name` in `dir` (final review I6). */
 export const entryCreateText = (dir: string, name: string) =>
-  call<string>('entry_create_text', { dir, name });
+  fileName !== null
+    ? call<string>('file_recreate')
+    : call<string>('entry_create_text', { dir, name });
 export const entryCreateFolder = (parent: string, name: string) =>
   call<string>('entry_create_folder', { parent, name });
 export const entryRename = (from: string, to: string) =>
@@ -465,23 +581,35 @@ export const settingsGet = () => call<SettingsResponse>('settings_get');
 export const settingsSet = (patch: SettingsPatch) => call<Settings>('settings_set', { patch });
 export const vaultsRecent = () => call<RecentVault[]>('vaults_recent');
 export const vaultsForget = (path: string) => call<void>('vaults_forget', { path });
-export const pageRead = (path: string) => call<PageText>('page_read', { path });
+export const pageRead = (path: string) =>
+  fileName !== null ? fileText(path) : call<PageText>('page_read', { path });
 export const pageWrite = (path: string, text: string, expectedHash: string) =>
-  call<WriteResult>('page_write', { path, text, expectedHash });
+  fileName !== null
+    ? fileWrite(path, text, expectedHash)
+    : call<WriteResult>('page_write', { path, text, expectedHash });
 /** Plain-text and code files (M4b part 2 §6): `notAText` for anything else. */
-export const textRead = (path: string) => call<PageText>('text_read', { path });
+export const textRead = (path: string) =>
+  fileName !== null ? fileText(path) : call<PageText>('text_read', { path });
 export const textWrite = (path: string, text: string, expectedHash: string) =>
-  call<WriteResult>('text_write', { path, text, expectedHash });
+  fileName !== null
+    ? fileWrite(path, text, expectedHash)
+    : call<WriteResult>('text_write', { path, text, expectedHash });
 export const pageCreateConflictCopy = (path: string, text: string) =>
-  call<string>('page_create_conflict_copy', { path, text });
+  fileName !== null
+    ? call<string>('file_conflict_copy', { text })
+    : call<string>('page_create_conflict_copy', { path, text });
 export const linksResolve = (source: string, targets: LinkTarget[]) =>
-  call<(string | null)[]>('links_resolve', { source, targets });
+  fileName !== null
+    ? call<(string | null)[]>('file_links_resolve', { targets })
+    : call<(string | null)[]>('links_resolve', { source, targets });
 export const urlOpen = (url: string) => call<void>('url_open', { url });
 export const fileOpenExternal = (path: string) => call<void>('file_open_external', { path });
 /** Outside files the targets name (M4b part 3 §9): `null` for vault targets.
  *  Markdown targets are as written (relative to `source`), not vault-joined. */
 export const linksExternal = (source: string, targets: LinkTarget[]) =>
-  call<(ExternalFile | null)[]>('links_external', { source, targets });
+  fileName !== null
+    ? none(targets.map(() => null))
+    : call<(ExternalFile | null)[]>('links_external', { source, targets });
 /** Opens a linked outside file in its default app (programs are refused). */
 export const externalOpen = (path: string) => call<void>('external_open', { path });
 /** The user loads a linked network file (final review C1): from now on,
@@ -511,7 +639,9 @@ export const attachmentImport = (page: string, paths: string[]) =>
 /** Opens the native image dialog (Rust side); `null` when cancelled. */
 export const coverPick = (page: string) => call<CoverPick | null>('cover_pick', { page });
 export const linkSuggest = (source: string, query: string, embed: boolean) =>
-  call<LinkSuggestion[]>('link_suggest', { source, query, embed });
+  fileName !== null
+    ? none<LinkSuggestion[]>([])
+    : call<LinkSuggestion[]>('link_suggest', { source, query, embed });
 export const gvChildren = (level: GvLevelRef) => call<GvLevel>('gv_children', { level });
 export const gvEdges = (visible: string[]) => call<GvEdge[]>('gv_edges', { visible });
 export const layoutGet = (level: string) =>
@@ -541,6 +671,25 @@ export const coverSideSet = (path: string, side: CoverSide) =>
 export const coverWidthSet = (path: string, width: number | null) =>
   call<VaultSettings>('cover_width_set', { path, width });
 
+// ---- quick notes (M4c §2, §7) ----
+
+/** Where the global Scratchpad goes unless the user picks another folder. */
+export const scratchpadDefault = () => call<string>('scratchpad_default');
+/** A folder dialog Rust opens; `null` when cancelled. */
+export const scratchpadChoose = () => call<string | null>('scratchpad_choose');
+/** Makes `path` (the default, or the folder just chosen) the Scratchpad. */
+export const scratchpadSet = (path: string) => call<Settings>('scratchpad_set', { path });
+/** Opens the global Scratchpad as the vault (no path: Rust knows it). */
+export const scratchpadOpen = () => call<VaultInfo>('scratchpad_open');
+/** A new quick note named `name` in the open vault's scratch place. */
+export const quickNoteCreate = (name: string) => call<string>('quick_note_create', { name });
+/** Renames a quick note after its saved first line, while it follows it. */
+export const quickNoteAutoname = (path: string) => call<AutoName>('quick_note_autoname', { path });
+export const quickNotesState = () => call<QuickNotesState>('quick_notes_state');
+/** Names the open vault's scratch folder (Settings → This vault). */
+export const scratchFolderSet = (name: string) =>
+  call<ScratchFolderResult>('scratch_folder_set', { name });
+
 /** URL of a vault file for <img>/<audio> through the `nimw-asset:` protocol
  *  (M2a §2.5); WebView2 on Windows reaches custom protocols over http. */
 export function assetUrl(path: string): string {
@@ -562,20 +711,42 @@ export function externalAssetUrl(path: string): string {
 
 // ---- events ----
 
+/** Events sent to this window (and to every window), not those sent to
+ *  another one: a listener with no target hears every window's events
+ *  (M4c §3: menu items act on the focused window only). */
+const mine = () => ({ target: { kind: 'WebviewWindow' as const, label: windowLabel() } });
+
 export const onVaultProgress = (cb: (p: ProgressPayload) => void): Promise<UnlistenFn> =>
   listen<ProgressPayload>('vault:progress', (e) => cb(e.payload));
 export const onVaultChanged = (cb: (p: ChangedPayload) => void): Promise<UnlistenFn> =>
   listen<ChangedPayload>('vault:changed', (e) => cb(e.payload));
 /** View → Back / Forward in the app menu (M2b §3). */
 export const onMenuNavigate = (cb: (direction: 'back' | 'forward') => void): Promise<UnlistenFn> =>
-  listen<'back' | 'forward'>('menu:navigate', (e) => cb(e.payload));
+  listen<'back' | 'forward'>('menu:navigate', (e) => cb(e.payload), mine());
 /** View → Toggle Formatting Toolbar / Toggle Line Numbers in the app menu:
  *  the settings key to flip. */
 export const onMenuToggle = (cb: (key: string) => void): Promise<UnlistenFn> =>
-  listen<string>('menu:toggle', (e) => cb(e.payload));
+  listen<string>('menu:toggle', (e) => cb(e.payload), mine());
 /** View → Editor / Global View in the app menu (M3a §2). */
 export const onMenuScreen = (cb: (screen: string) => void): Promise<UnlistenFn> =>
-  listen<string>('menu:screen', (e) => cb(e.payload));
+  listen<string>('menu:screen', (e) => cb(e.payload), mine());
+/** File → Open File… (M4c §3). */
+export const onMenuOpenFile = (cb: () => void): Promise<UnlistenFn> =>
+  listen<null>('menu:open-file', () => cb(), mine());
+/** A single-file window's file changed on disk, or is gone. */
+export const onFileChanged = (cb: (p: { removed: boolean }) => void): Promise<UnlistenFn> =>
+  listen<{ removed: boolean }>('file:changed', (e) => cb(e.payload), mine());
+/** A single-file window hands its page to the main window (M4c §3). */
+export const onOpenInVault = (
+  cb: (p: { root: string; page: string }) => void,
+): Promise<UnlistenFn> =>
+  listen<{ root: string; page: string }>('file:open-in-vault', (e) => cb(e.payload), mine());
+/** Settings changed in any window (M4c §3): every window shows them. */
+export const onSettingsChanged = (cb: (s: Settings) => void): Promise<UnlistenFn> =>
+  listen<Settings>('settings:changed', (e) => cb(e.payload), mine());
+/** File → New Quick Note in the app menu (M4c §2). */
+export const onMenuQuickNote = (cb: () => void): Promise<UnlistenFn> =>
+  listen('menu:quickNote', () => cb(), mine());
 export const onVaultWarning = (cb: (p: WarningPayload) => void): Promise<UnlistenFn> =>
   listen<WarningPayload>('vault:warning', (e) => cb(e.payload));
 
@@ -606,8 +777,10 @@ export const onDragDrop = (cb: (e: DragDropPayload) => void): Promise<UnlistenFn
 /** Runs `handler` (e.g. flushing unsaved pages) before the main window closes;
  *  the window is destroyed once it resolves `true` and stays open on `false`. */
 export const onCloseRequested = (handler: () => Promise<boolean>): Promise<UnlistenFn> =>
-  getCurrentWindow().onCloseRequested(async (event) => {
-    if (!(await handler())) event.preventDefault();
+  // As `Window.onCloseRequested`, closing through `window_close_self` (M4c
+  // review I2); listening at all is what keeps the window open meanwhile.
+  getCurrentWindow().listen(TauriEvent.WINDOW_CLOSE_REQUESTED, async () => {
+    if (await handler()) await destroyWindow();
   });
 
 // ---- native folder picker (dialog plugin, folder selection only) ----

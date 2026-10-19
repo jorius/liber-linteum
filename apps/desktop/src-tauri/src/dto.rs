@@ -35,6 +35,8 @@ pub struct VaultInfo {
     pub name: String,
     pub root: String,
     pub report: IndexReportDto,
+    /// The global Scratchpad (M4c §2).
+    pub scratchpad: bool,
 }
 
 #[derive(Debug, Clone, Serialize)]

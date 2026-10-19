@@ -2,6 +2,8 @@ import i18next from 'i18next';
 import { create } from 'zustand';
 import { detectLanguage } from '../i18n';
 import {
+  isTauri,
+  onSettingsChanged,
   settingsGet,
   settingsSet,
   type IpcResult,
@@ -31,6 +33,7 @@ export const DEFAULT_SETTINGS: Settings = {
   outline: false,
   coverHeight: 200,
   showAttachmentPaths: false,
+  scratchpadPath: null,
   globalViewMode: 'drill',
   globalViewEdges: { links: true, tree: true, manual: true, aggregated: true },
 };
@@ -42,6 +45,8 @@ interface SettingsState {
   /** Called before the first render (main.tsx). */
   load: () => Promise<void>;
   update: (patch: SettingsPatch) => Promise<IpcResult<Settings>>;
+  /** Shows settings saved by another window (nothing is written). */
+  adopt: (settings: Settings) => Promise<void>;
 }
 
 async function apply(s: Settings) {
@@ -79,4 +84,15 @@ export const useSettingsStore = create<SettingsState>((set) => ({
     }
     return res;
   },
+  adopt: async (next) => {
+    const settings = { ...DEFAULT_SETTINGS, ...next };
+    await apply(settings);
+    set({ settings });
+  },
 }));
+
+/** Settings changed in another window (M4c §3) show here too. */
+export function installSettingsSync(): void {
+  if (!isTauri()) return;
+  void onSettingsChanged((s) => void useSettingsStore.getState().adopt(s)).catch(() => undefined);
+}

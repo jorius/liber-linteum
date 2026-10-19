@@ -12,6 +12,7 @@ mod link_format;
 mod page_width;
 mod path;
 mod scan;
+mod scratch;
 mod vault;
 mod watch;
 
@@ -26,6 +27,7 @@ pub use link_format::{LinkFormat, LinkFormats};
 pub use page_width::{PageWidth, PageWidths};
 pub use path::VaultPath;
 pub use scan::{Entry, EntryKind, Scan};
+pub use scratch::DEFAULT_SCRATCH_FOLDER;
 pub use vault::Vault;
 pub use watch::{DEBOUNCE, WatchEvent, Watcher};
 

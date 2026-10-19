@@ -83,7 +83,7 @@ describe('M2a ipc commands', () => {
     await emit('tauri://close-requested');
     await new Promise((r) => setTimeout(r, 0));
     expect(flushed).toBe(true);
-    expect(calls).toContain('plugin:window|destroy');
+    expect(calls).toContain('window_close_self');
   });
 
   it('keeps the window open when the close handler says no', async () => {
@@ -98,6 +98,6 @@ describe('M2a ipc commands', () => {
     await emit('tauri://close-requested');
     await new Promise((r) => setTimeout(r, 0));
     expect(asked).toBe(true);
-    expect(calls).not.toContain('plugin:window|destroy');
+    expect(calls).not.toContain('window_close_self');
   });
 });

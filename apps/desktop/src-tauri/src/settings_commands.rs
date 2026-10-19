@@ -4,7 +4,7 @@ use crate::error::CmdResult;
 use crate::settings::{RecentVaultDto, Settings, SettingsDto, SettingsPatch};
 use crate::state::AppState;
 use crate::vault_commands::blocking;
-use tauri::{AppHandle, Manager, Runtime, State};
+use tauri::{AppHandle, Emitter, Manager, Runtime, State};
 
 #[tauri::command]
 pub fn settings_get(state: State<'_, AppState>) -> SettingsDto {
@@ -31,10 +31,16 @@ pub async fn settings_set<R: Runtime>(
     patch: SettingsPatch,
 ) -> CmdResult<Settings> {
     blocking(app, move |app| {
-        settings_set_impl(&app.state::<AppState>(), patch)
+        let settings = settings_set_impl(&app.state::<AppState>(), patch)?;
+        // Every window shows the change (M4c §3: single-file windows too).
+        let _ = app.emit(SETTINGS_CHANGED_EVENT, &settings);
+        Ok(settings)
     })
     .await
 }
+
+/// Sent to every window after a settings change, with the new settings.
+pub const SETTINGS_CHANGED_EVENT: &str = "settings:changed";
 
 #[tauri::command]
 pub async fn vaults_recent<R: Runtime>(app: AppHandle<R>) -> CmdResult<Vec<RecentVaultDto>> {

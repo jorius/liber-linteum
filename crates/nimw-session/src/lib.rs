@@ -7,6 +7,7 @@ mod error;
 mod events;
 mod external;
 mod global_view;
+mod quick_notes;
 mod rename;
 mod session;
 mod text_files;
@@ -20,5 +21,6 @@ pub use global_view::{
     CardKind, EdgeKind, GvCard, GvChildren, GvEdge, GvLevel, IndexFrom, MAX_NEIGHBOURS,
     MAX_VISIBLE, Relation, SUMMARY_TITLES,
 };
+pub use quick_notes::{AutoName, MAX_QUICK_NAME, quick_note_stem};
 pub use session::{VaultSession, index_db_path};
 pub use text_files::{TEXT_MAX_BYTES, is_text_content, is_text_path};

@@ -1,0 +1,37 @@
+/* A single-file window (M4c §3): the top bar, an optional vault bar, the
+   page. The shell's and the page's own classes do the rest. */
+.window {
+  height: 100%;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--color-bg);
+}
+
+.folder {
+  max-width: 40ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  direction: rtl; /* the end of a long path (the nearest folders) stays visible */
+  text-align: left;
+  color: var(--color-text-muted);
+  font-size: 12px;
+}
+
+.vaultBar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 20px;
+  background: var(--color-accent-soft);
+  border-bottom: 1px solid var(--color-border);
+  color: var(--color-text);
+  font-size: 13px;
+}
+
+.vaultBar p {
+  margin: 0;
+  flex: 1;
+  min-width: 0;
+}

@@ -6,8 +6,9 @@
 //! `VaultPath` validation (no `..`, no absolute paths, no symlink escapes),
 //! hidden files refused, nothing served when no vault is open.
 
+use crate::file_windows::{FileWindows, is_file_window};
 use crate::state::AppState;
-use nimw_vault::{VaultPath, is_hidden_name};
+use nimw_vault::{Vault, VaultPath, is_hidden_name};
 use percent_encoding::percent_decode_str;
 
 pub const SCHEME: &str = "nimw-asset";
@@ -141,6 +142,34 @@ pub fn serve(state: &AppState, uri_path: &str, range: Option<&str>) -> AssetResp
     {
         return serve_external(&session, encoded, range);
     }
+    serve_from(session.vault(), uri_path, range)
+}
+
+/// Serves a request from the webview labelled `label`: a single-file window
+/// (M4c §4) gets its own file's folder only — never the open vault, never
+/// outside files — and any other window the open vault.
+pub fn serve_window(
+    state: &AppState,
+    files: &FileWindows,
+    label: &str,
+    uri_path: &str,
+    range: Option<&str>,
+) -> AssetResponse {
+    if !is_file_window(label) {
+        return serve(state, uri_path, range);
+    }
+    match files.get(label) {
+        // Media and documents only: never a key or a config file that sits
+        // beside the note (M4c review I4). `.external/…` is a hidden path
+        // there: refused like any other.
+        Some(_) if mime_for(uri_path) == "application/octet-stream" => AssetResponse::status(403),
+        Some(grant) => serve_from(grant.vault(), uri_path, range),
+        None => AssetResponse::status(404),
+    }
+}
+
+/// A file of `vault` (the open vault, or a single file's folder).
+fn serve_from(vault: &Vault, uri_path: &str, range: Option<&str>) -> AssetResponse {
     let decoded = percent_decode_str(uri_path.trim_start_matches('/')).decode_utf8_lossy();
     let Ok(path) = VaultPath::new(&decoded) else {
         return AssetResponse::status(403);
@@ -148,9 +177,13 @@ pub fn serve(state: &AppState, uri_path: &str, range: Option<&str>) -> AssetResp
     if path.is_root() || path.as_str().split('/').any(is_hidden_name) {
         return AssetResponse::status(403);
     }
-    // A symlink resolving outside the vault is, for the webview, a file that
-    // doesn't exist (403 stays for requests that are malformed on their face).
-    let Ok((bytes, _)) = session.vault().read(&path) else {
+    // A symlink resolving outside the vault, or into a hidden file (or an 8.3
+    // name doing so, M4c review I4) is, for the webview, a file that doesn't
+    // exist (403 stays for requests that are malformed on their face).
+    if vault.visible_fs_path(&path).is_err() {
+        return AssetResponse::status(404);
+    }
+    let Ok((bytes, _)) = vault.read(&path) else {
         return AssetResponse::status(404);
     };
     respond(bytes, mime_for(path.as_str()), range)

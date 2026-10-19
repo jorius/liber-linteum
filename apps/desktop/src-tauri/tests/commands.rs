@@ -15,6 +15,7 @@ use tauri::{
 
 /// Every command M1b adds (spec §2.4).
 const COMMANDS: &[&str] = &[
+    "window_close_self",
     "vault_open",
     "vault_create",
     "vault_close",
@@ -587,8 +588,9 @@ fn external_open_commands_refuse_unsafe_targets() {
 }
 
 /// M2a §3.3: closing the window first flushes unsaved pages. The UI listens for
-/// `tauri://close-requested` and then destroys the window itself, so `main`
-/// needs `core:window:allow-destroy` — and another window must not get it.
+/// `tauri://close-requested` and then closes the window itself with
+/// `window_close_self` (M4c review I2: the window plugin's `destroy` takes
+/// any label, so no window has it) — and another window gets neither.
 #[test]
 fn ed_08_main_window_may_flush_then_close_itself() {
     let h = harness();
@@ -606,12 +608,11 @@ fn ed_08_main_window_may_flush_then_close_itself() {
     let destroy = json!({ "label": "other" });
     let err = call(&other, "plugin:window|destroy", destroy.clone()).expect_err("other");
     assert!(err.to_string().contains("not allowed"), "{err}");
-    if let Err(e) = call(&h.main, "plugin:window|destroy", json!({ "label": "main" })) {
-        assert!(
-            !e.to_string().contains("not allowed"),
-            "main must be allowed to destroy itself: {e}"
-        );
-    }
+    let err = call(&other, "window_close_self", json!({})).expect_err("other");
+    assert!(err.to_string().contains("not allowed"), "{err}");
+    let err = call(&h.main, "plugin:window|destroy", json!({ "label": "main" })).expect_err("main");
+    assert!(err.to_string().contains("not allowed"), "{err}");
+    call(&h.main, "window_close_self", json!({})).expect("main closes itself");
 }
 
 /// M1b hand-off §10 j: a read-only config dir must not stop a vault from

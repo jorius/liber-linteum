@@ -545,3 +545,22 @@ describe('vaultStore — event subscriptions refused (real-window regression)', 
     expect(useVaultStore.getState().status).toBe('closed');
   });
 });
+
+describe('applyRename (M4c final review)', () => {
+  const outcome = (updatedFiles: string[]) => ({
+    moved: [],
+    updatedFiles,
+    updatedLinks: updatedFiles.length,
+    failed: [],
+  });
+
+  it('I3: an open rename of another entry stays open', async () => {
+    mockIPC(() => []);
+    useVaultStore.setState({ renaming: 'Notes/Other.md' });
+    await useVaultStore.getState().applyRename('Q.md', 'Idea.md', outcome([]), { quiet: true });
+    expect(useVaultStore.getState().renaming).toBe('Notes/Other.md');
+    useVaultStore.setState({ renaming: 'Q.md' });
+    await useVaultStore.getState().applyRename('Q.md', 'Idea.md', outcome([]), { quiet: true });
+    expect(useVaultStore.getState().renaming).toBeNull();
+  });
+});

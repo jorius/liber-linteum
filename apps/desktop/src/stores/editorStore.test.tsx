@@ -187,9 +187,9 @@ describe('editorStore (M2a §3.3)', () => {
     editor().doc!.edit('typed just before quitting\n');
     await installQuitGuard();
     await emit('tauri://close-requested');
-    await vi.waitFor(() => expect(calls()).toContain('plugin:window|destroy'));
+    await vi.waitFor(() => expect(calls()).toContain('window_close_self'));
     expect(disk.files.get('A.md')).toBe('typed just before quitting\n');
-    expect(calls().indexOf('page_write')).toBeLessThan(calls().indexOf('plugin:window|destroy'));
+    expect(calls().indexOf('page_write')).toBeLessThan(calls().indexOf('window_close_self'));
   });
 
   it('m5: an orphaned page keeps the window open, says so, and a second close quits', async () => {
@@ -209,11 +209,11 @@ describe('editorStore (M2a §3.3)', () => {
     await screen.findByText(
       'Unsaved changes in “A” couldn’t be written, so the window stays open. Close it again to quit without them.',
     );
-    expect(calls()).not.toContain('plugin:window|destroy');
+    expect(calls()).not.toContain('window_close_self');
     expect(editor().doc!.text).toBe('keep me\n');
     // Asked twice: the person chose to quit.
     await act(() => emit('tauri://close-requested'));
-    await vi.waitFor(() => expect(calls()).toContain('plugin:window|destroy'));
+    await vi.waitFor(() => expect(calls()).toContain('window_close_self'));
   });
 
   it('m5: a page orphaned in the background is kept, blocks the close, and can be opened', async () => {
@@ -232,7 +232,7 @@ describe('editorStore (M2a §3.3)', () => {
     await installQuitGuard();
     await act(() => emit('tauri://close-requested'));
     await screen.findByText(/Unsaved changes in “A” couldn’t be written/);
-    expect(calls()).not.toContain('plugin:window|destroy');
+    expect(calls()).not.toContain('window_close_self');
     await userEvent.click(screen.getByRole('button', { name: 'Open' }));
     await vi.waitFor(() => expect(editor().path).toBe('A.md'));
     expect(editor().orphaned).toBe(true);

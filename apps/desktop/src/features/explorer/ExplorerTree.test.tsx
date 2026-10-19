@@ -7,7 +7,8 @@ import { clearMocks, mockIPC } from '../../ipc/testing';
 import { usePageStore } from '../../stores/pageStore';
 import { childrenByParent } from '../../stores/tree';
 import { resetVaultStore, useVaultStore } from '../../stores/vaultStore';
-import { ExplorerTree } from './ExplorerTree';
+import { useScratchpadStore } from '../scratchpad/scratchpadStore';
+import { ExplorerTree, visibleRows } from './ExplorerTree';
 
 const nodes: TreeNode[] = [
   { path: 'Art', kind: 'folder' },
@@ -221,5 +222,54 @@ describe('ExplorerTree (EXP-01, NFR-10)', () => {
     const { container } = render(<ExplorerTree />);
     const results = await axe.run(container, { rules: { 'color-contrast': { enabled: false } } });
     expect(results.violations).toEqual([]);
+  });
+});
+
+describe('the pinned scratch folder (M4c §7.2)', () => {
+  const withScratch: TreeNode[] = [
+    { path: 'Art', kind: 'folder' },
+    { path: 'Art/rex.md', kind: 'page' },
+    { path: 'Scratchpad', kind: 'folder' },
+    { path: 'Scratchpad/Idea.md', kind: 'page' },
+    { path: 'Scratchpad/Old', kind: 'folder' },
+    { path: 'Scratchpad/Old/Trip.md', kind: 'page' },
+    { path: 'Scratchpad/sketch.png', kind: 'attachment' },
+    { path: 'Welcome.md', kind: 'page' },
+  ];
+
+  afterEach(() => useScratchpadStore.getState().reset());
+
+  it('visibleRows puts it first; nothing changes without it', () => {
+    const children = childrenByParent(withScratch);
+    const rows = (pinned: string | null) =>
+      visibleRows(children, new Set(['Scratchpad']), pinned).map((r) => r.node.path);
+    expect(rows('Scratchpad').slice(0, 4)).toEqual([
+      'Scratchpad',
+      'Scratchpad/Idea.md',
+      'Scratchpad/Old',
+      'Scratchpad/sketch.png',
+    ]);
+    expect(rows('Scratchpad').slice(4)).toEqual(['Art', 'Welcome.md']);
+    expect(rows(null)[0]).toBe('Art');
+    expect(rows('Missing')[0]).toBe('Art');
+  });
+
+  it('is first, with its note count, a pencil and a divider under it', () => {
+    useScratchpadStore.setState({ folder: 'Scratchpad' });
+    seed(withScratch);
+    render(<ExplorerTree />);
+    const items = screen.getAllByRole('treeitem');
+    expect(items[0]).toHaveAccessibleName('Scratchpad, quick notes, 2 notes');
+    expect(items[0].querySelector('[data-quick-note-icon]')).not.toBeNull();
+    expect(within(items[0]).getByText('2')).toBeInTheDocument();
+    expect(items[1]).toHaveAttribute('data-path', 'Art');
+    expect(items[1]).toHaveAttribute('data-divider');
+  });
+
+  it('is an ordinary folder in the global Scratchpad (no folder pinned)', () => {
+    seed(withScratch);
+    render(<ExplorerTree />);
+    expect(screen.getAllByRole('treeitem')[0]).toHaveAttribute('data-path', 'Art');
+    expect(screen.getByRole('treeitem', { name: 'Scratchpad' })).toBeInTheDocument();
   });
 });

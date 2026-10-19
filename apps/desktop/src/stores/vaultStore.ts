@@ -8,6 +8,7 @@ import {
   onVaultChanged,
   onVaultProgress,
   onVaultWarning,
+  scratchpadOpen,
   vaultClose,
   vaultCreate,
   vaultOpen,
@@ -49,6 +50,8 @@ interface VaultState {
    *  `''` (the vault) collapses the tree and focuses its first row. */
   revealFolder: (path: string) => void;
   open: (path: string) => Promise<IpcResult<VaultInfo>>;
+  /** Opens the global Scratchpad (M4c §2): Rust knows its folder. */
+  openScratchpad: () => Promise<IpcResult<VaultInfo>>;
   create: (path: string) => Promise<IpcResult<VaultInfo>>;
   close: () => Promise<void>;
   refreshTree: () => Promise<void>;
@@ -66,6 +69,16 @@ interface VaultState {
     opts?: { quiet?: boolean },
   ) => Promise<IpcResult<RenameOutcome>>;
   trash: (path: string) => Promise<IpcResult<void>>;
+  /** What follows a rename done in the backend (`rename`, a quick note's
+   *  auto-name, the scratch folder's new name): selection, trail, tree, the
+   *  open page and pages whose links changed, and toasts (`quiet`: none for
+   *  updated links, M4c §7). */
+  applyRename: (
+    from: string,
+    to: string,
+    outcome: RenameOutcome,
+    opts?: { quiet?: boolean },
+  ) => Promise<void>;
 }
 
 /** Work a feature must finish while its vault is still open (the Global
@@ -197,7 +210,12 @@ export const useVaultStore = create<VaultState>((set, get) => {
       toast().push({ message: errorMessage(res.error), tone: 'error' });
       return res;
     }
-    set({ info: res.value, selected: null, expanded: new Set(), renaming: null });
+    // The global Scratchpad reads as "Quick notes" wherever the vault's
+    // name shows (M4c §7.19).
+    const info = res.value.scratchpad
+      ? { ...res.value, name: i18next.t('scratchpad.title') }
+      : res.value;
+    set({ info, selected: null, expanded: new Set(), renaming: null });
     useUiStore.getState().setScreen('edit');
     useTrailStore.getState().reset();
     usePageStore.getState().clear();
@@ -244,6 +262,7 @@ export const useVaultStore = create<VaultState>((set, get) => {
   return {
     ...EMPTY,
     open: (path) => withProgress(() => vaultOpen(path)),
+    openScratchpad: () => withProgress(() => scratchpadOpen()),
     create: (path) => withProgress(() => vaultCreate(path)),
     close: async () => {
       // Unsaved text is written before the vault goes away (M2a §3.3).
@@ -327,17 +346,21 @@ export const useVaultStore = create<VaultState>((set, get) => {
         if (!opts?.quiet) toast().push({ message: errorMessage(res.error), tone: 'error' });
         return res;
       }
-      const { selected, expanded } = get();
+      await get().applyRename(from, to, res.value);
+      return res;
+    },
+    applyRename: async (from, to, out, opts) => {
+      const { selected, expanded, renaming } = get();
       set({
         selected: selected ? (remap(selected, from, to) ?? selected) : selected,
         expanded: new Set([...expanded].map((p) => remap(p, from, to) ?? p)),
-        renaming: null,
+        // Another entry's rename stays open (M4c final review I3).
+        renaming: renaming && remap(renaming, from, to) === null ? renaming : null,
       });
       useTrailStore.getState().renamed(from, to);
       get().expand(parentOf(to));
       await get().refreshTree();
       await usePageStore.getState().follow(from, to);
-      const out = res.value;
       // Our link rewrites aren't reported by the watcher: re-read open pages.
       await useEditorStore.getState().syncPaths(out.updatedFiles);
       if (out.failed.length) {
@@ -346,12 +369,11 @@ export const useVaultStore = create<VaultState>((set, get) => {
           detail: out.failed.map(([p, why]) => `${p} — ${why}`),
           tone: 'error',
         });
-      } else if (out.updatedFiles.length) {
+      } else if (out.updatedFiles.length && !opts?.quiet) {
         toast().push({
           message: i18next.t('toasts.linksUpdated', { count: out.updatedFiles.length }),
         });
       }
-      return res;
     },
     trash: async (path) => {
       const siblings = get().children.get(parentOf(path)) ?? [];

@@ -42,5 +42,7 @@ export function DialogHost() {
       );
     case 'relations':
       return <RelationsDialog page={dialog.page} other={dialog.other} onClose={close} />;
+    case 'scratchpadSetup':
+      return null; // ScratchpadHost shows it, on the Welcome screen too
   }
 }

@@ -1,5 +1,6 @@
 import { useEffect, useId, useRef, useState, type KeyboardEvent } from 'react';
 import { useTranslation } from 'react-i18next';
+import type { IpcResult } from '../../ipc';
 import { errorMessage } from '../../stores/messages';
 import { usePageStore } from '../../stores/pageStore';
 import { nameOf, parentOf } from '../../stores/tree';
@@ -22,7 +23,15 @@ function split(path: string): { stem: string; ext: string } {
  *  Escape puts the name back. It sits in the top bar (M4b §1); the note's own
  *  title, when it differs, shows in the header band (`NoteTitle`). A text
  *  file (M4b part 2 §6) shows its extension after the field; it is kept. */
-export function PageTitle({ path }: { path: string }) {
+export function PageTitle({
+  path,
+  rename,
+}: {
+  path: string;
+  /** Renames to the new name (same folder); a single-file window renames
+   *  its own file (M4c §3). Default: the vault's rename, links updated. */
+  rename?: (to: string) => Promise<IpcResult<unknown>>;
+}) {
   const { t } = useTranslation();
   const { stem, ext } = split(path);
   const text = ext.toLowerCase() !== '.md';
@@ -32,6 +41,9 @@ export function PageTitle({ path }: { path: string }) {
   const errorId = useId();
   const input = useRef<HTMLInputElement>(null);
   useEffect(() => {
+    // A rename from elsewhere (a quick note named after its first line)
+    // mustn't reset a name being typed (M4c final review I3).
+    if (document.activeElement === input.current) return;
     setDraft(stem);
     setError(null);
   }, [stem]);
@@ -74,7 +86,9 @@ export function PageTitle({ path }: { path: string }) {
     }
     setBusy(true);
     // Reported inline under the title, so no toast as well (final review m4).
-    const res = await useVaultStore.getState().rename(path, to, { quiet: true });
+    const res = rename
+      ? await rename(to)
+      : await useVaultStore.getState().rename(path, to, { quiet: true });
     setBusy(false);
     if (!res.ok) setError(res.error.kind === 'alreadyExists' ? taken() : errorMessage(res.error));
     else setError(null);
@@ -96,6 +110,7 @@ export function PageTitle({ path }: { path: string }) {
       <h1 className={styles.title}>
         <input
           ref={input}
+          data-page-title
           className={styles.titleInput}
           aria-label={t(text ? 'page.fileNameLabel' : 'page.titleLabel')}
           aria-invalid={error !== null}

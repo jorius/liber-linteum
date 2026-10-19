@@ -24,6 +24,7 @@ rusqlite = { version = "0.40.2", features = ["bundled"] }
 thiserror = "2.0.21"
 trash = "5.2.9"
 unicode-normalization = "0.1.25"
+unicode-segmentation = "1.13.3"
 yaml-rust2 = "0.13.0"
 # M1a test/bench only
 criterion = "0.8.2"
@@ -33,6 +34,8 @@ tauri = "2.12.3"
 tauri-build = "2.7.2"
 tauri-plugin-dialog = "2.8.2"
 tauri-plugin-opener = "2.7.1"
+# M4c: a second launch hands its files to the running app (Windows, Linux)
+tauri-plugin-single-instance = "2.5.4"
 # M2b: installed font families (local files only)
 fontdb = "0.24.0"
 

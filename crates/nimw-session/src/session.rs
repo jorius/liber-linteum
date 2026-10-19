@@ -72,7 +72,22 @@ impl VaultSession {
             watcher: Mutex::new(None),
             network_ok: Mutex::new(HashSet::new()),
         };
-        let (report, _) = session.reindex_all()?;
+        let (report, changes) = session.reindex_all()?;
+        session.forget_page_sizes(&changes.removed);
+        // A flag is only trusted for a note the index saw unchanged: one
+        // edited, replaced or new since (Finder, Obsidian, sync, another
+        // machine's empty index) is the user's now (M4c final review I2).
+        let unseen: Vec<String> = changes
+            .created
+            .iter()
+            .chain(&changes.modified)
+            .cloned()
+            .collect();
+        if let Err(e) = session.vault.forget_auto_named(&unseen) {
+            session.emit(SessionEvent::Warning(format!(
+                "Quick notes changed elsewhere may still be renamed: {e}"
+            )));
+        }
         Ok((session, report))
     }
 
@@ -367,7 +382,9 @@ impl VaultSession {
         let heights = self.vault.forget_cover_heights(removed);
         let sides = self.vault.forget_cover_sides(removed);
         let strips = self.vault.forget_cover_widths(removed);
-        if let Err(e) = widths.and(heights).and(sides).and(strips) {
+        // Deleted quick notes stop being named after their first line (M4c).
+        let quick = self.vault.forget_auto_named(removed);
+        if let Err(e) = widths.and(heights).and(sides).and(strips).and(quick) {
             self.emit(SessionEvent::Warning(format!(
                 "Page widths or cover sizes not updated for {} removed entries: {e}",
                 removed.len()

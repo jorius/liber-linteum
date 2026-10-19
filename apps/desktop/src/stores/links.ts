@@ -1,5 +1,5 @@
 import i18next from 'i18next';
-import { externalReveal, type ExternalFile, type LinkKind } from '../ipc';
+import { externalReveal, fileWindowName, type ExternalFile, type LinkKind } from '../ipc';
 import { openPage } from './navigate';
 import { isTextPath } from './textFiles';
 import { usePageStore } from './pageStore';
@@ -35,9 +35,11 @@ export function followLink(action: LinkAction): void {
       ui.openDialog({ type: 'openExternal', url: action.url });
       return;
     case 'file':
-      // Text and code files open in the app (M4b part 2 §6).
-      if (isTextPath(action.path)) void openPage(action.path, null, 'link');
-      else ui.openDialog({ type: 'openFile', path: action.path });
+      // Text and code files open in the app (M4b part 2 §6); in a
+      // single-file window, every file goes through its folder (M4c §3).
+      if (isTextPath(action.path) || fileWindowName() !== null) {
+        void openPage(action.path, null, 'link');
+      } else ui.openDialog({ type: 'openFile', path: action.path });
       return;
     case 'anchor':
       usePageStore.getState().reveal(action.heading);
@@ -51,7 +53,13 @@ export function followLink(action: LinkAction): void {
       });
       return;
     case 'page':
-      if (action.resolved === null) {
+      if (action.resolved === null && fileWindowName() !== null) {
+        // No vault to make the page in (M4c §3).
+        useToastStore.getState().push({
+          message: i18next.t('singleFile.noSuchFile', { target: action.target }),
+          tone: 'error',
+        });
+      } else if (action.resolved === null) {
         ui.openDialog({ type: 'createPage', source: action.source, target: action.target });
       } else if (isPage(action.resolved)) {
         void openPage(action.resolved, action.heading, 'link');
