@@ -23,6 +23,11 @@ export function paletteVars(p: Palette, mode: 'light' | 'dark'): Record<string, 
     '--color-accent-hover': mix(t.accent, t.text, 0.15),
     '--color-accent-contrast': t.contrast,
     '--color-accent-soft': t.soft,
+    // Custom themes §2, §6: tags (text on its own tint) and the filled star;
+    // on the always-dark sidebar the star takes the dark secondary.
+    '--color-secondary': t.secondary,
+    '--color-secondary-soft': mix(t.surface, t.secondary, 0.12),
+    '--color-sidebar-secondary': p.dark.secondary,
     '--color-focus': t.accent,
     '--color-sidebar-bg': t.side,
     '--color-sidebar-text': t.sideText,
@@ -41,13 +46,14 @@ export function paletteVars(p: Palette, mode: 'light' | 'dark'): Record<string, 
     '--color-highlight-bg': t.mark,
     '--color-code-bg': t.code,
     // Global View (M3a §4, §6): the canvas sits between page and card;
-    // relationships are orange in every palette and drawn wider than links,
-    // so the kinds differ by more than colour.
+    // relationships are drawn wider than links, so the kinds differ by more
+    // than colour.
     '--color-canvas': mix(t.bg, t.surface, 0.35),
     '--color-card-border': mix(t.border, t.text, 0.05),
     '--color-edge-link': t.accent,
     '--color-edge-tree': t.muted,
-    '--color-edge-manual': mode === 'light' ? MANUAL_EDGE.light : MANUAL_EDGE.dark,
+    // Custom themes §2: relationships take the palette's secondary colour.
+    '--color-edge-manual': t.secondary,
     // M4b §1, §3: the header band's pills over a cover (translucent surface,
     // no color-mix()), and the danger button, fixed per mode like the manual
     // edge so it reads as "danger" in every palette.
@@ -116,9 +122,6 @@ export const DANGER = {
   light: { bg: '#b42318', text: '#ffffff' },
   dark: { bg: '#ff9d92', text: '#1b1426' },
 } as const;
-
-/** Manual-relationship edges (prototype `#c2571a`, kept readable on every canvas). */
-export const MANUAL_EDGE = { light: '#b4501a', dark: '#e8935a' } as const;
 
 const block = (selector: string, vars: Record<string, string>, indent = '') =>
   `${indent}${selector} {\n${Object.entries(vars)
