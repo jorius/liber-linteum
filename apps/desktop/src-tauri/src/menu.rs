@@ -57,7 +57,7 @@ pub const NOTION_IMPORT_EVENT: &str = "menu:notionImport";
 pub const OPEN_FILE_EVENT: &str = "menu:open-file";
 /// ⌘⇧O: ⌘O already opens a folder as a vault (spec §3.5).
 pub const OPEN_FILE_ACCELERATOR: &str = "CmdOrCtrl+Shift+O";
-/// Notes In My Way → Settings… (M5b §2.1): the focused window answers
+/// Liber Linteum → Settings… (M5b §2.1): the focused window answers
 /// `menu:settings` (file windows have Settings too).
 pub const SETTINGS_ID: &str = "liber-settings";
 pub const SETTINGS_EVENT: &str = "menu:settings";

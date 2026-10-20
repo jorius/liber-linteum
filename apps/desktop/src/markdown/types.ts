@@ -1,4 +1,4 @@
-// Node types the Notes In My Way Markdown model adds to mdast (M2a spec §2.1).
+// Node types the Liber Linteum Markdown model adds to mdast (M2a spec §2.1).
 import type { BlockContent, Data, Literal, Node, Parent, PhrasingContent, Root } from 'mdast';
 
 /** `[[target#heading|alias]]` (also the table form `[[target\|alias]]`). */

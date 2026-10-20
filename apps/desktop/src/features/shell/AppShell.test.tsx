@@ -94,7 +94,7 @@ describe('AppShell', () => {
     render(<AppShell />);
     const side = screen.getByRole('complementary', { name: 'Files · Digital Brain' });
     expect(side).toHaveTextContent('Digital Brain');
-    expect(side).not.toHaveTextContent('Notes In My Way');
+    expect(side).not.toHaveTextContent('Liber Linteum');
     expect(screen.queryByRole('banner')).not.toBeInTheDocument();
     await act(() => openPage('Art/rex.md'));
     const page = screen.getByRole('region', { name: 'Page' });
@@ -127,7 +127,7 @@ describe('AppShell', () => {
       expect(calls.at(-1)).toEqual(['window_title_set', { title: 'Trash — Digital Brain' }]),
     );
     unmount();
-    expect(calls.at(-1)).toEqual(['window_title_set', { title: 'Notes In My Way' }]);
+    expect(calls.at(-1)).toEqual(['window_title_set', { title: 'Liber Linteum' }]);
   });
 
   it('M3a §2: Edit and Global view switch the screen; the editor stays mounted (undo survives)', async () => {

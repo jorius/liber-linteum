@@ -1,6 +1,6 @@
 {
   "app": {
-    "name": "Notes In My Way",
+    "name": "Liber Linteum",
     "tagline": "Notas privadas que viven en tu disco. Sin nube, sin cuentas, sin telemetría.",
     "version": "v{version}",
     "credits": "Vista global hecha con React Flow (MIT)."
@@ -144,10 +144,10 @@
     "notSaved": "Sin guardar",
     "orphaned": "Esta página se borró fuera de la app. Tu texto sigue aquí.",
     "saveAsNew": "Guardar como página nueva",
-    "notText": "Este archivo cambió fuera de Notes In My Way y ya no es texto plano que pueda editar. Tus cambios sin guardar siguen aquí: cópialos o guárdalos como un archivo nuevo.",
-    "notTextPage": "Esta página cambió fuera de Notes In My Way y ya no es texto que pueda editar. Tus cambios sin guardar siguen aquí: cópialos o guárdalos como una página nueva.",
-    "notTextToast": "«{name}» cambió fuera de Notes In My Way y ya no es texto plano que pueda editar. Tus cambios sin guardar siguen en la app.",
-    "tooLarge": "Este texto no se puede guardar: un archivo de texto que Notes In My Way edita tiene como máximo 2 MB y ningún carácter NUL. Sigue aquí: acórtalo para volver a guardar, o cópialo.",
+    "notText": "Este archivo cambió fuera de Liber Linteum y ya no es texto plano que pueda editar. Tus cambios sin guardar siguen aquí: cópialos o guárdalos como un archivo nuevo.",
+    "notTextPage": "Esta página cambió fuera de Liber Linteum y ya no es texto que pueda editar. Tus cambios sin guardar siguen aquí: cópialos o guárdalos como una página nueva.",
+    "notTextToast": "«{name}» cambió fuera de Liber Linteum y ya no es texto plano que pueda editar. Tus cambios sin guardar siguen en la app.",
+    "tooLarge": "Este texto no se puede guardar: un archivo de texto que Liber Linteum edita tiene como máximo 2 MB y ningún carácter NUL. Sigue aquí: acórtalo para volver a guardar, o cópialo.",
     "tooLargeToast": "«{name}» es demasiado grande para guardarse como texto. Tu texto sigue en la app.",
     "saveAsNewFile": "Guardar como archivo nuevo",
     "largeNote": "Vista previa simplificada para notas grandes",
@@ -556,7 +556,7 @@
     "folderPath": "Carpeta de la bóveda",
     "obsidianSet": "Obsidian guarda los adjuntos nuevos en {value} ({place}).",
     "obsidianHint": "Cámbialo en Obsidian (Ajustes → Archivos y enlaces) o usa otro lugar aquí.",
-    "override": "Usar otro lugar en Notes In My Way",
+    "override": "Usar otro lugar en Liber Linteum",
     "obsidianRoot": "la raíz de la bóveda",
     "obsidianSame": "la carpeta de la página",
     "obsidianSubfolder": "la carpeta «{name}» junto a la página",

@@ -201,7 +201,7 @@ export function installIpcMock({
     obsidianLinkFormat: null,
   });
   // ---- M4c: quick notes (the global Scratchpad and the scratch folder) ----
-  const SCRATCH_DEFAULT = '/Users/e2e/Documents/Notes In My Way/Scratchpad';
+  const SCRATCH_DEFAULT = '/Users/e2e/Documents/Liber Linteum/Scratchpad';
   /** The open vault is the global Scratchpad (its root is the scratch place). */
   let inScratchpad = false;
   const autoNamed = new Set<string>();
@@ -229,7 +229,7 @@ export function installIpcMock({
   /** Spelling: words ignored this session. */
   const ignored = new Set<string>();
   const handlers: Record<string, (a: Args, options?: unknown) => unknown> = {
-    app_info: () => ({ name: 'Notes In My Way', version: '0.0.0-e2e' }),
+    app_info: () => ({ name: 'Liber Linteum', version: '0.0.0-e2e' }),
     settings_get: () => ({ settings }),
     settings_set: (a) => {
       settings = { ...settings, ...(a.patch as object) };

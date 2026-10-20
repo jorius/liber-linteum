@@ -25,7 +25,7 @@ use tauri_plugin_dialog::DialogExt;
 pub type FolderPicker = Arc<dyn Fn() -> Option<PathBuf> + Send + Sync>;
 
 /// The default Scratchpad, under the user's Documents folder.
-const DEFAULT_PARENT: &str = "Notes In My Way";
+const DEFAULT_PARENT: &str = "Liber Linteum";
 const DEFAULT_NAME: &str = "Scratchpad";
 
 /// Scratchpad state kept beside `AppState`.
@@ -91,7 +91,7 @@ fn io(e: impl std::fmt::Display) -> CommandError {
     CommandError::new(ErrorKind::Io, e.to_string())
 }
 
-/// `<Documents>/Notes In My Way/Scratchpad`.
+/// `<Documents>/Liber Linteum/Scratchpad`.
 fn default_location<R: Runtime>(app: &AppHandle<R>) -> CmdResult<PathBuf> {
     let docs = match lock(&app.state::<ScratchpadState>().documents_dir).clone() {
         Some(dir) => dir,

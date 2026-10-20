@@ -90,7 +90,7 @@ fn macos_menu_quit_is_ours_and_the_standard_items_stay() {
     assert!(
         app_items.iter().any(|(kind, id, text)| *kind == "item"
             && id == liber_desktop::menu::QUIT_ID
-            && text == "Quit Notes In My Way"),
+            && text == "Quit Liber Linteum"),
         "custom Quit missing from the app menu: {outline:?}"
     );
     let app_texts: Vec<&String> = app_items.iter().map(|(_, _, t)| t).collect();

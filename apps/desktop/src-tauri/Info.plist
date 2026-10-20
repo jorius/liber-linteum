@@ -11,6 +11,6 @@
   <!-- M6: macOS asks the first time a clip is recorded; the microphone is
        open only while recording. Tauri merges this into the bundle. -->
   <key>NSMicrophoneUsageDescription</key>
-  <string>Notes In My Way records audio clips into your notes only while you record one.</string>
+  <string>Liber Linteum records audio clips into your notes only while you record one.</string>
 </dict>
 </plist>

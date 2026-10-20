@@ -38,7 +38,7 @@ function obsidianPlace(value: string, t: TFunction): string {
 
 /** "This vault" (M2c §5.4): where new attachments go, stored in
  *  `.liber/vault.json`. When Obsidian has its own setting, it applies unless
- *  "Use a different place in Notes In My Way" is on (M4b §5); Obsidian's file
+ *  "Use a different place in Liber Linteum" is on (M4b §5); Obsidian's file
  *  is never written. */
 export function VaultSettingsSection() {
   const { t } = useTranslation();

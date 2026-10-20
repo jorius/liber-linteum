@@ -11,7 +11,7 @@ afterEach(() => {
 
 describe('useAppVersion', () => {
   it('returns the version from the backend', async () => {
-    mockIPC(() => ({ name: 'Notes In My Way', version: '0.1.0' }));
+    mockIPC(() => ({ name: 'Liber Linteum', version: '0.1.0' }));
     const { result } = renderHook(() => useAppVersion());
     await waitFor(() => expect(result.current).toBe('0.1.0'));
   });

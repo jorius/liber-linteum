@@ -30,7 +30,7 @@ describe('Welcome screen', () => {
   it('shows the app name, tagline and the vault actions, Notion import included', async () => {
     backend({ vaults_recent: () => [] });
     render(<Welcome version="0.1.0" />);
-    expect(screen.getByRole('heading', { level: 1, name: 'Notes In My Way' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 1, name: 'Liber Linteum' })).toBeInTheDocument();
     expect(screen.getByText(/Private notes that live on your disk/)).toBeInTheDocument();
     for (const name of ['New vault', 'Open folder as vault', 'Open an Obsidian vault']) {
       expect(screen.getByRole('button', { name })).toBeEnabled();

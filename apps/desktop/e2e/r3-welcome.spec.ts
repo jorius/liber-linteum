@@ -27,7 +27,7 @@ const box = async (page: Page, name: string) =>
 
 test('wide: the ways to start on the left, recent vaults on the right', async ({ page }) => {
   const errors = await start(page, 1200);
-  const title = await box(page, 'Notes In My Way');
+  const title = await box(page, 'Liber Linteum');
   const recent = await box(page, 'Recent vaults');
   // The start column is 330 px wide.
   expect(title.x).toBeLessThan(330);

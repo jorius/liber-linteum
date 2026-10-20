@@ -138,13 +138,13 @@ describe('text and code files (M4b part 2 §6)', () => {
         .onExternalChange({ created: [], modified: ['data.csv'], removed: [], renamed: [] }),
     );
     const notice =
-      'This file changed outside Notes In My Way and is no longer plain text it can edit. ' +
+      'This file changed outside Liber Linteum and is no longer plain text it can edit. ' +
       'Your unsaved changes are kept here: copy them, or save them as a new file.';
     expect(screen.getByText(notice)).toBeInTheDocument();
     expect(view().state.doc.toString()).toBe('José,Bogotá\nmine\n');
     expect(screen.getByRole('status', { name: 'Save status' })).toHaveTextContent('Not saved');
     expect(useToastStore.getState().toasts.map((t) => t.message)).toContain(
-      '“data.csv” changed outside Notes In My Way and is no longer plain text it can edit. ' +
+      '“data.csv” changed outside Liber Linteum and is no longer plain text it can edit. ' +
         'Your unsaved changes are kept in the app.',
     );
     await userEvent.click(screen.getByRole('button', { name: 'Save as new file' }));

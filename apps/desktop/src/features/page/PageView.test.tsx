@@ -339,7 +339,7 @@ describe('PageView (M2a §5)', () => {
     );
     expect(
       screen.getByText(
-        'This page changed outside Notes In My Way and is no longer text it can edit. ' +
+        'This page changed outside Liber Linteum and is no longer text it can edit. ' +
           'Your unsaved changes are kept here: copy them, or save them as a new page.',
       ),
     ).toBeInTheDocument();

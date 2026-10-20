@@ -1,6 +1,6 @@
 {
   "app": {
-    "name": "Notes In My Way",
+    "name": "Liber Linteum",
     "tagline": "Private notes that live on your disk. No cloud, no accounts, no telemetry.",
     "version": "v{version}",
     "credits": "Global View made with React Flow (MIT)."
@@ -144,10 +144,10 @@
     "notSaved": "Not saved",
     "orphaned": "This page was deleted outside the app. Your text is still here.",
     "saveAsNew": "Save as new page",
-    "notText": "This file changed outside Notes In My Way and is no longer plain text it can edit. Your unsaved changes are kept here: copy them, or save them as a new file.",
-    "notTextPage": "This page changed outside Notes In My Way and is no longer text it can edit. Your unsaved changes are kept here: copy them, or save them as a new page.",
-    "notTextToast": "“{name}” changed outside Notes In My Way and is no longer plain text it can edit. Your unsaved changes are kept in the app.",
-    "tooLarge": "This text can’t be saved: a text file Notes In My Way edits holds at most 2 MB and no NUL characters. It’s kept here: shorten it to save again, or copy it.",
+    "notText": "This file changed outside Liber Linteum and is no longer plain text it can edit. Your unsaved changes are kept here: copy them, or save them as a new file.",
+    "notTextPage": "This page changed outside Liber Linteum and is no longer text it can edit. Your unsaved changes are kept here: copy them, or save them as a new page.",
+    "notTextToast": "“{name}” changed outside Liber Linteum and is no longer plain text it can edit. Your unsaved changes are kept in the app.",
+    "tooLarge": "This text can’t be saved: a text file Liber Linteum edits holds at most 2 MB and no NUL characters. It’s kept here: shorten it to save again, or copy it.",
     "tooLargeToast": "“{name}” is too large to save as text. Your text is kept in the app.",
     "saveAsNewFile": "Save as new file",
     "largeNote": "Simplified preview for large notes",
@@ -556,7 +556,7 @@
     "folderPath": "Folder in the vault",
     "obsidianSet": "Obsidian puts new attachments in {value} ({place}).",
     "obsidianHint": "Change it in Obsidian (Settings → Files and links), or use a different place here.",
-    "override": "Use a different place in Notes In My Way",
+    "override": "Use a different place in Liber Linteum",
     "obsidianRoot": "the vault root",
     "obsidianSame": "the page’s folder",
     "obsidianSubfolder": "the “{name}” folder next to the page",

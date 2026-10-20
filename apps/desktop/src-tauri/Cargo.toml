@@ -1,6 +1,6 @@
 [package]
 name = "liber-desktop"
-description = "Notes In My Way desktop shell."
+description = "Liber Linteum desktop shell."
 version.workspace = true
 edition.workspace = true
 license.workspace = true

@@ -22,7 +22,7 @@ test('a quick note from the Welcome screen is named after its first line', async
   const errors = await start(page, {});
   await page.getByRole('button', { name: 'Quick note', exact: true }).click();
   const dialog = page.getByRole('dialog', { name: 'Where should quick notes live?' });
-  await expect(dialog.getByText('/Users/e2e/Documents/Notes In My Way/Scratchpad')).toBeVisible();
+  await expect(dialog.getByText('/Users/e2e/Documents/Liber Linteum/Scratchpad')).toBeVisible();
   await dialog.getByRole('button', { name: 'Create' }).click();
   await expect(dialog).toBeHidden();
 

@@ -25,7 +25,7 @@ export function installFileWindowMock({
   w.__liberCalls = calls;
   w.__liberDisk = () => disk;
   const handlers: Record<string, (a: Args) => unknown> = {
-    app_info: () => ({ name: 'Notes In My Way', version: '0.0.0-e2e' }),
+    app_info: () => ({ name: 'Liber Linteum', version: '0.0.0-e2e' }),
     settings_get: () => ({ settings }),
     settings_set: (a) => {
       settings = { ...settings, ...(a.patch as object) };

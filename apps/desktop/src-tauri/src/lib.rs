@@ -35,7 +35,7 @@ use std::path::PathBuf;
 use tauri::Manager;
 
 /// Where settings and the index cache live. `None` in `configure` means the
-/// OS app config/cache dirs for `app.notesinmyway.desktop`; tests pass temp dirs.
+/// OS app config/cache dirs for `app.liberlinteum.desktop`; tests pass temp dirs.
 #[derive(Debug, Clone)]
 pub struct AppDirs {
     pub config: PathBuf,
@@ -260,7 +260,7 @@ pub fn run() {
     }));
     menu::with_app_menu(configure(builder, None))
         .build(tauri::generate_context!())
-        .expect("error while building Notes In My Way")
+        .expect("error while building Liber Linteum")
         .run(|app, event| match event {
             // Files named on the command line that started the app.
             tauri::RunEvent::Ready => {

@@ -5,7 +5,7 @@ import globals from 'globals';
 import tseslint from 'typescript-eslint';
 
 const NETWORK =
-  'Notes In My Way makes no network requests (P1, NFR-04). Reach the backend through src/ipc/.';
+  'Liber Linteum makes no network requests (P1, NFR-04). Reach the backend through src/ipc/.';
 const NETWORK_GLOBALS = ['fetch', 'XMLHttpRequest', 'WebSocket', 'EventSource'];
 const GLOBAL_OBJECTS = ['window', 'globalThis', 'self'];
 

@@ -1037,7 +1037,7 @@ export const onNotionProgress = (
 /** View → Search… in the app menu (M5 §4). */
 export const onMenuSearch = (cb: () => void): Promise<UnlistenFn> =>
   listen<null>('menu:search', () => cb(), mine());
-/** Notes In My Way → Settings… (M5b §2.1). */
+/** Liber Linteum → Settings… (M5b §2.1). */
 export const onMenuSettings = (cb: () => void): Promise<UnlistenFn> =>
   listen<null>('menu:settings', () => cb(), mine());
 /** Vault → Open Vault… / Close Vault (M5b §2.1). */

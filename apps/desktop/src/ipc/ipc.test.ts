@@ -9,9 +9,9 @@ describe('ipc.appInfo', () => {
     const calls: string[] = [];
     mockIPC((cmd) => {
       calls.push(cmd);
-      if (cmd === 'app_info') return { name: 'Notes In My Way', version: '0.1.0' };
+      if (cmd === 'app_info') return { name: 'Liber Linteum', version: '0.1.0' };
     });
-    await expect(appInfo()).resolves.toEqual({ name: 'Notes In My Way', version: '0.1.0' });
+    await expect(appInfo()).resolves.toEqual({ name: 'Liber Linteum', version: '0.1.0' });
     expect(calls).toEqual(['app_info']);
   });
 });

@@ -1,8 +1,8 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "Notes In My Way",
+  "productName": "Liber Linteum",
   "version": "0.1.0",
-  "identifier": "app.notesinmyway.desktop",
+  "identifier": "app.liberlinteum.desktop",
   "build": {
     "beforeDevCommand": "pnpm dev",
     "devUrl": "http://localhost:1420",
@@ -14,7 +14,7 @@
     "windows": [
       {
         "label": "main",
-        "title": "Notes In My Way",
+        "title": "Liber Linteum",
         "width": 1280,
         "height": 820,
         "minWidth": 900,

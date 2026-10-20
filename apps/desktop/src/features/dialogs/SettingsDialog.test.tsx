@@ -568,7 +568,7 @@ describe('Settings → This vault (M2c §5.4)', () => {
       ),
     ).toBeInTheDocument();
     expect(
-      screen.getByRole('checkbox', { name: 'Use a different place in Notes In My Way' }),
+      screen.getByRole('checkbox', { name: 'Use a different place in Liber Linteum' }),
     ).not.toBeChecked();
     const violations = await axe
       .run(screen.getByRole('dialog'), { rules: { 'color-contrast': { enabled: false } } })
@@ -582,7 +582,7 @@ describe('Settings → This vault (M2c §5.4)', () => {
     await show('This vault');
     const where = await screen.findByRole('combobox', { name: 'New attachments go to' });
     await waitFor(() => expect(where).toBeDisabled());
-    const own = screen.getByRole('checkbox', { name: 'Use a different place in Notes In My Way' });
+    const own = screen.getByRole('checkbox', { name: 'Use a different place in Liber Linteum' });
     await userEvent.click(own);
     await waitFor(() =>
       expect(vaultPatches).toEqual([
