@@ -87,7 +87,8 @@ pub enum RawEvent {
     Overflow,
 }
 
-/// Keeps a [`Storage::watch`] running until dropped.
+/// Keeps a [`Storage::watch`] running until dropped. Dropping it must also
+/// drop the sink: `Vault`'s debounce thread exits only when the sink goes.
 pub struct WatchGuard(
     /// Held only for its Drop, which stops the watch.
     pub Box<dyn Send>,
@@ -117,5 +118,7 @@ pub trait Storage: Send + Sync + std::fmt::Debug {
     fn trash_os(&self, path: &VaultPath) -> Result<()>;
     fn os_path(&self, path: &VaultPath, use_: OsUse) -> Result<PathBuf>;
     fn vault_path_of(&self, os: &Path) -> Option<VaultPath>;
+    /// Calls `sink` for each change until the returned guard is dropped,
+    /// which must drop `sink` too (see [`WatchGuard`]).
     fn watch(&self, recursive: bool, sink: Box<dyn Fn(RawEvent) + Send>) -> Result<WatchGuard>;
 }

@@ -122,7 +122,7 @@ fn watch_folder_reports_only_the_folders_own_files() {
 /// Review Focus 5: temp files, hidden and excluded paths and the root never
 /// reach the session; a batch holding `Overflow` is only `Overflow`.
 #[test]
-fn watch_drops_temp_hidden_excluded_and_flags_root() {
+fn watch_drops_temp_hidden_excluded_drops_root_and_collapses_overflow() {
     let dir = tempfile::tempdir().unwrap();
     std::fs::create_dir(dir.path().join(".liber")).unwrap();
     std::fs::write(

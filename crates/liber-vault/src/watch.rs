@@ -115,21 +115,56 @@ impl Vault {
 }
 
 /// One debounced batch: `Overflow` if any event says so, else the visible
-/// paths (root, hidden and excluded ones dropped), sorted and de-duplicated.
+/// paths (root, hidden and excluded ones dropped), one event each, sorted.
+/// A path's last event wins: storage classifies a path when its event
+/// arrives, while the old watcher looked once, after the debounce.
 pub(crate) fn batch(excludes: &globset::GlobSet, raw: Vec<RawEvent>) -> Vec<WatchEvent> {
     let visible = |p: &VaultPath| {
         !(p.is_root() || is_hidden_path(p.as_str()) || excludes.is_match(p.as_str()))
     };
-    let mut out: Vec<WatchEvent> = Vec::new();
+    let mut removed = std::collections::HashMap::new();
     for ev in raw {
         match ev {
             RawEvent::Overflow => return vec![WatchEvent::Overflow],
-            RawEvent::Changed(p) if visible(&p) => out.push(WatchEvent::Changed(p)),
-            RawEvent::Removed(p) if visible(&p) => out.push(WatchEvent::Removed(p)),
-            _ => {}
-        }
+            RawEvent::Changed(p) if visible(&p) => removed.insert(p, false),
+            RawEvent::Removed(p) if visible(&p) => removed.insert(p, true),
+            _ => None,
+        };
     }
+    let mut out: Vec<WatchEvent> = removed
+        .into_iter()
+        .map(|(p, gone)| {
+            if gone {
+                WatchEvent::Removed(p)
+            } else {
+                WatchEvent::Changed(p)
+            }
+        })
+        .collect();
     out.sort_by(|a, b| format!("{a:?}").cmp(&format!("{b:?}")));
-    out.dedup();
     out
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// The last event on a path wins, as when paths were classified after
+    /// the debounce: modified-then-deleted is gone, deleted-then-recreated is
+    /// changed.
+    #[test]
+    fn vlt_04_last_event_on_a_path_wins() {
+        let p = VaultPath::new("a.md").unwrap();
+        let none = globset::GlobSet::empty();
+        let changed = RawEvent::Changed(p.clone());
+        let removed = RawEvent::Removed(p.clone());
+        assert_eq!(
+            batch(&none, vec![changed.clone(), removed.clone()]),
+            [WatchEvent::Removed(p.clone())]
+        );
+        assert_eq!(
+            batch(&none, vec![removed, changed]),
+            [WatchEvent::Changed(p)]
+        );
+    }
 }

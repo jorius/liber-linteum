@@ -21,7 +21,10 @@ pub const WARN_UNMOVED: &str = "metaDir.unmoved:";
 /// so nothing reads as empty and nothing is split across both folders.
 pub(crate) fn resolve(storage: &dyn Storage, rel: &str) -> String {
     match rel.strip_prefix(META_DIR).and_then(|r| r.strip_prefix('/')) {
-        Some(rest) if kind(storage, META_DIR).is_none() && is_dir(storage, LEGACY_META_DIR) => {
+        Some(rest)
+            if kind(storage, META_DIR, Follow::No).is_none()
+                && is_dir(storage, LEGACY_META_DIR) =>
+        {
             format!("{LEGACY_META_DIR}/{rest}")
         }
         _ => rel.to_string(),
@@ -49,13 +52,13 @@ fn dir_path(name: &str) -> VaultPath {
     VaultPath::new(name).expect("a valid name")
 }
 
-/// What sits at `name` (not following a symlink); `None` when nothing does
-/// or it can't be checked.
-fn kind(storage: &dyn Storage, name: &str) -> Option<Kind> {
-    let meta = storage.meta(&dir_path(name), Follow::No).ok()??;
+/// What sits at `name`; `None` when nothing does or it can't be checked.
+fn kind(storage: &dyn Storage, name: &str, follow: Follow) -> Option<Kind> {
+    let meta = storage.meta(&dir_path(name), follow).ok()??;
     Some(meta.kind)
 }
 
+/// A folder, or a link to one inside the vault (as `try_update_json_object`).
 fn is_dir(storage: &dyn Storage, name: &str) -> bool {
-    kind(storage, name) == Some(Kind::Dir)
+    kind(storage, name, Follow::InsideVault) == Some(Kind::Dir)
 }

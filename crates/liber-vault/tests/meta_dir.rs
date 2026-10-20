@@ -215,3 +215,17 @@ fn legacy_folder_moves_through_storage() {
     );
     assert_eq!(v.favorites(), vec!["A.md".to_string()]);
 }
+
+/// A legacy folder that is a symlink to a folder inside the vault counts as
+/// the legacy folder, as `is_dir` (which follows links) did.
+#[cfg(unix)]
+#[test]
+fn legacy_folder_linked_inside_the_vault_is_moved() {
+    let dir = tempfile::tempdir().unwrap();
+    write(dir.path(), "cfg/vault.json", r#"{"favorites":["A.md"]}"#);
+    std::os::unix::fs::symlink(dir.path().join("cfg"), dir.path().join(LEGACY_META_DIR)).unwrap();
+    let v = Vault::open(dir.path()).unwrap();
+    assert!(v.opened_legacy_settings());
+    assert!(dir.path().join(META_DIR).is_dir());
+    assert_eq!(v.favorites(), vec!["A.md".to_string()]);
+}
