@@ -308,3 +308,33 @@ Jose, after testing his vault: a folder `SmartJob/` holding `Smartjob.md` didn't
 3. **A page target's folder is predicted by exact name** in the drop rules (`P.md` → `P/`). The case-insensitive reuse of an existing sibling folder happens in Rust. *Cost if wrong:* a drop could look allowed onto a page whose case-variant sibling folder already holds the item; Rust then refuses it with a toast.
 4. **"Open folder in Finder" is not a separate item.** Reveal on a folder already shows it selected in its parent.
 5. **The menu label updates from Rust** where a session opens or closes (`open_session`, `vault_close`). Notion import and the Scratchpad go through the same `open_session`.
+
+### 9.6 Review fixes (2026-10-20)
+
+A fresh review found one Important issue and seven Minor ones. All are fixed, each with a test that failed first unless noted otherwise.
+
+1. **Moving under a page is one Rust command**, `entry_move_under_page(item, page)`, used by drops and by Move to….
+   - **Checked before anything moves:**
+     - the item is the page itself or contains it;
+     - a name clash in the target folder (case variants count when the disk says so);
+     - the item is already in that folder;
+     - the folder is the item, or a case variant of it;
+     - hidden or archived paths.
+   - **Rollback:** if the move still fails, the page's conversion is undone, and a folder the command made is removed from disk and index.
+   - **Before:** a refused drop could leave `Projects.md` moved to `projects/projects.md`.
+2. **The conversion's clean-up also removes the made folder from the index.** A page under a hidden folder (`.trash/x.md`) is refused before anything is made.
+3. **The vault name's `&` is escaped (`&&`) in the File menu.** Before, "R&D" showed as "RD".
+4. **The vault name is cut by whole characters (graphemes), after NFC.** Accents and emoji stay intact. The `&` escape happens after the cut, so the length counts visible characters.
+5. **`.MD`, in any case, is a page for Add sub-page and moves under a page.** The folder page keeps its own extension, e.g. `Notes/Notes.MD`.
+6. **Reveal in Finder refuses hidden paths** (`.git`, `.obsidian`, `.liber`…), as the rest of the app does. Archived items can still be revealed.
+7. **Names ending in `.` are refused on every platform.** Windows silently drops a trailing dot, so the disk and the index would disagree. The app's other name rules (Windows-forbidden characters) already apply everywhere.
+8. **Test gaps closed:**
+   - two distinct case-variant pages stay apart (case-sensitive disks, Linux CI);
+   - exact-name-wins is checked through the name picker on every OS;
+   - links from a converted page are rewritten;
+   - the drag e2e asserts `aria-expanded="true"`;
+   - a keyboard drag onto a page;
+   - opening a vault, opening the Scratchpad, and closing rename the File-menu item through the real session functions.
+
+**Ruling (from "declined to judge"):** an existing sibling folder with a different letter case is reused as the page's folder only when the disk treats the two names as one entry. That covers case-insensitive APFS and NTFS, checked with `same_entry`. On a case-sensitive disk, `Notes.md` gets its own `Notes/` beside an unrelated `notes/`.
+- *Cost if wrong:* on Linux, two folders whose names differ only in case can coexist, which is what that file system allows anyway.
