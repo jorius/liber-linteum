@@ -15,7 +15,7 @@ export default defineConfig({
       name: 'webkit',
       use: { ...devices['Desktop Safari'], browserName: 'webkit' },
       testMatch:
-        /\/(checklist|m2b|m2c|m3a|m3a-a11y|m3a-perf|m3b|m4|m4-perf|m4b|m4b2|cover-resize|m4b3-covers|m4b3-wide|m4b3-gv|m4b3-files|m4b3-settings|m4c-scratchpad|m4c-files|m5-search|m5b-shell|m5b-icons|m5b-trash|m5b-search-layout|m5b-wide|m5b-cmdf|m5b-settings|m5b-final-shell|m5b-favorites|m6-audio|m7-notion|r3-dialogs)\.spec\.ts$/,
+        /\/(checklist|m2b|m2c|m3a|m3a-a11y|m3a-perf|m3b|m4|m4-perf|m4b|m4b2|cover-resize|m4b3-covers|m4b3-wide|m4b3-gv|m4b3-files|m4b3-settings|m4c-scratchpad|m4c-files|m5-search|m5b-shell|m5b-icons|m5b-trash|m5b-search-layout|m5b-wide|m5b-cmdf|m5b-settings|m5b-final-shell|m5b-favorites|m6-audio|m7-notion|r3-dialogs|r3-sidebar|r3-welcome)\.spec\.ts$/,
     },
   ],
   webServer: {
