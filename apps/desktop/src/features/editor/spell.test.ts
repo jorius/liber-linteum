@@ -1,6 +1,7 @@
 import { EditorState } from '@codemirror/state';
 import { EditorView } from '@codemirror/view';
 import { act } from '@testing-library/react';
+import i18n from 'i18next';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { clearMocks, mockIPC } from '../../ipc/testing';
 import { parsePage } from '../../markdown/parse';
@@ -111,6 +112,50 @@ describe('the spellcheck extension', () => {
     await settle();
     expect(calls).toHaveLength(3);
     expect(calls[2]).toEqual(['uno', 'recieve', 'dos']);
+  });
+
+  // Round 3b final review #3: answers that arrive after a bump are stale.
+  it('drops a check answered after the dictionaries changed', async () => {
+    let answer: (v: boolean[]) => void = () => {};
+    let first = true;
+    clearMocks();
+    mockIPC((cmd, args) => {
+      if (cmd !== 'spell_check') return null;
+      const asked = (args as { words: string[] }).words;
+      calls.push(asked);
+      if (first) {
+        first = false;
+        return new Promise<boolean[]>((resolve) => (answer = resolve));
+      }
+      return asked.map(() => true);
+    });
+    const v = editor('uno nimw');
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(SPELL_DEBOUNCE_MS + 10);
+    });
+    act(() => useSpellStore.getState().bump());
+    await act(async () => {
+      answer([true, false]);
+      await Promise.resolve();
+    });
+    await settle();
+    expect(calls).toEqual([
+      ['uno', 'nimw'],
+      ['uno', 'nimw'],
+    ]);
+    expect(underlined(v)).toEqual([]);
+  });
+
+  // Round 3b final review #8: another UI language means other answers.
+  it('a language change re-checks', async () => {
+    const before = useSpellStore.getState().setKey;
+    await act(async () => {
+      await i18n.changeLanguage('es');
+    });
+    expect(useSpellStore.getState().setKey).toBe(before + 1);
+    await act(async () => {
+      await i18n.changeLanguage('en');
+    });
   });
 
   it('the menu opens on a misspelled word only', async () => {

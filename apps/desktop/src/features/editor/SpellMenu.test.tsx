@@ -98,6 +98,30 @@ describe('SpellMenu', () => {
     expect(closed).toBe(true);
   });
 
+  // Round 3b final review #11.
+  it('Tab closes and gives focus back to the editor', async () => {
+    let closed: boolean | null = null;
+    open((refocus) => (closed = refocus));
+    const first = await screen.findByRole('menuitem', { name: 'receive' });
+    fireEvent.keyDown(first, { key: 'Tab' });
+    expect(closed).toBe(true);
+  });
+
+  it('stays inside the window when opened at its edge', async () => {
+    render(
+      <SpellMenu
+        view={view}
+        target={target}
+        anchor={{ x: window.innerWidth - 5, y: window.innerHeight - 5 }}
+        onClose={() => {}}
+      />,
+    );
+    const menu = await screen.findByRole('menu');
+    await screen.findByRole('menuitem', { name: 'receive' });
+    expect(parseFloat(menu.style.left)).toBeLessThanOrEqual(window.innerWidth - 8);
+    expect(parseFloat(menu.style.top)).toBeLessThanOrEqual(window.innerHeight - 8);
+  });
+
   it('closes without a change when the word is no longer there', async () => {
     let closed: boolean | null = null;
     open((refocus) => (closed = refocus));

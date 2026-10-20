@@ -108,6 +108,11 @@ function DictionaryChecks({
           )}
         </div>
       ))}
+      {!list.some((d) => d.available && checked.includes(d.id)) && (
+        <p className={styles.hint} role="status">
+          {t('spelling.noneSelected')}
+        </p>
+      )}
     </fieldset>
   );
 }

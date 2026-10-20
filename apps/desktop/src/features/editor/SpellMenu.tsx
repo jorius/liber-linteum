@@ -1,15 +1,16 @@
 import type { EditorView } from '@codemirror/view';
-import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { spellAddWord, spellIgnore, spellSuggest, type IpcResult } from '../../ipc';
 import { errorMessage } from '../../stores/messages';
 import { useSpellStore } from '../../stores/spellStore';
 import { useToastStore } from '../../stores/toastStore';
+import { placePopup } from './placePopup';
 import type { WordRange } from './spell';
 
 /** The menu for a misspelled word (spell checking spec §6): suggestions,
  *  then Add to dictionary and Ignore. `onClose(refocus)`: true after a
- *  choice or Escape, to give the keyboard back to the editor. */
+ *  choice, Escape or Tab, to give the keyboard back to the editor. */
 export function SpellMenu({
   view,
   target,
@@ -26,6 +27,7 @@ export function SpellMenu({
   const [active, setActive] = useState(0);
   const items = useRef<(HTMLButtonElement | null)[]>([]);
   const box = useRef<HTMLDivElement>(null);
+  const [place, setPlace] = useState({ top: anchor.y, left: anchor.x });
 
   useEffect(() => {
     let live = true;
@@ -37,6 +39,17 @@ export function SpellMenu({
     };
   }, [target.word, i18n.resolvedLanguage]);
   const count = (suggestions?.length ?? 0) + 2;
+  // Inside the window, near either edge (round 3b final review #11).
+  useLayoutEffect(() => {
+    const el = box.current;
+    const size = { width: el?.offsetWidth ?? 0, height: el?.offsetHeight ?? 0 };
+    const at = { top: anchor.y, bottom: anchor.y, left: anchor.x };
+    const { top, left } = placePopup(at, size, {
+      width: window.innerWidth,
+      height: window.innerHeight,
+    });
+    setPlace((p) => (p.top === top && p.left === left ? p : { top, left }));
+  }, [anchor.x, anchor.y, suggestions]);
   useEffect(() => {
     if (suggestions) items.current[active]?.focus();
   }, [active, suggestions]);
@@ -67,7 +80,7 @@ export function SpellMenu({
   const onKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
     if (e.key === 'ArrowDown') setActive((a) => (a + 1) % count);
     else if (e.key === 'ArrowUp') setActive((a) => (a - 1 + count) % count);
-    else if (e.key === 'Escape' || e.key === 'Tab') onClose(e.key === 'Escape');
+    else if (e.key === 'Escape' || e.key === 'Tab') onClose(true);
     else return;
     e.preventDefault();
     e.stopPropagation();
@@ -95,7 +108,7 @@ export function SpellMenu({
       role="menu"
       aria-label={t('spelling.menu', { word: target.word })}
       className="nimw-menu"
-      style={{ position: 'fixed', left: anchor.x, top: anchor.y }}
+      style={{ position: 'fixed', left: place.left, top: place.top }}
       onKeyDown={onKeyDown}
     >
       {suggestions?.map((s, i) => item(`s:${s}`, i, s, () => replace(s)))}

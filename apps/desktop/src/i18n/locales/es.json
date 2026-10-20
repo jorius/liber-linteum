@@ -862,6 +862,7 @@
     "remove": "Quitar {name}",
     "removeShort": "Quitar",
     "removeAsk": "¿Quitar {name}?",
+    "noneSelected": "Ningún diccionario seleccionado: no se revisa la ortografía",
     "unavailable": "No se pudo cargar",
     "words": "Palabras agregadas en esta bóveda",
     "noWords": "Aún no hay palabras",

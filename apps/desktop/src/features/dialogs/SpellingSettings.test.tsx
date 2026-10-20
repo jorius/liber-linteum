@@ -90,6 +90,17 @@ describe('SpellingSettings', () => {
     expect(useSpellStore.getState().setKey).toBeGreaterThan(before);
   });
 
+  // Round 3b final review #2.
+  it('says so when no dictionary is selected', async () => {
+    render(<SpellingSettings vaultOpen={false} />);
+    await waitFor(() => expect(box('Español')).toBeTruthy());
+    expect(screen.queryByText(/Ningún diccionario seleccionado/)).toBeNull();
+    fireEvent.click(box('Español'));
+    expect(
+      await screen.findByText('Ningún diccionario seleccionado: no se revisa la ortografía'),
+    ).toBeTruthy();
+  });
+
   it('turning spelling off saves it', async () => {
     render(<SpellingSettings vaultOpen={false} />);
     fireEvent.click(box('Revisar la ortografía'));

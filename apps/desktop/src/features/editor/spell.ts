@@ -128,9 +128,13 @@ const checker = ViewPlugin.fromClass(
         .filter((w) => !cache.has(w))
         .slice(0, MAX_WORDS);
       if (asked.length > 0) {
+        const key = useSpellStore.getState().setKey;
         const res = await spellCheck(asked, i18n.resolvedLanguage ?? i18n.language ?? 'en');
         // Other tests' IPC mocks answer null to commands they don't know.
         if (!res.ok || !Array.isArray(res.value)) return;
+        // Answered for dictionaries that changed meanwhile: the bump already
+        // scheduled a fresh check (round 3b final review #3).
+        if (useSpellStore.getState().setKey !== key) return;
         asked.forEach((w, i) => cache.set(w, res.value[i] ?? true));
       }
       // Ranges from the editor as it is now: typing during the check is fine.
