@@ -53,6 +53,18 @@ The Source and Split modes are unchanged. Large-note limits (`LARGE_NOTE_CHARS`)
    The "…" button goes, and right-click keeps the context menu. *My call:* "+" (new page in this folder) also goes from the row because Jose listed only three. It stays in the context menu. Archived rows show no trash, as today.
 4. **Context menu label.** "New quick note" becomes "Create new scratchpad in this vault" (es: same meaning, using the existing Spanish terms for scratchpad and vault). The behaviour and the ⌘⇧N shortcut are unchanged.
 
+### §2 amendments (stream B, as built)
+
+- **The "New quick note" label is in the File menu.** The context menu never had a quick-note item; Jose's "file context menu" is the macOS **File** menu. It now reads **Create New Scratchpad in This Vault** (Title Case, like the other menu items; the native menu is English-only). The Settings → Shortcuts row for ⌘⇧N reads "Create new scratchpad in this vault" (es: "Crear una nota rápida nueva en esta bóveda"). The behaviour is unchanged: on the Welcome screen it still goes to the global Scratchpad. *Cost if wrong:* if he meant another menu, it's a one-string move.
+- **Width.** `sidebarWidth` is app-wide in `settings.json`, 270 px by default, and clamped to 200–560. An out-of-range number is clamped; a non-number resets on its own with the usual warning.
+  - Keys save on each press: ←/→ by 16 px, Shift ×4, Home/End to the limits.
+  - A drag saves once, on release. A double-click resets.
+  - *Cost if wrong:* a per-vault width would need a `.nimw/vault.json` key instead.
+- **Hidden actions take no room.** Before, the invisible actions (opacity 0) still took ~100 px, which is why "Bug Bou…" was cut short with space to spare. Now they are `max-width: 0` until hover, focus or selection. While the pointer is on a row, its name gives way to the three buttons; Notion does the same.
+- **★ on rows.** Pages and folders get it, but attachments and Archived items don't, matching what the context menu allows. It is labelled "Add {name} to Favorites" / "Remove {name} from Favorites" and has `aria-pressed`.
+- **Favorites section rows.** They lose their "…" as well (right-click and Shift+F10 still open the menu) and keep their filled ★ only. *Cost if wrong:* he may want ☺ and 🗑 there too, which is a small addition.
+- **"+" removed.** New page inside a folder is in its context menu ("New page"). The m5b-icons e2e now uses the menu.
+
 ## 3. Dialogs and fields (stream C)
 
 1. **Notion import dialog bug.** The dialog renders with no padding:

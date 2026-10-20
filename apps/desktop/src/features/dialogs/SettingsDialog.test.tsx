@@ -85,7 +85,7 @@ describe('Settings dialog (M2b §4, §5, §7)', () => {
     expect(
       screen.getByRole('heading', { name: 'Keyboard shortcuts', level: 3 }),
     ).toBeInTheDocument();
-    expect(screen.getByText('New quick note')).toBeInTheDocument();
+    expect(screen.getByText('Create new scratchpad in this vault')).toBeInTheDocument();
   });
 
   it('M5b §18: search shows the matching rows of every category, accents ignored', async () => {

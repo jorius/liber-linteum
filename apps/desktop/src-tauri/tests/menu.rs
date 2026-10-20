@@ -138,7 +138,7 @@ fn macos_menu_quit_is_ours_and_the_standard_items_stay() {
     // M4c §2: File → New Quick Note, right after the app menu.
     assert_eq!(outline[1].0, "File", "{outline:?}");
     assert!(
-        texts("File").iter().any(|t| t == "New Quick Note"),
+        texts("File").iter().any(|t| t == "Create New Scratchpad in This Vault"),
         "{outline:?}"
     );
     // M4c §3: File → Open File… (⌘⇧O; ⌘O opens a folder as a vault).

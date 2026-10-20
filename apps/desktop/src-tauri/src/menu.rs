@@ -44,7 +44,7 @@ pub const SEARCH_EVENT: &str = "menu:search";
 /// Event telling the page which screen to show; payload `"edit"`,
 /// `"global"`, or `"atoms"` (the open page's atoms in the Global View).
 pub const SCREEN_EVENT: &str = "menu:screen";
-/// Id of File → New Quick Note (M4c §2).
+/// Id of File → Create New Scratchpad in This Vault (M4c §2; renamed in round 3 §2.4).
 pub const QUICK_NOTE_ID: &str = "nimw-quick-note";
 /// Event telling the main window to take a quick note (no payload).
 pub const QUICK_NOTE_EVENT: &str = "menu:quickNote";
@@ -125,7 +125,7 @@ pub fn app_menu<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
     let quick_note = MenuItem::with_id(
         app,
         QUICK_NOTE_ID,
-        "New Quick Note",
+        "Create New Scratchpad in This Vault",
         true,
         Some("CmdOrCtrl+Shift+N"),
     )?;
