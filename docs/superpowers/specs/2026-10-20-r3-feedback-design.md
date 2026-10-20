@@ -27,6 +27,14 @@ Constructs, each with a test:
 
 The Source and Split modes are unchanged. Large-note limits (`LARGE_NOTE_CHARS`) still apply. Decorations must come from the syntax tree and only cover visible ranges, so typing on a 10k-line note stays smooth (existing perf tests).
 
+### 1a. As built (stream A rulings)
+
+1. **Fence lines stay as lines.** Off the cursor, the opening fence's text becomes the header row: the language badge and Copy, floated right. The closing fence becomes an empty line, which acts as the block's bottom padding. Revealing the source swaps text inside the same lines, so nothing below the block moves (tested in e2e). An unclosed fence keeps its last line. *Cost if wrong:* if Jose wants the block tighter, about one line of height per block.
+2. **A list marker reveals only on its own line.** Editing a nested child doesn't flip its parent's bullet. A task hides its `- ` too, leaving only the checkbox. *Cost if wrong:* if he expects the whole item to reveal, a one-line change.
+3. **Inline marks keep the existing line-based reveal** (§1.5 says keep it). This is not the "inside or at the edges" rule. *Cost if wrong:* a cursor-range check in `wrapped` and the link click.
+4. **Decorations are still built for the whole document**, as before, and large notes still get the reduced set. The perf tests stay green. *Cost if wrong:* a visible-ranges rewrite if 10k-line notes lag.
+5. **Not done:** setext heading underlines (`===` and `---` under a line) still show. Notion exports don't use them.
+
 ## 2. Sidebar (stream B)
 
 1. **Resizable.** A drag handle on the sidebar's right edge:
