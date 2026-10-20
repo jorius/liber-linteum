@@ -39,11 +39,31 @@ struct Retiring {
 }
 
 /// An open vault: its key, subkeys, and (mid-rotation) the retiring epoch's subkeys.
+///
+/// Read-only outside this crate, so `VaultHeader`'s guards can't be bypassed by editing it:
+///
+/// ```
+/// fn f(h: &liber_crypto::VaultHeader, u: &liber_crypto::Unlocked) -> bool {
+///     u.epoch() == h.epoch() && u.vault_id() == h.vault_id() && !h.slots().is_empty()
+/// }
+/// ```
+///
+/// ```compile_fail,E0616
+/// fn f(h: &liber_crypto::VaultHeader, u: &mut liber_crypto::Unlocked) {
+///     u.epoch = h.epoch(); // an old-epoch key passing for the current one
+/// }
+/// ```
+///
+/// ```compile_fail,E0616
+/// fn f(h: &mut liber_crypto::VaultHeader) {
+///     h.slots.retain(|_| false); // removing slots without tombstones or a MAC
+/// }
+/// ```
 pub struct Unlocked {
-    pub vk: VaultKey,
-    pub subkeys: Subkeys,
-    pub epoch: u32,
-    pub retiring: Option<(u32, Subkeys)>,
+    pub(crate) vk: VaultKey,
+    subkeys: Subkeys,
+    epoch: u32,
+    retiring: Option<(u32, Subkeys)>,
     /// Which vault these keys open; headers refuse an `Unlocked` from another vault or epoch.
     vault_id: VaultId,
 }
@@ -57,6 +77,24 @@ impl Unlocked {
             retiring,
             vault_id: *id,
         }
+    }
+
+    pub fn epoch(&self) -> u32 {
+        self.epoch
+    }
+
+    pub fn vault_id(&self) -> &VaultId {
+        &self.vault_id
+    }
+
+    /// The current epoch's subkeys.
+    pub fn subkeys(&self) -> &Subkeys {
+        &self.subkeys
+    }
+
+    /// Mid-rotation, the retiring epoch and its subkeys (names not yet re-encrypted use its K_name).
+    pub fn retiring(&self) -> Option<(u32, &Subkeys)> {
+        self.retiring.as_ref().map(|(e, k)| (*e, k))
     }
 
     /// K_content for a file written at `epoch`.
@@ -84,9 +122,9 @@ pub struct MergeOutcome {
 
 #[derive(Clone, Debug)]
 pub struct VaultHeader {
-    pub vault_id: VaultId,
-    pub epoch: u32,
-    pub slots: Vec<Slot>,
+    vault_id: VaultId,
+    epoch: u32,
+    slots: Vec<Slot>,
     retiring: Option<Retiring>,
     /// Slot types this version can't read, with their index in the file's `slots` array.
     unknown_slots: Vec<(usize, Value)>,
@@ -97,6 +135,19 @@ pub struct VaultHeader {
 }
 
 impl VaultHeader {
+    pub fn vault_id(&self) -> &VaultId {
+        &self.vault_id
+    }
+
+    pub fn epoch(&self) -> u32 {
+        self.epoch
+    }
+
+    /// Known slot types, in file order (unknown types are kept but not listed).
+    pub fn slots(&self) -> &[Slot] {
+        &self.slots
+    }
+
     /// A new vault with a passphrase slot and a recovery slot. `params` must meet the floor.
     pub fn create(
         passphrase: &str,

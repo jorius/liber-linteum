@@ -42,7 +42,7 @@ fn generate() -> Vec<(String, Vec<u8>)> {
     with_seeded_rng(SEED, || {
         let mut out = Vec::new();
         let (mut h, u, rc) = VaultHeader::create_unchecked(PASSPHRASE, PARAMS).unwrap();
-        let (vault_id, epoch) = (h.vault_id, h.epoch);
+        let (vault_id, epoch) = (*h.vault_id(), h.epoch());
         let device = Secret::<32>::random();
         let add_device = |h: &mut VaultHeader, device_id: &str, secret| {
             let device_id = device_id.into();
@@ -51,7 +51,7 @@ fn generate() -> Vec<(String, Vec<u8>)> {
         };
         add_device(&mut h, DEVICE_ID, &device);
         let (mut kf, ks, krc) = KeyringFile::create_unchecked(PASSPHRASE, PARAMS).unwrap();
-        kf.enroll(&ks, &vault_id, &u.subkeys.header).unwrap();
+        kf.enroll(&ks, &vault_id, &u.subkeys().header).unwrap();
         h.add_slot(&u, NewSlot::Keyring(&kf.public())).unwrap();
         // A removed slot leaves a tombstone in `removed`, which the MAC covers.
         let gone = add_device(&mut h, "old phone", &Secret::random());
@@ -64,7 +64,7 @@ fn generate() -> Vec<(String, Vec<u8>)> {
         out.push(("header.json".to_string(), header));
         out.push(("keyring.liberk".to_string(), kf.to_bytes(&ks).unwrap()));
 
-        let codec = NameCodec::new(&u.subkeys.name, &vault_id, epoch);
+        let codec = NameCodec::new(&u.subkeys().name, &vault_id, epoch);
         let projects = FolderId::random();
         let long = format!("{}.md", "x".repeat(150));
         let table = [
@@ -103,7 +103,7 @@ fn generate() -> Vec<(String, Vec<u8>)> {
             let salt: [u8; 32] = random_bytes();
             let plain: Vec<u8> = (0..len).map(|i| (i % 251) as u8).collect();
             let mut w =
-                StreamWriter::with_salt(Vec::new(), &u.subkeys.content, epoch, salt).unwrap();
+                StreamWriter::with_salt(Vec::new(), &u.subkeys().content, epoch, salt).unwrap();
             w.write_all(&plain).unwrap();
             let name = format!("file-{len}.libere");
             out.push((name.clone(), w.finish().unwrap()));
@@ -119,7 +119,7 @@ fn generate() -> Vec<(String, Vec<u8>)> {
         let (u2, rc2) = h.begin_rotation_unchecked(&u, PASSPHRASE, PARAMS).unwrap();
         out.push(("header-rotated.json".to_string(), h.to_bytes(&u2).unwrap()));
 
-        let s = &u.subkeys;
+        let s = u.subkeys();
         let v = json!({
             "vk": hex(u.vk.expose()),
             "vault_id": hex(&vault_id.0),
@@ -138,7 +138,7 @@ fn generate() -> Vec<(String, Vec<u8>)> {
             "files": files,
             "rotated": {
                 "vk": hex(u2.vk.expose()),
-                "epoch": u2.epoch,
+                "epoch": u2.epoch(),
                 "recovery_code": rc2.to_display(),
             },
             "keyring": { "recovery_code": krc.to_display() },

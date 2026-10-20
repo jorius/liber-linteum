@@ -351,7 +351,7 @@ mod tests {
         let h = VaultHeader::parse(&h.to_bytes(&u).unwrap()).unwrap();
         let got = h.unlock(Unlock::Keyring(&ks)).unwrap();
         assert_eq!(got.vk.expose(), u.vk.expose());
-        assert_eq!(got.subkeys.header.expose(), u.subkeys.header.expose());
+        assert_eq!(got.subkeys().header.expose(), u.subkeys().header.expose());
         // Another keyring's secret opens nothing.
         let (_, other, _) = new_keyring("keyring pw");
         assert!(is_auth(h.unlock(Unlock::Keyring(&other))));
@@ -377,20 +377,20 @@ mod tests {
         let real_open = real.unlock(Unlock::Keyring(&ks)).unwrap();
 
         let enrolled = |kf: &KeyringFile, h: &VaultHeader, u: &crate::Unlocked| {
-            kf.is_enrolled(&ks, &h.vault_id, &u.subkeys.header)
+            kf.is_enrolled(&ks, h.vault_id(), &u.subkeys().header)
         };
         assert!(!enrolled(&kf, &fake, &fake_open));
         assert!(!enrolled(&kf, &real, &real_open));
-        kf.enroll(&ks, &real.vault_id, &real_open.subkeys.header)
+        kf.enroll(&ks, real.vault_id(), &real_open.subkeys().header)
             .unwrap();
         assert!(enrolled(&kf, &real, &real_open));
         assert!(!enrolled(&kf, &fake, &fake_open));
         // Copying the real vault_id doesn't help: the commitment binds K_header.
-        assert!(!kf.is_enrolled(&ks, &real.vault_id, &fake_open.subkeys.header));
+        assert!(!kf.is_enrolled(&ks, real.vault_id(), &fake_open.subkeys().header));
         // Survives the file round trip.
         let kf = KeyringFile::parse(&kf.to_bytes(&ks).unwrap()).unwrap();
         let ks = kf.unlock(Unlock::Passphrase("keyring pw")).unwrap();
-        assert!(kf.is_enrolled(&ks, &real.vault_id, &real_open.subkeys.header));
+        assert!(kf.is_enrolled(&ks, real.vault_id(), &real_open.subkeys().header));
     }
 
     #[test]
