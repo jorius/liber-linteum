@@ -14,6 +14,7 @@ pub mod file_windows;
 pub mod fonts;
 pub mod gv_commands;
 pub mod icon_commands;
+pub mod legacy_dirs;
 pub mod menu;
 pub mod navigation;
 pub mod notion_commands;
@@ -129,6 +130,10 @@ pub fn configure<R: tauri::Runtime>(
         None => builder.setup(|app| {
             let config = app.path().app_config_dir()?;
             let cache = app.path().app_cache_dir()?;
+            // Rename to Liber Linteum: adopt the old app's settings once; never blocks launch.
+            if let Err(e) = legacy_dirs::adopt(&config, &cache) {
+                eprintln!("adopting the old app's settings failed: {e}");
+            }
             app.manage(AppState::new(SettingsStore::load(&config), cache));
             Ok(())
         }),
