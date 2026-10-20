@@ -134,9 +134,10 @@ In Python that is `json.dumps(v, sort_keys=True, separators=(",", ":"), ensure_a
 
 **What is MACed.** The reference rebuilds the object from what it parsed, then MACs that:
 
-- the top-level members are exactly the ones §6 (or §12) lists; unknown top-level members, and unknown members inside known slots, are dropped;
+- the top-level members are exactly the ones §6 (or §12) lists. Unknown members, at the top level or inside any object the reference rebuilds (known slots, `kdf`, `retiring`, `enrolled` entries), are **not authenticated**: the MAC never sees them, so anyone can add or change them unnoticed, and a writer drops them;
 - known slots are re-serialised from their parsed values, and unknown slot types are kept verbatim at their original index in `slots` (§7.6);
-- `removed` (§6) and `enrolled` (§12) are sorted and de-duplicated first.
+- `removed` (§6) is sorted and de-duplicated first. `enrolled` (§12) is sorted by `vault_id`; a duplicate `vault_id` is **not** de-duplicated: the parse fails with `BadFormat` (§12.1);
+- if an object repeats a member name, the parser keeps the **last** value (serde_json's behaviour; Python's `json` does the same), and that value is what the MAC covers. Writers never repeat a name.
 
 A writer always writes the canonical form with `"mac"` added (sorted in among the other keys) and nothing else: no BOM and no trailing newline. For a file a conforming writer produced, "drop `mac`, canonicalise the rest" gives the same bytes. The vectors are canonical, and `xcheck.py` checks that. Unknown slot objects should hold only strings, integers, booleans, `null`, arrays and objects: floating-point numbers have no portable canonical form.
 
@@ -261,7 +262,7 @@ To create one, a writer needs only the keyring's public key (§12.6):
 3. **KEK** = HKDF-SHA-256(IKM = `ss`, salt = `vault_id`, info = `"liber/v1/slot/keyring" ‖ slot id`, L = 32).
 4. Wrap VK as in §7.1.
 
-To open one: `ss = X-Wing.Decaps(sk, enc)`, with sk being the keyring seed (§12.2), then the same KEK. X-Wing decapsulation never fails (implicit rejection): a wrong key gives a wrong KEK, and the GCM tag catches it. An `enc` of the wrong length is `BadFormat`. An unlock tries only keyring slots whose `keyring_id` equals the keyring's id. A writer adds at most one keyring slot per `keyring_id`.
+To open one: `ss = X-Wing.Decaps(sk, enc)`, with sk being the keyring seed (§12.2), then the same KEK. X-Wing decapsulation never fails (implicit rejection): a wrong key gives a wrong KEK, and the GCM tag catches it. An `enc` of the wrong length is `BadFormat`. An unlock tries only keyring slots whose `keyring_id` equals the keyring's id. Adding a slot refuses a second keyring slot for the same `keyring_id`, but a merge (§11) can still leave two: one added on each copy before they met. Both wrap the same VK, so either one opens the vault, and unlock uses the first.
 
 ### 7.6 Unknown slot types
 
@@ -278,6 +279,8 @@ Given one credential (passphrase, recovery code, device secret or keyring secret
 3. On the first successful unwrap: derive the subkeys (§4.1) and verify `mac` under K_header (§5). If the MAC fails, **stop** with `Authentication`. Don't try more slots.
 4. If `retiring` is not `null`, unwrap the retiring key (§10). If that fails, stop with `Authentication`.
 5. No slot unwrapped: `Authentication`.
+
+**AES-GCM is not key-committing** (informative). Someone who can write the header can craft one `wrapped` value whose tag verifies under many candidate KEKs (a partitioning oracle; Len, Grubbs and Ristenpart, 2021). The result is `Authentication` either way, but the timing differs: a tag that verifies stops the loop at step 3, while a failed one moves on to the next slot, and a second passphrase slot means another Argon2id run. So an attacker who plants such a header and can time (or watch) the user's next unlock learns whether the passphrase is in the candidate set: about one bit per unlock. Each candidate still costs the attacker a full Argon2id run, and the attacker needs write access and repeated observed unlocks, so v1 accepts this. The app should treat a header that fails its MAC after a slot unwrapped as hostile and say so, rather than letting the user retry silently. A future version could add a key commitment (for example, a hash of the KEK) to each slot.
 
 ## 8. Argon2id parameters
 
@@ -308,7 +311,7 @@ LIBER-ZDS9-CHT4-WPMV-X60F-CR58-JN2Z-6Z09-23Z9-RK8B-MCCQ-PHTE-HG9K-7J30-26DD
 
 **Parsing** (forgiving, then strict):
 
-1. Remove all whitespace and `-`. The rest must be ASCII, else `RecoveryCode`.
+1. Remove every character with the Unicode `White_Space` property (Rust's `char::is_whitespace`; this includes U+00A0 and U+3000) and every `-`. The rest must be ASCII, else `RecoveryCode`.
 2. If it is 61 characters long and starts with `LIBER` in any case, drop those 5.
 3. It must now be exactly 56 characters.
 4. Map lower case to upper case, `O` → `0`, and `I` or `L` → `1`. Any other character outside the alphabet is an error (including `U`).
@@ -339,6 +342,13 @@ Every VK has an **epoch**: a u32 that starts at 1 and goes up by one per rotatio
 
 The vector `header-rotated.json` is the vectors' vault after `begin_rotation`, at epoch 2.
 
+**Header rollback is not detected by the format.** An old header is still a validly MACed header under its own epoch's K_header. Someone who held the old VK (a revoked device, a leaked passphrase, an old recovery code) and can write to the synced folder can put a **pre-rotation `liber-vault.json` back**. Their old credential opens it again, and anything written after that point is written at the old epoch, under a key they know. That defeats rotation and revocation. The same goes for rolling a header back within an epoch to bring back a removed slot. So the app must, outside the vault (phase E3):
+
+- **remember the highest `epoch` it has seen for each `vault_id`**, in app-local storage the sync folder can't reach;
+- **refuse** a header whose `epoch` is lower than that (or warn loudly and open it read-only), and never write new files under the lower epoch.
+
+Within one epoch, a rolled-back header can bring back slots that were removed. Tombstones (§11) stop this only when a merge sees both copies. Rotation is the real revocation, and the epoch check above is what makes it stick.
+
 ## 11. Changing the header: removal, tombstones, merging
 
 These are writer rules. A reader needs only §6 and §7, but a second writer must follow them, or a merge could bring back a revoked slot.
@@ -348,15 +358,19 @@ These are writer rules. A reader needs only §6 and §7, but a second writer mus
 - **A new recovery code** tombstones the old recovery slot's id and appends a new recovery slot.
 - **Adding** a slot appends it, subject to: at most 64 slots in all, at most 4 passphrase slots, the floor for new passphrase slots, `device_id` ≤ 256 bytes, and one keyring slot per keyring.
 - **Tombstone cap:** 1024. A writer that would exceed it refuses, and the user rotates instead (which resets `removed`).
+- **Verify before writing.** A writer verifies the header's current MAC under its key before changing or re-MACing it (`VaultHeader::verify`). Otherwise a header edited on disk since it was unlocked (say, a garbage `retiring`) would be MACed by the writer and lock everyone out.
+- **Never go back an epoch** (§10): a header with a lower `epoch` than the app has seen for this `vault_id` is refused, never merged or re-MACed.
 
 **Merging a sync-conflict copy** of `liber-vault.json` (spec §4.3), after unlocking the local copy:
 
-1. The other copy must have the **same `vault_id` and the same `epoch`**, and its MAC must **verify under the local K_header**. Otherwise the whole merge is refused (`Authentication`). A slot can't be checked without its secret, so the MAC is what proves the copy came from someone holding the key.
+1. The other copy must have the **same `vault_id` and the same `epoch`**, and both its MAC and the local copy's must **verify under the local K_header**. Otherwise the whole merge is refused (`Authentication`). A slot can't be checked without its secret, so the MAC is what proves the copy came from someone holding the key.
 2. **Union the tombstones** of both copies.
 3. Keep the local slots that aren't tombstoned. Then append, in the other copy's order, each of its slots that isn't tombstoned and whose id isn't already present. (The other copy's unknown slot types are not merged.)
-4. If more than one recovery slot remains, keep the one with the **smallest id** (by raw bytes) and tombstone the others, so every device converges on the same one. The other code stops working, and the app must ask the user to note the surviving code again.
-5. Refuse the merge if the result would exceed 64 slots, 4 passphrase slots or 1024 tombstones, or if it would leave **zero passphrase slots or zero recovery slots**. That happens, for example, when each copy removed a different passphrase.
+4. If more than one recovery slot remains, keep the one with the **smallest id** (by raw bytes) and tombstone the others, so every device converges on the same one. The other code stops working. The reference's `merge_from` returns `MergeOutcome { added, local_recovery_dropped }`: the device whose own recovery slot didn't survive the merge tells the user that the code it showed is **void** and offers a new one (`new_recovery`).
+5. Refuse the merge with `Params` if the result would exceed 64 slots, 4 passphrase slots or 1024 tombstones, or if it would leave **zero passphrase slots or zero recovery slots**. That happens, for example, when each copy removed a different passphrase. Nothing changes on a refusal.
 6. Re-MAC.
+
+A merge can leave **two keyring slots for one keyring**, when each copy added one before they met (§7.5). Both open the vault, so this is harmless; a later writer may remove one.
 
 ## 12. The keyring file `keyring.liberk`
 
@@ -488,7 +502,8 @@ Let body = file size − 48, full = ⌊body / 65 552⌋ and rem = body mod 65 55
 |---|---|
 | cut before or inside the header, or the §13.4 length rules fail | `Truncated` |
 | cut exactly at a chunk boundary | `Truncated` (§13.5) |
-| **torn mid-chunk** (a crash or an interrupted sync left a partial last chunk) | `Authentication`: the partial chunk is taken as the last one and its tag fails |
+| **torn mid-chunk** (a crash or an interrupted sync left a partial last chunk) of more than 16 bytes | `Authentication`: the partial chunk is taken as the last one and its tag fails |
+| torn with a tail of 16 bytes or fewer after the last whole chunk | `Truncated` (§13.4: rem in 1–16 with full > 0) |
 | any flipped, swapped, duplicated, reordered or spliced byte or chunk; a wrong key; a wrong epoch | `Authentication` |
 
 A file torn mid-chunk can't be told apart from tampering by the bytes alone. So **tools and the UI must not call an `Authentication` failure on a file "tampering" outright**. "Damaged or modified" is accurate. Salvage (§13.7) recovers what is left either way.
@@ -560,7 +575,7 @@ If an on-disk name (the full encoded form, including `.libere` for a file) is **
 
 - h = the first 32 characters of the RFC 4648 base32 encoding (A–Z, 2–7, no padding) of SHA-256(the encoded name's bytes), lower-cased;
 - the entry is stored as `h.liberl` (a file, or a folder for a folder), 39 bytes;
-- a side file `h.libern` next to it holds the full encoded name. It is not encrypted again: it is already ciphertext.
+- a side file `h.libern` next to it holds the full encoded name. It is not encrypted again: it is already ciphertext. Its **exact bytes** are the ASCII of the encoded name and nothing else: no BOM, no newline, no length prefix. For a file, that includes the `.libere` suffix (so it is exactly the name that was hashed); for a folder, it has no suffix.
 
 To read `h.liberl`, read the side file and decode its contents as in §14.4. A reader should also check that hashing the contents gives `h`. Phase E3 bounds the side file's size before reading it.
 
@@ -586,7 +601,15 @@ These are not format rules. They are the limits an auditor should know about.
 - Keys live on the heap in zeroize-on-drop wrappers, `mlock`ed best-effort. Wrapped keys are decrypted in place, so no plaintext copy is left behind.
 - **AES key schedules are moved by value.** `aes-gcm`'s `Aes256Gcm` (slots, STREAM) and `aes-siv`'s `Aes256Siv` (names) are built from a borrowed key, but the libraries return the expanded cipher state by value. A move can leave a stack copy of the key schedule that is never zeroized. Their `zeroize` features wipe only the final location.
 - **X-Wing seed copies.** `x-wing` 0.1.1 keeps the 32-byte seed inline in its `DecapsulationKey` and re-expands the private keys from it on the stack for each decapsulation. Its `zeroize` feature wipes them on drop, but moves may leave stack copies until that memory is reused.
-- Argon2's working memory is wiped by the `argon2` crate's `zeroize` feature. The NFC-normalised passphrase is built in a pre-sized, zeroized buffer.
+- Argon2's working memory is wiped by the `argon2` crate's `zeroize` feature. The NFC-normalised passphrase is built in a zeroized buffer pre-sized to 3 × its input + 16 bytes (UAX #15's NFC expansion bound), so it never reallocates.
+
+The reference's own limits:
+
+- **Caller-side copies are the caller's.** `passphrase_kek` and `RecoveryCode::parse` take `&str`: the caller's passphrase or typed code, and any UI copies, aren't wiped by the crate. `RecoveryCode::parse` also builds an unwiped working `String` from the typed text. `RecoveryCode::to_display` returns a `Zeroizing<String>`, wiped when the caller drops it.
+- `Secret::from_bytes` takes an array by value: the crate wipes its parameter, but the caller's original and any moves on the way are not wiped.
+- Non-secret random values (salts, nonces, ids) come from a stack-array helper and are not wiped. Key material always goes through `Secret`.
+- `mlock` is best-effort and page-granular: if the limit is hit, secrets stay pageable, and the lock is never released (the guard is leaked) so shared pages stay locked.
+- Decrypted file chunks and names are returned in ordinary buffers once they leave the crate (`StreamReader` keeps its own chunk buffer zeroized). Wiping plaintext after that is the app's job.
 
 ## 16. Test vectors and the Python reader
 
