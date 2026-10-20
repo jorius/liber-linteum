@@ -223,6 +223,8 @@ export function installIpcMock({
       .trim();
   /** M5b §5: pages moved into the vault's Trash, by their path there. */
   const trashed: Record<string, { text: string; from: string; at: number }> = {};
+  /** Spelling: words ignored this session. */
+  const ignored = new Set<string>();
   const handlers: Record<string, (a: Args, options?: unknown) => unknown> = {
     app_info: () => ({ name: 'Notes In My Way', version: '0.0.0-e2e' }),
     settings_get: () => ({ settings }),
@@ -341,6 +343,39 @@ export function installIpcMock({
       sessionStorage.setItem('nimwMockFavorites', JSON.stringify(next));
       return next;
     },
+    // ---- spell checking: a tiny dictionary that knows one misspelling ----
+    spell_check: (a) => {
+      const known = JSON.parse(sessionStorage.getItem('nimwMockWords') ?? '[]') as string[];
+      return (a.words as string[]).map(
+        (w) => w !== 'recieve' || known.includes(w) || ignored.has(w),
+      );
+    },
+    spell_suggest: (a) => (a.word === 'recieve' ? ['receive', 'relieve'] : []),
+    spell_dictionaries: () => [
+      { id: 'en_US', name: 'English (US)', bundled: true, available: true },
+      { id: 'es', name: 'Spanish', bundled: true, available: true },
+      { id: 'es_CO', name: 'Spanish (Colombia)', bundled: true, available: true },
+    ],
+    spell_import: () => null,
+    spell_remove: () => null,
+    // Kept in sessionStorage, like favorites, so a reload still has them.
+    spell_add_word: (a) => {
+      const known = JSON.parse(sessionStorage.getItem('nimwMockWords') ?? '[]') as string[];
+      sessionStorage.setItem('nimwMockWords', JSON.stringify([...known, a.word as string].sort()));
+      return null;
+    },
+    spell_ignore: (a) => {
+      ignored.add(a.word as string);
+      return null;
+    },
+    spell_words: () => JSON.parse(sessionStorage.getItem('nimwMockWords') ?? '[]') as string[],
+    spell_remove_word: (a) => {
+      const known = JSON.parse(sessionStorage.getItem('nimwMockWords') ?? '[]') as string[];
+      sessionStorage.setItem('nimwMockWords', JSON.stringify(known.filter((w) => w !== a.word)));
+      return null;
+    },
+    spell_vault_get: () => null,
+    spell_vault_set: () => null,
     page_get: (a) => page(a.path as string),
     page_read: (a) => ({ text: pages[a.path as string], hash: 'h' }),
     page_write: (a) => {

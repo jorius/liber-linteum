@@ -87,6 +87,16 @@ for (const mode of ['livePreview', 'source', 'split']) {
   });
 }
 
+// Spell checking: dictionaries are local; checking a page loads nothing.
+test('zero network requests: spelling on', async ({ page }) => {
+  const { outside, problems } = await openRemotePage(page, 'livePreview', { spellcheck: true });
+  await scrollThrough(page, '.cm-scroller');
+  await page.waitForTimeout(600); // the debounced check
+  await page.waitForLoadState('networkidle');
+  expect(problems).toEqual([]);
+  expect(outside).toEqual([]);
+});
+
 // M2b: every palette (and a custom accent) with installed fonts picked by
 // name: still nothing leaves the machine, and the palette really applies.
 for (const palette of [
