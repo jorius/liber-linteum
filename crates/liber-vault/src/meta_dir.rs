@@ -9,6 +9,11 @@ pub const META_DIR: &str = ".liber";
 /// Its name before the rename (Notes In My Way).
 pub const LEGACY_META_DIR: &str = ".nimw";
 
+/// Warning codes the UI translates (rename review M6): both folders exist;
+/// the move failed (followed by the OS error).
+pub const WARN_BOTH: &str = "metaDir.both";
+pub const WARN_UNMOVED: &str = "metaDir.unmoved:";
+
 /// `rel` in the folder that holds the vault's settings now. While the move
 /// hasn't happened (`.liber/` absent, `.nimw/` a folder: read-only media, a
 /// folder held open on Windows), `.liber/…` reads and writes go to `.nimw/…`,
@@ -32,16 +37,12 @@ pub(crate) fn migrate(root: &Path, warnings: &mut Vec<String>) -> bool {
     let legacy = !new.is_dir() && old.is_dir();
     if new.is_dir() {
         if old.is_dir() {
-            warnings.push(format!(
-                "{LEGACY_META_DIR} and {META_DIR} both exist: using {META_DIR}, {LEGACY_META_DIR} left untouched"
-            ));
+            warnings.push(WARN_BOTH.to_string());
         }
     } else if old.is_dir()
         && let Err(e) = std::fs::rename(&old, &new)
     {
-        warnings.push(format!(
-            "{LEGACY_META_DIR} could not become {META_DIR} ({e}); it moves on the next writable open"
-        ));
+        warnings.push(format!("{WARN_UNMOVED}{e}"));
     }
     legacy
 }

@@ -53,6 +53,8 @@
     "renameFailed": "{count, plural, one {Renombrado. No se pudo actualizar # archivo} other {Renombrado. No se pudieron actualizar # archivos}}",
     "trashed": "Movido a la papelera",
     "openedWithWarnings": "{count, plural, one {Abierta con # advertencia} other {Abierta con # advertencias}}",
+    "metaDirBoth": "Esta bóveda también tiene su carpeta de ajustes de antes del cambio de nombre. Se usa la actual; la antigua queda intacta.",
+    "metaDirUnmoved": "La carpeta de ajustes de esta bóveda de antes del cambio de nombre no se pudo mover ({error}). Se usa donde está y se moverá la próxima vez que se abra con permiso de escritura.",
     "dismiss": "Cerrar",
     "details": "Detalles",
     "liveUpdatesUnavailable": "Las actualizaciones en vivo no están disponibles: los cambios hechos fuera de la app aparecen al reabrir la bóveda.",

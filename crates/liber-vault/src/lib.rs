@@ -33,7 +33,7 @@ pub use hash::Hash;
 pub use icon::vault_icon_at;
 pub use layout::CardPosition;
 pub use link_format::{LinkFormat, LinkFormats};
-pub use meta_dir::{LEGACY_META_DIR, META_DIR};
+pub use meta_dir::{LEGACY_META_DIR, META_DIR, WARN_BOTH, WARN_UNMOVED};
 pub use page_width::{PageWidth, PageWidths};
 pub use path::VaultPath;
 pub use scan::{Entry, EntryKind, Scan};

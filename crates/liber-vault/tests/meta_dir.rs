@@ -1,7 +1,7 @@
 //! Rename to Liber Linteum: a vault's `.nimw/` folder becomes `.liber/` on
 //! open, never merged and never deleted.
 
-use liber_vault::{LEGACY_META_DIR, META_DIR, Vault, vault_icon_at};
+use liber_vault::{LEGACY_META_DIR, META_DIR, Vault, WARN_BOTH, WARN_UNMOVED, vault_icon_at};
 use std::fs;
 use std::path::Path;
 
@@ -76,7 +76,7 @@ fn both_exist_liber_wins_and_nimw_is_untouched() {
     );
     assert_eq!(v.favorites(), vec!["New.md".to_string()]);
     assert!(
-        v.warnings().iter().any(|w| w.contains(LEGACY_META_DIR)),
+        v.warnings().iter().any(|w| w == WARN_BOTH),
         "{:?}",
         v.warnings()
     );
@@ -97,7 +97,7 @@ fn rename_failure_keeps_nimw_and_warns() {
     fs::set_permissions(dir.path(), fs::Permissions::from_mode(0o755)).unwrap();
     let v = opened.unwrap();
     assert!(dir.path().join(legacy("vault.json")).is_file());
-    assert!(!v.warnings().is_empty());
+    assert!(v.warnings().iter().any(|w| w.starts_with(WARN_UNMOVED)));
     Vault::open(dir.path()).unwrap();
     assert!(!dir.path().join(LEGACY_META_DIR).exists());
     assert!(dir.path().join(".liber/vault.json").is_file());

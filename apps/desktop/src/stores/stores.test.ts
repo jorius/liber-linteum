@@ -267,6 +267,26 @@ describe('vaultStore', () => {
     expect(t.detail).toEqual(['bad.md: x', 'locked: y']);
   });
 
+  it('rename review M6: the settings-folder warnings arrive as codes and are translated', async () => {
+    backend({
+      vault_open: () => ({
+        ...info,
+        report: {
+          pages: 1,
+          warnings: ['metaDir.both', 'metaDir.unmoved:Permission denied', 'bad.md: x'],
+        },
+      }),
+      vault_tree: () => tree,
+    });
+    await useVaultStore.getState().open('/v');
+    const t = useToastStore.getState().toasts[0];
+    expect(t.detail).toEqual([
+      'This vault also has its settings folder from before the rename. The current one is used; the old one is left untouched.',
+      "This vault's settings folder from before the rename couldn't be moved (Permission denied). It's used where it is and moves on the next writable open.",
+      'bad.md: x',
+    ]);
+  });
+
   /** Review Focus: a slow, older tree response must not overwrite a newer one. */
   it('review_focus stale tree responses are ignored', async () => {
     const first = deferred<TreeNode[]>();

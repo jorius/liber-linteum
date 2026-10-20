@@ -159,6 +159,17 @@ export async function resetVaultStore() {
   useVaultStore.setState({ ...EMPTY, children: new Map(), expanded: new Set() });
 }
 
+/** Open warnings: the settings-folder codes from the rename are translated
+ *  (`metaDir.*`, rename review M6); the rest are shown as Rust wrote them. */
+function warningText(w: string): string {
+  if (w === 'metaDir.both') return i18next.t('toasts.metaDirBoth');
+  const unmoved = 'metaDir.unmoved:';
+  if (w.startsWith(unmoved)) {
+    return i18next.t('toasts.metaDirUnmoved', { error: w.slice(unmoved.length) });
+  }
+  return w;
+}
+
 export const useVaultStore = create<VaultState>((set, get) => {
   async function flushChanges() {
     timer = null;
@@ -255,7 +266,7 @@ export const useVaultStore = create<VaultState>((set, get) => {
     if (warnings.length) {
       toast().push({
         message: i18next.t('toasts.openedWithWarnings', { count: warnings.length }),
-        detail: warnings,
+        detail: warnings.map(warningText),
       });
     }
     return res;

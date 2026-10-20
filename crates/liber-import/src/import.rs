@@ -602,6 +602,7 @@ pub fn write(
         return Err(ImportError::Exists(target.display().to_string()));
     }
     std::fs::create_dir(target)?;
+    // A folder made just now: no legacy settings folder to move or warn about.
     let vault = Vault::open(target)?;
     let total = plan.total();
     let mut written = 0;

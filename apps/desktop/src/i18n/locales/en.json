@@ -53,6 +53,8 @@
     "renameFailed": "{count, plural, one {Renamed. # file couldn't be updated} other {Renamed. # files couldn't be updated}}",
     "trashed": "Moved to Trash",
     "openedWithWarnings": "{count, plural, one {Opened with # warning} other {Opened with # warnings}}",
+    "metaDirBoth": "This vault also has its settings folder from before the rename. The current one is used; the old one is left untouched.",
+    "metaDirUnmoved": "This vault's settings folder from before the rename couldn't be moved ({error}). It's used where it is and moves on the next writable open.",
     "dismiss": "Dismiss",
     "details": "Details",
     "liveUpdatesUnavailable": "Live updates are unavailable: changes made outside the app appear after reopening the vault.",

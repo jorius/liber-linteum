@@ -255,6 +255,9 @@ impl FileWindows {
             grants.remove(&label);
         }
         let grant = Arc::new(FileGrant {
+            // Moves a legacy settings folder like a vault open does; its
+            // warnings aren't shown here (one file, no toast of its own) but
+            // repeat when the folder next opens as a vault (rename M6).
             vault: Vault::open(folder)?,
             name: Arc::new(Mutex::new(VaultPath::new(name)?)),
             kind,
