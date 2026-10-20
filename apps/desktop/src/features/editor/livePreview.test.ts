@@ -392,8 +392,9 @@ describe('wide elements (M4b part 3): what may escape the measure', () => {
 });
 
 describe('Live Preview renders the whole page (round 3 §1)', () => {
-  const codeLines = (v: EditorView) =>
-    [...v.contentDOM.querySelectorAll<HTMLElement>('.cm-line.cm-nimw-codeblock')];
+  const codeLines = (v: EditorView) => [
+    ...v.contentDOM.querySelectorAll<HTMLElement>('.cm-line.cm-nimw-codeblock'),
+  ];
 
   it('a fenced block hides its fences off the cursor: a header row with the language and Copy', async () => {
     const text = 'Top\n\n```js\nconst a = 1;\n```\n\nEnd\n';
