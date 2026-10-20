@@ -865,6 +865,7 @@
     "noLocation": "No folder chosen",
     "chooseLocation": "Choose location…",
     "name": "Vault name",
+    "namePlaceholder": "Named after the export",
     "nameInvalid": "Use a plain folder name: no / \\ : * ? \" < > | # ^ [ ], no dot at the start or end, no Windows device name (CON, NUL…), at most 200 bytes.",
     "previewLabel": "Preview",
     "reading": "Reading the export…",

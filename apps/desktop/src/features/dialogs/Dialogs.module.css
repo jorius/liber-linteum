@@ -23,16 +23,20 @@
   gap: 14px;
 }
 
-/* Search (M5 §4). Its own regions scroll (M5b §7.1): the box never does,
-   so no engine can shrink the filters under the results. */
+/* Search (M5 §4), the Notion import (M7 §3). */
 .wide {
   width: min(780px, calc(100% - 32px));
+}
+
+/* Search lays out its own regions, which scroll (M5b §7.1): the box never
+   does, so no engine can shrink the filters under the results. */
+.bare {
   padding: 0;
   gap: 0;
   overflow: hidden;
 }
 
-.wide > * {
+.bare > * {
   flex: none;
 }
 

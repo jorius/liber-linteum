@@ -302,7 +302,7 @@ export function SearchDialog({ onClose }: { onClose: () => void }) {
       filters.textFiles);
 
   return (
-    <Dialog title={t('search.title')} onClose={onClose} wide hideTitle>
+    <Dialog title={t('search.title')} onClose={onClose} wide bare hideTitle>
       <div className={styles.field}>
         <SearchIcon />
         <input

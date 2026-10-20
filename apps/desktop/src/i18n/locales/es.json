@@ -865,6 +865,7 @@
     "noLocation": "Ninguna carpeta elegida",
     "chooseLocation": "Elegir ubicación…",
     "name": "Nombre de la bóveda",
+    "namePlaceholder": "Toma el nombre de la exportación",
     "nameInvalid": "Usa un nombre de carpeta sencillo: sin / \\ : * ? \" < > | # ^ [ ], sin punto al inicio ni al final, sin nombres de dispositivo de Windows (CON, NUL…), de 200 bytes como mucho.",
     "previewLabel": "Vista previa",
     "reading": "Leyendo la exportación…",

@@ -205,6 +205,7 @@ export function NotionImportDialog({ onClose }: { onClose: () => void }) {
           id={nameId}
           className={dialogs.textInput}
           value={name}
+          placeholder={t('notion.namePlaceholder')}
           disabled={importing}
           aria-invalid={name !== '' && !nameOk}
           aria-describedby={name !== '' && !nameOk ? nameErrorId : undefined}
