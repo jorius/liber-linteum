@@ -25,7 +25,13 @@ import { toSafeHast, vaultJoin } from '../../markdown/sanitize';
 import type { Embed, ParsedPage, WikiLink } from '../../markdown/types';
 import { rangeOf } from '../../markdown/walk';
 import { followLink, followOutside as followOutsideFile } from '../../stores/links';
-import { CheckboxWidget, CodeBadgeWidget, InlineMathWidget, PreviewWidget } from './widgets';
+import {
+  BulletWidget,
+  CheckboxWidget,
+  CodeBadgeWidget,
+  InlineMathWidget,
+  PreviewWidget,
+} from './widgets';
 import { widestLine } from './wideBox';
 
 import { LARGE_NOTE_CHARS } from './limits';
@@ -68,6 +74,10 @@ const lineClass = (cls: string) => Decoration.line({ class: cls });
 
 const BLOCK_WIDGET = new Set(['table', 'callout', 'columns', 'thematicBreak', 'math']);
 const TASK = /^(\s*(?:[-*+]|\d+[.)])[ \t]+)\[([ xX])\]/;
+const MARKER = /^(?:([-*+])|\d+[.)])[ \t]*/;
+const CLOSING_FENCE = /^\s*(`{3,}|~{3,})\s*$/;
+/** A quote line's `>` markers (nested ones too), after any list indent. */
+const QUOTE_MARKS = /^([ \t]*)((?:>[ \t]?)+)/;
 /** The wide-elements choice (M4b part 3) a block widget follows. */
 const WIDE_KIND: Record<string, keyof WideElements> = { table: 'tables', math: 'maths' };
 const IMAGE_FILE = /\.(?:png|jpe?g|gif|webp|svg|avif|bmp)$/i;
@@ -179,6 +189,8 @@ function build(state: EditorState, page: ParsedPage, active: Set<number>): Decor
       : null;
   };
 
+  /** Inside a blockquote: its outermost one hides every level's markers. */
+  let quoteDepth = 0;
   const visit = (node: Node) => {
     if (!node.position) return;
     const [from, to] = rangeOf(node);
@@ -256,30 +268,63 @@ function build(state: EditorState, page: ParsedPage, active: Set<number>): Decor
         // M4b part 3: a diagram's source follows the Diagrams choice, so it
         // keeps its box while edited; other code follows Code blocks.
         wideLines(from, to, mermaid ? 'diagrams' : 'code', 'cm-nimw-codeblock');
-        // M4b part 2 §2: a fenced block's language badge and Copy button.
         const first = doc.lineAt(from);
+        const last = doc.lineAt(Math.min(to, doc.length));
+        out.push(lineClass('cm-nimw-codeblock-first').range(first.from));
+        out.push(lineClass('cm-nimw-codeblock-last').range(last.from));
+        // Round 3 §1: off the cursor the fences hide; the opening one becomes
+        // the header row (language badge and Copy, M4b part 2 §2) and the
+        // closing one an empty line, so revealing the source moves nothing.
         const fence = /^\s*(`{3,}|~{3,})(\S*)/.exec(first.text);
-        if (fence && !touched(from, to) && first.number < doc.lineAt(to).number) {
-          const body = text(first.to + 1, doc.lineAt(Math.min(to, doc.length)).from);
+        if (fence && !touched(from, to) && first.number < last.number) {
+          const closed = CLOSING_FENCE.test(last.text);
+          const body = text(first.to + 1, closed ? last.from : last.to);
           const code = body.endsWith('\n') ? body.slice(0, -1) : body;
           out.push(
-            Decoration.widget({ widget: new CodeBadgeWidget(fence[2], code), side: 1 }).range(
+            Decoration.replace({ widget: new CodeBadgeWidget(fence[2], code) }).range(
+              first.from,
               first.to,
             ),
           );
+          if (closed) conceal(last.from, last.to);
         }
         return;
       }
       case 'yaml':
         lines(from, to, lineClass('cm-nimw-frontmatter'));
         return;
-      case 'blockquote':
-        if (!reduced) lines(from, to, lineClass('cm-nimw-quote'));
-        break;
+      case 'blockquote': {
+        if (reduced) break;
+        lines(from, to, lineClass('cm-nimw-quote'));
+        if (quoteDepth === 0 && !touched(from, to)) {
+          const last = doc.lineAt(Math.min(to, doc.length)).number;
+          for (let n = doc.lineAt(from).number; n <= last; n++) {
+            const ln = doc.line(n);
+            const start = Math.max(ln.from, from);
+            const m = QUOTE_MARKS.exec(text(start, ln.to));
+            if (m) conceal(start + m[1].length, start + m[0].length);
+          }
+        }
+        quoteDepth++;
+        ((node as Parent).children as Node[]).forEach(visit);
+        quoteDepth--;
+        return;
+      }
       case 'listItem': {
         const item = node as ListItem;
-        if (reduced || typeof item.checked !== 'boolean') break;
+        if (reduced) break;
         const line = doc.lineAt(from);
+        // Round 3 §1: off its own line the marker renders (a bullet, a styled
+        // number, or nothing beside a task's checkbox); children don't reveal it.
+        const marker = MARKER.exec(text(from, line.to));
+        if (marker && !touched(line.from, line.to)) {
+          const end = from + marker[0].length;
+          if (typeof item.checked === 'boolean') conceal(from, end);
+          else if (marker[1])
+            out.push(Decoration.replace({ widget: new BulletWidget() }).range(from, from + 1));
+          else out.push(mark('cm-nimw-listnum').range(from, from + marker[0].trimEnd().length));
+        }
+        if (typeof item.checked !== 'boolean') break;
         const m = TASK.exec(line.text);
         // Shown on the cursor line too, so a task can always be ticked with a
         // click (as Obsidian does); Backspace removes the whole marker.
@@ -518,8 +563,24 @@ const theme = EditorView.baseTheme({
   },
   '.cm-nimw-link': { color: 'var(--color-accent)', textDecoration: 'underline' },
   '.cm-nimw-tag': { color: 'var(--color-accent)', fontWeight: '600' },
-  '.cm-nimw-codeblock': { fontFamily: 'var(--font-source)', fontSize: '0.9em' },
+  '.cm-nimw-codeblock': {
+    fontFamily: 'var(--font-source)',
+    fontSize: '0.9em',
+    background: 'var(--color-code-bg)',
+  },
+  '.cm-nimw-codeblock-first': {
+    borderTopLeftRadius: '8px',
+    borderTopRightRadius: '8px',
+    paddingTop: '4px',
+  },
+  '.cm-nimw-codeblock-last': {
+    borderBottomLeftRadius: '8px',
+    borderBottomRightRadius: '8px',
+    paddingBottom: '4px',
+  },
   '.cm-nimw-quote': { borderLeft: '3px solid var(--color-border-strong)', paddingLeft: '12px' },
+  '.cm-nimw-bullet': { color: 'var(--color-text-muted)', fontWeight: '700' },
+  '.cm-nimw-listnum': { color: 'var(--color-text-muted)', fontVariantNumeric: 'tabular-nums' },
   '.cm-nimw-frontmatter': { color: 'var(--color-text-muted)', fontFamily: 'var(--font-source)' },
   '.cm-nimw-muted': {
     color: 'var(--color-text-muted)',
@@ -531,8 +592,8 @@ const theme = EditorView.baseTheme({
   '.cm-nimw-widget': { padding: '4px 0', cursor: 'default', whiteSpace: 'normal' },
   '.cm-nimw-codebadge': {
     display: 'inline-flex',
+    float: 'right',
     gap: '6px',
-    marginLeft: '10px',
     verticalAlign: 'middle',
     fontFamily: 'var(--font-body)',
   },

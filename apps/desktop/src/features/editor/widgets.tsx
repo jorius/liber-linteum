@@ -172,6 +172,21 @@ export class CodeBadgeWidget extends WidgetType {
   }
 }
 
+/** A bullet list's marker in Live Preview (round 3 §1); the source `-`, `*`
+ *  or `+` shows on the cursor line. */
+export class BulletWidget extends WidgetType {
+  eq(): boolean {
+    return true;
+  }
+
+  toDOM(): HTMLElement {
+    const dot = document.createElement('span');
+    dot.className = 'cm-nimw-bullet';
+    dot.textContent = '•';
+    return dot;
+  }
+}
+
 /** Inline maths in Live Preview (M4b part 2 §3); a click puts the cursor in
  *  it, which shows its source. */
 export class InlineMathWidget extends WidgetType {

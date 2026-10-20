@@ -390,3 +390,55 @@ describe('wide elements (M4b part 3): what may escape the measure', () => {
     expect(src.map((l) => l.dataset.wideSrc)).toEqual(['diagrams', 'diagrams', 'diagrams']);
   });
 });
+
+describe('Live Preview renders the whole page (round 3 §1)', () => {
+  const codeLines = (v: EditorView) =>
+    [...v.contentDOM.querySelectorAll<HTMLElement>('.cm-line.cm-nimw-codeblock')];
+
+  it('a fenced block hides its fences off the cursor: a header row with the language and Copy', async () => {
+    const text = 'Top\n\n```js\nconst a = 1;\n```\n\nEnd\n';
+    const v = editor(text, text.length - 1);
+    expect(v.contentDOM.textContent).not.toContain('```');
+    const rows = codeLines(v);
+    expect(rows).toHaveLength(3);
+    expect(rows[0].querySelector('.cm-nimw-codebadge')).not.toBeNull();
+    expect(rows[1]).toHaveTextContent('const a = 1;');
+    expect(rows[2].textContent).toBe('');
+    // Clicking into it shows the source in the same lines: nothing below moves.
+    await moveTo(v, v.state.doc.line(4).from);
+    expect(codeLines(v).map((l) => l.textContent)).toEqual(['```js', 'const a = 1;', '```']);
+    expect(v.contentDOM.querySelector('.cm-nimw-codebadge')).toBeNull();
+  });
+
+  it('~~~ fences follow the same rule; an unclosed fence keeps its last line', () => {
+    const v = editor('x\n\n~~~\nplain\n~~~\n\n```py\nlast line', 0);
+    expect(v.contentDOM.textContent).not.toContain('~~~');
+    expect(line(v, 4)).toBe('plain');
+    expect(line(v, 8)).toBe('last line');
+  });
+
+  it('bullets render as a bullet, numbers stay styled; the cursor line shows its marker', async () => {
+    const v = editor('x\n\n- one\n  - two\n\n1. first\n', 0);
+    expect(line(v, 3)).toBe('• one');
+    expect(line(v, 4)).toBe('  • two');
+    expect(line(v, 6)).toBe('1. first');
+    expect(v.contentDOM.querySelector('.cm-nimw-listnum')).toHaveTextContent('1.');
+    await moveTo(v, v.state.doc.line(3).from);
+    expect(line(v, 3)).toBe('- one');
+    expect(line(v, 4)).toBe('  • two');
+  });
+
+  it("a task's marker hides off the cursor; only its checkbox shows", () => {
+    const v = editor('- [ ] todo\n\nother\n', 13);
+    expect(line(v, 1)).toBe(' todo');
+    expect(v.contentDOM.querySelector('input[type="checkbox"]')).not.toBeNull();
+  });
+
+  it('quotes hide their > markers, nested ones too, until the cursor enters', async () => {
+    const v = editor('x\n\n> one\n> \n> > deep\n\nend\n', 0);
+    expect([line(v, 3), line(v, 4), line(v, 5)]).toEqual(['one', '', 'deep']);
+    expect(v.contentDOM.querySelectorAll('.cm-nimw-quote').length).toBeGreaterThan(0);
+    await moveTo(v, v.state.doc.line(4).from);
+    expect([line(v, 3), line(v, 4), line(v, 5)]).toEqual(['> one', '> ', '> > deep']);
+  });
+});

@@ -267,6 +267,23 @@ test('§2: the language badge picks a language; code takes the palette colours',
   await stayedLocal(page, outside, errors);
 });
 
+test('round 3 §1: a code block hides its fences until the cursor enters it', async ({ page }) => {
+  const { outside, errors } = await open(page, 'Code');
+  const content = page.locator('.cm-content');
+  await expect(page.getByRole('button', { name: 'Language: JavaScript' })).toBeVisible();
+  await expect(content).not.toContainText('```');
+  const before = await page.locator('.cm-line', { hasText: 'After.' }).boundingBox();
+  await page.locator('.cm-line', { hasText: 'const answer' }).click();
+  await expect(page.locator('.cm-line', { hasText: '```js' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Language: JavaScript' })).toHaveCount(0);
+  // The source takes the header's and the empty closing line's places.
+  const after = await page.locator('.cm-line', { hasText: 'After.' }).boundingBox();
+  expect(Math.abs((after?.y ?? 0) - (before?.y ?? 0))).toBeLessThan(2);
+  await page.locator('.cm-line', { hasText: 'After.' }).click();
+  await expect(content).not.toContainText('```');
+  await stayedLocal(page, outside, errors);
+});
+
 test('§5: the outline jumps to a heading', async ({ page }) => {
   const { outside, errors } = await open(page, 'Outline', 'livePreview', { outline: true });
   const tree = page.getByRole('tree', { name: 'Outline' });
