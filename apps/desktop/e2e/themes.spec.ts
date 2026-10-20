@@ -44,6 +44,21 @@ test('create a theme, edit Primary, and the app follows; Light/Dark edits each m
   await expect(hex).not.toHaveValue('#0e7c7b');
   // Review M15: edit the dark primary; each mode keeps its own.
   await hex.fill('#ffaa00');
+  // Wait for the (debounced) save: applying it re-sets the app's mode.
+  await expect
+    .poll(() =>
+      page.evaluate(async () => {
+        const w = window as unknown as {
+          __TAURI_INTERNALS__: { invoke: (c: string) => Promise<unknown> };
+        };
+        const r = (await w.__TAURI_INTERNALS__.invoke('settings_get')) as {
+          settings: { customThemes: { light: { accent: string }; dark: { accent: string } }[] };
+        };
+        const t = r.settings.customThemes[0];
+        return `${t.light.accent} ${t.dark.accent}`;
+      }),
+    )
+    .toBe('#0e7c7b #ffaa00');
   await page.evaluate(() => (document.documentElement.dataset.theme = 'dark'));
   await expect.poll(() => rootVar(page, '--color-accent')).toBe('#ffaa00');
   await page.evaluate(() => (document.documentElement.dataset.theme = 'light'));
