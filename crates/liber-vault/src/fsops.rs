@@ -1,7 +1,7 @@
 use crate::error::{Result, VaultError};
 use crate::hash::Hash;
 use crate::path::VaultPath;
-use crate::storage::{Child, Follow, Kind, Meta, OsUse, Reach, Reader, Replace, plain};
+use crate::storage::{Child, Follow, Kind, Meta, NewFile, OsUse, Reach, Reader, Replace};
 use crate::vault::Vault;
 use std::io::Read;
 use std::path::{Path, PathBuf};
@@ -30,7 +30,8 @@ impl Vault {
     }
 
     /// A new file streamed in order; `AlreadyExists` if `path` exists.
-    pub fn create_new(&self, path: &VaultPath) -> Result<Box<dyn std::io::Write + Send>> {
+    /// [`NewFile::finish`] commits it (see there for flush and drop).
+    pub fn create_new(&self, path: &VaultPath) -> Result<Box<dyn NewFile>> {
         self.storage().create_new(path)
     }
 
@@ -183,10 +184,7 @@ impl Vault {
     /// Whether two vault paths name the same entry on disk, e.g. `Notes` and
     /// `notes` (or `á`/`Á`) on a case-insensitive file system.
     pub fn same_entry(&self, a: &VaultPath, b: &VaultPath) -> bool {
-        match (self.os_path(a, OsUse::Open), self.os_path(b, OsUse::Open)) {
-            (Ok(x), Ok(y)) => plain::same_entry(&x, &y),
-            _ => false,
-        }
+        self.storage().same_entry(a, b)
     }
 
     /// Moves a file or folder to the OS trash (EXP-03).

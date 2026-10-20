@@ -3,8 +3,8 @@
 #![allow(dead_code)] // each test file uses part of it
 
 use liber_vault::{
-    Child, Follow, Meta, OsUse, PlainStorage, RawEvent, Reach, Reader, Replace, Result, Storage,
-    VaultPath, WatchGuard,
+    Child, Follow, Meta, NewFile, OsUse, PlainStorage, RawEvent, Reach, Reader, Replace, Result,
+    Storage, VaultPath, WatchGuard,
 };
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
@@ -69,7 +69,7 @@ impl Storage for Spy {
     ) -> Result<()> {
         self.inner.replace_atomic(path, from, mode)
     }
-    fn create_new(&self, path: &VaultPath) -> Result<Box<dyn std::io::Write + Send>> {
+    fn create_new(&self, path: &VaultPath) -> Result<Box<dyn NewFile>> {
         self.inner.create_new(path)
     }
     fn create_dir(&self, path: &VaultPath) -> Result<()> {
@@ -96,6 +96,9 @@ impl Storage for Spy {
     }
     fn vault_path_of(&self, os: &Path) -> Option<VaultPath> {
         self.inner.vault_path_of(os)
+    }
+    fn same_entry(&self, a: &VaultPath, b: &VaultPath) -> bool {
+        self.inner.same_entry(a, b)
     }
     fn watch(&self, _recursive: bool, sink: Sink) -> Result<WatchGuard> {
         *self.sink.lock().unwrap() = Some(sink);

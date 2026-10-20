@@ -626,8 +626,10 @@ pub fn write(
             .and_then(|(text, _)| file.write_all(text.as_bytes()).map_err(ImportError::from)),
             Body::Entry(i) => export.copy_to(&export.entries()[*i], &mut file).map(|_| ()),
         };
+        // `finish` commits (E3: a dropped file is deleted); its error is a write
+        // error. The closure takes `file`, so it is closed before the removal.
+        let written = written.and_then(|()| file.finish().map_err(ImportError::from));
         if written.is_err() {
-            drop(file);
             let _ = vault.remove_file(&path); // never leave half a file
         }
         written

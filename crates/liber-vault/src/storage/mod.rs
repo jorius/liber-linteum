@@ -82,11 +82,27 @@ pub struct Reader {
     pub inner: Box<dyn ReadSeek>,
 }
 
+/// What a [`Storage::watch`] reports. A storage must send `Overflow` when
+/// events may have been lost and for any change on the vault root itself;
+/// `Vault` also treats a `Changed`/`Removed` on the root as `Overflow`.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum RawEvent {
     Changed(VaultPath),
     Removed(VaultPath),
     Overflow,
+}
+
+/// A file being written by [`Storage::create_new`].
+///
+/// - `flush()` is durability only: a recorder may flush periodically, and a
+///   flush never ends the stream.
+/// - `finish()` commits: only after it returns `Ok` is the file complete.
+/// - Dropping without `finish` must not leave a complete-looking entry. E3
+///   deletes its temp file; `PlainStorage` writes in place, so the bytes
+///   written so far stay at the path and the caller removes them (import
+///   does, on any write or finish error).
+pub trait NewFile: std::io::Write + Send {
+    fn finish(self: Box<Self>) -> Result<()>;
 }
 
 /// Keeps a [`Storage::watch`] running until dropped. Dropping it must also
@@ -113,7 +129,9 @@ pub trait Storage: Send + Sync + std::fmt::Debug {
         from: &mut dyn std::io::Read,
         mode: Replace,
     ) -> Result<()>;
-    fn create_new(&self, path: &VaultPath) -> Result<Box<dyn std::io::Write + Send>>;
+    /// A new file streamed in order; `AlreadyExists` if `path` exists. Call
+    /// [`NewFile::finish`] to commit it.
+    fn create_new(&self, path: &VaultPath) -> Result<Box<dyn NewFile>>;
     fn create_dir(&self, path: &VaultPath) -> Result<()>;
     fn remove_file(&self, path: &VaultPath) -> Result<()>;
     fn remove_empty_dir(&self, path: &VaultPath) -> Result<()>;
@@ -121,8 +139,12 @@ pub trait Storage: Send + Sync + std::fmt::Debug {
     fn trash_os(&self, path: &VaultPath) -> Result<()>;
     fn os_path(&self, path: &VaultPath, use_: OsUse) -> Result<PathBuf>;
     fn vault_path_of(&self, os: &Path) -> Option<VaultPath>;
+    /// Whether `a` and `b` name the same entry, e.g. `Notes` and `notes` on a
+    /// case-insensitive file system; `false` if either is missing.
+    fn same_entry(&self, a: &VaultPath, b: &VaultPath) -> bool;
     /// Calls `sink` for each change until the returned guard is dropped,
-    /// which must drop `sink` too (see [`WatchGuard`]).
+    /// which must drop `sink` too (see [`WatchGuard`]). Lost events and
+    /// changes on the vault root must reach `sink` as [`RawEvent::Overflow`].
     fn watch(&self, recursive: bool, sink: Box<dyn Fn(RawEvent) + Send>) -> Result<WatchGuard>;
 }
 
@@ -149,7 +171,8 @@ fn storage_named(name: &str, root: &Path) -> Result<Box<dyn Storage>> {
 
 /// A second `Storage` for the test switch: every method delegates to
 /// `PlainStorage`, so a suite that passes on it doesn't depend on the
-/// concrete type behind `Vault`.
+/// concrete type behind `Vault`. A smoke switch only: the real proof is
+/// `LIBER_TEST_STORAGE=encrypted` in E3.
 #[cfg(any(test, feature = "test-storage"))]
 #[derive(Debug)]
 pub struct PassThrough(PlainStorage);
@@ -182,7 +205,7 @@ impl Storage for PassThrough {
     ) -> Result<()> {
         self.0.replace_atomic(path, from, mode)
     }
-    fn create_new(&self, path: &VaultPath) -> Result<Box<dyn std::io::Write + Send>> {
+    fn create_new(&self, path: &VaultPath) -> Result<Box<dyn NewFile>> {
         self.0.create_new(path)
     }
     fn create_dir(&self, path: &VaultPath) -> Result<()> {
@@ -205,6 +228,9 @@ impl Storage for PassThrough {
     }
     fn vault_path_of(&self, os: &Path) -> Option<VaultPath> {
         self.0.vault_path_of(os)
+    }
+    fn same_entry(&self, a: &VaultPath, b: &VaultPath) -> bool {
+        self.0.same_entry(a, b)
     }
     fn watch(&self, recursive: bool, sink: Box<dyn Fn(RawEvent) + Send>) -> Result<WatchGuard> {
         self.0.watch(recursive, sink)

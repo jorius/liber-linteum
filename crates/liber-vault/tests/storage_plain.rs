@@ -191,10 +191,39 @@ fn create_new_streams_and_refuses_existing() {
     let mut w = s.create_new(&p("a.bin")).unwrap();
     w.write_all(b"ab").unwrap();
     w.write_all(b"cd").unwrap();
-    drop(w);
+    w.finish().unwrap();
     assert_eq!(s.read(&p("a.bin")).unwrap(), b"abcd");
     let err = s.create_new(&p("a.bin")).err().unwrap();
     assert!(matches!(err, VaultError::AlreadyExists(_)), "{err:?}");
+}
+
+/// Final review I1: `flush()` is durability only, never the end of the
+/// stream (E3 recorders flush periodically); `finish()` commits.
+#[test]
+fn create_new_flushed_several_times_then_finished_keeps_everything() {
+    let dir = tempfile::tempdir().unwrap();
+    let s = PlainStorage::open(dir.path()).unwrap();
+    let mut w = s.create_new(&p("rec.bin")).unwrap();
+    for chunk in [&b"ab"[..], b"cd", b"ef"] {
+        w.write_all(chunk).unwrap();
+        w.flush().unwrap();
+    }
+    w.finish().unwrap();
+    assert_eq!(s.read(&p("rec.bin")).unwrap(), b"abcdef");
+}
+
+/// Final review I2: `same_entry` is the storage's call: the same name is the
+/// same entry, a missing one never is, and a case variant is exactly when
+/// the file system folds case.
+#[test]
+fn same_entry_compares_resolved_entries() {
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::create_dir(dir.path().join("Notes")).unwrap();
+    let s = PlainStorage::open(dir.path()).unwrap();
+    assert!(s.same_entry(&p("Notes"), &p("Notes")));
+    assert!(!s.same_entry(&p("Notes"), &p("missing")));
+    let folds = dir.path().join("notes").exists();
+    assert_eq!(s.same_entry(&p("Notes"), &p("notes")), folds);
 }
 
 #[test]

@@ -114,18 +114,21 @@ impl Vault {
     }
 }
 
-/// One debounced batch: `Overflow` if any event says so, else the visible
-/// paths (root, hidden and excluded ones dropped), one event each, sorted.
+/// One debounced batch: `Overflow` if any event says so or names the root
+/// (defence in depth: a storage should already send `Overflow` for it), else
+/// the visible paths (hidden and excluded ones dropped), one event each,
+/// sorted.
 /// A path's last event wins: storage classifies a path when its event
 /// arrives, while the old watcher looked once, after the debounce.
 pub(crate) fn batch(excludes: &globset::GlobSet, raw: Vec<RawEvent>) -> Vec<WatchEvent> {
-    let visible = |p: &VaultPath| {
-        !(p.is_root() || is_hidden_path(p.as_str()) || excludes.is_match(p.as_str()))
-    };
+    let visible = |p: &VaultPath| !(is_hidden_path(p.as_str()) || excludes.is_match(p.as_str()));
     let mut removed = std::collections::HashMap::new();
     for ev in raw {
         match ev {
             RawEvent::Overflow => return vec![WatchEvent::Overflow],
+            RawEvent::Changed(p) | RawEvent::Removed(p) if p.is_root() => {
+                return vec![WatchEvent::Overflow];
+            }
             RawEvent::Changed(p) if visible(&p) => removed.insert(p, false),
             RawEvent::Removed(p) if visible(&p) => removed.insert(p, true),
             _ => None,
@@ -166,5 +169,23 @@ mod tests {
             batch(&none, vec![removed, changed]),
             [WatchEvent::Changed(p)]
         );
+    }
+
+    /// Final review M4: a storage reporting a change on the root itself
+    /// (`Changed("")`/`Removed("")`) gets a rescan, not silence.
+    #[test]
+    fn vlt_04_root_path_event_becomes_overflow() {
+        let none = globset::GlobSet::empty();
+        let root = VaultPath::root();
+        let a = VaultPath::new("a.md").unwrap();
+        for ev in [
+            RawEvent::Changed(root.clone()),
+            RawEvent::Removed(root.clone()),
+        ] {
+            assert_eq!(
+                batch(&none, vec![RawEvent::Changed(a.clone()), ev]),
+                [WatchEvent::Overflow]
+            );
+        }
     }
 }

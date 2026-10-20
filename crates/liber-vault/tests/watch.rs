@@ -119,10 +119,11 @@ fn watch_folder_reports_only_the_folders_own_files() {
     assert!(!below, "{:?}", seen.lock().unwrap());
 }
 
-/// Review Focus 5: temp files, hidden and excluded paths and the root never
-/// reach the session; a batch holding `Overflow` is only `Overflow`.
+/// Review Focus 5: temp files, hidden and excluded paths never reach the
+/// session; a batch holding `Overflow`, or an event on the root (final
+/// review M4), is only `Overflow`.
 #[test]
-fn watch_drops_temp_hidden_excluded_drops_root_and_collapses_overflow() {
+fn watch_drops_temp_hidden_excluded_and_collapses_overflow_and_root() {
     let dir = tempfile::tempdir().unwrap();
     std::fs::create_dir(dir.path().join(".liber")).unwrap();
     std::fs::write(
@@ -146,7 +147,6 @@ fn watch_drops_temp_hidden_excluded_drops_root_and_collapses_overflow() {
             RawEvent::Changed(vp(".a.md.liber-tmp-1-0")),
             RawEvent::Changed(vp(".liber/vault.json")),
             RawEvent::Changed(vp("build/x.md")),
-            RawEvent::Changed(VaultPath::root()),
             RawEvent::Changed(vp("ok.md")),
         ],
     );
@@ -164,4 +164,15 @@ fn watch_drops_temp_hidden_excluded_drops_root_and_collapses_overflow() {
     assert!(wait_until(WAIT, || batches.lock().unwrap().len() == 2));
     settle();
     assert_eq!(batches.lock().unwrap()[1..], [vec![WatchEvent::Overflow]]);
+
+    Spy::inject(
+        &sink,
+        vec![
+            RawEvent::Changed(VaultPath::root()),
+            RawEvent::Changed(vp("ok.md")),
+        ],
+    );
+    assert!(wait_until(WAIT, || batches.lock().unwrap().len() == 3));
+    settle();
+    assert_eq!(batches.lock().unwrap()[2..], [vec![WatchEvent::Overflow]]);
 }

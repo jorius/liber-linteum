@@ -1,7 +1,8 @@
 //! [`PlainStorage`]: the vault as plain files in a folder.
 
 use super::{
-    Child, Follow, Kind, Meta, OsUse, RawEvent, Reach, Reader, Replace, Storage, WatchGuard,
+    Child, Follow, Kind, Meta, NewFile, OsUse, RawEvent, Reach, Reader, Replace, Storage,
+    WatchGuard,
 };
 use crate::error::{Result, VaultError, io_err};
 use crate::path::VaultPath;
@@ -236,7 +237,15 @@ pub(crate) fn trash(root: &Path, path: &VaultPath) -> Result<()> {
     })
 }
 
-pub(crate) fn same_entry(a: &Path, b: &Path) -> bool {
+/// Written in place, with no fsync (import's speed, spec §10): `finish` only
+/// flushes, and a dropped file keeps what was written (see [`NewFile`]).
+impl NewFile for std::fs::File {
+    fn finish(mut self: Box<Self>) -> Result<()> {
+        self.flush().map_err(|e| io_err("new file", e))
+    }
+}
+
+fn same_entry(a: &Path, b: &Path) -> bool {
     match (dunce::canonicalize(a), dunce::canonicalize(b)) {
         (Ok(x), Ok(y)) => x == y,
         _ => false,
@@ -374,7 +383,7 @@ impl Storage for PlainStorage {
         replace_atomic(&self.root, path, from, mode, false)
     }
 
-    fn create_new(&self, path: &VaultPath) -> Result<Box<dyn Write + Send>> {
+    fn create_new(&self, path: &VaultPath) -> Result<Box<dyn NewFile>> {
         let file = std::fs::OpenOptions::new()
             .write(true)
             .create_new(true)
@@ -413,6 +422,13 @@ impl Storage for PlainStorage {
 
     fn vault_path_of(&self, os: &Path) -> Option<VaultPath> {
         VaultPath::from_fs_path(&self.root, os).ok()
+    }
+
+    fn same_entry(&self, a: &VaultPath, b: &VaultPath) -> bool {
+        match (self.resolve(a), self.resolve(b)) {
+            (Ok(x), Ok(y)) => same_entry(&x, &y),
+            _ => false,
+        }
     }
 
     fn watch(&self, recursive: bool, sink: Box<dyn Fn(RawEvent) + Send>) -> Result<WatchGuard> {

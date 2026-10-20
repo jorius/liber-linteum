@@ -40,8 +40,8 @@ pub use scan::{Entry, EntryKind, Scan};
 pub use scratch::DEFAULT_SCRATCH_FOLDER;
 pub use storage::plain::TMP_MARKER;
 pub use storage::{
-    Child, Follow, Kind, Meta, OsUse, PlainStorage, RawEvent, Reach, ReadSeek, Reader, Replace,
-    Storage, WatchGuard,
+    Child, Follow, Kind, Meta, NewFile, OsUse, PlainStorage, RawEvent, Reach, ReadSeek, Reader,
+    Replace, Storage, WatchGuard,
 };
 pub use vault::Vault;
 pub use watch::{DEBOUNCE, WatchEvent, Watcher};
