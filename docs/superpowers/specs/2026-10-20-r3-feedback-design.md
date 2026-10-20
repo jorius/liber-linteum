@@ -184,3 +184,17 @@ Jose picked mock A: "clean, pretty, perfect". The mock is `.superpowers/brainsto
    - "Recent vaults"
 
    The old `welcome.*` strings change in both languages. The language toggle keeps its accessible name, "Language", but loses its visible label, as in the mock.
+
+## 8. Round 3b: Jose's notes after testing the round 3 build (2026-10-20)
+
+1. **Double-click on a sidebar page.**
+   - **When the editor isn't showing that page** (another page, the Global View, the Trash page, or the search dialog over it): open the page in the editor in the user's current editor mode, and focus the text.
+   - **When the editor is already showing that same page:** start the inline rename on the row, using the existing rename UI.
+   - **Single click** is unchanged.
+   - **Folder pages (§6)** follow the page rule. Plain folders keep their current double-click behaviour.
+2. **Search results show the page's icon in their icon box.** Today the box shows the generic file glyph, and the page's emoji sits inline before the title (screenshot: "🐜Información General"). The fix:
+   - the leading box shows the page's icon (emoji or custom), or the file-type glyph when there is none;
+   - the title no longer repeats the icon inline.
+
+   The same rule applies to every list that shows pages: the ⌘K picker, the `[[` link picker, Favorites and the recent lists. The plan checks each one.
+3. **Folder pages (§6)** are part of round 3b.
