@@ -30,7 +30,7 @@ export function SpellMenu({
   useEffect(() => {
     let live = true;
     void spellSuggest(target.word, i18n.resolvedLanguage ?? 'en').then((r) => {
-      if (live) setSuggestions(r.ok ? r.value.slice(0, 7) : []);
+      if (live) setSuggestions(r.ok && Array.isArray(r.value) ? r.value.slice(0, 7) : []);
     });
     return () => {
       live = false;

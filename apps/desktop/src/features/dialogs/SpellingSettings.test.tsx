@@ -48,6 +48,8 @@ beforeEach(async () => {
       case 'spell_remove_word':
         words = words.filter((w) => w !== a.word);
         return null;
+      case 'settings_get':
+        return { settings: useSettingsStore.getState().settings };
       case 'settings_set':
         return { ...useSettingsStore.getState().settings, ...(a.patch as object) };
       default:

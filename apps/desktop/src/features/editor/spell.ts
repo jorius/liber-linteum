@@ -129,7 +129,8 @@ const checker = ViewPlugin.fromClass(
         .slice(0, MAX_WORDS);
       if (asked.length > 0) {
         const res = await spellCheck(asked, i18n.resolvedLanguage ?? i18n.language ?? 'en');
-        if (!res.ok) return;
+        // Other tests' IPC mocks answer null to commands they don't know.
+        if (!res.ok || !Array.isArray(res.value)) return;
         asked.forEach((w, i) => cache.set(w, res.value[i] ?? true));
       }
       // Ranges from the editor as it is now: typing during the check is fine.
