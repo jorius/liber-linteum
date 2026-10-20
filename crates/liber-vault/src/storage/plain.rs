@@ -253,14 +253,14 @@ fn same_entry(a: &Path, b: &Path) -> bool {
 }
 
 #[cfg(unix)]
-fn sync_dir(dir: &Path) {
+pub(crate) fn sync_dir(dir: &Path) {
     if let Ok(d) = std::fs::File::open(dir) {
         let _ = d.sync_all();
     }
 }
 
 #[cfg(not(unix))]
-fn sync_dir(_dir: &Path) {}
+pub(crate) fn sync_dir(_dir: &Path) {}
 
 pub(crate) fn mtime_ns(meta: &std::fs::Metadata) -> i128 {
     meta.modified()

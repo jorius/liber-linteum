@@ -4,9 +4,10 @@
 
 use liber_crypto::{Argon2Params, FolderId, NameCodec, StreamWriter, Unlock, VaultHeader};
 use liber_vault::{
-    Child, EncryptedStorage, HEADER_FILE, Kind, Reach, Storage, VaultError, VaultPath,
-    is_encrypted_vault,
+    Child, EncryptedStorage, Follow, HEADER_FILE, Kind, OsUse, Reach, Replace, Storage, VaultError,
+    VaultPath, is_encrypted_vault,
 };
+use std::collections::BTreeMap;
 use std::io::{Read, Seek, SeekFrom, Write};
 use std::path::{Path, PathBuf};
 
@@ -391,4 +392,288 @@ fn symlinks_are_never_followed() {
     std::fs::rename(dir.path().join("d"), other.path().join("d")).unwrap();
     std::os::unix::fs::symlink(other.path().join("d"), dir.path().join("d")).unwrap();
     assert!(EncryptedStorage::unlock(dir.path(), Unlock::Passphrase(PASS)).is_err());
+}
+
+// ---- Task 2: writes, folders, renames and trash ----
+
+fn write(
+    storage: &EncryptedStorage,
+    path: &str,
+    body: &[u8],
+    mode: Replace,
+) -> Result<(), VaultError> {
+    storage.replace_atomic(&vp(path), &mut &body[..], mode)
+}
+
+/// Every entry under `d/`, relative to it: folders map to `None`, files to their bytes.
+fn tree(root: &Path) -> BTreeMap<PathBuf, Option<Vec<u8>>> {
+    let d = root.join("d");
+    let mut out = BTreeMap::new();
+    let mut stack = vec![d.clone()];
+    while let Some(p) = stack.pop() {
+        for e in std::fs::read_dir(&p).unwrap() {
+            let path = e.unwrap().path();
+            let rel = path.strip_prefix(&d).unwrap().to_path_buf();
+            if path.is_dir() {
+                stack.push(path);
+                out.insert(rel, None);
+            } else {
+                out.insert(rel, Some(std::fs::read(&path).unwrap()));
+            }
+        }
+    }
+    out
+}
+
+fn top_dirs(root: &Path) -> Vec<String> {
+    let mut out: Vec<String> = std::fs::read_dir(root.join("d"))
+        .unwrap()
+        .map(|e| e.unwrap())
+        .filter(|e| e.file_type().unwrap().is_dir())
+        .map(|e| e.file_name().into_string().unwrap())
+        .collect();
+    out.sort();
+    out
+}
+
+#[test]
+fn write_read_round_trip_and_overwrite() {
+    let (dir, storage) = new_vault();
+    write(&storage, "n.md", b"v1", Replace::CreateOnly).unwrap();
+    assert_eq!(storage.read(&vp("n.md")).unwrap(), b"v1");
+    let [file] = physical_files(dir.path()).try_into().unwrap();
+    let first = std::fs::read(&file).unwrap()[..48].to_vec();
+
+    write(&storage, "n.md", b"v2", Replace::Overwrite).unwrap();
+    assert_eq!(storage.read(&vp("n.md")).unwrap(), b"v2");
+    let [again] = physical_files(dir.path()).try_into().unwrap();
+    assert_eq!(again, file, "an overwrite keeps the physical name");
+    assert_ne!(
+        std::fs::read(&again).unwrap()[..48],
+        first[..],
+        "fresh salt"
+    );
+
+    assert!(matches!(
+        write(&storage, "n.md", b"v3", Replace::CreateOnly),
+        Err(VaultError::AlreadyExists(_))
+    ));
+    assert_eq!(storage.read(&vp("n.md")).unwrap(), b"v2");
+    assert!(matches!(
+        write(&storage, "missing/n.md", b"x", Replace::CreateOnly),
+        Err(VaultError::NotFound(_))
+    ));
+}
+
+#[test]
+fn encrypted_save_failure_keeps_previous_version() {
+    let (dir, storage) = new_vault();
+    write(&storage, "n.md", b"previous", Replace::CreateOnly).unwrap();
+    let big = vec![7u8; 200_000];
+    let err = storage
+        .replace_atomic_failing(&vp("n.md"), &mut &big[..], Replace::Overwrite)
+        .unwrap_err();
+    assert!(matches!(err, VaultError::Io { .. }), "{err:?}");
+    assert_eq!(storage.read(&vp("n.md")).unwrap(), b"previous");
+    assert_eq!(entries(&storage, ""), [("n.md".to_string(), Kind::File, 8)]);
+    assert_eq!(physical_files(dir.path()).len(), 1, "no temp file left");
+
+    // A new file that fails leaves nothing at all.
+    let err = storage.replace_atomic_failing(&vp("new.md"), &mut &big[..], Replace::CreateOnly);
+    assert!(err.is_err());
+    assert_eq!(entries(&storage, "").len(), 1);
+    assert_eq!(physical_files(dir.path()).len(), 1);
+}
+
+#[test]
+fn create_new_streams_and_finalises_on_finish() {
+    let (dir, storage) = new_vault();
+    let body: Vec<u8> = (0..150_000u32).map(|i| (i % 251) as u8).collect();
+    let mut w = storage.create_new(&vp("rec.m4a")).unwrap();
+    for (i, piece) in body.chunks(7 * 1024).enumerate() {
+        w.write_all(piece).unwrap();
+        if i % 3 == 0 {
+            w.flush().unwrap();
+        }
+    }
+    assert!(
+        entries(&storage, "").is_empty(),
+        "not visible before finish"
+    );
+    w.finish().unwrap();
+    assert_eq!(storage.read(&vp("rec.m4a")).unwrap(), body);
+    assert!(matches!(
+        storage.create_new(&vp("rec.m4a")).err(),
+        Some(VaultError::AlreadyExists(_))
+    ));
+
+    for flushed in [true, false] {
+        let mut w = storage.create_new(&vp("dropped.m4a")).unwrap();
+        w.write_all(&body).unwrap();
+        if flushed {
+            w.flush().unwrap();
+        }
+        drop(w);
+        assert_eq!(entries(&storage, "").len(), 1, "flushed: {flushed}");
+        assert_eq!(
+            physical_files(dir.path()).len(),
+            1,
+            "only rec.m4a, no temp file"
+        );
+    }
+}
+
+#[test]
+fn same_entry_folds_case() {
+    let (_dir, storage) = new_vault();
+    storage.create_dir(&vp("Notes")).unwrap();
+    assert!(storage.same_entry(&vp("Notes"), &vp("notes")));
+    assert!(storage.same_entry(&vp("Notes"), &vp("Notes")));
+    assert!(!storage.same_entry(&vp("Notes"), &vp("missing")));
+}
+
+#[test]
+fn folder_rename_touches_only_its_name() {
+    let (dir, storage) = new_vault();
+    for f in ["A", "B"] {
+        storage.create_dir(&vp(f)).unwrap();
+        write(
+            &storage,
+            &format!("{f}/Notes.md"),
+            f.as_bytes(),
+            Replace::CreateOnly,
+        )
+        .unwrap();
+    }
+    let before = tree(dir.path());
+    let dirs_before = top_dirs(dir.path());
+    storage.rename(&vp("A"), &vp("C")).unwrap();
+    assert_eq!(storage.read(&vp("C/Notes.md")).unwrap(), b"A");
+    assert_eq!(storage.read(&vp("B/Notes.md")).unwrap(), b"B");
+    assert!(storage.meta(&vp("A"), Follow::No).unwrap().is_none());
+
+    // Exactly one top-level physical name changed: A's became C's.
+    let dirs_after = top_dirs(dir.path());
+    let [old] = dirs_before
+        .iter()
+        .filter(|d| !dirs_after.contains(d))
+        .collect::<Vec<_>>()
+        .try_into()
+        .unwrap();
+    let [new] = dirs_after
+        .iter()
+        .filter(|d| !dirs_before.contains(d))
+        .collect::<Vec<_>>()
+        .try_into()
+        .unwrap();
+    // Everything else, A's children included, is byte-identical under its new name.
+    let moved: BTreeMap<_, _> = before
+        .into_iter()
+        .map(|(p, v)| match p.strip_prefix(old) {
+            Ok(rest) => (Path::new(new).join(rest), v),
+            Err(_) => (p, v),
+        })
+        .collect();
+    let after = tree(dir.path());
+    assert_eq!(moved, after);
+}
+
+#[test]
+fn move_file_between_folders() {
+    let (dir, storage) = new_vault();
+    storage.create_dir(&vp("A")).unwrap();
+    storage.create_dir(&vp("B")).unwrap();
+    write(&storage, "A/x.md", b"moving", Replace::CreateOnly).unwrap();
+    let [old] = physical_files(dir.path()).try_into().unwrap();
+    storage.rename(&vp("A/x.md"), &vp("B/x.md")).unwrap();
+    assert_eq!(storage.read(&vp("B/x.md")).unwrap(), b"moving");
+    assert!(entries(&storage, "A").is_empty());
+    assert!(!old.exists(), "the physical file under A is gone");
+    assert!(
+        std::fs::read_dir(old.parent().unwrap())
+            .unwrap()
+            .next()
+            .is_none()
+    );
+    assert!(matches!(
+        storage.rename(&vp("A/x.md"), &vp("B/y.md")),
+        Err(VaultError::NotFound(_))
+    ));
+}
+
+#[test]
+fn case_clash_is_refused() {
+    let (_dir, storage) = new_vault();
+    write(&storage, "a.md", b"a", Replace::CreateOnly).unwrap();
+    write(&storage, "b.md", b"b", Replace::CreateOnly).unwrap();
+    assert!(matches!(
+        storage.create_dir(&vp("A.md")),
+        Err(VaultError::AlreadyExists(_))
+    ));
+    assert!(matches!(
+        write(&storage, "A.md", b"x", Replace::CreateOnly),
+        Err(VaultError::AlreadyExists(_))
+    ));
+    assert!(matches!(
+        storage.rename(&vp("b.md"), &vp("A.MD")),
+        Err(VaultError::AlreadyExists(_))
+    ));
+    // A case-only rename of the entry itself works.
+    storage.rename(&vp("a.md"), &vp("A.md")).unwrap();
+    assert_eq!(
+        entries(&storage, ""),
+        [
+            ("A.md".to_string(), Kind::File, 1),
+            ("b.md".to_string(), Kind::File, 1)
+        ]
+    );
+    assert_eq!(storage.read(&vp("A.md")).unwrap(), b"a");
+}
+
+#[test]
+fn os_path_is_never_plaintext() {
+    let (dir, storage) = new_vault();
+    write(&storage, "n.md", b"x", Replace::CreateOnly).unwrap();
+    for use_ in [OsUse::Open, OsUse::Reveal, OsUse::FileUrl] {
+        assert!(matches!(
+            storage.os_path(&vp("n.md"), use_),
+            Err(VaultError::NotPermitted(_))
+        ));
+    }
+    let [file] = physical_files(dir.path()).try_into().unwrap();
+    assert!(storage.vault_path_of(&file).is_none());
+    assert!(storage.vault_path_of(dir.path()).is_none());
+}
+
+#[test]
+fn removes_trash_and_locked_writes() {
+    let (dir, storage) = new_vault();
+    storage.create_dir(&vp("F")).unwrap();
+    write(&storage, "F/a.md", b"a", Replace::CreateOnly).unwrap();
+    write(&storage, "b.md", b"b", Replace::CreateOnly).unwrap();
+    assert!(storage.remove_empty_dir(&vp("F")).is_err(), "not empty");
+    storage.remove_file(&vp("F/a.md")).unwrap();
+    storage.remove_empty_dir(&vp("F")).unwrap();
+    assert!(matches!(
+        storage.remove_file(&vp("F/a.md")),
+        Err(VaultError::NotFound(_))
+    ));
+    // The OS trash gets ciphertext only.
+    storage.trash_os(&vp("b.md")).unwrap();
+    assert!(entries(&storage, "").is_empty());
+    assert!(tree(dir.path()).is_empty());
+
+    storage.lock();
+    assert!(matches!(
+        write(&storage, "c.md", b"c", Replace::CreateOnly),
+        Err(VaultError::Locked)
+    ));
+    assert!(matches!(
+        storage.create_dir(&vp("G")),
+        Err(VaultError::Locked)
+    ));
+    assert!(matches!(
+        storage.create_new(&vp("c.md")).err(),
+        Some(VaultError::Locked)
+    ));
 }

@@ -75,6 +75,7 @@ impl From<VaultError> for CommandError {
             VaultError::OutsideVault(_) => ErrorKind::OutsideVault,
             VaultError::Watch(_) => ErrorKind::Watch,
             VaultError::NotEmpty(_) => ErrorKind::NotEmpty,
+            VaultError::NotPermitted(_) => ErrorKind::NotPermitted,
             // shortcut: encryption errors read as `io` until E3 Task 5 gives the encryption commands their own kinds.
             VaultError::Locked | VaultError::WrongSecret | VaultError::Crypto(_) => ErrorKind::Io,
             VaultError::NotUtf8(_) | VaultError::InvalidConfig { .. } | VaultError::Io { .. } => {

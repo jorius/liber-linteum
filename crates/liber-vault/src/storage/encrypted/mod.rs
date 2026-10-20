@@ -3,6 +3,7 @@
 //! encrypted name.
 
 mod names;
+mod write;
 
 use super::plain::{canonical_root, mtime_ns, replace_atomic};
 use super::{
@@ -18,7 +19,7 @@ use liber_crypto::{
 use names::{Cache, Entry};
 use std::io::Read;
 use std::path::{Path, PathBuf};
-use std::sync::{Mutex, MutexGuard};
+use std::sync::{Arc, Mutex, MutexGuard};
 
 pub const HEADER_FILE: &str = "liber-vault.json";
 const DATA_DIR: &str = "d";
@@ -51,8 +52,9 @@ pub struct EncryptedStorage {
     /// `None` once locked.
     keys: Mutex<Option<Keys>>,
     header: Mutex<VaultHeader>,
-    /// Decrypted names: dropped on lock with the keys.
-    cache: Mutex<Cache>,
+    /// Decrypted names: dropped on lock with the keys. Shared with each file
+    /// being written ([`write::Pending`]), which invalidates its folder on commit.
+    cache: Arc<Mutex<Cache>>,
 }
 
 impl std::fmt::Debug for EncryptedStorage {
@@ -167,7 +169,7 @@ impl EncryptedStorage {
             root,
             keys: Mutex::new(Some(Keys { unlocked })),
             header: Mutex::new(header),
-            cache: Mutex::new(Cache::default()),
+            cache: Arc::new(Mutex::new(Cache::default())),
         }
     }
 
@@ -198,6 +200,17 @@ impl EncryptedStorage {
 
     /// The entry at `path`, decrypting (and caching) each folder on the way.
     fn lookup(&self, u: &Unlocked, cache: &mut Cache, path: &VaultPath) -> Result<Option<Entry>> {
+        Ok(self.resolve(u, cache, path)?.map(|(_, e)| e))
+    }
+
+    /// [`Self::lookup`], with the entry's canonical logical path: each name as
+    /// stored, whatever its case in `path` (the cache's keys).
+    fn resolve(
+        &self,
+        u: &Unlocked,
+        cache: &mut Cache,
+        path: &VaultPath,
+    ) -> Result<Option<(String, Entry)>> {
         let mut cur = Entry {
             physical: self.root.join(DATA_DIR),
             folder: Some(FolderId::ROOT),
@@ -207,24 +220,20 @@ impl EncryptedStorage {
             let Some(id) = cur.folder else {
                 return Ok(None);
             };
-            if !cache.listings.contains_key(&dir) {
-                let listing = match names::list(u, &cur.physical, id) {
-                    Ok(l) => l,
-                    Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(None),
-                    Err(e) => return Err(io_err(dir, e)),
-                };
-                cache.listings.insert(dir.clone(), listing);
-            }
-            let Some(next) = cache.listings[&dir].entries.get(name) else {
+            let Some(listing) = load(u, cache, &dir, &cur.physical, id)? else {
                 return Ok(None);
             };
-            cur = next.clone();
+            let Some((real, next)) = listing.find(name) else {
+                return Ok(None);
+            };
+            let next = next.clone();
             if !dir.is_empty() {
                 dir.push('/');
             }
-            dir.push_str(name);
+            dir.push_str(real);
+            cur = next;
         }
-        Ok(Some(cur))
+        Ok(Some((dir, cur)))
     }
 
     /// `None` if the physical entry is gone.
@@ -253,6 +262,26 @@ impl EncryptedStorage {
             created: m.created().ok(),
         }))
     }
+}
+
+/// The cached listing of the folder `dir` (canonical), read if absent; `None`
+/// if its physical folder is gone.
+fn load<'c>(
+    u: &Unlocked,
+    cache: &'c mut Cache,
+    dir: &str,
+    physical: &Path,
+    id: FolderId,
+) -> Result<Option<&'c names::Listing>> {
+    if !cache.listings.contains_key(dir) {
+        let listing = match names::list(u, physical, id) {
+            Ok(l) => l,
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(None),
+            Err(e) => return Err(io_err(dir, e)),
+        };
+        cache.listings.insert(dir.to_string(), listing);
+    }
+    Ok(cache.listings.get(dir))
 }
 
 /// `create` accepts only an empty folder: OS files aside, it allows what a
@@ -301,17 +330,6 @@ fn plain_len(u: &Unlocked, cache: &mut Cache, physical: &Path, mtime: i128, size
     len
 }
 
-/// Write methods arrive in E3 Task 2; until then they refuse.
-fn not_yet(path: &VaultPath) -> VaultError {
-    VaultError::Io {
-        path: path.to_string(),
-        source: std::io::Error::new(
-            std::io::ErrorKind::Unsupported,
-            "not yet supported in encrypted vaults",
-        ),
-    }
-}
-
 impl Storage for EncryptedStorage {
     fn name(&self) -> &'static str {
         "encrypted"
@@ -336,7 +354,7 @@ impl Storage for EncryptedStorage {
     fn children(&self, dir: &VaultPath) -> Result<Vec<Child>> {
         self.with_keys(|u, cache| {
             let not_found = || VaultError::NotFound(dir.to_string());
-            let entry = self.lookup(u, cache, dir)?.ok_or_else(not_found)?;
+            let (canon, entry) = self.resolve(u, cache, dir)?.ok_or_else(not_found)?;
             let id = entry.folder.ok_or_else(not_found)?;
             // Always re-read: a listing is how changes from elsewhere (sync) come in.
             let listing =
@@ -352,7 +370,7 @@ impl Storage for EncryptedStorage {
                 }
             }
             out.extend(listing.unreadable.iter().cloned().map(Child::Unreadable));
-            cache.listings.insert(dir.as_str().to_string(), listing);
+            cache.listings.insert(canon, listing);
             Ok(out)
         })
     }
@@ -393,36 +411,41 @@ impl Storage for EncryptedStorage {
         })
     }
 
-    fn replace_atomic(&self, path: &VaultPath, _from: &mut dyn Read, _mode: Replace) -> Result<()> {
-        Err(not_yet(path))
+    fn replace_atomic(&self, path: &VaultPath, from: &mut dyn Read, mode: Replace) -> Result<()> {
+        self.replace_with(path, from, mode, u64::MAX)
     }
 
     fn create_new(&self, path: &VaultPath) -> Result<Box<dyn NewFile>> {
-        Err(not_yet(path))
+        Ok(Box::new(self.new_file(path)?))
     }
 
     fn create_dir(&self, path: &VaultPath) -> Result<()> {
-        Err(not_yet(path))
+        self.make_dir(path)
     }
 
     fn remove_file(&self, path: &VaultPath) -> Result<()> {
-        Err(not_yet(path))
+        self.remove(path, false)
     }
 
     fn remove_empty_dir(&self, path: &VaultPath) -> Result<()> {
-        Err(not_yet(path))
+        self.remove(path, true)
     }
 
-    fn rename(&self, from: &VaultPath, _to: &VaultPath) -> Result<()> {
-        Err(not_yet(from))
+    fn rename(&self, from: &VaultPath, to: &VaultPath) -> Result<()> {
+        self.move_entry(from, to)
     }
 
+    /// The OS trash gets the ciphertext entry (and its side file), never plaintext.
     fn trash_os(&self, path: &VaultPath) -> Result<()> {
-        Err(not_yet(path))
+        self.trash(path)
     }
 
-    fn os_path(&self, path: &VaultPath, _use: OsUse) -> Result<PathBuf> {
-        Err(not_yet(path))
+    /// No OS path holds plaintext: the app layer offers a decrypted copy for `Open`.
+    fn os_path(&self, path: &VaultPath, use_: OsUse) -> Result<PathBuf> {
+        Err(VaultError::NotPermitted(match use_ {
+            OsUse::Open => "decrypted copy needed".into(),
+            OsUse::Reveal | OsUse::FileUrl => format!("{path}: no OS path in an encrypted vault"),
+        }))
     }
 
     /// No OS path names a logical entry: the physical names are ciphertext.
@@ -430,7 +453,7 @@ impl Storage for EncryptedStorage {
         None
     }
 
-    /// Same physical entry after name resolution (case folding: Task 2).
+    /// Same physical entry after name resolution, which folds case.
     fn same_entry(&self, a: &VaultPath, b: &VaultPath) -> bool {
         self.with_keys(|u, cache| {
             Ok(

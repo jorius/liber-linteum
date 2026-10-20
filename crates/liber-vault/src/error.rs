@@ -31,6 +31,9 @@ pub enum VaultError {
     WrongSecret,
     #[error("encryption error: {0}")]
     Crypto(String),
+    /// Refused by design: an encrypted vault has no plaintext OS path.
+    #[error("not permitted: {0}")]
+    NotPermitted(String),
 }
 
 pub type Result<T> = std::result::Result<T, VaultError>;

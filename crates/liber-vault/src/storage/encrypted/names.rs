@@ -4,6 +4,7 @@
 use liber_crypto::{FolderId, NameCodec, Unlocked};
 use std::collections::HashMap;
 use std::path::{Component, Path, PathBuf};
+use unicode_normalization::UnicodeNormalization;
 
 /// One decrypted entry: `folder` is `Some(id)` for a folder.
 #[derive(Debug, Clone)]
@@ -19,6 +20,32 @@ pub(super) struct Listing {
     pub entries: HashMap<String, Entry>,
     /// `Child::Unreadable` messages, one per entry whose name won't decrypt.
     pub unreadable: Vec<String>,
+}
+
+impl Listing {
+    /// `name`, else the first (by name) entry equal to it case-insensitively: a vault
+    /// behaves as a case-insensitive file system on every OS.
+    pub fn find(&self, name: &str) -> Option<(&str, &Entry)> {
+        if let Some((k, e)) = self.entries.get_key_value(name) {
+            return Some((k, e));
+        }
+        let want = fold(name);
+        self.entries
+            .iter()
+            .filter(|(k, _)| fold(k) == want)
+            .min_by(|a, b| a.0.cmp(b.0))
+            .map(|(k, e)| (k.as_str(), e))
+    }
+}
+
+/// A name's NFC, lower-cased form (stored names are NFC: format §14.3).
+fn fold(name: &str) -> String {
+    name.nfc().collect::<String>().to_lowercase()
+}
+
+/// The `.libern` side file of a long-named (`.liberl`) entry (format §14.5).
+pub(super) fn side_file(physical: &Path) -> Option<PathBuf> {
+    (physical.extension()? == "liberl").then(|| physical.with_extension("libern"))
 }
 
 #[derive(Debug, Default)]
@@ -120,7 +147,20 @@ fn first_ok<T>(
 
 #[cfg(test)]
 mod tests {
-    use super::one_component;
+    use super::{fold, one_component, side_file};
+    use std::path::Path;
+
+    #[test]
+    fn fold_ignores_case_and_normal_form() {
+        assert_eq!(fold("Notes"), fold("nOTES"));
+        assert_eq!(fold("Cafe\u{301}"), fold("CAFÉ"));
+        assert_ne!(fold("a.md"), fold("b.md"));
+        assert_eq!(
+            side_file(Path::new("d/abc.liberl")).unwrap(),
+            Path::new("d/abc.libern")
+        );
+        assert!(side_file(Path::new("d/abc.libere")).is_none());
+    }
 
     #[test]
     fn only_single_normal_components_pass() {
