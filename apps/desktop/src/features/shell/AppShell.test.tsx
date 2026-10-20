@@ -312,6 +312,44 @@ describe('AppShell', () => {
     expect(width()).toBe('270px');
   });
 
+  it('round 3 review I1: held arrow keys never lose a step or go back while saves are in flight', async () => {
+    const pending: (() => void)[] = [];
+    const saved: number[] = [];
+    backend({
+      settings_set: (a) =>
+        new Promise((resolve) => {
+          const patch = a.patch as { sidebarWidth: number };
+          pending.push(() => {
+            saved.push(patch.sidebarWidth);
+            resolve({ ...useSettingsStore.getState().settings, ...patch });
+          });
+        }),
+    });
+    seed();
+    render(<AppShell />);
+    const edge = screen.getByRole('separator', { name: 'Resize the sidebar' });
+    const seen: number[] = [];
+    const watch = () => seen.push(Number(edge.getAttribute('aria-valuenow')));
+    edge.focus();
+    for (let i = 0; i < 3; i++) {
+      await userEvent.keyboard('{ArrowRight}');
+      watch();
+    }
+    // Answer every save, oldest first, as they reach the backend.
+    for (let i = 0; i < 10 && saved.length < 3; i++) {
+      await act(async () => {
+        pending.shift()?.();
+        await new Promise((r) => setTimeout(r, 0));
+      });
+      watch();
+    }
+    await waitFor(() => expect(edge).toHaveAttribute('aria-valuenow', '318'));
+    watch();
+    expect(seen).toEqual([...seen].sort((x, y) => x - y));
+    expect(saved.at(-1)).toBe(318);
+    expect(useSettingsStore.getState().settings.sidebarWidth).toBe(318);
+  });
+
   it('final review I5: collapsing from inside the sidebar keeps the keyboard; reopening returns it', async () => {
     backend({
       settings_set: (a) => ({ ...useSettingsStore.getState().settings, ...(a.patch as object) }),
