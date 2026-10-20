@@ -167,15 +167,17 @@ impl Vault {
     /// The child of `dir` named `name`, or failing that one whose name only
     /// differs in letter case or Unicode form (round 3 §9). Exact wins.
     pub fn child_named(&self, dir: &VaultPath, name: &str) -> Result<Option<VaultPath>> {
-        let full = self.fs_path(dir)?;
-        let entries = match std::fs::read_dir(&full) {
-            Ok(e) => e,
-            Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(None),
-            Err(e) => return Err(io_err(dir.as_str(), e)),
+        let names: Vec<String> = match self.children(dir) {
+            Ok(children) => children
+                .into_iter()
+                .filter_map(|c| match c {
+                    Child::Entry { name, .. } => Some(name),
+                    Child::Unreadable(_) => None,
+                })
+                .collect(),
+            Err(VaultError::NotFound(_)) => return Ok(None),
+            Err(e) => return Err(e),
         };
-        let names: Vec<String> = entries
-            .filter_map(|e| e.ok()?.file_name().into_string().ok())
-            .collect();
         pick_child(&names, name).map(|n| dir.join(n)).transpose()
     }
 
@@ -188,7 +190,8 @@ impl Vault {
         let page = self
             .child_named(folder, &format!("{}.md", folder.file_name()))
             .ok()??;
-        self.fs_path(&page).ok()?.is_file().then_some(page)
+        let meta = self.meta(&page, Follow::InsideVault).ok()??;
+        (meta.kind == Kind::File).then_some(page)
     }
 
     /// Whether two vault paths name the same entry on disk, e.g. `Notes` and
