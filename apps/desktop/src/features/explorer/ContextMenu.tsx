@@ -76,13 +76,13 @@ export function ContextMenu({ menu, onClose }: { menu: MenuState; onClose: () =>
           ? []
           : [[t('menu.matchFolderPageName'), () => void vault().rename(page, own)]]
         : hasNamesake
-        ? [
-            [
-              t('menu.useAsFolderPage', { name: nameOf(node.path) }),
-              () => void vault().rename(namesake, `${node.path}/${nameOf(node.path)}.md`),
-            ],
-          ]
-        : [[t('menu.addFolderPage'), () => void vault().createFolderPage(node.path)]];
+          ? [
+              [
+                t('menu.useAsFolderPage', { name: nameOf(node.path) }),
+                () => void vault().rename(namesake, `${node.path}/${nameOf(node.path)}.md`),
+              ],
+            ]
+          : [[t('menu.addFolderPage'), () => void vault().createFolderPage(node.path)]];
   const vault = useVaultStore.getState;
   // TODO(E4): hide in encrypted vaults, it would show ciphertext names
   // (docs/superpowers/plans/2026-10-20-enc-e4-encrypted-vault-ui.md).
@@ -109,7 +109,12 @@ export function ContextMenu({ menu, onClose }: { menu: MenuState; onClose: () =>
         [t('menu.newPage'), () => void vault().createPage(dir)],
         [t('menu.newFolder'), () => void vault().createFolder(dir)],
         ...(node.kind === 'page'
-          ? [[t('menu.addSubPage'), () => void vault().addSubPage(node.path)] as [string, () => void]]
+          ? [
+              [t('menu.addSubPage'), () => void vault().addSubPage(node.path)] as [
+                string,
+                () => void,
+              ],
+            ]
           : []),
         ...folderPage,
         [t('menu.rename'), () => vault().startRename(node.path)],

@@ -255,7 +255,13 @@ export function installIpcMock({
       madeFolders.add(folder);
       pages[target] = pages[page];
       delete pages[page];
-      const outcome = { moved: [[page, target]], updatedFiles: [], updatedLinks: 0, failed: [], pair: null };
+      const outcome = {
+        moved: [[page, target]],
+        updatedFiles: [],
+        updatedLinks: 0,
+        failed: [],
+        pair: null,
+      };
       return { folder, page: target, outcome };
     },
     entry_reveal: (a) => {

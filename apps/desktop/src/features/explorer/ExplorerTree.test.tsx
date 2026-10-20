@@ -676,7 +676,9 @@ describe('sub-pages and case-insensitive folder pages (round 3 §9)', () => {
     ]);
     render(<ContextMenu menu={{ path: 'SmartJob', anchor: { x: 0, y: 0 } }} onClose={() => {}} />);
     expect(labels()).not.toContain('Add a page to this folder');
-    await userEvent.click(screen.getByRole('menuitem', { name: 'Match the page name to the folder' }));
+    await userEvent.click(
+      screen.getByRole('menuitem', { name: 'Match the page name to the folder' }),
+    );
     expect(calls).toContainEqual([
       'entry_rename',
       { from: 'SmartJob/Smartjob.md', to: 'SmartJob/SmartJob.md' },
@@ -723,9 +725,15 @@ describe('sub-pages and case-insensitive folder pages (round 3 §9)', () => {
       <ContextMenu menu={{ path: 'Art', anchor: { x: 0, y: 0 } }} onClose={() => {}} />,
     );
     expect(labels()).not.toContain('Add sub-page');
-    expect(labels().some((l) => /^(Reveal in Finder|Show in File Explorer|Show in file manager)$/.test(l ?? ''))).toBe(true);
+    expect(
+      labels().some((l) =>
+        /^(Reveal in Finder|Show in File Explorer|Show in file manager)$/.test(l ?? ''),
+      ),
+    ).toBe(true);
     unmount();
-    render(<ContextMenu menu={{ path: '.archive/Old.md', anchor: { x: 0, y: 0 } }} onClose={() => {}} />);
+    render(
+      <ContextMenu menu={{ path: '.archive/Old.md', anchor: { x: 0, y: 0 } }} onClose={() => {}} />,
+    );
     expect(labels()).not.toContain('Add sub-page');
     expect(labels().some((l) => /Finder|Explorer|file manager/.test(l ?? ''))).toBe(true);
   });
@@ -733,10 +741,14 @@ describe('sub-pages and case-insensitive folder pages (round 3 §9)', () => {
   it('page rows offer "Move to…" and reveal calls entry_reveal with the vault path', async () => {
     const calls = backend({ entry_reveal: () => null });
     seed(nodes, { expanded: new Set(['Art']) });
-    render(<ContextMenu menu={{ path: 'Art/rex.md', anchor: { x: 0, y: 0 } }} onClose={() => {}} />);
+    render(
+      <ContextMenu menu={{ path: 'Art/rex.md', anchor: { x: 0, y: 0 } }} onClose={() => {}} />,
+    );
     expect(labels()).toContain('Move to…');
     await userEvent.click(
-      screen.getByRole('menuitem', { name: /^(Reveal in Finder|Show in File Explorer|Show in file manager)$/ }),
+      screen.getByRole('menuitem', {
+        name: /^(Reveal in Finder|Show in File Explorer|Show in file manager)$/,
+      }),
     );
     expect(calls).toContainEqual(['entry_reveal', { path: 'Art/rex.md' }]);
   });
