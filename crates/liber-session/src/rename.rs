@@ -274,6 +274,9 @@ impl VaultSession {
         {
             return Err(VaultError::AlreadyExists(taken.to_string()).into());
         }
+        // The move's own checks (its name, hidden targets) come before the
+        // conversion too, so a refused name never rewrites links twice.
+        check_target(item, &target)?;
         let converted = if already {
             None
         } else {
@@ -290,14 +293,31 @@ impl VaultSession {
             }),
             Err(e) => {
                 if let Some((_, new_page, _)) = &converted {
-                    // Undo the conversion: the page goes back, a new folder goes.
-                    let _ = self.rename(new_page, page, rewrite_links);
-                    if create {
-                        self.drop_created_folder(&folder);
-                    }
+                    self.undo_conversion(new_page, page, &folder, create, rewrite_links);
                 }
                 Err(e)
             }
+        }
+    }
+
+    /// Undoes a conversion after the move under it failed: the page goes
+    /// back, and a folder made for it goes too.
+    fn undo_conversion(
+        &self,
+        new_page: &VaultPath,
+        page: &VaultPath,
+        folder: &VaultPath,
+        create: bool,
+        rewrite_links: bool,
+    ) {
+        if let Err(e) = self.rename(new_page, page, rewrite_links) {
+            // The page stays where the conversion put it (and indexed there).
+            self.emit(SessionEvent::Warning(format!(
+                "{new_page}: could not move back to {page} after the move failed: {e}"
+            )));
+        }
+        if create {
+            self.drop_created_folder(folder);
         }
     }
 
@@ -359,8 +379,10 @@ impl VaultSession {
 
     /// Takes a folder this module just made away again, from disk and index.
     fn drop_created_folder(&self, folder: &VaultPath) {
-        let _ = self.vault.remove_empty_dir(folder); // only ever an empty folder
-        let _ = self.index().transaction(|tx| tx.remove(folder.as_str()));
+        // Only ever an empty folder; one still holding a page stays indexed.
+        if self.vault.remove_empty_dir(folder).is_ok() {
+            let _ = self.index().transaction(|tx| tx.remove(folder.as_str()));
+        }
     }
 
     pub(crate) fn rename_with_hook(
@@ -560,6 +582,47 @@ mod tests {
         VaultPath::new(s).unwrap()
     }
 
+    /// Follow-up: a folder that can't be removed (not empty) stays in the
+    /// index too, so a page left inside it after a failed undo stays found.
+    #[test]
+    fn subpages_followup_a_folder_left_on_disk_stays_indexed() {
+        let (dir, _c, s) = session("ambiguous-names");
+        s.create_folder(&VaultPath::root(), "P").unwrap();
+        std::fs::write(dir.path().join("P/P.md"), "# P\n").unwrap();
+        s.apply(vec![liber_vault::WatchEvent::Overflow]).unwrap();
+        s.drop_created_folder(&vp("P"));
+        assert!(dir.path().join("P/P.md").is_file());
+        assert!(s.index().stats().unwrap().contains_key("P/P.md"));
+    }
+
+    /// Follow-up: a conversion that can't be undone says so (a Warning), as
+    /// the pair rollback in `rename` does, instead of failing silently.
+    #[test]
+    fn subpages_followup_a_failed_undo_warns() {
+        let vault = liber_testkit::copy_fixture("ambiguous-names");
+        let cache = tempfile::tempdir().unwrap();
+        let seen = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
+        let sink = seen.clone();
+        let (s, _) = VaultSession::open(vault.path(), cache.path(), move |e: SessionEvent| {
+            sink.lock().unwrap().push(e)
+        })
+        .unwrap();
+        s.undo_conversion(
+            &vp("Gone/Gone.md"),
+            &vp("Gone.md"),
+            &vp("Gone"),
+            false,
+            true,
+        );
+        assert!(
+            seen.lock()
+                .unwrap()
+                .iter()
+                .any(|e| matches!(e, SessionEvent::Warning(m) if m.contains("Gone/Gone.md"))),
+            "no warning"
+        );
+    }
+
     #[test]
     fn apply_edits_from_the_end() {
         let text = "a [[x]] b [[y]]";
@@ -615,7 +678,6 @@ mod tests {
     }
 }
 
-/// What every rename refuses before it touches the disk.
 /// Result of [`VaultSession::move_under_page`].
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct MoveUnderOutcome {
@@ -634,6 +696,7 @@ fn reuse_folder(exact_name: bool, same_entry: bool) -> bool {
     exact_name || same_entry
 }
 
+/// What every rename refuses before it touches the disk.
 fn check_target(from: &VaultPath, to: &VaultPath) -> Result<()> {
     if from.is_root() || to.is_root() || from == to {
         return Err(SessionError::InvalidName(format!(

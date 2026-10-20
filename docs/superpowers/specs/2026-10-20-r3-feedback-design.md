@@ -338,3 +338,8 @@ A fresh review found one Important issue and seven Minor ones. All are fixed, ea
 
 **Ruling (from "declined to judge"):** an existing sibling folder with a different letter case is reused as the page's folder only when the disk treats the two names as one entry. That covers case-insensitive APFS and NTFS, checked with `same_entry`. On a case-sensitive disk, `Notes.md` gets its own `Notes/` beside an unrelated `notes/`.
 - *Cost if wrong:* on Linux, two folders whose names differ only in case can coexist, which is what that file system allows anyway.
+
+**Follow-ups from the re-review:**
+- A move whose own name would be refused (a `#`, a trailing dot, and so on) is now refused before the page is converted, so links are never rewritten twice.
+- If undoing a conversion fails, the session emits a warning instead of staying silent. The page stays, and stays indexed, where the conversion put it.
+- A folder made for a conversion leaves the index only when it actually left the disk.
