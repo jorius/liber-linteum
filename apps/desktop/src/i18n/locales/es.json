@@ -45,6 +45,7 @@
     "notAFile": "Las carpetas no se pueden adjuntar.",
     "tooLarge": "Ese archivo es demasiado grande para pegarlo.",
     "notAText": "Este archivo no se puede abrir como texto: no es texto UTF-8 o supera los 2 MB.",
+    "invalidInput": "Ese valor no es válido aquí.",
     "io": "Algo salió mal: {message}"
   },
   "toasts": {

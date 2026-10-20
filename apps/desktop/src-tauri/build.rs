@@ -98,6 +98,18 @@ const COMMANDS: &[&str] = &[
     "notion_cancel",
     "notion_open_partial",
     "notion_reveal_partial",
+    // Spell checking: local dictionaries (main window only).
+    "spell_dictionaries",
+    "spell_import",
+    "spell_remove",
+    "spell_check",
+    "spell_suggest",
+    "spell_add_word",
+    "spell_ignore",
+    "spell_words",
+    "spell_remove_word",
+    "spell_vault_get",
+    "spell_vault_set",
 ];
 
 fn main() {

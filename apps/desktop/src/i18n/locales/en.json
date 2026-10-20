@@ -45,6 +45,7 @@
     "notAFile": "Folders can't be attached.",
     "tooLarge": "That file is too large to paste.",
     "notAText": "This file can't be opened as text: it isn't UTF-8 text, or it's over 2 MB.",
+    "invalidInput": "That value isn't valid here.",
     "io": "Something went wrong: {message}"
   },
   "toasts": {

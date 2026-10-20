@@ -31,6 +31,8 @@ pub enum ErrorKind {
     TooLarge,
     /// Not a text file the app opens (M4b part 2 §6).
     NotAText,
+    /// A value the command refuses: a word or dictionary id (spell checking).
+    InvalidInput,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]

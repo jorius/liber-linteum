@@ -36,6 +36,7 @@ export type ErrorKind =
   | 'notAFile'
   | 'tooLarge'
   | 'notAText'
+  | 'invalidInput'
   | 'io';
 
 export interface CommandError {

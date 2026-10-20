@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-spell-ignore"
+description = "Enables the spell_ignore command without any pre-configured scope."
+commands.allow = ["spell_ignore"]
+
+[[permission]]
+identifier = "deny-spell-ignore"
+description = "Denies the spell_ignore command without any pre-configured scope."
+commands.deny = ["spell_ignore"]

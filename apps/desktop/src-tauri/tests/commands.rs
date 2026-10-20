@@ -85,6 +85,18 @@ const COMMANDS: &[&str] = &[
     "audio_record_stop",
     "audio_record_cancel",
     "audio_pick",
+    // Spell checking: local dictionaries.
+    "spell_dictionaries",
+    "spell_import",
+    "spell_remove",
+    "spell_check",
+    "spell_suggest",
+    "spell_add_word",
+    "spell_ignore",
+    "spell_words",
+    "spell_remove_word",
+    "spell_vault_get",
+    "spell_vault_set",
 ];
 
 struct Harness {
@@ -2791,4 +2803,170 @@ fn nimw_testkit_files(root: &std::path::Path) -> Vec<String> {
     out.retain(|p| !p.starts_with(".nimw"));
     out.sort();
     out
+}
+
+fn check(h: &Harness, words: &[&str], lang: &str) -> Vec<bool> {
+    serde_json::from_value(
+        call(
+            &h.main,
+            "spell_check",
+            json!({ "words": words, "lang": lang }),
+        )
+        .unwrap(),
+    )
+    .unwrap()
+}
+
+/// Spelling: the language's default dictionary until one is chosen; a
+/// vault's own choice wins while it's open.
+#[test]
+fn spell_checks_with_the_language_default_then_settings_then_the_vault_override() {
+    let h = harness();
+    assert_eq!(check(&h, &["canción", "receive"], "es"), [true, false]);
+    assert_eq!(check(&h, &["canción", "receive"], "en"), [false, true]);
+    call(
+        &h.main,
+        "settings_set",
+        json!({ "patch": { "spellDictionaries": ["es_CO", "en_US"] } }),
+    )
+    .unwrap();
+    assert_eq!(check(&h, &["parcero", "receive"], "es"), [true, true]);
+    let _vault = open_fixture(&h, "obsidian-basic");
+    call(&h.main, "spell_vault_set", json!({ "ids": ["en_US"] })).unwrap();
+    assert_eq!(
+        call(&h.main, "spell_vault_get", json!({})).unwrap(),
+        json!(["en_US"])
+    );
+    assert_eq!(check(&h, &["parcero", "receive"], "es"), [false, true]);
+    call(&h.main, "spell_vault_set", json!({ "ids": null })).unwrap();
+    assert_eq!(check(&h, &["parcero", "receive"], "es"), [true, true]);
+    let err = call(&h.main, "spell_vault_set", json!({ "ids": ["xx"] })).unwrap_err();
+    assert_eq!(kind(err), "invalidInput");
+    // es_CO then en_US: the English suggestion is among them.
+    let suggested = call(
+        &h.main,
+        "spell_suggest",
+        json!({ "word": "recieve", "lang": "en" }),
+    )
+    .unwrap();
+    assert!(
+        suggested.as_array().unwrap().contains(&json!("receive")),
+        "{suggested}"
+    );
+}
+
+#[test]
+fn spell_add_word_and_ignore() {
+    let h = harness();
+    let vault = open_fixture(&h, "obsidian-basic");
+    assert_eq!(check(&h, &["Ioque"], "es"), [false]);
+    call(&h.main, "spell_add_word", json!({ "word": "Ioque" })).unwrap();
+    assert_eq!(check(&h, &["Ioque"], "es"), [true]);
+    assert_eq!(
+        call(&h.main, "spell_words", json!({})).unwrap(),
+        json!(["Ioque"])
+    );
+    let json: Value =
+        serde_json::from_slice(&std::fs::read(vault.path().join(".nimw/vault.json")).unwrap())
+            .unwrap();
+    assert_eq!(json["spellingWords"], json!(["Ioque"]));
+    call(&h.main, "spell_ignore", json!({ "word": "Wayuunaiki" })).unwrap();
+    assert_eq!(check(&h, &["Wayuunaiki"], "es"), [true]);
+    call(&h.main, "vault_close", json!({})).unwrap();
+    call(&h.main, "vault_open", json!({ "path": vault.path() })).unwrap();
+    assert_eq!(check(&h, &["Wayuunaiki", "Ioque"], "es"), [false, true]);
+    call(&h.main, "spell_remove_word", json!({ "word": "Ioque" })).unwrap();
+    assert_eq!(check(&h, &["Ioque"], "es"), [false]);
+    for bad in ["two words", "", "tab\there"] {
+        let err = call(&h.main, "spell_add_word", json!({ "word": bad })).unwrap_err();
+        assert_eq!(kind(err), "invalidInput", "{bad:?}");
+    }
+    let err = call(
+        &h.main,
+        "spell_add_word",
+        json!({ "word": "a".repeat(101) }),
+    )
+    .unwrap_err();
+    assert_eq!(kind(err), "invalidInput");
+}
+
+#[test]
+fn spell_import_validates_copies_and_removes() {
+    let h = harness();
+    let state = h.app.state::<nimw_desktop::state::AppState>();
+    let src = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../../crates/nimw-spell/dictionaries/en_US");
+    let outside = tempfile::tempdir().unwrap();
+    let aff = outside.path().join("Mine.aff");
+    std::fs::copy(src.join("index.aff"), &aff).unwrap();
+    std::fs::copy(src.join("index.dic"), outside.path().join("Mine.dic")).unwrap();
+    let picked = aff.clone();
+    state.set_cover_picker(Some(Arc::new(move || Some(picked.clone()))));
+    let added = call(&h.main, "spell_import", json!({})).unwrap();
+    assert_eq!(
+        added,
+        json!({ "id": "user:mine", "name": "Mine", "bundled": false, "available": true })
+    );
+    let folder = h._config.path().join("dictionaries/user-mine");
+    assert!(folder.join("index.aff").is_file() && folder.join("index.dic").is_file());
+    // A second import of the same name gets its own id.
+    assert_eq!(
+        call(&h.main, "spell_import", json!({})).unwrap()["id"],
+        "user:mine-2"
+    );
+    let list = call(&h.main, "spell_dictionaries", json!({})).unwrap();
+    let ids: Vec<&str> = list
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|d| d["id"].as_str().unwrap())
+        .collect();
+    assert_eq!(ids, ["en_US", "es", "es_CO", "user:mine", "user:mine-2"]);
+    call(
+        &h.main,
+        "settings_set",
+        json!({ "patch": { "spellDictionaries": ["user:mine"] } }),
+    )
+    .unwrap();
+    assert_eq!(check(&h, &["receive"], "es"), [true]);
+    call(&h.main, "spell_remove", json!({ "id": "user:mine" })).unwrap();
+    assert!(!folder.exists());
+    let settings = call(&h.main, "settings_get", json!({})).unwrap();
+    assert_eq!(settings["settings"]["spellDictionaries"], json!([]));
+    assert_eq!(
+        settings["settings"]["importedDictionaries"],
+        json!([{ "id": "user:mine-2", "name": "Mine" }])
+    );
+    let err = call(&h.main, "spell_remove", json!({ "id": "es" })).unwrap_err();
+    assert_eq!(kind(err), "notPermitted");
+    // A broken import's files deleted by hand: listed, but unavailable.
+    std::fs::remove_dir_all(h._config.path().join("dictionaries/user-mine-2")).unwrap();
+    let list = call(&h.main, "spell_dictionaries", json!({})).unwrap();
+    assert_eq!(list[3]["available"], false);
+    // An .aff without its .dic.
+    std::fs::remove_file(outside.path().join("Mine.dic")).unwrap();
+    let err = call(&h.main, "spell_import", json!({})).unwrap_err();
+    assert_eq!(kind(err), "notFound");
+    state.set_cover_picker(Some(Arc::new(|| None)));
+    assert_eq!(
+        call(&h.main, "spell_import", json!({})).unwrap(),
+        Value::Null
+    );
+}
+
+#[test]
+fn settings_default_and_patch_spelling_fields() {
+    let h = harness();
+    let s = call(&h.main, "settings_get", json!({})).unwrap();
+    assert_eq!(s["settings"]["spellcheck"], true);
+    assert_eq!(s["settings"]["spellDictionaries"], Value::Null);
+    assert_eq!(s["settings"]["importedDictionaries"], json!([]));
+    let s = call(
+        &h.main,
+        "settings_set",
+        json!({ "patch": { "spellcheck": false, "spellDictionaries": ["es_CO", "en_US"] } }),
+    )
+    .unwrap();
+    assert_eq!(s["spellcheck"], false);
+    assert_eq!(s["spellDictionaries"], json!(["es_CO", "en_US"]));
 }

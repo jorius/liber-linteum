@@ -386,6 +386,12 @@ pub struct Settings {
     pub sidebar_width: SidebarWidth,
     /// Where the floating Edit / Global View / Search button sits (M5b §2.2).
     pub action_button: ActionButton,
+    /// Spell checking in the editor (spell checking spec §4).
+    pub spellcheck: bool,
+    /// The dictionaries checked, in order; `None` = the app language's.
+    pub spell_dictionaries: Option<Vec<String>>,
+    /// Dictionaries imported from disk; changed only by the spell commands.
+    pub imported_dictionaries: Vec<ImportedDictionary>,
     pub recent_vaults: Vec<RecentVault>,
     /// Keys this build does not know (written by a newer version); kept on save.
     #[serde(flatten)]
@@ -420,6 +426,9 @@ impl Default for Settings {
             sidebar_collapsed: false,
             sidebar_width: SidebarWidth::default(),
             action_button: ActionButton::BottomRight,
+            spellcheck: true,
+            spell_dictionaries: None,
+            imported_dictionaries: Vec::new(),
             recent_vaults: Vec::new(),
             extra: serde_json::Map::new(),
         }
@@ -453,6 +462,16 @@ pub struct SettingsPatch {
     pub sidebar_collapsed: Option<bool>,
     pub sidebar_width: Option<SidebarWidth>,
     pub action_button: Option<ActionButton>,
+    pub spellcheck: Option<bool>,
+    pub spell_dictionaries: Option<Vec<String>>,
+}
+
+/// A dictionary imported from disk; its files live in
+/// `<config>/dictionaries/<folder_name(id)>/index.{aff,dic}`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ImportedDictionary {
+    pub id: String,
+    pub name: String,
 }
 
 /// A recent vault as shown on the welcome screen.
@@ -525,6 +544,9 @@ fn parse_lenient(text: &str) -> Result<(Settings, Vec<String>), serde_json::Erro
     field!("sidebarCollapsed", sidebar_collapsed);
     field!("sidebarWidth", sidebar_width);
     field!("actionButton", action_button);
+    field!("spellcheck", spellcheck);
+    field!("spellDictionaries", spell_dictionaries);
+    field!("importedDictionaries", imported_dictionaries);
     match map.remove("recentVaults") {
         None => {}
         Some(Value::Array(items)) => {
@@ -684,6 +706,12 @@ impl SettingsStore {
         if let Some(v) = patch.action_button {
             next.action_button = v;
         }
+        if let Some(v) = patch.spellcheck {
+            next.spellcheck = v;
+        }
+        if let Some(v) = patch.spell_dictionaries {
+            next.spell_dictionaries = Some(v);
+        }
         self.save(&next)?;
         *s = next.clone();
         Ok(next)
@@ -731,6 +759,21 @@ impl SettingsStore {
         let mut s = self.lock();
         let mut next = s.clone();
         next.scratchpad_path = path;
+        self.save(&next)?;
+        *s = next.clone();
+        Ok(next)
+    }
+
+    /// The folder settings.json lives in (imported dictionaries go beside it).
+    pub fn dir(&self) -> &Path {
+        self.path.parent().expect("settings path has a parent")
+    }
+
+    /// Applies an edit no patch may make (imported dictionaries), saved atomically.
+    pub fn modify(&self, edit: impl FnOnce(&mut Settings)) -> std::io::Result<Settings> {
+        let mut s = self.lock();
+        let mut next = s.clone();
+        edit(&mut next);
         self.save(&next)?;
         *s = next.clone();
         Ok(next)

@@ -24,6 +24,7 @@ pub mod search_commands;
 pub mod settings;
 pub mod settings_commands;
 pub mod sort_commands;
+pub mod spell_commands;
 pub mod state;
 pub mod vault_commands;
 
@@ -88,6 +89,7 @@ pub fn configure<R: tauri::Runtime>(
         .manage(scratchpad_commands::ScratchpadState::default())
         // The Notion import (M7): its dialogs' picks and cancel flag.
         .manage(notion_commands::NotionState::default())
+        .manage(spell_commands::SpellState::default())
         .register_asynchronous_uri_scheme_protocol(asset::SCHEME, |ctx, request, responder| {
             let app = ctx.app_handle().clone();
             // A single-file window is served its file's folder (M4c §4).
@@ -226,6 +228,17 @@ pub fn configure<R: tauri::Runtime>(
         notion_commands::notion_cancel,
         notion_commands::notion_open_partial,
         notion_commands::notion_reveal_partial,
+        spell_commands::spell_dictionaries,
+        spell_commands::spell_import,
+        spell_commands::spell_remove,
+        spell_commands::spell_check,
+        spell_commands::spell_suggest,
+        spell_commands::spell_add_word,
+        spell_commands::spell_ignore,
+        spell_commands::spell_words,
+        spell_commands::spell_remove_word,
+        spell_commands::spell_vault_get,
+        spell_commands::spell_vault_set,
     ])
 }
 

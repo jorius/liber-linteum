@@ -27,6 +27,7 @@ nimw-vault = { path = "../../../crates/nimw-vault" }
 nimw-markdown = { path = "../../../crates/nimw-markdown" }
 nimw-audio = { path = "../../../crates/nimw-audio" }
 nimw-import = { path = "../../../crates/nimw-import" }
+nimw-spell = { path = "../../../crates/nimw-spell" }
 
 # M4c §3: files opened from Explorer or a command line while the app runs
 # reach the running app (macOS sends them to it itself: `RunEvent::Opened`).

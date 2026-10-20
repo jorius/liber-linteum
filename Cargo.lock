@@ -2708,6 +2708,7 @@ dependencies = [
  "nimw-import",
  "nimw-markdown",
  "nimw-session",
+ "nimw-spell",
  "nimw-testkit",
  "nimw-vault",
  "objc2",
