@@ -73,7 +73,8 @@ describe('the recent list (M4c §7.19)', () => {
     render(<RecentList />);
     const quick = await screen.findByRole('button', { name: /^Quick notes/ });
     expect(quick.querySelector('[data-quick-note-icon]')).not.toBeNull();
-    expect(screen.getByRole('button', { name: 'Remove Quick notes from recent' })).toBeVisible();
+    // R3 §7: row actions show on hover or focus, so check it's there, not painted.
+    expect(screen.getByRole('button', { name: 'Remove Quick notes from recent' })).toBeEnabled();
     await userEvent.click(quick);
     await waitFor(() => expect(useVaultStore.getState().status).toBe('open'));
     expect(calls.find(([c]) => c === 'scratchpad_open')?.[1]).toEqual({});
