@@ -383,16 +383,24 @@ export const useVaultStore = create<VaultState>((set, get) => {
     },
     applyRename: async (from, to, out, opts) => {
       const { selected, expanded, renaming } = get();
+      // A folder page's rename moves twice (round 3b §6.3); every path follows both.
+      const steps: [string, string][] = out.pair ? [[from, to], out.pair] : [[from, to]];
+      const move = (p: string) => steps.reduce((x, [a, b]) => remap(x, a, b) ?? x, p);
       set({
-        selected: selected ? (remap(selected, from, to) ?? selected) : selected,
-        expanded: new Set([...expanded].map((p) => remap(p, from, to) ?? p)),
+        selected: selected ? move(selected) : selected,
+        expanded: new Set([...expanded].map(move)),
         // Another entry's rename stays open (M4c final review I3).
         renaming: renaming && remap(renaming, from, to) === null ? renaming : null,
       });
-      useTrailStore.getState().renamed(from, to);
-      get().expand(parentOf(to));
+      for (const [a, b] of steps) {
+        useTrailStore.getState().renamed(a, b);
+        useEditorStore.getState().follow(a, b);
+      }
+      get().expand(parentOf(move(to)));
       await get().refreshTree();
-      await usePageStore.getState().follow(from, to);
+      // One reload, straight to the final path: never the in-between one.
+      const open = usePageStore.getState().path;
+      if (open && move(open) !== open) await usePageStore.getState().follow(open, move(open));
       // Our link rewrites aren't reported by the watcher: re-read open pages.
       await useEditorStore.getState().syncPaths(out.updatedFiles);
       if (out.failed.length) {

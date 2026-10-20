@@ -277,6 +277,22 @@ describe('the pinned scratch folder (M4c §7.2)', () => {
   });
 });
 
+describe('folder pages (round 3b §6.2)', () => {
+  it("a folder's own page isn't listed under it", () => {
+    const children = childrenByParent([
+      { path: 'Lore', kind: 'folder' },
+      { path: 'Lore/Lore.md', kind: 'page' },
+      { path: 'Lore/Other.md', kind: 'page' },
+      { path: 'Lore.md', kind: 'page' },
+    ]);
+    expect(visibleRows(children, new Set(['Lore'])).map((r) => r.node.path)).toEqual([
+      'Lore',
+      'Lore/Other.md',
+      'Lore.md',
+    ]);
+  });
+});
+
 describe('row quick actions (M5b §3)', () => {
   const actions = (name: string) =>
     within(screen.getByRole('treeitem', { name }))

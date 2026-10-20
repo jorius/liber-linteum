@@ -11,7 +11,7 @@ import { useTranslation } from 'react-i18next';
 import type { TreeNode } from '../../ipc';
 import { usePageStore } from '../../stores/pageStore';
 import { useTrailStore } from '../../stores/trailStore';
-import { isArchived, joinPath, parentOf, remap } from '../../stores/tree';
+import { folderPageOf, isArchived, joinPath, parentOf, remap } from '../../stores/tree';
 import { useVaultStore } from '../../stores/vaultStore';
 import { useUiStore } from '../../stores/uiStore';
 import { useScratchpadStore } from '../scratchpad/scratchpadStore';
@@ -42,7 +42,8 @@ export function visibleRows(
     return i <= 0 ? list : [list[i], ...list.slice(0, i), ...list.slice(i + 1)];
   };
   const walk = (parent: string, level: number) => {
-    const list = children.get(parent) ?? [];
+    const own = folderPageOf(parent, children); // the folder's row stands for it
+    const list = (children.get(parent) ?? []).filter((n) => n.path !== own);
     for (const node of parent ? list : pin(list.filter((n) => !isArchived(n.path)))) {
       out.push({ node, level });
       if (node.kind === 'folder' && expanded.has(node.path)) walk(node.path, level + 1);

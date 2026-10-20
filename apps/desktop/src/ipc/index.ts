@@ -129,6 +129,8 @@ export interface RenameOutcome {
   updatedFiles: string[];
   updatedLinks: number;
   failed: [string, string][];
+  /** Round 3b §6.3: the folder page's second rename, in paths after the first. */
+  pair?: [string, string] | null;
 }
 
 export type Theme = 'system' | 'light' | 'dark';

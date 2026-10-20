@@ -563,4 +563,31 @@ describe('applyRename (M4c final review)', () => {
     await useVaultStore.getState().applyRename('Q.md', 'Idea.md', outcome([]), { quiet: true });
     expect(useVaultStore.getState().renaming).toBeNull();
   });
+  it('round 3b: a paired rename follows the open page to its final path, once', async () => {
+    const after: TreeNode[] = [
+      { path: 'Myths', kind: 'folder' },
+      { path: 'Myths/Myths.md', kind: 'page' },
+      { path: 'Myths/Sub', kind: 'folder' },
+    ];
+    mockIPC((cmd) => (cmd === 'vault_tree' ? after : []));
+    const load = vi.fn(async () => {});
+    const realLoad = usePageStore.getState().load;
+    usePageStore.setState({ path: 'Lore/Lore.md', load });
+    useVaultStore.setState({ selected: 'Lore/Lore.md', expanded: new Set(['Lore', 'Lore/Sub']) });
+    await useVaultStore
+      .getState()
+      .applyRename(
+        'Lore/Lore.md',
+        'Lore/Myths.md',
+        { ...outcome([]), pair: ['Lore', 'Myths'] },
+        { quiet: true },
+      );
+    expect(load).toHaveBeenCalledWith('Myths/Myths.md');
+    expect(load).not.toHaveBeenCalledWith('Lore/Myths.md');
+    expect(useVaultStore.getState().selected).toBe('Myths/Myths.md');
+    expect([...useVaultStore.getState().expanded]).toEqual(
+      expect.arrayContaining(['Myths', 'Myths/Sub']),
+    );
+    usePageStore.setState({ path: null, load: realLoad });
+  });
 });
