@@ -198,3 +198,21 @@ Jose picked mock A: "clean, pretty, perfect". The mock is `.superpowers/brainsto
 
    The same rule applies to every list that shows pages: the ⌘K picker, the `[[` link picker, Favorites and the recent lists. The plan checks each one.
 3. **Folder pages (§6)** are part of round 3b.
+
+### §8 amendment: round 3b rulings as built (2026-10-20)
+
+1. **The pairing lives in `VaultSession::rename` (Rust).** Every rename path gets it: tree, title and drag. The second step comes back as `RenameOutcome.pair`. The UI then composes both moves and reloads the open page once, straight to `Y/Y.md`. Only an in-place rename pairs; a move to another folder never does. *If wrong:* the pairing moves to the UI.
+2. **A taken pair name refuses the whole rename before anything moves.** A case-only pair is left to the vault's case-only rename. *If wrong:* the user sees "already exists" and nothing moved.
+3. **"Add a page to this folder" is hidden when a namesake `X.md` sits beside the folder.** Only "Use X.md as this folder's page" shows, because creating `X/X.md` next to `X.md` would make two pages answer `[[X]]`. *If wrong:* one condition.
+4. **On a folder-page row, ★, ☺ and the menu's Favorites and Icon… act on the page.** The folder's own icon shows only when the page has none. The §6.2 "open in Global View" action isn't added: pages have no such menu action today. *If wrong:* the folder icon is settable only on folders without a page.
+5. **Importer:**
+   - **Folder pages are named before their folder's children,** so a child with the folder's own name can't take `X/X.md`.
+   - **A database index moves inside its rows folder** (`Tasks/Tasks.md`) when the table has rows.
+   - **Existing m7 test expectations changed accordingly.** *If wrong:* the numbering of such a child, or one condition.
+6. **Double-click decides from the state before its first click** (Review Focus 3). Text and code files double-click like pages. A Favorites row only gets the "open for editing" half. *If wrong:* one condition.
+7. **Page lists.**
+   - **Search:** the page's icon wins over the cover in the result's box.
+   - **The `[[` list:** an attachment without an icon shows the explorer's image glyph, a page the page glyph, and headings get no box.
+   - **+ Related page's picker** shows the same box.
+   - **The Favorites rows** already showed the icon in place of the glyph.
+   - *If wrong:* one glyph.

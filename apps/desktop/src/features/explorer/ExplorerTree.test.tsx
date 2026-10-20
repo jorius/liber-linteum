@@ -571,6 +571,10 @@ describe('the folder-page menu actions (round 3b §6.4)', () => {
         failed: [],
         pair: null,
       }),
+      vault_tree: () => [
+        { path: 'Lore', kind: 'folder' },
+        { path: 'Lore/Lore.md', kind: 'page' },
+      ],
     });
     seed([
       { path: 'Lore', kind: 'folder' },
