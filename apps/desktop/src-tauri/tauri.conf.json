@@ -45,6 +45,12 @@
     "targets": ["app", "dmg", "msi", "nsis", "deb", "appimage"],
     "category": "Productivity",
     "license": "GPL-3.0-or-later",
+    "resources": {
+      "../../../THIRD-PARTY-NOTICES.md": "licenses/THIRD-PARTY-NOTICES.md",
+      "../../../crates/nimw-spell/dictionaries/en_US/LICENSE": "licenses/dictionary-en_US.txt",
+      "../../../crates/nimw-spell/dictionaries/es/LICENSE": "licenses/dictionary-es.txt",
+      "../../../crates/nimw-spell/dictionaries/es_CO/LICENSE": "licenses/dictionary-es_CO.txt"
+    },
     "shortDescription": "Private, local-only notes with a visual Global View.",
     "icon": [
       "icons/32x32.png",
