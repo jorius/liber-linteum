@@ -45,4 +45,7 @@ pub struct RenameOutcome {
     pub updated_links: usize,
     /// Files that could not be rewritten (path, reason); the move itself succeeded.
     pub failed: Vec<(String, String)>,
+    /// The folder page's second rename (round 3b §6.3), in paths that exist
+    /// after the first: a folder renamed with its `X/X.md`, or the reverse.
+    pub pair: Option<(String, String)>,
 }

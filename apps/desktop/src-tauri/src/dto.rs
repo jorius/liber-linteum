@@ -80,6 +80,8 @@ pub struct RenameOutcomeDto {
     pub updated_files: Vec<String>,
     pub updated_links: usize,
     pub failed: Vec<(String, String)>,
+    /// Round 3b §6.3: the folder page's second rename, `[from, to]` or null.
+    pub pair: Option<(String, String)>,
 }
 
 impl From<RenameOutcome> for RenameOutcomeDto {
@@ -89,6 +91,7 @@ impl From<RenameOutcome> for RenameOutcomeDto {
             updated_files: o.updated_files,
             updated_links: o.updated_links,
             failed: o.failed,
+            pair: o.pair,
         }
     }
 }

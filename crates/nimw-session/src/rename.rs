@@ -156,7 +156,34 @@ impl VaultSession {
         to: &VaultPath,
         rewrite_links: bool,
     ) -> Result<RenameOutcome> {
-        self.rename_with_hook(from, to, rewrite_links, &|_| {})
+        let exists = |p: &VaultPath| {
+            self.vault
+                .fs_path(p)
+                .is_ok_and(|f| f.symlink_metadata().is_ok())
+        };
+        let is_folder = self.vault.fs_path(from).is_ok_and(|f| f.is_dir());
+        let pair = paired_rename(from, to, is_folder, |p| exists(p));
+        // A taken pair name refuses the whole rename before anything moves;
+        // a case-only pair is the same entry and the vault handles it.
+        if let Some((a, b)) = &pair
+            && exists(b)
+            && !a.as_str().eq_ignore_ascii_case(b.as_str())
+        {
+            return Err(VaultError::AlreadyExists(b.to_string()).into());
+        }
+        let mut outcome = self.rename_with_hook(from, to, rewrite_links, &|_| {})?;
+        if let Some((a, b)) = pair {
+            let second = self.rename_with_hook(&a, &b, rewrite_links, &|_| {})?;
+            outcome.moved.extend(second.moved);
+            outcome.moved.sort();
+            outcome.updated_files.extend(second.updated_files);
+            outcome.updated_files.sort();
+            outcome.updated_files.dedup();
+            outcome.updated_links += second.updated_links;
+            outcome.failed.extend(second.failed);
+            outcome.pair = Some((a.to_string(), b.to_string()));
+        }
+        Ok(outcome)
     }
 
     pub(crate) fn rename_with_hook(
@@ -425,5 +452,67 @@ mod tests {
             dir.path().join("Root Ideas.md").exists(),
             "the move itself succeeded"
         );
+    }
+}
+
+/// The second rename that keeps a folder page and its folder together
+/// (round 3b §6.1, §6.3), in paths that exist after the first rename. Only an
+/// in-place rename pairs; a move to another folder never does.
+fn paired_rename(
+    from: &VaultPath,
+    to: &VaultPath,
+    is_folder: bool,
+    exists: impl Fn(&VaultPath) -> bool,
+) -> Option<(VaultPath, VaultPath)> {
+    if from.parent()? != to.parent()? {
+        return None;
+    }
+    if is_folder {
+        let page = from.join(&format!("{}.md", from.file_name())).ok()?;
+        if !exists(&page) {
+            return None;
+        }
+        let a = to.join(&format!("{}.md", from.file_name())).ok()?;
+        let b = to.join(&format!("{}.md", to.file_name())).ok()?;
+        return Some((a, b));
+    }
+    let folder = from.parent()?;
+    if folder.is_root()
+        || from.extension() != Some("md")
+        || to.extension() != Some("md")
+        || folder.file_name() != from.stem()
+    {
+        return None;
+    }
+    let b = folder.parent()?.join(to.stem()).ok()?;
+    Some((folder, b))
+}
+
+#[cfg(test)]
+mod pair_tests {
+    use super::*;
+
+    fn vp(s: &str) -> VaultPath {
+        VaultPath::new(s).unwrap()
+    }
+
+    #[test]
+    fn only_in_place_renames_pair() {
+        let yes = |_: &VaultPath| true;
+        assert_eq!(
+            paired_rename(&vp("A/B/B.md"), &vp("A/B/C.md"), false, yes),
+            Some((vp("A/B"), vp("A/C")))
+        );
+        assert_eq!(paired_rename(&vp("B.md"), &vp("B/B.md"), false, yes), None);
+        assert_eq!(
+            paired_rename(&vp("A/B.md"), &vp("A/C.md"), false, yes),
+            None
+        );
+        assert_eq!(
+            paired_rename(&vp("B"), &vp("C"), true, yes),
+            Some((vp("C/B.md"), vp("C/C.md")))
+        );
+        assert_eq!(paired_rename(&vp("B"), &vp("C"), true, |_| false), None);
+        assert_eq!(paired_rename(&vp("A/B"), &vp("C"), true, yes), None);
     }
 }

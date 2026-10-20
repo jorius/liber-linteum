@@ -321,6 +321,7 @@ fn exp_02_04_create_rename_and_close() {
     assert_eq!(out["updatedLinks"], 4);
     assert_eq!(out["updatedFiles"].as_array().unwrap().len(), 2);
     assert_eq!(out["failed"], json!([]));
+    assert_eq!(out["pair"], json!(null));
     assert!(
         std::fs::read_to_string(vault.path().join("Character Design/rex-draft.md"))
             .unwrap()

@@ -495,3 +495,92 @@ fn m5b_r2_review_m1_a_rename_rewrites_links_inside_archived_pages() {
         "See [[Sparda the Dark Knight]].\n"
     );
 }
+
+// ---- Round 3b §6.3: folder pages (`X/X.md`) rename with their folder ----
+
+/// obsidian-basic plus `Lore/Lore.md`, `Lore/Other.md` and `Index.md` → `[[Lore]]`.
+fn lore_session(extra: &[&str]) -> (tempfile::TempDir, tempfile::TempDir, VaultSession) {
+    let vault = copy_fixture("obsidian-basic");
+    std::fs::create_dir_all(vault.path().join("Lore")).unwrap();
+    std::fs::write(vault.path().join("Lore/Lore.md"), "# Lore\n").unwrap();
+    std::fs::write(vault.path().join("Lore/Other.md"), "# Other\n").unwrap();
+    std::fs::write(vault.path().join("Index.md"), "See [[Lore]].\n").unwrap();
+    for dir in extra {
+        std::fs::create_dir_all(vault.path().join(dir)).unwrap();
+    }
+    let cache = tempfile::tempdir().unwrap();
+    let (s, _) = VaultSession::open(vault.path(), cache.path(), |_: SessionEvent| {}).unwrap();
+    (vault, cache, s)
+}
+
+fn pair(a: &str, b: &str) -> Option<(String, String)> {
+    Some((a.to_string(), b.to_string()))
+}
+
+#[test]
+fn r3b_renaming_a_folder_renames_its_page() {
+    let (dir, _c, s) = lore_session(&[]);
+    let out = s.rename(&vp("Lore"), &vp("Myths"), true).unwrap();
+    assert!(dir.path().join("Myths/Myths.md").exists());
+    assert!(!dir.path().join("Myths/Lore.md").exists());
+    assert!(dir.path().join("Myths/Other.md").exists());
+    assert_eq!(out.pair, pair("Myths/Lore.md", "Myths/Myths.md"));
+    assert!(
+        read(&dir, "Index.md").contains("[[Myths]]"),
+        "{}",
+        read(&dir, "Index.md")
+    );
+}
+
+#[test]
+fn r3b_renaming_a_folder_page_renames_its_folder() {
+    let (dir, _c, s) = lore_session(&[]);
+    let out = s
+        .rename(&vp("Lore/Lore.md"), &vp("Lore/Myths.md"), true)
+        .unwrap();
+    assert!(dir.path().join("Myths/Myths.md").exists());
+    assert!(dir.path().join("Myths/Other.md").exists());
+    assert!(!dir.path().join("Lore").exists());
+    assert_eq!(out.pair, pair("Lore", "Myths"));
+    assert!(
+        read(&dir, "Index.md").contains("[[Myths]]"),
+        "{}",
+        read(&dir, "Index.md")
+    );
+}
+
+#[test]
+fn r3b_a_taken_pair_name_refuses_the_whole_rename() {
+    let (dir, _c, s) = lore_session(&["Myths"]);
+    let err = s
+        .rename(&vp("Lore/Lore.md"), &vp("Lore/Myths.md"), true)
+        .unwrap_err();
+    assert!(
+        matches!(
+            err,
+            SessionError::Vault(nimw_vault::VaultError::AlreadyExists(_))
+        ),
+        "{err:?}"
+    );
+    assert!(dir.path().join("Lore/Lore.md").exists());
+    assert!(!dir.path().join("Lore/Myths.md").exists());
+}
+
+#[test]
+fn r3b_moving_a_page_into_its_namesake_folder_is_a_plain_move() {
+    let (dir, _c, s) = lore_session(&["Saga"]);
+    s.create_page(&VaultPath::root(), "Saga").unwrap();
+    let out = s.rename(&vp("Saga.md"), &vp("Saga/Saga.md"), true).unwrap();
+    assert_eq!(out.pair, None);
+    assert!(dir.path().join("Saga/Saga.md").exists());
+}
+
+#[test]
+fn r3b_plain_renames_have_no_pair() {
+    let (dir, _c, s) = lore_session(&[]);
+    let out = s
+        .rename(&vp("Lore/Other.md"), &vp("Lore/Else.md"), true)
+        .unwrap();
+    assert_eq!(out.pair, None);
+    assert!(dir.path().join("Lore/Lore.md").exists());
+}
