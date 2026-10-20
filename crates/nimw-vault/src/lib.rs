@@ -17,6 +17,7 @@ mod page_width;
 mod path;
 mod scan;
 mod scratch;
+mod spelling;
 mod vault;
 mod watch;
 

@@ -15,6 +15,7 @@ serde.workspace = true
 serde_json.workspace = true
 thiserror.workspace = true
 trash.workspace = true
+unicode-normalization.workspace = true
 
 [dev-dependencies]
 nimw-testkit = { path = "../nimw-testkit" }
