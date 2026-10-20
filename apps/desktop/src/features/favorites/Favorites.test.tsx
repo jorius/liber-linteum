@@ -270,3 +270,15 @@ describe('Favorites (M5b §19)', () => {
     expect(result.violations).toEqual([]);
   });
 });
+
+describe('double-click (round 3b §8.1)', () => {
+  it('a Favorites page row opens the page for editing from the Global View', async () => {
+    await open(['Zed.md']);
+    useUiStore.setState({ screen: 'global' });
+    render(<ExplorerTree />);
+    await userEvent.dblClick(within(section()).getByRole('button', { name: 'Zed' }));
+    expect(useUiStore.getState().screen).toBe('edit');
+    expect(usePageStore.getState().editorFocus).toBe(true);
+    useUiStore.setState({ screen: 'edit' });
+  });
+});

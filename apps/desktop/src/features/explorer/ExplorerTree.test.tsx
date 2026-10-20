@@ -607,3 +607,55 @@ describe('the folder-page menu actions (round 3b §6.4)', () => {
     expect(labels()).not.toContain('Add a page to this folder');
   });
 });
+
+describe('double-click a page (round 3b §8.1)', () => {
+  const realLoad = usePageStore.getState().load;
+  const loads: string[] = [];
+  const load = vi.fn(async (p: string) => {
+    loads.push(p);
+    usePageStore.setState({ path: p });
+  });
+  afterEach(() => {
+    usePageStore.setState({ load: realLoad, path: null, editorFocus: false });
+    useUiStore.setState({ screen: 'edit' });
+    loads.length = 0;
+  });
+  const start = (screenNow: 'edit' | 'global', open: string | null, list = nodes) => {
+    usePageStore.setState({ load, path: open, editorFocus: false });
+    useUiStore.setState({ screen: screenNow });
+    seed(list);
+    render(<ExplorerTree />);
+  };
+  const row = (name: string) => screen.getByRole('treeitem', { name });
+
+  it('from the Global View it opens the page for editing, without renaming', async () => {
+    start('global', 'Welcome.md');
+    await userEvent.dblClick(row('Welcome'));
+    expect(useUiStore.getState().screen).toBe('edit');
+    expect(usePageStore.getState().editorFocus).toBe(true);
+    expect(useVaultStore.getState().renaming).toBeNull();
+  });
+
+  it('on the page already open for editing it renames it', async () => {
+    start('edit', 'Welcome.md');
+    await userEvent.dblClick(row('Welcome'));
+    expect(useVaultStore.getState().renaming).toBe('Welcome.md');
+  });
+
+  it('on another page it opens that one; the first click switching pages starts no rename', async () => {
+    start('edit', 'Art/rex.md');
+    await userEvent.dblClick(row('Welcome'));
+    expect(loads).toContain('Welcome.md');
+    expect(useVaultStore.getState().renaming).toBeNull();
+    expect(usePageStore.getState().editorFocus).toBe(true);
+  });
+
+  it('a folder page row renames the folder when its page is the one open', async () => {
+    start('edit', 'Lore/Lore.md', [
+      { path: 'Lore', kind: 'folder' },
+      { path: 'Lore/Lore.md', kind: 'page' },
+    ]);
+    await userEvent.dblClick(within(row('Lore')).getByText('Lore'));
+    expect(useVaultStore.getState().renaming).toBe('Lore');
+  });
+});

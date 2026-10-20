@@ -150,13 +150,30 @@ export function ExplorerTree({
     if (focused && !rows.some((r) => r.node.path === focused) && selected) setFocused(selected);
   }, [rows, focused, selected]);
 
-  const activate = (node: TreeNode) => {
+  // Round 3b §8.1: whether the editor already showed the row's page before
+  // the double-click's first click (which may itself open it).
+  const wasEditing = useRef(false);
+  const activate = (node: TreeNode, clicks = 1) => {
     const vault = useVaultStore.getState();
+    const open = node.kind === 'folder' ? pageOf(node)?.path : node.path;
+    const opens = !!open && (node.kind !== 'attachment' || isTextPath(open));
+    if (opens && clicks >= 2) {
+      const ui = useUiStore.getState();
+      if (wasEditing.current) {
+        if (!archive) vault.startRename(node.path);
+      } else {
+        ui.setScreen('edit');
+        if (usePageStore.getState().path !== open) void usePageStore.getState().load(open);
+        usePageStore.getState().requestEditorFocus();
+      }
+      return;
+    }
+    wasEditing.current =
+      useUiStore.getState().screen === 'edit' && usePageStore.getState().path === open;
     vault.select(node.path);
     setFocused(node.path);
-    const open = node.kind === 'folder' ? pageOf(node)?.path : node.path;
     if (node.kind === 'folder' && !open) vault.toggle(node.path);
-    else if (open && (node.kind !== 'attachment' || isTextPath(open))) {
+    else if (opens) {
       // Pages, and text and code files in the text view (M4b part 2 §6).
       // Opening from the explorer starts a fresh link trail (M2b §3).
       useTrailStore.getState().reset();

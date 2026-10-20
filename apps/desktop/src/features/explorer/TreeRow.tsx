@@ -32,7 +32,8 @@ interface TreeRowProps {
   focused: boolean;
   renaming: boolean;
   dropTarget?: boolean;
-  onActivate: (node: TreeNode) => void;
+  /** `clicks`: the click's detail (2 on a double-click's second click). */
+  onActivate: (node: TreeNode, clicks?: number) => void;
   onFocusRow: (path: string) => void;
   onCommitRename: (node: TreeNode, name: string) => void;
   onCancelRename: () => void;
@@ -275,7 +276,7 @@ export const TreeRow = forwardRef<HTMLLIElement, TreeRowProps>(function TreeRow(
       data-divider={divider || undefined}
       className={classes}
       style={{ paddingLeft: 8 + (level - 1) * 16 }}
-      onClick={() => onActivate(node)}
+      onClick={(e) => onActivate(node, e.detail)}
       onFocus={() => onFocusRow(node.path)}
     >
       {/* An optional emoji (M5b §4) stands in for the page glyph, and
