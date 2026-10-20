@@ -122,10 +122,28 @@ pub(crate) fn random_bytes<const N: usize>() -> [u8; N] {
     b
 }
 
-#[allow(dead_code)] // used by the key-slot and Argon2 tasks
-pub(crate) fn rng() -> impl rand_core::CryptoRng {
-    rand_core::UnwrapErr(getrandom::SysRng)
+/// The OS RNG for APIs that take a `rand_core` RNG (the X-Wing KEM). It draws from the same
+/// source as everything else, so `with_seeded_rng` makes those calls deterministic too.
+pub(crate) struct OsRng;
+
+impl rand_core::TryRng for OsRng {
+    type Error = rand_core::Infallible;
+
+    fn try_next_u32(&mut self) -> Result<u32, Self::Error> {
+        Ok(u32::from_le_bytes(random_bytes()))
+    }
+
+    fn try_next_u64(&mut self) -> Result<u64, Self::Error> {
+        Ok(u64::from_le_bytes(random_bytes()))
+    }
+
+    fn try_fill_bytes(&mut self, dst: &mut [u8]) -> Result<(), Self::Error> {
+        fill_random(dst);
+        Ok(())
+    }
 }
+
+impl rand_core::TryCryptoRng for OsRng {}
 
 pub(crate) fn hkdf_sha256(ikm: &[u8], salt: &[u8], info: &[u8]) -> Secret<32> {
     let mut b = Box::new([0u8; 32]);

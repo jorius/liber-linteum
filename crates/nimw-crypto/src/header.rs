@@ -14,17 +14,18 @@ use crate::kdf::{Argon2Params, passphrase_kek};
 use crate::keys::{Secret, Subkeys, VaultId, VaultKey, hkdf_sha256, hmac_sha256, random_bytes};
 use crate::recovery::RecoveryCode;
 use crate::slots::{
-    NewSlot, Slot, SlotKind, Unlock, aad, b64, bytes, device_kek, field, object, recovery_kek,
-    slot_aad, slot_from_json, slot_to_json, text, uint, unwrap, wrap,
+    NewSlot, Slot, SlotKind, Unlock, aad, b64, bytes, device_kek, field, keyring_kek_new,
+    keyring_kek_open, object, recovery_kek, slot_aad, slot_from_json, slot_to_json, text, uint,
+    unwrap, wrap,
 };
 
 const FORMAT: &str = "nimw-vault";
 const VERSION: u64 = 1;
 const MAX_HEADER_BYTES: usize = 1 << 20;
 /// Known plus unknown slots; also bounds how many KDF runs a hostile header can cause.
-const MAX_SLOTS: usize = 64;
+pub(crate) const MAX_SLOTS: usize = 64;
 /// One normally; a few while a passphrase change or merge settles. Each costs a KDF run on unlock.
-const MAX_PASSPHRASE_SLOTS: usize = 4;
+pub(crate) const MAX_PASSPHRASE_SLOTS: usize = 4;
 /// Tombstones reset at each key rotation, so this is never reached in practice.
 const MAX_REMOVED: usize = 1024;
 const RETIRING: &[u8] = b"nimw/v1/retiring";
@@ -203,6 +204,11 @@ impl VaultHeader {
                 }
                 (SlotKind::Recovery, Unlock::Recovery(rc)) => recovery_kek(rc, id),
                 (SlotKind::Device { .. }, Unlock::Device(secret)) => device_kek(secret, id),
+                (SlotKind::Keyring { keyring_id, enc }, Unlock::Keyring(ks))
+                    if *keyring_id == ks.keyring_id =>
+                {
+                    keyring_kek_open(ks, enc, id, &s.id)?
+                }
                 _ => continue,
             };
             let Ok(vk) = unwrap(
@@ -251,6 +257,22 @@ impl VaultHeader {
                 }
                 let kek = device_kek(secret, &self.vault_id);
                 self.push(SlotKind::Device { device_id }, &kek, &u.vk)?
+            }
+            NewSlot::Keyring(p) => {
+                let kid = p.keyring_id;
+                if self.slots.iter().any(
+                    |s| matches!(&s.kind, SlotKind::Keyring { keyring_id, .. } if *keyring_id == kid),
+                ) {
+                    return Err(CryptoError::Params("this keyring already has a slot"));
+                }
+                // The KEK binds the slot id, so the id comes first.
+                let id = random_bytes();
+                let (enc, kek) = keyring_kek_new(p, &self.vault_id, &id);
+                let kind = SlotKind::Keyring {
+                    keyring_id: kid,
+                    enc,
+                };
+                self.push_as(id, kind, &kek, &u.vk)?
             }
         };
         self.seal(u);
@@ -436,6 +458,16 @@ impl VaultHeader {
     }
 
     fn push(&mut self, kind: SlotKind, kek: &Secret<32>, vk: &VaultKey) -> Result<[u8; 16]> {
+        self.push_as(random_bytes(), kind, kek, vk)
+    }
+
+    fn push_as(
+        &mut self,
+        id: [u8; 16],
+        kind: SlotKind,
+        kek: &Secret<32>,
+        vk: &VaultKey,
+    ) -> Result<[u8; 16]> {
         if self.slot_count() >= MAX_SLOTS {
             return Err(CryptoError::Params("too many slots"));
         }
@@ -444,7 +476,6 @@ impl VaultHeader {
         {
             return Err(CryptoError::Params("too many passphrase slots"));
         }
-        let id: [u8; 16] = random_bytes();
         let nonce = random_bytes();
         let aad = slot_aad(&self.vault_id, self.epoch, &id, &kind);
         let wrapped = wrap(kek, &nonce, &aad, vk);
@@ -501,11 +532,7 @@ impl VaultHeader {
     }
 
     fn verify(&self, k_header: &Secret<32>) -> Result<()> {
-        if bool::from(mac_over(&self.to_json(), k_header).ct_eq(&self.mac)) {
-            Ok(())
-        } else {
-            Err(CryptoError::Authentication)
-        }
+        check_mac(&self.to_json(), k_header, &self.mac)
     }
 }
 
@@ -516,16 +543,25 @@ fn recovery_slot_ids(slots: &[Slot]) -> impl Iterator<Item = [u8; 16]> + '_ {
         .map(|s| s.id)
 }
 
-fn passphrase_count(slots: &[Slot]) -> usize {
+pub(crate) fn passphrase_count(slots: &[Slot]) -> usize {
     slots
         .iter()
         .filter(|s| matches!(s.kind, SlotKind::Passphrase { .. }))
         .count()
 }
 
-fn mac_over(header: &Value, k_header: &Secret<32>) -> [u8; 32] {
-    let canonical = serde_json::to_vec(header).expect("a Value always serialises");
-    hmac_sha256(k_header.expose(), &[&canonical])
+/// HMAC-SHA-256 over canonical JSON (the module docs); also the keyring file's MAC.
+pub(crate) fn mac_over(v: &Value, key: &Secret<32>) -> [u8; 32] {
+    let canonical = serde_json::to_vec(v).expect("a Value always serialises");
+    hmac_sha256(key.expose(), &[&canonical])
+}
+
+pub(crate) fn check_mac(v: &Value, key: &Secret<32>, mac: &[u8; 32]) -> Result<()> {
+    if bool::from(mac_over(v, key).ct_eq(mac)) {
+        Ok(())
+    } else {
+        Err(CryptoError::Authentication)
+    }
 }
 
 fn retiring_kek(new_vk: &VaultKey, id: &VaultId) -> Secret<32> {

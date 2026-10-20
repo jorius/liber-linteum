@@ -20,6 +20,7 @@ sha2.workspace = true
 subtle.workspace = true
 thiserror.workspace = true
 unicode-normalization.workspace = true
+x-wing.workspace = true
 zeroize.workspace = true
 
 [lints]

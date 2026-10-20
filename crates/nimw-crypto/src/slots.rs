@@ -4,17 +4,17 @@ use aes_gcm::Aes256Gcm;
 use aes_gcm::aead::{AeadInOut, KeyInit, Nonce};
 use data_encoding::BASE64URL_NOPAD;
 use serde_json::{Map, Value, json};
-use zeroize::Zeroizing;
+use x_wing::{CIPHERTEXT_SIZE, Ciphertext, Decapsulate, Encapsulate};
+use zeroize::{Zeroize, Zeroizing};
 
 use crate::error::{CryptoError, Result};
 use crate::kdf::Argon2Params;
-use crate::keys::{Secret, VaultId, VaultKey, hkdf_sha256};
+use crate::keyring::{KeyringPublic, KeyringSecret};
+use crate::keys::{OsRng, Secret, VaultId, VaultKey, hkdf_sha256};
 use crate::recovery::RecoveryCode;
 
 /// A wrapped 32-byte key plus the GCM tag.
 pub(crate) const WRAPPED_LEN: usize = 32 + 16;
-/// Bound on a keyring slot's KEM ciphertext (X-Wing's is 1120 bytes).
-const MAX_ENC: usize = 4096;
 pub(crate) const MAX_DEVICE_ID: usize = 256;
 
 #[derive(Clone, Debug)]
@@ -57,6 +57,7 @@ pub enum Unlock<'a> {
     Passphrase(&'a str),
     Recovery(&'a RecoveryCode),
     Device(&'a Secret<32>),
+    Keyring(&'a KeyringSecret),
 }
 
 /// A slot to add to an unlocked vault. Recovery slots come only from `create` / `new_recovery`.
@@ -66,6 +67,8 @@ pub enum NewSlot<'a> {
         device_id: String,
         secret: &'a Secret<32>,
     },
+    /// Needs only the keyring's public key, so the keyring can stay locked.
+    Keyring(&'a KeyringPublic),
 }
 
 pub(crate) fn recovery_kek(rc: &RecoveryCode, id: &VaultId) -> Secret<32> {
@@ -74,6 +77,36 @@ pub(crate) fn recovery_kek(rc: &RecoveryCode, id: &VaultId) -> Secret<32> {
 
 pub(crate) fn device_kek(secret: &Secret<32>, id: &VaultId) -> Secret<32> {
     hkdf_sha256(secret.expose(), &id.0, b"nimw/v1/slot/device")
+}
+
+/// X-Wing encapsulation to the keyring: returns the slot's `enc` (the ciphertext) and its KEK.
+pub(crate) fn keyring_kek_new(
+    p: &KeyringPublic,
+    id: &VaultId,
+    slot_id: &[u8; 16],
+) -> (Vec<u8>, Secret<32>) {
+    let (ct, mut ss) = p.ek.encapsulate_with_rng(&mut OsRng);
+    let kek = keyring_kek(&ss, id, slot_id);
+    ss[..].zeroize();
+    (ct.to_vec(), kek)
+}
+
+pub(crate) fn keyring_kek_open(
+    s: &KeyringSecret,
+    enc: &[u8],
+    id: &VaultId,
+    slot_id: &[u8; 16],
+) -> Result<Secret<32>> {
+    let ct = <&Ciphertext>::try_from(enc).map_err(|_| CryptoError::BadFormat("enc"))?;
+    // X-Wing never fails here (implicit rejection): a wrong key yields a KEK that fails the GCM tag.
+    let mut ss = s.decapsulation_key().decapsulate(ct);
+    let kek = keyring_kek(&ss, id, slot_id);
+    ss[..].zeroize();
+    Ok(kek)
+}
+
+fn keyring_kek(ss: &[u8], id: &VaultId, slot_id: &[u8; 16]) -> Secret<32> {
+    hkdf_sha256(ss, &id.0, &[&b"nimw/v1/slot/keyring"[..], slot_id].concat())
 }
 
 /// `label ‖ vault_id ‖ epoch (u32 BE) ‖ tail…`
@@ -189,7 +222,7 @@ pub(crate) fn slot_from_json(v: &Value) -> Result<Option<Slot>> {
         "recovery" => SlotKind::Recovery,
         "keyring" => SlotKind::Keyring {
             keyring_id: bytes(o, "keyring_id")?,
-            enc: bytes_max(o, "enc", MAX_ENC)?,
+            enc: bytes::<CIPHERTEXT_SIZE>(o, "enc")?.to_vec(),
         },
         "device" => {
             let d = text(o, "device_id")?;
