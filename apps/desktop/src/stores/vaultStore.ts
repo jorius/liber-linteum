@@ -43,6 +43,7 @@ import {
   parentOf,
   remap,
 } from './tree';
+import { useSpellStore } from './spellStore';
 
 /** External changes arriving within this window trigger one tree refresh. */
 export const COALESCE_MS = 100;
@@ -248,6 +249,8 @@ export const useVaultStore = create<VaultState>((set, get) => {
     await get().refreshTree();
     await startListening();
     set({ status: 'open', progress: null });
+    // Another vault: its own words and dictionaries (spell checking).
+    useSpellStore.getState().bump();
     const warnings = res.value.report.warnings ?? [];
     if (warnings.length) {
       toast().push({
@@ -310,6 +313,7 @@ export const useVaultStore = create<VaultState>((set, get) => {
       usePageStore.getState().clear();
       treeSeq++;
       set({ ...EMPTY, children: new Map(), expanded: new Set() });
+      useSpellStore.getState().bump();
     },
     refreshTree: async () => {
       const mine = ++treeSeq;

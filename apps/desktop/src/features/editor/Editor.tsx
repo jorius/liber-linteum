@@ -44,6 +44,7 @@ import { notifyViewReset, notifyViewUpdate, setCurrentView } from './viewUpdates
 import { Toolbar } from './Toolbar';
 import { hideView, pageDocOf, showView, storedState, storeState } from './views';
 import { LIVE_PADDING, wideAttrs, wideExtents } from './wideBox';
+import { spellcheck } from './spell';
 import { toggleTaskIn } from './widgets';
 
 /** The Split pane of the component currently showing each view. */
@@ -59,6 +60,8 @@ const languageSlot = new Compartment();
 /** Archived pages are read-only (M5b round 2): no typing, and no edits from
  *  the toolbar or keys; changes from the disk still show. */
 const readOnlySlot = new Compartment();
+/** Spell checking, pages only (spell checking spec): off leaves it out. */
+const spellSlot = new Compartment();
 const readOnly = [
   EditorState.readOnly.of(true),
   EditorView.editable.of(false),
@@ -118,6 +121,11 @@ const theme = EditorView.theme({
   '.cm-nimw-code-punct': { color: 'var(--code-punct)' },
   '&': { height: '100%', color: 'var(--color-text)', backgroundColor: 'transparent' },
   '&.cm-focused': { outline: 'none' },
+  '.cm-nimw-misspelled': {
+    textDecoration: 'underline wavy var(--color-danger)',
+    textDecorationSkipInk: 'none',
+    textUnderlineOffset: '3px',
+  },
   '.cm-scroller': {
     fontFamily: 'var(--font-live)',
     fontSize: 'var(--font-size-editor)',
@@ -330,10 +338,13 @@ function createState(d: PageDoc, mode: EditorMode, label: string, numbers: boole
       // An atom clicked in the Global View flashes here (M4b part 3 §6).
       flash,
       gutterSlot.of(gutter(numbers)),
+      spellSlot.of(spellOn() ? spellcheck() : []),
       followers,
     ],
   });
 }
+
+const spellOn = () => useSettingsStore.getState().settings.spellcheck;
 
 export interface EditorProps {
   doc: PageDoc;
@@ -427,6 +438,8 @@ export function Editor({ doc, mode, label }: EditorProps) {
         modeSlot.reconfigure(modeExtensions(mode)),
         labelSlot.reconfigure(labelled(label)),
         gutterSlot.reconfigure(gutter(showNumbers || isTextPath(doc.path))),
+        // A page's stored state may predate a change to the setting.
+        ...(isTextPath(doc.path) ? [] : [spellSlot.reconfigure(spellOn() ? spellcheck() : [])]),
       ],
     });
     setText(doc.text);
@@ -449,6 +462,13 @@ export function Editor({ doc, mode, label }: EditorProps) {
       effects: gutterSlot.reconfigure(gutter(showNumbers || isTextPath(current.current.path))),
     });
   }, [showNumbers]);
+
+  const spellEnabled = useSettingsStore((s) => s.settings.spellcheck);
+  useLayoutEffect(() => {
+    const v = view.current;
+    if (!v || isTextPath(current.current.path)) return;
+    v.dispatch({ effects: spellSlot.reconfigure(spellEnabled ? spellcheck() : []) });
+  }, [spellEnabled]);
 
   // Back from the Global View (a card opened in the editor, ⌘1): the keyboard
   // comes back here, with the selection it had, once the editor shows —

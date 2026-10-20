@@ -211,6 +211,12 @@ export interface Settings {
   sidebarWidth: number;
   /** Where the floating Edit / Global View / Search button sits (M5b §2.2). */
   actionButton: ActionButtonPlace;
+  /** Spell checking in the editor (spell checking spec §4). */
+  spellcheck: boolean;
+  /** The dictionaries checked, in order; `null` = the app language's. */
+  spellDictionaries: string[] | null;
+  /** Dictionaries imported from disk (changed only by the spell commands). */
+  importedDictionaries: { id: string; name: string }[];
 }
 
 export type ActionButtonPlace = 'bottomRight' | 'bottomLeft' | 'topRight';
@@ -266,6 +272,8 @@ export interface SettingsPatch {
   sidebarCollapsed?: boolean;
   sidebarWidth?: number;
   actionButton?: ActionButtonPlace;
+  spellcheck?: boolean;
+  spellDictionaries?: string[];
 }
 
 export interface SettingsResponse {
@@ -748,6 +756,36 @@ export const folderSortSet = (path: string, sort: FolderSort) =>
   call<null>('folder_sort_set', { path, sort });
 /** The vault's own emoji (M5b §4); `null` removes it. */
 export const vaultIconSet = (icon: string | null) => call<null>('vault_icon_set', { icon });
+// ---- spell checking (local dictionaries only) ----
+
+export interface SpellDictionary {
+  id: string;
+  name: string;
+  bundled: boolean;
+  /** False when an imported dictionary's files are gone or don't parse. */
+  available: boolean;
+}
+
+/** Whether each word is spelled right; `lang` (the UI's language) picks the
+ *  default dictionary when none is chosen. */
+export const spellCheck = (words: string[], lang: string) =>
+  call<boolean[]>('spell_check', { words, lang });
+export const spellSuggest = (word: string, lang: string) =>
+  call<string[]>('spell_suggest', { word, lang });
+export const spellDictionaries = () => call<SpellDictionary[]>('spell_dictionaries');
+/** Picks a .aff/.dic pair on disk; `null` when cancelled. */
+export const spellImport = () => call<SpellDictionary | null>('spell_import');
+export const spellRemove = (id: string) => call<void>('spell_remove', { id });
+/** Adds a word to the open vault's dictionary. */
+export const spellAddWord = (word: string) => call<void>('spell_add_word', { word });
+/** Ignores a word until the vault closes. */
+export const spellIgnore = (word: string) => call<void>('spell_ignore', { word });
+export const spellWords = () => call<string[]>('spell_words');
+export const spellRemoveWord = (word: string) => call<void>('spell_remove_word', { word });
+/** The open vault's own dictionaries; `null` = the app's. */
+export const spellVaultGet = () => call<string[] | null>('spell_vault_get');
+export const spellVaultSet = (ids: string[] | null) => call<void>('spell_vault_set', { ids });
+
 /** The vault's favorites, in the order they were added (M5b §19). */
 export const favoritesGet = () => call<string[]>('favorites_get');
 /** Replaces the favorites; Rust drops missing entries and repeats and
