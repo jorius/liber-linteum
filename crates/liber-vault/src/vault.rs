@@ -9,8 +9,8 @@ use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 
 /// An open vault folder. Opening reads configuration and writes nothing of
-/// the user's (VLT-02); its one write is moving a legacy `.nimw/` settings
-/// folder to `.liber/` (`meta_dir::migrate`).
+/// the user's (VLT-02); its one write is moving the settings folder from
+/// before the rename (`LEGACY_META_DIR`) to `.liber/` (`meta_dir::migrate`).
 #[derive(Debug)]
 pub struct Vault {
     pub(crate) root: PathBuf,
