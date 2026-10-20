@@ -316,13 +316,20 @@ describe('move (EXP-02)', () => {
     render(<AppShell />);
     act(() => useUiStore.getState().openDialog({ type: 'move', path: 'Art/DMC' }));
     const dialog = screen.getByRole('dialog', { name: 'Move “DMC”' });
-    const select = within(dialog).getByRole('listbox', { name: 'Destination folder' });
-    const options = within(select)
-      .getAllByRole('option')
+    // Round 3 §3.2: a folder tree. Its own folder is shown but can't be
+    // picked; itself and its descendants aren't there.
+    const tree = within(dialog).getByRole('tree', { name: 'Destination folder' });
+    const enabled = within(tree)
+      .getAllByRole('treeitem')
+      .filter((o) => o.getAttribute('aria-disabled') !== 'true')
       .map((o) => o.textContent);
-    expect(options).toEqual(['Vault root', 'Games']); // not itself, its folder or descendants
+    expect(enabled).toEqual(['Vault root', 'Games']);
+    expect(within(tree).getByRole('treeitem', { name: /^Art/ })).toHaveAttribute(
+      'aria-disabled',
+      'true',
+    );
     expect(await axeRun(dialog)).toEqual([]);
-    await userEvent.selectOptions(select, 'Games');
+    await userEvent.click(within(tree).getByRole('treeitem', { name: 'Games' }));
     await userEvent.click(within(dialog).getByRole('button', { name: 'Move' }));
     await waitFor(() =>
       expect(calls.find(([c]) => c === 'entry_rename')?.[1]).toEqual({
