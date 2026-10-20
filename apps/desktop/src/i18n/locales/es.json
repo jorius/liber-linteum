@@ -7,15 +7,20 @@
   },
   "welcome": {
     "language": "Idioma",
-    "create": "Crear una bóveda nueva",
-    "open": "Abrir una carpeta como bóveda",
+    "create": "Bóveda nueva",
+    "open": "Abrir carpeta como bóveda",
     "openObsidian": "Abrir una bóveda de Obsidian",
-    "importNotion": "Importar una exportación de Notion",
-    "recent": "Recientes",
+    "importNotion": "Importar desde Notion…",
+    "recent": "Bóvedas recientes",
     "noRecent": "Aún no hay bóvedas recientes.",
     "forget": "Quitar {name} de recientes",
     "missing": "Carpeta no encontrada",
-    "quickNote": "Tomar una nota rápida"
+    "quickNote": "Nota rápida",
+    "moreWays": "Más formas de empezar",
+    "openFile": "Abrir un solo archivo…",
+    "filter": "Filtrar bóvedas",
+    "noMatch": "Ninguna bóveda coincide con «{query}».",
+    "reveal": "{os, select, mac {Mostrar {name} en el Finder} windows {Mostrar {name} en el Explorador} other {Mostrar {name} en el gestor de archivos}}"
   },
   "languages": {
     "en": "English",

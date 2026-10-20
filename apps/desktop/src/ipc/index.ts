@@ -604,6 +604,8 @@ export const settingsGet = () => call<SettingsResponse>('settings_get');
 export const settingsSet = (patch: SettingsPatch) => call<Settings>('settings_set', { patch });
 export const vaultsRecent = () => call<RecentVault[]>('vaults_recent');
 export const vaultsForget = (path: string) => call<void>('vaults_forget', { path });
+/** Shows a recent vault's folder in Finder or Explorer (R3 §7). */
+export const vaultsReveal = (path: string) => call<void>('vaults_reveal', { path });
 export const pageRead = (path: string) =>
   fileName !== null ? fileText(path) : call<PageText>('page_read', { path });
 export const pageWrite = (path: string, text: string, expectedHash: string) =>

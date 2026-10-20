@@ -167,3 +167,20 @@ Jose picked mock A: "clean, pretty, perfect". The mock is `.superpowers/brainsto
 - **Narrow windows.** Below ~720 px wide, the two columns stack, start first.
 - **Unchanged.** All existing behaviour is kept: opening overlay `inert`, missing vaults, forgetting, quick notes, single file, Notion import. Only the layout and the new filter, meta and reveal change.
 - **Fields.** Use the shared field style from stream C.
+
+### §7 amendment (stream E rulings)
+
+1. **No page count.** Counting pages means walking each vault folder, or opening its index database, every time the Welcome screen loads. That is slow for iCloud vaults and for unmounted drives. The meta shows only when the vault was last opened, e.g. "5 minutes ago" or "yesterday", through `Intl.RelativeTimeFormat` in the UI language. *If wrong:* the count gets added later through a cheap source, such as the index's row count.
+2. **⌘N and ⌘O work on the Welcome screen.** Its own key handler makes them work, because the shell's shortcuts aren't mounted there and the menu has no accelerator for either. ⌘⇧N was already global, through `ScratchpadHost`. All three buttons carry `aria-keyshortcuts` and show the key in the platform's spelling. *If wrong:* the hints are drawn from one table, so removing them is a small change.
+3. **Reveal goes through a new `vaults_reveal` command.** It refuses any path that isn't on the recent list, so the webview can't reveal arbitrary paths. A missing vault has nothing to reveal and shows only "Remove". The existing `external_reveal` needs an open vault, so it can't serve here.
+4. **The filter appears from 6 vaults.** That is "more than 5", per the spec. It matches the shown name, so the global Scratchpad matches "Quick notes", and it matches the path.
+5. **The middle ellipsis on paths is character-based (52 characters).** The full path is in the row's tooltip. It is marked `shortcut:` in the code.
+6. **Labels follow the mock:**
+   - "New vault"
+   - "Open folder as vault"
+   - "Quick note"
+   - "Import from Notion…"
+   - "Open a single file…"
+   - "Recent vaults"
+
+   The old `welcome.*` strings change in both languages. The language toggle keeps its accessible name, "Language", but loses its visible label, as in the mock.

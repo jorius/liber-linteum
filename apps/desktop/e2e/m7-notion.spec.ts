@@ -18,7 +18,7 @@ test('Import from Notion: preview, import, the new vault opens at its report', a
     remoteCover: false,
   });
   await page.goto('/');
-  await page.getByRole('button', { name: 'Import a Notion export' }).click();
+  await page.getByRole('button', { name: 'Import from Notion…' }).click();
   const dialog = page.getByRole('dialog', { name: 'Import from Notion' });
   const importButton = dialog.getByRole('button', { name: 'Import', exact: true });
   await expect(importButton).toHaveAttribute('aria-disabled', 'true');
