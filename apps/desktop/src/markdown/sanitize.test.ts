@@ -67,7 +67,7 @@ describe('URL policy (M2a §2.4, PG acceptance: no remote request)', () => {
     const out = JSON.stringify(tree);
     expect(out).not.toMatch(/"src":"https?:/);
     expect(out).not.toContain('srcset');
-    const blocked = elements(tree).filter((e) => e.properties.dataNimw === 'remote-blocked');
+    const blocked = elements(tree).filter((e) => e.properties.dataLiber === 'remote-blocked');
     expect(blocked.map((b) => b.properties.dataUrl)).toEqual([
       'https://x.com/p.png',
       'https://x.com/q.png',
@@ -92,7 +92,7 @@ describe('URL policy (M2a §2.4, PG acceptance: no remote request)', () => {
     // M4b part 3 §9: a Markdown path above the vault root names a file
     // outside it (Rust decides whether it may be shown).
     expect(imgs[2].properties.dataExternal).toBe('../../c.png');
-    expect(imgs[2].properties.dataNimw).toBeUndefined();
+    expect(imgs[2].properties.dataLiber).toBeUndefined();
   });
 
   it('M4b part 3 §9: Markdown links and images to files outside the vault', () => {
@@ -123,7 +123,7 @@ describe('URL policy (M2a §2.4, PG acceptance: no remote request)', () => {
     ]);
     const links = elements(tree).filter((e) => e.tagName === 'a');
     expect(
-      links.map((a) => [a.properties.dataNimw, a.properties.dataExternal, a.properties.href]),
+      links.map((a) => [a.properties.dataLiber, a.properties.dataExternal, a.properties.href]),
     ).toEqual([
       ['link', 'file:///D:/Docs/x.pdf', undefined],
       ['link', '../../Docs/y.pdf', undefined],
@@ -151,7 +151,7 @@ describe('URL policy (M2a §2.4, PG acceptance: no remote request)', () => {
   it('marks external links and internal Markdown links', () => {
     const tree = render('[e](https://e.com) [m](mailto:a@b.c) [p](Other.md#H)\n');
     const links = elements(tree).filter((e) => e.tagName === 'a');
-    expect(links.map((a) => [a.properties.dataNimw, a.properties.href ?? null])).toEqual([
+    expect(links.map((a) => [a.properties.dataLiber, a.properties.href ?? null])).toEqual([
       ['external', 'https://e.com'],
       ['external', 'mailto:a@b.c'],
       ['link', null],
@@ -175,7 +175,7 @@ describe('extension nodes become marked elements', () => {
         '::::columns\n:::column\nL\n:::\n::::\n',
     );
     const marks = elements(tree)
-      .map((e) => e.properties.dataNimw)
+      .map((e) => e.properties.dataLiber)
       .filter(Boolean);
     expect(marks).toEqual([
       'wikilink',
@@ -186,10 +186,10 @@ describe('extension nodes become marked elements', () => {
       'columns',
       'column',
     ]);
-    const wl = elements(tree).find((e) => e.properties.dataNimw === 'wikilink')!;
+    const wl = elements(tree).find((e) => e.properties.dataLiber === 'wikilink')!;
     expect([wl.properties.dataTarget, wl.properties.dataHeading]).toEqual(['Game 1', 'Plot']);
     expect(elements(tree).some((e) => e.tagName === 'mark')).toBe(true);
-    const callout = elements(tree).find((e) => e.properties.dataNimw === 'callout')!;
+    const callout = elements(tree).find((e) => e.properties.dataLiber === 'callout')!;
     expect([callout.properties.dataCallout, callout.properties.dataFolded]).toEqual([
       'tip',
       'true',
@@ -236,7 +236,7 @@ describe('extension nodes become marked elements', () => {
       '<details open=true>\\n<summary>S</summary>\\n<ul>\\n<li>a</li>\\n<li>b</li>\\n</ul>\\n</details>\\n<p>After</p>',
     );
     expect(shape(render('<div align="center">\n\n![[img.png]]\n\n</div>\n'))).toBe(
-      '<div>\\n<p><span dataNimw="embed" dataTarget="img.png"></span></p>\\n</div>',
+      '<div>\\n<p><span dataLiber="embed" dataTarget="img.png"></span></p>\\n</div>',
     );
     // The opening block's element is the gutter's anchor; the Markdown inside
     // keeps its own.
@@ -262,7 +262,7 @@ describe('malformed percent-encoding (I4)', () => {
   it('raw-HTML links with a bare % keep the text as written instead of throwing', () => {
     const tree = render('<a href="#100%">a</a> <a href="B.md#50%">b</a> <a href="C%.md">c</a>');
     const links = elements(tree).filter((e) => e.tagName === 'a');
-    expect(links.map((e) => e.properties.dataNimw)).toEqual(['anchor', 'link', 'link']);
+    expect(links.map((e) => e.properties.dataLiber)).toEqual(['anchor', 'link', 'link']);
     expect(links[1].properties.dataHeading).toBe('50%');
     expect(links[2].properties.dataTarget).toBe('Notes/C%.md');
   });

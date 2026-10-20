@@ -35,7 +35,8 @@ const source = (page: Page) =>
  *  long note is read from what was written). */
 const saved = (page: Page) =>
   page.evaluate(() => {
-    const writes = (window as unknown as { __nimwWrites?: { text: string }[] }).__nimwWrites ?? [];
+    const writes =
+      (window as unknown as { __liberWrites?: { text: string }[] }).__liberWrites ?? [];
     return writes.length ? writes[writes.length - 1].text : null;
   });
 

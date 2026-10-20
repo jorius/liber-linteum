@@ -1,14 +1,14 @@
 // NFR-03 probe (M3a final review I2): a level of ≤ 200 cards renders in
 // < 300 ms at the edge density of the 10k reference vault's level 0 (~2,200
 // aggregated pairs, counts in the tens). Timings depend on the machine, so it
-// runs only when asked: NIMW_PERF=1 pnpm --filter @nimw/desktop exec
+// runs only when asked: LIBER_PERF=1 pnpm --filter @liber/desktop exec
 // playwright test m3a-perf (after `vite build`). Reference numbers are in
 // the M3a spec, §13.
 import { expect, test, type Page } from '@playwright/test';
 import { showEditor, showGlobalView } from './shell';
 import { installIpcMock } from './ipcMock';
 
-test.skip(!process.env.NIMW_PERF, 'timing probe: set NIMW_PERF=1 to run it');
+test.skip(!process.env.LIBER_PERF, 'timing probe: set LIBER_PERF=1 to run it');
 
 /** `gv_edges` answered directly (the mock's own link resolution would be
  *  timed too): every card linked to `partners` others, aggregated, ×5–×44. */

@@ -63,7 +63,7 @@ const handlers: Record<string, Handler> = {
     const label = node.alias ?? (node.heading ? `${node.target} › ${node.heading}` : node.target);
     const out = el(
       'a',
-      { dataNimw: 'wikilink', dataTarget: node.target, dataHeading: node.heading ?? undefined },
+      { dataLiber: 'wikilink', dataTarget: node.target, dataHeading: node.heading ?? undefined },
       [{ type: 'text', value: label }],
     );
     state.patch(node, out);
@@ -71,7 +71,7 @@ const handlers: Record<string, Handler> = {
   },
   embed(state: State, node: Embed) {
     const out = el('span', {
-      dataNimw: 'embed',
+      dataLiber: 'embed',
       dataTarget: node.target,
       dataHeading: node.heading ?? undefined,
       dataWidth: node.width ?? undefined,
@@ -83,12 +83,12 @@ const handlers: Record<string, Handler> = {
   // M4b part 2 §3: maths become placeholders the renderer draws with KaTeX
   // after sanitizing (KaTeX's own markup would not pass the schema).
   inlineMath(state: State, node: { value: string }) {
-    const out = el('span', { dataNimw: 'math', dataTex: node.value });
+    const out = el('span', { dataLiber: 'math', dataTex: node.value });
     state.patch(node as unknown as MdastNodes, out);
     return out;
   },
   math(state: State, node: { value: string }) {
-    const out = el('div', { dataNimw: 'math', dataTex: node.value, dataDisplay: 'block' });
+    const out = el('div', { dataLiber: 'math', dataTex: node.value, dataDisplay: 'block' });
     state.patch(node as unknown as MdastNodes, out);
     return out;
   },
@@ -98,7 +98,7 @@ const handlers: Record<string, Handler> = {
     return out;
   },
   tag(state: State, node: Tag) {
-    const out = el('span', { dataNimw: 'tag', dataTag: node.name }, [
+    const out = el('span', { dataLiber: 'tag', dataTag: node.name }, [
       { type: 'text', value: `#${node.name}` },
     ]);
     state.patch(node, out);
@@ -108,7 +108,7 @@ const handlers: Record<string, Handler> = {
     const out = el(
       'div',
       {
-        dataNimw: 'callout',
+        dataLiber: 'callout',
         dataCallout: node.calloutType,
         dataTitle: node.title,
         dataFoldable: String(node.foldable),
@@ -120,14 +120,14 @@ const handlers: Record<string, Handler> = {
     return out;
   },
   calloutTitle(state: State, node: CalloutTitle) {
-    const out = el('div', { dataNimw: 'callout-title' }, state.all(node as unknown as MdastNodes));
+    const out = el('div', { dataLiber: 'callout-title' }, state.all(node as unknown as MdastNodes));
     state.patch(node, out);
     return out;
   },
   columns(state: State, node: Columns) {
     const out = el(
       'div',
-      { dataNimw: 'columns' },
+      { dataLiber: 'columns' },
       state.wrap(state.all(node as unknown as MdastNodes), true),
     );
     state.patch(node, out);
@@ -136,7 +136,7 @@ const handlers: Record<string, Handler> = {
   column(state: State, node: Column) {
     const out = el(
       'div',
-      { dataNimw: 'column' },
+      { dataLiber: 'column' },
       state.wrap(state.all(node as unknown as MdastNodes), true),
     );
     state.patch(node, out);
@@ -175,7 +175,7 @@ function markSourceRanges(node: Nodes) {
   if ('children' in node) for (const c of node.children) markSourceRanges(c as Nodes);
 }
 
-const DATA = ['dataNimw', 'dataSourceStart', 'dataSourceEnd'];
+const DATA = ['dataLiber', 'dataSourceStart', 'dataSourceEnd'];
 const schema: Schema = {
   strip: ['script', 'style'],
   clobber: [],
@@ -285,17 +285,17 @@ function applyUrlPolicy(parent: Root | Element, ctx: RenderContext) {
         delete p[key];
       }
     }
-    if (child.tagName === 'a' && p.dataNimw !== 'wikilink' && typeof p.href === 'string') {
+    if (child.tagName === 'a' && p.dataLiber !== 'wikilink' && typeof p.href === 'string') {
       const href = p.href;
       if (EXTERNAL.test(href)) {
-        p.dataNimw = 'external';
+        p.dataLiber = 'external';
       } else if (href.startsWith('#')) {
-        p.dataNimw = 'anchor';
+        p.dataLiber = 'anchor';
       } else {
         const hash = href.indexOf('#');
         const path = hash >= 0 ? href.slice(0, hash) : href;
         const target = path && !isFileTarget(path) ? vaultJoin(ctx.sourcePath, path) : null;
-        p.dataNimw = 'link';
+        p.dataLiber = 'link';
         if (target) p.dataTarget = target;
         if (hash >= 0 && href.slice(hash + 1)) p.dataHeading = safeDecode(href.slice(hash + 1));
         delete p.href;
@@ -307,7 +307,7 @@ function applyUrlPolicy(parent: Root | Element, ctx: RenderContext) {
         return {
           type: 'element',
           tagName: 'span',
-          properties: { dataNimw: 'remote-blocked', dataUrl: src },
+          properties: { dataLiber: 'remote-blocked', dataUrl: src },
           children: [{ type: 'text', value: typeof p.alt === 'string' && p.alt ? p.alt : src }],
           position: child.position,
         } satisfies Element;
@@ -320,7 +320,7 @@ function applyUrlPolicy(parent: Root | Element, ctx: RenderContext) {
         const path = vaultJoin(ctx.sourcePath, src);
         delete p.src;
         if (path) p.dataAssetPath = path;
-        else if (p.dataExternal === undefined) p.dataNimw = 'missing';
+        else if (p.dataExternal === undefined) p.dataLiber = 'missing';
       }
     }
     applyUrlPolicy(child, ctx);
@@ -407,7 +407,7 @@ const LINKED = new Set(['a', 'img', 'audio', 'video', 'source']);
 function newSeal(): string {
   const bytes = new Uint32Array(2);
   crypto.getRandomValues(bytes);
-  return `nimw${bytes[0].toString(36)}${bytes[1].toString(36)}:`;
+  return `liber${bytes[0].toString(36)}${bytes[1].toString(36)}:`;
 }
 
 /** Keeps the pipeline's own `data-external` values (without their seal) and
@@ -444,7 +444,7 @@ function markExternal(node: Nodes, ctx: RenderContext, seal: string) {
       if (isFileTarget(path)) {
         p.dataExternal = seal + path;
         delete p[key];
-        if (node.tagName === 'a') p.dataNimw = 'link';
+        if (node.tagName === 'a') p.dataLiber = 'link';
       } else if (path.startsWith('/') || vaultJoin(ctx.sourcePath, value) === null) {
         p.dataExternal = seal + path;
       }

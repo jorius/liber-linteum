@@ -107,13 +107,13 @@ export function SpellMenu({
       ref={box}
       role="menu"
       aria-label={t('spelling.menu', { word: target.word })}
-      className="nimw-menu"
+      className="liber-menu"
       style={{ position: 'fixed', left: place.left, top: place.top }}
       onKeyDown={onKeyDown}
     >
       {suggestions?.map((s, i) => item(`s:${s}`, i, s, () => replace(s)))}
       {suggestions && n === 0 && (
-        <span role="none" aria-disabled="true" className="nimw-menu-note">
+        <span role="none" aria-disabled="true" className="liber-menu-note">
           {t('spelling.noSuggestions')}
         </span>
       )}

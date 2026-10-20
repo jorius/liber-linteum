@@ -14,7 +14,7 @@ const SEARCH_FROM = 10;
 const stem = (path: string) => nameOf(path).replace(/\.md$/i, '');
 
 /** Picks the page a folder's card previews (M3b §4, GV-02 rule 3): one of
- *  the folder's own pages, or none. Saved in `.nimw/vault.json`. A folder
+ *  the folder's own pages, or none. Saved in `.liber/vault.json`. A folder
  *  with a single page (`only`) uses it already (rule 4): it starts chosen,
  *  and the dialog says so (final review m14). */
 export function IndexPickDialog({

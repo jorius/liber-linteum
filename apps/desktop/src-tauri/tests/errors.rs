@@ -1,8 +1,8 @@
 //! IPC error mapping (M1b spec §2.6).
 
-use nimw_desktop::error::{CommandError, ErrorKind};
-use nimw_session::SessionError;
-use nimw_vault::{Hash, VaultError};
+use liber_desktop::error::{CommandError, ErrorKind};
+use liber_session::SessionError;
+use liber_vault::{Hash, VaultError};
 
 #[test]
 fn errors_serialize_as_kind_and_message() {

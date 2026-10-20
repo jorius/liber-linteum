@@ -28,7 +28,8 @@ async function open(page: Page, name: string, settings: Record<string, unknown> 
 const writes = (page: Page) =>
   page.evaluate(
     () =>
-      (window as unknown as { __nimwWrites?: { path: string; text: string }[] }).__nimwWrites ?? [],
+      (window as unknown as { __liberWrites?: { path: string; text: string }[] }).__liberWrites ??
+      [],
   );
 
 test('the floating button opens the Global View and Search; no top bar', async ({ page }) => {

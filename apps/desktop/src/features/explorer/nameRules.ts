@@ -1,4 +1,4 @@
-// Client-side mirror of the backend's name rule (nimw-session `validate_name`,
+// Client-side mirror of the backend's name rule (liber-session `validate_name`,
 // M1a spec amendment 9) for instant feedback. The backend stays authoritative.
 
 const FORBIDDEN = ['/', '\\', '#', '|', '^', '[', ']', ':', '*', '"', '<', '>', '?'];

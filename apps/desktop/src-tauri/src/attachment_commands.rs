@@ -1,6 +1,6 @@
 //! M2c page extras (spec §7): pasted and dropped attachments, cover upload,
 //! `[[` suggestions and the vault's attachment setting. Thin wrappers over
-//! `nimw-session`; outside paths only come from native drops (`drops`) or a
+//! `liber-session`; outside paths only come from native drops (`drops`) or a
 //! dialog Rust opens itself (spec §8).
 
 use crate::dto::{
@@ -10,8 +10,8 @@ use crate::dto::{
 use crate::error::{CmdResult, CommandError, ErrorKind};
 use crate::state::AppState;
 use crate::vault_commands::blocking;
-use nimw_session::{VaultSession, cover_reference};
-use nimw_vault::{CoverSide, EntryKind, LinkFormat, PageWidth, VaultPath};
+use liber_session::{VaultSession, cover_reference};
+use liber_vault::{CoverSide, EntryKind, LinkFormat, PageWidth, VaultPath};
 use percent_encoding::percent_decode_str;
 use std::path::PathBuf;
 use tauri::ipc::{InvokeBody, Request};
@@ -51,7 +51,7 @@ pub(crate) fn visible_page(session: &VaultSession, page: &str) -> CmdResult<Vaul
 }
 
 /// The page path, file name and bytes of a paste: a raw body with
-/// percent-encoded `x-nimw-page` / `x-nimw-name` headers.
+/// percent-encoded `x-liber-page` / `x-liber-name` headers.
 fn paste_parts(request: &Request<'_>) -> CmdResult<(String, String, Vec<u8>)> {
     let InvokeBody::Raw(bytes) = request.body() else {
         return Err(invalid("expected the image bytes as a raw body"));
@@ -74,8 +74,8 @@ fn paste_parts(request: &Request<'_>) -> CmdResult<(String, String, Vec<u8>)> {
             .map_err(|_| invalid(format!("{name} is not UTF-8")))
     };
     Ok((
-        header("x-nimw-page")?,
-        header("x-nimw-name")?,
+        header("x-liber-page")?,
+        header("x-liber-name")?,
         bytes.clone(),
     ))
 }

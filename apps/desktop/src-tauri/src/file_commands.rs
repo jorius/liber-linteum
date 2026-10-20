@@ -14,9 +14,9 @@ use crate::file_windows::{
 };
 use crate::state::AppState;
 use crate::vault_commands::blocking;
-use nimw_markdown::resolve;
-use nimw_session::is_text_content;
-use nimw_vault::{Hash, Vault, VaultError, VaultPath, is_hidden_name};
+use liber_markdown::resolve;
+use liber_session::is_text_content;
+use liber_vault::{Hash, Vault, VaultError, VaultPath, is_hidden_name};
 use serde::Serialize;
 use std::path::{Path, PathBuf};
 use tauri::{AppHandle, Emitter, Manager, Runtime, WebviewUrl, WebviewWindowBuilder, Window};
@@ -284,7 +284,7 @@ pub(crate) fn file_follow_impl<R: Runtime>(
 ) -> CmdResult<Followed> {
     let vp = folder_path(grant.vault(), &path)?;
     match grant.vault().stat(&vp)? {
-        Some(entry) if entry.kind == nimw_vault::EntryKind::File => {}
+        Some(entry) if entry.kind == liber_vault::EntryKind::File => {}
         Some(_) => return Err(CommandError::new(ErrorKind::NotAFile, path)),
         None => return Err(CommandError::new(ErrorKind::NotFound, path)),
     }

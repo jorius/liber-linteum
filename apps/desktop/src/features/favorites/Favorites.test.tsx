@@ -258,7 +258,7 @@ describe('Favorites (M5b §19)', () => {
     const close = vi.fn();
     render(<ContextMenu menu={{ path: 'Welcome.md', anchor: { x: 0, y: 0 } }} onClose={close} />);
     await userEvent.click(screen.getByRole('menuitem', { name: 'Move up in Favorites' }));
-    expect(document.querySelector('[data-nimw-status]')).toHaveTextContent(
+    expect(document.querySelector('[data-liber-status]')).toHaveTextContent(
       'Welcome moved to 1 of 2 in Favorites',
     );
   });

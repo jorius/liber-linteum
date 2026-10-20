@@ -410,7 +410,7 @@ describe('Settings → This vault (M2c §5.4)', () => {
     expect(screen.queryByRole('heading', { name: 'This vault' })).not.toBeInTheDocument();
   });
 
-  it("shows NIMW's setting and saves another mode at once", async () => {
+  it("shows Liber Linteum's setting and saves another mode at once", async () => {
     open();
     await show('This vault');
     const where = await screen.findByRole('combobox', { name: 'New attachments go to' });
@@ -466,7 +466,7 @@ describe('Settings → This vault (M2c §5.4)', () => {
     expect(screen.getByText('![](file:///…/Assets/x.png)')).toBeInTheDocument();
   });
 
-  it("M4b part 3 §8: Obsidian's newLinkFormat is followed until NIMW has its own", async () => {
+  it("M4b part 3 §8: Obsidian's newLinkFormat is followed until Liber Linteum has its own", async () => {
     obsidianLinkFormat = 'relative';
     open();
     await show('This vault');
@@ -525,7 +525,7 @@ describe('Settings → This vault (M2c §5.4)', () => {
     );
   });
 
-  it('tabbing through the untouched field writes nothing (no .nimw/ for nothing; final review M5)', async () => {
+  it('tabbing through the untouched field writes nothing (no .liber/ for nothing; final review M5)', async () => {
     open();
     await show('This vault');
     const where = await screen.findByRole('combobox', { name: 'New attachments go to' });
@@ -576,7 +576,7 @@ describe('Settings → This vault (M2c §5.4)', () => {
     expect(violations).toEqual([]);
   });
 
-  it("M4b §5: a switch lets NIMW use its own place; off restores Obsidian's", async () => {
+  it("M4b §5: a switch lets Liber Linteum use its own place; off restores Obsidian's", async () => {
     obsidian = './assets';
     open();
     await show('This vault');

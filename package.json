@@ -1,5 +1,5 @@
 {
-  "name": "notes-in-my-way",
+  "name": "liber-linteum",
   "private": true,
   "license": "GPL-3.0-or-later",
   "packageManager": "pnpm@12.11.2",
@@ -7,16 +7,16 @@
     "node": ">=22.18"
   },
   "scripts": {
-    "dev": "pnpm --filter @nimw/desktop tauri dev",
-    "build": "pnpm --filter @nimw/desktop tauri build",
-    "build:ui": "pnpm --filter @nimw/desktop build",
-    "lint": "pnpm --filter @nimw/desktop lint && prettier --check .",
+    "dev": "pnpm --filter @liber/desktop tauri dev",
+    "build": "pnpm --filter @liber/desktop tauri build",
+    "build:ui": "pnpm --filter @liber/desktop build",
+    "lint": "pnpm --filter @liber/desktop lint && prettier --check .",
     "format": "prettier --write .",
-    "typecheck": "pnpm --filter @nimw/desktop typecheck",
-    "test": "pnpm --filter @nimw/desktop test",
-    "check:i18n": "pnpm --filter @nimw/desktop check:i18n",
+    "typecheck": "pnpm --filter @liber/desktop typecheck",
+    "test": "pnpm --filter @liber/desktop test",
+    "check:i18n": "pnpm --filter @liber/desktop check:i18n",
     "check": "pnpm lint && pnpm typecheck && pnpm test && pnpm check:i18n && pnpm build:ui && pnpm test:e2e && cargo fmt --all --check && cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace",
-    "test:e2e": "pnpm --filter @nimw/desktop test:e2e"
+    "test:e2e": "pnpm --filter @liber/desktop test:e2e"
   },
   "devDependencies": {
     "prettier": "^3.9.10"

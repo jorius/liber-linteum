@@ -2,5 +2,5 @@
 export const LARGE_NOTE_CHARS = 200 * 1024;
 
 /** The most a text file the app edits may hold, as UTF-8 (M4b part 2 §6;
- *  `nimw_session::TEXT_MAX_BYTES`). */
+ *  `liber_session::TEXT_MAX_BYTES`). */
 export const TEXT_MAX_BYTES = 2 * 1024 * 1024;

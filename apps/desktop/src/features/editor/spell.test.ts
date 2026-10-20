@@ -88,7 +88,7 @@ describe('the spellcheck extension', () => {
   };
 
   const underlined = (v: EditorView) =>
-    [...v.contentDOM.querySelectorAll('.cm-nimw-misspelled')].map((e) => e.textContent);
+    [...v.contentDOM.querySelectorAll('.cm-liber-misspelled')].map((e) => e.textContent);
 
   it('underlines misspelled words and maps them through edits', async () => {
     const v = editor('I recieve mail');
@@ -129,7 +129,7 @@ describe('the spellcheck extension', () => {
       }
       return asked.map(() => true);
     });
-    const v = editor('uno nimw');
+    const v = editor('uno liber');
     await act(async () => {
       await vi.advanceTimersByTimeAsync(SPELL_DEBOUNCE_MS + 10);
     });
@@ -140,8 +140,8 @@ describe('the spellcheck extension', () => {
     });
     await settle();
     expect(calls).toEqual([
-      ['uno', 'nimw'],
-      ['uno', 'nimw'],
+      ['uno', 'liber'],
+      ['uno', 'liber'],
     ]);
     expect(underlined(v)).toEqual([]);
   });

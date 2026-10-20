@@ -7,7 +7,7 @@ import { useTranslation } from 'react-i18next';
 import { CloseIcon } from '../../app/icons';
 import styles from './BlockGutter.module.css';
 
-export const HINT_KEY = 'nimw.blockHintDismissed';
+export const HINT_KEY = 'liber.blockHintDismissed';
 
 function dismissed(): boolean {
   try {

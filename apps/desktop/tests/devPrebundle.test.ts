@@ -13,7 +13,7 @@ import { optimizeDeps, resolveConfig } from 'vite';
 import { afterAll, describe, expect, it } from 'vitest';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
-const cacheDir = mkdtempSync(join(tmpdir(), 'nimw-prebundle-'));
+const cacheDir = mkdtempSync(join(tmpdir(), 'liber-prebundle-'));
 
 afterAll(() => rmSync(cacheDir, { recursive: true, force: true }));
 
@@ -41,7 +41,7 @@ describe('dev dependency pre-bundle (freezePrototype)', () => {
     expect(code.includes('prototype.constructor = constructor;'), 'unpatched assignment').toBe(
       false,
     );
-    expect(/__nimwOwn(\$\d+)?\(prototype,\s*"constructor"\)/.test(code), 'patched').toBe(true);
+    expect(/__liberOwn(\$\d+)?\(prototype,\s*"constructor"\)/.test(code), 'patched').toBe(true);
   }, 60_000);
 
   it("patches dayjs inside mermaid's pre-bundle (M4b part 2 §4)", async () => {
@@ -62,7 +62,7 @@ describe('dev dependency pre-bundle (freezePrototype)', () => {
     );
     const all = files.join('\n');
     expect(all.includes('$d.getTime()'), 'dayjs is in the bundle').toBe(true);
-    expect(all.includes('__nimwOwn'), 'patched').toBe(true);
+    expect(all.includes('__liberOwn'), 'patched').toBe(true);
     // Every dayjs `valueOf`/`toString` assignment goes through the helper.
     expect(
       /[\w$]\.valueOf=function\(\)\{return this\.\$d\.getTime\(\)\}/.test(all),

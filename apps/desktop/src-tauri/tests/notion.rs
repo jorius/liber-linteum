@@ -2,8 +2,8 @@
 //! capabilities, mock runtime, temp dirs. The zip and folder dialogs are
 //! replaced through `NotionState`.
 
-use nimw_desktop::AppDirs;
-use nimw_desktop::notion_commands::NotionState;
+use liber_desktop::AppDirs;
+use liber_desktop::notion_commands::NotionState;
 use serde_json::{Value, json};
 use std::io::Write;
 use std::path::{Path, PathBuf};
@@ -42,7 +42,7 @@ fn harness() -> Harness {
         config: config.path().to_path_buf(),
         cache: cache.path().to_path_buf(),
     };
-    let app = nimw_desktop::configure(mock_builder(), Some(dirs))
+    let app = liber_desktop::configure(mock_builder(), Some(dirs))
         .build(tauri::generate_context!())
         .expect("app builds with the real context");
     let main = WebviewWindowBuilder::new(&app, "main", Default::default())

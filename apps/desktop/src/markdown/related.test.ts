@@ -44,7 +44,7 @@ describe('reading related: (M3b §5)', () => {
     expect(readRelated('---\nrelated: [oops\n---\n')).toEqual([]);
   });
 
-  it('the link reader counts a scalar related: too (parity with nimw-markdown)', () => {
+  it('the link reader counts a scalar related: too (parity with liber-markdown)', () => {
     const fm = readFrontmatter(parsePage('---\nrelated: "[[A]]"\n---\n# x\n').tree);
     expect(frontmatterLinks(fm).map((l) => [l.kind, l.target])).toEqual([['related', 'A']]);
   });
@@ -85,7 +85,7 @@ describe('appending a relationship (M3b §2, §5)', () => {
     expect(apply(empty, appendRelated(empty, 'C'))).toBe('---\nrelated:\n  - "[[C]]"\nz: 1\n---\n');
   });
 
-  it('a link with " or \\ is single-quoted: no escapes, as nimw-markdown indexes it (final review m4)', () => {
+  it('a link with " or \\ is single-quoted: no escapes, as liber-markdown indexes it (final review m4)', () => {
     for (const [target, item] of [
       ['say "hi"', `'[[say "hi"]]'`],
       ['a\\b', `'[[a\\b]]'`],

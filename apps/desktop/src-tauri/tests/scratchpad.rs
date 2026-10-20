@@ -4,8 +4,8 @@
 //! dialog are replaced through `ScratchpadState`, so no test touches the
 //! user's Documents folder or opens a dialog.
 
-use nimw_desktop::AppDirs;
-use nimw_desktop::scratchpad_commands::ScratchpadState;
+use liber_desktop::AppDirs;
+use liber_desktop::scratchpad_commands::ScratchpadState;
 use serde_json::{Value, json};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -46,7 +46,7 @@ fn harness() -> Harness {
         config: config.path().to_path_buf(),
         cache: cache.path().to_path_buf(),
     };
-    let app = nimw_desktop::configure(mock_builder(), Some(dirs))
+    let app = liber_desktop::configure(mock_builder(), Some(dirs))
         .build(tauri::generate_context!())
         .expect("app builds with the real context");
     app.state::<ScratchpadState>()

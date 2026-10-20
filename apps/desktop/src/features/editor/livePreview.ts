@@ -62,13 +62,13 @@ const setModel = StateEffect.define<{ page: ParsedPage; text: string }>();
 const hide = Decoration.replace({});
 const mark = (cls: string) => Decoration.mark({ class: cls });
 const MARKS = {
-  emphasis: mark('cm-nimw-em'),
-  strong: mark('cm-nimw-strong'),
-  delete: mark('cm-nimw-strike'),
-  highlight: mark('cm-nimw-highlight'),
-  inlineCode: mark('cm-nimw-code'),
-  link: mark('cm-nimw-link'),
-  tag: mark('cm-nimw-tag'),
+  emphasis: mark('cm-liber-em'),
+  strong: mark('cm-liber-strong'),
+  delete: mark('cm-liber-strike'),
+  highlight: mark('cm-liber-highlight'),
+  inlineCode: mark('cm-liber-code'),
+  link: mark('cm-liber-link'),
+  tag: mark('cm-liber-tag'),
 };
 const lineClass = (cls: string) => Decoration.line({ class: cls });
 
@@ -170,7 +170,7 @@ function build(state: EditorState, page: ParsedPage, active: Set<number>): Decor
     for (let n = first; n <= last; n++) texts.push(doc.line(n).text);
     const deco = Decoration.line({
       ...(cls ? { class: cls } : {}),
-      attributes: { 'data-wide-src': kind, style: `--nimw-ch: ${widestLine(texts)}` },
+      attributes: { 'data-wide-src': kind, style: `--liber-ch: ${widestLine(texts)}` },
     });
     lines(from, to, deco);
   };
@@ -227,7 +227,7 @@ function build(state: EditorState, page: ParsedPage, active: Set<number>): Decor
     switch (type) {
       case 'heading': {
         const line = doc.lineAt(from);
-        out.push(lineClass(`cm-nimw-h${(node as Heading).depth}`).range(line.from));
+        out.push(lineClass(`cm-liber-h${(node as Heading).depth}`).range(line.from));
         const marks = /^ {0,3}#{1,6}(?:[ \t]+|$)/.exec(line.text);
         if (marks && !touched(from, to)) conceal(line.from, line.from + marks[0].length);
         break;
@@ -284,11 +284,11 @@ function build(state: EditorState, page: ParsedPage, active: Set<number>): Decor
         }
         // M4b part 3: a diagram's source follows the Diagrams choice, so it
         // keeps its box while edited; other code follows Code blocks.
-        wideLines(from, to, mermaid ? 'diagrams' : 'code', 'cm-nimw-codeblock');
+        wideLines(from, to, mermaid ? 'diagrams' : 'code', 'cm-liber-codeblock');
         const first = doc.lineAt(from);
         const last = doc.lineAt(Math.min(to, doc.length));
-        out.push(lineClass('cm-nimw-codeblock-first').range(first.from));
-        out.push(lineClass('cm-nimw-codeblock-last').range(last.from));
+        out.push(lineClass('cm-liber-codeblock-first').range(first.from));
+        out.push(lineClass('cm-liber-codeblock-last').range(last.from));
         // Round 3 §1: off the cursor the fences hide; the opening one becomes
         // the header row (language badge and Copy, M4b part 2 §2) and the
         // closing one an empty line, so revealing the source moves nothing.
@@ -311,11 +311,11 @@ function build(state: EditorState, page: ParsedPage, active: Set<number>): Decor
         return;
       }
       case 'yaml':
-        lines(from, to, lineClass('cm-nimw-frontmatter'));
+        lines(from, to, lineClass('cm-liber-frontmatter'));
         return;
       case 'blockquote': {
         if (reduced) break;
-        lines(from, to, lineClass('cm-nimw-quote'));
+        lines(from, to, lineClass('cm-liber-quote'));
         if (quoteDepth === 0 && !touched(from, to)) {
           const depth = new Map<number, number>();
           quoteLevels(node, 1, depth);
@@ -343,7 +343,7 @@ function build(state: EditorState, page: ParsedPage, active: Set<number>): Decor
           if (typeof item.checked === 'boolean') conceal(from, end);
           else if (marker[1])
             out.push(Decoration.replace({ widget: new BulletWidget() }).range(from, from + 1));
-          else out.push(mark('cm-nimw-listnum').range(from, from + marker[0].trimEnd().length));
+          else out.push(mark('cm-liber-listnum').range(from, from + marker[0].trimEnd().length));
         }
         if (typeof item.checked !== 'boolean') break;
         // From the item's start, so a task in a quote matches too.
@@ -372,7 +372,7 @@ function build(state: EditorState, page: ParsedPage, active: Set<number>): Decor
     if (!node.position) return;
     const [from, to] = rangeOf(node);
     if (reduced || touched(from, to)) return;
-    if (rendersEmpty(text(from, to))) lines(from, to, lineClass('cm-nimw-muted'));
+    if (rendersEmpty(text(from, to))) lines(from, to, lineClass('cm-liber-muted'));
     else blockWidget(node);
   };
   page.tree.children.forEach((node) =>
@@ -531,10 +531,10 @@ export function followLinkAt(view: EditorView, pos: number): boolean {
 export const followLinkAtCursor = (view: EditorView): boolean =>
   followLinkAt(view, view.state.selection.main.head);
 
-/** A rendered link's text (`.cm-nimw-link` on a line the selection does not
+/** A rendered link's text (`.cm-liber-link` on a line the selection does not
  *  touch, so its markup is hidden): its position, else `null`. */
 function renderedLinkAt(view: EditorView, target: EventTarget | null): number | null {
-  const el = target instanceof Element ? target.closest('.cm-nimw-link') : null;
+  const el = target instanceof Element ? target.closest('.cm-liber-link') : null;
   if (!el || !view.contentDOM.contains(el)) return null;
   const pos = view.posAtDOM(el, 0);
   const node = linkAt(refresh(view).page, pos);
@@ -564,62 +564,62 @@ const linkClick = EditorView.domEventHandlers({
 });
 
 const theme = EditorView.baseTheme({
-  '.cm-nimw-h1, .cm-nimw-h2, .cm-nimw-h3, .cm-nimw-h4, .cm-nimw-h5, .cm-nimw-h6': {
+  '.cm-liber-h1, .cm-liber-h2, .cm-liber-h3, .cm-liber-h4, .cm-liber-h5, .cm-liber-h6': {
     fontFamily: 'var(--font-display)',
     fontWeight: '700',
     color: 'var(--color-text-strong)',
   },
-  '.cm-nimw-h1': { fontSize: '1.9em' },
-  '.cm-nimw-h2': { fontSize: '1.5em' },
-  '.cm-nimw-h3': { fontSize: '1.25em' },
-  '.cm-nimw-h4': { fontSize: '1.1em' },
-  '.cm-nimw-em': { fontStyle: 'italic' },
-  '.cm-nimw-strong': { fontWeight: '700' },
-  '.cm-nimw-strike': { textDecoration: 'line-through' },
-  '.cm-nimw-highlight': { background: 'var(--color-highlight-bg)', borderRadius: '3px' },
-  '.cm-nimw-code': {
+  '.cm-liber-h1': { fontSize: '1.9em' },
+  '.cm-liber-h2': { fontSize: '1.5em' },
+  '.cm-liber-h3': { fontSize: '1.25em' },
+  '.cm-liber-h4': { fontSize: '1.1em' },
+  '.cm-liber-em': { fontStyle: 'italic' },
+  '.cm-liber-strong': { fontWeight: '700' },
+  '.cm-liber-strike': { textDecoration: 'line-through' },
+  '.cm-liber-highlight': { background: 'var(--color-highlight-bg)', borderRadius: '3px' },
+  '.cm-liber-code': {
     fontFamily: 'var(--font-source)',
     fontSize: '0.9em',
     background: 'var(--color-code-bg)',
     borderRadius: '4px',
   },
-  '.cm-nimw-link': { color: 'var(--color-accent)', textDecoration: 'underline' },
-  '.cm-nimw-tag': { color: 'var(--color-accent)', fontWeight: '600' },
-  '.cm-nimw-codeblock': {
+  '.cm-liber-link': { color: 'var(--color-accent)', textDecoration: 'underline' },
+  '.cm-liber-tag': { color: 'var(--color-accent)', fontWeight: '600' },
+  '.cm-liber-codeblock': {
     fontFamily: 'var(--font-source)',
     fontSize: '0.9em',
     background: 'var(--color-code-bg)',
   },
-  '.cm-nimw-codeblock-first': {
+  '.cm-liber-codeblock-first': {
     borderTopLeftRadius: '8px',
     borderTopRightRadius: '8px',
     paddingTop: '4px',
   },
-  '.cm-nimw-codeblock-last': {
+  '.cm-liber-codeblock-last': {
     borderBottomLeftRadius: '8px',
     borderBottomRightRadius: '8px',
     paddingBottom: '4px',
   },
-  '.cm-nimw-quote': { borderLeft: '3px solid var(--color-border-strong)', paddingLeft: '12px' },
-  '.cm-nimw-bullet': { color: 'var(--color-text-muted)', fontWeight: '700' },
-  '.cm-nimw-listnum': { color: 'var(--color-text-muted)', fontVariantNumeric: 'tabular-nums' },
-  '.cm-nimw-frontmatter': { color: 'var(--color-text-muted)', fontFamily: 'var(--font-source)' },
-  '.cm-nimw-muted': {
+  '.cm-liber-quote': { borderLeft: '3px solid var(--color-border-strong)', paddingLeft: '12px' },
+  '.cm-liber-bullet': { color: 'var(--color-text-muted)', fontWeight: '700' },
+  '.cm-liber-listnum': { color: 'var(--color-text-muted)', fontVariantNumeric: 'tabular-nums' },
+  '.cm-liber-frontmatter': { color: 'var(--color-text-muted)', fontFamily: 'var(--font-source)' },
+  '.cm-liber-muted': {
     color: 'var(--color-text-muted)',
     fontFamily: 'var(--font-source)',
     fontSize: '0.9em',
   },
   // Rendered HTML, not editor text: CodeMirror's pre-wrapped whitespace would
   // turn the renderer's newlines into blank lines.
-  '.cm-nimw-widget': { padding: '4px 0', cursor: 'default', whiteSpace: 'normal' },
-  '.cm-nimw-codebadge': {
+  '.cm-liber-widget': { padding: '4px 0', cursor: 'default', whiteSpace: 'normal' },
+  '.cm-liber-codebadge': {
     display: 'inline-flex',
     float: 'right',
     gap: '6px',
     verticalAlign: 'middle',
     fontFamily: 'var(--font-body)',
   },
-  '.cm-nimw-codebadge button': {
+  '.cm-liber-codebadge button': {
     font: '600 11.5px var(--font-body)',
     padding: '1px 8px',
     borderRadius: '999px',
@@ -628,7 +628,7 @@ const theme = EditorView.baseTheme({
     color: 'var(--color-text-body)',
     cursor: 'pointer',
   },
-  '.cm-nimw-checkbox': { margin: '0 4px 0 0', verticalAlign: 'middle', cursor: 'pointer' },
+  '.cm-liber-checkbox': { margin: '0 4px 0 0', verticalAlign: 'middle', cursor: 'pointer' },
 });
 
 export function livePreview(): Extension {

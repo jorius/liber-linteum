@@ -17,7 +17,7 @@ const PAGES = {
 };
 
 /** A Windows WebView2 user agent: vault files go through
- *  http://nimw-asset.localhost, which the test can serve. */
+ *  http://liber-asset.localhost, which the test can serve. */
 const WINDOWS_UA =
   'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36 Edg/130.0.0.0';
 
@@ -34,13 +34,13 @@ async function watchNetwork(page: Page) {
     const local =
       (url.protocol === 'http:' && url.hostname === '127.0.0.1') ||
       url.protocol === 'data:' ||
-      url.protocol === 'nimw-asset:' ||
-      url.hostname === 'nimw-asset.localhost';
+      url.protocol === 'liber-asset:' ||
+      url.hostname === 'liber-asset.localhost';
     if (!local) outside.push(r.url());
   });
-  await page.route(/^https?:\/\/(?!127\.0\.0\.1|nimw-asset\.localhost)/, (route) => route.abort());
+  await page.route(/^https?:\/\/(?!127\.0\.0\.1|liber-asset\.localhost)/, (route) => route.abort());
   // Vault files over WebView2's http form (only reached with WINDOWS_UA).
-  await page.route(/^http:\/\/nimw-asset\.localhost\//, (route) =>
+  await page.route(/^http:\/\/liber-asset\.localhost\//, (route) =>
     route.fulfill({ status: 200, contentType: 'image/svg+xml', body: TALL_SVG }),
   );
   return outside;
@@ -71,7 +71,7 @@ async function stayedLocal(page: Page, outside: string[]) {
   expect(outside).toEqual([]);
   expect(
     await page.evaluate(
-      () => (window as unknown as { __nimwCspViolations: string[] }).__nimwCspViolations,
+      () => (window as unknown as { __liberCspViolations: string[] }).__liberCspViolations,
     ),
   ).toEqual([]);
 }
@@ -84,7 +84,7 @@ const radio = (page: Page, name: string) =>
 const stripWidth = (page: Page) => strip(page).evaluate((el) => el.getBoundingClientRect().width);
 const sides = (page: Page) =>
   page.evaluate(
-    () => (window as unknown as { __nimwCoverSides?: unknown[] }).__nimwCoverSides ?? [],
+    () => (window as unknown as { __liberCoverSides?: unknown[] }).__liberCoverSides ?? [],
   );
 
 test.use({ viewport: { width: 1280, height: 900 } });
@@ -122,7 +122,7 @@ test('§3 side covers: Left makes a full-height strip beside the header and text
   await expect.poll(() => stripWidth(page)).toBe(340);
   // The note itself is never written.
   expect(
-    await page.evaluate(() => (window as unknown as { __nimwWrites?: unknown[] }).__nimwWrites),
+    await page.evaluate(() => (window as unknown as { __liberWrites?: unknown[] }).__liberWrites),
   ).toBeUndefined();
   await page.reload();
   await openPage(page, 'A');
@@ -163,7 +163,7 @@ test('§3 side covers: reposition moves the focus in both axes; Save writes cove
     .poll(() =>
       page.evaluate(
         () =>
-          (window as unknown as { __nimwWrites?: { text: string }[] }).__nimwWrites?.at(-1)?.text,
+          (window as unknown as { __liberWrites?: { text: string }[] }).__liberWrites?.at(-1)?.text,
       ),
     )
     .toMatch(/cover-y: 55\ncover-x: 45\n/);
@@ -212,7 +212,7 @@ test.describe('§2 covers crop where they were placed (WebView2 path)', () => {
     const outside = await open(page, 'Focus');
     await expect(page.locator('img[data-cover]')).toHaveAttribute(
       'src',
-      'http://nimw-asset.localhost/sky.png',
+      'http://liber-asset.localhost/sky.png',
     );
     await fillsFrame(page);
     await expect(page.locator('img[data-cover]')).toHaveCSS('object-position', '0% 100%');

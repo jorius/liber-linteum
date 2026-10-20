@@ -215,7 +215,7 @@ describe('the block gutter in the Split pane (M4 §4)', () => {
   it('final review I1: an HTML block gets its gutter from the element it renders; a <details> still holds the Markdown after it', async () => {
     const pane = await split('<details>\n<summary>More</summary>\n\nHidden\n\n</details>\n\nP2\n');
     expect(pane.querySelector('details > p')?.textContent).toBe('Hidden');
-    expect(pane.querySelector('[data-nimw="html"]')).toBeNull();
+    expect(pane.querySelector('[data-liber="html"]')).toBeNull();
     await hover(pane.querySelector('summary')!);
     expect(screen.getByRole('group', { name: 'HTML block' })).toBeInTheDocument();
     await hover(block(pane, 'Hidden'));

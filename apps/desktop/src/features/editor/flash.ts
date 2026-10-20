@@ -10,7 +10,7 @@ const setFlash = StateEffect.define<{ from: number; to: number } | null>();
 
 function linesOf(state: EditorState, from: number, to: number): DecorationSet {
   const deco: Range<Decoration>[] = [];
-  const mark = Decoration.line({ class: 'cm-nimw-flash' });
+  const mark = Decoration.line({ class: 'cm-liber-flash' });
   for (let pos = from; pos <= to;) {
     const line = state.doc.lineAt(pos);
     deco.push(mark.range(line.from));
@@ -37,7 +37,7 @@ const field = StateField.define<DecorationSet>({
 export const flash = [
   field,
   EditorView.baseTheme({
-    '.cm-nimw-flash': {
+    '.cm-liber-flash': {
       backgroundColor: 'var(--color-accent-soft)',
       transition: 'background-color 0.3s',
     },

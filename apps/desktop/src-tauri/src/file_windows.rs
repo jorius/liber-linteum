@@ -4,15 +4,15 @@
 //! Opening a file records a **grant** for the window's label before the
 //! window exists: the file's folder as a [`Vault`] (its path checks: no `..`,
 //! no absolute paths, no symlink escapes) and the file's name in it. The
-//! window's commands (`file_commands`) and its `nimw-asset:` requests act on
+//! window's commands (`file_commands`) and its `liber-asset:` requests act on
 //! that grant only; nothing the page sends names another path to write. The
 //! grant goes with its window.
 
 use crate::error::{CmdResult, CommandError, ErrorKind};
 use crate::state::FilePicker;
-use nimw_markdown::FileSet;
-use nimw_session::is_text_path;
-use nimw_vault::{Vault, VaultPath, WatchEvent, Watcher};
+use liber_markdown::FileSet;
+use liber_session::is_text_path;
+use liber_vault::{Vault, VaultPath, WatchEvent, Watcher};
 use serde::Serialize;
 use std::collections::{HashMap, VecDeque};
 use std::path::{Path, PathBuf};
@@ -43,7 +43,7 @@ pub const PAGE_MAX_BYTES: u64 = 16 * 1024 * 1024;
 pub fn check_size(kind: FileKind, len: u64, name: &str) -> CmdResult<()> {
     let max = match kind {
         FileKind::Page => PAGE_MAX_BYTES,
-        FileKind::Text => nimw_session::TEXT_MAX_BYTES as u64,
+        FileKind::Text => liber_session::TEXT_MAX_BYTES as u64,
     };
     if len > max {
         return Err(CommandError::new(
@@ -162,16 +162,16 @@ fn folder_files(vault: &Vault) -> FileSet {
         };
         for entry in entries {
             match entry.kind {
-                nimw_vault::EntryKind::File => {
+                liber_vault::EntryKind::File => {
                     if out.len() >= MAX_LISTED {
                         return FileSet::new(out);
                     }
                     out.push(entry.path.to_string());
                 }
-                nimw_vault::EntryKind::Dir if depth < LINK_DEPTH => {
+                liber_vault::EntryKind::Dir if depth < LINK_DEPTH => {
                     queue.push_back((entry.path, depth + 1));
                 }
-                nimw_vault::EntryKind::Dir => {}
+                liber_vault::EntryKind::Dir => {}
             }
         }
     }
@@ -487,7 +487,7 @@ mod tests {
     fn m4c_review_m2_files_too_large_to_edit_get_no_grant() {
         let dir = tempfile::tempdir().unwrap();
         let big = std::fs::File::create(dir.path().join("huge.log.txt")).unwrap();
-        big.set_len(nimw_session::TEXT_MAX_BYTES as u64 + 1)
+        big.set_len(liber_session::TEXT_MAX_BYTES as u64 + 1)
             .unwrap();
         let page = std::fs::File::create(dir.path().join("huge.md")).unwrap();
         page.set_len(PAGE_MAX_BYTES + 1).unwrap();

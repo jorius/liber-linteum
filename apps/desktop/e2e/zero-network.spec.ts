@@ -73,13 +73,13 @@ for (const mode of ['livePreview', 'source', 'split']) {
       await expect(pane.getByRole('region', { name: 'Other › Section' })).toBeVisible();
     }
     if (mode === 'livePreview') {
-      await expect(page.locator('.cm-nimw-widget').first()).toBeVisible();
+      await expect(page.locator('.cm-liber-widget').first()).toBeVisible();
     }
     await scrollThrough(page, '.cm-scroller');
     await page.waitForLoadState('networkidle');
     await page.waitForTimeout(500); // debounced renders, lazy embeds
     const csp = await page.evaluate(
-      () => (window as unknown as { __nimwCspViolations: string[] }).__nimwCspViolations,
+      () => (window as unknown as { __liberCspViolations: string[] }).__liberCspViolations,
     );
     expect(problems).toEqual([]);
     expect(csp).toEqual([]); // nothing even reached the CSP
@@ -129,7 +129,7 @@ for (const palette of [
     await page.waitForLoadState('networkidle');
     await page.waitForTimeout(300);
     const csp = await page.evaluate(
-      () => (window as unknown as { __nimwCspViolations: string[] }).__nimwCspViolations,
+      () => (window as unknown as { __liberCspViolations: string[] }).__liberCspViolations,
     );
     expect(problems).toEqual([]);
     expect(csp).toEqual([]);
@@ -158,7 +158,7 @@ test('zero network requests: the Global View', async ({ page }) => {
   await page.waitForLoadState('networkidle');
   await page.waitForTimeout(300);
   const csp = await page.evaluate(
-    () => (window as unknown as { __nimwCspViolations: string[] }).__nimwCspViolations,
+    () => (window as unknown as { __liberCspViolations: string[] }).__liberCspViolations,
   );
   expect(problems).toEqual([]);
   expect(csp).toEqual([]);
@@ -180,7 +180,7 @@ test('zero network requests: relationships in the Global View', async ({ page })
   await page.waitForLoadState('networkidle');
   await page.waitForTimeout(300);
   const csp = await page.evaluate(
-    () => (window as unknown as { __nimwCspViolations: string[] }).__nimwCspViolations,
+    () => (window as unknown as { __liberCspViolations: string[] }).__liberCspViolations,
   );
   expect(problems).toEqual([]);
   expect(csp).toEqual([]);
@@ -198,7 +198,7 @@ test('zero network requests: moving blocks in Split', async ({ page }) => {
   await page.waitForLoadState('networkidle');
   await page.waitForTimeout(300);
   const csp = await page.evaluate(
-    () => (window as unknown as { __nimwCspViolations: string[] }).__nimwCspViolations,
+    () => (window as unknown as { __liberCspViolations: string[] }).__liberCspViolations,
   );
   expect(problems).toEqual([]);
   expect(csp).toEqual([]);
@@ -238,7 +238,7 @@ for (const mode of ['split', 'livePreview']) {
     await page.evaluate(() => document.fonts.ready);
     await page.waitForLoadState('networkidle');
     const csp = await page.evaluate(
-      () => (window as unknown as { __nimwCspViolations: string[] }).__nimwCspViolations,
+      () => (window as unknown as { __liberCspViolations: string[] }).__liberCspViolations,
     );
     expect(seen.problems).toEqual([]);
     expect(csp).toEqual([]);

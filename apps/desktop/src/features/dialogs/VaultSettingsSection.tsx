@@ -37,7 +37,7 @@ function obsidianPlace(value: string, t: TFunction): string {
 }
 
 /** "This vault" (M2c §5.4): where new attachments go, stored in
- *  `.nimw/vault.json`. When Obsidian has its own setting, it applies unless
+ *  `.liber/vault.json`. When Obsidian has its own setting, it applies unless
  *  "Use a different place in Notes In My Way" is on (M4b §5); Obsidian's file
  *  is never written. */
 export function VaultSettingsSection() {
@@ -56,8 +56,8 @@ export function VaultSettingsSection() {
   const [obsidianFormat, setObsidianFormat] = useState<LinkFormat | null>(null);
   const [loaded, setLoaded] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  // What `.nimw/vault.json` holds (as loaded, then as last saved): saving the
-  // same again would create `.nimw/` for nothing (final review M5).
+  // What `.liber/vault.json` holds (as loaded, then as last saved): saving the
+  // same again would create `.liber/` for nothing (final review M5).
   const stored = useRef<{ mode: AttachmentMode; path: string } | null>(null);
 
   useEffect(() => {
@@ -126,7 +126,7 @@ export function VaultSettingsSection() {
     }
   };
 
-  /** The override switch: on stores NIMW's current place with it; off keeps
+  /** The override switch: on stores Liber Linteum's current place with it; off keeps
    *  the place for next time. */
   const toggleOwn = async (on: boolean) => {
     const res = await vaultSettingsSet(
@@ -141,7 +141,7 @@ export function VaultSettingsSection() {
     setError(null);
   };
 
-  /** NIMW's own link format; `default` follows Obsidian's (else shortest). */
+  /** Liber Linteum's own link format; `default` follows Obsidian's (else shortest). */
   const changeFormat = async (next: LinkFormat | 'default') => {
     const res = await vaultSettingsSet({ attachmentLinkFormat: next });
     if (!res.ok) {

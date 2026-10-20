@@ -143,8 +143,8 @@ impl From<FontChoice> for String {
 }
 
 /// How wide pages read by default (M4b part 2 §1); vaults and pages can
-/// override it in `.nimw/vault.json`.
-pub use nimw_vault::PageWidth;
+/// override it in `.liber/vault.json`.
+pub use liber_vault::PageWidth;
 
 /// How a Global View click opens the next level (M3a §5, GV-13).
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
@@ -262,7 +262,7 @@ pub const MAX_COVER_HEIGHT: u16 = 600;
 
 /// The default cover height in px for pages without their own (cover
 /// resize), clamped to 132–600 (an out-of-range number is clamped, not
-/// reset). Pages keep their own in `.nimw/vault.json`.
+/// reset). Pages keep their own in `.liber/vault.json`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(from = "u32", into = "u16")]
 pub struct CoverHeight(u16);
@@ -484,7 +484,7 @@ pub struct RecentVaultDto {
     pub missing: bool,
     /// The global Scratchpad (M4c §2): shown as "Quick notes".
     pub scratchpad: bool,
-    /// The vault's emoji (M5b §4), read from its `.nimw/vault.json`.
+    /// The vault's emoji (M5b §4), read from its `.liber/vault.json`.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub icon: Option<String>,
 }
@@ -747,8 +747,8 @@ impl SettingsStore {
                 opened_at: r.opened_at.clone(),
                 missing: !Path::new(&r.path).is_dir(),
                 scratchpad: s.scratchpad_path.as_deref() == Some(r.path.as_str()),
-                icon: nimw_vault::vault_icon_at(Path::new(&r.path))
-                    .filter(|i| nimw_markdown::is_icon(i)),
+                icon: liber_vault::vault_icon_at(Path::new(&r.path))
+                    .filter(|i| liber_markdown::is_icon(i)),
             })
             .collect()
     }

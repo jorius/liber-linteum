@@ -1,7 +1,7 @@
 import { defineConfig, devices } from '@playwright/test';
 
-// NIMW_E2E_PORT lets parallel worktrees run their suites side by side.
-const PORT = Number(process.env.NIMW_E2E_PORT ?? 4317);
+// LIBER_E2E_PORT lets parallel worktrees run their suites side by side.
+const PORT = Number(process.env.LIBER_E2E_PORT ?? 4317);
 
 /** Zero-network test of the built UI (M2a §7); run `vite build` first. */
 export default defineConfig({

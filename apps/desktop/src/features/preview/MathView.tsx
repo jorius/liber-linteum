@@ -22,8 +22,8 @@ export function MathView({ tex, display }: { tex: string; display: boolean }) {
     if (el.current) renderMath(tex, el.current, display);
   }, [tex, display]);
   return display ? (
-    <div ref={el as React.RefObject<HTMLDivElement>} data-nimw="math" />
+    <div ref={el as React.RefObject<HTMLDivElement>} data-liber="math" />
   ) : (
-    <span ref={el as React.RefObject<HTMLSpanElement>} data-nimw="math" />
+    <span ref={el as React.RefObject<HTMLSpanElement>} data-liber="math" />
   );
 }

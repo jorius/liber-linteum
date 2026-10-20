@@ -9,12 +9,12 @@
 //
 // In node_modules files:
 // - `obj.name = value` (or `obj["name"] = value`) becomes
-//   `__nimwOwn(obj, "name").name = value`. The helper gives `obj` its own
+//   `__liberOwn(obj, "name").name = value`. The helper gives `obj` its own
 //   writable, enumerable property first — what the assignment would have
 //   created — but only when the name it inherits is a read-only data
 //   property; otherwise (setters, own properties, an unfrozen realm) nothing
 //   changes.
-// - `Object.assign` becomes `__nimwAssign`, which does the same for those
+// - `Object.assign` becomes `__liberAssign`, which does the same for those
 //   names in the sources before calling Object.assign.
 // Assignments with computed keys (`obj[key] = value`) are not covered: the
 // e2e draws every kind of Mermaid diagram under a frozen prototype to show
@@ -37,8 +37,8 @@ const HINT = new RegExp(
   `(?:\\.\\s*|\\[\\s*["'])(?:${NAMES.join('|')})["']?\\s*\\]?\\s*=(?![=>])|\\bObject\\.assign\\b`,
 );
 const HELPERS =
-  'var __nimwOwn=function(o,k){if(o!=null&&(typeof o==="object"||typeof o==="function")&&!Object.prototype.hasOwnProperty.call(o,k)){for(var p=Object.getPrototypeOf(o);p;p=Object.getPrototypeOf(p)){var d=Object.getOwnPropertyDescriptor(p,k);if(d){if("value" in d&&!d.writable&&Object.isExtensible(o))Object.defineProperty(o,k,{value:void 0,writable:true,enumerable:true,configurable:true});break}}}return o};\n' +
-  `var __nimwAssign=function(t){for(var i=1;i<arguments.length;i++){var s=arguments[i];if(s!=null)for(var n=${JSON.stringify(NAMES)},j=0;j<n.length;j++)if(Object.prototype.propertyIsEnumerable.call(s,n[j]))__nimwOwn(t,n[j])}return Object.assign.apply(Object,arguments)};\n`;
+  'var __liberOwn=function(o,k){if(o!=null&&(typeof o==="object"||typeof o==="function")&&!Object.prototype.hasOwnProperty.call(o,k)){for(var p=Object.getPrototypeOf(o);p;p=Object.getPrototypeOf(p)){var d=Object.getOwnPropertyDescriptor(p,k);if(d){if("value" in d&&!d.writable&&Object.isExtensible(o))Object.defineProperty(o,k,{value:void 0,writable:true,enumerable:true,configurable:true});break}}}return o};\n' +
+  `var __liberAssign=function(t){for(var i=1;i<arguments.length;i++){var s=arguments[i];if(s!=null)for(var n=${JSON.stringify(NAMES)},j=0;j<n.length;j++)if(Object.prototype.propertyIsEnumerable.call(s,n[j]))__liberOwn(t,n[j])}return Object.assign.apply(Object,arguments)};\n`;
 
 type Node = { type: string; start: number; end: number; [key: string]: unknown };
 
@@ -59,7 +59,10 @@ const PREBUNDLED = /[\\/]node_modules[\\/]\.vite[\\/]/;
  *  overflowed the stack and left `pnpm dev` with a blank window). */
 export function freezeSafeSource(code: string, file: string): string | null {
   if (!NODE_MODULES.test(file) || PREBUNDLED.test(file) || !HINT.test(code)) return null;
-  if (code.includes('var __nimwAssign=function(') || code.includes('var __nimwAssign = function('))
+  if (
+    code.includes('var __liberAssign=function(') ||
+    code.includes('var __liberAssign = function(')
+  )
     return null;
   const { program, errors } = parseSync(file, code, { sourceType: 'unambiguous' });
   if (errors.length > 0) return null;
@@ -86,7 +89,7 @@ export function freezeSafeSource(code: string, file: string): string | null {
       const size = target.end - target.start;
       const at = (pos: number, text: string, order: number) =>
         edits.push({ start: pos, end: pos, text, order });
-      at(target.start, '__nimwOwn(', -size);
+      at(target.start, '__liberOwn(', -size);
       at(target.end, `,${JSON.stringify(key)})`, -1e9 + size);
     },
   }).visit(program);
@@ -94,7 +97,7 @@ export function freezeSafeSource(code: string, file: string): string | null {
   // check), never where it is itself assigned (a polyfill).
   for (const m of assignReads) {
     if (!assigned.has(m.start))
-      edits.push({ start: m.start, end: m.end, text: '__nimwAssign', order: 0 });
+      edits.push({ start: m.start, end: m.end, text: '__liberAssign', order: 0 });
   }
   if (edits.length === 0) return null;
   // The helpers go after a hashbang and any directive prologue ("use strict"
@@ -117,7 +120,7 @@ export function freezeSafeSource(code: string, file: string): string | null {
 
 export function freezeSafe() {
   return {
-    name: 'nimw-freeze-safe',
+    name: 'liber-freeze-safe',
     enforce: 'pre' as const,
     transform(code: string, id: string): string | null {
       return freezeSafeSource(code, id.split('?')[0]);

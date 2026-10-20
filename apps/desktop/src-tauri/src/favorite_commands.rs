@@ -4,7 +4,7 @@
 use crate::error::{CmdResult, CommandError, ErrorKind};
 use crate::state::AppState;
 use crate::vault_commands::blocking;
-use nimw_vault::{TRASH_DIR, VaultPath, is_hidden_path};
+use liber_vault::{TRASH_DIR, VaultPath, is_hidden_path};
 use tauri::{AppHandle, Manager, Runtime};
 
 /// More favorites than anyone keeps in a sidebar.

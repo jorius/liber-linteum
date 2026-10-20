@@ -1,10 +1,10 @@
-//! The `nimw-asset:` protocol (M2a spec §2.5): serves files of the open vault
+//! The `liber-asset:` protocol (M2a spec §2.5): serves files of the open vault
 //! only, through `VaultPath` (no traversal, no hidden files), with ranges.
 
-use nimw_desktop::AppDirs;
-use nimw_desktop::asset::serve;
-use nimw_desktop::state::AppState;
-use nimw_testkit::copy_fixture;
+use liber_desktop::AppDirs;
+use liber_desktop::asset::serve;
+use liber_desktop::state::AppState;
+use liber_testkit::copy_fixture;
 use serde_json::json;
 use tauri::Manager;
 use tauri::test::{INVOKE_KEY, get_ipc_response, mock_builder};
@@ -18,7 +18,7 @@ fn app() -> (
 ) {
     let config = tempfile::tempdir().unwrap();
     let cache = tempfile::tempdir().unwrap();
-    let app = nimw_desktop::configure(
+    let app = liber_desktop::configure(
         mock_builder(),
         Some(AppDirs {
             config: config.path().into(),
@@ -232,7 +232,7 @@ fn outside_world(
     page: impl Fn(&std::path::Path) -> String,
 ) -> (tempfile::TempDir, std::path::PathBuf) {
     let base = tempfile::Builder::new()
-        .prefix("nimw-ext")
+        .prefix("liber-ext")
         .tempdir()
         .unwrap();
     let pics = dunce::canonicalize(base.path()).unwrap().join("Pics");

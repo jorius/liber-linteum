@@ -68,7 +68,7 @@ function itemNodes(src: string): unknown[] | null {
 }
 
 /** A label as the dialog shows it: a string as written, any other scalar as
- *  its source text (`label: 2024`, as nimw-markdown reads it); none: `null`
+ *  its source text (`label: 2024`, as liber-markdown reads it); none: `null`
  *  (final review I1). */
 function labelOf(item: Record<string, unknown>, node: unknown): string | null {
   const label = item.label;
@@ -101,7 +101,7 @@ export function readRelated(text: string): RelatedEntry[] {
 }
 
 /** A link as a YAML scalar. One holding `"` or `\` is single-quoted, so its
- *  source text is the link itself: nimw-markdown finds a link by its text,
+ *  source text is the link itself: liber-markdown finds a link by its text,
  *  and skips an escaped one (final review m4). */
 function linkYaml(link: string): string {
   const single = /["\\]/.test(link) && !link.includes("'");

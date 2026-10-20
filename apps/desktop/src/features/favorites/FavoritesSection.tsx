@@ -32,7 +32,7 @@ export function StarIcon({ filled, size = 13 }: { filled: boolean; size?: number
   );
 }
 
-const COLLAPSED = 'nimw.favoritesCollapsed:';
+const COLLAPSED = 'liber.favoritesCollapsed:';
 
 function readCollapsed(root: string): boolean {
   try {

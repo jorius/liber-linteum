@@ -26,11 +26,11 @@ async function watchNetwork(page: Page) {
     const local =
       (url.protocol === 'http:' && url.hostname === '127.0.0.1') ||
       url.protocol === 'data:' ||
-      url.protocol === 'nimw-asset:' ||
-      url.hostname === 'nimw-asset.localhost';
+      url.protocol === 'liber-asset:' ||
+      url.hostname === 'liber-asset.localhost';
     if (!local) outside.push(r.url());
   });
-  await page.route(/^https?:\/\/(?!127\.0\.0\.1|nimw-asset\.localhost)/, (route) => route.abort());
+  await page.route(/^https?:\/\/(?!127\.0\.0\.1|liber-asset\.localhost)/, (route) => route.abort());
   return outside;
 }
 
@@ -59,7 +59,7 @@ async function stayedLocal(page: Page, outside: string[]) {
   expect(outside).toEqual([]);
   expect(
     await page.evaluate(
-      () => (window as unknown as { __nimwCspViolations: string[] }).__nimwCspViolations,
+      () => (window as unknown as { __liberCspViolations: string[] }).__liberCspViolations,
     ),
   ).toEqual([]);
 }
@@ -67,7 +67,8 @@ async function stayedLocal(page: Page, outside: string[]) {
 const lastWrite = (page: Page, path?: string) =>
   page.evaluate((path) => {
     const writes =
-      (window as unknown as { __nimwWrites?: { path: string; text: string }[] }).__nimwWrites ?? [];
+      (window as unknown as { __liberWrites?: { path: string; text: string }[] }).__liberWrites ??
+      [];
     return writes.filter((w) => !path || w.path === path).at(-1)?.text ?? null;
   }, path);
 
@@ -143,7 +144,7 @@ test('M5b §2.3: the title and subtitle are edited in the page', async ({ page }
   await title.press('Enter');
   await expect
     .poll(() =>
-      page.evaluate(() => (window as unknown as { __nimwRenames?: unknown[] }).__nimwRenames),
+      page.evaluate(() => (window as unknown as { __liberRenames?: unknown[] }).__liberRenames),
     )
     .toEqual([{ from: 'B.md', to: 'Beta notes.md' }]);
   await expect(title).toHaveValue('Beta notes');

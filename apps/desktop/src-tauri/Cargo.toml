@@ -1,5 +1,5 @@
 [package]
-name = "nimw-desktop"
+name = "liber-desktop"
 description = "Notes In My Way desktop shell."
 version.workspace = true
 edition.workspace = true
@@ -7,7 +7,7 @@ license.workspace = true
 publish.workspace = true
 
 [lib]
-name = "nimw_desktop"
+name = "liber_desktop"
 
 [build-dependencies]
 tauri-build.workspace = true
@@ -22,12 +22,12 @@ fontdb.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 thiserror.workspace = true
-nimw-session = { path = "../../../crates/nimw-session" }
-nimw-vault = { path = "../../../crates/nimw-vault" }
-nimw-markdown = { path = "../../../crates/nimw-markdown" }
-nimw-audio = { path = "../../../crates/nimw-audio" }
-nimw-import = { path = "../../../crates/nimw-import" }
-nimw-spell = { path = "../../../crates/nimw-spell" }
+liber-session = { path = "../../../crates/liber-session" }
+liber-vault = { path = "../../../crates/liber-vault" }
+liber-markdown = { path = "../../../crates/liber-markdown" }
+liber-audio = { path = "../../../crates/liber-audio" }
+liber-import = { path = "../../../crates/liber-import" }
+liber-spell = { path = "../../../crates/liber-spell" }
 
 # M4c §3: files opened from Explorer or a command line while the app runs
 # reach the running app (macOS sends them to it itself: `RunEvent::Opened`).
@@ -41,7 +41,7 @@ tauri-plugin-single-instance.workspace = true
 [dev-dependencies]
 tauri = { workspace = true, features = ["test"] }
 tempfile.workspace = true
-nimw-testkit = { path = "../../../crates/nimw-testkit" }
+liber-testkit = { path = "../../../crates/liber-testkit" }
 zip.workspace = true
 
 # Runs on the process main thread (muda menus can only be created there).

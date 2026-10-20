@@ -3,7 +3,7 @@
 use crate::drops::DropGrants;
 use crate::error::CommandError;
 use crate::settings::SettingsStore;
-use nimw_session::VaultSession;
+use liber_session::VaultSession;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex, MutexGuard};
 use std::time::Instant;
@@ -18,7 +18,7 @@ pub type FilePicker = Arc<dyn Fn() -> Vec<PathBuf> + Send + Sync>;
 pub struct AppState {
     session: Mutex<Option<Arc<VaultSession>>>,
     pub settings: SettingsStore,
-    /// OS cache dir; index databases live under `<cache_dir>/nimw/…`.
+    /// OS cache dir; index databases live under `<cache_dir>/liber/…`.
     pub cache_dir: PathBuf,
     /// Paths the OS dropped onto the window, importable once (M2c §8).
     drop_grants: Mutex<DropGrants>,

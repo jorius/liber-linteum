@@ -7,9 +7,9 @@ use crate::dto::AttachedDto;
 use crate::error::{CmdResult, CommandError, ErrorKind};
 use crate::state::AppState;
 use crate::vault_commands::{blocking, not_archived};
-use nimw_audio::{AudioError, Device, Ended, Host, Take};
-use nimw_session::VaultSession;
-use nimw_vault::VaultPath;
+use liber_audio::{AudioError, Device, Ended, Host, Take};
+use liber_session::VaultSession;
+use liber_vault::VaultPath;
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 use std::path::{Path, PathBuf};
@@ -263,7 +263,7 @@ pub(crate) fn audio_record_start_impl<R: Runtime>(
         let file = file.clone();
         let app = app.clone();
         std::thread::spawn(move || {
-            let emit = |level: nimw_audio::Level, elapsed: Duration, ended| {
+            let emit = |level: liber_audio::Level, elapsed: Duration, ended| {
                 let _ = app.emit_to(
                     "main",
                     "audio:level",
@@ -276,15 +276,16 @@ pub(crate) fn audio_record_start_impl<R: Runtime>(
                     },
                 );
             };
-            let take = nimw_audio::record(&*host, device.as_deref(), &file, &stop, &mut |l, at| {
-                let _ = started.send(());
-                emit(l, at, None);
-            });
+            let take =
+                liber_audio::record(&*host, device.as_deref(), &file, &stop, &mut |l, at| {
+                    let _ = started.send(());
+                    emit(l, at, None);
+                });
             // Ended by itself: the bar says so, Stop & insert keeps the sound.
             if let Ok(t) = &take
                 && t.ended != Ended::Stopped
             {
-                emit(nimw_audio::Level::default(), t.duration, Some(t.ended));
+                emit(liber_audio::Level::default(), t.duration, Some(t.ended));
             }
             take
         })

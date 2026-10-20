@@ -290,7 +290,7 @@ export interface WriteResult {
   hash: string;
 }
 
-/** Mirrors `nimw_markdown::LinkKind::as_str`. */
+/** Mirrors `liber_markdown::LinkKind::as_str`. */
 export type LinkKind = 'wiki' | 'embed' | 'markdown' | 'markdown_image' | 'related' | 'cover';
 
 export interface LinkTarget {
@@ -385,7 +385,7 @@ export interface VaultSettings {
   attachments: { mode: AttachmentMode; path: string };
   /** Obsidian's `attachmentFolderPath` when set (it wins unless overridden). */
   obsidian: string | null;
-  /** NIMW's place wins over Obsidian's (M4b §5). */
+  /** Liber Linteum's place wins over Obsidian's (M4b §5). */
   overrideObsidian: boolean;
   /** The vault's default page width (`null`: the app's; M4b part 2 §1). */
   pageWidth: PageWidth | null;
@@ -397,9 +397,9 @@ export interface VaultSettings {
   coverSides: Record<string, 'left' | 'right'>;
   /** Side covers' own strip widths in px (§3). */
   coverWidths: Record<string, number>;
-  /** NIMW's own link format for new attachments (M4b part 3 §8). */
+  /** Liber Linteum's own link format for new attachments (M4b part 3 §8). */
   attachmentLinkFormat?: LinkFormat | null;
-  /** Obsidian's `newLinkFormat` (applies while NIMW has none of its own). */
+  /** Obsidian's `newLinkFormat` (applies while Liber Linteum has none of its own). */
   obsidianLinkFormat?: LinkFormat | null;
 }
 
@@ -664,8 +664,8 @@ export const attachmentPaste = (page: string, name: string, bytes: Uint8Array) =
   ipcCall(() =>
     invoke<Attached>('attachment_paste', bytes, {
       headers: {
-        'x-nimw-page': encodeURIComponent(page),
-        'x-nimw-name': encodeURIComponent(name),
+        'x-liber-page': encodeURIComponent(page),
+        'x-liber-name': encodeURIComponent(name),
       },
     }),
   );
@@ -967,13 +967,13 @@ export const entryArchive = (path: string) => call<RenameOutcome>('entry_archive
 export const archiveRestore = (path: string, keepBoth: boolean) =>
   call<RenameOutcome>('archive_restore', { path, keepBoth });
 
-/** URL of a vault file for <img>/<audio> through the `nimw-asset:` protocol
+/** URL of a vault file for <img>/<audio> through the `liber-asset:` protocol
  *  (M2a §2.5); WebView2 on Windows reaches custom protocols over http. */
 export function assetUrl(path: string): string {
   const encoded = path.split('/').map(encodeURIComponent).join('/');
   return /Windows/i.test(navigator.userAgent)
-    ? `http://nimw-asset.localhost/${encoded}`
-    : `nimw-asset://localhost/${encoded}`;
+    ? `http://liber-asset.localhost/${encoded}`
+    : `liber-asset://localhost/${encoded}`;
 }
 
 /** URL of a linked file outside the vault (M4b part 3 §9): its absolute
@@ -982,8 +982,8 @@ export function assetUrl(path: string): string {
 export function externalAssetUrl(path: string): string {
   const encoded = `.external/${encodeURIComponent(path)}`;
   return /Windows/i.test(navigator.userAgent)
-    ? `http://nimw-asset.localhost/${encoded}`
-    : `nimw-asset://localhost/${encoded}`;
+    ? `http://liber-asset.localhost/${encoded}`
+    : `liber-asset://localhost/${encoded}`;
 }
 
 // ---- events ----

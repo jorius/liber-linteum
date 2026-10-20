@@ -1,12 +1,12 @@
 //! M3a §8: the Global View — levels and their cards, edges between visible
-//! cards, pinned card positions. Thin wrappers over `nimw-session`.
+//! cards, pinned card positions. Thin wrappers over `liber-session`.
 
 use crate::dto::{GvCardDto, GvEdgeDto, GvLevelDto, GvLevelResultDto};
 use crate::error::{CmdResult, CommandError, ErrorKind};
 use crate::state::AppState;
 use crate::vault_commands::blocking;
-use nimw_session::{GvLevel, MAX_VISIBLE};
-use nimw_vault::{CardPosition, VaultPath};
+use liber_session::{GvLevel, MAX_VISIBLE};
+use liber_vault::{CardPosition, VaultPath};
 use std::collections::BTreeMap;
 use tauri::{AppHandle, Manager, Runtime};
 

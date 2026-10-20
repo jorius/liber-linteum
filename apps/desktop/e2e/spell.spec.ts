@@ -25,7 +25,7 @@ async function open(page: Page, settings: Record<string, unknown> = {}) {
   return errors;
 }
 
-const underlined = (page: Page) => page.locator('.cm-nimw-misspelled');
+const underlined = (page: Page) => page.locator('.cm-liber-misspelled');
 
 test('a misspelled word is underlined; code is not', async ({ page }) => {
   const errors = await open(page);

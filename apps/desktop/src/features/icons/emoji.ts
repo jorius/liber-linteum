@@ -56,7 +56,7 @@ export function emojiName(groups: EmojiGroup[], emoji: string, lang: string): st
   return emoji;
 }
 
-const RECENT_KEY = 'nimw.recentIcons';
+const RECENT_KEY = 'liber.recentIcons';
 const MAX_RECENT = 16;
 
 /** Recent picks, newest first (a per-viewer convenience: may be empty). */

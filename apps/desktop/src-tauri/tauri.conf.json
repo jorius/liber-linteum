@@ -28,8 +28,8 @@
         "default-src": "'self'",
         "script-src": "'self'",
         "style-src": "'self' 'unsafe-inline'",
-        "img-src": "'self' nimw-asset: http://nimw-asset.localhost data: blob:",
-        "media-src": "'self' nimw-asset: http://nimw-asset.localhost blob:",
+        "img-src": "'self' liber-asset: http://liber-asset.localhost data: blob:",
+        "media-src": "'self' liber-asset: http://liber-asset.localhost blob:",
         "font-src": "'self'",
         "connect-src": "ipc: http://ipc.localhost",
         "frame-src": "'none'",
@@ -47,9 +47,9 @@
     "license": "GPL-3.0-or-later",
     "resources": {
       "../../../THIRD-PARTY-NOTICES.md": "licenses/THIRD-PARTY-NOTICES.md",
-      "../../../crates/nimw-spell/dictionaries/en_US/LICENSE": "licenses/dictionary-en_US.txt",
-      "../../../crates/nimw-spell/dictionaries/es/LICENSE": "licenses/dictionary-es.txt",
-      "../../../crates/nimw-spell/dictionaries/es_CO/LICENSE": "licenses/dictionary-es_CO.txt"
+      "../../../crates/liber-spell/dictionaries/en_US/LICENSE": "licenses/dictionary-en_US.txt",
+      "../../../crates/liber-spell/dictionaries/es/LICENSE": "licenses/dictionary-es.txt",
+      "../../../crates/liber-spell/dictionaries/es_CO/LICENSE": "licenses/dictionary-es_CO.txt"
     },
     "shortDescription": "Private, local-only notes with a visual Global View.",
     "icon": [

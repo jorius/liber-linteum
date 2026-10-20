@@ -60,7 +60,7 @@ test('the header’s icon button writes the page’s frontmatter; 🗑 asks firs
   await expect
     .poll(() =>
       page.evaluate(() =>
-        ((window as unknown as { __nimwWrites?: { text: string }[] }).__nimwWrites ?? []).some(
+        ((window as unknown as { __liberWrites?: { text: string }[] }).__liberWrites ?? []).some(
           (w) => w.text.startsWith('---\nicon: 🐉\n---\n'),
         ),
       ),

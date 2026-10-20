@@ -52,7 +52,7 @@ describe('Cover (M2c §2)', () => {
     await waitFor(() =>
       expect(document.querySelector('img[data-cover]')).toHaveAttribute(
         'src',
-        'nimw-asset://localhost/Chars/attachments/sky.png',
+        'liber-asset://localhost/Chars/attachments/sky.png',
       ),
     );
     expect(disk.calls.some(([c]) => c === 'vault_tree')).toBe(true);
@@ -246,7 +246,7 @@ describe('Cover (M2c §2)', () => {
       await waitFor(() =>
         expect(document.querySelector('img[data-cover]')).toHaveAttribute(
           'src',
-          'nimw-asset://localhost/b.png',
+          'liber-asset://localhost/b.png',
         ),
       );
       await waitFor(() =>

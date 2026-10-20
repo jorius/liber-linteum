@@ -1,4 +1,4 @@
-//! `nimw-asset:` — serves the open vault's files to the webview (M2a spec §2.5).
+//! `liber-asset:` — serves the open vault's files to the webview (M2a spec §2.5).
 //!
 //! Tauri's built-in asset protocol can only *add* allowed directories, so a
 //! vault that was open earlier would stay readable after switching vaults.
@@ -8,12 +8,12 @@
 
 use crate::file_windows::{FileWindows, is_file_window};
 use crate::state::AppState;
-use nimw_vault::{Vault, VaultPath, is_hidden_path};
+use liber_vault::{Vault, VaultPath, is_hidden_path};
 use percent_encoding::percent_decode_str;
 
-pub const SCHEME: &str = "nimw-asset";
+pub const SCHEME: &str = "liber-asset";
 
-/// Policy for every `nimw-asset:` response (M2a review m2).
+/// Policy for every `liber-asset:` response (M2a review m2).
 pub const CSP: &str = "default-src 'none'; sandbox";
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -107,11 +107,11 @@ pub const EXTERNAL_PREFIX: &str = ".external/";
 /// (`VaultSession::external_file`): 403 when it may not be shown, 404 when
 /// it isn't there.
 fn serve_external(
-    session: &nimw_session::VaultSession,
+    session: &liber_session::VaultSession,
     encoded: &str,
     range: Option<&str>,
 ) -> AssetResponse {
-    use nimw_session::SessionError;
+    use liber_session::SessionError;
     if encoded.contains('/') {
         return AssetResponse::status(403);
     }
@@ -154,7 +154,7 @@ fn serve_trashed_image(vault: &Vault, encoded: &str, range: Option<&str>) -> Ass
     let mime = mime_for(&name);
     // `:` too: on Windows `D:photo.png` joined onto `.trash` leaves it for drive D.
     if name.contains(['/', '\\', ':'])
-        || nimw_vault::is_hidden_name(&name)
+        || liber_vault::is_hidden_name(&name)
         || !mime.starts_with("image/")
     {
         return AssetResponse::status(403);

@@ -44,7 +44,7 @@ async function open(page: Page, name: string, settings: Record<string, unknown> 
   await page.getByRole('button', { name: /^vault/ }).click();
   await page.getByRole('treeitem', { name, exact: true }).click();
   await expect(page.getByRole('textbox', { name: 'Page title' })).toHaveValue(name);
-  if (name !== 'Code') await expect(page.locator('.cm-nimw-widget table')).toBeVisible();
+  if (name !== 'Code') await expect(page.locator('.cm-liber-widget table')).toBeVisible();
   return errors;
 }
 
@@ -53,7 +53,7 @@ async function open(page: Page, name: string, settings: Record<string, unknown> 
 const brokenWords = (page: Page) =>
   page.evaluate(() => {
     const broken: string[] = [];
-    for (const cell of document.querySelectorAll('.cm-nimw-widget td, .cm-nimw-widget th')) {
+    for (const cell of document.querySelectorAll('.cm-liber-widget td, .cm-liber-widget th')) {
       const walker = document.createTreeWalker(cell, NodeFilter.SHOW_TEXT);
       for (let n = walker.nextNode(); n; n = walker.nextNode()) {
         const text = (n as Text).data;
@@ -84,7 +84,7 @@ const geometry = (page: Page) =>
     };
     // The rendered table's box: the widget's content (the widget itself is
     // the frame it is placed in).
-    const w = document.querySelector('.cm-nimw-widget > *')!.getBoundingClientRect();
+    const w = document.querySelector('.cm-liber-widget > *')!.getBoundingClientRect();
     const scroller = document.querySelector('.cm-scroller')!.getBoundingClientRect();
     const gutter = document.querySelector('.cm-gutters')?.getBoundingClientRect() ?? null;
     const para = [...document.querySelectorAll<HTMLElement>('.cm-line')]
@@ -154,7 +154,7 @@ test("Live Preview: pressing a wide table's scrollbar scrolls it and keeps it re
     // Overlay scrollbars: the bar's press lands on the box, as here.
     await region.dispatchEvent('mousedown', { button: 0 });
   }
-  await expect(page.locator('.cm-nimw-widget table')).toBeVisible();
+  await expect(page.locator('.cm-liber-widget table')).toBeVisible();
   await expect(page.locator('.cm-line', { hasText: '| --- |' })).toHaveCount(0);
 });
 
@@ -174,7 +174,7 @@ test('Wide elements: the table spans the editor while the text keeps the measure
   expect(g.widgetRight).toBeLessThanOrEqual(g.scrollerRight);
   expect(await brokenWords(page)).toEqual([]);
   // Clicking into the table shows its source in the same wide box; typing works.
-  await page.locator('.cm-nimw-widget td').first().click();
+  await page.locator('.cm-liber-widget td').first().click();
   const raw = page.locator('.cm-line[data-wide-src="tables"]').first();
   await expect(raw).toBeVisible();
   expect(await raw.evaluate((el) => el.getBoundingClientRect().width)).toBeGreaterThan(g.text + 50);

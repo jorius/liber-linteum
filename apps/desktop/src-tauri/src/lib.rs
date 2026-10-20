@@ -48,10 +48,10 @@ pub fn configure<R: tauri::Runtime>(
     dirs: Option<AppDirs>,
 ) -> tauri::Builder<R> {
     // M6 §7: tests (the only callers that pass dirs) never open a microphone.
-    let microphone: std::sync::Arc<dyn nimw_audio::Host> = if dirs.is_some() {
-        std::sync::Arc::new(nimw_audio::SyntheticHost::tone(48_000, 1).realtime())
+    let microphone: std::sync::Arc<dyn liber_audio::Host> = if dirs.is_some() {
+        std::sync::Arc::new(liber_audio::SyntheticHost::tone(48_000, 1).realtime())
     } else {
-        std::sync::Arc::new(nimw_audio::CpalHost)
+        std::sync::Arc::new(liber_audio::CpalHost)
     };
     let builder = builder
         .manage(audio_commands::AudioState::new(microphone))

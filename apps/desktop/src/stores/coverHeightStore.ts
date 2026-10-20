@@ -1,5 +1,5 @@
 // Cover resize: a page's own cover height, else the app's default
-// (Settings → Editor). Page heights live in `.nimw/vault.json`
+// (Settings → Editor). Page heights live in `.liber/vault.json`
 // `coverHeights` (Rust), never in the note; they're re-read when the vault or
 // its tree changes (renames move them, deletions drop them), like page widths.
 import i18next from 'i18next';

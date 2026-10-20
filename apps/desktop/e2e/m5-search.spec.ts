@@ -100,7 +100,7 @@ test('nothing leaves the machine with search open', async ({ page }) => {
   expect(outside).toEqual([]);
   expect(
     await page.evaluate(
-      () => (window as unknown as { __nimwCspViolations: string[] }).__nimwCspViolations,
+      () => (window as unknown as { __liberCspViolations: string[] }).__liberCspViolations,
     ),
   ).toEqual([]);
   expect(errors).toEqual([]);

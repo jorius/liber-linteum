@@ -7,7 +7,7 @@ const PAGES = { 'tasks.md': '# Tasks\n\n- [ ] one\n- [x] two\n\nEnd.\n' };
 
 async function writes(page: import('@playwright/test').Page) {
   return page.evaluate(() =>
-    ((window as unknown as { __nimwWrites?: { text: string }[] }).__nimwWrites ?? []).map(
+    ((window as unknown as { __liberWrites?: { text: string }[] }).__liberWrites ?? []).map(
       (w) => w.text,
     ),
   );

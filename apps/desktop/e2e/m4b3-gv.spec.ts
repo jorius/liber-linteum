@@ -9,7 +9,7 @@ import { showGlobalView } from './shell';
 import { installIpcMock } from './ipcMock';
 
 /** WebView2's user agent: the app reaches vault files over
- *  http://nimw-asset.localhost, which the test can serve. */
+ *  http://liber-asset.localhost, which the test can serve. */
 const WINDOWS_UA =
   'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0.0.0 Safari/537.36 Edg/129.0.0.0';
 
@@ -46,7 +46,7 @@ const TALL = bandsPng(120, 600);
 const WIDE = bandsPng(600, 120);
 
 async function serveImages(page: Page) {
-  await page.route('http://nimw-asset.localhost/**', (route) =>
+  await page.route('http://liber-asset.localhost/**', (route) =>
     route.fulfill({
       contentType: 'image/png',
       body: route.request().url().includes('wide') ? WIDE : TALL,
@@ -287,7 +287,7 @@ test('§6: See atoms shows a page as sections and blocks; a block opens the edit
   await map.getByRole('button', { name: 'List: water, magnets' }).click();
   await expect(page.getByRole('textbox', { name: 'Page title' })).toHaveValue('Rex');
   // The cursor is on the list, its lines flash.
-  await expect(page.locator('.cm-nimw-flash').first()).toContainText('water');
+  await expect(page.locator('.cm-liber-flash').first()).toContainText('water');
   const head = await page.evaluate(() => {
     const sel = window.getSelection();
     return sel?.anchorNode?.textContent ?? '';

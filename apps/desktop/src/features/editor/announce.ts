@@ -5,12 +5,12 @@ const NBSP = String.fromCharCode(0xa0);
  *  (M4b §4), "Copied" (final review M7). Unchanged text isn't read again
  *  unless `repeat` (a no-break space then tells it apart). */
 export function announce(text: string, repeat = false): void {
-  let region = document.querySelector<HTMLElement>('[data-nimw-status]');
+  let region = document.querySelector<HTMLElement>('[data-liber-status]');
   if (!region) {
     region = document.createElement('div');
-    region.setAttribute('data-nimw-status', '');
+    region.setAttribute('data-liber-status', '');
     region.setAttribute('role', 'status');
-    region.className = 'nimw-sr-only';
+    region.className = 'liber-sr-only';
     document.body.appendChild(region);
   }
   region.textContent = repeat && region.textContent === text ? text + NBSP : text;

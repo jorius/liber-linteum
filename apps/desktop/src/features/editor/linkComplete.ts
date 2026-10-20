@@ -168,16 +168,16 @@ function searchSection(query: string, count: number): CompletionSection {
     name: 'search',
     header: () => {
       const line = document.createElement('div');
-      line.className = 'cm-nimw-search';
+      line.className = 'cm-liber-search';
       line.setAttribute('aria-hidden', 'true');
       line.innerHTML = SEARCH_ICON;
       const what = document.createElement('span');
-      what.className = 'cm-nimw-search-text';
+      what.className = 'cm-liber-search-text';
       what.textContent = typed
         ? i18next.t('linkComplete.search', { query: typed })
         : i18next.t('linkComplete.typeToFilter');
       const count_ = document.createElement('span');
-      count_.className = 'cm-nimw-search-count';
+      count_.className = 'cm-liber-search-count';
       count_.textContent = matches;
       line.append(what, count_);
       return line;
@@ -243,7 +243,7 @@ const theme = EditorView.theme({
     background: 'var(--color-accent-soft)',
     color: 'var(--color-text-strong)',
   },
-  '.cm-tooltip.cm-tooltip-autocomplete .cm-nimw-search': {
+  '.cm-tooltip.cm-tooltip-autocomplete .cm-liber-search': {
     position: 'sticky',
     top: '0',
     display: 'flex',
@@ -255,18 +255,18 @@ const theme = EditorView.theme({
     color: 'var(--color-text-muted)',
     fontSize: '12.5px',
   },
-  '.cm-tooltip.cm-tooltip-autocomplete .cm-nimw-search-text': {
+  '.cm-tooltip.cm-tooltip-autocomplete .cm-liber-search-text': {
     color: 'var(--color-text)',
     fontWeight: '600',
     overflow: 'hidden',
     textOverflow: 'ellipsis',
     whiteSpace: 'nowrap',
   },
-  '.cm-tooltip.cm-tooltip-autocomplete .cm-nimw-search-count': {
+  '.cm-tooltip.cm-tooltip-autocomplete .cm-liber-search-count': {
     marginLeft: 'auto',
     flex: 'none',
   },
-  '.cm-tooltip.cm-tooltip-autocomplete .cm-nimw-linkIcon': {
+  '.cm-tooltip.cm-tooltip-autocomplete .cm-liber-linkIcon': {
     display: 'inline-flex',
     alignItems: 'center',
     justifyContent: 'center',
@@ -288,7 +288,7 @@ const SVG = 'http://www.w3.org/2000/svg';
 function iconBox(c: FileCompletion): Node | null {
   if (c.type !== 'text' && c.type !== 'variable') return null;
   const box = document.createElement('span');
-  box.className = 'cm-nimw-linkIcon';
+  box.className = 'cm-liber-linkIcon';
   box.setAttribute('aria-hidden', 'true');
   if (c.icon) {
     box.textContent = c.icon;

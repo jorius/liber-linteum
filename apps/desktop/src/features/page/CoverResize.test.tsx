@@ -1,6 +1,6 @@
 // Cover resize: the cover band's bottom edge is a separator the user drags
 // (or moves with the keyboard) to set the page's cover height, kept per page
-// in `.nimw/vault.json` (never in the note).
+// in `.liber/vault.json` (never in the note).
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import axe from 'axe-core';

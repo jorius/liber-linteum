@@ -36,7 +36,7 @@ async function open(page: Page, name: string, lineNumbers: boolean) {
   await page.goto('/');
   await page.getByRole('button', { name: /^vault/ }).click();
   await page.getByRole('treeitem', { name, exact: true }).click();
-  await expect(page.locator('.cm-nimw-widget table')).toBeVisible();
+  await expect(page.locator('.cm-liber-widget table')).toBeVisible();
   return errors;
 }
 
@@ -49,7 +49,7 @@ const geometry = (page: Page) =>
     const content = document.querySelector<HTMLElement>('.cm-content')!;
     const cs = getComputedStyle(content);
     const c = content.getBoundingClientRect();
-    const table = document.querySelector('.cm-nimw-widget table')!.getBoundingClientRect();
+    const table = document.querySelector('.cm-liber-widget table')!.getBoundingClientRect();
     const numbers = [...document.querySelectorAll('.cm-lineNumbers .cm-gutterElement')]
       .map((n) => n.getBoundingClientRect())
       .filter((r) => r.height > 0 && r.width > 0);

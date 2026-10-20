@@ -151,13 +151,13 @@ describe('drop (M2c §5.2)', () => {
       emit('tauri://drag-enter', payload(20, 30, ['/u/a.png', '/u/b.zip', '/u/dir'])),
     );
     await act(() => emit('tauri://drag-over', payload(20, 30)));
-    expect(viewOf().contentDOM.querySelector('.cm-nimw-drop-caret')).not.toBeNull();
+    expect(viewOf().contentDOM.querySelector('.cm-liber-drop-caret')).not.toBeNull();
     await act(() => emit('tauri://drag-drop', payload(20, 30, ['/u/a.png', '/u/b.zip', '/u/dir'])));
     await vi.waitFor(() =>
       expect(viewOf().state.doc.toString()).toBe('one\n![[a.png]]\n[[b.zip]]two\n'),
     );
     expect(imported).toEqual([{ page: 'P.md', paths: ['/u/a.png', '/u/b.zip', '/u/dir'] }]);
-    expect(viewOf().contentDOM.querySelector('.cm-nimw-drop-caret')).toBeNull();
+    expect(viewOf().contentDOM.querySelector('.cm-liber-drop-caret')).toBeNull();
     expect(useToastStore.getState().toasts.at(-1)?.message).toBe('Some files weren’t attached');
     expect(useToastStore.getState().toasts.at(-1)?.detail).toEqual([
       "dir: Folders can't be attached.",
@@ -203,7 +203,7 @@ describe('drop (M2c §5.2)', () => {
     const stop = await installFileDrop();
     await mount('P.md');
     act(() => viewOf().dispatch({ selection: { anchor: 9 } }));
-    const carets = () => viewOf().contentDOM.querySelectorAll('.cm-nimw-drop-caret').length;
+    const carets = () => viewOf().contentDOM.querySelectorAll('.cm-liber-drop-caret').length;
     vi.spyOn(document, 'elementFromPoint').mockReturnValue(viewOf().contentDOM);
     const pos = vi.spyOn(viewOf(), 'posAtCoords').mockReturnValue(2);
     await act(() => emit('tauri://drag-enter', payload(1, 1, ['/u/a.png'])));
@@ -326,7 +326,7 @@ describe('drop (M2c §5.2)', () => {
     vi.spyOn(viewOf(), 'posAtCoords').mockReturnValue(1);
     await act(() => emit('tauri://drag-enter', payload(1, 1, [])));
     await act(() => emit('tauri://drag-over', payload(1, 1)));
-    expect(viewOf().contentDOM.querySelector('.cm-nimw-drop-caret')).toBeNull();
+    expect(viewOf().contentDOM.querySelector('.cm-liber-drop-caret')).toBeNull();
     await act(() => emit('tauri://drag-drop', payload(1, 1, [])));
     // …and dropped outside the text.
     at.mockReturnValue(document.body);
@@ -354,9 +354,9 @@ describe('drop (M2c §5.2)', () => {
     await act(() => emit('tauri://drag-leave', null));
     await act(() => emit('tauri://drag-enter', payload(1, 1, ['/u/a.png'])));
     await act(() => emit('tauri://drag-over', payload(1, 1)));
-    expect(viewOf().contentDOM.querySelector('.cm-nimw-drop-caret')).not.toBeNull();
+    expect(viewOf().contentDOM.querySelector('.cm-liber-drop-caret')).not.toBeNull();
     await act(() => emit('tauri://drag-leave', null));
-    expect(viewOf().contentDOM.querySelector('.cm-nimw-drop-caret')).toBeNull();
+    expect(viewOf().contentDOM.querySelector('.cm-liber-drop-caret')).toBeNull();
     await stop();
   });
 
@@ -377,7 +377,7 @@ describe('drop (M2c §5.2)', () => {
 
 describe('a page switch while a paste or drop is saved (final review I1)', () => {
   const payload = (paths: string[]) => ({ paths, position: { x: 1, y: 1 } });
-  const caretCount = () => viewOf().contentDOM.querySelectorAll('.cm-nimw-drop-caret').length;
+  const caretCount = () => viewOf().contentDOM.querySelectorAll('.cm-liber-drop-caret').length;
   /** `attachment_import` held: the drop is copying until `held.release`. */
   function slowImport(files: Record<string, string>) {
     const held: { release: (v: unknown) => void } = { release: () => undefined };

@@ -270,9 +270,9 @@
 
 @media (prefers-reduced-motion: no-preference) {
   .side {
-    animation: nimw-side-in 120ms ease-out;
+    animation: liber-side-in 120ms ease-out;
   }
-  @keyframes nimw-side-in {
+  @keyframes liber-side-in {
     from {
       transform: translateX(-12px);
       opacity: 0.6;

@@ -12,7 +12,7 @@ function view(doc: string) {
 }
 
 const flashed = (v: EditorView) =>
-  [...v.dom.querySelectorAll('.cm-nimw-flash')].map((el) => el.textContent);
+  [...v.dom.querySelectorAll('.cm-liber-flash')].map((el) => el.textContent);
 
 describe('jump and flash (M4b part 3 §6: an atom clicked in the Global View)', () => {
   it('puts the cursor on the block and flashes its lines for a second', () => {

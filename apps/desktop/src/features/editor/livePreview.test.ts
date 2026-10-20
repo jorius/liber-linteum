@@ -62,11 +62,11 @@ describe('Live Preview (M2a §3.2)', () => {
 
   it('styles headings by level and inline formatting by kind', () => {
     const v = editor('x\n\n## Two\n\n*em* ==hi== ~~no~~ #tag\n');
-    expect(v.contentDOM.querySelector('.cm-nimw-h2')).toHaveTextContent('Two');
-    expect(v.contentDOM.querySelector('.cm-nimw-em')).toHaveTextContent('em');
-    expect(v.contentDOM.querySelector('.cm-nimw-highlight')).toHaveTextContent('hi');
-    expect(v.contentDOM.querySelector('.cm-nimw-strike')).toHaveTextContent('no');
-    expect(v.contentDOM.querySelector('.cm-nimw-tag')).toHaveTextContent('#tag');
+    expect(v.contentDOM.querySelector('.cm-liber-h2')).toHaveTextContent('Two');
+    expect(v.contentDOM.querySelector('.cm-liber-em')).toHaveTextContent('em');
+    expect(v.contentDOM.querySelector('.cm-liber-highlight')).toHaveTextContent('hi');
+    expect(v.contentDOM.querySelector('.cm-liber-strike')).toHaveTextContent('no');
+    expect(v.contentDOM.querySelector('.cm-liber-tag')).toHaveTextContent('#tag');
   });
 
   it('review focus: positions are UTF-16 offsets, so astral characters keep markup aligned', () => {
@@ -93,10 +93,10 @@ describe('Live Preview (M2a §3.2)', () => {
   it('tables, callouts and rules become rendered widgets until the cursor enters them', async () => {
     const doc = 'x\n\n| a | b |\n|---|---|\n| 1 | 2 |\n\n> [!tip] Hint\n> body\n\n---\n';
     const v = editor(doc);
-    expect(v.contentDOM.querySelectorAll('.cm-nimw-widget')).toHaveLength(3);
-    expect(v.contentDOM.querySelector('.cm-nimw-widget table')).not.toBeNull();
+    expect(v.contentDOM.querySelectorAll('.cm-liber-widget')).toHaveLength(3);
+    expect(v.contentDOM.querySelector('.cm-liber-widget table')).not.toBeNull();
     await moveTo(v, doc.indexOf('| 1'));
-    expect(v.contentDOM.querySelectorAll('.cm-nimw-widget')).toHaveLength(2);
+    expect(v.contentDOM.querySelectorAll('.cm-liber-widget')).toHaveLength(2);
     expect(v.contentDOM.textContent).toContain('| 1 | 2 |');
   });
 
@@ -115,8 +115,8 @@ describe('Live Preview (M2a §3.2)', () => {
     const para = 'plain text line one\nplain text line two\n\n';
     const filler = para.repeat(Math.ceil(LARGE_NOTE_CHARS / para.length) + 10);
     const v = editor(`x\n\n# Big\n\n- [ ] task **b**\n\n| a |\n|---|\n| 1 |\n\n${filler}`);
-    expect(v.contentDOM.querySelector('.cm-nimw-h1')).not.toBeNull();
-    expect(v.contentDOM.querySelector('.cm-nimw-widget')).toBeNull();
+    expect(v.contentDOM.querySelector('.cm-liber-h1')).not.toBeNull();
+    expect(v.contentDOM.querySelector('.cm-liber-widget')).toBeNull();
     expect(v.contentDOM.querySelector('input[type="checkbox"]')).toBeNull();
     expect(line(v, 5)).toBe('- [ ] task b');
   }, 30_000);
@@ -145,7 +145,7 @@ describe('Live Preview (M2a §3.2)', () => {
         return null;
       });
     const click = (v: EditorView, init: MouseEventInit = {}) => {
-      const link = v.contentDOM.querySelector('.cm-nimw-link')!;
+      const link = v.contentDOM.querySelector('.cm-liber-link')!;
       act(() => {
         link.dispatchEvent(
           new MouseEvent('mousedown', { bubbles: true, cancelable: true, button: 0, ...init }),
@@ -302,28 +302,28 @@ describe('raw HTML blocks (M2c §7.7)', () => {
       'x\n\n<div align="center">\n<b>Hi</b> <script>alert(1)</script>\n</div>\n\npara\n',
       0,
     );
-    const widget = v.contentDOM.querySelector('.cm-nimw-widget')!;
+    const widget = v.contentDOM.querySelector('.cm-liber-widget')!;
     expect(widget).not.toBeNull();
     expect(widget.querySelector('b')).toHaveTextContent('Hi');
     expect(widget.querySelector('script')).toBeNull();
     expect(v.contentDOM.textContent).not.toContain('<div');
     await moveTo(v, v.state.doc.line(3).from);
-    expect(v.contentDOM.querySelector('.cm-nimw-widget')).toBeNull();
+    expect(v.contentDOM.querySelector('.cm-liber-widget')).toBeNull();
     expect(line(v, 3)).toBe('<div align="center">');
   });
 
   it('comments and blocks that sanitize to nothing keep their source, muted', () => {
     const v = editor('x\n\n<!-- a note -->\n\n<script>alert(1)</script>\n\npara\n', 0);
-    expect(v.contentDOM.querySelector('.cm-nimw-widget')).toBeNull();
+    expect(v.contentDOM.querySelector('.cm-liber-widget')).toBeNull();
     expect(line(v, 3)).toBe('<!-- a note -->');
-    expect(v.contentDOM.querySelectorAll('.cm-line')[2]).toHaveClass('cm-nimw-muted');
+    expect(v.contentDOM.querySelectorAll('.cm-line')[2]).toHaveClass('cm-liber-muted');
     expect(line(v, 5)).toBe('<script>alert(1)</script>');
-    expect(v.contentDOM.querySelectorAll('.cm-line')[4]).toHaveClass('cm-nimw-muted');
+    expect(v.contentDOM.querySelectorAll('.cm-line')[4]).toHaveClass('cm-liber-muted');
   });
 
   it('inline HTML inside a paragraph stays text', () => {
     const v = editor('x\n\na <b>bold</b> c\n', 0);
-    expect(v.contentDOM.querySelector('.cm-nimw-widget')).toBeNull();
+    expect(v.contentDOM.querySelector('.cm-liber-widget')).toBeNull();
     expect(line(v, 3)).toBe('a <b>bold</b> c');
   });
 });
@@ -342,14 +342,14 @@ describe('Live Preview diagrams (M4b part 2 §4)', () => {
   it('a mermaid fence off the cursor is a block widget without a code badge', async () => {
     const text = 'x\n\n```mermaid\ngraph TD; A-->B\n```\n\nend\n';
     const v = editor(text, text.length - 1);
-    expect(v.contentDOM.querySelector('.cm-nimw-widget')).not.toBeNull();
-    expect(v.contentDOM.querySelector('.cm-nimw-codebadge')).toBeNull();
+    expect(v.contentDOM.querySelector('.cm-liber-widget')).not.toBeNull();
+    expect(v.contentDOM.querySelector('.cm-liber-codebadge')).toBeNull();
   });
 });
 
 describe('wide elements (M4b part 3): what may escape the measure', () => {
   const kinds = (v: EditorView) =>
-    [...v.contentDOM.querySelectorAll<HTMLElement>('.cm-nimw-widget')].map(
+    [...v.contentDOM.querySelectorAll<HTMLElement>('.cm-liber-widget')].map(
       (w) => w.dataset.wideKind ?? null,
     );
 
@@ -365,10 +365,10 @@ describe('wide elements (M4b part 3): what may escape the measure', () => {
     const text =
       'Top\n\n```js\nshort();\n\tconst longer = 1;\n```\n\n| a | b |\n| - | - |\n| one | two |\n';
     const v = editor(text);
-    const code = [...v.contentDOM.querySelectorAll<HTMLElement>('.cm-nimw-codeblock')];
+    const code = [...v.contentDOM.querySelectorAll<HTMLElement>('.cm-liber-codeblock')];
     expect(code).toHaveLength(4);
     // The tab counts as four columns: "    const longer = 1;" is 21.
-    expect(code.map((l) => l.style.getPropertyValue('--nimw-ch'))).toEqual([
+    expect(code.map((l) => l.style.getPropertyValue('--liber-ch'))).toEqual([
       '21',
       '21',
       '21',
@@ -379,21 +379,21 @@ describe('wide elements (M4b part 3): what may escape the measure', () => {
     await moveTo(v, v.state.doc.line(9).from);
     const rows = [...v.contentDOM.querySelectorAll<HTMLElement>('[data-wide-src="tables"]')];
     expect(rows.map((l) => l.textContent)).toEqual(['| a | b |', '| - | - |', '| one | two |']);
-    expect(rows[0].style.getPropertyValue('--nimw-ch')).toBe('13');
+    expect(rows[0].style.getPropertyValue('--liber-ch')).toBe('13');
   });
 
   it('a Mermaid block being edited follows the diagrams choice', async () => {
     const text = 'Top\n\n```mermaid\nflowchart LR\n```\n';
     const v = editor(text);
     await moveTo(v, v.state.doc.line(4).from);
-    const src = [...v.contentDOM.querySelectorAll<HTMLElement>('.cm-nimw-codeblock')];
+    const src = [...v.contentDOM.querySelectorAll<HTMLElement>('.cm-liber-codeblock')];
     expect(src.map((l) => l.dataset.wideSrc)).toEqual(['diagrams', 'diagrams', 'diagrams']);
   });
 });
 
 describe('Live Preview renders the whole page (round 3 §1)', () => {
   const codeLines = (v: EditorView) => [
-    ...v.contentDOM.querySelectorAll<HTMLElement>('.cm-line.cm-nimw-codeblock'),
+    ...v.contentDOM.querySelectorAll<HTMLElement>('.cm-line.cm-liber-codeblock'),
   ];
 
   it('a fenced block hides its fences off the cursor: a header row with the language and Copy', async () => {
@@ -402,13 +402,13 @@ describe('Live Preview renders the whole page (round 3 §1)', () => {
     expect(v.contentDOM.textContent).not.toContain('```');
     const rows = codeLines(v);
     expect(rows).toHaveLength(3);
-    expect(rows[0].querySelector('.cm-nimw-codebadge')).not.toBeNull();
+    expect(rows[0].querySelector('.cm-liber-codebadge')).not.toBeNull();
     expect(rows[1]).toHaveTextContent('const a = 1;');
     expect(rows[2].textContent).toBe('');
     // Clicking into it shows the source in the same lines: nothing below moves.
     await moveTo(v, v.state.doc.line(4).from);
     expect(codeLines(v).map((l) => l.textContent)).toEqual(['```js', 'const a = 1;', '```']);
-    expect(v.contentDOM.querySelector('.cm-nimw-codebadge')).toBeNull();
+    expect(v.contentDOM.querySelector('.cm-liber-codebadge')).toBeNull();
   });
 
   it('~~~ fences follow the same rule; an unclosed fence keeps its last line', () => {
@@ -417,7 +417,7 @@ describe('Live Preview renders the whole page (round 3 §1)', () => {
     expect(line(v, 4)).toBe('plain');
     // The unclosed block's opening fence is the header row too.
     expect(line(v, 7)).not.toContain('```');
-    expect(v.contentDOM.querySelectorAll('.cm-nimw-codebadge')).toHaveLength(2);
+    expect(v.contentDOM.querySelectorAll('.cm-liber-codebadge')).toHaveLength(2);
     expect(line(v, 8)).toBe('last line');
   });
 
@@ -425,7 +425,7 @@ describe('Live Preview renders the whole page (round 3 §1)', () => {
   const copied = async (v: EditorView) => {
     const writeText = vi.fn(() => Promise.resolve());
     Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true });
-    act(() => v.contentDOM.querySelector<HTMLElement>('.cm-nimw-codebadge-copy')!.click());
+    act(() => v.contentDOM.querySelector<HTMLElement>('.cm-liber-codebadge-copy')!.click());
     return (writeText.mock.calls[0] as unknown as [string])[0];
   };
 
@@ -450,7 +450,7 @@ describe('Live Preview renders the whole page (round 3 §1)', () => {
   it('a fence on a list item renders like any other', () => {
     const v = editor('x\n\n- ```js\n  a\n  ```\n', 0);
     expect(v.contentDOM.textContent).not.toContain('```');
-    expect(v.contentDOM.querySelector('.cm-nimw-codebadge')).not.toBeNull();
+    expect(v.contentDOM.querySelector('.cm-liber-codebadge')).not.toBeNull();
   });
 
   it('a task inside a quote keeps a working checkbox', () => {
@@ -464,7 +464,7 @@ describe('Live Preview renders the whole page (round 3 §1)', () => {
     expect(line(v, 3)).toBe('• one');
     expect(line(v, 4)).toBe('  • two');
     expect(line(v, 6)).toBe('1. first');
-    expect(v.contentDOM.querySelector('.cm-nimw-listnum')).toHaveTextContent('1.');
+    expect(v.contentDOM.querySelector('.cm-liber-listnum')).toHaveTextContent('1.');
     await moveTo(v, v.state.doc.line(3).from);
     expect(line(v, 3)).toBe('- one');
     expect(line(v, 4)).toBe('  • two');
@@ -479,7 +479,7 @@ describe('Live Preview renders the whole page (round 3 §1)', () => {
   it('quotes hide their > markers, nested ones too, until the cursor enters', async () => {
     const v = editor('x\n\n> one\n> \n> > deep\n\nend\n', 0);
     expect([line(v, 3), line(v, 4), line(v, 5)]).toEqual(['one', '', 'deep']);
-    expect(v.contentDOM.querySelectorAll('.cm-nimw-quote').length).toBeGreaterThan(0);
+    expect(v.contentDOM.querySelectorAll('.cm-liber-quote').length).toBeGreaterThan(0);
     await moveTo(v, v.state.doc.line(4).from);
     expect([line(v, 3), line(v, 4), line(v, 5)]).toEqual(['> one', '> ', '> > deep']);
   });

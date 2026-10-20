@@ -25,7 +25,7 @@ import { onViewUpdate } from './viewUpdates';
 /** Typing pauses this long before the outline is read again. */
 export const OUTLINE_DEBOUNCE_MS = 300;
 export const OUTLINE_WIDTH = { min: 200, max: 420, initial: 260 };
-const WIDTH_KEY = 'nimw.outlineWidth';
+const WIDTH_KEY = 'liber.outlineWidth';
 
 function storedWidth(): number {
   try {

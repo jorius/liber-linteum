@@ -1,12 +1,12 @@
-//! M5b §5: the vault's Trash and Archive — thin wrappers over `nimw-session`.
+//! M5b §5: the vault's Trash and Archive — thin wrappers over `liber-session`.
 //! (`entry_trash` in `vault_commands` moves an item into the Trash.)
 
 use crate::dto::RenameOutcomeDto;
 use crate::error::CmdResult;
 use crate::state::AppState;
 use crate::vault_commands::blocking;
-use nimw_session::BinItem;
-use nimw_vault::VaultPath;
+use liber_session::BinItem;
+use liber_vault::VaultPath;
 use serde::Serialize;
 use tauri::{AppHandle, Manager, Runtime};
 

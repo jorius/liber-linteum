@@ -98,7 +98,7 @@ mod tests {
         let urls: Vec<tauri::Url> = [
             "file:///Users/me/My%20Note.md",
             "https://example.com/a.md",
-            "nimw://x",
+            "liber://x",
         ]
         .iter()
         .map(|u| u.parse().unwrap())

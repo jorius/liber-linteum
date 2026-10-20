@@ -1,8 +1,8 @@
 //! The single error type every command returns (M1b spec §2.6), serialized as
 //! `{ "kind": "...", "message": "..." }` for the UI to translate.
 
-use nimw_session::SessionError;
-use nimw_vault::VaultError;
+use liber_session::SessionError;
+use liber_vault::VaultError;
 use serde::Serialize;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]

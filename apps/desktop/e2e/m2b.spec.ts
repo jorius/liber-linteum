@@ -19,7 +19,7 @@ async function open(page: Page, name: string, editorMode = 'livePreview') {
 
 const writes = (page: Page) =>
   page.evaluate(() =>
-    ((window as unknown as { __nimwWrites?: { text: string }[] }).__nimwWrites ?? []).map(
+    ((window as unknown as { __liberWrites?: { text: string }[] }).__liberWrites ?? []).map(
       (w) => w.text,
     ),
   );
@@ -43,7 +43,7 @@ test('renaming from the title renames the file', async ({ page }) => {
   await title.press('Enter');
   await expect
     .poll(() =>
-      page.evaluate(() => (window as unknown as { __nimwRenames?: unknown[] }).__nimwRenames),
+      page.evaluate(() => (window as unknown as { __liberRenames?: unknown[] }).__liberRenames),
     )
     .toEqual([{ from: 'A.md', to: 'Alpha.md' }]);
   await expect(title).toHaveValue('Alpha');
@@ -65,7 +65,7 @@ test('a plain click on a link in Live Preview opens the page (as in Obsidian)', 
   page,
 }) => {
   await open(page, 'A');
-  await page.locator('.cm-nimw-link', { hasText: 'B' }).click();
+  await page.locator('.cm-liber-link', { hasText: 'B' }).click();
   await expect(page.getByRole('textbox', { name: 'Page title' })).toHaveValue('B');
   await expect(page.getByRole('button', { name: 'Back to A' })).toBeVisible();
 });
@@ -80,7 +80,7 @@ test('a table or callout in Live Preview has no blank lines above it', async ({ 
   await page.goto('/');
   await page.getByRole('button', { name: /^vault/ }).click();
   await page.getByRole('treeitem', { name: 'T' }).click();
-  const widgets = page.locator('.cm-nimw-widget');
+  const widgets = page.locator('.cm-liber-widget');
   await expect(widgets).toHaveCount(2);
   for (const w of await widgets.all()) {
     // The rendered block alone: CodeMirror's pre-wrapped whitespace must not

@@ -101,11 +101,11 @@ kept in this repository:
 
 - **English (US)**: `dictionary-en@4.0.0`, from SCOWL
   (<http://wordlist.aspell.net/dicts/>), under `(MIT AND BSD)`. Licence:
-  `crates/nimw-spell/dictionaries/en_US/LICENSE`.
+  `crates/liber-spell/dictionaries/en_US/LICENSE`.
 - **Spanish**: `dictionary-es@4.0.0`, from RLA-ES
   (<https://github.com/sbosio/rla-es>), under
   `(GPL-3.0 OR LGPL-3.0 OR MPL-1.1)`, used under GPL-3.0. Licence:
-  `crates/nimw-spell/dictionaries/es/LICENSE`.
+  `crates/liber-spell/dictionaries/es/LICENSE`.
 - **Spanish (Colombia)**: `dictionary-es-co@2.0.0`, from RLA-ES, under
   `(GPL-3.0 OR LGPL-3.0 OR MPL-1.1)`, used under GPL-3.0. Licence:
-  `crates/nimw-spell/dictionaries/es_CO/LICENSE`.
+  `crates/liber-spell/dictionaries/es_CO/LICENSE`.

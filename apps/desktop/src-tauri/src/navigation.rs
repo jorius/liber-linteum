@@ -1,5 +1,5 @@
 //! The main webview may only ever show the app itself (review m2). A vault file
-//! served over `nimw-asset:` (an SVG, an HTML file) or a remote page must never
+//! served over `liber-asset:` (an SVG, an HTML file) or a remote page must never
 //! become the top-level document: Tauri treats registered schemes as local, so
 //! such a document would get the app's IPC. Links are opened through
 //! `url_open` / `file_open_external`, never by navigating.
@@ -27,7 +27,7 @@ pub fn allowed(url: &Url) -> bool {
 
 /// A plugin with no commands whose only job is the navigation guard.
 pub fn guard<R: tauri::Runtime>() -> tauri::plugin::TauriPlugin<R> {
-    tauri::plugin::Builder::new("nimw-navigation")
+    tauri::plugin::Builder::new("liber-navigation")
         .on_navigation(|_, url| allowed(url))
         .build()
 }
@@ -58,8 +58,8 @@ mod tests {
     #[test]
     fn vault_files_and_the_web_never_become_the_page() {
         for url in [
-            "nimw-asset://localhost/Notes/evil.svg",
-            "http://nimw-asset.localhost/Notes/evil.html",
+            "liber-asset://localhost/Notes/evil.svg",
+            "http://liber-asset.localhost/Notes/evil.html",
             "https://example.com/",
             "http://example.com/",
             "file:///etc/passwd",

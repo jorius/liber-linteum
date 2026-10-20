@@ -39,13 +39,13 @@ jobs:
           node-version-file: .nvmrc
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - run: pnpm --filter @nimw/desktop exec playwright install --with-deps chromium webkit
+      - run: pnpm --filter @liber/desktop exec playwright install --with-deps chromium webkit
       - run: pnpm test:e2e
 
   rust:
     env:
       # Runner home dirs are throwaway, so tests that use the real OS trash run here.
-      NIMW_TRASH_TESTS: '1'
+      LIBER_TRASH_TESTS: '1'
     strategy:
       fail-fast: false
       matrix:

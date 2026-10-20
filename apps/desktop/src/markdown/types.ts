@@ -90,12 +90,12 @@ declare module 'mdast' {
   }
 }
 
-/** Same names as `nimw_markdown::LinkKind::as_str()`. */
+/** Same names as `liber_markdown::LinkKind::as_str()`. */
 export type LinkKind = 'wiki' | 'embed' | 'markdown' | 'markdown_image' | 'related' | 'cover';
 
 export interface LinkRef {
   kind: LinkKind;
-  /** Decoded target without `#heading` (as `nimw-markdown` stores it). */
+  /** Decoded target without `#heading` (as `liber-markdown` stores it). */
   target: string;
   heading: string | null;
   alias: string | null;

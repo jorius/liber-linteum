@@ -4,13 +4,13 @@
 use crate::error::{CmdResult, CommandError, ErrorKind};
 use crate::state::AppState;
 use crate::vault_commands::blocking;
-use nimw_vault::{EntryKind, VaultPath, is_hidden_name};
+use liber_vault::{EntryKind, VaultPath, is_hidden_name};
 use tauri::{AppHandle, Manager, Runtime};
 
 /// `None` clears; anything that isn't one emoji is refused.
 fn checked(icon: Option<String>) -> CmdResult<Option<String>> {
     match icon {
-        Some(icon) if !nimw_markdown::is_icon(&icon) => Err(CommandError::new(
+        Some(icon) if !liber_markdown::is_icon(&icon) => Err(CommandError::new(
             ErrorKind::InvalidName,
             format!("not an emoji icon: {icon:?}"),
         )),

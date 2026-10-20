@@ -118,7 +118,7 @@
     "breadcrumb": "Ruta",
     "titleLabel": "Título de la página",
     "titleTaken": "Ya hay una página llamada «{name}» en esta carpeta.",
-    "frontmatterInvalid": "NIMW no puede cambiar con seguridad el frontmatter de esta nota. Edítalo en el modo Código.",
+    "frontmatterInvalid": "Liber Linteum no puede cambiar con seguridad el frontmatter de esta nota. Edítalo en el modo Código.",
     "titleInNote": "Título en la nota: {title}",
     "subtitleLabel": "Subtítulo",
     "subtitlePlaceholder": "Añade un subtítulo",
@@ -405,7 +405,7 @@
       },
       "vault": {
         "title": "Esta bóveda",
-        "description": "Ajustes guardados con esta bóveda, en .nimw/vault.json."
+        "description": "Ajustes guardados con esta bóveda, en .liber/vault.json."
       }
     },
     "shortcuts": {

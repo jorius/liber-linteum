@@ -42,7 +42,7 @@ const writesTo = (page: Page, path: string) =>
   page.evaluate(
     (p) =>
       (
-        (window as unknown as { __nimwWrites?: { path: string; text: string }[] }).__nimwWrites ??
+        (window as unknown as { __liberWrites?: { path: string; text: string }[] }).__liberWrites ??
         []
       )
         .filter((w) => w.path === p)

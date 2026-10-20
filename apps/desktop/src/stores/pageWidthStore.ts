@@ -1,6 +1,6 @@
 // Page width (M4b part 2 §1; `wide`: M4b part 3): a page's own width, else
 // the vault's, else the app's. Page and vault widths live in
-// `.nimw/vault.json` (Rust); they're re-read when the vault or its tree
+// `.liber/vault.json` (Rust); they're re-read when the vault or its tree
 // changes (renames move them).
 import { create } from 'zustand';
 import {

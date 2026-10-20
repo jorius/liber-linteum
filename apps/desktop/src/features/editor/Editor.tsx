@@ -92,11 +92,11 @@ const sourceHighlight = HighlightStyle.define([
 const codeHighlighter = tagHighlighter([
   {
     tag: [tags.keyword, tags.bool, tags.null, tags.atom, tags.tagName],
-    class: 'cm-nimw-code-keyword',
+    class: 'cm-liber-code-keyword',
   },
-  { tag: [tags.string, tags.regexp, tags.special(tags.string)], class: 'cm-nimw-code-string' },
-  { tag: [tags.number, tags.integer, tags.float], class: 'cm-nimw-code-number' },
-  { tag: tags.comment, class: 'cm-nimw-code-comment' },
+  { tag: [tags.string, tags.regexp, tags.special(tags.string)], class: 'cm-liber-code-string' },
+  { tag: [tags.number, tags.integer, tags.float], class: 'cm-liber-code-number' },
+  { tag: tags.comment, class: 'cm-liber-code-comment' },
   {
     tag: [
       tags.function(tags.variableName),
@@ -104,25 +104,25 @@ const codeHighlighter = tagHighlighter([
       tags.propertyName,
       tags.attributeName,
     ],
-    class: 'cm-nimw-code-function',
+    class: 'cm-liber-code-function',
   },
-  { tag: [tags.typeName, tags.className, tags.namespace], class: 'cm-nimw-code-type' },
-  { tag: [tags.annotation, tags.modifier, tags.self], class: 'cm-nimw-code-meta' },
-  { tag: [tags.operator, tags.punctuation, tags.bracket], class: 'cm-nimw-code-punct' },
+  { tag: [tags.typeName, tags.className, tags.namespace], class: 'cm-liber-code-type' },
+  { tag: [tags.annotation, tags.modifier, tags.self], class: 'cm-liber-code-meta' },
+  { tag: [tags.operator, tags.punctuation, tags.bracket], class: 'cm-liber-code-punct' },
 ]);
 
 const theme = EditorView.theme({
-  '.cm-nimw-code-keyword': { color: 'var(--code-keyword)' },
-  '.cm-nimw-code-string': { color: 'var(--code-string)' },
-  '.cm-nimw-code-number': { color: 'var(--code-number)' },
-  '.cm-nimw-code-comment': { color: 'var(--code-comment)', fontStyle: 'italic' },
-  '.cm-nimw-code-function': { color: 'var(--code-function)' },
-  '.cm-nimw-code-type': { color: 'var(--code-type)' },
-  '.cm-nimw-code-meta': { color: 'var(--code-meta)' },
-  '.cm-nimw-code-punct': { color: 'var(--code-punct)' },
+  '.cm-liber-code-keyword': { color: 'var(--code-keyword)' },
+  '.cm-liber-code-string': { color: 'var(--code-string)' },
+  '.cm-liber-code-number': { color: 'var(--code-number)' },
+  '.cm-liber-code-comment': { color: 'var(--code-comment)', fontStyle: 'italic' },
+  '.cm-liber-code-function': { color: 'var(--code-function)' },
+  '.cm-liber-code-type': { color: 'var(--code-type)' },
+  '.cm-liber-code-meta': { color: 'var(--code-meta)' },
+  '.cm-liber-code-punct': { color: 'var(--code-punct)' },
   '&': { height: '100%', color: 'var(--color-text)', backgroundColor: 'transparent' },
   '&.cm-focused': { outline: 'none' },
-  '.cm-nimw-misspelled': {
+  '.cm-liber-misspelled': {
     textDecoration: 'underline wavy var(--color-danger)',
     textDecorationSkipInk: 'none',
     textUnderlineOffset: '3px',
@@ -132,7 +132,7 @@ const theme = EditorView.theme({
     fontSize: 'var(--font-size-editor)',
     lineHeight: '1.7',
   },
-  '&.cm-nimw-source .cm-scroller': {
+  '&.cm-liber-source .cm-scroller': {
     fontFamily: 'var(--font-source)',
     fontSize: 'calc(var(--font-size-editor) * 0.9)',
     lineHeight: '1.6',
@@ -154,10 +154,10 @@ const theme = EditorView.theme({
 
 function modeExtensions(mode: EditorMode): Extension {
   return mode === 'livePreview'
-    ? [livePreview(), EditorView.editorAttributes.of({ class: 'cm-nimw-live' })]
+    ? [livePreview(), EditorView.editorAttributes.of({ class: 'cm-liber-live' })]
     : [
         syntaxHighlighting(sourceHighlight),
-        EditorView.editorAttributes.of({ class: 'cm-nimw-source' }),
+        EditorView.editorAttributes.of({ class: 'cm-liber-source' }),
       ];
 }
 
@@ -547,8 +547,8 @@ export function Editor({ doc, mode, label }: EditorProps) {
     const v = toolbarView;
     if (!h) return;
     if (!v || width !== 'wide' || mode !== 'livePreview') {
-      h.style.removeProperty('--nimw-wide-m');
-      h.style.removeProperty('--nimw-wide-r');
+      h.style.removeProperty('--liber-wide-m');
+      h.style.removeProperty('--liber-wide-r');
       return;
     }
     const measure = () => {
@@ -561,8 +561,8 @@ export function Editor({ doc, mode, label }: EditorProps) {
         leftBound: Math.max(scroller.left, gutters ? gutters.right : scroller.left) + LIVE_PADDING,
         rightBound: scroller.left + v.scrollDOM.clientWidth - LIVE_PADDING,
       });
-      h.style.setProperty('--nimw-wide-m', `${m}px`);
-      h.style.setProperty('--nimw-wide-r', `${r}px`);
+      h.style.setProperty('--liber-wide-m', `${m}px`);
+      h.style.setProperty('--liber-wide-r', `${r}px`);
     };
     measure();
     const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(measure);

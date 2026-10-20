@@ -1,6 +1,6 @@
 // Cover resize in the built UI, in Chromium and WebKit (≈ WKWebView): the
 // cover band's bottom edge is dragged to a new height, kept for the page
-// across a reload (in `.nimw/vault.json`; here the mock's sessionStorage),
+// across a reload (in `.liber/vault.json`; here the mock's sessionStorage),
 // with the band's rows pinned to its top and bottom — and nothing leaves the
 // machine.
 import { readFileSync } from 'node:fs';
@@ -22,11 +22,11 @@ async function watchNetwork(page: Page) {
     const local =
       (url.protocol === 'http:' && url.hostname === '127.0.0.1') ||
       url.protocol === 'data:' ||
-      url.protocol === 'nimw-asset:' ||
-      url.hostname === 'nimw-asset.localhost';
+      url.protocol === 'liber-asset:' ||
+      url.hostname === 'liber-asset.localhost';
     if (!local) outside.push(r.url());
   });
-  await page.route(/^https?:\/\/(?!127\.0\.0\.1|nimw-asset\.localhost)/, (route) => route.abort());
+  await page.route(/^https?:\/\/(?!127\.0\.0\.1|liber-asset\.localhost)/, (route) => route.abort());
   return outside;
 }
 
@@ -57,7 +57,7 @@ async function stayedLocal(page: Page, outside: string[]) {
   expect(outside).toEqual([]);
   expect(
     await page.evaluate(
-      () => (window as unknown as { __nimwCspViolations: string[] }).__nimwCspViolations,
+      () => (window as unknown as { __liberCspViolations: string[] }).__liberCspViolations,
     ),
   ).toEqual([]);
 }
@@ -69,7 +69,7 @@ const handle = (page: Page) => page.getByRole('separator', { name: 'Cover height
 /** What `cover_height_set` was asked to store. */
 const saved = (page: Page) =>
   page.evaluate(
-    () => (window as unknown as { __nimwCoverHeights?: unknown[] }).__nimwCoverHeights ?? [],
+    () => (window as unknown as { __liberCoverHeights?: unknown[] }).__liberCoverHeights ?? [],
   );
 
 /** The first row (the title, then the breadcrumb under it) hugs the band's
@@ -117,7 +117,7 @@ test('cover resize: drag the bottom edge, reload, the height is kept; the rows s
   await rowsPinned(page);
   // The note itself is never written.
   expect(
-    await page.evaluate(() => (window as unknown as { __nimwWrites?: unknown[] }).__nimwWrites),
+    await page.evaluate(() => (window as unknown as { __liberWrites?: unknown[] }).__liberWrites),
   ).toBeUndefined();
 
   await page.reload();
@@ -180,7 +180,7 @@ test('cover resize: reposition still places the image in a taller band', async (
     .poll(() =>
       page.evaluate(
         () =>
-          (window as unknown as { __nimwWrites?: { text: string }[] }).__nimwWrites?.at(-1)?.text,
+          (window as unknown as { __liberWrites?: { text: string }[] }).__liberWrites?.at(-1)?.text,
       ),
     )
     .toContain('cover-y: 55');

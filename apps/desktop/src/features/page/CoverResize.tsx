@@ -30,7 +30,7 @@ function useWindowHeight(): number {
 }
 
 /** Cover resize: the cover band's height and the handle on its bottom edge.
- *  The page's own height (`.nimw/vault.json`, never the note) or the app's
+ *  The page's own height (`.liber/vault.json`, never the note) or the app's
  *  default, shown between 132 px and 60% of the window; the window caps what
  *  is shown, never what is stored. Dragging the edge sets the height live and
  *  release saves it; from the keyboard (a focusable separator) ↑/↓ move it

@@ -1,8 +1,8 @@
 //! M1b commands through the real IPC path: real `generate_context!()` (config +
 //! capabilities), real command registration, mock runtime, temp config/cache dirs.
 
-use nimw_desktop::AppDirs;
-use nimw_testkit::{copy_fixture, real_trash_tests_enabled, trashable_fixture};
+use liber_desktop::AppDirs;
+use liber_testkit::{copy_fixture, real_trash_tests_enabled, trashable_fixture};
 use serde_json::{Value, json};
 use std::sync::{Arc, Mutex};
 use tauri::test::MockRuntime;
@@ -113,7 +113,7 @@ fn harness() -> Harness {
         config: config.path().to_path_buf(),
         cache: cache.path().to_path_buf(),
     };
-    let app = nimw_desktop::configure(mock_builder(), Some(dirs))
+    let app = liber_desktop::configure(mock_builder(), Some(dirs))
         .build(tauri::generate_context!())
         .expect("app builds with the real context");
     let main = WebviewWindowBuilder::new(&app, "main", Default::default())
@@ -289,7 +289,7 @@ fn vlt_01_create_requires_an_empty_or_new_folder() {
     assert_eq!(info["name"], "brand new");
     assert!(fresh.is_dir());
     assert!(
-        !fresh.join(".nimw").exists(),
+        !fresh.join(".liber").exists(),
         "creating writes nothing inside"
     );
 }
@@ -610,7 +610,7 @@ fn external_open_commands_refuse_unsafe_targets() {
         "javascript:alert(1)",
         "file:///etc/passwd",
         "data:text/html,x",
-        "nimw-asset://x",
+        "liber-asset://x",
         "relative.md",
     ] {
         let err = call(&h.main, "url_open", json!({ "url": url })).unwrap_err();
@@ -786,7 +786,7 @@ fn open_fixture(h: &Harness, name: &str) -> tempfile::TempDir {
     vault
 }
 
-/// M2c §7.5: NIMW's attachment setting over IPC; Obsidian's wins and blocks it.
+/// M2c §7.5: Liber Linteum's attachment setting over IPC; Obsidian's wins and blocks it.
 #[test]
 fn m2c_vault_settings_round_trip_over_ipc() {
     let h = harness();
@@ -818,7 +818,7 @@ fn m2c_vault_settings_round_trip_over_ipc() {
         saved["attachments"],
         json!({ "mode": "folder", "path": "Media" })
     );
-    assert!(vault.path().join(".nimw/vault.json").is_file());
+    assert!(vault.path().join(".liber/vault.json").is_file());
     let err = call(
         &h.main,
         "vault_settings_set",
@@ -842,7 +842,7 @@ fn m2c_vault_settings_round_trip_over_ipc() {
     assert_eq!(kind(err), "notPermitted");
 }
 
-/// M4b §5: with Obsidian's setting present, NIMW's own place applies only
+/// M4b §5: with Obsidian's setting present, Liber Linteum's own place applies only
 /// while `overrideObsidian` is on; turning it off restores Obsidian's.
 #[test]
 fn m4b_vault_settings_override_obsidian_over_ipc() {
@@ -896,7 +896,7 @@ fn m2c_attachment_paste_takes_a_raw_body() {
         raw_request(
             "attachment_paste",
             b"\x89PNG".to_vec(),
-            &[("x-nimw-page", page), ("x-nimw-name", name)],
+            &[("x-liber-page", page), ("x-liber-name", name)],
         ),
     )
     .map(|r| r.deserialize::<Value>().unwrap())
@@ -925,7 +925,7 @@ fn m2c_attachment_paste_takes_a_raw_body() {
                 raw_request(
                     "attachment_paste",
                     body,
-                    &[("x-nimw-page", page), ("x-nimw-name", name)],
+                    &[("x-liber-page", page), ("x-liber-name", name)],
                 ),
             )
             .map(|r| r.deserialize::<Value>().unwrap())
@@ -936,7 +936,7 @@ fn m2c_attachment_paste_takes_a_raw_body() {
     assert_eq!(refuse(Vec::new(), "x.png"), "invalidName");
     assert_eq!(
         refuse(
-            vec![0u8; nimw_desktop::attachment_commands::MAX_PASTE_BYTES + 1],
+            vec![0u8; liber_desktop::attachment_commands::MAX_PASTE_BYTES + 1],
             "x.png"
         ),
         "tooLarge"
@@ -956,7 +956,7 @@ fn m2c_attachment_import_requires_a_native_drop_grant() {
     std::fs::write(&dropped, b"%PDF").unwrap();
     std::fs::write(&secret, b"key").unwrap();
     let window = h.main.as_ref().window();
-    nimw_desktop::drops::on_window_event(
+    liber_desktop::drops::on_window_event(
         &window,
         &tauri::WindowEvent::DragDrop(tauri::DragDropEvent::Drop {
             paths: vec![dropped.clone(), outside.path().to_path_buf()],
@@ -1001,7 +1001,7 @@ fn m2c_cover_pick_imports_the_picked_image() {
     let outside = tempfile::tempdir().unwrap();
     let image = outside.path().join("sky.png");
     std::fs::write(&image, b"\x89PNG").unwrap();
-    let state = h.app.state::<nimw_desktop::state::AppState>();
+    let state = h.app.state::<liber_desktop::state::AppState>();
     let picked = image.clone();
     state.set_cover_picker(Some(Arc::new(move || Some(picked.clone()))));
     let cover = call(
@@ -1116,7 +1116,7 @@ fn m2c_cover_outside_the_page_folder_is_vault_rooted_and_resolves() {
     let outside = tempfile::tempdir().unwrap();
     let image = outside.path().join("sky.png");
     std::fs::write(&image, b"\x89PNG").unwrap();
-    let state = h.app.state::<nimw_desktop::state::AppState>();
+    let state = h.app.state::<liber_desktop::state::AppState>();
     state.set_cover_picker(Some(Arc::new(move || Some(image.clone()))));
     let cover = call(&h.main, "cover_pick", json!({ "page": "Chars/Rex.md" })).unwrap();
     assert_eq!(
@@ -1152,7 +1152,7 @@ fn m2c_attachments_refuse_a_hidden_or_missing_page() {
             raw_request(
                 "attachment_paste",
                 b"\x89PNG".to_vec(),
-                &[("x-nimw-page", page), ("x-nimw-name", "shot.png")],
+                &[("x-liber-page", page), ("x-liber-name", "shot.png")],
             ),
         )
         .map(|r| r.deserialize::<Value>().unwrap())
@@ -1168,7 +1168,7 @@ fn m2c_attachments_refuse_a_hidden_or_missing_page() {
     let dropped = outside.path().join("main.js");
     std::fs::write(&dropped, b"evil()").unwrap();
     let window = h.main.as_ref().window();
-    nimw_desktop::drops::on_window_event(
+    liber_desktop::drops::on_window_event(
         &window,
         &tauri::WindowEvent::DragDrop(tauri::DragDropEvent::Drop {
             paths: vec![dropped.clone()],
@@ -1188,7 +1188,7 @@ fn m2c_attachments_refuse_a_hidden_or_missing_page() {
     let asked = Arc::new(Mutex::new(0));
     let image = outside.path().join("sky.png");
     std::fs::write(&image, b"\x89PNG").unwrap();
-    let state = h.app.state::<nimw_desktop::state::AppState>();
+    let state = h.app.state::<liber_desktop::state::AppState>();
     let counter = asked.clone();
     state.set_cover_picker(Some(Arc::new(move || {
         *counter.lock().unwrap() += 1;
@@ -1338,7 +1338,7 @@ fn m3a_layout_get_set_over_ipc() {
         call(&h.main, "layout_get", json!({ "level": "" })).unwrap(),
         json!({})
     );
-    assert!(!vault.path().join(".nimw").exists(), "VLT-02");
+    assert!(!vault.path().join(".liber").exists(), "VLT-02");
     call(
         &h.main,
         "layout_set",
@@ -1349,7 +1349,7 @@ fn m3a_layout_get_set_over_ipc() {
         call(&h.main, "layout_get", json!({ "level": "" })).unwrap(),
         json!({ "Game Design": { "x": 12.5, "y": -40.0 } })
     );
-    assert!(vault.path().join(".nimw/layout.json").exists());
+    assert!(vault.path().join(".liber/layout.json").exists());
     call(
         &h.main,
         "layout_set",
@@ -1389,7 +1389,7 @@ fn m3b_link_target_and_index_pick_set_over_ipc() {
         "notFound"
     );
 
-    assert!(!vault.path().join(".nimw").exists(), "VLT-02");
+    assert!(!vault.path().join(".liber").exists(), "VLT-02");
     let card = call(
         &h.main,
         "index_pick_set",
@@ -1400,7 +1400,7 @@ fn m3b_link_target_and_index_pick_set_over_ipc() {
     assert_eq!(card["indexPage"], "Character Design/My characters.md");
     assert_eq!(card["indexFrom"], "picked");
     let json: Value = serde_json::from_str(
-        &std::fs::read_to_string(vault.path().join(".nimw/vault.json")).unwrap(),
+        &std::fs::read_to_string(vault.path().join(".liber/vault.json")).unwrap(),
     )
     .unwrap();
     assert_eq!(
@@ -1434,7 +1434,7 @@ fn m3b_link_target_and_index_pick_set_over_ipc() {
 }
 
 /// M4b part 2 §1: a page's own width and the vault's default live in
-/// `.nimw/vault.json`; the page entry follows a rename; only visible pages.
+/// `.liber/vault.json`; the page entry follows a rename; only visible pages.
 #[test]
 fn m4b2_page_width_over_ipc() {
     let h = harness();
@@ -1519,10 +1519,10 @@ fn m4b2_page_width_over_ipc() {
         )
         .is_err()
     );
-    assert!(vault.path().join(".nimw/vault.json").exists());
+    assert!(vault.path().join(".liber/vault.json").exists());
 }
 
-/// Cover resize: a page's cover height lives in `.nimw/vault.json`
+/// Cover resize: a page's cover height lives in `.liber/vault.json`
 /// (`coverHeights`), never in the note; clamped to 132–2000 px; the entry
 /// follows an in-app rename; only visible, indexed pages.
 #[test]
@@ -1571,7 +1571,7 @@ fn cover_height_over_ipc() {
     let got = call(&h.main, "vault_settings_get", json!({})).unwrap();
     assert_eq!(got["coverHeights"], json!({ "Hello.md": 2000 }));
     let file: Value =
-        serde_json::from_slice(&std::fs::read(vault.path().join(".nimw/vault.json")).unwrap())
+        serde_json::from_slice(&std::fs::read(vault.path().join(".liber/vault.json")).unwrap())
             .unwrap();
     assert_eq!(file["coverHeights"], json!({ "Hello.md": 2000 }));
     // `null` clears it.
@@ -1637,7 +1637,7 @@ fn cover_height_set_is_allowed_from_main_only() {
 }
 
 /// M4b part 3 §3: a page's cover placement (`coverSides`) and strip width
-/// (`coverWidths`) live in `.nimw/vault.json`, never in the note; `top`
+/// (`coverWidths`) live in `.liber/vault.json`, never in the note; `top`
 /// clears the placement, widths are clamped to 160–2000 px; both follow an
 /// in-app rename; only visible, indexed pages; Global View cards carry the
 /// placement.
@@ -1894,7 +1894,7 @@ fn final_review_i3_a_conflict_with_a_non_text_file_carries_no_lossy_text() {
         .as_str()
         .unwrap()
         .to_string();
-    let big = vec![b'a'; nimw_session::TEXT_MAX_BYTES + 1];
+    let big = vec![b'a'; liber_session::TEXT_MAX_BYTES + 1];
     let outside: [&[u8]; 3] = [b"Jos\xe9,Bogot\xe1\n", b"Jose\0,Bogota\n", &big];
     for bytes in outside {
         std::fs::write(vault.path().join("data.csv"), bytes).unwrap();
@@ -1924,7 +1924,7 @@ fn final_review_i3_a_conflict_with_a_non_text_file_carries_no_lossy_text() {
 }
 
 /// M4b part 3 §8: the link format over IPC — Obsidian's `newLinkFormat` is
-/// reported, NIMW's own choice wins, `default` clears it, nonsense is refused;
+/// reported, Liber Linteum's own choice wins, `default` clears it, nonsense is refused;
 /// a paste in the absolute format comes back with its `file:` URL.
 #[test]
 fn m4b3_link_format_over_ipc() {
@@ -1954,7 +1954,7 @@ fn m4b3_link_format_over_ipc() {
         raw_request(
             "attachment_paste",
             b"\x89PNG".to_vec(),
-            &[("x-nimw-page", "a.md"), ("x-nimw-name", "shot.png")],
+            &[("x-liber-page", "a.md"), ("x-liber-name", "shot.png")],
         ),
     )
     .map(|r| r.deserialize::<Value>().unwrap())
@@ -1982,13 +1982,13 @@ fn m4b3_file_pick_returns_the_picks_and_grants_them_for_import() {
     let h = harness();
     let vault = open_fixture(&h, "obsidian-basic");
     let outside = tempfile::Builder::new()
-        .prefix("nimw-pick")
+        .prefix("liber-pick")
         .tempdir()
         .unwrap();
     let pdf = outside.path().join("my brief.pdf");
     std::fs::write(&pdf, b"%PDF").unwrap();
     let inside = vault.path().join("Character Design/assets/rex-cover.png");
-    let state = h.app.state::<nimw_desktop::state::AppState>();
+    let state = h.app.state::<liber_desktop::state::AppState>();
     let picks = vec![pdf.clone(), inside.clone()];
     state.set_file_picker(Some(Arc::new(move || picks.clone())));
     let got = call(&h.main, "file_pick", json!({ "page": "Welcome.md" })).unwrap();
@@ -2030,7 +2030,7 @@ fn m4b3_file_pick_returns_the_picks_and_grants_them_for_import() {
 fn m4b3_outside_files_over_ipc() {
     let h = harness();
     let base = tempfile::Builder::new()
-        .prefix("nimw-ext")
+        .prefix("liber-ext")
         .tempdir()
         .unwrap();
     let pics = dunce::canonicalize(base.path()).unwrap().join("Pics");
@@ -2378,7 +2378,7 @@ fn m5b_trash_and_archive_over_ipc() {
     .unwrap();
     assert_eq!(out["moved"][0][1], "Welcome.md");
     // Refused: the bins themselves.
-    assert!(call(&h.main, "entry_trash", json!({ "path": ".nimw" })).is_err());
+    assert!(call(&h.main, "entry_trash", json!({ "path": ".liber" })).is_err());
 }
 
 /// M5b §19: Favorites are one ordered list; escaping or hidden paths are
@@ -2402,7 +2402,7 @@ fn m5b_favorites_over_ipc() {
     for bad in [
         "../x.md",
         ".obsidian/app.json",
-        ".nimw/vault.json",
+        ".liber/vault.json",
         ".trash/.x",
         "/abs.md",
     ] {
@@ -2553,7 +2553,7 @@ fn b6_review_c1_a_take_left_by_a_killed_app_is_recovered() {
     let vault = open_fixture(&h, "obsidian-basic");
     let cache = h
         .app
-        .state::<nimw_desktop::state::AppState>()
+        .state::<liber_desktop::state::AppState>()
         .cache_dir
         .join("audio")
         .join("clip-20261018-090000-1");
@@ -2687,7 +2687,7 @@ fn b6_review_i4_an_orphaned_take_is_stopped_and_kept() {
     )
     .unwrap();
     std::thread::sleep(std::time::Duration::from_millis(150));
-    nimw_desktop::audio_commands::stop_orphaned(h.app.handle());
+    liber_desktop::audio_commands::stop_orphaned(h.app.handle());
     assert!(
         vault
             .path()
@@ -2714,7 +2714,7 @@ fn b6_review_i4_an_orphaned_take_is_stopped_and_kept() {
 fn m6_cancel_writes_nothing_and_bad_takes_are_refused() {
     let h = harness();
     let vault = open_fixture(&h, "obsidian-basic");
-    let before = nimw_testkit_files(vault.path());
+    let before = liber_testkit_files(vault.path());
     let started = call(
         &h.main,
         "audio_record_start",
@@ -2727,7 +2727,7 @@ fn m6_cancel_writes_nothing_and_bad_takes_are_refused() {
         json!({ "recordingId": started["recordingId"] }),
     )
     .unwrap();
-    assert_eq!(nimw_testkit_files(vault.path()), before);
+    assert_eq!(liber_testkit_files(vault.path()), before);
     for (body, expected) in [
         (
             json!({ "page": "Welcome.md", "device": null, "name": "../x" }),
@@ -2768,7 +2768,7 @@ fn m6_audio_pick_imports_the_picked_clip() {
     let outside = tempfile::tempdir().unwrap();
     let clip = outside.path().join("voice memo.m4a");
     std::fs::write(&clip, b"....ftypM4A ").unwrap();
-    let state = h.app.state::<nimw_desktop::state::AppState>();
+    let state = h.app.state::<liber_desktop::state::AppState>();
     let picked = clip.clone();
     state.set_cover_picker(Some(Arc::new(move || Some(picked.clone()))));
     let attached = call(&h.main, "audio_pick", json!({ "page": "Welcome.md" })).unwrap();
@@ -2787,7 +2787,7 @@ fn m6_audio_pick_imports_the_picked_clip() {
 }
 
 /// Every file under `root`, relative, sorted.
-fn nimw_testkit_files(root: &std::path::Path) -> Vec<String> {
+fn liber_testkit_files(root: &std::path::Path) -> Vec<String> {
     fn walk(dir: &std::path::Path, root: &std::path::Path, out: &mut Vec<String>) {
         for e in std::fs::read_dir(dir).unwrap().flatten() {
             let p = e.path();
@@ -2800,7 +2800,7 @@ fn nimw_testkit_files(root: &std::path::Path) -> Vec<String> {
     }
     let mut out = Vec::new();
     walk(root, root, &mut out);
-    out.retain(|p| !p.starts_with(".nimw"));
+    out.retain(|p| !p.starts_with(".liber"));
     out.sort();
     out
 }
@@ -2867,7 +2867,7 @@ fn spell_add_word_and_ignore() {
         json!(["Ioque"])
     );
     let json: Value =
-        serde_json::from_slice(&std::fs::read(vault.path().join(".nimw/vault.json")).unwrap())
+        serde_json::from_slice(&std::fs::read(vault.path().join(".liber/vault.json")).unwrap())
             .unwrap();
     assert_eq!(json["spellingWords"], json!(["Ioque"]));
     call(&h.main, "spell_ignore", json!({ "word": "Wayuunaiki" })).unwrap();
@@ -2893,9 +2893,9 @@ fn spell_add_word_and_ignore() {
 #[test]
 fn spell_import_validates_copies_and_removes() {
     let h = harness();
-    let state = h.app.state::<nimw_desktop::state::AppState>();
+    let state = h.app.state::<liber_desktop::state::AppState>();
     let src = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../../crates/nimw-spell/dictionaries/en_US");
+        .join("../../../crates/liber-spell/dictionaries/en_US");
     let outside = tempfile::tempdir().unwrap();
     let aff = outside.path().join("Mine.aff");
     std::fs::copy(src.join("index.aff"), &aff).unwrap();
@@ -2971,14 +2971,14 @@ fn settings_default_and_patch_spelling_fields() {
     assert_eq!(s["spellDictionaries"], json!(["es_CO", "en_US"]));
 }
 
-/// Round 3b final review #12: a check reads `.nimw/vault.json` only when it
+/// Round 3b final review #12: a check reads `.liber/vault.json` only when it
 /// changed, and a dictionary that failed to parse isn't re-read until its
 /// files change. Round 3b final review #2: no dictionary → nothing flagged.
 #[test]
 fn spell_review_caches_vault_settings_and_failed_dictionaries() {
     let h = harness();
-    let state = h.app.state::<nimw_desktop::state::AppState>();
-    let spell = h.app.state::<nimw_desktop::spell_commands::SpellState>();
+    let state = h.app.state::<liber_desktop::state::AppState>();
+    let spell = h.app.state::<liber_desktop::spell_commands::SpellState>();
     let vault = open_fixture(&h, "obsidian-basic");
     // A registered import whose files don't parse.
     let dir = h._config.path().join("dictionaries/user-broken");
@@ -2989,7 +2989,7 @@ fn spell_review_caches_vault_settings_and_failed_dictionaries() {
         .settings
         .modify(|s| {
             s.imported_dictionaries
-                .push(nimw_desktop::settings::ImportedDictionary {
+                .push(liber_desktop::settings::ImportedDictionary {
                     id: "user:broken".into(),
                     name: "Broken".into(),
                 });
@@ -3006,7 +3006,7 @@ fn spell_review_caches_vault_settings_and_failed_dictionaries() {
         "nothing re-read on the second check"
     );
     // An outside edit to vault.json is seen.
-    let json = vault.path().join(".nimw/vault.json");
+    let json = vault.path().join(".liber/vault.json");
     std::fs::create_dir_all(json.parent().unwrap()).unwrap();
     std::fs::write(&json, r#"{"spellingWords":["Ioque"]}"#).unwrap();
     call(

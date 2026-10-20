@@ -7,8 +7,8 @@ use crate::error::{CmdResult, CommandError, ErrorKind};
 use crate::settings::ImportedDictionary;
 use crate::state::AppState;
 use crate::vault_commands::blocking;
-use nimw_session::VaultSession;
-use nimw_spell::{BUNDLED, SpellError, Speller, validate};
+use liber_session::VaultSession;
+use liber_spell::{BUNDLED, SpellError, Speller, validate};
 use serde::Serialize;
 use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
@@ -32,7 +32,7 @@ pub struct SpellState {
     /// Imported dictionaries that failed to load, with their files' times
     /// then: not retried until the files change (round 3b final review #12).
     failed: Mutex<HashMap<String, Option<(SystemTime, SystemTime)>>>,
-    /// The open vault's spelling settings, kept until `.nimw/vault.json`
+    /// The open vault's spelling settings, kept until `.liber/vault.json`
     /// changes rather than read on every check (final review #12).
     vault: Mutex<Option<VaultSpelling>>,
     loads: AtomicUsize,

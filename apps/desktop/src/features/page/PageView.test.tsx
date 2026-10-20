@@ -77,7 +77,7 @@ describe('PageView (M2a §5)', () => {
     await waitFor(() =>
       expect(document.querySelector('img[data-cover]')).toHaveAttribute(
         'src',
-        'nimw-asset://localhost/Character%20Design/assets/rex-cover.png',
+        'liber-asset://localhost/Character%20Design/assets/rex-cover.png',
       ),
     );
   });
@@ -90,7 +90,7 @@ describe('PageView (M2a §5)', () => {
     expect(screen.getByRole('radio', { name: 'Live Preview' })).toBeChecked();
     await userEvent.click(screen.getByRole('radio', { name: 'Source' }));
     expect(disk.calls).toContainEqual(['settings_set', { patch: { editorMode: 'source' } }]);
-    expect(view().dom).toHaveClass('cm-nimw-source');
+    expect(view().dom).toHaveClass('cm-liber-source');
     await userEvent.click(screen.getByRole('radio', { name: 'Split' }));
     expect(screen.getByRole('region', { name: 'Preview' })).toHaveTextContent('body');
   });
@@ -429,7 +429,7 @@ describe('an archived page', () => {
     render(<PageScreen />);
     await open('.archive/Old.md');
     const box = await waitFor(() => {
-      const el = document.querySelector<HTMLInputElement>('.cm-nimw-checkbox');
+      const el = document.querySelector<HTMLInputElement>('.cm-liber-checkbox');
       expect(el).not.toBeNull();
       return el!;
     });

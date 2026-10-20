@@ -77,7 +77,7 @@ export function clearSpellCache(): void {
 }
 
 const setMisspelled = StateEffect.define<DecorationSet>();
-const mark = Decoration.mark({ class: 'cm-nimw-misspelled' });
+const mark = Decoration.mark({ class: 'cm-liber-misspelled' });
 
 const misspelled = StateField.define<DecorationSet>({
   create: () => Decoration.none,

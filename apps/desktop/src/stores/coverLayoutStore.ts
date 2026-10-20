@@ -1,6 +1,6 @@
 // Side covers (M4b part 3 §3): where a page's cover sits (the header band by
 // default, or a tall strip on the left or right) and the strip's width. Both
-// live in `.nimw/vault.json` (`coverSides`, `coverWidths`; Rust), never in
+// live in `.liber/vault.json` (`coverSides`, `coverWidths`; Rust), never in
 // the note, and are re-read when the vault or its tree changes, like cover
 // heights.
 import i18next from 'i18next';

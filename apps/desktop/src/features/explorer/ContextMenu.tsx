@@ -161,7 +161,7 @@ export function ContextMenu({ menu, onClose }: { menu: MenuState; onClose: () =>
       ref={box}
       role="menu"
       aria-label={t('menu.label', { name: displayName(node) })}
-      className="nimw-menu"
+      className="liber-menu"
       style={{ position: 'fixed', left: menu.anchor.x, top: menu.anchor.y }}
       onKeyDown={onKeyDown}
     >

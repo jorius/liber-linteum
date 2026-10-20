@@ -22,8 +22,8 @@ export function installFileWindowMock({
   let hash = 1;
   let settings: Record<string, unknown> = { editorMode: 'livePreview', ...overrides };
   const calls: [string, Args][] = [];
-  w.__nimwCalls = calls;
-  w.__nimwDisk = () => disk;
+  w.__liberCalls = calls;
+  w.__liberDisk = () => disk;
   const handlers: Record<string, (a: Args) => unknown> = {
     app_info: () => ({ name: 'Notes In My Way', version: '0.0.0-e2e' }),
     settings_get: () => ({ settings }),

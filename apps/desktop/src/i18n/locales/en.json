@@ -119,7 +119,7 @@
     "titleLabel": "Page title",
     "titleTaken": "A page named “{name}” is already in this folder.",
     "titleInNote": "Title in the note: {title}",
-    "frontmatterInvalid": "NIMW can’t safely change this note’s frontmatter. Edit it in Source mode.",
+    "frontmatterInvalid": "Liber Linteum can’t safely change this note’s frontmatter. Edit it in Source mode.",
     "subtitleLabel": "Subtitle",
     "subtitlePlaceholder": "Add a subtitle",
     "width": {
@@ -405,7 +405,7 @@
       },
       "vault": {
         "title": "This vault",
-        "description": "Settings kept with this vault, in .nimw/vault.json."
+        "description": "Settings kept with this vault, in .liber/vault.json."
       }
     },
     "shortcuts": {

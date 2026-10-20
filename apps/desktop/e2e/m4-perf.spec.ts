@@ -2,7 +2,7 @@
 // stall while the block gutter maps the pane's blocks. The worst frame after
 // a keystroke (the pane re-renders 150 ms later) is measured three times.
 // Timings depend on the machine, so it runs only when asked:
-// NIMW_PERF=1 pnpm --filter @nimw/desktop exec playwright test m4-perf (after
+// LIBER_PERF=1 pnpm --filter @liber/desktop exec playwright test m4-perf (after
 // `vite build`).
 //
 // Reference (Apple silicon, headless, worst frames in ms, Chromium / WebKit):
@@ -16,7 +16,7 @@
 import { expect, test, type Page } from '@playwright/test';
 import { installIpcMock } from './ipcMock';
 
-test.skip(!process.env.NIMW_PERF, 'timing probe: set NIMW_PERF=1 to run it');
+test.skip(!process.env.LIBER_PERF, 'timing probe: set LIBER_PERF=1 to run it');
 
 /** Paragraphs, an H2 every tenth block and a nested list every seventh. */
 function note(size: number): string {
