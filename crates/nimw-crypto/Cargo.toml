@@ -23,5 +23,8 @@ unicode-normalization.workspace = true
 x-wing.workspace = true
 zeroize.workspace = true
 
+[dev-dependencies]
+proptest.workspace = true
+
 [lints]
 workspace = true

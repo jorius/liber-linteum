@@ -2944,6 +2944,7 @@ dependencies = [
  "getrandom 0.4.3",
  "hkdf",
  "hmac",
+ "proptest",
  "rand_core",
  "region",
  "serde_json",
