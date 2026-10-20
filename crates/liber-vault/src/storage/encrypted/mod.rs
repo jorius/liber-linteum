@@ -23,8 +23,7 @@ use std::sync::{Mutex, MutexGuard};
 pub const HEADER_FILE: &str = "liber-vault.json";
 const DATA_DIR: &str = "d";
 const README_FILE: &str = "README.txt";
-const README_TEXT: &str =
-    "This folder is an encrypted Liber Linteum vault. Open it with Liber Linteum.";
+const README_TEXT: &str = "Encrypted Liber Linteum vault. Open it with Liber Linteum.";
 /// Files the OS drops into any folder: `create` still counts the folder as empty.
 const OS_FILES: [&str; 3] = [".DS_Store", "Thumbs.db", "desktop.ini"];
 
@@ -58,9 +57,15 @@ pub struct EncryptedStorage {
 
 impl std::fmt::Debug for EncryptedStorage {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        // `try_lock`: formatting while a call holds the keys must not deadlock.
+        let locked = match self.keys.try_lock() {
+            Ok(k) => format!("{}", k.is_none()),
+            Err(std::sync::TryLockError::Poisoned(k)) => format!("{}", k.into_inner().is_none()),
+            Err(std::sync::TryLockError::WouldBlock) => "busy".to_string(),
+        };
         f.debug_struct("EncryptedStorage")
             .field("root", &self.root)
-            .field("locked", &self.is_locked())
+            .field("locked", &format_args!("{locked}"))
             .finish_non_exhaustive()
     }
 }
@@ -86,29 +91,40 @@ fn content_err(path: &VaultPath, e: CryptoError) -> VaultError {
 }
 
 impl EncryptedStorage {
-    /// A new vault in the empty folder `root` (OS files like `.DS_Store` allowed).
+    /// A new vault in the empty folder `root`: OS files, and what a create
+    /// that failed before its header left, are allowed. `params` must meet
+    /// the Argon2 floor.
     pub fn create(
         root: &Path,
         passphrase: &str,
         params: Argon2Params,
     ) -> Result<(EncryptedStorage, RecoveryCode)> {
+        Self::create_with(root, || VaultHeader::create(passphrase, params))
+    }
+
+    /// `create` below the Argon2 floor, for test fixtures only (plan ruling 2).
+    #[cfg(feature = "test-params")]
+    pub fn create_insecure(
+        root: &Path,
+        passphrase: &str,
+        params: Argon2Params,
+    ) -> Result<(EncryptedStorage, RecoveryCode)> {
+        Self::create_with(root, || VaultHeader::create_insecure(passphrase, params))
+    }
+
+    fn create_with(
+        root: &Path,
+        make: impl FnOnce() -> liber_crypto::Result<(VaultHeader, Unlocked, RecoveryCode)>,
+    ) -> Result<(EncryptedStorage, RecoveryCode)> {
         let root = canonical_root(root)?;
-        for item in std::fs::read_dir(&root).map_err(|e| io_err(root.display().to_string(), e))? {
-            let name = item
-                .map_err(|e| io_err(root.display().to_string(), e))?
-                .file_name();
-            if !OS_FILES.iter().any(|f| name == *f) {
-                return Err(VaultError::NotEmpty(root.display().to_string()));
-            }
-        }
-        // Test builds may go below the Argon2 floor; real builds never do (plan ruling 2).
-        #[cfg(feature = "test-params")]
-        let made = VaultHeader::create_insecure(passphrase, params);
-        #[cfg(not(feature = "test-params"))]
-        let made = VaultHeader::create(passphrase, params);
-        let (header, unlocked, code) = made.map_err(crypto)?;
+        refuse_non_empty(&root)?;
+        let (header, unlocked, code) = make().map_err(crypto)?;
         let bytes = header.to_bytes(&unlocked).map_err(crypto)?;
-        std::fs::create_dir(root.join(DATA_DIR)).map_err(|e| io_err(DATA_DIR, e))?;
+        match std::fs::create_dir(root.join(DATA_DIR)) {
+            // An empty `d/` from a create that failed earlier (`refuse_non_empty`).
+            Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => {}
+            other => other.map_err(|e| io_err(DATA_DIR, e))?,
+        }
         std::fs::write(root.join(README_FILE), README_TEXT).map_err(|e| io_err(README_FILE, e))?;
         // Last: the header is what makes the folder a vault (`is_encrypted_vault`).
         replace_atomic(
@@ -124,6 +140,14 @@ impl EncryptedStorage {
     pub fn unlock(root: &Path, with: Unlock<'_>) -> Result<(EncryptedStorage, UnlockReport)> {
         let root = canonical_root(root)?;
         let bytes = std::fs::read(root.join(HEADER_FILE)).map_err(|e| io_err(HEADER_FILE, e))?;
+        // Never follow a link out of the vault for its whole content tree.
+        match root.join(DATA_DIR).symlink_metadata() {
+            Ok(m) if m.is_dir() => {}
+            Ok(m) if m.file_type().is_symlink() => {
+                return Err(VaultError::OutsideVault(format!("{DATA_DIR}/ is a link")));
+            }
+            _ => return Err(VaultError::NotFound(format!("{DATA_DIR}/ folder"))),
+        }
         let unlock_err = |e| match e {
             CryptoError::Authentication => VaultError::WrongSecret,
             e => crypto(e),
@@ -210,6 +234,10 @@ impl EncryptedStorage {
             Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(None),
             Err(e) => return Err(io_err(entry.physical.display().to_string(), e)),
         };
+        // Never follow a link swapped in since the listing: it reads as gone.
+        if !(m.is_dir() && entry.folder.is_some() || m.is_file() && entry.folder.is_none()) {
+            return Ok(None);
+        }
         let mtime = mtime_ns(&m);
         let (kind, len) = match entry.folder {
             Some(_) => (Kind::Dir, 0),
@@ -225,6 +253,31 @@ impl EncryptedStorage {
             created: m.created().ok(),
         }))
     }
+}
+
+/// `create` accepts only an empty folder: OS files aside, it allows what a
+/// create that failed before writing the header leaves (our own `README.txt`
+/// and an empty `d/`), so that create can be retried.
+fn refuse_non_empty(root: &Path) -> Result<()> {
+    let leftover = |name: &std::ffi::OsStr| {
+        let p = root.join(name);
+        if name == README_FILE {
+            p.symlink_metadata().is_ok_and(|m| m.is_file())
+                && std::fs::read(&p).is_ok_and(|b| b == README_TEXT.as_bytes())
+        } else if name == DATA_DIR {
+            p.symlink_metadata().is_ok_and(|m| m.is_dir())
+                && std::fs::read_dir(&p).is_ok_and(|mut d| d.next().is_none())
+        } else {
+            OS_FILES.iter().any(|f| name == *f)
+        }
+    };
+    let err = |e| io_err(root.display().to_string(), e);
+    for item in std::fs::read_dir(root).map_err(err)? {
+        if !leftover(&item.map_err(err)?.file_name()) {
+            return Err(VaultError::NotEmpty(root.display().to_string()));
+        }
+    }
+    Ok(())
 }
 
 /// A file's plaintext length, cached by its physical mtime and size. A file
@@ -325,6 +378,10 @@ impl Storage for EncryptedStorage {
             if entry.folder.is_some() {
                 return Err(VaultError::NotFound(format!("{path} is not a file")));
             }
+            // Never follow a link swapped in since the listing.
+            if !entry.physical.symlink_metadata().is_ok_and(|m| m.is_file()) {
+                return Err(VaultError::NotFound(format!("{path} is not a file")));
+            }
             let file =
                 std::fs::File::open(&entry.physical).map_err(|e| io_err(path.as_str(), e))?;
             let r =
@@ -390,5 +447,27 @@ impl Storage for EncryptedStorage {
         Err(VaultError::Watch(
             "not yet supported in encrypted vaults".into(),
         ))
+    }
+}
+
+#[cfg(all(test, feature = "test-params"))]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn debug_never_blocks_on_the_keys() {
+        let dir = tempfile::tempdir().unwrap();
+        let tiny = Argon2Params {
+            m_kib: 64,
+            t: 1,
+            p: 1,
+        };
+        let (s, _) = EncryptedStorage::create_insecure(dir.path(), "pw", tiny).unwrap();
+        assert!(format!("{s:?}").contains("locked: false"));
+        let held = lock(&s.keys);
+        assert!(format!("{s:?}").contains("locked: busy"));
+        drop(held);
+        s.lock();
+        assert!(format!("{s:?}").contains("locked: true"));
     }
 }

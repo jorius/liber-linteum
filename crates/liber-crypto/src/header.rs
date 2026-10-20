@@ -453,6 +453,17 @@ impl VaultHeader {
         self.begin_rotation_unchecked(u, passphrase, params)
     }
 
+    /// `begin_rotation` below the Argon2 floor, as [`Self::create_insecure`].
+    #[cfg(any(test, feature = "test-params"))]
+    pub fn begin_rotation_insecure(
+        &mut self,
+        u: &Unlocked,
+        passphrase: &str,
+        params: Argon2Params,
+    ) -> Result<(Unlocked, RecoveryCode)> {
+        self.begin_rotation_unchecked(u, passphrase, params)
+    }
+
     pub(crate) fn begin_rotation_unchecked(
         &mut self,
         u: &Unlocked,

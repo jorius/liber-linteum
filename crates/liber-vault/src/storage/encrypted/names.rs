@@ -52,6 +52,10 @@ pub(super) fn list(u: &Unlocked, physical: &Path, id: FolderId) -> std::io::Resu
         entries: HashMap::new(),
         unreadable: Vec::new(),
     };
+    let unreadable = |path: &Path, reason: &str| {
+        format!("{}: couldn't read the name ({reason})", path.display())
+    };
+    let mut named: HashMap<String, Vec<Entry>> = HashMap::new();
     for item in std::fs::read_dir(physical)? {
         let item = item?;
         let path = item.path();
@@ -74,29 +78,29 @@ pub(super) fn list(u: &Unlocked, physical: &Path, id: FolderId) -> std::io::Resu
         } else {
             Err("not a file or folder".to_string())
         };
-        let entry = match decrypted {
-            Ok((name, _)) if !one_component(&name) => Err("not a single name".to_string()),
-            Ok((name, _)) if listing.entries.contains_key(&name) => {
-                Err(format!("another entry is also named {name:?}"))
-            }
-            other => other,
-        };
-        match entry {
-            Ok((name, folder)) => {
-                listing.entries.insert(
-                    name,
-                    Entry {
-                        physical: path,
-                        folder,
-                    },
-                );
-            }
-            Err(reason) => listing.unreadable.push(format!(
-                "{}: couldn't read the name ({reason})",
-                path.display()
-            )),
+        match decrypted {
+            Ok((name, _)) if !one_component(&name) => listing
+                .unreadable
+                .push(unreadable(&path, "not a single name")),
+            Ok((name, folder)) => named.entry(name).or_default().push(Entry {
+                physical: path,
+                folder,
+            }),
+            Err(reason) => listing.unreadable.push(unreadable(&path, &reason)),
         }
     }
+    // Two entries with one name: neither wins, so the result doesn't depend on `read_dir` order.
+    for (name, mut found) in named {
+        if found.len() == 1 {
+            listing.entries.insert(name, found.remove(0));
+        } else {
+            let reason = format!("another entry is also named {name:?}");
+            for e in found {
+                listing.unreadable.push(unreadable(&e.physical, &reason));
+            }
+        }
+    }
+    listing.unreadable.sort();
     Ok(listing)
 }
 
