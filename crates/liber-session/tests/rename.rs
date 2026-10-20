@@ -853,6 +853,21 @@ fn subpages_review_move_under_page_moves_and_rewrites() {
     assert_eq!(names(&dir, "P"), vec!["P.md", "a.md", "b.md"]);
 }
 
+/// Follow-up: an item whose name a rename refuses (`#`) is refused before
+/// the page is converted, so links to the page are never rewritten twice.
+#[test]
+fn subpages_followup_a_refused_name_is_refused_before_the_conversion() {
+    let (dir, _c, s) = vault_with(&[
+        ("P.md", b"# P\n"),
+        ("a#b.md", b""),
+        ("Other.md", b"See [p](./P.md).\n"),
+    ]);
+    assert!(in_tree(&s, "a#b.md"));
+    assert!(s.move_under_page(&vp("a#b.md"), &vp("P.md"), true).is_err());
+    assert_eq!(read(&dir, "Other.md"), "See [p](./P.md).\n");
+    assert_eq!(names(&dir, "."), vec!["Other.md", "P.md", "a#b.md"]);
+}
+
 /// Review #2 (spec §9.2): a folder the command had just created is removed
 /// again, from disk and from the index, when the page can't move.
 #[test]
