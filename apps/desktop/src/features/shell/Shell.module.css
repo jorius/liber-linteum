@@ -326,9 +326,13 @@
 }
 
 .sideResize:hover,
-.sideResize:focus-visible,
 .sideResize[data-dragging] {
   background: var(--color-accent);
   opacity: 0.6;
-  outline: none;
+}
+
+/* Its own rule: Safari 15 drops a whole selector list it can't parse. */
+.sideResize:focus-visible {
+  background: var(--color-accent);
+  opacity: 0.6;
 }
