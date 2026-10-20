@@ -8,6 +8,7 @@ import { useGvStore } from '../features/global-view/gvStore';
 import { useTrailStore } from './trailStore';
 import { useToastStore } from './toastStore';
 import { resetVaultStore, useVaultStore } from './vaultStore';
+import { derive } from '../theme/derive';
 
 type Handler = (args: Record<string, unknown>) => unknown;
 
@@ -126,6 +127,34 @@ describe('settingsStore', () => {
     expect(document.documentElement.dataset.palette).toBe('sepia');
     await useSettingsStore.getState().update({ palette: 'ink' });
     expect(document.documentElement.dataset.palette).toBe('ink');
+  });
+
+  it('migrates_custom_accent_once (custom themes plan, focus 1)', async () => {
+    const patches: Record<string, unknown>[] = [];
+    let saved: Record<string, unknown> = {
+      ...DEFAULT_SETTINGS,
+      palette: 'custom',
+      accentColor: '#2aa198',
+    };
+    backend({
+      settings_get: () => ({ settings: saved }),
+      settings_set: (a) => {
+        patches.push(a.patch as Record<string, unknown>);
+        saved = { ...saved, ...(a.patch as object) };
+        return saved;
+      },
+    });
+    await useSettingsStore.getState().load();
+    expect(patches).toHaveLength(1);
+    const s = useSettingsStore.getState().settings;
+    expect(s.customThemes).toHaveLength(1);
+    expect(s.customThemes[0].name).toBe('Custom');
+    expect(s.customTheme).toBe(s.customThemes[0].id);
+    expect(s.customThemes[0].light.accent).toBe(derive('#2aa198').light.accent);
+    expect(document.documentElement.dataset.palette).toBe('custom');
+    // The next load finds the theme and patches nothing.
+    await useSettingsStore.getState().load();
+    expect(patches).toHaveLength(1);
   });
 });
 

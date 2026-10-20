@@ -446,6 +446,9 @@
         "settings": "Settings",
         "quit": "Quit"
       }
+    },
+    "themes": {
+      "legacyName": "Custom"
     }
   },
   "toolbar": {
