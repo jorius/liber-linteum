@@ -24,7 +24,7 @@ test('the Notion import dialog keeps its padding; its fields are the app size', 
   page,
 }) => {
   const errors = await open(page);
-  await page.getByRole('button', { name: 'Import a Notion export' }).click();
+  await page.getByRole('button', { name: 'Import from Notion…' }).click();
   const dialog = page.getByRole('dialog', { name: 'Import from Notion' });
   const box = (await dialog.boundingBox())!;
   const title = (await dialog.getByRole('heading', { name: 'Import from Notion' }).boundingBox())!;
