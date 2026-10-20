@@ -95,3 +95,32 @@ A Notion page with sub-pages becomes a page plus a folder of the same name, so t
 5. **Breadcrumb.** `X/X.md` reads `… / X`, not `… / X / X`.
 6. **Notion importer.** A page with children is written as `X/X.md` and rewritten links point there. The import report is unchanged otherwise.
 7. **Elsewhere.** Search, Global View, favourites and backlinks treat `X/X.md` as the ordinary page it is.
+
+## 7. Welcome page, option A "Launcher" (stream E)
+
+Jose picked mock A: "clean, pretty, perfect". The mock is `.superpowers/brainstorm/12538-1792502930/content/welcome.html`, first card, and is not committed. The page has two columns that fill the window.
+
+- **Left: start (≈330 px, surface background, right border), top to bottom:**
+  1. The brand mark, the app name and the version under it.
+  2. The tagline.
+  3. Three stacked full-width buttons:
+     - New vault, primary, which picks a folder and creates the vault;
+     - Open folder as vault;
+     - Quick note.
+
+     Each button shows its keyboard hint only if that shortcut works on the Welcome screen.
+  4. "More ways to start", as accent links:
+     - Open an Obsidian vault;
+     - Open a single file…;
+     - Import from Notion….
+  5. At the bottom, the language toggle (English / Español) and "🔒 Local only".
+- **Right: recent vaults (dotted background):**
+  - The "Recent vaults" label, with a filter field on the right. The filter matches name or path and only shows when there are more than 5 vaults.
+  - One card holds the rows. Each row has the vault emoji (or the quick-notes icon for the global Scratchpad), the name, and the path with a middle ellipsis. The right side shows meta: when it was last opened (relative), plus the page count if it's cheap to get. *Builder's call, record a ruling.*
+  - On hover or focus, a row shows "Show in Finder" (Explorer on Windows) and "Remove from list". A missing vault is dimmed and reads "Can't open".
+  - The first row is highlighted as the most recent.
+  - The empty state keeps today's dashed box.
+  - The credits line sits at the bottom of this column.
+- **Narrow windows.** Below ~720 px wide, the two columns stack, start first.
+- **Unchanged.** All existing behaviour is kept: opening overlay `inert`, missing vaults, forgetting, quick notes, single file, Notion import. Only the layout and the new filter, meta and reveal change.
+- **Fields.** Use the shared field style from stream C.
