@@ -67,3 +67,12 @@ The final grep (`nimw`, `notes in my way`, `notesinmyway`, case-insensitive) fin
 
 **Also for Jose (M5):** once Liber Linteum has opened a vault, don't use Notes In My Way on it again. The old app would recreate its settings folder. Liber Linteum keeps using its own and warns that the vault has both. Whatever the old app wrote is left on disk but not used.
 
+
+## 8. Open minors after the re-review (not fixed, tracked)
+
+1. **Write race on the legacy folder.** `try_update_json_object` resolves to `.nimw/…`. If a concurrent `Vault::open` of the same root moves the folder in that microsecond window, `create_dir` recreates an empty `.nimw`. That loses one write and leaves a permanent `metaDir.both` warning. Fix: only `create_dir` for the current meta dir, and otherwise return `Conflict` so the retry resolves again (`liber-vault/src/vault.rs:206-212`).
+2. **A failed adoption isn't retried.** If `adopt` fails after `settings.json` is copied (for example on a full disk), the dictionaries are not retried, and a half-copied take folder is skipped for good. The originals stay in the old folders.
+3. The M3 comment in `liber-session/src/session.rs:116-118` overstates the heuristic. On that first open every `autoNamed` flag survives.
+4. In §7 the M5 row points to "§3 below". §3 is above and was not changed.
+5. The `adopt` doc says "imported dictionaries it lists", but it copies the whole `dictionaries/` folder.
+6. **The advice should go further.** Besides "don't keep using the old app on a vault", say: once the new app has launched, settings changes, newly imported dictionaries and crashed recordings made in the old app are not carried over.
