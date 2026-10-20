@@ -14,7 +14,7 @@
     "recent": "Recent vaults",
     "noRecent": "No recent vaults yet.",
     "forget": "Remove {name} from recent",
-    "missing": "Folder not found",
+    "missing": "Can't open",
     "quickNote": "Quick note",
     "moreWays": "More ways to start",
     "openFile": "Open a single file…",

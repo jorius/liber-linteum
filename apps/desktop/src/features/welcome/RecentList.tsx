@@ -2,6 +2,8 @@ import { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { FolderIcon, SearchIcon, SmallCloseIcon } from '../../app/icons';
 import { vaultsForget, vaultsRecent, vaultsReveal, type RecentVault } from '../../ipc';
+import { errorMessage } from '../../stores/messages';
+import { useToastStore } from '../../stores/toastStore';
 import { useVaultStore } from '../../stores/vaultStore';
 import { ItemIcon } from '../icons/ItemIcon';
 import { QuickNoteIcon } from '../scratchpad/QuickNoteIcon';
@@ -63,6 +65,12 @@ export function RecentList() {
     void reload();
   }, [reload]);
 
+  // The folder may have gone since the list loaded (an unmounted drive).
+  const reveal = async (path: string) => {
+    const res = await vaultsReveal(path);
+    if (!res.ok) useToastStore.getState().push({ message: errorMessage(res.error), tone: 'error' });
+  };
+
   const forget = async (path: string) => {
     await vaultsForget(path);
     await reload();
@@ -106,7 +114,11 @@ export function RecentList() {
               const item = it.scratchpad ? { ...it, name: t('scratchpad.title') } : it;
               const when = lastOpened(item.openedAt, now, i18n.resolvedLanguage ?? 'en');
               return (
-                <li key={item.path} className={styles.recentItem}>
+                <li
+                  key={item.path}
+                  className={styles.recentItem}
+                  data-latest={it === items[0] || undefined}
+                >
                   <button
                     type="button"
                     className={styles.recentOpen}
@@ -149,7 +161,7 @@ export function RecentList() {
                         className={styles.rowAction}
                         aria-label={t('welcome.reveal', { name: item.name, os: OS })}
                         title={t('welcome.reveal', { name: item.name, os: OS })}
-                        onClick={() => void vaultsReveal(item.path)}
+                        onClick={() => void reveal(item.path)}
                       >
                         <FolderIcon />
                       </button>

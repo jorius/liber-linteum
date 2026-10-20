@@ -192,6 +192,6 @@ describe('M1b polish (M2a §6)', () => {
     const open = await screen.findByRole('button', { name: /^gone/ });
     await userEvent.click(open);
     await waitFor(() => expect(screen.getByRole('button', { name: /^gone/ })).toBeDisabled());
-    expect(screen.getByText('Folder not found')).toBeInTheDocument();
+    expect(screen.getByText("Can't open")).toBeInTheDocument();
   });
 });

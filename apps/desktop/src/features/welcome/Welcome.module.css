@@ -274,7 +274,7 @@
 }
 
 /* The most recent vault stands out (R3 §7). */
-.recentItem:first-child {
+.recentItem[data-latest] {
   background: var(--color-accent-soft);
 }
 
@@ -282,7 +282,7 @@
   background: var(--color-surface-subtle);
 }
 
-.recentItem:first-child:hover {
+.recentItem[data-latest]:hover {
   background: var(--color-accent-soft);
 }
 

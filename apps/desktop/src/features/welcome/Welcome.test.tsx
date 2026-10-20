@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event';
 import axe from 'axe-core';
 import { afterEach, describe, expect, it } from 'vitest';
 import { clearMocks, mockIPC } from '../../ipc/testing';
+import { useToastStore } from '../../stores/toastStore';
 import { useUiStore } from '../../stores/uiStore';
 import { resetVaultStore, useVaultStore } from '../../stores/vaultStore';
 import { lastOpened } from './RecentList';
@@ -97,7 +98,7 @@ describe('Welcome screen', () => {
     const list = await screen.findByRole('list', { name: 'Recent vaults' });
     const old = within(list).getByRole('button', { name: /^Old/ });
     expect(old).toBeDisabled();
-    expect(within(list).getByText('Folder not found')).toBeInTheDocument();
+    expect(within(list).getByText("Can't open")).toBeInTheDocument();
     await userEvent.click(within(list).getByRole('button', { name: 'Remove Old from recent' }));
     await waitFor(() => expect(within(list).queryByText('Old')).not.toBeInTheDocument());
     await userEvent.click(within(list).getByRole('button', { name: /^Notes/ }));
@@ -252,6 +253,39 @@ describe('Welcome screen', () => {
       expect(calls.find(([c]) => c === 'vaults_reveal')?.[1]).toEqual({ path: '/v/Notes' });
       expect(within(list).queryByRole('button', { name: /^Show Old/ })).not.toBeInTheDocument();
       expect(within(list).getByRole('button', { name: 'Remove Old from recent' })).toBeEnabled();
+    });
+
+    it('review M9: a reveal that fails says so', async () => {
+      useToastStore.setState({ toasts: [] });
+      backend({
+        vaults_recent: () => [vault('Notes')],
+        vaults_reveal: () => {
+          throw { kind: 'notFound', message: '/v/Notes' };
+        },
+      });
+      render(<Welcome version={null} />);
+      const list = await screen.findByRole('list', { name: 'Recent vaults' });
+      await userEvent.click(
+        within(list).getByRole('button', { name: 'Show Notes in the file manager' }),
+      );
+      await waitFor(() =>
+        expect(useToastStore.getState().toasts.map((t) => t.tone)).toEqual(['error']),
+      );
+    });
+
+    it('review M9: only the most recent vault is highlighted, filtered or not', async () => {
+      const six = ['Cybersec', 'Personal', 'Latin', 'Work', 'Recipes', 'Travel'].map((n) =>
+        vault(n),
+      );
+      backend({ vaults_recent: () => six });
+      render(<Welcome version={null} />);
+      const list = await screen.findByRole('list', { name: 'Recent vaults' });
+      const latest = () => list.querySelectorAll('li[data-latest]');
+      expect(latest()).toHaveLength(1);
+      expect(latest()[0]).toHaveTextContent('Cybersec');
+      await userEvent.type(screen.getByRole('searchbox', { name: 'Filter vaults' }), 'latin');
+      expect(within(list).getAllByRole('listitem')).toHaveLength(1);
+      expect(latest()).toHaveLength(0);
     });
 
     it('says when each vault was last opened', async () => {
