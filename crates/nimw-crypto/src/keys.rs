@@ -103,11 +103,11 @@ pub(crate) fn rng() -> impl rand_core::CryptoRng {
 
 #[allow(dead_code)] // used by later tasks
 pub(crate) fn hkdf_sha256(ikm: &[u8], salt: &[u8], info: &[u8]) -> Secret<32> {
-    let mut out = [0u8; 32];
+    let mut b = Box::new([0u8; 32]);
     Hkdf::<Sha256>::new(Some(salt), ikm)
-        .expand(info, &mut out)
+        .expand(info, &mut b[..])
         .expect("32 <= 255 * 32");
-    Secret::from_bytes(out)
+    Secret::from_box(b)
 }
 
 #[allow(dead_code)] // used by later tasks
