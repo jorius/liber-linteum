@@ -352,7 +352,14 @@ impl Storage for PlainStorage {
             Reach::Any => self.resolve(path)?,
             Reach::Visible => self.resolve_visible(path)?,
         };
-        let file = std::fs::File::open(full).map_err(|e| io_err(path.as_str(), e))?;
+        // Windows can't open a folder (PermissionDenied); unix can, see below.
+        let file = std::fs::File::open(&full).map_err(|e| {
+            if full.is_dir() {
+                VaultError::NotFound(format!("{path} is not a file"))
+            } else {
+                io_err(path.as_str(), e)
+            }
+        })?;
         let meta = file.metadata().map_err(|e| io_err(path.as_str(), e))?;
         if !meta.is_file() {
             return Err(VaultError::NotFound(format!("{path} is not a file")));

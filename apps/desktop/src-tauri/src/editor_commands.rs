@@ -281,9 +281,9 @@ fn executable_name(path: &Path) -> bool {
 /// exFAT/SMB volumes set them on everything, and the OS opens such a file by
 /// its type rather than running it. Symlinks are judged by their target.
 pub(crate) fn check_openable(full: &Path) -> CmdResult<()> {
-    let real = std::fs::canonicalize(full) // seam: outside (check_openable inspects the OS path os_path(Open) returned)
+    let real = std::fs::canonicalize(full) // seam: outside (an OS path the caller already resolved (os_path(Open), an outside file, or a file window's target))
         .map_err(|e| CommandError::new(ErrorKind::NotFound, e.to_string()))?;
-    let meta = std::fs::metadata(&real) // seam: outside (check_openable inspects the OS path os_path(Open) returned)
+    let meta = std::fs::metadata(&real) // seam: outside (an OS path the caller already resolved (os_path(Open), an outside file, or a file window's target))
         .map_err(|e| CommandError::new(ErrorKind::NotFound, e.to_string()))?;
     if !meta.is_file() {
         return Err(refuse(full, "not a regular file"));
@@ -293,7 +293,7 @@ pub(crate) fn check_openable(full: &Path) -> CmdResult<()> {
     }
     #[cfg(unix)]
     {
-        use std::os::unix::fs::PermissionsExt; // seam: outside (check_openable inspects the OS path os_path(Open) returned)
+        use std::os::unix::fs::PermissionsExt; // seam: outside (an OS path the caller already resolved (os_path(Open), an outside file, or a file window's target))
         let extensionless = full.extension().is_none() || real.extension().is_none();
         if extensionless && meta.permissions().mode() & 0o111 != 0 {
             return Err(refuse(full, "marked executable"));

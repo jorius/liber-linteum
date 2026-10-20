@@ -3,7 +3,9 @@
 
 mod support;
 
-use liber_vault::{LEGACY_META_DIR, META_DIR, Vault, WARN_BOTH, WARN_UNMOVED, vault_icon_at};
+#[cfg(unix)]
+use liber_vault::WARN_UNMOVED;
+use liber_vault::{LEGACY_META_DIR, META_DIR, Vault, WARN_BOTH, vault_icon_at};
 use std::fs;
 use std::path::Path;
 use support::Spy;

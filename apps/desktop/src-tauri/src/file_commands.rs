@@ -16,7 +16,7 @@ use crate::state::AppState;
 use crate::vault_commands::blocking;
 use liber_markdown::resolve;
 use liber_session::is_text_content;
-use liber_vault::{Follow, Hash, OsUse, Reach, Vault, VaultError, VaultPath, is_hidden_name};
+use liber_vault::{Follow, Hash, OsUse, Vault, VaultError, VaultPath, is_hidden_name};
 use serde::Serialize;
 use std::path::{Path, PathBuf};
 use tauri::{AppHandle, Emitter, Manager, Runtime, WebviewUrl, WebviewWindowBuilder, Window};
@@ -100,12 +100,9 @@ fn text_for(kind: FileKind, path: &VaultPath, bytes: Vec<u8>) -> CmdResult<Strin
 /// by its name and by where it resolves (M4c review I4).
 fn folder_path(vault: &Vault, path: &str) -> CmdResult<VaultPath> {
     let vp = VaultPath::new(path)?;
-    // A missing file or a folder is left to the caller's own check, as before E2.
-    let refused = matches!(
-        vault.open_read(&vp, Reach::Visible),
-        Err(VaultError::OutsideVault(_))
-    );
-    if vp.as_str().split('/').any(is_hidden_name) || refused {
+    // Reveal resolves like `Reach::Visible` without opening: a missing file
+    // or a folder is left to the caller's own check.
+    if vp.as_str().split('/').any(is_hidden_name) || vault.os_path(&vp, OsUse::Reveal).is_err() {
         return Err(not_permitted(format!("hidden: {path}")));
     }
     Ok(vp)

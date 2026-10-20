@@ -119,6 +119,7 @@ fn byte_ranges_for_audio_seeking() {
     );
     assert_eq!(r.status, 206);
     assert_eq!(r.body, full[2..=5]);
+    assert!(accepts_ranges(&r), "{:?}", r.headers);
     assert!(
         r.headers
             .iter()
@@ -416,6 +417,12 @@ fn b6_review_i6_long_media_is_served_in_bounded_pieces() {
     );
 }
 
+fn accepts_ranges(r: &liber_desktop::asset::AssetResponse) -> bool {
+    r.headers
+        .iter()
+        .any(|(k, v)| k == "Accept-Ranges" && v == "bytes")
+}
+
 fn content_range(r: &liber_desktop::asset::AssetResponse) -> Option<&str> {
     r.headers
         .iter()
@@ -436,6 +443,7 @@ fn asset_range_on_empty_file_is_416() {
     assert_eq!((r.status, content_range(&r)), (416, Some("bytes */0")));
     let r = serve(&state, "/e.wav", None);
     assert_eq!((r.status, r.body.len()), (200, 0));
+    assert!(accepts_ranges(&r), "{:?}", r.headers);
     let r = serve(&state, "/f.wav", Some("bytes=10-"));
     assert_eq!((r.status, content_range(&r)), (416, Some("bytes */10")));
     assert_eq!(serve(&state, "/f.wav", None).body, [7u8; 10]);

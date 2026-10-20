@@ -739,3 +739,21 @@ fn m4c_review_i4_assets_never_resolve_into_hidden_files() {
         200
     );
 }
+
+/// M4c review I4, kept through E2 Task 5: a dangling link in the folder is
+/// refused as hidden (its real location can't be checked), never read.
+#[cfg(unix)]
+#[test]
+fn a_dangling_link_in_the_folder_is_not_permitted() {
+    let h = harness();
+    let dir = folder(&[]);
+    std::os::unix::fs::symlink(dir.path().join("gone.md"), dir.path().join("dead.md")).unwrap();
+    let w = open(&h, &dir.path().join("note.md"));
+    for cmd in ["file_note_read", "file_follow"] {
+        assert_eq!(
+            kind(call(&w, cmd, json!({ "path": "dead.md" })).unwrap_err()),
+            "notPermitted",
+            "{cmd}"
+        );
+    }
+}
