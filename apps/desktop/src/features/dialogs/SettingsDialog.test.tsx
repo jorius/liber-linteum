@@ -404,7 +404,10 @@ describe('Settings → This vault (M2c §5.4)', () => {
     await waitFor(() => expect(where).toHaveValue('subfolder'));
     expect(screen.getByRole('textbox', { name: 'Subfolder name' })).toHaveValue('attachments');
     // M5b round 2: as wide as the selects around it, not a 10-character box.
-    expect(screen.getByRole('textbox', { name: 'Subfolder name' })).toHaveClass(styles.textInput);
+    expect(screen.getByRole('textbox', { name: 'Subfolder name' })).toHaveClass(
+      styles.textInput,
+      'field-control',
+    );
     await userEvent.selectOptions(where, 'same');
     await waitFor(() =>
       expect(vaultPatches).toEqual([{ attachments: { mode: 'same', path: '' } }]),

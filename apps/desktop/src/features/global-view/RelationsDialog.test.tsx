@@ -116,10 +116,11 @@ describe('relationships dialog (M3b §3)', () => {
     render(<RelationsDialog page="A.md" onClose={vi.fn()} />);
     const input = await screen.findByRole('textbox', { name: 'Label' });
     expect(input).toHaveAttribute('maxLength', String(LABEL_MAX));
-    // Not the settings' 10ch monospace hex field: the dialog's width, in the
-    // body font.
+    // The app's text field (round 3 §3.3), not the settings' monospace hex
+    // field: the dialog's width.
+    expect(input).toHaveClass('field-control');
     const field = getComputedStyle(input);
-    expect(field.font).toBe('400 14px var(--font-body)');
+    expect(field.fontFamily).not.toContain('mono');
     expect(field.width).toBe('100%');
   });
 

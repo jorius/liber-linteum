@@ -33,7 +33,7 @@ export function MoveToDialog({ path, onClose }: { path: string; onClose: () => v
       <label className={styles.field}>
         <span>{t('dialogs.move.to')}</span>
         <select
-          className={styles.select}
+          className="field-control"
           size={Math.min(10, Math.max(2, targets.length))}
           value={target}
           onChange={(e) => setTarget(e.target.value)}

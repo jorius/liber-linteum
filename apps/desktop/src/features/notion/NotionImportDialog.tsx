@@ -172,7 +172,7 @@ export function NotionImportDialog({ onClose }: { onClose: () => void }) {
         <span className={styles.label} id={exportId}>
           {t('notion.export')}
         </span>
-        <span className={styles.value}>{zip ?? t('notion.noExport')}</span>
+        <span className={`field-control ${styles.value}`}>{zip ?? t('notion.noExport')}</span>
         <button
           type="button"
           className="btn btn-secondary"
@@ -188,7 +188,7 @@ export function NotionImportDialog({ onClose }: { onClose: () => void }) {
         <span className={styles.label} id={placeId}>
           {t('notion.location')}
         </span>
-        <span className={styles.value}>{parent ?? t('notion.noLocation')}</span>
+        <span className={`field-control ${styles.value}`}>{parent ?? t('notion.noLocation')}</span>
         <button
           type="button"
           className="btn btn-secondary"
@@ -203,7 +203,7 @@ export function NotionImportDialog({ onClose }: { onClose: () => void }) {
         {t('notion.name')}
         <input
           id={nameId}
-          className={dialogs.textInput}
+          className={`field-control ${dialogs.textInput}`}
           value={name}
           placeholder={t('notion.namePlaceholder')}
           disabled={importing}

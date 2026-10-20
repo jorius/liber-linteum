@@ -117,7 +117,7 @@ export function PickerPopup({
   return (
     <div ref={box} className={styles.linkPicker} style={place ?? undefined}>
       <input
-        className={styles.linkPickerInput}
+        className={`field-control ${styles.linkPickerInput}`}
         role="combobox"
         aria-label={label}
         aria-expanded={options.length > 0}

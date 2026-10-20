@@ -70,15 +70,6 @@
   color: var(--color-text-body);
 }
 
-.select {
-  font: 400 14px var(--font-body);
-  color: var(--color-text);
-  background: var(--color-surface-subtle);
-  border: 1px solid var(--color-border-strong);
-  border-radius: var(--radius-md);
-  padding: 6px 8px;
-}
-
 .fieldset {
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
@@ -175,26 +166,17 @@
 
 .colorInput {
   width: 44px;
-  height: 32px;
+  height: 36px;
   padding: 2px;
   border: 1px solid var(--color-border-strong);
   border-radius: var(--radius-sm);
   background: var(--color-surface-subtle);
 }
 
+/* A field (fields.css) in the mono font, as wide as a hex colour. */
 .hexInput {
-  font: 400 14px var(--font-mono);
-  width: 10ch;
-  color: var(--color-text);
-  background: var(--color-surface-subtle);
-  border: 1px solid var(--color-border-strong);
-  border-radius: var(--radius-md);
-  padding: 6px 8px;
-}
-
-.hexInput[aria-invalid='true'],
-.textInput[aria-invalid='true'] {
-  border-color: var(--color-warn-border);
+  font-family: var(--font-mono);
+  width: 12ch;
 }
 
 /* A field in a fieldset takes its own row (a relationship's label). */
@@ -202,17 +184,10 @@
   flex: 1 1 100%;
 }
 
-/* A text field (a relationship's label, up to 40 characters; a search): the
-   body font, the dialog's width (M3b final review m12). */
+/* A text field (fields.css) as wide as the dialog: a relationship's label, a
+   search (M3b final review m12). */
 .textInput {
-  box-sizing: border-box;
-  font: 400 14px var(--font-body);
   width: 100%;
-  color: var(--color-text);
-  background: var(--color-surface-subtle);
-  border: 1px solid var(--color-border-strong);
-  border-radius: var(--radius-md);
-  padding: 6px 8px;
 }
 
 .error {

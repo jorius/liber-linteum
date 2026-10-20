@@ -130,7 +130,7 @@ describe('Settings → This vault: the scratch folder (M4c §7.8)', () => {
     const field = screen.getByRole('textbox', { name: 'Quick notes folder' });
     expect(field).toHaveValue('Scratchpad');
     // M5b round 2: as wide as the selects around it, not a 10-character box.
-    expect(field).toHaveClass(dialogs.textInput);
+    expect(field).toHaveClass(dialogs.textInput, 'field-control');
     await userEvent.clear(field);
     await userEvent.type(field, 'Inbox{Enter}');
     await waitFor(() =>

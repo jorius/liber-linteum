@@ -69,7 +69,7 @@ export function IndexPickDialog({
         <label className={styles.field}>
           <span>{t('gv.indexPick.search')}</span>
           <input
-            className={styles.textInput}
+            className={`field-control ${styles.textInput}`}
             type="search"
             value={query}
             onChange={(e) => setQuery(e.target.value)}

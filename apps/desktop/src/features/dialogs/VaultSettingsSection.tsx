@@ -162,7 +162,7 @@ export function VaultSettingsSection() {
       <label className={styles.field}>
         <span>{t('vault.attachmentsLabel')}</span>
         <select
-          className={styles.select}
+          className="field-control"
           value={mode}
           disabled={locked || !loaded}
           onChange={(e) => changeMode(e.target.value as AttachmentMode)}
@@ -194,7 +194,7 @@ export function VaultSettingsSection() {
         <label className={styles.field}>
           <span>{t(mode === 'subfolder' ? 'vault.subfolderName' : 'vault.folderPath')}</span>
           <input
-            className={styles.textInput}
+            className={`field-control ${styles.textInput}`}
             value={path}
             spellCheck={false}
             aria-invalid={error !== null}
@@ -218,7 +218,7 @@ export function VaultSettingsSection() {
         <span>{t('settings.links.label')}</span>
         <select
           id={formatId}
-          className={styles.select}
+          className="field-control"
           value={followsObsidian ? 'default' : effectiveFormat}
           disabled={!loaded}
           aria-describedby={formatHintId}
@@ -248,7 +248,7 @@ export function VaultSettingsSection() {
         <span>{t('vault.pageWidth')}</span>
         <select
           id={widthId}
-          className={styles.select}
+          className="field-control"
           value={vaultWidth ?? 'default'}
           disabled={!loaded}
           onChange={(e) =>
