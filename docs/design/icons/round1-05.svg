@@ -1,0 +1,42 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 100 100"><defs>
+    <linearGradient id="gTerra" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#c25a28"/><stop offset="1" stop-color="#8f3a14"/></linearGradient>
+    <linearGradient id="gPlum" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#5e3ba3"/><stop offset="1" stop-color="#36205f"/></linearGradient>
+    <linearGradient id="gInk" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#2d2a33"/><stop offset="1" stop-color="#16141a"/></linearGradient>
+    <linearGradient id="gLinen" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#f6efe3"/><stop offset="1" stop-color="#e6dac6"/></linearGradient>
+    <linearGradient id="gGold" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#e8b856"/><stop offset="1" stop-color="#c48a26"/></linearGradient>
+    <pattern id="weave" width="6" height="6" patternUnits="userSpaceOnUse"><rect width="6" height="6" fill="none"/><path d="M0 1.5h6M0 4.5h6" stroke="#d9cbb3" stroke-width="1"/><path d="M1.5 0v6M4.5 0v6" stroke="#cfbfa4" stroke-width=".7"/></pattern>
+    <pattern id="weaveDark" width="6" height="6" patternUnits="userSpaceOnUse"><path d="M0 1.5h6M0 4.5h6" stroke="rgba(255,255,255,.10)" stroke-width="1"/><path d="M1.5 0v6M4.5 0v6" stroke="rgba(255,255,255,.07)" stroke-width=".7"/></pattern>
+
+    <!-- 1 Woven LL -->
+    
+    <!-- 2 Linen-bound book -->
+    
+    <!-- 3 Folded linen strip forming an open book -->
+    
+    <!-- 4 Canvas page with a stitched thread -->
+    
+    <!-- 5 Etruscan-style script on linen (abstract, not real letters) -->
+    
+    <!-- 6 Codex stack with a ribbon -->
+    
+    <!-- 7 Loom: warp threads with a ribbon weft -->
+    
+    <!-- 8 Bookmark ribbon "L" on a blank page -->
+    
+    <!-- 9 Geometric open book -->
+    
+    <!-- 10 Rolled linen scroll -->
+    
+    <!-- 11 Thread knot drawing an L (linked notes) -->
+    
+    <!-- 12 Seal monogram -->
+    
+  </defs>
+      <rect width="100" height="100" rx="22" fill="#e9dcc6"/>
+      <rect width="100" height="100" rx="22" fill="url(#weave)"/>
+      <path d="M22 30h56M22 48h56M22 66h56" stroke="#cdb994" stroke-width="1"/>
+      <path d="M26 27l4-6 4 6M38 21v6l5-3M48 27l3-6 3 6m-6-2h6M60 21l5 6M65 21l-5 6M70 21v6h5" fill="none" stroke="#9e2f1d" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"/>
+      <path d="M26 45l5-6M31 39v6M37 39l4 6 4-6M50 39v6M50 42h5M60 45l3-6 3 6M70 39l5 3-5 3" fill="none" stroke="#9e2f1d" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"/>
+      <path d="M26 57v6l5-3M38 63l4-6 4 6M52 57v6M57 57v6M52 60h5M64 63l4-6M70 57l4 3-4 3" fill="none" stroke="#9e2f1d" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"/>
+      <path d="M22 76 Q30 80 38 76 T54 76 T70 76 T78 76" fill="none" stroke="#c49a6c" stroke-width="2"/>
+    </svg>

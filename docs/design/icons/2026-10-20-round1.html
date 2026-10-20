@@ -1,0 +1,158 @@
+<style>
+  .ic-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:16px; }
+  .ic { border:1px solid #e3ddd6; border-radius:14px; padding:14px; background:#fff; cursor:pointer; display:flex; flex-direction:column; gap:10px; }
+  .ic.selected { outline:3px solid #a8471c; outline-offset:-2px; }
+  .ic-row { display:flex; align-items:flex-end; gap:14px; }
+  .ic-big { width:128px; height:128px; filter:drop-shadow(0 8px 14px rgba(30,20,10,.22)); }
+  .ic-small { display:flex; flex-direction:column; gap:8px; }
+  .dock { display:flex; gap:10px; align-items:center; padding:7px 10px; border-radius:12px; }
+  .dock.light { background:#ece8e3; }
+  .dock.dark { background:#232127; }
+  .dock svg { width:40px; height:40px; filter:drop-shadow(0 2px 3px rgba(0,0,0,.25)); }
+  .dock svg.s16 { width:18px; height:18px; filter:none; }
+  .ic h3 { margin:0; font:700 15px system-ui; }
+  .ic p { margin:0; font:13px/1.45 system-ui; color:#5b524b; }
+  .ic .tag { font:600 11px system-ui; color:#8a7d72; letter-spacing:.04em; text-transform:uppercase; }
+</style>
+
+<h2>Liber Linteum: app icon concepts</h2>
+<p class="subtitle">12 directions. Each one is shown at 128 px, in a light and a dark Dock at 40 px, and at 18 px (Finder sidebar and tabs). Colours use the app's terracotta, plum, ink and a linen cream. Every concept can be recoloured. Click any you like (several is fine), then tell me in the terminal what to keep, combine or change.</p>
+
+<svg width="0" height="0" style="position:absolute">
+  <defs>
+    <linearGradient id="gTerra" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#c25a28"/><stop offset="1" stop-color="#8f3a14"/></linearGradient>
+    <linearGradient id="gPlum" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#5e3ba3"/><stop offset="1" stop-color="#36205f"/></linearGradient>
+    <linearGradient id="gInk" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#2d2a33"/><stop offset="1" stop-color="#16141a"/></linearGradient>
+    <linearGradient id="gLinen" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#f6efe3"/><stop offset="1" stop-color="#e6dac6"/></linearGradient>
+    <linearGradient id="gGold" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#e8b856"/><stop offset="1" stop-color="#c48a26"/></linearGradient>
+    <pattern id="weave" width="6" height="6" patternUnits="userSpaceOnUse"><rect width="6" height="6" fill="none"/><path d="M0 1.5h6M0 4.5h6" stroke="#d9cbb3" stroke-width="1"/><path d="M1.5 0v6M4.5 0v6" stroke="#cfbfa4" stroke-width=".7"/></pattern>
+    <pattern id="weaveDark" width="6" height="6" patternUnits="userSpaceOnUse"><path d="M0 1.5h6M0 4.5h6" stroke="rgba(255,255,255,.10)" stroke-width="1"/><path d="M1.5 0v6M4.5 0v6" stroke="rgba(255,255,255,.07)" stroke-width=".7"/></pattern>
+
+    <!-- 1 Woven LL -->
+    <symbol id="i1" viewBox="0 0 100 100">
+      <rect width="100" height="100" rx="22" fill="url(#gInk)"/>
+      <path d="M30 22v48h22" fill="none" stroke="#efe6d8" stroke-width="11" stroke-linecap="round" stroke-linejoin="round"/>
+      <path d="M48 30v48h22" fill="none" stroke="#c25a28" stroke-width="11" stroke-linecap="round" stroke-linejoin="round"/>
+      <path d="M30 52v8" stroke="#efe6d8" stroke-width="11" stroke-linecap="round"/>
+      <path d="M43 70h9" stroke="#efe6d8" stroke-width="11" stroke-linecap="butt"/>
+    </symbol>
+    <!-- 2 Linen-bound book -->
+    <symbol id="i2" viewBox="0 0 100 100">
+      <rect width="100" height="100" rx="22" fill="url(#gTerra)"/>
+      <rect x="24" y="18" width="52" height="66" rx="5" fill="url(#gLinen)"/>
+      <rect x="24" y="18" width="52" height="66" rx="5" fill="url(#weave)"/>
+      <rect x="24" y="18" width="9" height="66" rx="4" fill="#8f3a14" opacity=".85"/>
+      <rect x="42" y="38" width="26" height="4" rx="2" fill="#8f3a14"/>
+      <rect x="42" y="46" width="18" height="3" rx="1.5" fill="#b07a5c"/>
+    </symbol>
+    <!-- 3 Folded linen strip forming an open book -->
+    <symbol id="i3" viewBox="0 0 100 100">
+      <rect width="100" height="100" rx="22" fill="url(#gPlum)"/>
+      <path d="M50 30 L18 24 L18 74 L50 80 Z" fill="#efe6d8"/>
+      <path d="M50 30 L82 24 L82 74 L50 80 Z" fill="#dccdb6"/>
+      <path d="M50 30 L18 24 L18 74 L50 80 Z" fill="url(#weave)" opacity=".7"/>
+      <path d="M50 30 L82 24 L82 74 L50 80 Z" fill="url(#weave)" opacity=".7"/>
+      <path d="M26 38l17 3M26 46l17 3M26 54l13 2.4M57 41l17-3M57 49l17-3" stroke="#6b4fa8" stroke-width="2.4" stroke-linecap="round"/>
+    </symbol>
+    <!-- 4 Canvas page with a stitched thread -->
+    <symbol id="i4" viewBox="0 0 100 100">
+      <rect width="100" height="100" rx="22" fill="url(#gLinen)"/>
+      <rect width="100" height="100" rx="22" fill="url(#weave)"/>
+      <rect x="22" y="16" width="56" height="68" rx="6" fill="#fffaf2" stroke="#d7c7ac" stroke-width="1.5"/>
+      <path d="M32 30h36M32 40h36M32 50h24" stroke="#c8b89c" stroke-width="3" stroke-linecap="round"/>
+      <path d="M30 66 h6 m4 0 h6 m4 0 h6 m4 0 h6" stroke="#a8471c" stroke-width="3.2" stroke-linecap="round"/>
+      <path d="M70 66 C78 66 80 58 74 54" fill="none" stroke="#a8471c" stroke-width="2.4" stroke-linecap="round"/>
+      <path d="M71 50 l9 -9" stroke="#5a4b3f" stroke-width="2.6" stroke-linecap="round"/>
+    </symbol>
+    <!-- 5 Etruscan-style script on linen (abstract, not real letters) -->
+    <symbol id="i5" viewBox="0 0 100 100">
+      <rect width="100" height="100" rx="22" fill="#e9dcc6"/>
+      <rect width="100" height="100" rx="22" fill="url(#weave)"/>
+      <path d="M22 30h56M22 48h56M22 66h56" stroke="#cdb994" stroke-width="1"/>
+      <path d="M26 27l4-6 4 6M38 21v6l5-3M48 27l3-6 3 6m-6-2h6M60 21l5 6M65 21l-5 6M70 21v6h5" fill="none" stroke="#9e2f1d" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"/>
+      <path d="M26 45l5-6M31 39v6M37 39l4 6 4-6M50 39v6M50 42h5M60 45l3-6 3 6M70 39l5 3-5 3" fill="none" stroke="#9e2f1d" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"/>
+      <path d="M26 57v6l5-3M38 63l4-6 4 6M52 57v6M57 57v6M52 60h5M64 63l4-6M70 57l4 3-4 3" fill="none" stroke="#9e2f1d" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"/>
+      <path d="M22 76 Q30 80 38 76 T54 76 T70 76 T78 76" fill="none" stroke="#c49a6c" stroke-width="2"/>
+    </symbol>
+    <!-- 6 Codex stack with a ribbon -->
+    <symbol id="i6" viewBox="0 0 100 100">
+      <rect width="100" height="100" rx="22" fill="url(#gInk)"/>
+      <rect x="28" y="30" width="48" height="52" rx="5" fill="#6b4fa8"/>
+      <rect x="24" y="24" width="48" height="52" rx="5" fill="#c25a28"/>
+      <rect x="20" y="18" width="48" height="52" rx="5" fill="#efe6d8"/>
+      <rect x="20" y="18" width="48" height="52" rx="5" fill="url(#weave)" opacity=".6"/>
+      <path d="M54 18v24l6-5 6 5V18z" fill="#c25a28"/>
+    </symbol>
+    <!-- 7 Loom: warp threads with a ribbon weft -->
+    <symbol id="i7" viewBox="0 0 100 100">
+      <rect width="100" height="100" rx="22" fill="url(#gPlum)"/>
+      <path d="M28 18v64M38 18v64M48 18v64M58 18v64M68 18v64" stroke="#d8cfe8" stroke-width="3" stroke-linecap="round" opacity=".85"/>
+      <path d="M20 44 C28 40 30 50 38 46 S50 40 58 46 S70 50 80 44" fill="none" stroke="#e8b856" stroke-width="7" stroke-linecap="round"/>
+      <path d="M20 60 C28 56 30 66 38 62 S50 56 58 62 S70 66 80 60" fill="none" stroke="#efe6d8" stroke-width="7" stroke-linecap="round"/>
+    </symbol>
+    <!-- 8 Bookmark ribbon "L" on a blank page -->
+    <symbol id="i8" viewBox="0 0 100 100">
+      <rect width="100" height="100" rx="22" fill="#fbf7f0"/>
+      <rect x="20" y="14" width="60" height="72" rx="7" fill="#fff" stroke="#e3d7c3" stroke-width="2"/>
+      <path d="M38 14v52h30v-9l-5 4.5-5-4.5" fill="none" stroke="#a8471c" stroke-width="9" stroke-linejoin="round" stroke-linecap="butt"/>
+    </symbol>
+    <!-- 9 Geometric open book -->
+    <symbol id="i9" viewBox="0 0 100 100">
+      <rect width="100" height="100" rx="22" fill="url(#gTerra)"/>
+      <path d="M50 28 C40 22 28 22 18 26 V74 C28 70 40 70 50 76 Z" fill="#fbf2e4"/>
+      <path d="M50 28 C60 22 72 22 82 26 V74 C72 70 60 70 50 76 Z" fill="#efe1cb"/>
+      <path d="M50 28 V76" stroke="#8f3a14" stroke-width="2"/>
+    </symbol>
+    <!-- 10 Rolled linen scroll -->
+    <symbol id="i10" viewBox="0 0 100 100">
+      <rect width="100" height="100" rx="22" fill="url(#gInk)"/>
+      <path d="M30 30 H78 V70 H30 Z" fill="#efe6d8"/>
+      <path d="M30 30 H78 V70 H30 Z" fill="url(#weave)" opacity=".7"/>
+      <rect x="18" y="24" width="16" height="52" rx="8" fill="#d9cbb3"/>
+      <ellipse cx="26" cy="24" rx="8" ry="3.5" fill="#c4b393"/>
+      <path d="M44 42h26M44 50h26M44 58h18" stroke="#a8471c" stroke-width="3" stroke-linecap="round"/>
+    </symbol>
+    <!-- 11 Thread knot drawing an L (linked notes) -->
+    <symbol id="i11" viewBox="0 0 100 100">
+      <rect width="100" height="100" rx="22" fill="url(#gLinen)"/>
+      <path d="M34 18 C34 40 30 56 34 72 C36 80 50 80 64 76 C76 72 78 62 70 60 C60 58 56 70 66 74" fill="none" stroke="#a8471c" stroke-width="6" stroke-linecap="round"/>
+      <circle cx="34" cy="18" r="5" fill="#6b4fa8"/>
+      <circle cx="70" cy="60" r="4" fill="#6b4fa8"/>
+    </symbol>
+    <!-- 12 Seal monogram -->
+    <symbol id="i12" viewBox="0 0 100 100">
+      <rect width="100" height="100" rx="22" fill="url(#gLinen)"/>
+      <rect width="100" height="100" rx="22" fill="url(#weave)"/>
+      <circle cx="50" cy="52" r="30" fill="url(#gTerra)"/>
+      <circle cx="50" cy="52" r="24" fill="none" stroke="#f3d2bd" stroke-width="1.5" opacity=".7"/>
+      <path d="M42 38v28h18" fill="none" stroke="#fbeee4" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>
+      <path d="M46 34v28" stroke="#fbeee4" stroke-width="2.4" stroke-linecap="round" opacity=".6"/>
+    </symbol>
+  </defs>
+</svg>
+
+<div class="ic-grid">
+  <div class="ic" data-choice="1" onclick="toggleSelect(this)"><span class="tag">1 · Monogram</span><div class="ic-row"><svg class="ic-big"><use href="#i1"/></svg><div class="ic-small"><div class="dock light"><svg><use href="#i1"/></svg><svg class="s16"><use href="#i1"/></svg></div><div class="dock dark"><svg><use href="#i1"/></svg><svg class="s16"><use href="#i1"/></svg></div></div></div><h3>Woven LL</h3><p>Two Ls, linen and terracotta, crossed like warp and weft. Bold and readable small.</p></div>
+
+  <div class="ic" data-choice="2" onclick="toggleSelect(this)"><span class="tag">2 · Book</span><div class="ic-row"><svg class="ic-big"><use href="#i2"/></svg><div class="ic-small"><div class="dock light"><svg><use href="#i2"/></svg><svg class="s16"><use href="#i2"/></svg></div><div class="dock dark"><svg><use href="#i2"/></svg><svg class="s16"><use href="#i2"/></svg></div></div></div><h3>Linen-bound book</h3><p>A notebook with a woven-linen cover and a spine. The literal "linen book", warm and familiar.</p></div>
+
+  <div class="ic" data-choice="3" onclick="toggleSelect(this)"><span class="tag">3 · Book</span><div class="ic-row"><svg class="ic-big"><use href="#i3"/></svg><div class="ic-small"><div class="dock light"><svg><use href="#i3"/></svg><svg class="s16"><use href="#i3"/></svg></div><div class="dock dark"><svg><use href="#i3"/></svg><svg class="s16"><use href="#i3"/></svg></div></div></div><h3>Folded linen</h3><p>A strip of cloth folded into an open book. A nod to the Etruscan book, which was folded linen.</p></div>
+
+  <div class="ic" data-choice="4" onclick="toggleSelect(this)"><span class="tag">4 · Canvas</span><div class="ic-row"><svg class="ic-big"><use href="#i4"/></svg><div class="ic-small"><div class="dock light"><svg><use href="#i4"/></svg><svg class="s16"><use href="#i4"/></svg></div><div class="dock dark"><svg><use href="#i4"/></svg><svg class="s16"><use href="#i4"/></svg></div></div></div><h3>Canvas & stitch</h3><p>A page on a linen background, signed off with a running stitch and a needle. "Lienzo", plus craft.</p></div>
+
+  <div class="ic" data-choice="5" onclick="toggleSelect(this)"><span class="tag">5 · Script</span><div class="ic-row"><svg class="ic-big"><use href="#i5"/></svg><div class="ic-small"><div class="dock light"><svg><use href="#i5"/></svg><svg class="s16"><use href="#i5"/></svg></div><div class="dock dark"><svg><use href="#i5"/></svg><svg class="s16"><use href="#i5"/></svg></div></div></div><h3>Ancient script</h3><p>Abstract archaic letters in red ink on ruled linen, like the original artefact. Beautiful at 128 px, busy at 18 px.</p></div>
+
+  <div class="ic" data-choice="6" onclick="toggleSelect(this)"><span class="tag">6 · Codex</span><div class="ic-row"><svg class="ic-big"><use href="#i6"/></svg><div class="ic-small"><div class="dock light"><svg><use href="#i6"/></svg><svg class="s16"><use href="#i6"/></svg></div><div class="dock dark"><svg><use href="#i6"/></svg><svg class="s16"><use href="#i6"/></svg></div></div></div><h3>Codex stack</h3><p>Three stacked pages in the palette's colours with a bookmark ribbon. Many notes, one place.</p></div>
+
+  <div class="ic" data-choice="7" onclick="toggleSelect(this)"><span class="tag">7 · Weave</span><div class="ic-row"><svg class="ic-big"><use href="#i7"/></svg><div class="ic-small"><div class="dock light"><svg><use href="#i7"/></svg><svg class="s16"><use href="#i7"/></svg></div><div class="dock dark"><svg><use href="#i7"/></svg><svg class="s16"><use href="#i7"/></svg></div></div></div><h3>Loom</h3><p>Warp threads with two weft ribbons running through: ideas woven together. Abstract and distinctive.</p></div>
+
+  <div class="ic" data-choice="8" onclick="toggleSelect(this)"><span class="tag">8 · Minimal</span><div class="ic-row"><svg class="ic-big"><use href="#i8"/></svg><div class="ic-small"><div class="dock light"><svg><use href="#i8"/></svg><svg class="s16"><use href="#i8"/></svg></div><div class="dock dark"><svg><use href="#i8"/></svg><svg class="s16"><use href="#i8"/></svg></div></div></div><h3>Ribbon L</h3><p>A bookmark ribbon bent into an L across a blank page. Quiet and modern, close to the macOS Notes style.</p></div>
+
+  <div class="ic" data-choice="9" onclick="toggleSelect(this)"><span class="tag">9 · Book</span><div class="ic-row"><svg class="ic-big"><use href="#i9"/></svg><div class="ic-small"><div class="dock light"><svg><use href="#i9"/></svg><svg class="s16"><use href="#i9"/></svg></div><div class="dock dark"><svg><use href="#i9"/></svg><svg class="s16"><use href="#i9"/></svg></div></div></div><h3>Open book</h3><p>A simple open book on terracotta. Instantly readable at any size, but the least distinctive.</p></div>
+
+  <div class="ic" data-choice="10" onclick="toggleSelect(this)"><span class="tag">10 · Scroll</span><div class="ic-row"><svg class="ic-big"><use href="#i10"/></svg><div class="ic-small"><div class="dock light"><svg><use href="#i10"/></svg><svg class="s16"><use href="#i10"/></svg></div><div class="dock dark"><svg><use href="#i10"/></svg><svg class="s16"><use href="#i10"/></svg></div></div></div><h3>Linen roll</h3><p>A roll of linen unrolling into a page of notes, on ink. Old-world feel, still clean.</p></div>
+
+  <div class="ic" data-choice="11" onclick="toggleSelect(this)"><span class="tag">11 · Thread</span><div class="ic-row"><svg class="ic-big"><use href="#i11"/></svg><div class="ic-small"><div class="dock light"><svg><use href="#i11"/></svg><svg class="s16"><use href="#i11"/></svg></div><div class="dock dark"><svg><use href="#i11"/></svg><svg class="s16"><use href="#i11"/></svg></div></div></div><h3>Thread L</h3><p>A single thread drawing an L that loops into a knot, with two plum "notes" at its ends. Linked notes, made of thread.</p></div>
+
+  <div class="ic" data-choice="12" onclick="toggleSelect(this)"><span class="tag">12 · Seal</span><div class="ic-row"><svg class="ic-big"><use href="#i12"/></svg><div class="ic-small"><div class="dock light"><svg><use href="#i12"/></svg><svg class="s16"><use href="#i12"/></svg></div><div class="dock dark"><svg><use href="#i12"/></svg><svg class="s16"><use href="#i12"/></svg></div></div></div><h3>Wax seal</h3><p>A terracotta seal stamped with an L on linen. Private, sealed: fits the encryption story.</p></div>
+</div>

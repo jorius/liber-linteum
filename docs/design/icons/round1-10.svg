@@ -1,0 +1,41 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 100 100"><defs>
+    <linearGradient id="gTerra" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#c25a28"/><stop offset="1" stop-color="#8f3a14"/></linearGradient>
+    <linearGradient id="gPlum" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#5e3ba3"/><stop offset="1" stop-color="#36205f"/></linearGradient>
+    <linearGradient id="gInk" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#2d2a33"/><stop offset="1" stop-color="#16141a"/></linearGradient>
+    <linearGradient id="gLinen" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#f6efe3"/><stop offset="1" stop-color="#e6dac6"/></linearGradient>
+    <linearGradient id="gGold" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#e8b856"/><stop offset="1" stop-color="#c48a26"/></linearGradient>
+    <pattern id="weave" width="6" height="6" patternUnits="userSpaceOnUse"><rect width="6" height="6" fill="none"/><path d="M0 1.5h6M0 4.5h6" stroke="#d9cbb3" stroke-width="1"/><path d="M1.5 0v6M4.5 0v6" stroke="#cfbfa4" stroke-width=".7"/></pattern>
+    <pattern id="weaveDark" width="6" height="6" patternUnits="userSpaceOnUse"><path d="M0 1.5h6M0 4.5h6" stroke="rgba(255,255,255,.10)" stroke-width="1"/><path d="M1.5 0v6M4.5 0v6" stroke="rgba(255,255,255,.07)" stroke-width=".7"/></pattern>
+
+    <!-- 1 Woven LL -->
+    
+    <!-- 2 Linen-bound book -->
+    
+    <!-- 3 Folded linen strip forming an open book -->
+    
+    <!-- 4 Canvas page with a stitched thread -->
+    
+    <!-- 5 Etruscan-style script on linen (abstract, not real letters) -->
+    
+    <!-- 6 Codex stack with a ribbon -->
+    
+    <!-- 7 Loom: warp threads with a ribbon weft -->
+    
+    <!-- 8 Bookmark ribbon "L" on a blank page -->
+    
+    <!-- 9 Geometric open book -->
+    
+    <!-- 10 Rolled linen scroll -->
+    
+    <!-- 11 Thread knot drawing an L (linked notes) -->
+    
+    <!-- 12 Seal monogram -->
+    
+  </defs>
+      <rect width="100" height="100" rx="22" fill="url(#gInk)"/>
+      <path d="M30 30 H78 V70 H30 Z" fill="#efe6d8"/>
+      <path d="M30 30 H78 V70 H30 Z" fill="url(#weave)" opacity=".7"/>
+      <rect x="18" y="24" width="16" height="52" rx="8" fill="#d9cbb3"/>
+      <ellipse cx="26" cy="24" rx="8" ry="3.5" fill="#c4b393"/>
+      <path d="M44 42h26M44 50h26M44 58h18" stroke="#a8471c" stroke-width="3" stroke-linecap="round"/>
+    </svg>
