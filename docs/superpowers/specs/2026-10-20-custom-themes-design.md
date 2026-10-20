@@ -99,3 +99,23 @@ Today, Settings → Appearance offers 8 built-in palettes plus "Custom accent". 
 ## 6. Open for Jose
 
 - **Secondary's uses:** tags, manual relationship lines and the favourite ★. This is my call; say if you'd rather it colour something else, e.g. callouts or the Global View cards.
+
+## 7. As built (2026-10-20)
+
+Built on `feat/themes` (plan `docs/superpowers/plans/2026-10-20-custom-themes.md`, 6 tasks). The gate passes: vitest 1681, e2e 391 passed and 12 skipped (Chromium and WebKit), cargo 732 passed and 5 ignored, plus lint, typecheck, i18n, fmt, clippy and deny.
+
+Rulings made while building:
+
+1. **Secondary per palette.** Manual relationship lines now follow each palette's secondary instead of one fixed orange (`MANUAL_EDGE` is gone).
+   - Ink's secondary equals its accent (Ink is monochrome).
+   - Built-in secondaries were hand-tuned with hues lavender 55, graphite 200, rosewood 165, saffron 255, persimmon 230, midnight 65 and sepia 190, then tested against these floors in both modes: surface ≥ 4.5, tag tint ≥ 4.5, canvas ≥ 3, star on the sidebar ≥ 3.
+2. **The tag tint** is `mix(surface, secondary, 0.12)`. On the always-dark sidebar the star uses the dark-mode secondary (`--color-sidebar-secondary`).
+3. **"Fill the rest" seeds each mode from that mode's own primary,** so a hand-set dark primary drives the dark colours.
+4. **Settings shape.** `palette` stays the Rust enum (`custom`), plus `customTheme` (an id) and `customThemes`. A `customTheme: ""` patch clears the selection. One bad theme in settings.json is dropped and the rest are kept.
+5. **Migration** runs only when `palette` is `custom` and there are no themes yet. A deleted selection falls back to Lavender and never brings the old accent back.
+6. **Fold.** Accents (selection tint, highlight, code) fold behind "Show 3 more colours". Brand, Surfaces and Text stay open, following mock A, which shows Text open (§3 had said "the first two groups").
+7. **Delete confirms inline** in the editor rather than in a dialog over Settings.
+8. **"Import…"** sits next to "New theme" so it is always reachable.
+9. **A valid hex saves as it is typed** (debounced), so closing Settings keeps it.
+10. **Mermaid's diagram cache key** uses the selected theme's colours instead of `accentColor`.
+11. **The export and import commands** carry a `// seam: outside` note on each file-system line, for the E2 storage seam guard.
