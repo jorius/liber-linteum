@@ -3,6 +3,7 @@
 //! encrypted name.
 
 mod names;
+mod watch;
 mod write;
 
 use super::plain::{canonical_root, mtime_ns, replace_atomic};
@@ -49,8 +50,8 @@ struct Keys {
 pub struct EncryptedStorage {
     /// Canonical.
     root: PathBuf,
-    /// `None` once locked.
-    keys: Mutex<Option<Keys>>,
+    /// `None` once locked. Shared with the watcher.
+    keys: Arc<Mutex<Option<Keys>>>,
     header: Mutex<VaultHeader>,
     /// Decrypted names: dropped on lock with the keys. Shared with each file
     /// being written ([`write::Pending`]), which invalidates its folder on commit.
@@ -167,7 +168,7 @@ impl EncryptedStorage {
     fn new(root: PathBuf, header: VaultHeader, unlocked: Unlocked) -> Self {
         EncryptedStorage {
             root,
-            keys: Mutex::new(Some(Keys { unlocked })),
+            keys: Arc::new(Mutex::new(Some(Keys { unlocked }))),
             header: Mutex::new(header),
             cache: Arc::new(Mutex::new(Cache::default())),
         }
@@ -181,6 +182,19 @@ impl EncryptedStorage {
 
     pub fn is_locked(&self) -> bool {
         lock(&self.keys).is_none()
+    }
+
+    /// Physical paths whose names couldn't be read on the last listing, with
+    /// the reason. Never deleted by any operation.
+    pub fn unreadable(&self) -> Vec<(PathBuf, String)> {
+        // A folder moved or removed since its listing leaves stale paths: skipped.
+        lock(&self.cache)
+            .unreadable
+            .values()
+            .flatten()
+            .filter(|(p, _)| p.symlink_metadata().is_ok())
+            .cloned()
+            .collect()
     }
 
     pub fn vault_id(&self) -> [u8; 16] {
@@ -279,7 +293,7 @@ fn load<'c>(
             Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(None),
             Err(e) => return Err(io_err(dir, e)),
         };
-        cache.listings.insert(dir.to_string(), listing);
+        cache.insert(dir.to_string(), physical, listing);
     }
     Ok(cache.listings.get(dir))
 }
@@ -369,8 +383,13 @@ impl Storage for EncryptedStorage {
                     });
                 }
             }
-            out.extend(listing.unreadable.iter().cloned().map(Child::Unreadable));
-            cache.listings.insert(canon, listing);
+            out.extend(listing.unreadable.iter().map(|(p, reason)| {
+                Child::Unreadable(format!(
+                    "{}: couldn't read the name ({reason})",
+                    p.display()
+                ))
+            }));
+            cache.insert(canon, &entry.physical, listing);
             Ok(out)
         })
     }
@@ -466,10 +485,8 @@ impl Storage for EncryptedStorage {
         .unwrap_or(false)
     }
 
-    fn watch(&self, _recursive: bool, _sink: Box<dyn Fn(RawEvent) + Send>) -> Result<WatchGuard> {
-        Err(VaultError::Watch(
-            "not yet supported in encrypted vaults".into(),
-        ))
+    fn watch(&self, recursive: bool, sink: Box<dyn Fn(RawEvent) + Send>) -> Result<WatchGuard> {
+        watch::watch(self, recursive, sink)
     }
 }
 

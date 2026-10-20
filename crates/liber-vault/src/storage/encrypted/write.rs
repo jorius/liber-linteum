@@ -4,13 +4,13 @@
 //! only: a file's content is moved, never rewritten, and a folder keeps its id,
 //! so its children are untouched.
 
-use super::names::{Cache, Entry, side_file};
+use super::names::{Cache, Entry, one_component, side_file};
 use super::{EncryptedStorage, load, lock};
 use crate::error::{Result, VaultError, io_err};
 use crate::path::VaultPath;
 use crate::storage::plain::sync_dir;
 use crate::storage::{NewFile, Replace};
-use liber_crypto::{FolderId, LONG_NAME_LIMIT, NameCodec, StreamWriter, Unlocked};
+use liber_crypto::{FolderId, NameCodec, ShortName, StreamWriter, Unlocked, shorten};
 use std::fs::File;
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
@@ -34,6 +34,8 @@ pub(super) struct Pending {
     w: Option<StreamWriter<Sink>>,
     tmp: PathBuf,
     target: PathBuf,
+    /// A new long name's side file, written just before the rename.
+    side: Option<ShortName>,
     create_only: bool,
     /// The logical path, for errors.
     path: String,
@@ -101,10 +103,12 @@ impl Pending {
             if self.create_only && self.target.symlink_metadata().is_ok() {
                 return Err(std::io::ErrorKind::AlreadyExists.into());
             }
-            std::fs::rename(&self.tmp, &self.target)?;
-            if let Some(parent) = self.target.parent() {
-                sync_dir(parent);
+            let parent = self.target.parent().unwrap_or(Path::new("."));
+            if let Some(side) = &self.side {
+                write_side(parent, side)?;
             }
+            std::fs::rename(&self.tmp, &self.target)?;
+            sync_dir(parent);
             Ok(())
         })()
         .map_err(|e| io_err(&*self.path, e))?;
@@ -130,25 +134,46 @@ fn invalid(path: &VaultPath, why: impl std::fmt::Display) -> VaultError {
 }
 
 /// The on-disk name for `name` in the folder `parent`: a folder's (`folder` is
-/// its id) or a file's, under the current epoch's K_name.
+/// its id) or a file's, under the current epoch's K_name. A long one comes with
+/// the side file to write before the entry (format §14.5).
 fn encode(
     u: &Unlocked,
     parent: &FolderId,
     name: &str,
     folder: Option<FolderId>,
     path: &VaultPath,
-) -> Result<String> {
+) -> Result<(String, Option<ShortName>)> {
+    // A name a listing would refuse (`names::decode`) is refused here too.
+    if !one_component(name) {
+        return Err(invalid(path, "not a single name, or has a ':'"));
+    }
     let codec = NameCodec::new(&u.subkeys().name, u.vault_id(), u.epoch());
     let encoded = match folder {
         Some(id) => codec.encrypt_folder(parent, &id, name),
         None => codec.encrypt_file(parent, name),
     }
     .map_err(|e| invalid(path, e))?;
-    // shortcut: long names (format §14.5) are refused until E3 Task 3 writes `.liberl`.
-    if encoded.len() > LONG_NAME_LIMIT {
-        return Err(invalid(path, "too long"));
+    Ok(match shorten(&encoded) {
+        Some(short) => (short.on_disk.clone(), Some(short)),
+        None => (encoded, None),
+    })
+}
+
+/// Writes a long name's side file into the physical folder `parent`, via a temp
+/// name. Called only once the entry's own name is known to be free, so what it
+/// replaces is an orphan (a failed write's), never a listed entry's side file.
+fn write_side(parent: &Path, short: &ShortName) -> std::io::Result<()> {
+    let tmp = parent.join(temp_name());
+    let r = (|| {
+        let mut f = File::options().write(true).create_new(true).open(&tmp)?;
+        f.write_all(short.side_contents.as_bytes())?;
+        f.sync_all()?;
+        std::fs::rename(&tmp, parent.join(&short.side_file))
+    })();
+    if r.is_err() {
+        let _ = std::fs::remove_file(&tmp);
     }
-    Ok(encoded)
+    r
 }
 
 /// `.<32 random hex>.liber-tmp`: a leading `.`, so listings skip it.
@@ -169,7 +194,7 @@ fn parent_of(canon: &str) -> &str {
 
 /// Drops what the cache knows of the entry `canon` after it moved or went: its
 /// parent's listing and, for a folder, every listing under it.
-fn forget(cache: &mut Cache, canon: &str) {
+pub(super) fn forget(cache: &mut Cache, canon: &str) {
     cache.listings.remove(parent_of(canon));
     let below = format!("{canon}/");
     cache
@@ -206,15 +231,18 @@ impl EncryptedStorage {
     }
 
     /// A temp file in `t`'s folder, its header already written, bound for `target`.
+    /// It commits as `CreateOnly` unless `target` is `t`'s resolved entry: never
+    /// replacing a file at a new name (an unreadable duplicate can share it).
     fn pending(
         &self,
         u: &Unlocked,
         path: &VaultPath,
         t: Target,
         target: PathBuf,
-        create_only: bool,
+        side: Option<ShortName>,
         budget: u64,
     ) -> Result<Pending> {
+        let create_only = t.existing.is_none();
         let tmp = t.parent.join(temp_name());
         let file = File::options()
             .write(true)
@@ -225,6 +253,7 @@ impl EncryptedStorage {
             w: None,
             tmp,
             target,
+            side,
             create_only,
             path: path.to_string(),
             dir: t.dir,
@@ -248,21 +277,22 @@ impl EncryptedStorage {
     ) -> Result<()> {
         let mut p = self.with_keys(|u, cache| {
             let t = self.target(u, cache, path)?;
-            let target = match &t.existing {
+            let (target, side) = match &t.existing {
                 Some(_) if mode == Replace::CreateOnly => {
                     return Err(VaultError::AlreadyExists(path.to_string()));
                 }
                 Some((_, e)) if e.folder.is_some() => {
                     return Err(VaultError::AlreadyExists(format!("{path} is a folder")));
                 }
-                // Onto the existing name, even a case-folded match: one atomic rename.
-                Some((_, e)) => e.physical.clone(),
-                None => t.parent.join(encode(u, &t.id, &t.name, None, path)?),
+                // Onto the existing name, even a case-folded match or a conflict
+                // copy: one atomic rename, and a long name's side file stays valid.
+                Some((_, e)) => (e.physical.clone(), None),
+                None => {
+                    let (name, side) = encode(u, &t.id, &t.name, None, path)?;
+                    (t.parent.join(name), side)
+                }
             };
-            // No resolved entry: never replace a file at that name (an unreadable
-            // duplicate can share it), so commit as `CreateOnly`.
-            let create_only = mode == Replace::CreateOnly || t.existing.is_none();
-            self.pending(u, path, t, target, create_only, budget)
+            self.pending(u, path, t, target, side, budget)
         })?;
         // The keys aren't held while `from` streams: `p` has its own file key.
         std::io::copy(from, &mut p).map_err(|e| io_err(path.as_str(), e))?;
@@ -288,8 +318,9 @@ impl EncryptedStorage {
             if t.existing.is_some() {
                 return Err(VaultError::AlreadyExists(path.to_string()));
             }
-            let target = t.parent.join(encode(u, &t.id, &t.name, None, path)?);
-            self.pending(u, path, t, target, true, u64::MAX)
+            let (name, side) = encode(u, &t.id, &t.name, None, path)?;
+            let target = t.parent.join(name);
+            self.pending(u, path, t, target, side, u64::MAX)
         })
     }
 
@@ -299,8 +330,10 @@ impl EncryptedStorage {
             if t.existing.is_some() {
                 return Err(VaultError::AlreadyExists(path.to_string()));
             }
-            let name = encode(u, &t.id, &t.name, Some(FolderId::random()), path)?;
-            std::fs::create_dir(t.parent.join(name)).map_err(|e| io_err(path.as_str(), e))?;
+            let (name, side) = encode(u, &t.id, &t.name, Some(FolderId::random()), path)?;
+            let dst = t.parent.join(name);
+            place(&t.parent, &dst, side.as_ref(), || std::fs::create_dir(&dst))
+                .map_err(|e| io_err(path.as_str(), e))?;
             cache.listings.remove(&t.dir);
             Ok(())
         })
@@ -322,7 +355,11 @@ impl EncryptedStorage {
             } else {
                 std::fs::remove_file(&e.physical)
             }
-            .map_err(|err| io_err(path.as_str(), err))?;
+            .map_err(|err| match err.kind() {
+                // Unreadable entries count: they are never deleted.
+                std::io::ErrorKind::DirectoryNotEmpty => VaultError::NotEmpty(path.to_string()),
+                _ => io_err(path.as_str(), err),
+            })?;
             remove_side(&e.physical);
             forget(cache, &canon);
             Ok(())
@@ -345,16 +382,18 @@ impl EncryptedStorage {
                     return Err(VaultError::AlreadyExists(to.to_string()));
                 }
             }
-            let dst = t.parent.join(encode(u, &t.id, &t.name, e.folder, to)?);
+            let (name, side) = encode(u, &t.id, &t.name, e.folder, to)?;
+            let dst = t.parent.join(name);
             // `rename` would silently replace a file there (a duplicate name).
             if dst.symlink_metadata().is_ok() {
                 return Err(VaultError::AlreadyExists(to.to_string()));
             }
-            std::fs::rename(&e.physical, &dst).map_err(|err| io_err(from.as_str(), err))?;
+            place(&t.parent, &dst, side.as_ref(), || {
+                std::fs::rename(&e.physical, &dst)
+            })
+            .map_err(|err| io_err(from.as_str(), err))?;
             remove_side(&e.physical);
-            if let Some(parent) = dst.parent() {
-                sync_dir(parent);
-            }
+            sync_dir(&t.parent);
             forget(cache, &canon);
             cache.listings.remove(&t.dir);
             Ok(())
@@ -381,6 +420,24 @@ impl EncryptedStorage {
             Ok(())
         })
     }
+}
+
+/// Creates the new entry `dst` in the physical folder `parent` with `make`,
+/// writing its long name's side file first so a listed entry always has one.
+fn place(
+    parent: &Path,
+    dst: &Path,
+    side: Option<&ShortName>,
+    make: impl FnOnce() -> std::io::Result<()>,
+) -> std::io::Result<()> {
+    // The side file only for a free name: never over a listed entry's.
+    if dst.symlink_metadata().is_ok() {
+        return Err(std::io::ErrorKind::AlreadyExists.into());
+    }
+    if let Some(side) = side {
+        write_side(parent, side)?;
+    }
+    make()
 }
 
 /// A removed or moved long-named entry's side file goes with it; a leftover one

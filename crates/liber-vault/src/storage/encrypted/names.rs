@@ -1,8 +1,9 @@
 //! Logical ↔ physical names (spec §4.3, format §14): each physical folder's listing is
 //! decrypted once and cached under its logical path.
 
-use liber_crypto::{FolderId, NameCodec, Unlocked};
-use std::collections::HashMap;
+use liber_crypto::{FolderId, NameCodec, Unlocked, shorten, strip_conflict};
+use std::collections::{BTreeMap, HashMap};
+use std::io::Read;
 use std::path::{Component, Path, PathBuf};
 use unicode_normalization::UnicodeNormalization;
 
@@ -18,8 +19,8 @@ pub(super) struct Entry {
 #[derive(Debug)]
 pub(super) struct Listing {
     pub entries: HashMap<String, Entry>,
-    /// `Child::Unreadable` messages, one per entry whose name won't decrypt.
-    pub unreadable: Vec<String>,
+    /// Each entry whose name won't decrypt: its physical path and why.
+    pub unreadable: Vec<(PathBuf, String)>,
 }
 
 impl Listing {
@@ -54,10 +55,22 @@ pub(super) struct Cache {
     pub listings: HashMap<String, Listing>,
     /// Physical file → (mtime_ns, size, plaintext length).
     pub lens: HashMap<PathBuf, (i128, u64, u64)>,
+    /// Physical folder → its last listing's unreadable entries. Kept when the
+    /// listing itself is dropped, so writes elsewhere don't hide them.
+    pub unreadable: BTreeMap<PathBuf, Vec<(PathBuf, String)>>,
+}
+
+impl Cache {
+    /// Caches `listing`, read from the physical folder `physical`, as the folder `dir`.
+    pub fn insert(&mut self, dir: String, physical: &Path, listing: Listing) {
+        self.unreadable
+            .insert(physical.to_path_buf(), listing.unreadable.clone());
+        self.listings.insert(dir, listing);
+    }
 }
 
 /// Name codecs to try: the current epoch's, then (mid-rotation) the retiring one's.
-fn codecs(u: &Unlocked) -> Vec<NameCodec<'_>> {
+pub(super) fn codecs(u: &Unlocked) -> Vec<NameCodec<'_>> {
     let mut out = vec![NameCodec::new(&u.subkeys().name, u.vault_id(), u.epoch())];
     if let Some((epoch, keys)) = u.retiring() {
         out.push(NameCodec::new(&keys.name, u.vault_id(), epoch));
@@ -65,11 +78,93 @@ fn codecs(u: &Unlocked) -> Vec<NameCodec<'_>> {
     out
 }
 
-/// A decrypted name is used only as exactly one normal path component
-/// (E1 hand-off §5: on Windows `C:x` would otherwise carry a prefix).
-fn one_component(name: &str) -> bool {
+/// A name is used only as exactly one normal path component (E1 hand-off §5: on
+/// Windows `C:x` would otherwise carry a prefix), and never with a `:`, so a vault
+/// lists the same on every OS.
+pub(super) fn one_component(name: &str) -> bool {
     let mut c = Path::new(name).components();
-    matches!((c.next(), c.next()), (Some(Component::Normal(_)), None))
+    matches!((c.next(), c.next()), (Some(Component::Normal(_)), None)) && !name.contains(':')
+}
+
+/// A long name's side file (or a sync copy of one): never an entry itself.
+pub(super) fn is_side(on_disk: &str) -> bool {
+    on_disk.ends_with(".libern")
+        || strip_conflict(on_disk).is_some_and(|c| c.original.ends_with(".libern"))
+}
+
+/// Side files longer than this are unreadable (format §14.5: bounded before reading).
+const SIDE_MAX: u64 = 2048;
+
+/// The decrypted name and, for a folder, its id behind `on_disk` in the physical
+/// folder `dir` whose id is `id`; else why not. A sync conflict copy decrypts as
+/// its original, named `<stem> (conflict <label>)<.ext>`.
+pub(super) fn decode(
+    codecs: &[NameCodec<'_>],
+    dir: &Path,
+    id: &FolderId,
+    on_disk: &str,
+) -> Result<(String, Option<FolderId>), String> {
+    let (name, folder) = match decode_exact(codecs, dir, id, on_disk) {
+        Err(reason) => {
+            let c = strip_conflict(on_disk).ok_or(reason.clone())?;
+            let (name, folder) = decode_exact(codecs, dir, id, &c.original).map_err(|_| reason)?;
+            (conflict_name(&name, &c.label, folder.is_none()), folder)
+        }
+        ok => ok?,
+    };
+    if !one_component(&name) {
+        return Err("not a single name".into());
+    }
+    Ok((name, folder))
+}
+
+/// `decode` without conflict suffixes: the kind comes from the encoded name
+/// (a file's ends in `.libere`).
+fn decode_exact(
+    codecs: &[NameCodec<'_>],
+    dir: &Path,
+    id: &FolderId,
+    on_disk: &str,
+) -> Result<(String, Option<FolderId>), String> {
+    let encoded = match on_disk.strip_suffix(".liberl") {
+        Some(_) => read_side(dir, on_disk)?,
+        None => on_disk.to_string(),
+    };
+    if encoded.ends_with(".libere") {
+        first_ok(codecs, |c| c.decrypt_file(id, &encoded)).map(|name| (name, None))
+    } else {
+        first_ok(codecs, |c| c.decrypt_folder(id, &encoded)).map(|(fid, name)| (name, Some(fid)))
+    }
+}
+
+/// The encoded name in `on_disk`'s side file, which must hash to `on_disk` (format §14.5).
+fn read_side(dir: &Path, on_disk: &str) -> Result<String, String> {
+    let side = side_file(&dir.join(on_disk)).ok_or("not a long name")?;
+    // Never follow a link.
+    if !side.symlink_metadata().is_ok_and(|m| m.is_file()) {
+        return Err("side file missing".into());
+    }
+    let mut buf = Vec::new();
+    std::fs::File::open(&side)
+        .and_then(|f| f.take(SIDE_MAX + 1).read_to_end(&mut buf))
+        .map_err(|e| format!("side file: {e}"))?;
+    if buf.len() as u64 > SIDE_MAX {
+        return Err("side file too large".into());
+    }
+    let encoded = String::from_utf8(buf).map_err(|_| "side file is not text")?;
+    if shorten(&encoded).is_none_or(|s| s.on_disk != on_disk) {
+        return Err("side file does not match its entry".into());
+    }
+    Ok(encoded)
+}
+
+/// `n.md` → `n (conflict <label>).md`; a folder's name keeps any dot as is.
+fn conflict_name(name: &str, label: &str, file: bool) -> String {
+    let (stem, ext) = match name.rfind('.') {
+        Some(i) if file && i > 0 => name.split_at(i),
+        _ => (name, ""),
+    };
+    format!("{stem} (conflict {label}){ext}")
 }
 
 /// Reads and decrypts the physical folder `physical`, whose folder id is `id`.
@@ -79,41 +174,34 @@ pub(super) fn list(u: &Unlocked, physical: &Path, id: FolderId) -> std::io::Resu
         entries: HashMap::new(),
         unreadable: Vec::new(),
     };
-    let unreadable = |path: &Path, reason: &str| {
-        format!("{}: couldn't read the name ({reason})", path.display())
-    };
     let mut named: HashMap<String, Vec<Entry>> = HashMap::new();
     for item in std::fs::read_dir(physical)? {
         let item = item?;
         let path = item.path();
         let Some(on_disk) = item.file_name().to_str().map(str::to_owned) else {
-            listing
-                .unreadable
-                .push(format!("{}: name is not UTF-8", path.display()));
+            listing.unreadable.push((path, "name is not UTF-8".into()));
             continue;
         };
         // Encoded names never start with `.`: these are OS files and in-flight temp files.
-        if on_disk.starts_with('.') {
+        if on_disk.starts_with('.') || is_side(&on_disk) {
             continue;
         }
         let Ok(ft) = item.file_type() else { continue };
-        let decrypted = if ft.is_dir() {
-            first_ok(&codecs, |c| c.decrypt_folder(&id, &on_disk))
-                .map(|(fid, name)| (name, Some(fid)))
-        } else if ft.is_file() {
-            first_ok(&codecs, |c| c.decrypt_file(&id, &on_disk)).map(|name| (name, None))
+        let decoded = if ft.is_dir() || ft.is_file() {
+            decode(&codecs, physical, &id, &on_disk).and_then(|(name, folder)| {
+                (folder.is_some() == ft.is_dir())
+                    .then_some((name, folder))
+                    .ok_or_else(|| "a file named as a folder, or the reverse".into())
+            })
         } else {
-            Err("not a file or folder".to_string())
+            Err("not a file or folder".into())
         };
-        match decrypted {
-            Ok((name, _)) if !one_component(&name) => listing
-                .unreadable
-                .push(unreadable(&path, "not a single name")),
+        match decoded {
             Ok((name, folder)) => named.entry(name).or_default().push(Entry {
                 physical: path,
                 folder,
             }),
-            Err(reason) => listing.unreadable.push(unreadable(&path, &reason)),
+            Err(reason) => listing.unreadable.push((path, reason)),
         }
     }
     // Two entries with one name: neither wins, so the result doesn't depend on `read_dir` order.
@@ -123,7 +211,7 @@ pub(super) fn list(u: &Unlocked, physical: &Path, id: FolderId) -> std::io::Resu
         } else {
             let reason = format!("another entry is also named {name:?}");
             for e in found {
-                listing.unreadable.push(unreadable(&e.physical, &reason));
+                listing.unreadable.push((e.physical, reason.clone()));
             }
         }
     }
