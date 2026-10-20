@@ -26,7 +26,7 @@ impl Argon2Params {
         t: 3,
         p: 4,
     };
-    pub const MAX_M_KIB: u32 = 4_194_304;
+    pub const MAX_M_KIB: u32 = 1_048_576;
     pub const MAX_T: u32 = 32;
     pub const MAX_P: u32 = 16;
 
@@ -73,9 +73,13 @@ impl Argon2Params {
 
 /// Argon2id over the NFC-normalised passphrase (never trimmed), straight into a heap buffer.
 pub fn passphrase_kek(passphrase: &str, salt: &[u8; 32], p: &Argon2Params) -> Result<Secret<32>> {
+    p.check()?;
     let params = Params::new(p.m_kib, p.t, p.p, Some(32))
         .map_err(|_| CryptoError::Params("argon2 parameters rejected"))?;
-    let pw: String = passphrase.nfc().collect();
+    // Pre-sized so the buffer never reallocates (which would leave unzeroized copies); wiped on drop.
+    let mut pw = String::with_capacity(passphrase.len() + 16);
+    pw.extend(passphrase.nfc());
+    let pw = zeroize::Zeroizing::new(pw);
     let mut b = Box::new([0u8; 32]);
     Argon2::new(Algorithm::Argon2id, Version::V0x13, params)
         .hash_password_into(pw.as_bytes(), salt, &mut b[..])
@@ -114,12 +118,49 @@ mod tests {
             p: 4,
         };
         assert!(matches!(p.check(), Err(CryptoError::Params(_))));
+        let d = Argon2Params::DEFAULT;
         assert!(
             Argon2Params {
-                t: 0,
-                ..Argon2Params::DEFAULT
+                m_kib: 1_048_577,
+                ..d
             }
             .check()
+            .is_err()
+        );
+        assert!(
+            Argon2Params {
+                m_kib: 1_048_576,
+                ..d
+            }
+            .check()
+            .is_ok()
+        );
+        assert!(Argon2Params { t: 0, ..d }.check().is_err());
+        assert!(Argon2Params { t: 33, ..d }.check().is_err());
+        assert!(Argon2Params { p: 0, ..d }.check().is_err());
+        assert!(Argon2Params { p: 17, ..d }.check().is_err());
+        let s = [0u8; 32];
+        assert!(
+            passphrase_kek(
+                "x",
+                &s,
+                &Argon2Params {
+                    m_kib: 8,
+                    t: 1,
+                    p: 0
+                }
+            )
+            .is_err()
+        );
+        assert!(
+            passphrase_kek(
+                "x",
+                &s,
+                &Argon2Params {
+                    m_kib: 1_048_577,
+                    ..d
+                }
+            )
             .is_err()
         );
         assert!(

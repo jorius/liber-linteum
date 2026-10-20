@@ -55,10 +55,13 @@ impl RecoveryCode {
             .filter(|c| !c.is_whitespace() && *c != '-')
             .collect();
         // The prefix letters N, I, M, W are all valid symbols or translated ones, so strip it before decoding.
-        if chars.len() >= 4 && chars[..4].eq_ignore_ascii_case("NIMW") && chars.len() == 60 {
+        if !chars.is_ascii() {
+            return Err(CryptoError::RecoveryCode);
+        }
+        if chars.len() == 60 && chars[..4].eq_ignore_ascii_case("NIMW") {
             chars.drain(..4);
         }
-        if chars.len() != 56 || !chars.is_ascii() {
+        if chars.len() != 56 {
             return Err(CryptoError::RecoveryCode);
         }
         let mut b = Box::new([0u8; 32]);
@@ -90,6 +93,21 @@ mod tests {
         let c = RecoveryCode::generate();
         let p = RecoveryCode::parse(&c.to_display()).unwrap();
         assert_eq!(c.secret().expose(), p.secret().expose());
+    }
+
+    #[test]
+    fn recovery_parse_rejects_non_ascii_without_panic() {
+        let tail = "0".repeat(56);
+        for bad in [
+            format!("NIM\u{e9}{tail}"),
+            format!("N\u{1f600}{tail}"),
+            "\u{e9}".repeat(60),
+        ] {
+            assert!(matches!(
+                RecoveryCode::parse(&bad),
+                Err(CryptoError::RecoveryCode)
+            ));
+        }
     }
 
     #[test]
