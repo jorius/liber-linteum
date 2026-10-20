@@ -73,11 +73,16 @@ const MARKS = {
 const lineClass = (cls: string) => Decoration.line({ class: cls });
 
 const BLOCK_WIDGET = new Set(['table', 'callout', 'columns', 'thematicBreak', 'math']);
-const TASK = /^(\s*(?:[-*+]|\d+[.)])[ \t]+)\[([ xX])\]/;
+const TASK = /^((?:[-*+]|\d+[.)])[ \t]+)\[([ xX])\]/;
 const MARKER = /^(?:([-*+])|\d+[.)])[ \t]*/;
-const CLOSING_FENCE = /^\s*(`{3,}|~{3,})\s*$/;
-/** A quote line's `>` markers (nested ones too), after any list indent. */
-const QUOTE_MARKS = /^([ \t]*)((?:>[ \t]?)+)/;
+/** A code block's last line as a closing fence, after its container prefix
+ *  (indent, and `>` markers inside a quote). */
+const CLOSING_FENCE = /^([ \t]*(?:>[ \t]?)*[ \t]*)(`{3,}|~{3,})[ \t]*$/;
+/** A quote line's first `depth` markers, after any list indent; deeper `>`
+ *  belong to the content (code in a quote keeps its own). */
+const QUOTE_MARKS: RegExp[] = [];
+const quoteMarks = (depth: number) =>
+  (QUOTE_MARKS[depth] ??= new RegExp(`^([ \\t]*)((?:>[ \\t]?){1,${depth}})`));
 /** The wide-elements choice (M4b part 3) a block widget follows. */
 const WIDE_KIND: Record<string, keyof WideElements> = { table: 'tables', math: 'maths' };
 const IMAGE_FILE = /\.(?:png|jpe?g|gif|webp|svg|avif|bmp)$/i;
@@ -191,6 +196,18 @@ function build(state: EditorState, page: ParsedPage, active: Set<number>): Decor
 
   /** Inside a blockquote: its outermost one hides every level's markers. */
   let quoteDepth = 0;
+  /** Each line's quote nesting under `node` (a blockquote at `level`). */
+  const quoteLevels = (node: Node, level: number, depth: Map<number, number>) => {
+    if (!node.position) return;
+    if (node.type === 'blockquote') {
+      const [from, to] = rangeOf(node);
+      const last = doc.lineAt(Math.min(to, doc.length)).number;
+      for (let n = doc.lineAt(from).number; n <= last; n++)
+        depth.set(n, Math.max(depth.get(n) ?? 0, level));
+    }
+    for (const kid of ((node as Parent).children as Node[] | undefined) ?? [])
+      quoteLevels(kid, kid.type === 'blockquote' ? level + 1 : level, depth);
+  };
   const visit = (node: Node) => {
     if (!node.position) return;
     const [from, to] = rangeOf(node);
@@ -275,18 +292,21 @@ function build(state: EditorState, page: ParsedPage, active: Set<number>): Decor
         // Round 3 §1: off the cursor the fences hide; the opening one becomes
         // the header row (language badge and Copy, M4b part 2 §2) and the
         // closing one an empty line, so revealing the source moves nothing.
-        const fence = /^\s*(`{3,}|~{3,})(\S*)/.exec(first.text);
+        // The node starts after any container prefix (`> `, `- `).
+        const fence = /^(`{3,}|~{3,})(\S*)/.exec(text(from, first.to));
         if (fence && !touched(from, to) && first.number < last.number) {
-          const closed = CLOSING_FENCE.test(last.text);
-          const body = text(first.to + 1, closed ? last.from : last.to);
-          const code = body.endsWith('\n') ? body.slice(0, -1) : body;
+          // Closed only by the opening character, at least as long (CommonMark).
+          const close = CLOSING_FENCE.exec(last.text);
+          const closed =
+            !!close && close[2][0] === fence[1][0] && close[2].length >= fence[1].length;
+          const code = (node as unknown as { value: string }).value;
           out.push(
             Decoration.replace({ widget: new CodeBadgeWidget(fence[2], code) }).range(
-              first.from,
+              from,
               first.to,
             ),
           );
-          if (closed) conceal(last.from, last.to);
+          if (closed) conceal(last.from + close[1].length, last.to);
         }
         return;
       }
@@ -297,11 +317,12 @@ function build(state: EditorState, page: ParsedPage, active: Set<number>): Decor
         if (reduced) break;
         lines(from, to, lineClass('cm-nimw-quote'));
         if (quoteDepth === 0 && !touched(from, to)) {
-          const last = doc.lineAt(Math.min(to, doc.length)).number;
-          for (let n = doc.lineAt(from).number; n <= last; n++) {
+          const depth = new Map<number, number>();
+          quoteLevels(node, 1, depth);
+          for (const [n, d] of depth) {
             const ln = doc.line(n);
             const start = Math.max(ln.from, from);
-            const m = QUOTE_MARKS.exec(text(start, ln.to));
+            const m = quoteMarks(d).exec(text(start, ln.to));
             if (m) conceal(start + m[1].length, start + m[0].length);
           }
         }
@@ -325,12 +346,13 @@ function build(state: EditorState, page: ParsedPage, active: Set<number>): Decor
           else out.push(mark('cm-nimw-listnum').range(from, from + marker[0].trimEnd().length));
         }
         if (typeof item.checked !== 'boolean') break;
-        const m = TASK.exec(line.text);
+        // From the item's start, so a task in a quote matches too.
+        const m = TASK.exec(text(from, line.to));
         // Shown on the cursor line too, so a task can always be ticked with a
         // click (as Obsidian does); Backspace removes the whole marker.
         if (m) {
-          const at = line.from + m[1].length;
-          const label = line.text.slice(m[0].length).trim();
+          const at = from + m[1].length;
+          const label = text(at + 3, line.to).trim();
           out.push(
             Decoration.replace({ widget: new CheckboxWidget(item.checked, label) }).range(
               at,

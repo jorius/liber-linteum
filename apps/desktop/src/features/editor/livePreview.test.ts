@@ -415,7 +415,48 @@ describe('Live Preview renders the whole page (round 3 §1)', () => {
     const v = editor('x\n\n~~~\nplain\n~~~\n\n```py\nlast line', 0);
     expect(v.contentDOM.textContent).not.toContain('~~~');
     expect(line(v, 4)).toBe('plain');
+    // The unclosed block's opening fence is the header row too.
+    expect(line(v, 7)).not.toContain('```');
+    expect(v.contentDOM.querySelectorAll('.cm-nimw-codebadge')).toHaveLength(2);
     expect(line(v, 8)).toBe('last line');
+  });
+
+  /** What the block's Copy button puts on the clipboard. */
+  const copied = async (v: EditorView) => {
+    const writeText = vi.fn(() => Promise.resolve());
+    Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true });
+    act(() => v.contentDOM.querySelector<HTMLElement>('.cm-nimw-codebadge-copy')!.click());
+    return (writeText.mock.calls[0] as unknown as [string])[0];
+  };
+
+  it('a closing fence needs the opening character and length; text that only looks like one stays', async () => {
+    let v = editor('x\n\n````md\n```js\ncode\n```', 0);
+    expect(line(v, 6)).toBe('```');
+    expect(await copied(v)).toBe('```js\ncode\n```');
+    v.destroy();
+    v = editor('x\n\n```\nabc\n~~~', 0);
+    expect(line(v, 5)).toBe('~~~');
+    expect(await copied(v)).toBe('abc\n~~~');
+  });
+
+  it('code inside a quote keeps its own > characters; its fences render like any other', async () => {
+    const v = editor('x\n\n> ```\n> > a > b\n> >>> 1\n> ```\n', 0);
+    expect(line(v, 4)).toBe('> a > b');
+    expect(line(v, 5)).toBe('>>> 1');
+    expect(v.contentDOM.textContent).not.toContain('```');
+    expect(await copied(v)).toBe('> a > b\n>>> 1');
+  });
+
+  it('a fence on a list item renders like any other', () => {
+    const v = editor('x\n\n- ```js\n  a\n  ```\n', 0);
+    expect(v.contentDOM.textContent).not.toContain('```');
+    expect(v.contentDOM.querySelector('.cm-nimw-codebadge')).not.toBeNull();
+  });
+
+  it('a task inside a quote keeps a working checkbox', () => {
+    const v = editor('x\n\n> - [ ] todo\n', 0);
+    expect(v.contentDOM.querySelector('input[type="checkbox"]')).not.toBeNull();
+    expect(line(v, 3)).toBe(' todo');
   });
 
   it('bullets render as a bullet, numbers stay styled; the cursor line shows its marker', async () => {
