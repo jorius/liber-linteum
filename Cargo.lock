@@ -2883,6 +2883,7 @@ dependencies = [
  "blake3",
  "dunce",
  "globset",
+ "liber-crypto",
  "liber-testkit",
  "liber-vault",
  "notify",

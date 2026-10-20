@@ -3,6 +3,7 @@
 //! Every path crossing the trait is a [`VaultPath`], except `location`,
 //! `os_path` and `vault_path_of`, which exist to talk to the OS.
 
+pub(crate) mod encrypted;
 pub(crate) mod plain;
 mod plain_watch;
 
@@ -10,6 +11,7 @@ use crate::error::Result;
 use crate::path::VaultPath;
 use std::path::{Path, PathBuf};
 
+pub use encrypted::{EncryptedStorage, HEADER_FILE, UnlockReport, is_encrypted_vault};
 pub use plain::PlainStorage;
 
 pub trait ReadSeek: std::io::Read + std::io::Seek + Send {}
@@ -146,6 +148,11 @@ pub trait Storage: Send + Sync + std::fmt::Debug {
     /// which must drop `sink` too (see [`WatchGuard`]). Lost events and
     /// changes on the vault root must reach `sink` as [`RawEvent::Overflow`].
     fn watch(&self, recursive: bool, sink: Box<dyn Fn(RawEvent) + Send>) -> Result<WatchGuard>;
+    /// The encrypted storage behind this one, for what only it has (lock,
+    /// salvage, unreadable entries): `None` for every other storage.
+    fn as_encrypted(&self) -> Option<&EncryptedStorage> {
+        None
+    }
 }
 
 /// The storage `Vault::open` uses: `PlainStorage`, unless built with

@@ -157,6 +157,16 @@ impl VaultHeader {
         Self::create_unchecked(passphrase, params)
     }
 
+    /// `create` below the Argon2 floor, for test fixtures in other crates (`test-params`
+    /// feature, which a release build must never enable).
+    #[cfg(any(test, feature = "test-params"))]
+    pub fn create_insecure(
+        passphrase: &str,
+        params: Argon2Params,
+    ) -> Result<(VaultHeader, Unlocked, RecoveryCode)> {
+        Self::create_unchecked(passphrase, params)
+    }
+
     /// `create` without the Argon2 floor (tests and vectors use tiny parameters).
     pub(crate) fn create_unchecked(
         passphrase: &str,

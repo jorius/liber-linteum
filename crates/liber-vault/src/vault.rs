@@ -68,6 +68,11 @@ impl Vault {
         &*self.storage
     }
 
+    /// The encrypted storage behind this vault, if it is one.
+    pub fn encrypted(&self) -> Option<&crate::EncryptedStorage> {
+        self.storage.as_encrypted()
+    }
+
     /// Where new attachments go, re-read from disk so a config edit while the
     /// vault is open applies at once (M2c §5.3): `.liber/vault.json` when it
     /// overrides Obsidian (M4b §5), else Obsidian's `attachmentFolderPath`,

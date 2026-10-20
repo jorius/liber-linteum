@@ -23,6 +23,14 @@ pub enum VaultError {
     },
     #[error("file watcher error: {0}")]
     Watch(String),
+    #[error("folder is not empty: {0}")]
+    NotEmpty(String),
+    #[error("the vault is locked")]
+    Locked,
+    #[error("wrong passphrase or recovery code")]
+    WrongSecret,
+    #[error("encryption error: {0}")]
+    Crypto(String),
 }
 
 pub type Result<T> = std::result::Result<T, VaultError>;

@@ -10,6 +10,7 @@ publish.workspace = true
 blake3.workspace = true
 dunce.workspace = true
 globset.workspace = true
+liber-crypto = { path = "../liber-crypto" }
 notify.workspace = true
 serde.workspace = true
 serde_json.workspace = true
@@ -21,10 +22,12 @@ unicode-normalization.workspace = true
 # `LIBER_TEST_STORAGE` picks the storage `Vault::open` uses (tests only; see
 # docs/architecture/storage-seam.md).
 test-storage = []
+# Tiny Argon2 parameters for test vaults (never in a release build; spec ruling 2).
+test-params = ["liber-crypto/test-params"]
 
 [dev-dependencies]
 # Its own integration tests follow the switch too.
-liber-vault = { path = ".", features = ["test-storage"] }
+liber-vault = { path = ".", features = ["test-storage", "test-params"] }
 liber-testkit = { path = "../liber-testkit" }
 proptest.workspace = true
 tempfile.workspace = true

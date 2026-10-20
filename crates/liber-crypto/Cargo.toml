@@ -24,6 +24,10 @@ unicode-normalization.workspace = true
 x-wing.workspace = true
 zeroize.workspace = true
 
+[features]
+# `VaultHeader::create_insecure`: vaults below the Argon2 floor, for test fixtures only.
+test-params = []
+
 [dev-dependencies]
 proptest.workspace = true
 
