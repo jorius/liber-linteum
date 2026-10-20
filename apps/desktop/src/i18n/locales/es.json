@@ -254,6 +254,9 @@
       "title": "Mover «{name}»",
       "to": "Carpeta de destino",
       "root": "Raíz de la bóveda",
+      "filter": "Filtrar carpetas",
+      "current": "actual",
+      "none": "Ninguna carpeta coincide",
       "confirm": "Mover"
     },
     "external": {

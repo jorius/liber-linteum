@@ -254,6 +254,9 @@
       "title": "Move “{name}”",
       "to": "Destination folder",
       "root": "Vault root",
+      "filter": "Filter folders",
+      "current": "current",
+      "none": "No folder matches",
       "confirm": "Move"
     },
     "external": {
