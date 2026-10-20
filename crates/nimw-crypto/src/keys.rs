@@ -85,7 +85,33 @@ impl Subkeys {
     }
 }
 
+#[cfg(test)]
+thread_local! {
+    static SEEDED: std::cell::Cell<Option<u64>> = const { std::cell::Cell::new(None) };
+}
+
+/// Test vectors: inside `f`, every random byte on this thread comes from splitmix64 seeded with `seed`.
+#[cfg(test)]
+pub(crate) fn with_seeded_rng<T>(seed: u64, f: impl FnOnce() -> T) -> T {
+    SEEDED.set(Some(seed));
+    let out = f();
+    SEEDED.set(None);
+    out
+}
+
 fn fill_random(buf: &mut [u8]) {
+    #[cfg(test)]
+    if let Some(mut s) = SEEDED.get() {
+        for chunk in buf.chunks_mut(8) {
+            s = s.wrapping_add(0x9E37_79B9_7F4A_7C15);
+            let mut z = s;
+            z = (z ^ (z >> 30)).wrapping_mul(0xBF58_476D_1CE4_E5B9);
+            z = (z ^ (z >> 27)).wrapping_mul(0x94D0_49BB_1331_11EB);
+            chunk.copy_from_slice(&(z ^ (z >> 31)).to_le_bytes()[..chunk.len()]);
+        }
+        SEEDED.set(Some(s));
+        return;
+    }
     // The OS RNG failing is unrecoverable; refusing to continue is the safe response.
     getrandom::fill(buf).expect("OS random number generator unavailable");
 }
@@ -101,7 +127,6 @@ pub(crate) fn rng() -> impl rand_core::CryptoRng {
     rand_core::UnwrapErr(getrandom::SysRng)
 }
 
-#[allow(dead_code)] // used by later tasks
 pub(crate) fn hkdf_sha256(ikm: &[u8], salt: &[u8], info: &[u8]) -> Secret<32> {
     let mut b = Box::new([0u8; 32]);
     Hkdf::<Sha256>::new(Some(salt), ikm)
@@ -110,7 +135,6 @@ pub(crate) fn hkdf_sha256(ikm: &[u8], salt: &[u8], info: &[u8]) -> Secret<32> {
     Secret::from_box(b)
 }
 
-#[allow(dead_code)] // used by later tasks
 pub(crate) fn hmac_sha256(key: &[u8], parts: &[&[u8]]) -> [u8; 32] {
     let mut mac =
         <Hmac<Sha256> as KeyInit>::new_from_slice(key).expect("HMAC takes any key length");

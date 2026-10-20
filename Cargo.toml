@@ -45,7 +45,7 @@ fontdb = "0.24.0"
 cpal = "0.18.2"
 hound = "3.5.1"
 # Encryption E1 (nimw-crypto)
-aes-gcm = "0.11.1"
+aes-gcm = { version = "0.11.1", features = ["zeroize"] }
 aes-siv = "0.8.0"
 hkdf = "0.13.0"
 hmac = { version = "0.13.0", features = ["zeroize"] }
