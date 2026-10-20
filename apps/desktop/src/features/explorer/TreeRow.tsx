@@ -46,15 +46,15 @@ interface TreeRowProps {
 function FavoriteAction({ path, name }: { path: string; name: string }) {
   const { t } = useTranslation();
   const on = useFavoritesStore((s) => s.paths.includes(path));
-  const label = t(on ? 'favorites.removeNamed' : 'favorites.addNamed', { name });
+  // One fixed name; aria-pressed carries the state (the tooltip says the action).
   return (
     <button
       type="button"
       tabIndex={-1}
       className={styles.action}
       aria-pressed={on}
-      aria-label={label}
-      title={label}
+      aria-label={t('favorites.toggleNamed', { name })}
+      title={t(on ? 'favorites.removeNamed' : 'favorites.addNamed', { name })}
       onClick={() => void useFavoritesStore.getState().toggle(path)}
     >
       <StarIcon filled={on} size={13} />

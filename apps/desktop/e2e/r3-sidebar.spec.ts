@@ -72,11 +72,11 @@ test('a row shows ★ ☺ 🗑 on hover, no "…"; right-click opens its menu', 
   const row = page.getByRole('treeitem', { name: 'Linux' });
   await row.hover();
   await expect(row.getByRole('button')).toHaveText(['', '', '']);
-  await expect(row.getByRole('button', { name: 'Add Linux to Favorites' })).toBeVisible();
+  await expect(row.getByRole('button', { name: 'Linux in Favorites' })).toBeVisible();
   await expect(row.getByRole('button', { name: 'Icon for Linux' })).toBeVisible();
   await expect(row.getByRole('button', { name: 'Move Linux to Trash' })).toBeVisible();
-  await row.getByRole('button', { name: 'Add Linux to Favorites' }).click();
-  await expect(row.getByRole('button', { name: 'Remove Linux from Favorites' })).toHaveAttribute(
+  await row.getByRole('button', { name: 'Linux in Favorites' }).click();
+  await expect(row.getByRole('button', { name: 'Linux in Favorites' })).toHaveAttribute(
     'aria-pressed',
     'true',
   );

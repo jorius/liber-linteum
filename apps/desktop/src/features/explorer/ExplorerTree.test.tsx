@@ -287,12 +287,12 @@ describe('row quick actions (M5b §3)', () => {
     seed(nodes, { expanded: new Set(['Art']) });
     render(<ExplorerTree onRequestMenu={() => undefined} />);
     expect(actions('Games')).toEqual([
-      'Add Games to Favorites',
+      'Games in Favorites',
       'Icon for Games',
       'Move Games to Trash',
     ]);
     expect(actions('Welcome')).toEqual([
-      'Add Welcome to Favorites',
+      'Welcome in Favorites',
       'Icon for Welcome',
       'Move Welcome to Trash',
     ]);
@@ -307,12 +307,18 @@ describe('row quick actions (M5b §3)', () => {
     useFavoritesStore.setState({ paths: [] });
     seed();
     render(<ExplorerTree />);
-    await userEvent.click(screen.getByRole('button', { name: 'Add Welcome to Favorites' }));
+    // Review M7: one fixed name; the state is only aria-pressed (and the tooltip).
+    const starOf = () =>
+      within(screen.getByRole('treeitem', { name: 'Welcome' })).getByRole('button', {
+        name: 'Welcome in Favorites',
+      });
+    expect(starOf()).toHaveAttribute('aria-pressed', 'false');
+    expect(starOf()).toHaveAttribute('title', 'Add Welcome to Favorites');
+    await userEvent.click(starOf());
     await waitFor(() => expect(useFavoritesStore.getState().paths).toEqual(['Welcome.md']));
-    const star = within(screen.getByRole('treeitem', { name: 'Welcome' })).getByRole('button', {
-      name: 'Remove Welcome from Favorites',
-    });
+    const star = starOf();
     expect(star).toHaveAttribute('aria-pressed', 'true');
+    expect(star).toHaveAttribute('title', 'Remove Welcome from Favorites');
     expect(useVaultStore.getState().selected).toBeNull(); // the row wasn't activated
     await userEvent.click(star);
     await waitFor(() => expect(useFavoritesStore.getState().paths).toEqual([]));

@@ -858,6 +858,7 @@
     "remove": "Quitar de Favoritos",
     "addNamed": "Añadir {name} a Favoritos",
     "removeNamed": "Quitar {name} de Favoritos",
+    "toggleNamed": "{name} en Favoritos",
     "moveUp": "Subir en Favoritos",
     "moveDown": "Bajar en Favoritos",
     "movedTo": "{name} pasó a la posición {position} de {count} en Favoritos",
