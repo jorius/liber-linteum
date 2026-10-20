@@ -1,5 +1,7 @@
 # Docs
 
+> Renamed from Notes In My Way on 2026-10-20. Existing vaults keep working: their `.nimw/` folder becomes `.liber/` the first time they open, and the app copies its settings from `app.notesinmyway.desktop`, which it never changes.
+
 Where to start, depending on what you need.
 
 | You want | Read |

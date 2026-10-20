@@ -23,7 +23,7 @@
 | Cards matching the prototype (kind label, cover/placeholder/folder summary, title, subtitle, excerpt, image/audio icons, See all); new tokens for every palette and mode | done, tested (axe, contrast) |
 | Drill-down with breadcrumb; Expand in place with collapse; single/double click (240 ms); keyboard (arrows, Enter, Shift+Enter, Escape) | done, tested |
 | Edges: text links, parent/child, manual (read-only), aggregated to the nearest visible card with counts; four toggles saved in settings | done, tested (GV-25 acceptance) |
-| Layout: deterministic grid / columns / neighbourhood (prototype values); dragged cards pinned per level in `.nimw/layout.json` (lazy, atomic, follows renames); Reset layout; pan/zoom | done, tested |
+| Layout: deterministic grid / columns / neighbourhood (prototype values); dragged cards pinned per level in `.liber/layout.json` (lazy, atomic, follows renames); Reset layout; pan/zoom | done, tested |
 | New entry → "Untitled" page in the current level's folder, opened with the title selected | done, tested |
 | React Flow 12.12.0 under Tauri's frozen prototypes (d3-color fix as a Vite transform) | done, tested |
 | Final review (opus) + fix pass (§13): 1 Critical, 6 Important, 14 upgraded minors fixed test-first | done |
@@ -36,19 +36,19 @@ Totals after the fix pass: **643 vitest tests (72 files)**, **76 Playwright test
 | What | Command (repo root) |
 |---|---|
 | Everything (CI gate) | `pnpm check` |
-| UI unit tests | `pnpm --filter @nimw/desktop exec vitest run --maxWorkers=2` |
-| E2E | `pnpm test:e2e` (browsers: `pnpm --filter @nimw/desktop exec playwright install chromium webkit`) |
-| Perf test (release, ignored in debug) | `cargo test --release -p nimw-session --test global_view -- --ignored` |
+| UI unit tests | `pnpm --filter @liber/desktop exec vitest run --maxWorkers=2` |
+| E2E | `pnpm test:e2e` (browsers: `pnpm --filter @liber/desktop exec playwright install chromium webkit`) |
+| Perf test (release, ignored in debug) | `cargo test --release -p liber-session --test global_view -- --ignored` |
 | App (dev) | `pnpm dev` (Rust changed: restart) |
 
 ## 3. Backend map
 
 | File | What it does |
 |---|---|
-| `crates/nimw-index/src/{rows,index}.rs` | `CardRow`, `PageLink`; `card_children`, `card`, `page_links_of`, `page_links_from` (one indexed range per visible card) |
-| `crates/nimw-session/src/global_view.rs` | `gv_children` (levels, cards, index notes, attachment folders, neighbourhoods), `gv_edges` (lift to the nearest visible ancestor, aggregate, count), `follow_layout` on renames |
-| `crates/nimw-vault/src/layout.rs` | `.nimw/layout.json`: `layout_level`, `set_layout_level`, `remap_layout` |
-| `crates/nimw-vault/src/{config,vault}.rs` | `indexPicks` (read in M3a, written in M3b); shared `.nimw` JSON read-modify-write |
+| `crates/liber-index/src/{rows,index}.rs` | `CardRow`, `PageLink`; `card_children`, `card`, `page_links_of`, `page_links_from` (one indexed range per visible card) |
+| `crates/liber-session/src/global_view.rs` | `gv_children` (levels, cards, index notes, attachment folders, neighbourhoods), `gv_edges` (lift to the nearest visible ancestor, aggregate, count), `follow_layout` on renames |
+| `crates/liber-vault/src/layout.rs` | `.liber/layout.json`: `layout_level`, `set_layout_level`, `remap_layout` |
+| `crates/liber-vault/src/{config,vault}.rs` | `indexPicks` (read in M3a, written in M3b); shared `.liber` JSON read-modify-write |
 | `apps/desktop/src-tauri/src/gv_commands.rs` | `gv_children(level)`, `gv_edges(visible)`, `layout_get(level)`, `layout_set(level, positions)` |
 | `apps/desktop/src-tauri/src/settings.rs` | `globalViewMode` (`drill`), `globalViewEdges` (all on) |
 | `apps/desktop/src-tauri/src/menu.rs` | View → Editor / Global View (`menu:screen`, no accelerators) |
@@ -92,11 +92,11 @@ Totals after the fix pass: **643 vitest tests (72 files)**, **76 Playwright test
 
 | Layer | Files |
 |---|---|
-| Rust | `crates/nimw-session/tests/global_view.rs` (levels, index notes, attachment folders, neighbourhood cap, edges + GV-25, layout follows renames, perf `--ignored`), `crates/nimw-vault/tests/layout.rs` (lazy/atomic, lenient per entry, remap batches, collisions, pruning, concurrent writers), `crates/nimw-vault/tests/open_scan.rs` (a malformed `vault.json` field never disables excludes) |
+| Rust | `crates/liber-session/tests/global_view.rs` (levels, index notes, attachment folders, neighbourhood cap, edges + GV-25, layout follows renames, perf `--ignored`), `crates/liber-vault/tests/layout.rs` (lazy/atomic, lenient per entry, remap batches, collisions, pruning, concurrent writers), `crates/liber-vault/tests/open_scan.rs` (a malformed `vault.json` field never disables excludes) |
 | Commands (real ACL) | `apps/desktop/src-tauri/tests/commands.rs` (`gv_children`, `gv_edges`, `layout_get/set`), `tests/menu.rs` (View → Editor / Global View), `tests/settings.rs` |
 | Build | `apps/desktop/tests/freezeSafe.test.ts` (d3-color under a frozen prototype), `devPrebundle.test.ts` (dev pre-bundle patched), `credits.test.ts` |
 | TS | `features/global-view/{layout,gvStore,Card,GlobalView,GlobalView.edges,edges,Canvas.a11y,targets}.test.*`, `ipc/globalView.test.ts`, `stores/layering.test.ts`, plus additions in `AppShell`, `Editor`, `PageTitle`, `navigate`, `stores`, `palettes`, `cssCompat`, `Welcome` tests |
-| E2E | `e2e/m3a.spec.ts` (drill/breadcrumb, expand/collapse, double click incl. a slow one, drag + reload + Reset, aggregated edge + toggle, keyboard only, focus after leaving), `e2e/m3a-a11y.spec.ts` (axe, both engines, light + dark), `e2e/m3a-perf.spec.ts` (opt-in `NIMW_PERF=1`), zero-network with the Global View open |
+| E2E | `e2e/m3a.spec.ts` (drill/breadcrumb, expand/collapse, double click incl. a slow one, drag + reload + Reset, aggregated edge + toggle, keyboard only, focus after leaving), `e2e/m3a-a11y.spec.ts` (axe, both engines, light + dark), `e2e/m3a-perf.spec.ts` (opt-in `LIBER_PERF=1`), zero-network with the Global View open |
 
 ## 8. Decisions taken for you (review in bulk)
 
@@ -137,7 +137,7 @@ From the final review (spec §13.17–18 and §8 notes):
   - a level save keeps positions for paths still in the vault, even off the canvas;
   - deleted paths and levels are pruned on writes;
   - one unreadable entry hides only itself, and a failed save shows one toast.
-- **`.nimw/vault.json` is read field by field:** a bad `indexPicks` or `exclude` item never disables the rest. JSON updates are serialized, with one retry.
+- **`.liber/vault.json` is read field by field:** a bad `indexPicks` or `exclude` item never disables the rest. JSON updates are serialized, with one retry.
 - **React Flow is credited** in the README, `THIRD-PARTY-NOTICES.md` and on the welcome screen. Its screen-reader strings are translated, and its wrapper is named "Global View cards".
 
 ## 9. Needs the real window (you)
@@ -172,7 +172,7 @@ From the final review (spec §13.17–18 and §8 notes):
 |---|---|
 | Blank window, console says `Cannot assign to read only property 'constructor'` | the freeze-safe transform didn't run on d3-color: check `vite.config.ts` `plugins` **and** `optimizeDeps.rolldownOptions.plugins`; `tests/freezeSafe.test.ts` |
 | Cards jump or hide on focus | React Flow re-measured: nodes must keep fixed `width`/`height` and stable object identity |
-| Pinned positions gone | check `.nimw/layout.json`; parsing is lenient per entry (§14) |
+| Pinned positions gone | check `.liber/layout.json`; parsing is lenient per entry (§14) |
 | Global View empty after a vault switch | `gvStore` resets on vault change |
 
 ## 12. Next steps

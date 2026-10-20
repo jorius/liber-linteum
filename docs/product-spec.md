@@ -1,4 +1,4 @@
-# Notes In My Way — Product Spec (v0.2)
+# Liber Linteum — Product Spec (v0.2)
 
 > **Status:** v0.2 — all open questions closed · **Date:** 2026-10-12
 > **Roles:** Jose — tech lead · PO — product owner (owns the idea and final say on behavior)
@@ -38,7 +38,7 @@ The defining feature is the **Global View**: a navigable canvas where each proje
 
 ### 1.2 Who it's for [DECIDED 2026-10-14]
 
-| Persona | What they need from NIMW | Status |
+| Persona | What they need from Liber Linteum | Status |
 |---|---|---|
 | **Quick note-takers** | Jot something down without setting up a vault; open a single `.md`/`.txt` file from Finder. | Done in **M4c**: a global Scratchpad, a Scratchpad folder in every vault (⌘⇧N), single-file windows (Finder Open With, ⌘⇧O). |
 | **Writers** (books, long-form) | Chapters as pages, cross-references to a glossary, concepts, characters, ideas and brainstorming; outline and word count; a map of how ideas connect. | Links, autocomplete, Global View, relationships, outline panel, word count, search, favourites done. Candidates: glossary/alias tooling, unlinked mentions, word-count goals, focus mode, manuscript export. |
@@ -102,9 +102,9 @@ The defining feature is the **Global View**: a navigable canvas where each proje
 |----|-------------|
 | VLT-01 | The user can create a new vault (choose an empty folder) or open an existing folder as a vault. |
 | VLT-02 | Opening an existing Obsidian vault must not modify any existing file unless the user edits it. |
-| VLT-03 | The app stores its own per-vault data (layout positions, index-note picks, settings) in a hidden `.nimw/` folder created only when first needed, plus a rebuildable cache outside the vault. Details: architecture doc. |
+| VLT-03 | The app stores its own per-vault data (layout positions, index-note picks, settings) in a hidden `.liber/` folder created only when first needed, plus a rebuildable cache outside the vault. Details: architecture doc. |
 | VLT-04 | Changes made to files outside the app (another editor, Obsidian, file manager) are reflected in the app without restart. |
-| VLT-05 | **Exclusions:** dot-folders (`.obsidian`, `.git`, `.trash`, `.nimw`, …) are ignored everywhere; attachment folders are hidden from the Global View but shown in the explorer; the user can add exclude globs per vault. [DECIDED] |
+| VLT-05 | **Exclusions:** dot-folders (`.obsidian`, `.git`, `.trash`, `.liber`, …) are ignored everywhere; attachment folders are hidden from the Global View but shown in the explorer; the user can add exclude globs per vault. [DECIDED] |
 | EXP-01 | A collapsible sidebar shows the vault tree (folders and pages), Obsidian-style. |
 | EXP-02 | Create, rename, move (drag & drop), and delete pages and folders from the explorer. |
 | EXP-03 | Delete moves items to the vault's own Trash (`.trash/`, as Obsidian's option), after a confirmation; the Trash view restores them or deletes them from the vault, which sends them to the OS trash — never permanent deletion (revised 2026-10-15, M5b §5). [DECIDED] |
@@ -285,7 +285,7 @@ The view is opened from the floating top toggle **[Edit | Global view]** (see re
 | Q-SEC-4 | Lost password = data lost. Accepted, with a clear warning at setup? | **Accepted**, with a clear warning. |
 | Q-FMT-1 | Which Notion-like features besides columns? | **Toggles** (foldable callouts), **highlights & colored text**, **dividers**. No callout colors or page icons. |
 | Q-PG-1 | Where does the **subtitle** come from? | Frontmatter **`subtitle:`**, edited from the page header. |
-| Q-GV-1 | Folder with several pages: how is the index note chosen? | Page named like the folder or `index.md`; else user pick (stored in `.nimw/vault.json`); else folder summary card. |
+| Q-GV-1 | Folder with several pages: how is the index note chosen? | Page named like the folder or `index.md`; else user pick (stored in `.liber/vault.json`); else folder summary card. |
 | Q-GV-2 | Do vault-root pages appear at level 0? | **Yes**, as page cards. |
 | Q-GV-3 | Single-clicking a **page** card: what is its next level? | Its **neighborhood**: outgoing links, backlinks, manual relationships. |
 | Q-GV-4 | Can edges have text labels? | **Yes**, optional. |

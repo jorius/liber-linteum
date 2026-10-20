@@ -4,7 +4,7 @@
 
 **Goal:** Underline misspelled words in the editor and offer suggestions, using local Hunspell dictionaries only. Ship Spanish (Colombia), Spanish and English (US), let the user import more from disk, and allow several to be active at once.
 
-**Architecture:** A new pure-Rust crate, `nimw-spell`, wraps the `spellbook` checker and embeds the three bundled dictionaries. Tauri commands check batches of words against the active set (app settings, or the vault's override) plus the vault's word list. A CodeMirror extension tokenises only the prose text nodes of the page's existing parsed model (`parsedFor`) in the viewport, caches the answers and draws wavy underlines. A small `SpellMenu` handles suggestions, Add to dictionary and Ignore.
+**Architecture:** A new pure-Rust crate, `liber-spell`, wraps the `spellbook` checker and embeds the three bundled dictionaries. Tauri commands check batches of words against the active set (app settings, or the vault's override) plus the vault's word list. A CodeMirror extension tokenises only the prose text nodes of the page's existing parsed model (`parsedFor`) in the viewport, caches the answers and draws wavy underlines. A small `SpellMenu` handles suggestions, Add to dictionary and Ignore.
 
 **Tech Stack:** Rust (`spellbook` 0.4.2, MPL-2.0), Tauri 2 commands, React 19, CodeMirror 6, zustand, vitest, Playwright.
 
@@ -55,14 +55,14 @@
 - **Suggestions:** at most **7** per word. The per-word dictionary order is the active order, duplicates are dropped, and the first suggester wins.
 - **Re-check debounce:** **300 ms** after typing. Only the viewport is checked.
 - **Main-thread budget:** at most **4 ms** per keystroke on a 10 000-line note.
-- **Underline:** wavy, colour `var(--color-danger)`, class `cm-nimw-misspelled`.
+- **Underline:** wavy, colour `var(--color-danger)`, class `cm-liber-misspelled`.
 - **Locales:** every new string is added to both `en.json` and `es.json` (the parity test).
 - **Commands:** every new Tauri command is added to `build.rs`, `capabilities/main.json`, the command list in `src-tauri/tests/commands.rs`, `src/ipc/index.ts` and `e2e/ipcMock.ts`, following the favorites pattern.
 - **Text files** (`isTextPath`) are not checked. Only pages are.
 
 ## Rulings (deviations from the spec, decided here)
 
-1. **The vault word list is stored in `.nimw/vault.json`** as `spellingWords: string[]`, not in `.nimw/spelling.txt`. It reuses `update_json_object`, which is atomic, compare-and-swap and serialised, so it needs no new file-write path. It is still inside the vault, so encryption §5 holds. *Cost if wrong:* moving one key into a file.
+1. **The vault word list is stored in `.liber/vault.json`** as `spellingWords: string[]`, not in `.liber/spelling.txt`. It reuses `update_json_object`, which is atomic, compare-and-swap and serialised, so it needs no new file-write path. It is still inside the vault, so encryption §5 holds. *Cost if wrong:* moving one key into a file.
 2. **Bundled dictionaries are embedded with `include_str!`,** not shipped as Tauri resources. This means no resource-path plumbing, and tests and cross-builds see the same bytes. *Cost:* the binary grows by about 2.3 MB.
 3. **Skipping follows the parsed model, not Lezer.** Only text inside mdast `text` nodes is checked, plus a wikilink's display part. Code, math, HTML, frontmatter, tags, URLs and comments are skipped because they are not `text` nodes. This is the same model Live Preview and the outline already use, and it works the same in Live Preview and Source.
 4. **The import picker runs in Rust,** through the `cover_picker` test hook, as `audio_upload` does. No path ever comes from the webview.
@@ -81,9 +81,9 @@
 
 | File | Responsibility |
 |---|---|
-| `crates/nimw-spell/Cargo.toml`, `src/lib.rs` | `Speller`: bundled list, lazy loading, check, suggest, import validation |
-| `crates/nimw-spell/dictionaries/{en_US,es,es_CO}/` | `index.aff`, `index.dic`, `LICENSE`, `SOURCE.md` (package, version, upstream) |
-| `crates/nimw-vault/src/spelling.rs` | `.nimw/vault.json` keys `spelling` (override) and `spellingWords` |
+| `crates/liber-spell/Cargo.toml`, `src/lib.rs` | `Speller`: bundled list, lazy loading, check, suggest, import validation |
+| `crates/liber-spell/dictionaries/{en_US,es,es_CO}/` | `index.aff`, `index.dic`, `LICENSE`, `SOURCE.md` (package, version, upstream) |
+| `crates/liber-vault/src/spelling.rs` | `.liber/vault.json` keys `spelling` (override) and `spellingWords` |
 | `apps/desktop/src-tauri/src/settings.rs` | `spellcheck: bool`, `spellDictionaries: Option<Vec<String>>`, `importedDictionaries: Vec<ImportedDictionary>` |
 | `apps/desktop/src-tauri/src/spell_commands.rs` | commands and `SpellState` (loaded dictionaries, session ignores) |
 | `apps/desktop/src/features/editor/spell.ts` | `wordsToCheck` tokeniser, the CodeMirror spell extension, cache |
@@ -93,12 +93,12 @@
 
 ---
 
-### Task 1: `nimw-spell` crate with the bundled dictionaries
+### Task 1: `liber-spell` crate with the bundled dictionaries
 
 **Files:**
-- Create: `crates/nimw-spell/Cargo.toml`, `crates/nimw-spell/src/lib.rs`, `crates/nimw-spell/dictionaries/**`
+- Create: `crates/liber-spell/Cargo.toml`, `crates/liber-spell/src/lib.rs`, `crates/liber-spell/dictionaries/**`
 - Modify: root `Cargo.toml` (workspace member, `spellbook = "=0.4.2"` in workspace deps)
-- Test: `crates/nimw-spell/tests/speller.rs`
+- Test: `crates/liber-spell/tests/speller.rs`
 
 **Interfaces:**
 - Produces:
@@ -136,16 +136,16 @@
 
 `don’t` (typographic apostrophe) is accepted as is: en_US's `.aff` has `ICONV 1`, which spellbook applies (confirmed in the spike: `don’t` → true).
 
-- [ ] **Step 3: Run** `cargo test -p nimw-spell`. Expected: FAIL to compile (`Speller` is undefined).
+- [ ] **Step 3: Run** `cargo test -p liber-spell`. Expected: FAIL to compile (`Speller` is undefined).
 - [ ] **Step 4: Implement `lib.rs`** with the interface above. Embed with `include_str!("../dictionaries/en_US/index.aff")` and so on.
-- [ ] **Step 5: Run** `cargo test -p nimw-spell && cargo deny check`. Expected: all pass, deny ok.
-- [ ] **Step 6: Commit** `feat(spell): nimw-spell — spellbook with embedded en_US, es and es_CO dictionaries`.
+- [ ] **Step 5: Run** `cargo test -p liber-spell && cargo deny check`. Expected: all pass, deny ok.
+- [ ] **Step 6: Commit** `feat(spell): liber-spell — spellbook with embedded en_US, es and es_CO dictionaries`.
 
 ### Task 2: Vault keys for the override and the word list
 
 **Files:**
-- Create: `crates/nimw-vault/src/spelling.rs`
-- Modify: `crates/nimw-vault/src/lib.rs` (`mod spelling;`)
+- Create: `crates/liber-vault/src/spelling.rs`
+- Modify: `crates/liber-vault/src/lib.rs` (`mod spelling;`)
 - Test: in-module `#[cfg(test)]`, following `favorite.rs`'s test style.
 
 **Interfaces:**
@@ -160,10 +160,10 @@
   - `override_round_trips_and_clears`: set `Some(["es_CO"])`, read it back, set `None`, and the key is gone; other keys in vault.json are untouched.
   - `words_are_sorted_unique_nfc`: add "zeta", "Ioque", decomposed "cancio\u{301}n", and "zeta" again → `["Ioque", "canción", "zeta"]`.
   - `removing_the_last_word_drops_the_key`.
-- [ ] **Step 2: Run** `cargo test -p nimw-vault spelling`. Expected: FAIL (no such methods).
+- [ ] **Step 2: Run** `cargo test -p liber-vault spelling`. Expected: FAIL (no such methods).
 - [ ] **Step 3: Implement** with `read_json` and `update_json_object`, as `favorite.rs` does.
 - [ ] **Step 4: Run** the same command. Expected: PASS.
-- [ ] **Step 5: Commit** `feat(vault): spelling override and word list in .nimw/vault.json`.
+- [ ] **Step 5: Commit** `feat(vault): spelling override and word list in .liber/vault.json`.
 
 ### Task 3: Settings fields and the spell commands
 
@@ -174,7 +174,7 @@
   - `lib.rs`: `manage(SpellState)` and registration;
   - `build.rs`;
   - `capabilities/main.json`;
-  - `Cargo.toml` of src-tauri (`nimw-spell`);
+  - `Cargo.toml` of src-tauri (`liber-spell`);
   - `vault_commands.rs`: clear the session ignores on vault open and close.
 - Test: `apps/desktop/src-tauri/tests/commands.rs` (and its command list)
 
@@ -219,9 +219,9 @@
 ```
 
   Use `user-mine` instead if `:` is not valid in a folder name on Windows. The ruling: the id stays `user:mine`, but the folder name uses `-` instead of `:`.
-- [ ] **Step 2: Run** `cargo test -p nimw-desktop --test commands spell_`. Expected: FAIL (unknown commands).
-- [ ] **Step 3: Implement** `spell_commands.rs` with `blocking(...)`, as `favorite_commands.rs` does. `SpellState { speller: nimw_spell::Speller, ignores: Mutex<HashSet<String>> }` is managed in `configure`. The settings fields and patch follow `sidebar_width`.
-- [ ] **Step 4: Run** `cargo test -p nimw-desktop && cargo clippy --workspace --all-targets -- -D warnings`. Expected: PASS.
+- [ ] **Step 2: Run** `cargo test -p liber-desktop --test commands spell_`. Expected: FAIL (unknown commands).
+- [ ] **Step 3: Implement** `spell_commands.rs` with `blocking(...)`, as `favorite_commands.rs` does. `SpellState { speller: liber_spell::Speller, ignores: Mutex<HashSet<String>> }` is managed in `configure`. The settings fields and patch follow `sidebar_width`.
+- [ ] **Step 4: Run** `cargo test -p liber-desktop && cargo clippy --workspace --all-targets -- -D warnings`. Expected: PASS.
 - [ ] **Step 5: Commit** `feat(spell): spelling settings and commands (check, suggest, import, word list, vault override)`.
 
 ### Task 4: The editor extension: tokenise, check, underline
@@ -230,7 +230,7 @@
 - Create: `apps/desktop/src/features/editor/spell.ts`, `apps/desktop/src/stores/spellStore.ts`
 - Modify:
   - `features/editor/Editor.tsx`: a new `spellSlot = new Compartment()` in `createState` only (not `createTextState`), reconfigured when `useSpellStore` `enabled` changes;
-  - `features/editor/Editor.module.css` or the `theme` in Editor.tsx: `.cm-nimw-misspelled { text-decoration: underline wavy var(--color-danger); text-decoration-skip-ink: none; }`;
+  - `features/editor/Editor.module.css` or the `theme` in Editor.tsx: `.cm-liber-misspelled { text-decoration: underline wavy var(--color-danger); text-decoration-skip-ink: none; }`;
   - `src/ipc/index.ts`: wrappers for the Task 3 commands.
 - Test: `apps/desktop/src/features/editor/spell.test.ts`
 
@@ -277,16 +277,16 @@ it('checks only uncached words, once per debounce, and bump re-checks', () => {
   /* vi.useFakeTimers; mock spellCheck; type twice within 300 ms → one call; bump → cache cleared, next pass calls again */
 });
 it('underlines misspelled words and maps them through edits', () => {
-  /* spellCheck → [false] for "recieve" → one .cm-nimw-misspelled over it; insert text before it → the decoration moves */
+  /* spellCheck → [false] for "recieve" → one .cm-liber-misspelled over it; insert text before it → the decoration moves */
 });
 it('does nothing when disabled or for text files', () => {
   /* enabled false → no spellCheck call */
 });
 ```
 
-- [ ] **Step 2: Run** `pnpm --filter @nimw/desktop exec vitest run src/features/editor/spell.test.ts`. Expected: FAIL (module not found).
+- [ ] **Step 2: Run** `pnpm --filter @liber/desktop exec vitest run src/features/editor/spell.test.ts`. Expected: FAIL (module not found).
 - [ ] **Step 3: Implement** `spell.ts` and `spellStore.ts`, wire `spellSlot` in `Editor.tsx`, and add the IPC wrappers.
-- [ ] **Step 4: Run** the same command, then `pnpm --filter @nimw/desktop exec vitest run src/features/editor`. Expected: PASS, and the existing editor tests are unchanged.
+- [ ] **Step 4: Run** the same command, then `pnpm --filter @liber/desktop exec vitest run src/features/editor`. Expected: PASS, and the existing editor tests are unchanged.
 - [ ] **Step 5: Commit** `feat(editor): spell checking underlines misspelled prose in the viewport (local dictionaries)`.
 
 ### Task 5: The spelling menu (suggestions, Add to dictionary, Ignore)
@@ -314,7 +314,7 @@ it('does nothing when disabled or for text files', () => {
   - `'Ignore calls spell_ignore and bumps'`.
   - `'Escape closes and returns focus to the editor; arrows move between items'`.
   - `'right-click on a correct word does not open it (the default menu is untouched)'`.
-- [ ] **Step 2: Run** `pnpm --filter @nimw/desktop exec vitest run src/features/editor/SpellMenu.test.tsx`. Expected: FAIL.
+- [ ] **Step 2: Run** `pnpm --filter @liber/desktop exec vitest run src/features/editor/SpellMenu.test.tsx`. Expected: FAIL.
 - [ ] **Step 3: Implement.** The replacement is one `view.dispatch({ changes, userEvent: 'input.spell' })`.
 - [ ] **Step 4: Run** the same command. Expected: PASS.
 - [ ] **Step 5: Commit** `feat(editor): spelling menu — suggestions, add to dictionary, ignore`.
@@ -348,7 +348,7 @@ it('does nothing when disabled or for text files', () => {
   - `'This vault: choosing a custom set calls spell_vault_set; back to app clears it'`.
   - `'the word list removes a word'`.
   - `'Settings search finds "spelling" / "ortografía"'`.
-- [ ] **Step 2: Run** `pnpm --filter @nimw/desktop exec vitest run src/features/dialogs`. Expected: FAIL.
+- [ ] **Step 2: Run** `pnpm --filter @liber/desktop exec vitest run src/features/dialogs`. Expected: FAIL.
 - [ ] **Step 3: Implement,** with `className="field-control"` on any select (the fields guard test).
 - [ ] **Step 4: Run** the same command plus `pnpm check:i18n`. Expected: PASS.
 - [ ] **Step 5: Commit** `feat(settings): Spelling category and per-vault dictionaries`.
@@ -365,14 +365,14 @@ it('does nothing when disabled or for text files', () => {
 - Test: the files above.
 
 - [ ] **Step 1: Write the failing e2e tests** in `spell.spec.ts`:
-  - `'a misspelled word is underlined; code is not'`: the page is "recieve\n\n```\nrecieve\n```" → exactly one `.cm-nimw-misspelled`.
+  - `'a misspelled word is underlined; code is not'`: the page is "recieve\n\n```\nrecieve\n```" → exactly one `.cm-liber-misspelled`.
   - `'right-click → a suggestion replaces it'`.
   - `'Add to dictionary removes the underline and survives a reload'`.
   - `'spelling off: nothing underlined'`.
   - `'the spelling menu and settings are axe-clean'` (light and dark).
-- [ ] **Step 2: Run** `PLAYWRIGHT_BROWSERS_PATH=$SP/pw-browsers pnpm --filter @nimw/desktop exec playwright test spell zero-network`. Expected: the new spell tests FAIL, because the mock lacks the commands.
+- [ ] **Step 2: Run** `PLAYWRIGHT_BROWSERS_PATH=$SP/pw-browsers pnpm --filter @liber/desktop exec playwright test spell zero-network`. Expected: the new spell tests FAIL, because the mock lacks the commands.
 - [ ] **Step 3: Add the mock commands and config,** and fix whatever the runs show.
-- [ ] **Step 4: Run** the same command, and once, `NIMW_PERF=1 … playwright test m4-perf`. Expected: PASS, with the spelling-on worst frame within the probe's existing bound. Record the numbers in the probe's reference comment.
+- [ ] **Step 4: Run** the same command, and once, `LIBER_PERF=1 … playwright test m4-perf`. Expected: PASS, with the spelling-on worst frame within the probe's existing bound. Record the numbers in the probe's reference comment.
 - [ ] **Step 5: Run the full gate** `$SP/check.sh all <worktree>`. Expected: ALL-OK.
 - [ ] **Step 6: Commit** `test(spell): e2e, zero-network and perf coverage for spell checking`.
 

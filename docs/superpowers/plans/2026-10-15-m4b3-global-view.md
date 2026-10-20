@@ -33,7 +33,7 @@ This plan records what ran: every task was implemented test-first in the Stream 
 - **Layering:** the stores layer never imports `features/global-view/` (`src/stores/layering.test.ts`).
 - **Edge performance:**
   - edges stay one SVG layer (`EdgeLayer`), with the `dashScale` and per-kind batching;
-  - NFR-03's probe stays under 300 ms: `NIMW_PERF=1 … playwright test m3a-perf`.
+  - NFR-03's probe stays under 300 ms: `LIBER_PERF=1 … playwright test m3a-perf`.
 - **Data contract with Stream B:** `GvCard` gains exactly `coverSide: 'top' | 'left' | 'right';` and `coverX: number | null;`, right after `coverY`. Rust's `GvCard` is Stream B's.
 - **Commits:** signed, ending with `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`.
 - **Build and test environment:**
@@ -67,7 +67,7 @@ This plan records what ran: every task was implemented test-first in the Stream 
 - Produces: `GvCard.coverSide: 'top' | 'left' | 'right'`, `GvCard.coverX: number | null`; the card's `.hit` carries `data-cover-side` when it shows a side strip.
 
 - [x] **Step 1: Write the failing e2e (chromium with WebView2's user agent).**
-  - `bandsPng(w, h)` writes a red/green/blue-banded PNG with `node:zlib`, routed at `http://nimw-asset.localhost/**` (the Windows UA makes `assetUrl` use it).
+  - `bandsPng(w, h)` writes a red/green/blue-banded PNG with `node:zlib`, routed at `http://liber-asset.localhost/**` (the Windows UA makes `assetUrl` use it).
   - A page with `cover: tall.png`, `cover-y: 100`.
   - The test asserts that the card image's box equals its frame (96 px tall), with `object-position: 50% 100%`.
 - [x] **Step 2: Run it. Failed as the friend saw it:** `img` 238 × **1190** in a 96 px frame in Chromium (WebKit passed).
@@ -153,7 +153,7 @@ This plan records what ran: every task was implemented test-first in the Stream 
   - the legend's elbow;
   - hover Gamma: the aggregated line at 0.15 and Alpha at 0.55;
   - hover Beta: the line at 1, One at 1, Alpha at 0.55, tree lines at 0.15.
-- [x] **Step 5: Perf probe.** `NIMW_PERF=1 playwright test m3a-perf --workers=1`:
+- [x] **Step 5: Perf probe.** `LIBER_PERF=1 playwright test m3a-perf --workers=1`:
   - chromium 200 cards: 175/135/108 ms;
   - webkit 94 cards: 176/100/117 ms;
   - webkit 200 cards: 242/182/144 ms (all < 300).
@@ -187,7 +187,7 @@ This plan records what ran: every task was implemented test-first in the Stream 
   - `jumpTo(view, from, to)`;
   - `openPageAt(path, from, to)`;
   - `useGvStore().seeAtoms(path, title)`;
-  - Rust `menu::ATOMS_ID = "nimw-see-atoms"`, emitting `menu:screen` with `"atoms"`.
+  - Rust `menu::ATOMS_ID = "liber-see-atoms"`, emitting `menu:screen` with `"atoms"`.
 
 - [x] **Step 1: Model and layout tests** (`atoms.test.ts`, 7 tests).
   - **The friend's note:** the sections are the two `#` headings far down. The intro is two paragraphs hanging from the page. A run of `![[…]]` lines is one image atom each, and the offsets slice back to the source.
@@ -201,7 +201,7 @@ This plan records what ran: every task was implemented test-first in the Stream 
     - tree pairs in order.
   - Green after `atoms.ts`; one test fixed: two lists with the same bullet are one list in Markdown, so the task list uses `*`.
 - [x] **Step 2: Jump and flash.**
-  - `flash.test.ts`: the cursor is on `from` and the lines of `from`–`to` get `cm-nimw-flash` for `FLASH_MS`. Past-the-end offsets are clamped, and a destroyed view is safe.
+  - `flash.test.ts`: the cursor is on `from` and the lines of `from`–`to` get `cm-liber-flash` for `FLASH_MS`. Past-the-end offsets are clamped, and a destroyed view is safe.
   - Editor test: a jump for `A.md` waits while `B.md` shows, then lands, once.
   - Red (no jump), then green with the `Editor.tsx` effect.
 - [x] **Step 3: Store, canvas, cards, toolbar, menu.**
@@ -214,7 +214,7 @@ This plan records what ran: every task was implemented test-first in the Stream 
     - Rust's View → See Atoms of This Page emits `menu:screen` with `"atoms"`.
     - `seeAtomsMenu.ts` (the feature, not `stores/`: `layering.test.ts` failed when `menuToggles.ts` imported the store) opens the open Markdown page's atoms.
 - [x] **Step 4: `GlobalView.atoms.test.tsx`** (7 tests):
-  - **Entry:** the card's Atoms button shows the sections, blocks, the linked page (Sparda) and the related page (Mentor), but not a backlink alone (Fan). The image thumbnail is `nimw-asset://localhost/assets/rex.png`.
+  - **Entry:** the card's Atoms button shows the sections, blocks, the linked page (Sparda) and the related page (Mentor), but not a backlink alone (Fan). The image thumbnail is `liber-asset://localhost/assets/rex.png`.
   - **Edges:** 6 tree edges; the link edge `atom:0 → Sparda.md`; the manual edge to Mentor.
   - **Breadcrumb:** as above.
   - **Clicks:** a block sets `jump` to the list's offsets; a section to its heading.
@@ -225,7 +225,7 @@ This plan records what ran: every task was implemented test-first in the Stream 
     - lists and tables are named by their first items or columns.
 - [x] **Step 5: e2e** (chromium + webkit):
   - **The map:** headings, code `js`, list, Sparda's card and the link edge to it; trunk routes `MVH`; the breadcrumb.
-  - **A click on the list** opens Rex with `.cm-nimw-flash` on "water", and the selection there.
+  - **A click on the list** opens Rex with `.cm-liber-flash` on "water", and the selection there.
   - **Keyboard:** ArrowDown from a heading reaches its first block. Escape goes back with focus on Rex's card.
   - **axe** light and dark, with the pointer off the cards: hover dimming is a passing state, and Chromium's axe flagged a dimmed card's Edit button while the pointer rested on another card.
   - The mock titles pages by their first `# ` anywhere (Stream B's §1 fixes the app, not the mock), so the e2e page starts with `# Rex`.

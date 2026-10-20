@@ -46,7 +46,7 @@ The user picks one or more dictionaries.
 
 ## 2. Engine and dictionaries
 
-- **Engine.** Use a pure-Rust, Hunspell-compatible checker in a new crate, `nimw-spell`.
+- **Engine.** Use a pure-Rust, Hunspell-compatible checker in a new crate, `liber-spell`.
   - **Candidate:** `spellbook` (the Helix editor project). The plan must verify, from primary sources, its version, licence, Hunspell feature coverage (affixes, compounding as used by the es and en dictionaries), and suggestion support.
   - **Requirements:**
     - pure Rust;
@@ -67,7 +67,7 @@ The user picks one or more dictionaries.
 
 ## 3. Words the user adds
 
-- **Add to dictionary** writes the word to the **vault's** word list, `.nimw/spelling.txt`: one word per line, NFC-normalised, sorted, deduplicated.
+- **Add to dictionary** writes the word to the **vault's** word list, `.liber/spelling.txt`: one word per line, NFC-normalised, sorted, deduplicated.
   - **Why the vault, not the app:** an encrypted vault (encryption spec §5) must not leave words derived from its content outside itself. The list therefore lives in the vault and is encrypted with it.
   - **What it costs:** a word added in one vault isn't known in another.
 - **Ignore** lasts only for the session, per vault, and is held in memory.
@@ -80,7 +80,7 @@ The user picks one or more dictionaries.
   - **Dictionaries:** a list of checkboxes. The three bundled dictionaries come first, then imported ones, each with Remove.
   - **Add dictionary from disk…**
   - **Default selection:** the dictionary matching the app language. English selects `en_US`; Spanish selects `es`, the generic Spanish (_my call_: `es` covers every region, and Jose can switch to `es_CO`).
-- **"This vault"** gains a "Spelling" control with two choices: "Use the app's dictionaries", or a custom set (the same checkbox list). The choice is stored in `.nimw/vault.json` as `spelling: { dictionaries: [ids] } | absent`.
+- **"This vault"** gains a "Spelling" control with two choices: "Use the app's dictionaries", or a custom set (the same checkbox list). The choice is stored in `.liber/vault.json` as `spelling: { dictionaries: [ids] } | absent`.
 
 ## 5. What gets checked
 
@@ -142,8 +142,8 @@ Each ruling ends with what it costs if it turns out wrong.
 
 **Storage and packaging**
 
-1. **Added words live in `.nimw/vault.json`** under `spellingWords`, not in a separate `.nimw/spelling.txt`. This reuses the existing atomic, compare-and-swap JSON update, and the words still live inside the vault, so encryption §5 holds. The words are NFC-normalised, sorted and unique. _Cost if wrong:_ moving one key into its own file.
-2. **The dictionaries are compiled into the binary** with `include_str!`; they are not Tauri resources. They are `dictionary-en@4.0.0`, `dictionary-es@4.0.0` and `dictionary-es-co@2.0.0` from wooorm/dictionaries, with their licence and source in `crates/nimw-spell/dictionaries/*/`. The Spanish sets are used under GPL-3.0. _Cost:_ the binary grows by about 2.3 MB.
+1. **Added words live in `.liber/vault.json`** under `spellingWords`, not in a separate `.liber/spelling.txt`. This reuses the existing atomic, compare-and-swap JSON update, and the words still live inside the vault, so encryption §5 holds. The words are NFC-normalised, sorted and unique. _Cost if wrong:_ moving one key into its own file.
+2. **The dictionaries are compiled into the binary** with `include_str!`; they are not Tauri resources. They are `dictionary-en@4.0.0`, `dictionary-es@4.0.0` and `dictionary-es-co@2.0.0` from wooorm/dictionaries, with their licence and source in `crates/liber-spell/dictionaries/*/`. The Spanish sets are used under GPL-3.0. _Cost:_ the binary grows by about 2.3 MB.
 3. **The engine is `spellbook` 0.4.2** (MPL-2.0, pure Rust). Suggestions work, so no fallback suggester was needed.
 4. **Imported dictionaries get the id `user:<slug>`** and live in `<config>/dictionaries/user-<slug>/`, because `:` isn't valid in Windows folder names. The import picker runs in Rust through the cover-picker test hook, so no path ever comes from the webview. _Cost if wrong:_ a rename.
 5. **A deleted dictionary reports `available: false`.** If an imported dictionary's files are deleted by hand, it says so even while it is still loaded in memory. _Cost:_ none.
@@ -165,7 +165,7 @@ From the fresh-context review of round 3b plus spell checking, fixed test-first 
 - **No dictionary (#2).** With no usable dictionary active (none ticked, or only imported ones whose files are gone), nothing is flagged. Settings → Spelling says "No dictionary selected — spelling is not checked" ("Ningún diccionario seleccionado: no se revisa la ortografía").
 - **Stale answers (#3).** A check answered after the dictionaries changed is dropped; the bump already scheduled a fresh one.
 - **Licences (#4).** `THIRD-PARTY-NOTICES.md` credits spellbook (MPL-2.0) and the three dictionaries with their sources, versions and licences. The licence texts ship in the app's resources under `licenses/`. A test fails if a bundled dictionary's `LICENSE` isn't both named and bundled.
-- **Case forms (#7).** An added word also matches its Title and ALL-CAPS forms, as Hunspell does for its own words: `nimw` accepts `Nimw` and `NIMW`. Mixed case such as `nImw` still matches only itself.
+- **Case forms (#7).** An added word also matches its Title and ALL-CAPS forms, as Hunspell does for its own words: `liber` accepts `Liber` and `LIBER`. Mixed case such as `lIber` still matches only itself.
 - **Language change (#8).** Changing the UI language bumps the spell key, so answers are re-checked against the new language's default dictionary.
 - **Menu placement (#11).** The spelling menu is placed with `placePopup`, so it stays inside the window, and Tab closes it and gives focus back to the editor.
-- **Caching (#12).** A vault's spelling settings are cached until `.nimw/vault.json` changes (keyed on its mtime and size), and also dropped after this app writes them. An imported dictionary that fails to load isn't read again until its files' modification times change, or it is removed and re-imported.
+- **Caching (#12).** A vault's spelling settings are cached until `.liber/vault.json` changes (keyed on its mtime and size), and also dropped after this app writes them. An imported dictionary that fails to load isn't read again until its files' modification times change, or it is removed and re-imported.

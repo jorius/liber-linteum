@@ -7,8 +7,8 @@
 ## 1. Full page width (F12): app, vault and page
 
 - **Three levels**, the most specific set one winning:
-  1. **Page:** `.nimw/vault.json` `pageWidths: { "<page path>": "full" | "readable" }`.
-  2. **Vault:** `.nimw/vault.json` `pageWidth: "full" | "readable"` (absent = use the app's).
+  1. **Page:** `.liber/vault.json` `pageWidths: { "<page path>": "full" | "readable" }`.
+  2. **Vault:** `.liber/vault.json` `pageWidth: "full" | "readable"` (absent = use the app's).
   3. **App:** `settings.json` `pageWidth: "readable" | "full"` (default `readable`).
 
   Page entries follow renames and moves, through the same Rust choke points as the M3a layout remap. Notes themselves are never written.
@@ -48,7 +48,7 @@
   - A `$` followed by a space or digit-space doesn't open maths, so prices like `$5 and $10` stay text (as in Obsidian).
   - The incremental re-parse falls back to a full parse when an edit touches a `$$` line.
 - **Rendering (preview, widgets):**
-  - math nodes become `data-nimw="math"` placeholders carrying the TeX, which pass the sanitizer;
+  - math nodes become `data-liber="math"` placeholders carrying the TeX, which pass the sanitizer;
   - a React `Math` component renders them with `katex.render` (`throwOnError: false`, `trust: false`, `strict: "ignore"`, `output: "htmlAndMathml"`) for accessibility;
   - errors show the source in red with the KaTeX message as a `title`.
 - **Live Preview:** inline maths renders as a widget when the cursor isn't inside it; `$$` blocks render as block widgets (cursor-in shows the source).
@@ -159,7 +159,7 @@ The plan (`docs/superpowers/plans/2026-10-14-m4b-part2.md`) was replayed end to 
 ### Code (§2)
 
 3. **Tokens are generated per palette** by an OKLCH lightness search to ≥ 4.6:1 on `--color-code-bg`. `--code-variable` is the text colour, and `--code-punct` the muted colour where that is readable.
-4. **The editor colours tokens through classes** (`cm-nimw-code-*`), so a few Markdown tags take token colours too, such as a link title as a string.
+4. **The editor colours tokens through classes** (`cm-liber-code-*`), so a few Markdown tags take token colours too, such as a link title as a string.
 5. **The fence id written by the picker** is the language's shortest language-data alias, or else its name in lower case (so Python is written `python`; language-data has no `py` alias). "Plain text" clears the id. The picker is its own combobox; the shared `PickerPopup` is a page search.
 
 ### Maths (§3)
@@ -175,7 +175,7 @@ The plan (`docs/superpowers/plans/2026-10-14-m4b-part2.md`) was replayed end to 
 11. **The Safari 15.0–15.3 message** shows when a render fails on a WebKit without `structuredClone`, `Array.prototype.at` or `Object.hasOwn`.
 12. **Frozen prototypes: `freezeSafe` is now general.**
     - **Why:** Mermaid's tree has a long tail of code that assigns names `Object.prototype` defines: dayjs (`valueOf`/`toString`, which broke every diagram), d3-format (gantt), the vscode-jsonrpc copy in `@mermaid-js/parser`, layout-base, and cytoscape's `Object.assign` mixins (mindmap, architecture).
-    - **What it does:** the transform parses every `node_modules` file that could need it, using Vite's oxc parser. It rewrites `obj.name = v` to `__nimwOwn(obj, "name").name = v`, and reads of `Object.assign` to `__nimwAssign`. Strings and comments are never touched.
+    - **What it does:** the transform parses every `node_modules` file that could need it, using Vite's oxc parser. It rewrites `obj.name = v` to `__liberOwn(obj, "name").name = v`, and reads of `Object.assign` to `__liberAssign`. Strings and comments are never touched.
     - **Semantics:** the helper defines an own writable, enumerable property only when the inherited one is a read-only data property, so behaviour is unchanged elsewhere.
     - **What it replaces:** the M3a d3-color rule.
     - **Not covered:** computed keys (`obj[k] = v`), for cost.

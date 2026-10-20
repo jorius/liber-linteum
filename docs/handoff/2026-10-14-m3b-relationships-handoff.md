@@ -18,7 +18,7 @@
 | Connect two cards: drag from the connect handle, or the card menu → Connect to… → a card (click or keyboard); folders stand for their index note | done, tested |
 | Relationships dialog: label (≤ 40), arrow, delete; opened from a card's menu or by clicking a direct relationship edge | done, tested |
 | Writing `related:` in the source page: string or one-line flow map, byte-minimal, read back or refused; open pages undoable through the editor, closed pages written against their hash with one retry | done, tested |
-| Index note pick for folders without a named/`index.md` note (`.nimw/vault.json` `indexPicks`, follows renames) | done, tested |
+| Index note pick for folders without a named/`index.md` note (`.liber/vault.json` `indexPicks`, follows renames) | done, tested |
 | Scalar `related: "[[X]]"` indexed by Rust (TS parity) | done, tested |
 | Safari 15: no `color-mix()` (generated sidebar shades and backdrops), React Flow click-to-connect `structuredClone` path off | done, tested (CSS guard) |
 | Final review (opus) + fix pass (§13): 4 Important, 17 upgraded minors fixed test-first | done |
@@ -31,18 +31,18 @@ Totals after the fix pass: **766 vitest tests (77 files)**, **97 Playwright test
 | What | Command (repo root) |
 |---|---|
 | Everything (CI gate) | `pnpm check` |
-| UI unit tests | `pnpm --filter @nimw/desktop exec vitest run --maxWorkers=2` |
+| UI unit tests | `pnpm --filter @liber/desktop exec vitest run --maxWorkers=2` |
 | E2E | `pnpm test:e2e` |
-| Regenerate palette CSS | `pnpm --filter @nimw/desktop gen:palettes` |
+| Regenerate palette CSS | `pnpm --filter @liber/desktop gen:palettes` |
 | App (dev) | `pnpm dev` (Rust changed: restart) |
 
 ## 3. Backend map
 
 | File | What it does |
 |---|---|
-| `crates/nimw-markdown/src/frontmatter.rs` | scalar `related:` indexed (string or map) |
-| `crates/nimw-vault/src/{vault,layout}.rs` | `set_index_pick`, `remap_index_picks_many` (picks follow renames) |
-| `crates/nimw-session/src/global_view.rs` | `IndexFrom` (`named`/`index`/`picked`/`only`), `index_pick_set`, `link_target` |
+| `crates/liber-markdown/src/frontmatter.rs` | scalar `related:` indexed (string or map) |
+| `crates/liber-vault/src/{vault,layout}.rs` | `set_index_pick`, `remap_index_picks_many` (picks follow renames) |
+| `crates/liber-session/src/global_view.rs` | `IndexFrom` (`named`/`index`/`picked`/`only`), `index_pick_set`, `link_target` |
 | `apps/desktop/src-tauri/src/gv_commands.rs` | commands `link_target(source, target)`, `index_pick_set(folder, page?)` |
 
 ## 4. Frontend map (`apps/desktop/src/`)
@@ -78,7 +78,7 @@ Totals after the fix pass: **766 vitest tests (77 files)**, **97 Playwright test
 
 | Layer | Files |
 |---|---|
-| Rust | `crates/nimw-markdown` frontmatter unit tests (scalar `related:`, single-quoted links), `crates/nimw-session/tests/global_view.rs` (index picks: set/validate/follow renames/leave the folder; folder relationships are direct edges; `link_target`), `apps/desktop/src-tauri/tests/commands.rs` (`link_target`, `index_pick_set` real ACL) |
+| Rust | `crates/liber-markdown` frontmatter unit tests (scalar `related:`, single-quoted links), `crates/liber-session/tests/global_view.rs` (index picks: set/validate/follow renames/leave the folder; folder relationships are direct edges; `link_target`), `apps/desktop/src-tauri/tests/commands.rs` (`link_target`, `index_pick_set` real ACL) |
 | TS | `markdown/related.test.ts` (forms, comments, null, quoting, a sweep of shapes × edits: exact read-back or refusal), `stores/relations.test.tsx` (open page undoable, background page live text, CAS retry, duplicates, pending saves, unlinkable names), `features/global-view/{Connect,RelationsDialog,IndexPickDialog,GlobalView.edges}.test.tsx` (connect by drag/click/keyboard, Escape everywhere, focus return, corner cases, dialogs, memoised hits, `connectOnClick` pin), `theme/cssCompat.test.ts` (no `color-mix(`) |
 | E2E | `e2e/m3b.spec.ts`: connect by click, keyboard and drag (incl. drops on header/footer), edit/delete from the edge, folder↔folder edge, pick an index note, focus after menu dialogs, menu inside the landmark + axe, zero-network |
 
@@ -151,7 +151,7 @@ From spec §11 (final review):
 |---|---|
 | "Edit it in Source mode" toast when connecting | the page's `related:` uses a form the guard refuses (block scalar, comments inside a flow list): edit it in Source |
 | A relationship didn't appear | check the toast: the page changed on disk twice in a row, or its name contains `#`, `\|` or `^` |
-| `read fixture dir: NotFound` in cargo tests | a test binary was built in a removed worktree: `cargo clean -p nimw-testkit -p nimw-desktop -p nimw-session -p nimw-vault -p nimw-index -p nimw-markdown` |
+| `read fixture dir: NotFound` in cargo tests | a test binary was built in a removed worktree: `cargo clean -p liber-testkit -p liber-desktop -p liber-session -p liber-vault -p liber-index -p liber-markdown` |
 
 ## 12. Next steps
 

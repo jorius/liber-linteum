@@ -62,7 +62,7 @@ The Source and Split modes are unchanged. Large-note limits (`LARGE_NOTE_CHARS`)
 - **Width.** `sidebarWidth` is app-wide in `settings.json`, 270 px by default, and clamped to 200–560. An out-of-range number is clamped; a non-number resets on its own with the usual warning.
   - Keys save on each press: ←/→ by 16 px, Shift ×4, Home/End to the limits.
   - A drag saves once, on release. A double-click resets.
-  - _Cost if wrong:_ a per-vault width would need a `.nimw/vault.json` key instead.
+  - _Cost if wrong:_ a per-vault width would need a `.liber/vault.json` key instead.
 - **Hidden actions take no room.** Before, the invisible actions (opacity 0) still took ~100 px, which is why "Bug Bou…" was cut short with space to spare. Now they are `max-width: 0` until hover, focus or selection. While the pointer is on a row, its name gives way to the three buttons; Notion does the same.
 - **★ on rows.** Pages and folders get it, but attachments and Archived items don't, matching what the context menu allows. It is labelled "Add {name} to Favorites" / "Remove {name} from Favorites" and has `aria-pressed`.
 - **Favorites section rows.** They lose their "…" as well (right-click and Shift+F10 still open the menu) and keep their filled ★ only. _Cost if wrong:_ he may want ☺ and 🗑 there too, which is a small addition.

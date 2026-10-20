@@ -17,7 +17,7 @@ Jose's decisions (2026-10-20):
 
 **Goals**
 
-- **G1. At rest, an encrypted vault reveals nothing but its shape.** File contents, file and folder names, the vault's own settings (`.nimw/`), Trash, Archive and the search index are all unreadable without a key. The only things left visible are the number of files and folders, their nesting, their approximate sizes and their times (§9).
+- **G1. At rest, an encrypted vault reveals nothing but its shape.** File contents, file and folder names, the vault's own settings (`.liber/`), Trash, Archive and the search index are all unreadable without a key. The only things left visible are the number of files and folders, their nesting, their approximate sizes and their times (§9).
 - **G2. Sync-friendly.** One ciphertext file per note or attachment, so iCloud, Dropbox, Syncthing and Git sync and version it like any folder, and two machines can use it.
 - **G3. Several ways in, one key.** A passphrase, a recovery key, the keyring, and "this device" (Touch ID / Windows Hello) each unlock the same vault key. Changing the passphrase never re-encrypts the vault.
 - **G4. Locks itself.** On idle, sleep, screen lock and quit. Locking never loses an edit.
@@ -64,19 +64,19 @@ Each encrypted vault has one random 256-bit **vault key** (VK), made from the OS
 
 | Key | info | Use |
 |---|---|---|
-| K_content | `nimw/v1/content` | root for per-file content keys (§4.2) |
-| K_name (64 bytes) | `nimw/v1/name` | AES-SIV-256 for names (§4.3) |
-| K_header | `nimw/v1/header` | HMAC-SHA-256 over the vault header (§3.2) |
-| K_index | `nimw/v1/index` | optional encrypted index snapshot (§5.1) |
+| K_content | `liber/v1/content` | root for per-file content keys (§4.2) |
+| K_name (64 bytes) | `liber/v1/name` | AES-SIV-256 for names (§4.3) |
+| K_header | `liber/v1/header` | HMAC-SHA-256 over the vault header (§3.2) |
+| K_index | `liber/v1/index` | optional encrypted index snapshot (§5.1) |
 
 Keys live in Rust only, in `secrecy`/`zeroize` wrappers, and are `mlock`ed via `region` where the OS allows. Locking drops and zeroizes them (§6).
 
 ### 3.2 Key slots (the vault header)
 
-`nimw-vault.json` at the vault root is plaintext and contains nothing secret:
+`liber-vault.json` at the vault root is plaintext and contains nothing secret:
 
 - the format version, the cipher suite and `vault_id`;
-- a list of **slots**, where each slot is VK wrapped with AES-256-GCM under a slot key (KEK), with a random 12-byte nonce and AAD = `"nimw/v1/slot" ‖ vault_id ‖ slot_id ‖ slot_type`;
+- a list of **slots**, where each slot is VK wrapped with AES-256-GCM under a slot key (KEK), with a random 12-byte nonce and AAD = `"liber/v1/slot" ‖ vault_id ‖ slot_id ‖ slot_type`;
 - `mac`, which is HMAC-SHA-256(K_header, canonical JSON of everything else). It is checked after every unlock, so a tampered header (swapped slots, downgraded parameters) is refused. The design follows LUKS2 keyslots and the Cryptomator masterkey file (facts §3).
 
 Slot types in v1:
@@ -84,7 +84,7 @@ Slot types in v1:
 | Type | KEK from | Required | Notes |
 |---|---|---|---|
 | `passphrase` | Argon2id(passphrase NFC-normalised, 32-byte salt, params) | yes, exactly one | params are stored per slot. Default m = 256 MiB, t = 3, p = 4, calibrated at creation to 0.5–2 s and never below m = 64 MiB, t = 3. That is far above the OWASP floor (46 MiB / t = 1) and the Bitwarden/KeePassXC defaults (facts §3) |
-| `recovery` | HKDF-SHA-256(recovery secret, salt = vault_id) | yes, exactly one | 256-bit random secret shown **once** at creation as `NIMW-` + 52 Crockford base32 characters in groups of 4, with a checksum group for typos. The user must type two groups back before the vault is created |
+| `recovery` | HKDF-SHA-256(recovery secret, salt = vault_id) | yes, exactly one | 256-bit random secret shown **once** at creation as `LIBER-` + 52 Crockford base32 characters in groups of 4, with a checksum group for typos. The user must type two groups back before the vault is created |
 | `keyring` | hybrid KEM to the keyring's public key (§3.3) | optional, at most one per keyring | can be added without unlocking the keyring, since only the public key is needed |
 | `device` | 256-bit random secret in the OS keychain, biometry-bound (§6.3) | optional, one per device | "Unlock with Touch ID on this Mac" |
 | reserved: `recipient` | public-key wrap to another person | later (share) | type id reserved now (G7); readers in v1 skip unknown slot types |
@@ -115,7 +115,7 @@ The keyring is an app-level identity that holds one **hybrid keypair**: X25519 p
   3. Wrap VK with AES-256-GCM.
 
   An attacker has to break *both* X25519 and ML-KEM. That matters because the `ml-kem` crate is unaudited (facts §1), so X25519 stays the floor.
-- **Storage.** The keyring file `keyring.nimwk` lives in the app data dir. Public keys are in the clear. The private keys are wrapped by their own slots: a keyring passphrase (Argon2id as above), a keyring recovery key, and an optional `device` slot.
+- **Storage.** The keyring file `keyring.liberk` lives in the app data dir. Public keys are in the clear. The private keys are wrapped by their own slots: a keyring passphrase (Argon2id as above), a keyring recovery key, and an optional `device` slot.
 - **One unlock opens every vault in the keyring.** The keyring **locks on the same triggers as vaults** (idle, sleep, screen lock, quit; §6.2). After any lock, the person at the Mac needs the keyring passphrase or biometry again, which keeps §2 true. One keyring unlock then reopens every enrolled vault.
 - **Enrolled vaults only.** The keyring stores a list of enrolled vaults: `vault_id` → HMAC-SHA-256(keyring MAC key, `vault_id` ‖ K_header). It opens a vault silently only when the vault's unwrapped keys match that commitment. Public-key wrapping is unauthenticated, so without this list anyone with the public key could plant a look-alike vault, with a key they know, in a synced folder, and the app would open it silently (builder check, flaw 5). An unknown vault with a keyring slot asks first: "Add this vault to your keyring?" with the passphrase.
 - **New encrypted vaults** get a keyring slot automatically when a keyring exists. **Existing encrypted vaults** can be added from Settings → Security.
@@ -128,14 +128,14 @@ The keyring is an app-level identity that holds one **hybrid keypair**: X25519 p
 
 ```
 My Vault/                         ← the folder the user picks
-  nimw-vault.json                 ← header + slots (plaintext, no secrets)
-  README.txt                      ← plaintext: "Encrypted Notes In My Way vault. Open it with Notes In My Way."
+  liber-vault.json                 ← header + slots (plaintext, no secrets)
+  README.txt                      ← plaintext: "Encrypted Liber Linteum vault. Open it with Liber Linteum."
   d/                              ← everything else; names encrypted
     <enc-name>/                   ← a folder (its encrypted name also carries its random id, §4.3)
-      <enc-name>.nimwe            ← a file (note, attachment, .nimw/*.json, Trash, Archive…)
+      <enc-name>.libere            ← a file (note, attachment, .liber/*.json, Trash, Archive…)
 ```
 
-The folder tree mirrors the logical tree, so syncing and moving behave like a normal folder (G2). `.nimw/`, `.trash/`, `.archive/` and the vault Scratchpad are ordinary encrypted folders under `d/`.
+The folder tree mirrors the logical tree, so syncing and moving behave like a normal folder (G2). `.liber/`, `.trash/`, `.archive/` and the vault Scratchpad are ordinary encrypted folders under `d/`.
 
 ### 4.2 File contents: chunked AES-256-GCM (STREAM)
 
@@ -143,7 +143,7 @@ Header (48 bytes), which is also the AAD of every chunk:
 
 | Offset | Size | Field |
 |---|---|---|
-| 0 | 5 | magic `NIMWE` |
+| 0 | 5 | magic `LIBER` |
 | 5 | 1 | format version = 1 |
 | 6 | 1 | suite = 1 (AES-256-GCM); 2 reserved for XChaCha20-Poly1305 |
 | 7 | 1 | log2 of the chunk size = 16 (64 KiB) |
@@ -151,7 +151,7 @@ Header (48 bytes), which is also the AAD of every chunk:
 | 40 | 4 | key epoch (u32 BE, §3.2) |
 | 44 | 4 | reserved, zero |
 
-- **File key** K_f = HKDF-SHA-256(K_content, salt = file salt, info = `nimw/v1/file`). Each write gets a fresh key, so counter nonces never repeat.
+- **File key** K_f = HKDF-SHA-256(K_content, salt = file salt, info = `liber/v1/file`). Each write gets a fresh key, so counter nonces never repeat.
 - **Chunk *i*** = AES-256-GCM(K_f, nonce = 11-byte big-endian *i* ‖ last-flag byte, AAD = header) → ciphertext ‖ 16-byte tag. This is age's STREAM construction (facts §2).
   - A truncated file fails, because its last chunk has no last-flag.
   - Reordered chunks fail, because the counter is in the nonce.
@@ -162,7 +162,7 @@ Header (48 bytes), which is also the AAD of every chunk:
 - **Writes** go through the existing atomic path: write a temp file, then rename.
 - **Writers only append; a chunk is written once.** The encrypted writer never seeks. It emits a chunk only when the chunk is complete, plus the final short chunk with the last-flag at close. Re-encrypting a chunk under the same K_f and nonce would be GCM nonce reuse, which leaks the XOR of the plaintexts and the authentication key. Any in-place fix-up is therefore a **new file with a fresh salt**.
 - **Recordings.** Today's recorder rewrites the WAV header every 2 s through `hound`'s seek. That would be exactly the nonce reuse above (builder check, flaw 1). For an encrypted vault:
-  - the take is written append-only into the vault itself (`.nimw/recording/`, encrypted under K_content), never to the plaintext cache dir;
+  - the take is written append-only into the vault itself (`.liber/recording/`, encrypted under K_content), never to the plaintext cache dir;
   - the WAV header carries placeholder sizes;
   - at Stop, the file is rewritten once with correct sizes and a fresh salt, then moved into place.
   - **Crash:** only complete chunks survive, losing at most the last 64 KiB (≈ 0.4 s of 44.1 kHz stereo). Recovery runs at that vault's next unlock: it decrypts the complete chunks, writes a corrected copy with a fresh salt, and saves it as `clip-…-recovered.wav`. That is the same promise as today's M6 recovery.
@@ -170,22 +170,22 @@ Header (48 bytes), which is also the AAD of every chunk:
 ### 4.3 Names
 
 - **Encryption.** Each name component (NFC-normalised UTF-8) is encrypted with AES-SIV-256 (RFC 5297) under K_name, with AD = `vault_id ‖ epoch ‖ parent folder id`. Encoding is Base64url without padding.
-  - **Files:** the SIV plaintext is the name, and `.nimwe` is appended.
+  - **Files:** the SIV plaintext is the name, and `.libere` is appended.
   - **Folders:** the SIV plaintext is `folder id (16 random bytes) ‖ name`, so a folder's encrypted name carries its own id. The root's id is 16 zero bytes.
 - **Why bind to the parent's id.** Two "Notes.md" files in different folders don't look alike. Renaming or moving a folder re-encrypts only that folder's own name, keeping its id, so its subtree is untouched. Cryptomator does the same (facts §3).
 - **Why there is no id file.** Cryptomator keeps the id in a separate file. Here it lives in the name, so there is no hidden file whose loss would make a whole folder's names unrecoverable (builder check, flaw 6).
 - **Lookups.** Files are found by computing the ciphertext name. Folders are found by listing the parent, because their ciphertext depends on the random id. Decrypted listings are cached in memory while the vault is unlocked.
-- **Long names.** An encoded name longer than 200 bytes becomes `<base32(SHA-256(encoded))[..32]>.nimwl`. Its full encrypted name is stored in a small encrypted side file `<same>.nimwn` next to it. This keeps us under the 255-byte name limits and well under Windows path limits.
+- **Long names.** An encoded name longer than 200 bytes becomes `<base32(SHA-256(encoded))[..32]>.liberl`. Its full encrypted name is stored in a small encrypted side file `<same>.libern` next to it. This keeps us under the 255-byte name limits and well under Windows path limits.
 - **Case-insensitive file systems** (APFS default, NTFS). Two different SIV outputs that collide when case is ignored are astronomically unlikely (128-bit tags). The writer still checks for a collision and refuses the write if it ever happens.
-- **Sync conflicts and stray files never hide a note** (builder check, gap 4). Dropbox, iCloud and Syncthing rename conflicts, e.g. `<enc> (conflicted copy …).nimwe` or `<enc>.sync-conflict-….nimwe`.
+- **Sync conflicts and stray files never hide a note** (builder check, gap 4). Dropbox, iCloud and Syncthing rename conflicts, e.g. `<enc> (conflicted copy …).libere` or `<enc>.sync-conflict-….libere`.
   - **Known conflict patterns.** The decoder strips the provider's suffix and decrypts the name. The content always decrypts, because content keys don't depend on names. The file then appears as `Name (conflict <date>)` next to the original.
   - **Names that can't be decoded at all** appear in a "Couldn't read" list in the vault's Settings, with Export and Show in Finder. They are never deleted.
-  - **Conflicted copies of `nimw-vault.json`** are merged after unlock: every slot that unwraps to the same VK and epoch is kept, and the MAC is rewritten.
+  - **Conflicted copies of `liber-vault.json`** are merged after unlock: every slot that unwraps to the same VK and epoch is kept, and the MAC is rewritten.
 - **Crate.** `aes-siv` is unaudited (facts §1). The construction is standard RFC 5297. The crate is named explicitly in the external review scope (§12).
 
 ### 4.4 Format spec and vectors
 
-`docs/security/vault-format-v1.md` gives the byte-level description of §3–§4. `crates/nimw-crypto/tests/vectors/` holds frozen vectors: a header, slots of each type, files at 0, 1, 65 535, 65 536 and 200 000 bytes, names, and a long name. An independent ~150-line Python reader, using the `cryptography` package, decrypts the vectors in a test. That makes it a second implementation that keeps us honest.
+`docs/security/vault-format-v1.md` gives the byte-level description of §3–§4. `crates/liber-crypto/tests/vectors/` holds frozen vectors: a header, slots of each type, files at 0, 1, 65 535, 65 536 and 200 000 bytes, names, and a long name. An independent ~150-line Python reader, using the `cryptography` package, decrypts the vectors in a test. That makes it a second implementation that keeps us honest.
 
 ## 5. Everything that isn't a vault file
 
@@ -195,7 +195,7 @@ The rule is that **nothing derived from an encrypted vault's content is written 
    - For encrypted vaults the SQLite index is opened in memory (`:memory:`), filled at unlock, and dropped at lock.
    - SQLCipher is rejected. Its Windows cross-build from macOS is the biggest build risk found (facts §4).
    - If unlock-to-searchable on 10 000 notes exceeds 3 s on Jose's Mac, phase E3b adds an **encrypted snapshot**: serialize the DB, encrypt it with K_index, store it in the cache dir, and reindex by mtime and size after loading.
-2. **App data.** The recent vaults list shows an encrypted vault by folder name with a lock icon. Its emoji and name live inside the vault. Session state, Global View positions, cover positions, favourites and icons all live in the vault's own (encrypted) `.nimw/`. Anything app-side keyed by vault path is audited and moved, or keyed by `vault_id` and holds no content.
+2. **App data.** The recent vaults list shows an encrypted vault by folder name with a lock icon. Its emoji and name live inside the vault. Session state, Global View positions, cover positions, favourites and icons all live in the vault's own (encrypted) `.liber/`. Anything app-side keyed by vault path is audited and moved, or keyed by `vault_id` and holds no content.
 3. **WebView.**
    - The asset protocol keeps `Cache-Control: no-store`.
    - The UI must not persist note content in `localStorage` or IndexedDB. Today they hold per-viewer conveniences only; audit and test this.
@@ -204,7 +204,7 @@ The rule is that **nothing derived from an encrypted vault's content is written 
 5. **Opening an attachment in another app** (Preview, a PDF reader) needs a plaintext file. It asks first ("A decrypted copy will be written to a temporary folder until the vault locks"), writes into a per-session temp dir, and deletes it on lock or quit. This is listed as a residual risk.
 6. **Logs and crash reports** never contain content or names. A test greps the logs for the canary.
 7. **Clipboard.** Copy and paste go through the WebView. Native clipboard marking (concealed/transient on macOS, history exclusion on Windows) is a later hardening item and documented as residual.
-8. **Spotlight and QuickLook** see only `.nimwe` blobs, so nothing is indexed or thumbnailed. This is better than today.
+8. **Spotlight and QuickLook** see only `.libere` blobs, so nothing is indexed or thumbnailed. This is better than today.
 
 ## 6. Unlock, lock, auto-lock
 
@@ -244,7 +244,7 @@ The rule is that **nothing derived from an encrypted vault's content is written 
 
 ## 8. Code architecture
 
-- **New crate `nimw-crypto`**, with no I/O and no Tauri. It holds:
+- **New crate `liber-crypto`**, with no I/O and no Tauri. It holds:
   - keys and slots (create, unwrap, rewrap);
   - the keyring;
   - the file STREAM reader/writer (`Read + Seek` and `Write` adapters);
@@ -253,7 +253,7 @@ The rule is that **nothing derived from an encrypted vault's content is written 
   - vectors, property tests and fuzz targets.
 
   Dependencies, all MIT/Apache or BSD, all inside deny.toml's allow list: `aes-gcm`, `aes-siv`, `hkdf`, `sha2`, `hmac`, `argon2`, `x25519-dalek`, `ml-kem`, `zeroize`, `secrecy`, `region`, `getrandom`.
-- **`nimw-vault` gets a storage seam.**
+- **`liber-vault` gets a storage seam.**
   - A `Storage` trait with `PlainStorage` (today's behaviour, byte for byte) and `EncryptedStorage` (logical path ↔ ciphertext path, encrypt on write, decrypt on read).
   - Every direct `std::fs` use in the crates and in `src-tauri` is routed through `Vault`. The 25 files found by grep are listed in the plan.
   - Index, session, import, audio, asset protocol and commands all speak logical paths only.
@@ -270,7 +270,7 @@ The rule is that **nothing derived from an encrypted vault's content is written 
 - The number of files and folders, and how they nest.
 - Approximate file sizes (to 16 bytes per 64 KiB, plus the 48-byte header).
 - Modification times, and which files change together. Sync history shows edit activity.
-- That the folder is a NIMW encrypted vault, and its Argon2id parameters.
+- That the folder is a Liber Linteum encrypted vault, and its Argon2id parameters.
 - Swapping two ciphertext files, or restoring an older version of one, is not detected. Content isn't bound to its path, so that renames stay cheap (§4.3). An attacker who can write the folder can also simply delete files.
 
 ## 10. Testing
@@ -304,7 +304,7 @@ The rule is that **nothing derived from an encrypted vault's content is written 
 
 ## 12. Assurance
 
-- The feature is labelled **beta** in the UI until an external review of `nimw-crypto` and the format spec is done. The review scope names the unaudited crates (`aes-siv`, `ml-kem`, `argon2`) and our composition.
+- The feature is labelled **beta** in the UI until an external review of `liber-crypto` and the format spec is done. The review scope names the unaudited crates (`aes-siv`, `ml-kem`, `argon2`) and our composition.
 - No custom primitives. Every construction is cited in the format spec: RFC 5869, RFC 5297, RFC 9106, FIPS 203, NIST SP 800-38D, and age STREAM.
 - Each phase gets a fresh-context security review (Opus) in addition to the usual code review. Findings are fixed test-first.
 
@@ -312,8 +312,8 @@ The rule is that **nothing derived from an encrypted vault's content is written 
 
 | Phase | Delivers | Depends on |
 |---|---|---|
-| E1 | `nimw-crypto`: keys, slots, STREAM, names, vectors, the Python cross-check, `vault-format-v1.md` | — |
-| E2 | the storage seam in `nimw-vault`, all fs access routed through it, no behaviour change | — (parallel with E1) |
+| E1 | `liber-crypto`: keys, slots, STREAM, names, vectors, the Python cross-check, `vault-format-v1.md` | — |
+| E2 | the storage seam in `liber-vault`, all fs access routed through it, no behaviour change | — (parallel with E1) |
 | E3 | `EncryptedStorage`, the watcher, the in-memory index, asset range decryption, encrypted recording | E1, E2 |
 | E4 | UI: create, unlock, lock, auto-lock, Settings → Security (passphrase and recovery), lock badges | E3 |
 | E5 | converting and exporting, the keyring, key rotation | E4 |
@@ -341,7 +341,7 @@ It found two flaws and four gaps. All six are resolved in the text above as my c
 3. **Rotation had no key id and no slot rules.** Fixed: epochs everywhere, a retiring key during rotation, a new recovery key on every rotation, Touch ID re-enrolled, the keyring slot re-added (§3.2, §4.2, §4.3).
 4. **Sync conflict copies could hide notes.** Fixed: conflicts are detected and surfaced, unreadable names are listed and never deleted, and header conflicts are merged (§4.3).
 5. **Keyring vault substitution.** Fixed: the keyring keeps a list of enrolled vaults and opens only those silently (§3.3).
-6. **Losing `.nimwdir` lost a folder's names.** Fixed: there is no id file; a folder's id is inside its own encrypted name (§4.1, §4.3).
+6. **Losing `.liberdir` lost a folder's names.** Fixed: there is no id file; a folder's id is inside its own encrypted name (§4.1, §4.3).
 
 The reviewer checked and found sound: per-write file keys with counter nonces, the STREAM last-flag, the HKDF subkey split, SIV bound to the parent, the slot AAD and the hybrid KEM combiner.
 

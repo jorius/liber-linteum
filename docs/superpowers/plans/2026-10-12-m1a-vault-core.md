@@ -4,7 +4,7 @@
 
 **Goal:** Turn the M0 crate stubs into a tested, headless vault engine: open an Obsidian vault without changing it, index it into a SQLite cache, keep the index in sync with external changes, and create/rename/move/trash files with automatic link rewriting.
 
-**Architecture:** Four library crates with one job each — `nimw-vault` (filesystem only), `nimw-markdown` (pure parsing and link resolution), `nimw-index` (SQLite cache, never touches vault files) — composed by a new `nimw-session` crate that owns one open vault (index + watcher + operations). None depends on Tauri; M1b will wrap `nimw-session` in Tauri commands. A test-only `nimw-testkit` crate holds fixture helpers and the 10k-note generator.
+**Architecture:** Four library crates with one job each — `liber-vault` (filesystem only), `liber-markdown` (pure parsing and link resolution), `liber-index` (SQLite cache, never touches vault files) — composed by a new `liber-session` crate that owns one open vault (index + watcher + operations). None depends on Tauri; M1b will wrap `liber-session` in Tauri commands. A test-only `liber-testkit` crate holds fixture helpers and the 10k-note generator.
 
 **Tech Stack:** Rust 1.99 (edition 2024), pulldown-cmark 0.13, yaml-rust2 0.13, unicode-normalization 0.1, rusqlite 0.40 (bundled SQLite 3.53), notify 8.2 via notify-debouncer-mini 0.7, blake3 1.8, globset 0.4, trash 5.2, rayon 1.12; tests: tempfile, proptest, criterion.
 
@@ -15,13 +15,13 @@
 ## Global Constraints
 
 - License GPL-3.0-or-later; every new dependency must keep `cargo deny check` green (GPL-compatible licenses, no network crates — `deny.toml` bans reqwest, ureq, isahc, curl, hyper, h2, attohttpc, tungstenite, tokio-tungstenite and the Tauri http/updater/shell/websocket/upload plugins).
-- `crates/*` never depend on `tauri`. `nimw-markdown` does no I/O. `nimw-index` never reads or writes vault files. Only `nimw-session` composes the others.
-- Opening a vault writes **nothing** inside it: no file bytes, no mtimes, no `.nimw/` (VLT-02). The index lives at `<cache_root>/nimw/<cache_dir_name(vault)>/index.sqlite`.
+- `crates/*` never depend on `tauri`. `liber-markdown` does no I/O. `liber-index` never reads or writes vault files. Only `liber-session` composes the others.
+- Opening a vault writes **nothing** inside it: no file bytes, no mtimes, no `.liber/` (VLT-02). The index lives at `<cache_root>/liber/<cache_dir_name(vault)>/index.sqlite`.
 - Paths crossing crate boundaries are vault-relative, `/`-separated, **exactly as named on disk**; Unicode NFC + lowercase is applied only to matching keys.
 - Exact resolved versions (verified in `Cargo.lock`): blake3 1.8.7, dunce 1.0.5, globset 0.4.20, notify 8.2.0 (through notify-debouncer-mini 0.7.0), percent-encoding 2.3.2, pulldown-cmark 0.13.4, rayon 1.12.0, rusqlite 0.40.2 (bundled SQLite 3.53.2), thiserror 2.0.21, trash 5.2.9, unicode-normalization 0.1.25, yaml-rust2 0.13.0; dev: criterion 0.8.2, proptest 1.12.0, tempfile 3.27.0.
 - Toolchain and lints: Rust 1.99.0, edition 2024, `style_edition = "2024"`; core crates inherit `unsafe_code = "forbid"`; every task ends with `cargo clippy … -- -D warnings` and `cargo fmt --all --check` clean.
 - Constants from the spec: debounce 200 ms; progress event every 200 files; index write batches ≤ 500 rows; rewrite retries 3; excerpt 200 characters; schema version 1.
-- Out of scope (spec §8): Tauri commands, settings, UI (M1b); FTS/search (M5); Global View queries and layout (M3); writing `.nimw/vault.json`; undo.
+- Out of scope (spec §8): Tauri commands, settings, UI (M1b); FTS/search (M5); Global View queries and layout (M3); writing `.liber/vault.json`; undo.
 - Name tests after the requirement they pin (`vlt_02_…`, `pg_05_…`, `exp_04_…`, `nfr_08_…`); `review_focus_…` for the Review Focus pins below.
 - Commits are conventional (`feat(scope): …`) and end with a `Co-Authored-By:` trailer naming **the model that actually wrote the commit** (M0 ruling); the trailer shown in each commit step is the controller's and must be adjusted by subagent implementers.
 
@@ -43,20 +43,20 @@ fixtures/vaults/
                                         frontmatter (subtitle, cover, tags, related), all link forms
   ambiguous-names/                      four Ideas.md at different depths + links relying on tie-breaks
   edge-cases/                           links in code/HTML, malformed YAML, empty, CRLF, invalid UTF-8, Unicode
-crates/nimw-testkit/                    test-only: fixture copies, snapshots, polling, 10k generator
+crates/liber-testkit/                    test-only: fixture copies, snapshots, polling, 10k generator
   src/lib.rs
-crates/nimw-vault/                      filesystem only
+crates/liber-vault/                      filesystem only
   src/lib.rs        exports + is_hidden_name (M0)
   src/error.rs      VaultError, Result, io_err
   src/hash.rs       Hash (BLAKE3)
   src/path.rs       VaultPath (validated vault-relative path)
-  src/config.rs     AttachmentPolicy, .nimw/vault.json + .obsidian/app.json readers
+  src/config.rs     AttachmentPolicy, .liber/vault.json + .obsidian/app.json readers
   src/vault.rs      Vault::open, warnings, excludes
   src/scan.rs       Entry/EntryKind/Scan, scan, scan_from, list_dir, stat
   src/fsops.rs      fs_path, read, write_cas, create_dir, rename, trash
   src/watch.rs      WatchEvent, Watcher, Vault::watch
   tests/            path_hash.rs, open_scan.rs, write_ops.rs, watch.rs
-crates/nimw-markdown/                   pure parsing
+crates/liber-markdown/                   pure parsing
   src/lib.rs        exports
   src/title.rs      extract_title (M0, unchanged)
   src/types.rs      PageMeta, Tag, LinkKind, LinkRef
@@ -66,13 +66,13 @@ crates/nimw-markdown/                   pure parsing
   src/page.rs       parse_page
   src/resolve.rs    FileSet, resolve, shortest_unique_target, link_key, name_key
   tests/            frontmatter_api.rs, fixture_pages.rs, resolve_api.rs
-crates/nimw-index/                      SQLite cache
+crates/liber-index/                      SQLite cache
   src/lib.rs        exports + cache_dir_name (M0)
   src/schema.rs     schema v1
   src/rows.rs       FileKind, FileRow, Stat, TreeNode, LinkRow, PageRow
   src/index.rs      Index, Tx, IndexError
   tests/index.rs
-crates/nimw-session/                    one open vault
+crates/liber-session/                    one open vault
   src/lib.rs        exports
   src/error.rs      SessionError
   src/events.rs     IndexReport, SessionEvent, RenameOutcome
@@ -86,23 +86,23 @@ docs/handoff/2026-10-12-m1a-vault-core-handoff.md   (Task 12)
 
 ---
 
-### Task 1: nimw-vault: `VaultPath`, `Hash` (BLAKE3) and `VaultError`
+### Task 1: liber-vault: `VaultPath`, `Hash` (BLAKE3) and `VaultError`
 
 **Files:**
 - Modify: `Cargo.toml` (workspace dependencies for all of M1a)
-- Modify: `crates/nimw-vault/Cargo.toml`
-- Create: `crates/nimw-vault/src/error.rs`, `crates/nimw-vault/src/hash.rs`, `crates/nimw-vault/src/path.rs`
-- Modify: `crates/nimw-vault/src/lib.rs`
-- Test: `crates/nimw-vault/tests/path_hash.rs` (+ unit tests inside `hash.rs` and `path.rs`)
+- Modify: `crates/liber-vault/Cargo.toml`
+- Create: `crates/liber-vault/src/error.rs`, `crates/liber-vault/src/hash.rs`, `crates/liber-vault/src/path.rs`
+- Modify: `crates/liber-vault/src/lib.rs`
+- Test: `crates/liber-vault/tests/path_hash.rs` (+ unit tests inside `hash.rs` and `path.rs`)
 
 **Interfaces:**
-- Consumes: M0 `nimw_vault::is_hidden_name(name: &str) -> bool` (kept unchanged).
+- Consumes: M0 `liber_vault::is_hidden_name(name: &str) -> bool` (kept unchanged).
 - Produces (used by every later task):
   - `pub struct VaultPath` (Clone, Eq, Ord, Hash, Display, Debug): `root() -> VaultPath`, `new(&str) -> Result<VaultPath>`, `from_fs_path(root: &Path, path: &Path) -> Result<VaultPath>`, `is_root(&self) -> bool`, `as_str(&self) -> &str`, `parent(&self) -> Option<VaultPath>`, `file_name(&self) -> &str`, `stem(&self) -> &str`, `extension(&self) -> Option<&str>`, `join(&self, rel: &str) -> Result<VaultPath>`, `starts_with(&self, prefix: &VaultPath) -> bool`, `rebase(&self, from: &VaultPath, to: &VaultPath) -> Option<VaultPath>`, `to_fs_path(&self, root: &Path) -> PathBuf`.
   - `pub struct Hash` (Copy, Eq, Ord, Hash, Display = hex): `of(&[u8]) -> Hash`, `to_hex(&self) -> String`, `from_hex(&str) -> Option<Hash>`.
   - `pub enum VaultError { NotFound(String), AlreadyExists(String), Conflict { path: String, current: Hash }, OutsideVault(String), NotUtf8(String), InvalidConfig { file: String, reason: String }, Io { path: String, source: std::io::Error }, Watch(String) }` and `pub type Result<T> = std::result::Result<T, VaultError>`.
 
-- [ ] **Step 1: Add every M1a dependency to the workspace once (unused workspace deps are inert) and the first two to `nimw-vault`**
+- [ ] **Step 1: Add every M1a dependency to the workspace once (unused workspace deps are inert) and the first two to `liber-vault`**
 
 In `Cargo.toml`, replace:
 
@@ -132,11 +132,11 @@ proptest = "1.12.0"
 tempfile = "3.27.0"
 ```
 
-`crates/nimw-vault/Cargo.toml` (create or replace the whole file):
+`crates/liber-vault/Cargo.toml` (create or replace the whole file):
 
 ```toml
 [package]
-name = "nimw-vault"
+name = "liber-vault"
 description = "Vault filesystem model: scanning, watching, atomic writes, trash."
 version.workspace = true
 edition.workspace = true
@@ -153,10 +153,10 @@ workspace = true
 
 - [ ] **Step 2: Write the failing integration test**
 
-`crates/nimw-vault/tests/path_hash.rs` (create or replace the whole file):
+`crates/liber-vault/tests/path_hash.rs` (create or replace the whole file):
 
 ```rust
-use nimw_vault::{Hash, VaultError, VaultPath};
+use liber_vault::{Hash, VaultError, VaultPath};
 
 #[test]
 fn vlt_path_public_api() {
@@ -186,13 +186,13 @@ fn nfr_08_hash_public_api() {
 
 - [ ] **Step 3: Run it to verify it fails**
 
-Run: `cargo test -p nimw-vault --test path_hash`
+Run: `cargo test -p liber-vault --test path_hash`
 
-Expected: FAIL: compile error `unresolved imports nimw_vault::Hash, nimw_vault::VaultError, nimw_vault::VaultPath`
+Expected: FAIL: compile error `unresolved imports liber_vault::Hash, liber_vault::VaultError, liber_vault::VaultPath`
 
 - [ ] **Step 4: Implement (unit tests live next to the code)**
 
-`crates/nimw-vault/src/error.rs` (create or replace the whole file):
+`crates/liber-vault/src/error.rs` (create or replace the whole file):
 
 ```rust
 use crate::Hash;
@@ -225,7 +225,7 @@ pub enum VaultError {
 pub type Result<T> = std::result::Result<T, VaultError>;
 ```
 
-`crates/nimw-vault/src/hash.rs` (create or replace the whole file):
+`crates/liber-vault/src/hash.rs` (create or replace the whole file):
 
 ```rust
 use std::fmt;
@@ -291,7 +291,7 @@ mod tests {
 }
 ```
 
-`crates/nimw-vault/src/path.rs` (create or replace the whole file):
+`crates/liber-vault/src/path.rs` (create or replace the whole file):
 
 ```rust
 use crate::error::{Result, VaultError};
@@ -536,7 +536,7 @@ mod tests {
 }
 ```
 
-`crates/nimw-vault/src/lib.rs` (create or replace the whole file):
+`crates/liber-vault/src/lib.rs` (create or replace the whole file):
 
 ```rust
 //! Vault filesystem model: scanning, watching, atomic writes, trash.
@@ -550,7 +550,7 @@ pub use error::{Result, VaultError};
 pub use hash::Hash;
 pub use path::VaultPath;
 
-/// VLT-05: dot-entries (`.obsidian`, `.git`, `.nimw`, …) are ignored everywhere.
+/// VLT-05: dot-entries (`.obsidian`, `.git`, `.liber`, …) are ignored everywhere.
 pub fn is_hidden_name(name: &str) -> bool {
     name.starts_with('.')
 }
@@ -561,7 +561,7 @@ mod tests {
 
     #[test]
     fn vlt_05_dot_folders_are_hidden() {
-        for name in [".obsidian", ".git", ".nimw", ".trash", ".", ".."] {
+        for name in [".obsidian", ".git", ".liber", ".trash", ".", ".."] {
             assert!(is_hidden_name(name), "{name} should be hidden");
         }
     }
@@ -577,14 +577,14 @@ mod tests {
 
 - [ ] **Step 5: Run the crate's tests, clippy and rustfmt**
 
-Run: `cargo test -p nimw-vault && cargo clippy -p nimw-vault --all-targets -- -D warnings && cargo fmt --all --check`
+Run: `cargo test -p liber-vault && cargo clippy -p liber-vault --all-targets -- -D warnings && cargo fmt --all --check`
 
 Expected: PASS: 10 unit tests (2 M0 + 2 hash + 6 path) and 2 integration tests; no clippy warnings; no fmt diff
 
 - [ ] **Step 6: Commit**
 
 ```bash
-git add Cargo.toml Cargo.lock crates/nimw-vault
+git add Cargo.toml Cargo.lock crates/liber-vault
 git commit -m "feat(vault): VaultPath, BLAKE3 Hash and VaultError (VLT-05, NFR-08)
 
 Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
@@ -592,15 +592,15 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 
 ---
 
-### Task 2: nimw-vault: `Vault::open`, `scan`, fixture vaults and the test kit
+### Task 2: liber-vault: `Vault::open`, `scan`, fixture vaults and the test kit
 
 **Files:**
-- Modify: `crates/nimw-vault/Cargo.toml`, `crates/nimw-vault/src/error.rs` (adds `io_err`), `crates/nimw-vault/src/lib.rs`
-- Create: `crates/nimw-vault/src/config.rs`, `crates/nimw-vault/src/vault.rs`, `crates/nimw-vault/src/scan.rs`
-- Create: `crates/nimw-testkit/Cargo.toml`, `crates/nimw-testkit/src/lib.rs`
+- Modify: `crates/liber-vault/Cargo.toml`, `crates/liber-vault/src/error.rs` (adds `io_err`), `crates/liber-vault/src/lib.rs`
+- Create: `crates/liber-vault/src/config.rs`, `crates/liber-vault/src/vault.rs`, `crates/liber-vault/src/scan.rs`
+- Create: `crates/liber-testkit/Cargo.toml`, `crates/liber-testkit/src/lib.rs`
 - Create: `fixtures/vaults/{obsidian-basic,ambiguous-names,edge-cases}/…`, `.gitattributes`
 - Modify: `.prettierignore`
-- Test: `crates/nimw-vault/tests/open_scan.rs` (+ unit tests in `config.rs`)
+- Test: `crates/liber-vault/tests/open_scan.rs` (+ unit tests in `config.rs`)
 
 **Interfaces:**
 - Consumes: Task 1 `VaultPath`, `VaultError`, `Result`, `is_hidden_name`.
@@ -609,16 +609,16 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
   - `pub enum AttachmentPolicy { VaultRoot, Folder(VaultPath), SameAsNote, Subfolder(String) }` (default `Subfolder("attachments")`).
   - `pub enum EntryKind { File, Dir }`, `pub struct Entry { pub path: VaultPath, pub kind: EntryKind, pub mtime_ns: i128, pub size: u64 }`, `pub struct Scan { pub entries: Vec<Entry> /* sorted by path */, pub skipped: Vec<String> }`.
   - `pub(crate) fn io_err(path: impl Into<String>, source: std::io::Error) -> VaultError` (maps NotFound/AlreadyExists kinds).
-  - Test kit (`nimw-testkit`, dev-dependency only): `fixture_path(name: &str) -> PathBuf`, `copy_fixture(name: &str) -> TempDir`, `trashable_fixture(name: &str) -> TempDir` (temp dir inside `$HOME` so the OS trash works on Linux), `snapshot(root: &Path) -> BTreeMap<PathBuf, (Vec<u8>, SystemTime)>`, `wait_until(timeout: Duration, check: impl FnMut() -> bool) -> bool`.
+  - Test kit (`liber-testkit`, dev-dependency only): `fixture_path(name: &str) -> PathBuf`, `copy_fixture(name: &str) -> TempDir`, `trashable_fixture(name: &str) -> TempDir` (temp dir inside `$HOME` so the OS trash works on Linux), `snapshot(root: &Path) -> BTreeMap<PathBuf, (Vec<u8>, SystemTime)>`, `wait_until(timeout: Duration, check: impl FnMut() -> bool) -> bool`.
   - Fixture vaults used by Tasks 6, 9, 10, 11.
 
 - [ ] **Step 1: Add the test kit crate, manifests, `.gitattributes` (keep fixture bytes exact: CRLF and invalid UTF-8 are on purpose) and ignore fixtures in Prettier**
 
-`crates/nimw-testkit/Cargo.toml` (create or replace the whole file):
+`crates/liber-testkit/Cargo.toml` (create or replace the whole file):
 
 ```toml
 [package]
-name = "nimw-testkit"
+name = "liber-testkit"
 description = "Test-only helpers shared by the vault, index and session crates: fixture vaults, snapshots, polling."
 version.workspace = true
 edition.workspace = true
@@ -632,7 +632,7 @@ tempfile.workspace = true
 workspace = true
 ```
 
-`crates/nimw-testkit/src/lib.rs` (create or replace the whole file):
+`crates/liber-testkit/src/lib.rs` (create or replace the whole file):
 
 ```rust
 //! Test-only helpers. Never a dependency of production code.
@@ -666,7 +666,7 @@ pub fn trashable_fixture(name: &str) -> TempDir {
         .map(PathBuf::from)
         .unwrap_or_else(std::env::temp_dir);
     let dir = tempfile::Builder::new()
-        .prefix("nimw-trash-test-")
+        .prefix("liber-trash-test-")
         .tempdir_in(home)
         .expect("tempdir in home");
     copy_dir(&fixture_path(name), dir.path());
@@ -721,11 +721,11 @@ pub fn wait_until(timeout: Duration, mut check: impl FnMut() -> bool) -> bool {
 }
 ```
 
-`crates/nimw-vault/Cargo.toml` (create or replace the whole file):
+`crates/liber-vault/Cargo.toml` (create or replace the whole file):
 
 ```toml
 [package]
-name = "nimw-vault"
+name = "liber-vault"
 description = "Vault filesystem model: scanning, watching, atomic writes, trash."
 version.workspace = true
 edition.workspace = true
@@ -741,7 +741,7 @@ serde_json.workspace = true
 thiserror.workspace = true
 
 [dev-dependencies]
-nimw-testkit = { path = "../nimw-testkit" }
+liber-testkit = { path = "../liber-testkit" }
 tempfile.workspace = true
 
 [lints]
@@ -925,17 +925,17 @@ EOF_FIXTURE
 cat > "$F/obsidian-basic/Welcome.md" <<'EOF_FIXTURE'
 # Welcome
 
-This vault exercises Notes In My Way. Start at [[Character Design/My characters|my characters]].
+This vault exercises Liber Linteum. Start at [[Character Design/My characters|my characters]].
 EOF_FIXTURE
 ````
 
 - [ ] **Step 3: Write the failing integration tests**
 
-`crates/nimw-vault/tests/open_scan.rs` (create or replace the whole file):
+`crates/liber-vault/tests/open_scan.rs` (create or replace the whole file):
 
 ```rust
-use nimw_testkit::{copy_fixture, fixture_path, snapshot};
-use nimw_vault::{AttachmentPolicy, EntryKind, Vault, VaultError, VaultPath};
+use liber_testkit::{copy_fixture, fixture_path, snapshot};
+use liber_vault::{AttachmentPolicy, EntryKind, Vault, VaultError, VaultPath};
 
 fn paths(vault: &Vault) -> Vec<String> {
     vault
@@ -1000,9 +1000,9 @@ fn vlt_05_scan_reports_kinds_and_sizes() {
 #[test]
 fn vlt_05_exclude_globs_and_bad_config_are_handled() {
     let dir = copy_fixture("obsidian-basic");
-    std::fs::create_dir(dir.path().join(".nimw")).unwrap();
+    std::fs::create_dir(dir.path().join(".liber")).unwrap();
     std::fs::write(
-        dir.path().join(".nimw/vault.json"),
+        dir.path().join(".liber/vault.json"),
         r#"{ "version": 1, "exclude": ["Game Design", "Game Design/**", "**/*.mp3", "[bad"],
             "attachments": { "mode": "same" } }"#,
     )
@@ -1019,9 +1019,9 @@ fn vlt_05_exclude_globs_and_bad_config_are_handled() {
         vault.warnings()
     );
 
-    std::fs::write(dir.path().join(".nimw/vault.json"), "{ not json").unwrap();
+    std::fs::write(dir.path().join(".liber/vault.json"), "{ not json").unwrap();
     let vault = Vault::open(dir.path()).unwrap();
-    assert!(vault.warnings()[0].contains(".nimw/vault.json"));
+    assert!(vault.warnings()[0].contains(".liber/vault.json"));
     assert_eq!(
         vault.attachment_policy(),
         &AttachmentPolicy::Subfolder("assets".into())
@@ -1036,7 +1036,7 @@ fn vlt_02_open_and_scan_write_nothing() {
         let vault = Vault::open(dir.path()).unwrap();
         vault.scan().unwrap();
         assert_eq!(snapshot(dir.path()), before, "{name} changed");
-        assert!(!dir.path().join(".nimw").exists());
+        assert!(!dir.path().join(".liber").exists());
     }
 }
 
@@ -1122,13 +1122,13 @@ fn scan_from_list_dir_and_stat() {
 
 - [ ] **Step 4: Run them to verify they fail**
 
-Run: `cargo test -p nimw-vault --test open_scan`
+Run: `cargo test -p liber-vault --test open_scan`
 
-Expected: FAIL: compile error `unresolved imports nimw_vault::AttachmentPolicy, nimw_vault::EntryKind, nimw_vault::Vault`
+Expected: FAIL: compile error `unresolved imports liber_vault::AttachmentPolicy, liber_vault::EntryKind, liber_vault::Vault`
 
 - [ ] **Step 5: Implement**
 
-In `crates/nimw-vault/src/error.rs`, replace:
+In `crates/liber-vault/src/error.rs`, replace:
 
 ```rust
 pub type Result<T> = std::result::Result<T, VaultError>;
@@ -1149,13 +1149,13 @@ pub(crate) fn io_err(path: impl Into<String>, source: std::io::Error) -> VaultEr
 }
 ```
 
-`crates/nimw-vault/src/config.rs` (create or replace the whole file):
+`crates/liber-vault/src/config.rs` (create or replace the whole file):
 
 ```rust
 use crate::path::VaultPath;
 use serde::Deserialize;
 
-/// Where new attachments go (Q-ED-1). Resolved from `.nimw/vault.json`, else
+/// Where new attachments go (Q-ED-1). Resolved from `.liber/vault.json`, else
 /// Obsidian's `attachmentFolderPath`, else the default `attachments/` subfolder.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum AttachmentPolicy {
@@ -1194,24 +1194,24 @@ impl AttachmentPolicy {
     }
 }
 
-/// `.nimw/vault.json` (arch §3.1). Unknown fields are ignored; M1a only reads
+/// `.liber/vault.json` (arch §3.1). Unknown fields are ignored; M1a only reads
 /// `exclude` and `attachments`.
 #[derive(Debug, Default, Deserialize)]
-pub(crate) struct NimwVaultJson {
+pub(crate) struct LiberVaultJson {
     #[serde(default)]
     pub exclude: Vec<String>,
     #[serde(default)]
-    pub attachments: Option<NimwAttachments>,
+    pub attachments: Option<LiberAttachments>,
 }
 
 #[derive(Debug, Deserialize)]
-pub(crate) struct NimwAttachments {
+pub(crate) struct LiberAttachments {
     pub mode: String,
     #[serde(default)]
     pub path: String,
 }
 
-impl NimwAttachments {
+impl LiberAttachments {
     pub(crate) fn policy(&self) -> Option<AttachmentPolicy> {
         match self.mode.as_str() {
             "vault" if self.path.trim_matches('/').is_empty() => Some(AttachmentPolicy::VaultRoot),
@@ -1258,9 +1258,9 @@ mod tests {
     }
 
     #[test]
-    fn q_ed_1_nimw_attachment_modes() {
+    fn q_ed_1_liber_attachment_modes() {
         let p = |mode: &str, path: &str| {
-            NimwAttachments {
+            LiberAttachments {
                 mode: mode.into(),
                 path: path.into(),
             }
@@ -1281,10 +1281,10 @@ mod tests {
 }
 ```
 
-`crates/nimw-vault/src/vault.rs` (create or replace the whole file):
+`crates/liber-vault/src/vault.rs` (create or replace the whole file):
 
 ```rust
-use crate::config::{AttachmentPolicy, NimwVaultJson, ObsidianAppJson};
+use crate::config::{AttachmentPolicy, LiberVaultJson, ObsidianAppJson};
 use crate::error::{Result, VaultError};
 use globset::{Glob, GlobSet, GlobSetBuilder};
 use std::path::{Path, PathBuf};
@@ -1315,21 +1315,21 @@ impl Vault {
         }
         let mut warnings = Vec::new();
 
-        let nimw: NimwVaultJson = read_json(&root, ".nimw/vault.json", &mut warnings);
+        let liber: LiberVaultJson = read_json(&root, ".liber/vault.json", &mut warnings);
         let obsidian: ObsidianAppJson = read_json(&root, ".obsidian/app.json", &mut warnings);
 
         let mut builder = GlobSetBuilder::new();
-        for pattern in &nimw.exclude {
+        for pattern in &liber.exclude {
             match Glob::new(pattern) {
                 Ok(g) => {
                     builder.add(g);
                 }
-                Err(e) => warnings.push(format!(".nimw/vault.json: bad exclude {pattern:?}: {e}")),
+                Err(e) => warnings.push(format!(".liber/vault.json: bad exclude {pattern:?}: {e}")),
             }
         }
         let excludes = builder.build().unwrap_or_else(|_| GlobSet::empty());
 
-        let attachments = nimw
+        let attachments = liber
             .attachments
             .as_ref()
             .and_then(|a| a.policy())
@@ -1394,7 +1394,7 @@ fn read_json<T: serde::de::DeserializeOwned + Default>(
 }
 ```
 
-`crates/nimw-vault/src/scan.rs` (create or replace the whole file):
+`crates/liber-vault/src/scan.rs` (create or replace the whole file):
 
 ```rust
 use crate::error::{Result, io_err};
@@ -1553,7 +1553,7 @@ impl Vault {
 }
 ```
 
-`crates/nimw-vault/src/lib.rs` (create or replace the whole file):
+`crates/liber-vault/src/lib.rs` (create or replace the whole file):
 
 ```rust
 //! Vault filesystem model: scanning, watching, atomic writes, trash.
@@ -1573,7 +1573,7 @@ pub use path::VaultPath;
 pub use scan::{Entry, EntryKind, Scan};
 pub use vault::Vault;
 
-/// VLT-05: dot-entries (`.obsidian`, `.git`, `.nimw`, …) are ignored everywhere.
+/// VLT-05: dot-entries (`.obsidian`, `.git`, `.liber`, …) are ignored everywhere.
 pub fn is_hidden_name(name: &str) -> bool {
     name.starts_with('.')
 }
@@ -1584,7 +1584,7 @@ mod tests {
 
     #[test]
     fn vlt_05_dot_folders_are_hidden() {
-        for name in [".obsidian", ".git", ".nimw", ".trash", ".", ".."] {
+        for name in [".obsidian", ".git", ".liber", ".trash", ".", ".."] {
             assert!(is_hidden_name(name), "{name} should be hidden");
         }
     }
@@ -1600,14 +1600,14 @@ mod tests {
 
 - [ ] **Step 6: Run the tests, clippy and rustfmt**
 
-Run: `cargo test -p nimw-vault -p nimw-testkit && cargo clippy -p nimw-vault -p nimw-testkit --all-targets -- -D warnings && cargo fmt --all --check`
+Run: `cargo test -p liber-vault -p liber-testkit && cargo clippy -p liber-vault -p liber-testkit --all-targets -- -D warnings && cargo fmt --all --check`
 
 Expected: PASS: 12 unit + 9 open_scan + 2 path_hash tests (the symlink test runs on Unix only)
 
 - [ ] **Step 7: Commit**
 
 ```bash
-git add .gitattributes .prettierignore Cargo.lock crates/nimw-vault crates/nimw-testkit fixtures
+git add .gitattributes .prettierignore Cargo.lock crates/liber-vault crates/liber-testkit fixtures
 git commit -m "feat(vault): open, scan and fixture vaults (VLT-01, VLT-02, VLT-05)
 
 Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
@@ -1615,24 +1615,24 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 
 ---
 
-### Task 3: nimw-vault: `read`, compare-and-swap `write_cas`, `create_dir`, `rename`, `trash`
+### Task 3: liber-vault: `read`, compare-and-swap `write_cas`, `create_dir`, `rename`, `trash`
 
 **Files:**
-- Modify: `crates/nimw-vault/Cargo.toml`, `crates/nimw-vault/src/lib.rs`
-- Create: `crates/nimw-vault/src/fsops.rs`
-- Test: `crates/nimw-vault/tests/write_ops.rs` (+ fault-injection unit test in `fsops.rs`)
+- Modify: `crates/liber-vault/Cargo.toml`, `crates/liber-vault/src/lib.rs`
+- Create: `crates/liber-vault/src/fsops.rs`
+- Test: `crates/liber-vault/tests/write_ops.rs` (+ fault-injection unit test in `fsops.rs`)
 
 **Interfaces:**
 - Consumes: Tasks 1–2 (`Vault`, `VaultPath`, `Hash`, `io_err`).
-- Produces (on `impl Vault`): `fs_path(&self, path: &VaultPath) -> Result<PathBuf>` (refuses symlinks escaping the vault), `read(&self, path) -> Result<(Vec<u8>, Hash)>`, `read_to_string(&self, path) -> Result<(String, Hash)>` (`NotUtf8`), `write_cas(&self, path, content: &[u8], expected: Option<Hash>) -> Result<Hash>` (`None` = create-only/`AlreadyExists`; `Some(h)` = `Conflict { current }` or `NotFound`), `create_dir(&self, path) -> Result<()>`, `rename(&self, from, to) -> Result<()>` (`AlreadyExists` unless case-only rename of the same entry), `trash(&self, path) -> Result<()>`. Constant `pub const TMP_MARKER: &str = ".nimw-tmp-"` (temp names start with `.`, so scans/watchers ignore them).
+- Produces (on `impl Vault`): `fs_path(&self, path: &VaultPath) -> Result<PathBuf>` (refuses symlinks escaping the vault), `read(&self, path) -> Result<(Vec<u8>, Hash)>`, `read_to_string(&self, path) -> Result<(String, Hash)>` (`NotUtf8`), `write_cas(&self, path, content: &[u8], expected: Option<Hash>) -> Result<Hash>` (`None` = create-only/`AlreadyExists`; `Some(h)` = `Conflict { current }` or `NotFound`), `create_dir(&self, path) -> Result<()>`, `rename(&self, from, to) -> Result<()>` (`AlreadyExists` unless case-only rename of the same entry), `trash(&self, path) -> Result<()>`. Constant `pub const TMP_MARKER: &str = ".liber-tmp-"` (temp names start with `.`, so scans/watchers ignore them).
 
 - [ ] **Step 1: Add `trash` and `proptest`**
 
-`crates/nimw-vault/Cargo.toml` (create or replace the whole file):
+`crates/liber-vault/Cargo.toml` (create or replace the whole file):
 
 ```toml
 [package]
-name = "nimw-vault"
+name = "liber-vault"
 description = "Vault filesystem model: scanning, watching, atomic writes, trash."
 version.workspace = true
 edition.workspace = true
@@ -1649,7 +1649,7 @@ thiserror.workspace = true
 trash.workspace = true
 
 [dev-dependencies]
-nimw-testkit = { path = "../nimw-testkit" }
+liber-testkit = { path = "../liber-testkit" }
 proptest.workspace = true
 tempfile.workspace = true
 
@@ -1659,11 +1659,11 @@ workspace = true
 
 - [ ] **Step 2: Write the failing integration tests**
 
-`crates/nimw-vault/tests/write_ops.rs` (create or replace the whole file):
+`crates/liber-vault/tests/write_ops.rs` (create or replace the whole file):
 
 ```rust
-use nimw_testkit::trashable_fixture;
-use nimw_vault::{Hash, Vault, VaultError, VaultPath};
+use liber_testkit::trashable_fixture;
+use liber_vault::{Hash, Vault, VaultError, VaultPath};
 use proptest::prelude::*;
 
 fn vp(s: &str) -> VaultPath {
@@ -1823,13 +1823,13 @@ proptest! {
 
 - [ ] **Step 3: Run them to verify they fail**
 
-Run: `cargo test -p nimw-vault --test write_ops`
+Run: `cargo test -p liber-vault --test write_ops`
 
 Expected: FAIL: compile errors `no method named write_cas / read / rename / trash found for struct Vault`
 
 - [ ] **Step 4: Implement**
 
-`crates/nimw-vault/src/fsops.rs` (create or replace the whole file):
+`crates/liber-vault/src/fsops.rs` (create or replace the whole file):
 
 ```rust
 use crate::error::{Result, VaultError, io_err};
@@ -1844,7 +1844,7 @@ static TMP_COUNTER: AtomicU64 = AtomicU64::new(0);
 
 /// Suffix marker of in-flight atomic writes. Temp names start with `.` so scans
 /// and watchers ignore them (VLT-05).
-pub const TMP_MARKER: &str = ".nimw-tmp-";
+pub const TMP_MARKER: &str = ".liber-tmp-";
 
 impl Vault {
     /// Absolute path for `path`, refusing anything whose deepest existing
@@ -2060,7 +2060,7 @@ mod tests {
 }
 ```
 
-`crates/nimw-vault/src/lib.rs` (create or replace the whole file):
+`crates/liber-vault/src/lib.rs` (create or replace the whole file):
 
 ```rust
 //! Vault filesystem model: scanning, watching, atomic writes, trash.
@@ -2082,7 +2082,7 @@ pub use path::VaultPath;
 pub use scan::{Entry, EntryKind, Scan};
 pub use vault::Vault;
 
-/// VLT-05: dot-entries (`.obsidian`, `.git`, `.nimw`, …) are ignored everywhere.
+/// VLT-05: dot-entries (`.obsidian`, `.git`, `.liber`, …) are ignored everywhere.
 pub fn is_hidden_name(name: &str) -> bool {
     name.starts_with('.')
 }
@@ -2093,7 +2093,7 @@ mod tests {
 
     #[test]
     fn vlt_05_dot_folders_are_hidden() {
-        for name in [".obsidian", ".git", ".nimw", ".trash", ".", ".."] {
+        for name in [".obsidian", ".git", ".liber", ".trash", ".", ".."] {
             assert!(is_hidden_name(name), "{name} should be hidden");
         }
     }
@@ -2107,16 +2107,16 @@ mod tests {
 }
 ```
 
-- [ ] **Step 5: Run the tests, clippy and rustfmt. `exp_03_trash_moves_to_os_trash` really moves a temp folder named `nimw-trash-test-*` to your OS trash**
+- [ ] **Step 5: Run the tests, clippy and rustfmt. `exp_03_trash_moves_to_os_trash` really moves a temp folder named `liber-trash-test-*` to your OS trash**
 
-Run: `cargo test -p nimw-vault && cargo clippy -p nimw-vault --all-targets -- -D warnings && cargo fmt --all --check`
+Run: `cargo test -p liber-vault && cargo clippy -p liber-vault --all-targets -- -D warnings && cargo fmt --all --check`
 
 Expected: PASS: 13 unit + 8 write_ops + 9 open_scan + 2 path_hash tests
 
 - [ ] **Step 6: Commit**
 
 ```bash
-git add Cargo.lock crates/nimw-vault
+git add Cargo.lock crates/liber-vault
 git commit -m "feat(vault): atomic CAS writes, rename, trash (NFR-08, EXP-02, EXP-03)
 
 Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
@@ -2124,12 +2124,12 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 
 ---
 
-### Task 4: nimw-vault: file watcher (`notify` 8.2 via `notify-debouncer-mini` 0.7)
+### Task 4: liber-vault: file watcher (`notify` 8.2 via `notify-debouncer-mini` 0.7)
 
 **Files:**
-- Modify: `crates/nimw-vault/Cargo.toml`, `crates/nimw-vault/src/lib.rs`
-- Create: `crates/nimw-vault/src/watch.rs`
-- Test: `crates/nimw-vault/tests/watch.rs`
+- Modify: `crates/liber-vault/Cargo.toml`, `crates/liber-vault/src/lib.rs`
+- Create: `crates/liber-vault/src/watch.rs`
+- Test: `crates/liber-vault/tests/watch.rs`
 
 **Interfaces:**
 - Consumes: Task 2 `Vault` (`root`, `excludes`), `is_hidden_name`, `VaultPath::from_fs_path`.
@@ -2137,11 +2137,11 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 
 - [ ] **Step 1: Add `notify-debouncer-mini` (it re-exports `notify` 8.2, so `notify` is not declared separately)**
 
-`crates/nimw-vault/Cargo.toml` (create or replace the whole file):
+`crates/liber-vault/Cargo.toml` (create or replace the whole file):
 
 ```toml
 [package]
-name = "nimw-vault"
+name = "liber-vault"
 description = "Vault filesystem model: scanning, watching, atomic writes, trash."
 version.workspace = true
 edition.workspace = true
@@ -2159,7 +2159,7 @@ thiserror.workspace = true
 trash.workspace = true
 
 [dev-dependencies]
-nimw-testkit = { path = "../nimw-testkit" }
+liber-testkit = { path = "../liber-testkit" }
 proptest.workspace = true
 tempfile.workspace = true
 
@@ -2169,18 +2169,18 @@ workspace = true
 
 - [ ] **Step 2: Write the failing integration tests (they poll with timeouts, never fixed sleeps, apart from 300 ms to arm the backend)**
 
-`crates/nimw-vault/tests/watch.rs` (create or replace the whole file):
+`crates/liber-vault/tests/watch.rs` (create or replace the whole file):
 
 ```rust
-use nimw_testkit::{copy_fixture, wait_until};
-use nimw_vault::{Vault, VaultPath, WatchEvent};
+use liber_testkit::{copy_fixture, wait_until};
+use liber_vault::{Vault, VaultPath, WatchEvent};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 const WAIT: Duration = Duration::from_secs(5);
 type Seen = Arc<Mutex<Vec<WatchEvent>>>;
 
-fn watch(dir: &std::path::Path) -> (nimw_vault::Watcher, Seen) {
+fn watch(dir: &std::path::Path) -> (liber_vault::Watcher, Seen) {
     let vault = Vault::open(dir).unwrap();
     let seen: Seen = Arc::new(Mutex::new(Vec::new()));
     let sink = seen.clone();
@@ -2222,27 +2222,27 @@ fn vlt_04_external_rename_reports_new_path_and_old_path_gone() {
     std::fs::rename(dir.path().join("Links.md"), dir.path().join("Renamed.md")).unwrap();
     assert!(saw(&seen, WatchEvent::Changed(vp("Renamed.md"))));
     // Some backends only report the new name; the session reconciles the
-    // parent folder to notice the old one is gone (nimw-session Task 11).
+    // parent folder to notice the old one is gone (liber-session Task 11).
 }
 
 #[test]
 fn vlt_05_hidden_and_excluded_changes_are_dropped() {
     let dir = copy_fixture("ambiguous-names");
-    std::fs::create_dir(dir.path().join(".nimw")).unwrap();
+    std::fs::create_dir(dir.path().join(".liber")).unwrap();
     std::fs::write(
-        dir.path().join(".nimw/vault.json"),
+        dir.path().join(".liber/vault.json"),
         r#"{"exclude":["Archive/**"]}"#,
     )
     .unwrap();
     let (_w, seen) = watch(dir.path());
-    std::fs::write(dir.path().join(".nimw/layout.json"), "{}").unwrap();
+    std::fs::write(dir.path().join(".liber/layout.json"), "{}").unwrap();
     std::fs::write(dir.path().join("Archive/Old/x.md"), "x").unwrap();
     std::fs::write(dir.path().join("visible.md"), "v").unwrap();
     assert!(saw(&seen, WatchEvent::Changed(vp("visible.md"))));
     let all = seen.lock().unwrap().clone();
     assert!(
         all.iter()
-            .all(|e| !format!("{e:?}").contains(".nimw") && !format!("{e:?}").contains("Archive")),
+            .all(|e| !format!("{e:?}").contains(".liber") && !format!("{e:?}").contains("Archive")),
         "{all:?}"
     );
 }
@@ -2268,13 +2268,13 @@ fn review_focus_burst_of_changes_is_delivered_without_loss() {
 
 - [ ] **Step 3: Run them to verify they fail**
 
-Run: `cargo test -p nimw-vault --test watch`
+Run: `cargo test -p liber-vault --test watch`
 
-Expected: FAIL: compile errors `unresolved import nimw_vault::WatchEvent`, `no method named watch`
+Expected: FAIL: compile errors `unresolved import liber_vault::WatchEvent`, `no method named watch`
 
 - [ ] **Step 4: Implement**
 
-`crates/nimw-vault/src/watch.rs` (create or replace the whole file):
+`crates/liber-vault/src/watch.rs` (create or replace the whole file):
 
 ```rust
 use crate::error::{Result, VaultError};
@@ -2388,7 +2388,7 @@ impl PathFilter {
 }
 ```
 
-`crates/nimw-vault/src/lib.rs` (create or replace the whole file):
+`crates/liber-vault/src/lib.rs` (create or replace the whole file):
 
 ```rust
 //! Vault filesystem model: scanning, watching, atomic writes, trash.
@@ -2412,7 +2412,7 @@ pub use scan::{Entry, EntryKind, Scan};
 pub use vault::Vault;
 pub use watch::{DEBOUNCE, WatchEvent, Watcher};
 
-/// VLT-05: dot-entries (`.obsidian`, `.git`, `.nimw`, …) are ignored everywhere.
+/// VLT-05: dot-entries (`.obsidian`, `.git`, `.liber`, …) are ignored everywhere.
 pub fn is_hidden_name(name: &str) -> bool {
     name.starts_with('.')
 }
@@ -2423,7 +2423,7 @@ mod tests {
 
     #[test]
     fn vlt_05_dot_folders_are_hidden() {
-        for name in [".obsidian", ".git", ".nimw", ".trash", ".", ".."] {
+        for name in [".obsidian", ".git", ".liber", ".trash", ".", ".."] {
             assert!(is_hidden_name(name), "{name} should be hidden");
         }
     }
@@ -2439,14 +2439,14 @@ mod tests {
 
 - [ ] **Step 5: Run the tests three times (watchers are timing-sensitive; all three runs must pass), then clippy and rustfmt**
 
-Run: `for i in 1 2 3; do cargo test -p nimw-vault --test watch || exit 1; done && cargo test -p nimw-vault && cargo clippy -p nimw-vault --all-targets -- -D warnings && cargo fmt --all --check`
+Run: `for i in 1 2 3; do cargo test -p liber-vault --test watch || exit 1; done && cargo test -p liber-vault && cargo clippy -p liber-vault --all-targets -- -D warnings && cargo fmt --all --check`
 
 Expected: PASS: 4 watch tests in each run; whole crate green
 
 - [ ] **Step 6: Commit**
 
 ```bash
-git add Cargo.lock crates/nimw-vault
+git add Cargo.lock crates/liber-vault
 git commit -m "feat(vault): debounced file watcher classified by disk state (VLT-04)
 
 Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
@@ -2454,12 +2454,12 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 
 ---
 
-### Task 5: nimw-markdown: types, `[[…]]` inner parser and frontmatter (yaml-rust2 with byte positions)
+### Task 5: liber-markdown: types, `[[…]]` inner parser and frontmatter (yaml-rust2 with byte positions)
 
 **Files:**
-- Modify: `crates/nimw-markdown/Cargo.toml`, `crates/nimw-markdown/src/lib.rs`
-- Create: `crates/nimw-markdown/src/types.rs`, `src/wikilink.rs`, `src/frontmatter.rs`, `src/page.rs`
-- Test: `crates/nimw-markdown/tests/frontmatter_api.rs` (+ unit tests in `wikilink.rs`, `frontmatter.rs`)
+- Modify: `crates/liber-markdown/Cargo.toml`, `crates/liber-markdown/src/lib.rs`
+- Create: `crates/liber-markdown/src/types.rs`, `src/wikilink.rs`, `src/frontmatter.rs`, `src/page.rs`
+- Test: `crates/liber-markdown/tests/frontmatter_api.rs` (+ unit tests in `wikilink.rs`, `frontmatter.rs`)
 
 **Interfaces:**
 - Consumes: M0 `extract_title(source: &str, file_stem: &str) -> String` (unchanged).
@@ -2473,11 +2473,11 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 
 - [ ] **Step 1: Manifest (all markdown dependencies at once)**
 
-`crates/nimw-markdown/Cargo.toml` (create or replace the whole file):
+`crates/liber-markdown/Cargo.toml` (create or replace the whole file):
 
 ```toml
 [package]
-name = "nimw-markdown"
+name = "liber-markdown"
 description = "Metadata extraction from Markdown pages (title, frontmatter, tags, links)."
 version.workspace = true
 edition.workspace = true
@@ -2496,10 +2496,10 @@ workspace = true
 
 - [ ] **Step 2: Write the failing integration test**
 
-`crates/nimw-markdown/tests/frontmatter_api.rs` (create or replace the whole file):
+`crates/liber-markdown/tests/frontmatter_api.rs` (create or replace the whole file):
 
 ```rust
-use nimw_markdown::{LinkKind, parse_page};
+use liber_markdown::{LinkKind, parse_page};
 
 #[test]
 fn pg_02_03_04_frontmatter_through_parse_page() {
@@ -2528,13 +2528,13 @@ fn pg_02_03_04_frontmatter_through_parse_page() {
 
 - [ ] **Step 3: Run it to verify it fails**
 
-Run: `cargo test -p nimw-markdown --test frontmatter_api`
+Run: `cargo test -p liber-markdown --test frontmatter_api`
 
-Expected: FAIL: compile errors `unresolved imports nimw_markdown::parse_page, nimw_markdown::LinkKind`
+Expected: FAIL: compile errors `unresolved imports liber_markdown::parse_page, liber_markdown::LinkKind`
 
 - [ ] **Step 4: Implement. yaml-rust2's `Marker::index()` is a **character** index (not bytes, despite its docs) and points at the opening quote of quoted scalars — `frontmatter.rs` maps both**
 
-`crates/nimw-markdown/src/types.rs` (create or replace the whole file):
+`crates/liber-markdown/src/types.rs` (create or replace the whole file):
 
 ```rust
 use std::ops::Range;
@@ -2651,7 +2651,7 @@ impl LinkRef {
 }
 ```
 
-`crates/nimw-markdown/src/wikilink.rs` (create or replace the whole file):
+`crates/liber-markdown/src/wikilink.rs` (create or replace the whole file):
 
 ```rust
 use std::ops::Range;
@@ -2712,7 +2712,7 @@ mod tests {
 }
 ```
 
-`crates/nimw-markdown/src/frontmatter.rs` (create or replace the whole file):
+`crates/liber-markdown/src/frontmatter.rs` (create or replace the whole file):
 
 ```rust
 use crate::types::{LinkKind, LinkRef, Tag};
@@ -3050,7 +3050,7 @@ mod tests {
 }
 ```
 
-`crates/nimw-markdown/src/page.rs` (create or replace the whole file):
+`crates/liber-markdown/src/page.rs` (create or replace the whole file):
 
 ```rust
 use crate::types::PageMeta;
@@ -3076,7 +3076,7 @@ pub fn parse_page(source: &str, file_stem: &str) -> PageMeta {
 }
 ```
 
-`crates/nimw-markdown/src/lib.rs` (create or replace the whole file):
+`crates/liber-markdown/src/lib.rs` (create or replace the whole file):
 
 ```rust
 //! Metadata extraction from Markdown pages (title, frontmatter, tags, links).
@@ -3095,14 +3095,14 @@ pub use types::{LinkKind, LinkRef, PageMeta, Tag};
 
 - [ ] **Step 5: Run the tests, clippy and rustfmt**
 
-Run: `cargo test -p nimw-markdown && cargo clippy -p nimw-markdown --all-targets -- -D warnings && cargo fmt --all --check`
+Run: `cargo test -p liber-markdown && cargo clippy -p liber-markdown --all-targets -- -D warnings && cargo fmt --all --check`
 
 Expected: PASS: 8 title + 1 wikilink + 6 frontmatter unit tests, 1 integration test
 
 - [ ] **Step 6: Commit**
 
 ```bash
-git add Cargo.lock crates/nimw-markdown
+git add Cargo.lock crates/liber-markdown
 git commit -m "feat(markdown): page types and frontmatter extraction with byte ranges (PG-02, PG-03, PG-04)
 
 Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
@@ -3110,12 +3110,12 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 
 ---
 
-### Task 6: nimw-markdown: body links, tags, excerpt and the full `parse_page`
+### Task 6: liber-markdown: body links, tags, excerpt and the full `parse_page`
 
 **Files:**
-- Modify: `crates/nimw-markdown/src/wikilink.rs` (adds `find_all`), `src/page.rs` (full version), `src/lib.rs`
-- Create: `crates/nimw-markdown/src/body.rs`
-- Test: `crates/nimw-markdown/tests/fixture_pages.rs` (+ unit tests in `body.rs`, `page.rs`, `wikilink.rs`)
+- Modify: `crates/liber-markdown/src/wikilink.rs` (adds `find_all`), `src/page.rs` (full version), `src/lib.rs`
+- Create: `crates/liber-markdown/src/body.rs`
+- Test: `crates/liber-markdown/tests/fixture_pages.rs` (+ unit tests in `body.rs`, `page.rs`, `wikilink.rs`)
 
 **Interfaces:**
 - Consumes: Task 5 types, `wikilink::parse_inner`, `frontmatter`; fixture files from Task 2.
@@ -3123,10 +3123,10 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 
 - [ ] **Step 1: Write the failing integration test (reads the committed fixtures)**
 
-`crates/nimw-markdown/tests/fixture_pages.rs` (create or replace the whole file):
+`crates/liber-markdown/tests/fixture_pages.rs` (create or replace the whole file):
 
 ```rust
-use nimw_markdown::{LinkKind, parse_page};
+use liber_markdown::{LinkKind, parse_page};
 use std::path::Path;
 
 fn fixture(rel: &str) -> String {
@@ -3190,13 +3190,13 @@ fn pg_05_edge_case_code_fixture_has_one_real_link() {
 
 - [ ] **Step 2: Run it to verify it fails**
 
-Run: `cargo test -p nimw-markdown --test fixture_pages`
+Run: `cargo test -p liber-markdown --test fixture_pages`
 
 Expected: FAIL: assertion failures — body links, tags and excerpt are still empty
 
 - [ ] **Step 3: Implement. pulldown-cmark splits text at `[`, so `[[x]]` arrives as several adjacent Text events: `body.rs` merges touching ranges before scanning**
 
-`crates/nimw-markdown/src/wikilink.rs` (create or replace the whole file):
+`crates/liber-markdown/src/wikilink.rs` (create or replace the whole file):
 
 ```rust
 use std::ops::Range;
@@ -3308,7 +3308,7 @@ mod tests {
 }
 ```
 
-`crates/nimw-markdown/src/body.rs` (create or replace the whole file):
+`crates/liber-markdown/src/body.rs` (create or replace the whole file):
 
 ````rust
 use crate::types::{LinkKind, LinkRef, Tag};
@@ -3673,7 +3673,7 @@ mod tests {
 }
 ````
 
-`crates/nimw-markdown/src/page.rs` (create or replace the whole file):
+`crates/liber-markdown/src/page.rs` (create or replace the whole file):
 
 ```rust
 use crate::types::{LinkKind, PageMeta};
@@ -3787,7 +3787,7 @@ mod tests {
 }
 ```
 
-`crates/nimw-markdown/src/lib.rs` (create or replace the whole file):
+`crates/liber-markdown/src/lib.rs` (create or replace the whole file):
 
 ```rust
 //! Metadata extraction from Markdown pages (title, frontmatter, tags, links).
@@ -3807,14 +3807,14 @@ pub use types::{LinkKind, LinkRef, PageMeta, Tag};
 
 - [ ] **Step 4: Run the tests, clippy and rustfmt**
 
-Run: `cargo test -p nimw-markdown && cargo clippy -p nimw-markdown --all-targets -- -D warnings && cargo fmt --all --check`
+Run: `cargo test -p liber-markdown && cargo clippy -p liber-markdown --all-targets -- -D warnings && cargo fmt --all --check`
 
 Expected: PASS: 24 unit tests (incl. the 200,000-link and binary-junk Review Focus test) + 3 integration tests
 
 - [ ] **Step 5: Commit**
 
 ```bash
-git add crates/nimw-markdown
+git add crates/liber-markdown
 git commit -m "feat(markdown): body links, tags and excerpt (PG-04, PG-05)
 
 Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
@@ -3822,12 +3822,12 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 
 ---
 
-### Task 7: nimw-markdown: `FileSet`, `resolve`, `shortest_unique_target`, `link_key`
+### Task 7: liber-markdown: `FileSet`, `resolve`, `shortest_unique_target`, `link_key`
 
 **Files:**
-- Modify: `crates/nimw-markdown/src/lib.rs`
-- Create: `crates/nimw-markdown/src/resolve.rs`
-- Test: `crates/nimw-markdown/tests/resolve_api.rs` (+ unit tests in `resolve.rs`)
+- Modify: `crates/liber-markdown/src/lib.rs`
+- Create: `crates/liber-markdown/src/resolve.rs`
+- Test: `crates/liber-markdown/tests/resolve_api.rs` (+ unit tests in `resolve.rs`)
 
 **Interfaces:**
 - Consumes: Task 5 `LinkKind`.
@@ -3839,10 +3839,10 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 
 - [ ] **Step 1: Write the failing integration test**
 
-`crates/nimw-markdown/tests/resolve_api.rs` (create or replace the whole file):
+`crates/liber-markdown/tests/resolve_api.rs` (create or replace the whole file):
 
 ```rust
-use nimw_markdown::{FileSet, LinkKind, link_key, resolve, shortest_unique_target};
+use liber_markdown::{FileSet, LinkKind, link_key, resolve, shortest_unique_target};
 
 #[test]
 fn pg_05_resolve_public_api() {
@@ -3869,13 +3869,13 @@ fn pg_05_resolve_public_api() {
 
 - [ ] **Step 2: Run it to verify it fails**
 
-Run: `cargo test -p nimw-markdown --test resolve_api`
+Run: `cargo test -p liber-markdown --test resolve_api`
 
-Expected: FAIL: compile error `unresolved imports nimw_markdown::{link_key, resolve, shortest_unique_target, FileSet}`
+Expected: FAIL: compile error `unresolved imports liber_markdown::{link_key, resolve, shortest_unique_target, FileSet}`
 
 - [ ] **Step 3: Implement**
 
-`crates/nimw-markdown/src/resolve.rs` (create or replace the whole file):
+`crates/liber-markdown/src/resolve.rs` (create or replace the whole file):
 
 ```rust
 use crate::types::LinkKind;
@@ -4321,7 +4321,7 @@ mod tests {
 }
 ```
 
-`crates/nimw-markdown/src/lib.rs` (create or replace the whole file):
+`crates/liber-markdown/src/lib.rs` (create or replace the whole file):
 
 ```rust
 //! Metadata extraction from Markdown pages (title, frontmatter, tags, links).
@@ -4343,14 +4343,14 @@ pub use types::{LinkKind, LinkRef, PageMeta, Tag};
 
 - [ ] **Step 4: Run the tests, clippy and rustfmt**
 
-Run: `cargo test -p nimw-markdown && cargo clippy -p nimw-markdown --all-targets -- -D warnings && cargo fmt --all --check`
+Run: `cargo test -p liber-markdown && cargo clippy -p liber-markdown --all-targets -- -D warnings && cargo fmt --all --check`
 
 Expected: PASS: 30 unit + 4 integration tests
 
 - [ ] **Step 5: Commit**
 
 ```bash
-git add crates/nimw-markdown
+git add crates/liber-markdown
 git commit -m "feat(markdown): Obsidian link resolution and shortest unique targets (PG-05)
 
 Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
@@ -4358,12 +4358,12 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 
 ---
 
-### Task 8: nimw-index: SQLite cache (schema v1), writes, reads and link resolution
+### Task 8: liber-index: SQLite cache (schema v1), writes, reads and link resolution
 
 **Files:**
-- Modify: `crates/nimw-index/Cargo.toml`, `crates/nimw-index/src/lib.rs`
-- Create: `crates/nimw-index/src/schema.rs`, `src/rows.rs`, `src/index.rs`
-- Test: `crates/nimw-index/tests/index.rs`
+- Modify: `crates/liber-index/Cargo.toml`, `crates/liber-index/src/lib.rs`
+- Create: `crates/liber-index/src/schema.rs`, `src/rows.rs`, `src/index.rs`
+- Test: `crates/liber-index/tests/index.rs`
 
 **Interfaces:**
 - Consumes: Tasks 5–7 (`PageMeta`, `Tag`, `LinkKind`, `FileSet`, `resolve`, `link_key`, `name_key`); M0 `cache_dir_name` (kept).
@@ -4375,11 +4375,11 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 
 - [ ] **Step 1: Manifest**
 
-`crates/nimw-index/Cargo.toml` (create or replace the whole file):
+`crates/liber-index/Cargo.toml` (create or replace the whole file):
 
 ```toml
 [package]
-name = "nimw-index"
+name = "liber-index"
 description = "SQLite + FTS5 index cache and Global View / search queries."
 version.workspace = true
 edition.workspace = true
@@ -4387,7 +4387,7 @@ license.workspace = true
 publish.workspace = true
 
 [dependencies]
-nimw-markdown = { path = "../nimw-markdown" }
+liber-markdown = { path = "../liber-markdown" }
 rusqlite.workspace = true
 sha2.workspace = true
 thiserror.workspace = true
@@ -4400,11 +4400,11 @@ workspace = true
 
 - [ ] **Step 2: Write the failing integration tests**
 
-`crates/nimw-index/tests/index.rs` (create or replace the whole file):
+`crates/liber-index/tests/index.rs` (create or replace the whole file):
 
 ```rust
-use nimw_index::{FileKind, FileRow, Index, SCHEMA_VERSION};
-use nimw_markdown::{LinkKind, parse_page};
+use liber_index::{FileKind, FileRow, Index, SCHEMA_VERSION};
+use liber_markdown::{LinkKind, parse_page};
 
 fn file(path: &str, kind: FileKind) -> FileRow {
     FileRow {
@@ -4558,7 +4558,7 @@ fn upsert_file_as_attachment_drops_page_data() {
 #[test]
 fn review_focus_corrupt_or_foreign_or_old_db_is_rebuilt() {
     let dir = tempfile::tempdir().unwrap();
-    let db = dir.path().join("nimw/abc/index.sqlite");
+    let db = dir.path().join("liber/abc/index.sqlite");
     {
         let mut idx = Index::open(&db).unwrap();
         idx.transaction(|tx| tx.upsert_file(&file("x.md", FileKind::Page)))
@@ -4618,13 +4618,13 @@ fn stats_return_stored_stat() {
 
 - [ ] **Step 3: Run them to verify they fail**
 
-Run: `cargo test -p nimw-index --test index`
+Run: `cargo test -p liber-index --test index`
 
-Expected: FAIL: compile errors `unresolved imports nimw_index::{FileKind, FileRow, Index, SCHEMA_VERSION}`
+Expected: FAIL: compile errors `unresolved imports liber_index::{FileKind, FileRow, Index, SCHEMA_VERSION}`
 
 - [ ] **Step 4: Implement**
 
-`crates/nimw-index/src/schema.rs` (create or replace the whole file):
+`crates/liber-index/src/schema.rs` (create or replace the whole file):
 
 ```rust
 pub const SCHEMA_VERSION: i64 = 1;
@@ -4682,10 +4682,10 @@ CREATE INDEX links_src ON links(src);
 "#;
 ```
 
-`crates/nimw-index/src/rows.rs` (create or replace the whole file):
+`crates/liber-index/src/rows.rs` (create or replace the whole file):
 
 ```rust
-use nimw_markdown::{LinkKind, Tag};
+use liber_markdown::{LinkKind, Tag};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum FileKind {
@@ -4792,12 +4792,12 @@ pub(crate) fn ext_of(name: &str) -> String {
 }
 ```
 
-`crates/nimw-index/src/index.rs` (create or replace the whole file):
+`crates/liber-index/src/index.rs` (create or replace the whole file):
 
 ```rust
 use crate::rows::{FileKind, FileRow, LinkRow, PageRow, Stat, TreeNode, ext_of, split_path};
 use crate::schema::{SCHEMA, SCHEMA_VERSION};
-use nimw_markdown::{FileSet, LinkKind, PageMeta, Tag, link_key, name_key, resolve};
+use liber_markdown::{FileSet, LinkKind, PageMeta, Tag, link_key, name_key, resolve};
 use rusqlite::{Connection, OptionalExtension, Row, params};
 use std::collections::HashMap;
 use std::path::Path;
@@ -5067,7 +5067,7 @@ impl Index {
         )
     }
 
-    /// Links whose `target_key` is one of `keys` (see `nimw_markdown::link_key`).
+    /// Links whose `target_key` is one of `keys` (see `liber_markdown::link_key`).
     pub fn links_by_key(&self, keys: &[String]) -> Result<Vec<LinkRow>> {
         let mut out = Vec::new();
         let mut stmt = self.conn.prepare(&format!(
@@ -5242,11 +5242,11 @@ impl Tx<'_> {
 }
 ```
 
-`crates/nimw-index/src/lib.rs` (create or replace the whole file):
+`crates/liber-index/src/lib.rs` (create or replace the whole file):
 
 ```rust
 //! SQLite cache of one vault (spec §5): files, pages, tags, links.
-//! Never reads or writes vault files; `nimw-session` feeds it.
+//! Never reads or writes vault files; `liber-session` feeds it.
 
 mod index;
 mod rows;
@@ -5260,7 +5260,7 @@ use sha2::{Digest, Sha256};
 use std::path::Path;
 
 /// Folder name for a vault's index cache inside the OS cache dir
-/// (`nimw/<name>/index.sqlite`): first 16 hex chars of SHA-256 of the
+/// (`liber/<name>/index.sqlite`): first 16 hex chars of SHA-256 of the
 /// canonical absolute vault path. Callers must pass a canonicalized path.
 pub fn cache_dir_name(vault_abs_path: &Path) -> String {
     let digest = Sha256::digest(vault_abs_path.as_os_str().as_encoded_bytes());
@@ -5298,14 +5298,14 @@ mod tests {
 
 - [ ] **Step 5: Run the tests, clippy and rustfmt**
 
-Run: `cargo test -p nimw-index && cargo clippy -p nimw-index --all-targets -- -D warnings && cargo fmt --all --check`
+Run: `cargo test -p liber-index && cargo clippy -p liber-index --all-targets -- -D warnings && cargo fmt --all --check`
 
 Expected: PASS: 2 unit (M0) + 9 integration tests
 
 - [ ] **Step 6: Commit**
 
 ```bash
-git add Cargo.lock crates/nimw-index
+git add Cargo.lock crates/liber-index
 git commit -m "feat(index): SQLite cache with link resolution (PG-05, EXP-01)
 
 Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
@@ -5313,44 +5313,44 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 
 ---
 
-### Task 9: nimw-session: open + incremental index, reads, create/trash operations
+### Task 9: liber-session: open + incremental index, reads, create/trash operations
 
 **Files:**
-- Create: `crates/nimw-session/Cargo.toml`, `src/lib.rs`, `src/error.rs`, `src/events.rs`, `src/session.rs`
-- Test: `crates/nimw-session/tests/open.rs`
+- Create: `crates/liber-session/Cargo.toml`, `src/lib.rs`, `src/error.rs`, `src/events.rs`, `src/session.rs`
+- Test: `crates/liber-session/tests/open.rs`
 
 **Interfaces:**
 - Consumes: Tasks 1–8.
 - Produces:
   - `pub enum SessionError { Vault(VaultError), Index(IndexError), NotIndexed(String), InvalidName(String) }`, `pub type Result<T>`.
   - `pub struct IndexReport { files, pages, parsed, skipped_unchanged, removed: usize, warnings: Vec<String>, duration: Duration }`; `pub enum SessionEvent { Progress { done, total }, Indexed(IndexReport), Changed { created, modified, removed: Vec<String>, renamed: Vec<(String, String)> } }`; `pub struct RenameOutcome { moved: Vec<(String, String)>, updated_files: Vec<String>, updated_links: usize, failed: Vec<(String, String)> }` (used from Task 10).
-  - `pub fn index_db_path(cache_root: &Path, vault_root: &Path) -> PathBuf` (`<cache_root>/nimw/<cache_dir_name>/index.sqlite`).
+  - `pub fn index_db_path(cache_root: &Path, vault_root: &Path) -> PathBuf` (`<cache_root>/liber/<cache_dir_name>/index.sqlite`).
   - `pub struct VaultSession`: `open(root: &Path, cache_root: &Path, sink: impl Fn(SessionEvent) + Send + Sync + 'static) -> Result<(VaultSession, IndexReport)>`, `vault(&self) -> &Vault`, `tree() -> Vec<TreeNode>`, `page(&VaultPath) -> Option<PageRow>`, `backlinks(&VaultPath) -> Vec<LinkRow>`, `create_page(dir: &VaultPath, name: &str) -> Result<VaultPath>`, `create_folder(parent: &VaultPath, name: &str) -> Result<VaultPath>`, `trash(&VaultPath) -> Result<()>`.
   - crate-internal (used by Tasks 10–11): `index()`, `emit(SessionEvent)`, `reindex_all()`, `load(&Entry, old_hash, &mut warnings) -> Option<Loaded>`, `reindex_written(&VaultPath, text, Hash)`, `enum Loaded { StatOnly(FileRow), Page(FileRow, Box<PageMeta>), Attachment(FileRow) }`, `write_loaded`, `folder_row`, `unchanged`, `clamp_ns`, `validate_name`, `is_page_path`.
 
 - [ ] **Step 1: Create the crate manifest**
 
-`crates/nimw-session/Cargo.toml` (create or replace the whole file):
+`crates/liber-session/Cargo.toml` (create or replace the whole file):
 
 ```toml
 [package]
-name = "nimw-session"
-description = "One open vault: indexing, watching and file operations over nimw-vault, nimw-markdown and nimw-index."
+name = "liber-session"
+description = "One open vault: indexing, watching and file operations over liber-vault, liber-markdown and liber-index."
 version.workspace = true
 edition.workspace = true
 license.workspace = true
 publish.workspace = true
 
 [dependencies]
-nimw-index = { path = "../nimw-index" }
-nimw-markdown = { path = "../nimw-markdown" }
-nimw-vault = { path = "../nimw-vault" }
+liber-index = { path = "../liber-index" }
+liber-markdown = { path = "../liber-markdown" }
+liber-vault = { path = "../liber-vault" }
 percent-encoding.workspace = true
 rayon.workspace = true
 thiserror.workspace = true
 
 [dev-dependencies]
-nimw-testkit = { path = "../nimw-testkit" }
+liber-testkit = { path = "../liber-testkit" }
 proptest.workspace = true
 tempfile.workspace = true
 
@@ -5360,13 +5360,13 @@ workspace = true
 
 - [ ] **Step 2: Write the failing integration tests**
 
-`crates/nimw-session/tests/open.rs` (create or replace the whole file):
+`crates/liber-session/tests/open.rs` (create or replace the whole file):
 
 ```rust
-use nimw_markdown::LinkKind;
-use nimw_session::{SessionError, SessionEvent, VaultSession};
-use nimw_testkit::{copy_fixture, snapshot, trashable_fixture};
-use nimw_vault::VaultPath;
+use liber_markdown::LinkKind;
+use liber_session::{SessionError, SessionEvent, VaultSession};
+use liber_testkit::{copy_fixture, snapshot, trashable_fixture};
+use liber_vault::VaultPath;
 use std::sync::{Arc, Mutex};
 
 fn vp(s: &str) -> VaultPath {
@@ -5378,7 +5378,7 @@ fn open(
     cache: &std::path::Path,
 ) -> (
     VaultSession,
-    nimw_session::IndexReport,
+    liber_session::IndexReport,
     Arc<Mutex<Vec<SessionEvent>>>,
 ) {
     let events = Arc::new(Mutex::new(Vec::new()));
@@ -5410,11 +5410,11 @@ fn vlt_02_opening_any_fixture_changes_nothing() {
             "{name}: vault bytes or mtimes changed"
         );
         assert!(
-            !vault.path().join(".nimw").exists(),
-            "{name}: .nimw created"
+            !vault.path().join(".liber").exists(),
+            "{name}: .liber created"
         );
         assert!(
-            cache.path().join("nimw").is_dir(),
+            cache.path().join("liber").is_dir(),
             "index lives in the cache dir"
         );
     }
@@ -5647,17 +5647,17 @@ fn review_focus_names_differing_only_by_case_on_case_sensitive_fs() {
 
 - [ ] **Step 3: Run them to verify they fail**
 
-Run: `cargo test -p nimw-session --test open`
+Run: `cargo test -p liber-session --test open`
 
-Expected: FAIL: `can't find library nimw_session` (no `src/lib.rs` yet)
+Expected: FAIL: `can't find library liber_session` (no `src/lib.rs` yet)
 
 - [ ] **Step 4: Implement**
 
-`crates/nimw-session/src/error.rs` (create or replace the whole file):
+`crates/liber-session/src/error.rs` (create or replace the whole file):
 
 ```rust
-use nimw_index::IndexError;
-use nimw_vault::VaultError;
+use liber_index::IndexError;
+use liber_vault::VaultError;
 
 #[derive(Debug, thiserror::Error)]
 pub enum SessionError {
@@ -5674,7 +5674,7 @@ pub enum SessionError {
 pub type Result<T> = std::result::Result<T, SessionError>;
 ```
 
-`crates/nimw-session/src/events.rs` (create or replace the whole file):
+`crates/liber-session/src/events.rs` (create or replace the whole file):
 
 ```rust
 use std::time::Duration;
@@ -5724,14 +5724,14 @@ pub struct RenameOutcome {
 }
 ```
 
-`crates/nimw-session/src/session.rs` (create or replace the whole file):
+`crates/liber-session/src/session.rs` (create or replace the whole file):
 
 ```rust
 use crate::error::{Result, SessionError};
 use crate::events::{IndexReport, SessionEvent};
-use nimw_index::{FileKind, FileRow, Index, Stat, cache_dir_name};
-use nimw_markdown::{PageMeta, link_key, parse_page};
-use nimw_vault::{Entry, EntryKind, Hash, Vault, VaultPath, is_hidden_name};
+use liber_index::{FileKind, FileRow, Index, Stat, cache_dir_name};
+use liber_markdown::{PageMeta, link_key, parse_page};
+use liber_vault::{Entry, EntryKind, Hash, Vault, VaultPath, is_hidden_name};
 use rayon::prelude::*;
 use std::collections::HashSet;
 use std::path::{Path, PathBuf};
@@ -5772,10 +5772,10 @@ pub(crate) fn is_page_path(path: &str) -> bool {
         .is_some_and(|(_, ext)| ext.eq_ignore_ascii_case("md"))
 }
 
-/// Index database path for a vault: `<cache_root>/nimw/<cache_dir_name>/index.sqlite`.
+/// Index database path for a vault: `<cache_root>/liber/<cache_dir_name>/index.sqlite`.
 pub fn index_db_path(cache_root: &Path, vault_root: &Path) -> PathBuf {
     cache_root
-        .join("nimw")
+        .join("liber")
         .join(cache_dir_name(vault_root))
         .join("index.sqlite")
 }
@@ -5968,15 +5968,15 @@ impl VaultSession {
 
     // ---- reads ----
 
-    pub fn tree(&self) -> Result<Vec<nimw_index::TreeNode>> {
+    pub fn tree(&self) -> Result<Vec<liber_index::TreeNode>> {
         Ok(self.index().tree()?)
     }
 
-    pub fn page(&self, path: &VaultPath) -> Result<Option<nimw_index::PageRow>> {
+    pub fn page(&self, path: &VaultPath) -> Result<Option<liber_index::PageRow>> {
         Ok(self.index().page(path.as_str())?)
     }
 
-    pub fn backlinks(&self, path: &VaultPath) -> Result<Vec<nimw_index::LinkRow>> {
+    pub fn backlinks(&self, path: &VaultPath) -> Result<Vec<liber_index::LinkRow>> {
         Ok(self.index().backlinks(path.as_str())?)
     }
 
@@ -6028,7 +6028,7 @@ impl VaultSession {
     }
 }
 
-pub(crate) fn write_loaded(tx: &nimw_index::Tx<'_>, loaded: &Loaded) -> nimw_index::Result<()> {
+pub(crate) fn write_loaded(tx: &liber_index::Tx<'_>, loaded: &Loaded) -> liber_index::Result<()> {
     match loaded {
         Loaded::StatOnly(row) | Loaded::Attachment(row) => tx.upsert_file(row),
         Loaded::Page(row, meta) => {
@@ -6072,11 +6072,11 @@ pub(crate) fn validate_name(name: &str) -> Result<&str> {
 }
 ```
 
-`crates/nimw-session/src/lib.rs` (create or replace the whole file):
+`crates/liber-session/src/lib.rs` (create or replace the whole file):
 
 ```rust
 //! One open vault: indexing, watching and file operations, composed from
-//! `nimw-vault` (filesystem), `nimw-markdown` (parsing) and `nimw-index` (cache).
+//! `liber-vault` (filesystem), `liber-markdown` (parsing) and `liber-index` (cache).
 
 mod error;
 mod events;
@@ -6089,14 +6089,14 @@ pub use session::{VaultSession, index_db_path};
 
 - [ ] **Step 5: Run the tests, clippy and rustfmt**
 
-Run: `cargo test -p nimw-session && cargo clippy -p nimw-session --all-targets -- -D warnings && cargo fmt --all --check`
+Run: `cargo test -p liber-session && cargo clippy -p liber-session --all-targets -- -D warnings && cargo fmt --all --check`
 
 Expected: PASS: 8 integration tests (the case-only test returns early on case-insensitive filesystems)
 
 - [ ] **Step 6: Commit**
 
 ```bash
-git add Cargo.lock crates/nimw-session
+git add Cargo.lock crates/liber-session
 git commit -m "feat(session): open vault with incremental index, create and trash (VLT-02, PG-01, PG-05, EXP-03)
 
 Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
@@ -6104,12 +6104,12 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 
 ---
 
-### Task 10: nimw-session: rename/move with link rewriting
+### Task 10: liber-session: rename/move with link rewriting
 
 **Files:**
-- Create: `crates/nimw-session/src/rename.rs`
-- Modify: `crates/nimw-session/src/session.rs` (adds `subtree_files`), `src/lib.rs`
-- Test: `crates/nimw-session/tests/rename.rs`, `tests/rename_props.rs` (+ conflict-retry unit tests in `rename.rs`)
+- Create: `crates/liber-session/src/rename.rs`
+- Modify: `crates/liber-session/src/session.rs` (adds `subtree_files`), `src/lib.rs`
+- Test: `crates/liber-session/tests/rename.rs`, `tests/rename_props.rs` (+ conflict-retry unit tests in `rename.rs`)
 
 **Interfaces:**
 - Consumes: Task 9 internals; Task 7 `resolve`, `shortest_unique_target`, `link_key`; Task 8 `links_into`, `links_by_key`, `Tx::rename`, `resolve_affected`, `resolve_from`.
@@ -6117,12 +6117,12 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 
 - [ ] **Step 1: Write the failing integration and property tests**
 
-`crates/nimw-session/tests/rename.rs` (create or replace the whole file):
+`crates/liber-session/tests/rename.rs` (create or replace the whole file):
 
 ```rust
-use nimw_session::{SessionError, SessionEvent, VaultSession};
-use nimw_testkit::{copy_fixture, snapshot};
-use nimw_vault::VaultPath;
+use liber_session::{SessionError, SessionEvent, VaultSession};
+use liber_testkit::{copy_fixture, snapshot};
+use liber_vault::VaultPath;
 
 fn vp(s: &str) -> VaultPath {
     VaultPath::new(s).unwrap()
@@ -6398,15 +6398,15 @@ fn rename_rejects_invalid_requests() {
 }
 ```
 
-`crates/nimw-session/tests/rename_props.rs` (create or replace the whole file):
+`crates/liber-session/tests/rename_props.rs` (create or replace the whole file):
 
 ```rust
 //! Property tests for rename-with-rewrite (spec §7.2): links keep their target,
 //! and no byte outside a link target changes.
 
-use nimw_markdown::{FileSet, LinkKind, parse_page, shortest_unique_target};
-use nimw_session::{SessionEvent, VaultSession};
-use nimw_vault::VaultPath;
+use liber_markdown::{FileSet, LinkKind, parse_page, shortest_unique_target};
+use liber_session::{SessionEvent, VaultSession};
+use liber_vault::VaultPath;
 use proptest::prelude::*;
 use std::collections::BTreeMap;
 
@@ -6575,13 +6575,13 @@ proptest! {
 
 - [ ] **Step 2: Run them to verify they fail**
 
-Run: `cargo test -p nimw-session --test rename`
+Run: `cargo test -p liber-session --test rename`
 
 Expected: FAIL: compile error `no method named rename found for struct VaultSession`
 
 - [ ] **Step 3: Implement**
 
-In `crates/nimw-session/src/session.rs`, replace:
+In `crates/liber-session/src/session.rs`, replace:
 
 ```rust
 use std::collections::HashSet;
@@ -6593,7 +6593,7 @@ with:
 use std::collections::{HashMap, HashSet};
 ```
 
-In `crates/nimw-session/src/session.rs`, replace:
+In `crates/liber-session/src/session.rs`, replace:
 
 ```rust
     Ok(trimmed)
@@ -6620,14 +6620,14 @@ pub(crate) fn subtree_files(stats: &HashMap<String, Stat>, path: &VaultPath) -> 
 }
 ```
 
-`crates/nimw-session/src/rename.rs` (create or replace the whole file):
+`crates/liber-session/src/rename.rs` (create or replace the whole file):
 
 ```rust
 use crate::error::{Result, SessionError};
 use crate::events::RenameOutcome;
 use crate::session::{VaultSession, is_page_path, subtree_files};
-use nimw_markdown::{FileSet, LinkKind, link_key, parse_page, resolve, shortest_unique_target};
-use nimw_vault::{VaultError, VaultPath};
+use liber_markdown::{FileSet, LinkKind, link_key, parse_page, resolve, shortest_unique_target};
+use liber_vault::{VaultError, VaultPath};
 use percent_encoding::{AsciiSet, CONTROLS, utf8_percent_encode};
 use std::collections::{BTreeSet, HashMap};
 use std::ops::Range;
@@ -6875,7 +6875,7 @@ mod tests {
     use std::sync::atomic::{AtomicUsize, Ordering};
 
     fn session(fixture: &str) -> (tempfile::TempDir, tempfile::TempDir, VaultSession) {
-        let vault = nimw_testkit::copy_fixture(fixture);
+        let vault = liber_testkit::copy_fixture(fixture);
         let cache = tempfile::tempdir().unwrap();
         let (s, _) = VaultSession::open(vault.path(), cache.path(), |_: SessionEvent| {}).unwrap();
         (vault, cache, s)
@@ -6941,11 +6941,11 @@ mod tests {
 }
 ```
 
-`crates/nimw-session/src/lib.rs` (create or replace the whole file):
+`crates/liber-session/src/lib.rs` (create or replace the whole file):
 
 ```rust
 //! One open vault: indexing, watching and file operations, composed from
-//! `nimw-vault` (filesystem), `nimw-markdown` (parsing) and `nimw-index` (cache).
+//! `liber-vault` (filesystem), `liber-markdown` (parsing) and `liber-index` (cache).
 
 mod error;
 mod events;
@@ -6959,14 +6959,14 @@ pub use session::{VaultSession, index_db_path};
 
 - [ ] **Step 4: Run the tests, clippy and rustfmt**
 
-Run: `cargo test -p nimw-session && cargo clippy -p nimw-session --all-targets -- -D warnings && cargo fmt --all --check`
+Run: `cargo test -p liber-session && cargo clippy -p liber-session --all-targets -- -D warnings && cargo fmt --all --check`
 
 Expected: PASS: 3 unit + 8 open + 8 rename + 2 property tests (48 random vaults each)
 
 - [ ] **Step 5: Commit**
 
 ```bash
-git add crates/nimw-session
+git add crates/liber-session
 git commit -m "feat(session): rename and move with link rewriting (EXP-02, EXP-04)
 
 Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
@@ -6974,12 +6974,12 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 
 ---
 
-### Task 11: nimw-session: applying watcher events (external changes)
+### Task 11: liber-session: applying watcher events (external changes)
 
 **Files:**
-- Create: `crates/nimw-session/src/watching.rs`
-- Modify: `crates/nimw-session/src/session.rs` (watcher field; `reindex_all` also returns the changed paths), `src/lib.rs`
-- Test: `crates/nimw-session/tests/watching.rs`
+- Create: `crates/liber-session/src/watching.rs`
+- Modify: `crates/liber-session/src/session.rs` (watcher field; `reindex_all` also returns the changed paths), `src/lib.rs`
+- Test: `crates/liber-session/tests/watching.rs`
 
 **Interfaces:**
 - Consumes: Task 4 `Vault::watch`, `WatchEvent`; Task 2 `list_dir`, `scan_from`, `stat`; Task 9 internals.
@@ -6987,12 +6987,12 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 
 - [ ] **Step 1: Write the failing integration tests**
 
-`crates/nimw-session/tests/watching.rs` (create or replace the whole file):
+`crates/liber-session/tests/watching.rs` (create or replace the whole file):
 
 ```rust
-use nimw_session::{SessionEvent, VaultSession};
-use nimw_testkit::{copy_fixture, wait_until};
-use nimw_vault::{VaultPath, WatchEvent};
+use liber_session::{SessionEvent, VaultSession};
+use liber_testkit::{copy_fixture, wait_until};
+use liber_vault::{VaultPath, WatchEvent};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
@@ -7180,25 +7180,25 @@ fn review_focus_git_checkout_like_burst_converges() {
 
 - [ ] **Step 2: Run them to verify they fail**
 
-Run: `cargo test -p nimw-session --test watching`
+Run: `cargo test -p liber-session --test watching`
 
 Expected: FAIL: compile errors `no method named start_watching / apply`
 
 - [ ] **Step 3: Implement: seven edits in `session.rs`, then the new module**
 
-In `crates/nimw-session/src/session.rs`, replace:
+In `crates/liber-session/src/session.rs`, replace:
 
 ```rust
-use nimw_vault::{Entry, EntryKind, Hash, Vault, VaultPath, is_hidden_name};
+use liber_vault::{Entry, EntryKind, Hash, Vault, VaultPath, is_hidden_name};
 ```
 
 with:
 
 ```rust
-use nimw_vault::{Entry, EntryKind, Hash, Vault, VaultPath, Watcher, is_hidden_name};
+use liber_vault::{Entry, EntryKind, Hash, Vault, VaultPath, Watcher, is_hidden_name};
 ```
 
-In `crates/nimw-session/src/session.rs`, replace:
+In `crates/liber-session/src/session.rs`, replace:
 
 ```rust
     pub(crate) sink: Sink,
@@ -7213,7 +7213,7 @@ with:
 }
 ```
 
-In `crates/nimw-session/src/session.rs`, replace:
+In `crates/liber-session/src/session.rs`, replace:
 
 ```rust
             sink: Arc::new(sink),
@@ -7230,7 +7230,7 @@ with:
         let (report, _) = session.reindex_all()?;
 ```
 
-In `crates/nimw-session/src/session.rs`, replace:
+In `crates/liber-session/src/session.rs`, replace:
 
 ```rust
     /// Full incremental pass (spec §6.2).
@@ -7245,7 +7245,7 @@ with:
     pub(crate) fn reindex_all(&self) -> Result<(IndexReport, Changes)> {
 ```
 
-In `crates/nimw-session/src/session.rs`, replace:
+In `crates/liber-session/src/session.rs`, replace:
 
 ```rust
         report.parsed = loaded
@@ -7279,7 +7279,7 @@ with:
         }
 ```
 
-In `crates/nimw-session/src/session.rs`, replace:
+In `crates/liber-session/src/session.rs`, replace:
 
 ```rust
         Ok(report)
@@ -7291,7 +7291,7 @@ with:
         Ok((report, changes))
 ```
 
-In `crates/nimw-session/src/session.rs`, replace:
+In `crates/liber-session/src/session.rs`, replace:
 
 ```rust
 pub(crate) fn write_loaded
@@ -7311,15 +7311,15 @@ pub(crate) struct Changes {
 pub(crate) fn write_loaded
 ```
 
-`crates/nimw-session/src/watching.rs` (create or replace the whole file):
+`crates/liber-session/src/watching.rs` (create or replace the whole file):
 
 ```rust
 use crate::error::Result;
 use crate::events::SessionEvent;
 use crate::session::{Loaded, VaultSession, folder_row, unchanged, write_loaded};
-use nimw_index::FileKind;
-use nimw_markdown::link_key;
-use nimw_vault::{EntryKind, VaultPath, WatchEvent};
+use liber_index::FileKind;
+use liber_markdown::link_key;
+use liber_vault::{EntryKind, VaultPath, WatchEvent};
 use std::collections::{BTreeSet, HashMap};
 use std::sync::Arc;
 
@@ -7527,11 +7527,11 @@ impl VaultSession {
 }
 ```
 
-`crates/nimw-session/src/lib.rs` (create or replace the whole file):
+`crates/liber-session/src/lib.rs` (create or replace the whole file):
 
 ```rust
 //! One open vault: indexing, watching and file operations, composed from
-//! `nimw-vault` (filesystem), `nimw-markdown` (parsing) and `nimw-index` (cache).
+//! `liber-vault` (filesystem), `liber-markdown` (parsing) and `liber-index` (cache).
 
 mod error;
 mod events;
@@ -7546,14 +7546,14 @@ pub use session::{VaultSession, index_db_path};
 
 - [ ] **Step 4: Run the watching tests three times, then everything in the crate, clippy and rustfmt**
 
-Run: `for i in 1 2 3; do cargo test -p nimw-session --test watching || exit 1; done && cargo test -p nimw-session && cargo clippy -p nimw-session --all-targets -- -D warnings && cargo fmt --all --check`
+Run: `for i in 1 2 3; do cargo test -p liber-session --test watching || exit 1; done && cargo test -p liber-session && cargo clippy -p liber-session --all-targets -- -D warnings && cargo fmt --all --check`
 
 Expected: PASS: 5 watching tests in each run; whole crate green
 
 - [ ] **Step 5: Commit**
 
 ```bash
-git add crates/nimw-session
+git add crates/liber-session
 git commit -m "feat(session): apply external changes from the watcher (VLT-04)
 
 Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
@@ -7564,16 +7564,16 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 ### Task 12: Benchmarks (10k notes), full verification and the M1a hand-off
 
 **Files:**
-- Modify: `crates/nimw-testkit/src/lib.rs` (vault generator), `crates/nimw-session/Cargo.toml` (criterion + bench target)
-- Create: `crates/nimw-session/benches/vault.rs`, `docs/handoff/2026-10-12-m1a-vault-core-handoff.md`
+- Modify: `crates/liber-testkit/src/lib.rs` (vault generator), `crates/liber-session/Cargo.toml` (criterion + bench target)
+- Create: `crates/liber-session/benches/vault.rs`, `docs/handoff/2026-10-12-m1a-vault-core-handoff.md`
 
 **Interfaces:**
 - Consumes: everything above.
-- Produces: `nimw_testkit::VaultShape { notes, folders, max_depth, links_per_note, tags_per_note, attachments, hub_backlinks }` with `VaultShape::TEN_K`; `nimw_testkit::generate_vault(root: &Path, shape: VaultShape, seed: u64) -> Vec<String>` (note paths; deterministic); criterion bench `vault` in `nimw-session`; the M1a hand-off document.
+- Produces: `liber_testkit::VaultShape { notes, folders, max_depth, links_per_note, tags_per_note, attachments, hub_backlinks }` with `VaultShape::TEN_K`; `liber_testkit::generate_vault(root: &Path, shape: VaultShape, seed: u64) -> Vec<String>` (note paths; deterministic); criterion bench `vault` in `liber-session`; the M1a hand-off document.
 
 - [ ] **Step 1: Add the deterministic generator (with its own test), criterion and the bench**
 
-In `crates/nimw-testkit/src/lib.rs`, replace:
+In `crates/liber-testkit/src/lib.rs`, replace:
 
 ```rust
     check()
@@ -7742,28 +7742,28 @@ mod tests {
 }
 ```
 
-`crates/nimw-session/Cargo.toml` (create or replace the whole file):
+`crates/liber-session/Cargo.toml` (create or replace the whole file):
 
 ```toml
 [package]
-name = "nimw-session"
-description = "One open vault: indexing, watching and file operations over nimw-vault, nimw-markdown and nimw-index."
+name = "liber-session"
+description = "One open vault: indexing, watching and file operations over liber-vault, liber-markdown and liber-index."
 version.workspace = true
 edition.workspace = true
 license.workspace = true
 publish.workspace = true
 
 [dependencies]
-nimw-index = { path = "../nimw-index" }
-nimw-markdown = { path = "../nimw-markdown" }
-nimw-vault = { path = "../nimw-vault" }
+liber-index = { path = "../liber-index" }
+liber-markdown = { path = "../liber-markdown" }
+liber-vault = { path = "../liber-vault" }
 percent-encoding.workspace = true
 rayon.workspace = true
 thiserror.workspace = true
 
 [dev-dependencies]
 criterion.workspace = true
-nimw-testkit = { path = "../nimw-testkit" }
+liber-testkit = { path = "../liber-testkit" }
 proptest.workspace = true
 tempfile.workspace = true
 
@@ -7775,17 +7775,17 @@ harness = false
 workspace = true
 ```
 
-`crates/nimw-session/benches/vault.rs` (create or replace the whole file):
+`crates/liber-session/benches/vault.rs` (create or replace the whole file):
 
 ```rust
 //! NFR-03 benchmarks on a generated 10,000-note vault (spec §7.3).
-//! Run: `cargo bench -p nimw-session`. Targets: first index < 30 s,
+//! Run: `cargo bench -p liber-session`. Targets: first index < 30 s,
 //! single-file re-index < 100 ms. Results go in the M1a hand-off.
 
 use criterion::{BatchSize, Criterion, criterion_group, criterion_main};
-use nimw_session::{SessionEvent, VaultSession};
-use nimw_testkit::{VaultShape, generate_vault};
-use nimw_vault::{VaultPath, WatchEvent};
+use liber_session::{SessionEvent, VaultSession};
+use liber_testkit::{VaultShape, generate_vault};
+use liber_vault::{VaultPath, WatchEvent};
 use std::time::Duration;
 
 fn quiet(_: SessionEvent) {}
@@ -7853,13 +7853,13 @@ criterion_main!(m1a);
 
 - [ ] **Step 2: Check the generator test and that the bench compiles**
 
-Run: `cargo test -p nimw-testkit && cargo bench -p nimw-session --bench vault --no-run && cargo clippy -p nimw-testkit -p nimw-session --all-targets -- -D warnings && cargo fmt --all --check`
+Run: `cargo test -p liber-testkit && cargo bench -p liber-session --bench vault --no-run && cargo clippy -p liber-testkit -p liber-session --all-targets -- -D warnings && cargo fmt --all --check`
 
 Expected: PASS: 1 generator test; bench binary builds
 
 - [ ] **Step 3: Run the benchmarks (~5 minutes with default settings; `-- --quick` for a fast look). Copy the four `time:` lines into the hand-off**
 
-Run: `cargo bench -p nimw-session --bench vault`
+Run: `cargo bench -p liber-session --bench vault`
 
 Expected: Four results under `10k-notes/`. Reference run (Apple Silicon, `--quick`): first full index ≈ 1.1 s (budget < 30 s), reopen unchanged ≈ 0.15 s, re-index one file ≈ 11 ms (budget < 100 ms), rename with 100 backlinks ≈ 0.96 s
 
@@ -7875,7 +7875,7 @@ Create `docs/handoff/2026-10-12-m1a-vault-core-handoff.md` in the style of `docs
 
 1. **Status at a glance**: what M1a delivers, test counts per crate (from the last `cargo test` output), benchmark table (the four `time:` lines from Step 3 with machine/OS noted, against NFR-03 budgets), what is not done (M1b: Tauri commands, settings store, explorer UI; M5 FTS; undo).
 2. **Document map**: product spec, architecture doc, M1a design spec, this plan, M0 hand-off.
-3. **Crate map**: one table row per crate (`nimw-vault`, `nimw-markdown`, `nimw-index`, `nimw-session`, `nimw-testkit`) with its responsibility, public API (copy the signatures from this plan's Interfaces blocks), what it must never do (no Tauri; index never touches vault files; markdown has no I/O).
+3. **Crate map**: one table row per crate (`liber-vault`, `liber-markdown`, `liber-index`, `liber-session`, `liber-testkit`) with its responsibility, public API (copy the signatures from this plan's Interfaces blocks), what it must never do (no Tauri; index never touches vault files; markdown has no I/O).
 4. **How a vault is opened** (step by step through `VaultSession::open` → `Vault::open` → `Index::open` → `reindex_all`), where the cache lives (`index_db_path`), what makes reopening incremental, and why opening writes nothing.
 5. **Link resolution rules** (spec §4.4 plus plan note 3) with the `ambiguous-names` fixture as the worked example.
 6. **Rename/move algorithm** (spec §6.4 plus plan note 4): candidate selection, edit planning, move-then-rewrite order, conflict retry, `RenameOutcome`, why there is no undo.
@@ -7889,7 +7889,7 @@ Create `docs/handoff/2026-10-12-m1a-vault-core-handoff.md` in the style of `docs
 - [ ] **Step 6: Commit**
 
 ```bash
-git add Cargo.lock crates/nimw-testkit crates/nimw-session docs/handoff/2026-10-12-m1a-vault-core-handoff.md
+git add Cargo.lock crates/liber-testkit crates/liber-session docs/handoff/2026-10-12-m1a-vault-core-handoff.md
 git commit -m "feat(session): 10k-note benchmarks and M1a hand-off (NFR-01, NFR-03)
 
 Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
@@ -7907,13 +7907,13 @@ Each note was forced by evidence found while compile-checking the plan; the spec
 4. **Markdown destinations (spec §6.4).** A plain (unencoded, not `<…>`) destination that needs a space is %-encoded rather than wrapped in `<…>`, because wrapping only the path would break a `#heading` suffix outside the range. Encoded destinations stay encoded; angle destinations stay angled.
 5. **API additions** needed by later tasks: `Vault::scan` returns `Scan { entries, skipped }` (skipped symlinks/non-UTF-8 names are reported, not silently dropped); `scan_from`, `list_dir`, `stat`, `fs_path`; `VaultError::Watch`; `TMP_MARKER`; `Index::open_in_memory`, `stats`, `links_from`, `resolve_from`, `counts` and the `Tx` transaction type; `index_db_path`; `VaultSession::vault`, `stop_watching`; `start_watching` takes `self: &Arc<Self>` (the watcher holds a weak reference).
 6. **Session events.** `create_page`, `create_folder`, `rename` and `trash` return their results and do not emit `Changed`; `Changed` is reserved for external changes from the watcher (M1b refreshes the tree after its own calls).
-7. **Test infrastructure.** New test-only crate `nimw-testkit`. Trash tests copy fixtures into `$HOME/nimw-trash-test-*` because on Linux the system temp dir is often on a different filesystem than `~/.local/share/Trash` (each run leaves one such folder in your OS trash).
+7. **Test infrastructure.** New test-only crate `liber-testkit`. Trash tests copy fixtures into `$HOME/liber-trash-test-*` because on Linux the system temp dir is often on a different filesystem than `~/.local/share/Trash` (each run leaves one such folder in your OS trash).
 8. **Fixtures (spec §7.1).** `.trash/` stands in for the `.git/` stub (git cannot commit a nested `.git`); NFD file names are tested at runtime because git on macOS re-normalizes committed names; `.gitattributes` (`fixtures/** -text`) keeps CRLF and invalid UTF-8 bytes exact; fixtures are excluded from Prettier.
 9. **Spec §2.1 dependency table.** `notify` is reached through `notify_debouncer_mini::notify` (guaranteed matching version); `serde`/`serde_json` come from the existing workspace entries.
 
 ## Self-review
 
-- **Spec coverage:** §1 criteria 1–7 → Tasks 2/9 (VLT-02), 5–7 + 9 (PG-01/04/05), 4 + 11 (VLT-04), 10 (EXP-02/04), 3 + 9 (EXP-03), 12 (NFR-01/03), all headless. §3 → Tasks 1–4; §4 → Tasks 5–7; §5 → Task 8; §6.1–6.3 → Task 9; §6.4 → Task 10; §6.5 → Task 11; §6.6 → Task 9; §7.1 → Task 2; §7.2 → tests listed per task; §7.3 → Task 12; §8 respected (no task touches Tauri, UI, FTS, layout or `.nimw/vault.json` writes).
+- **Spec coverage:** §1 criteria 1–7 → Tasks 2/9 (VLT-02), 5–7 + 9 (PG-01/04/05), 4 + 11 (VLT-04), 10 (EXP-02/04), 3 + 9 (EXP-03), 12 (NFR-01/03), all headless. §3 → Tasks 1–4; §4 → Tasks 5–7; §5 → Task 8; §6.1–6.3 → Task 9; §6.4 → Task 10; §6.5 → Task 11; §6.6 → Task 9; §7.1 → Task 2; §7.2 → tests listed per task; §7.3 → Task 12; §8 respected (no task touches Tauri, UI, FTS, layout or `.liber/vault.json` writes).
 - **Placeholders:** none; every code step contains the complete file or an exact replace/with pair, and every command has its expected result.
 - **Type consistency:** checked mechanically — the replay compiled each task's code against the previous tasks' real code.
 - **Review Focus:** five items above, each with a named test in its owning task.

@@ -11,7 +11,7 @@ Jose's feedback, item by item. Each item cites the feedback it answers.
 **Goal:** the page's text starts about 25% from the top instead of about 50%.
 
 - **Sidebar header:**
-  - It shows the **vault name** (ellipsized, with a `title` for the full name) next to the app mark (`BrandMark`), replacing "Notes In My Way".
+  - It shows the **vault name** (ellipsized, with a `title` for the full name) next to the app mark (`BrandMark`), replacing "Liber Linteum".
   - The app name stays in the window title, the About panel and the Welcome screen.
 - **Top bar, left area** (replacing the vault name):
   - **Edit screen with a page:** the page **title** (M2b `PageTitle`, editable in place, rendered as the page's `h1`), with the **subtitle** below it (M2c `PageSubtitle`, editable), on one compact line each, ellipsized.
@@ -72,16 +72,16 @@ Jose's feedback, item by item. Each item cites the feedback it answers.
 
 ## 5. Attachments override (F9)
 
-- **`.nimw/vault.json` `attachments.overrideObsidian: boolean`** (default false).
+- **`.liber/vault.json` `attachments.overrideObsidian: boolean`** (default false).
 - **Precedence:**
-  1. NIMW's setting when `overrideObsidian` is true;
+  1. Liber Linteum's setting when `overrideObsidian` is true;
   2. else Obsidian's `attachmentFolderPath` when present;
-  3. else NIMW's setting;
+  3. else Liber Linteum's setting;
   4. else the default.
 - **Settings → This vault, when Obsidian's setting exists:**
   - the note reads "Obsidian puts new attachments in `./assets` (next to each page)";
-  - a switch, **Use a different place in Notes In My Way**, enables the selector, and saving with it on writes `overrideObsidian: true`;
-  - turning it off writes false; NIMW's last choice is kept for next time.
+  - a switch, **Use a different place in Liber Linteum**, enables the selector, and saving with it on writes `overrideObsidian: true`;
+  - turning it off writes false; Liber Linteum's last choice is kept for next time.
 - **`.obsidian/app.json` is never written.**
 - **`vault_settings_get`** gains `overrideObsidian`, and `vault_settings_set` accepts it. The real-ACL test is extended.
 
@@ -171,7 +171,7 @@ The plan (`docs/superpowers/plans/2026-10-14-m4b-feedback.md`) was replayed end 
 
 ### Attachments
 
-12. **`overrideObsidian` is a top-level field** of `vault_settings_get`'s result and `vault_settings_set`'s patch, not inside `attachments`. In `.nimw/vault.json` it stays `attachments.overrideObsidian`, and it is written only once set. A patch with only `overrideObsidian` turns the override on or off and keeps NIMW's place. While Obsidian's setting applies, saving the same place is allowed; a different place is refused, as in M2c.
+12. **`overrideObsidian` is a top-level field** of `vault_settings_get`'s result and `vault_settings_set`'s patch, not inside `attachments`. In `.liber/vault.json` it stays `attachments.overrideObsidian`, and it is written only once set. A patch with only `overrideObsidian` turns the override on or off and keeps Liber Linteum's place. While Obsidian's setting applies, saving the same place is allowed; a different place is refused, as in M2c.
 
 ### Relationships
 

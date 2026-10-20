@@ -4,7 +4,7 @@
 
 **Goal:** Connect the M1a vault engine to the desktop app: Tauri commands and events over `VaultSession`, a persisted settings store, working welcome actions with recent vaults, an app shell with an Obsidian-style explorer (keyboard tree, inline rename, context menu, drag-and-drop, move/delete dialogs), a read-only page view, toasts and global shortcuts.
 
-**Architecture:** The Rust shell (`apps/desktop/src-tauri`) gains thin commands over `nimw-session`, an `AppState` (open session + settings + cache dir) and a JSON settings store; every path from the UI is validated by `VaultPath::new` and every command is allow-listed per window. The React app talks to it only through `src/ipc/` (typed functions returning `IpcResult`, never throwing), keeps state in five small Zustand stores, refetches the whole tree after its own operations and after 100 ms-coalesced external changes (newest response wins), and renders only expanded folders.
+**Architecture:** The Rust shell (`apps/desktop/src-tauri`) gains thin commands over `liber-session`, an `AppState` (open session + settings + cache dir) and a JSON settings store; every path from the UI is validated by `VaultPath::new` and every command is allow-listed per window. The React app talks to it only through `src/ipc/` (typed functions returning `IpcResult`, never throwing), keeps state in five small Zustand stores, refetches the whole tree after its own operations and after 100 ms-coalesced external changes (newest response wins), and renders only expanded folders.
 
 **Tech Stack:** Rust 1.99 / Tauri 2.12 (+ tauri-plugin-dialog 2.8), React 19, TypeScript 6.0, Zustand 5, dnd-kit 6, i18next ICU, Vitest 5 + Testing Library + axe-core.
 
@@ -25,7 +25,7 @@
 - Shortcuts (⌘ on macOS, Ctrl elsewhere): ⇧E explorer, O open vault, `,` settings, N new page, ⇧N new folder.
 - Exact versions (verified in `Cargo.lock` / `pnpm-lock.yaml`): `tauri-plugin-dialog` 2.8.2, `@tauri-apps/plugin-dialog` 2.8.2, `zustand` 5.0.15, `@dnd-kit/core` 6.3.1, `@dnd-kit/utilities` 3.2.2 (existing: tauri 2.12.3, @tauri-apps/api 2.12.3, react 19.3, typescript 6.0.3, vitest 5.0.4, axe-core 4.14).
 - All UI strings in `en.json` **and** `es.json` (`pnpm check:i18n`); all colours via CSS tokens (light/dark).
-- Tests are named after requirements (`vlt_01_…`, `EXP-02 …`, `NFR-10 …`) and `review_focus…` for the pins below. Real-OS-trash tests run only with `NIMW_TRASH_TESTS=1`. Never send synthetic keystrokes to the user's machine (osascript key codes are forbidden); real-window checks use launching + screenshots only.
+- Tests are named after requirements (`vlt_01_…`, `EXP-02 …`, `NFR-10 …`) and `review_focus…` for the pins below. Real-OS-trash tests run only with `LIBER_TRASH_TESTS=1`. Never send synthetic keystrokes to the user's machine (osascript key codes are forbidden); real-window checks use launching + screenshots only.
 - Commits are conventional and end with a `Co-Authored-By:` trailer naming the model that actually wrote the commit (M0 ruling).
 
 ## Review Focus
@@ -39,12 +39,12 @@
 ## File Structure
 
 ```
-crates/nimw-session/src/
+crates/liber-session/src/
   events.rs           + SessionEvent::Warning                                    (Task 1)
   session.rs          trash without the index lock, backlinks_into               (Tasks 1, 3)
   watching.rs         warnings → SessionEvent::Warning                           (Task 1)
 apps/desktop/src-tauri/
-  Cargo.toml          nimw-session/vault, thiserror, serde_json, dialog plugin   (Tasks 2, 3)
+  Cargo.toml          liber-session/vault, thiserror, serde_json, dialog plugin   (Tasks 2, 3)
   build.rs            COMMANDS list for the AppManifest                          (Task 3)
   capabilities/main.json  allow-<command> ×15 + dialog:allow-open                (Task 3)
   src/lib.rs          AppDirs, configure(builder, Option<AppDirs>), run()        (Tasks 2, 3)
@@ -80,29 +80,29 @@ Removed in Task 8: `app/ScreenRouter.tsx` (+ test), `features/global-view/Global
 
 ---
 
-### Task 1: nimw-session: `SessionEvent::Warning` and trash without holding the index lock
+### Task 1: liber-session: `SessionEvent::Warning` and trash without holding the index lock
 
 **Requirements:** M1a hand-off §11 n, o · VLT-04, EXP-03
 
 **Files:**
-- Modify: `crates/nimw-session/src/events.rs`
-- Modify: `crates/nimw-session/src/session.rs`
-- Modify: `crates/nimw-session/src/watching.rs`
-- Modify: `crates/nimw-session/tests/watching.rs`
+- Modify: `crates/liber-session/src/events.rs`
+- Modify: `crates/liber-session/src/session.rs`
+- Modify: `crates/liber-session/src/watching.rs`
+- Modify: `crates/liber-session/tests/watching.rs`
 
 **Interfaces:**
-- Consumes: M1a `nimw-session` (`VaultSession`, `SessionEvent`, `emit`, `index()`, watcher `apply`).
+- Consumes: M1a `liber-session` (`VaultSession`, `SessionEvent`, `emit`, `index()`, watcher `apply`).
 - Produces: `SessionEvent::Warning(String)` (watcher/apply warnings; no more `Indexed(IndexReport{files:0,..})`); `VaultSession::trash` now releases the index lock during the OS call; crate-internal `trash_with_hook(&self, path: &VaultPath, before_os_call: &dyn Fn()) -> Result<()>`.
 
 - [ ] **Step 1: Write the failing tests**
 
-Modify `crates/nimw-session/tests/watching.rs` — apply this patch (`git apply`, or edit by hand):
+Modify `crates/liber-session/tests/watching.rs` — apply this patch (`git apply`, or edit by hand):
 
 ````diff
-diff --git a/crates/nimw-session/tests/watching.rs b/crates/nimw-session/tests/watching.rs
+diff --git a/crates/liber-session/tests/watching.rs b/crates/liber-session/tests/watching.rs
 index 6d8ca53..d36c411 100644
---- a/crates/nimw-session/tests/watching.rs
-+++ b/crates/nimw-session/tests/watching.rs
+--- a/crates/liber-session/tests/watching.rs
++++ b/crates/liber-session/tests/watching.rs
 @@ -260,3 +260,31 @@ fn vlt_04_unreadable_new_folder_does_not_drop_the_batch() {
      result.unwrap();
      assert!(s.page(&vp("b.md")).unwrap().is_some());
@@ -137,7 +137,7 @@ index 6d8ca53..d36c411 100644
 +}
 ````
 
-Append this test module to the end of `crates/nimw-session/src/session.rs`:
+Append this test module to the end of `crates/liber-session/src/session.rs`:
 
 ````rust
 #[cfg(test)]
@@ -169,19 +169,19 @@ mod tests {
 
 - [ ] **Step 2: Run the tests to verify they fail**
 
-Run: `cargo test -p nimw-session`
+Run: `cargo test -p liber-session`
 
 Expected: FAIL to compile: "no variant, associated function, or constant named `Warning` found for enum `SessionEvent`" and "no method named `trash_with_hook` found for struct `session::VaultSession`".
 
 - [ ] **Step 3: Implement**
 
-Modify `crates/nimw-session/src/events.rs` — apply this patch (`git apply`, or edit by hand):
+Modify `crates/liber-session/src/events.rs` — apply this patch (`git apply`, or edit by hand):
 
 ````diff
-diff --git a/crates/nimw-session/src/events.rs b/crates/nimw-session/src/events.rs
+diff --git a/crates/liber-session/src/events.rs b/crates/liber-session/src/events.rs
 index 70b20ec..9103c5e 100644
---- a/crates/nimw-session/src/events.rs
-+++ b/crates/nimw-session/src/events.rs
+--- a/crates/liber-session/src/events.rs
++++ b/crates/liber-session/src/events.rs
 @@ -30,6 +30,9 @@ pub enum SessionEvent {
          removed: Vec<String>,
          renamed: Vec<(String, String)>,
@@ -194,13 +194,13 @@ index 70b20ec..9103c5e 100644
  /// Result of [`crate::VaultSession::rename`] (EXP-02, EXP-04).
 ````
 
-Modify `crates/nimw-session/src/watching.rs` — apply this patch (`git apply`, or edit by hand):
+Modify `crates/liber-session/src/watching.rs` — apply this patch (`git apply`, or edit by hand):
 
 ````diff
-diff --git a/crates/nimw-session/src/watching.rs b/crates/nimw-session/src/watching.rs
+diff --git a/crates/liber-session/src/watching.rs b/crates/liber-session/src/watching.rs
 index 684eaab..0b28286 100644
---- a/crates/nimw-session/src/watching.rs
-+++ b/crates/nimw-session/src/watching.rs
+--- a/crates/liber-session/src/watching.rs
++++ b/crates/liber-session/src/watching.rs
 @@ -31,10 +31,7 @@ impl VaultSession {
      }
  
@@ -215,11 +215,11 @@ index 684eaab..0b28286 100644
      /// Applies one watcher batch (spec §6.5). Paths are re-checked on disk and
 ````
 
-Modify `crates/nimw-session/src/session.rs` — apply this patch (implementation part):
+Modify `crates/liber-session/src/session.rs` — apply this patch (implementation part):
 
 ````diff
---- a/crates/nimw-session/src/session.rs
-+++ b/crates/nimw-session/src/session.rs
+--- a/crates/liber-session/src/session.rs
++++ b/crates/liber-session/src/session.rs
 @@ -303,14 +303,27 @@
  
      /// Moves a file or folder to the OS trash (EXP-03). Links to it become unresolved.
@@ -259,20 +259,20 @@ Modify `crates/nimw-session/src/session.rs` — apply this patch (implementation
 
 - [ ] **Step 4: Run the tests to verify they pass**
 
-Run: `cargo test -p nimw-session`
+Run: `cargo test -p liber-session`
 
 Expected: PASS: lib 5, open 8, rename 13, rename_props 2, watching 9 (incl. `vlt_04_watcher_warnings_are_warning_events`, `exp_03_trash_does_not_hold_the_index_lock_during_the_os_call`).
 
 - [ ] **Step 5: Format, lint and type checks**
 
-Run: `cargo fmt --all --check && cargo clippy -p nimw-session --all-targets -- -D warnings`
+Run: `cargo fmt --all --check && cargo clippy -p liber-session --all-targets -- -D warnings`
 
 Expected: clean (no diff, no warnings)
 
 - [ ] **Step 6: Commit**
 
 ````bash
-git add crates/nimw-session
+git add crates/liber-session
 git commit -m "feat(session): Warning event and trash without holding the index lock (VLT-04, EXP-03)
 
 Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
@@ -297,8 +297,8 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 - Updated by cargo: `Cargo.lock`
 
 **Interfaces:**
-- Consumes: `nimw_session::{SessionError, VaultSession}`, `nimw_vault::{VaultError, Hash}`.
-- Produces: `nimw_desktop::error::{ErrorKind, CommandError, CmdResult<T>}` (serialized `{ kind: camelCase, message }`, `CommandError::new(kind, msg)`, `CommandError::no_vault()`, `From<SessionError|VaultError|io::Error>`); `nimw_desktop::settings::{Settings, SettingsPatch, Theme, RecentVault, RecentVaultDto, SettingsDto, SettingsStore, MAX_RECENT = 10, SETTINGS_VERSION = 1, rfc3339_utc(u64) -> String}` with `SettingsStore::load(dir) / get() -> (Settings, Option<String>) / dto() / update(SettingsPatch) -> io::Result<Settings> / push_recent(&Path, &str) / recent() -> Vec<RecentVaultDto> / forget(&str)`; `nimw_desktop::state::AppState { settings }` with `new(SettingsStore)`, `session() -> Result<Arc<VaultSession>, CommandError>`, `set_session(Option<Arc<VaultSession>>)` (Task 3 adds `cache_dir`).
+- Consumes: `liber_session::{SessionError, VaultSession}`, `liber_vault::{VaultError, Hash}`.
+- Produces: `liber_desktop::error::{ErrorKind, CommandError, CmdResult<T>}` (serialized `{ kind: camelCase, message }`, `CommandError::new(kind, msg)`, `CommandError::no_vault()`, `From<SessionError|VaultError|io::Error>`); `liber_desktop::settings::{Settings, SettingsPatch, Theme, RecentVault, RecentVaultDto, SettingsDto, SettingsStore, MAX_RECENT = 10, SETTINGS_VERSION = 1, rfc3339_utc(u64) -> String}` with `SettingsStore::load(dir) / get() -> (Settings, Option<String>) / dto() / update(SettingsPatch) -> io::Result<Settings> / push_recent(&Path, &str) / recent() -> Vec<RecentVaultDto> / forget(&str)`; `liber_desktop::state::AppState { settings }` with `new(SettingsStore)`, `session() -> Result<Arc<VaultSession>, CommandError>`, `set_session(Option<Arc<VaultSession>>)` (Task 3 adds `cache_dir`).
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -317,14 +317,14 @@ index b437793..7b33995 100644
  serde.workspace = true
 +serde_json.workspace = true
 +thiserror.workspace = true
-+nimw-session = { path = "../../../crates/nimw-session" }
-+nimw-vault = { path = "../../../crates/nimw-vault" }
++liber-session = { path = "../../../crates/liber-session" }
++liber-vault = { path = "../../../crates/liber-vault" }
  
  [dev-dependencies]
 -serde_json.workspace = true
  tauri = { workspace = true, features = ["test"] }
 +tempfile.workspace = true
-+nimw-testkit = { path = "../../../crates/nimw-testkit" }
++liber-testkit = { path = "../../../crates/liber-testkit" }
  
  [lints.clippy]
  all = { level = "warn", priority = -1 }
@@ -335,7 +335,7 @@ Create `apps/desktop/src-tauri/tests/settings.rs`:
 ````rust
 //! Settings store (M1b spec §2.3).
 
-use nimw_desktop::settings::{
+use liber_desktop::settings::{
     MAX_RECENT, Settings, SettingsPatch, SettingsStore, Theme, rfc3339_utc,
 };
 use std::path::Path;
@@ -485,9 +485,9 @@ Create `apps/desktop/src-tauri/tests/errors.rs`:
 ````rust
 //! IPC error mapping (M1b spec §2.6).
 
-use nimw_desktop::error::{CommandError, ErrorKind};
-use nimw_session::SessionError;
-use nimw_vault::{Hash, VaultError};
+use liber_desktop::error::{CommandError, ErrorKind};
+use liber_session::SessionError;
+use liber_vault::{Hash, VaultError};
 
 #[test]
 fn errors_serialize_as_kind_and_message() {
@@ -558,9 +558,9 @@ fn session_and_vault_errors_map_to_kinds() {
 
 - [ ] **Step 2: Run the tests to verify they fail**
 
-Run: `cargo test -p nimw-desktop --test settings --test errors`
+Run: `cargo test -p liber-desktop --test settings --test errors`
 
-Expected: FAIL to compile: "unresolved import `nimw_desktop::settings`" and "unresolved import `nimw_desktop::error`".
+Expected: FAIL to compile: "unresolved import `liber_desktop::settings`" and "unresolved import `liber_desktop::error`".
 
 - [ ] **Step 3: Implement**
 
@@ -570,8 +570,8 @@ Create `apps/desktop/src-tauri/src/error.rs`:
 //! The single error type every command returns (M1b spec §2.6), serialized as
 //! `{ "kind": "...", "message": "..." }` for the UI to translate.
 
-use nimw_session::SessionError;
-use nimw_vault::VaultError;
+use liber_session::SessionError;
+use liber_vault::VaultError;
 use serde::Serialize;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
@@ -923,7 +923,7 @@ Create `apps/desktop/src-tauri/src/state.rs`:
 
 use crate::error::CommandError;
 use crate::settings::SettingsStore;
-use nimw_session::VaultSession;
+use liber_session::VaultSession;
 use std::sync::{Arc, Mutex};
 
 pub struct AppState {
@@ -977,13 +977,13 @@ index d3a59f6..a01fd1c 100644
 
 - [ ] **Step 4: Run the tests to verify they pass**
 
-Run: `cargo test -p nimw-desktop --test settings --test errors`
+Run: `cargo test -p liber-desktop --test settings --test errors`
 
 Expected: PASS: errors 2, settings 6 (incl. `review_focus_newer_settings_file_keeps_unknown_keys_and_version`).
 
 - [ ] **Step 5: Format, lint and type checks**
 
-Run: `cargo fmt --all --check && cargo clippy -p nimw-desktop --all-targets -- -D warnings`
+Run: `cargo fmt --all --check && cargo clippy -p liber-desktop --all-targets -- -D warnings`
 
 Expected: clean (no diff, no warnings)
 
@@ -1016,13 +1016,13 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 - Modify: `apps/desktop/src-tauri/src/lib.rs`
 - Modify: `apps/desktop/src-tauri/src/state.rs`
 - Modify: `apps/desktop/src-tauri/tests/ipc.rs`
-- Modify: `crates/nimw-session/src/session.rs`
+- Modify: `crates/liber-session/src/session.rs`
 - Generated by the build (commit them): `apps/desktop/src-tauri/permissions/autogenerated/<command>.toml` for each new command
 - Updated by cargo: `Cargo.lock`
 
 **Interfaces:**
-- Consumes: Task 2 (`AppState`, `SettingsStore`, `CommandError`, `CmdResult`), Task 1 (`SessionEvent::Warning`), `nimw_session::VaultSession` (`open`, `start_watching`, `tree`, `page`, `backlinks`, `create_page`, `create_folder`, `rename`, `trash`, `vault().read/root`).
-- Produces: `nimw_desktop::AppDirs { config: PathBuf, cache: PathBuf }`; `configure<R>(builder, dirs: Option<AppDirs>)` (tests pass temp dirs; `None` = OS dirs via `setup`); `AppState::new(SettingsStore, cache_dir: PathBuf)` + `pub cache_dir`; `VaultSession::backlinks_into(&VaultPath) -> Result<Vec<LinkRow>>` (links from outside a file/folder into it); commands `vault_open {path}`, `vault_create {path}`, `vault_close`, `vault_tree`, `page_get {path}`, `backlink_count {path}`, `entry_create_page {dir,name}`, `entry_create_folder {parent,name}`, `entry_rename {from,to}`, `entry_trash {path}`, `settings_get`, `settings_set {patch}`, `vaults_recent`, `vaults_forget {path}` with DTOs in `dto.rs` (`VaultInfo`, `IndexReportDto`, `TreeNodeDto {path, kind}`, `PageDto`, `RenameOutcomeDto`); events `vault:progress {done,total}`, `vault:changed {created,modified,removed,renamed}`, `vault:warning {message}` emitted to window `main`; `vault_commands::MAX_PAGE_BYTES = 1 MiB`.
+- Consumes: Task 2 (`AppState`, `SettingsStore`, `CommandError`, `CmdResult`), Task 1 (`SessionEvent::Warning`), `liber_session::VaultSession` (`open`, `start_watching`, `tree`, `page`, `backlinks`, `create_page`, `create_folder`, `rename`, `trash`, `vault().read/root`).
+- Produces: `liber_desktop::AppDirs { config: PathBuf, cache: PathBuf }`; `configure<R>(builder, dirs: Option<AppDirs>)` (tests pass temp dirs; `None` = OS dirs via `setup`); `AppState::new(SettingsStore, cache_dir: PathBuf)` + `pub cache_dir`; `VaultSession::backlinks_into(&VaultPath) -> Result<Vec<LinkRow>>` (links from outside a file/folder into it); commands `vault_open {path}`, `vault_create {path}`, `vault_close`, `vault_tree`, `page_get {path}`, `backlink_count {path}`, `entry_create_page {dir,name}`, `entry_create_folder {parent,name}`, `entry_rename {from,to}`, `entry_trash {path}`, `settings_get`, `settings_set {patch}`, `vaults_recent`, `vaults_forget {path}` with DTOs in `dto.rs` (`VaultInfo`, `IndexReportDto`, `TreeNodeDto {path, kind}`, `PageDto`, `RenameOutcomeDto`); events `vault:progress {done,total}`, `vault:changed {created,modified,removed,renamed}`, `vault:warning {message}` emitted to window `main`; `vault_commands::MAX_PAGE_BYTES = 1 MiB`.
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -1034,8 +1034,8 @@ Create `apps/desktop/src-tauri/tests/commands.rs`:
 //! M1b commands through the real IPC path: real `generate_context!()` (config +
 //! capabilities), real command registration, mock runtime, temp config/cache dirs.
 
-use nimw_desktop::AppDirs;
-use nimw_testkit::{copy_fixture, real_trash_tests_enabled, trashable_fixture};
+use liber_desktop::AppDirs;
+use liber_testkit::{copy_fixture, real_trash_tests_enabled, trashable_fixture};
 use serde_json::{Value, json};
 use std::sync::{Arc, Mutex};
 use tauri::test::MockRuntime;
@@ -1078,7 +1078,7 @@ fn harness() -> Harness {
         config: config.path().to_path_buf(),
         cache: cache.path().to_path_buf(),
     };
-    let app = nimw_desktop::configure(mock_builder(), Some(dirs))
+    let app = liber_desktop::configure(mock_builder(), Some(dirs))
         .build(tauri::generate_context!())
         .expect("app builds with the real context");
     let main = WebviewWindowBuilder::new(&app, "main", Default::default())
@@ -1254,7 +1254,7 @@ fn vlt_01_create_requires_an_empty_or_new_folder() {
     assert_eq!(info["name"], "brand new");
     assert!(fresh.is_dir());
     assert!(
-        !fresh.join(".nimw").exists(),
+        !fresh.join(".liber").exists(),
         "creating writes nothing inside"
     );
 }
@@ -1388,13 +1388,13 @@ index a1db095..eb9764b 100644
  };
  
  fn build_app() -> App<MockRuntime> {
--    nimw_desktop::configure(mock_builder())
+-    liber_desktop::configure(mock_builder())
 +    // Temp config/cache dirs so tests never read or write the user's settings.
-+    let dirs = nimw_desktop::AppDirs {
-+        config: std::env::temp_dir().join(format!("nimw-ipc-cfg-{}", std::process::id())),
-+        cache: std::env::temp_dir().join(format!("nimw-ipc-cache-{}", std::process::id())),
++    let dirs = liber_desktop::AppDirs {
++        config: std::env::temp_dir().join(format!("liber-ipc-cfg-{}", std::process::id())),
++        cache: std::env::temp_dir().join(format!("liber-ipc-cache-{}", std::process::id())),
 +    };
-+    nimw_desktop::configure(mock_builder(), Some(dirs))
++    liber_desktop::configure(mock_builder(), Some(dirs))
          .build(tauri::generate_context!())
          .expect("failed to build app with the real context")
  }
@@ -1402,9 +1402,9 @@ index a1db095..eb9764b 100644
 
 - [ ] **Step 2: Run the tests to verify they fail**
 
-Run: `pnpm build:ui && cargo test -p nimw-desktop --test commands --test ipc`
+Run: `pnpm build:ui && cargo test -p liber-desktop --test commands --test ipc`
 
-Expected: FAIL to compile: "unresolved import `nimw_desktop::AppDirs`" and "this function takes 1 argument but 2 arguments were supplied".
+Expected: FAIL to compile: "unresolved import `liber_desktop::AppDirs`" and "this function takes 1 argument but 2 arguments were supplied".
 
 - [ ] **Step 3: Implement**
 
@@ -1444,20 +1444,20 @@ index 7b33995..0200ade 100644
  thiserror.workspace = true
 ````
 
-Modify `crates/nimw-session/src/session.rs` — apply this patch (`git apply`, or edit by hand):
+Modify `crates/liber-session/src/session.rs` — apply this patch (`git apply`, or edit by hand):
 
 ````diff
-diff --git a/crates/nimw-session/src/session.rs b/crates/nimw-session/src/session.rs
+diff --git a/crates/liber-session/src/session.rs b/crates/liber-session/src/session.rs
 index da2cd6f..725aec5 100644
---- a/crates/nimw-session/src/session.rs
-+++ b/crates/nimw-session/src/session.rs
+--- a/crates/liber-session/src/session.rs
++++ b/crates/liber-session/src/session.rs
 @@ -270,6 +270,18 @@ impl VaultSession {
          Ok(self.index().backlinks(path.as_str())?)
      }
  
 +    /// Links from outside `path` into it: the file itself, or anything inside
 +    /// the folder (delete confirmation, M1b).
-+    pub fn backlinks_into(&self, path: &VaultPath) -> Result<Vec<nimw_index::LinkRow>> {
++    pub fn backlinks_into(&self, path: &VaultPath) -> Result<Vec<liber_index::LinkRow>> {
 +        let prefix = format!("{}/", path.as_str());
 +        Ok(self
 +            .index()
@@ -1477,7 +1477,7 @@ Create `apps/desktop/src-tauri/src/dto.rs`:
 ````rust
 //! Serializable shapes returned to the UI (M1b spec §2.4), all camelCase.
 
-use nimw_session::{IndexReport, RenameOutcome};
+use liber_session::{IndexReport, RenameOutcome};
 use serde::Serialize;
 
 #[derive(Debug, Clone, Serialize)]
@@ -1579,7 +1579,7 @@ Create `apps/desktop/src-tauri/src/vault_commands.rs`:
 
 ````rust
 //! Vault and explorer commands (M1b spec §2.4). Thin wrappers over
-//! `nimw-session`; every path from the UI goes through `VaultPath::new`.
+//! `liber-session`; every path from the UI goes through `VaultPath::new`.
 
 use crate::dto::{
     ChangedPayload, PageDto, ProgressPayload, RenameOutcomeDto, TreeNodeDto, VaultInfo,
@@ -1587,8 +1587,8 @@ use crate::dto::{
 };
 use crate::error::{CmdResult, CommandError, ErrorKind};
 use crate::state::AppState;
-use nimw_session::{SessionEvent, VaultSession};
-use nimw_vault::VaultPath;
+use liber_session::{SessionEvent, VaultSession};
+use liber_vault::VaultPath;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use tauri::{AppHandle, Emitter, Manager, Runtime, State};
@@ -1847,14 +1847,14 @@ index cc2dfe2..2fbccab 100644
 @@ -3,18 +3,22 @@
  use crate::error::CommandError;
  use crate::settings::SettingsStore;
- use nimw_session::VaultSession;
+ use liber_session::VaultSession;
 +use std::path::PathBuf;
  use std::sync::{Arc, Mutex};
  
  pub struct AppState {
      session: Mutex<Option<Arc<VaultSession>>>,
      pub settings: SettingsStore,
-+    /// OS cache dir; index databases live under `<cache_dir>/nimw/…`.
++    /// OS cache dir; index databases live under `<cache_dir>/liber/…`.
 +    pub cache_dir: PathBuf,
  }
  
@@ -1891,7 +1891,7 @@ index a01fd1c..d6022e3 100644
 +use tauri::Manager;
 +
 +/// Where settings and the index cache live. `None` in `configure` means the
-+/// OS app config/cache dirs for `app.notesinmyway.desktop`; tests pass temp dirs.
++/// OS app config/cache dirs for `app.liberlinteum.desktop`; tests pass temp dirs.
 +#[derive(Debug, Clone)]
 +pub struct AppDirs {
 +    pub config: PathBuf,
@@ -1941,7 +1941,7 @@ index a01fd1c..d6022e3 100644
 -    configure(tauri::Builder::default())
 +    configure(tauri::Builder::default(), None)
          .run(tauri::generate_context!())
-         .expect("error while running Notes In My Way");
+         .expect("error while running Liber Linteum");
  }
 ````
 
@@ -2021,9 +2021,9 @@ index 824293e..9a83a5a 100644
 
 - [ ] **Step 4: Run the tests to verify they pass**
 
-Run: `cargo test -p nimw-desktop`
+Run: `cargo test -p liber-desktop`
 
-Expected: PASS: unit 2, commands 9, errors 2, ipc 3, settings 6. (`exp_03_trash_through_ipc` prints `skipped: set NIMW_TRASH_TESTS=1 …` and passes locally.)
+Expected: PASS: unit 2, commands 9, errors 2, ipc 3, settings 6. (`exp_03_trash_through_ipc` prints `skipped: set LIBER_TRASH_TESTS=1 …` and passes locally.)
 
 - [ ] **Step 5: Format, lint and type checks**
 
@@ -2034,7 +2034,7 @@ Expected: clean; cargo-deny `advisories ok, bans ok, licenses ok, sources ok`
 - [ ] **Step 6: Commit**
 
 ````bash
-git add Cargo.toml Cargo.lock crates/nimw-session apps/desktop/src-tauri
+git add Cargo.toml Cargo.lock crates/liber-session apps/desktop/src-tauri
 git commit -m "feat(desktop): vault, explorer and settings commands with events and permissions (VLT-01, VLT-04, EXP-01..05)
 
 Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
@@ -2060,7 +2060,7 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 
 - [ ] **Step 1: Add the frontend dependencies (exact versions verified):**
 
-Run: `pnpm --filter @nimw/desktop add zustand@^5.0.15 @dnd-kit/core@^6.3.1 @dnd-kit/utilities@^3.2.2 @tauri-apps/plugin-dialog@^2.8.2`
+Run: `pnpm --filter @liber/desktop add zustand@^5.0.15 @dnd-kit/core@^6.3.1 @dnd-kit/utilities@^3.2.2 @tauri-apps/plugin-dialog@^2.8.2`
 
 Expected: `Lockfile passes supply-chain policies`; +6 packages. If pnpm's release-age gate refuses one, add a narrow exact-version entry to `minimumReleaseAgeExclude` in `pnpm-workspace.yaml` with a dated comment (M0 convention).
 
@@ -2164,7 +2164,7 @@ describe('M1b ipc commands', () => {
 
 - [ ] **Step 3: Run the tests to verify they fail**
 
-Run: `pnpm --filter @nimw/desktop exec vitest run src/ipc`
+Run: `pnpm --filter @liber/desktop exec vitest run src/ipc`
 
 Expected: FAIL: `TypeError: vaultOpen is not a function` (and the same for `vaultTree`, `onVaultProgress`, `pickFolder`).
 
@@ -2371,7 +2371,7 @@ index 8837df3..908f87a 100644
 
 - [ ] **Step 5: Run the tests to verify they pass**
 
-Run: `pnpm --filter @nimw/desktop exec vitest run src/ipc`
+Run: `pnpm --filter @liber/desktop exec vitest run src/ipc`
 
 Expected: PASS: 5 tests.
 
@@ -2806,7 +2806,7 @@ export { clearMocks, mockIPC } from '@tauri-apps/api/mocks';
 
 - [ ] **Step 2: Run the tests to verify they fail**
 
-Run: `pnpm --filter @nimw/desktop exec vitest run src/stores`
+Run: `pnpm --filter @liber/desktop exec vitest run src/stores`
 
 Expected: FAIL: `Failed to resolve import "./pageStore"` and `Failed to resolve import "./tree"`.
 
@@ -3435,7 +3435,7 @@ index d4f54e2..1efecc1 100644
 
 - [ ] **Step 4: Run the tests to verify they pass**
 
-Run: `pnpm --filter @nimw/desktop exec vitest run src/stores`
+Run: `pnpm --filter @liber/desktop exec vitest run src/stores`
 
 Expected: PASS: 21 tests, no unhandled errors (incl. `review_focus stale tree responses are ignored`, `review_focus selection falls back to the nearest existing ancestor`).
 
@@ -3523,7 +3523,7 @@ index 46d0b44..9a334fb 100644
 +  it('shows the app name, tagline, the vault actions and Notion as later', () => {
 +    backend({ vaults_recent: () => [] });
      render(<Welcome version="0.1.0" />);
-     expect(screen.getByRole('heading', { level: 1, name: 'Notes In My Way' })).toBeInTheDocument();
+     expect(screen.getByRole('heading', { level: 1, name: 'Liber Linteum' })).toBeInTheDocument();
      expect(screen.getByText(/Private notes that live on your disk/)).toBeInTheDocument();
 -    for (const name of [
 -      'Create a new vault',
@@ -3681,7 +3681,7 @@ afterEach(async () => {
 describe('App routing', () => {
   it('shows the welcome screen while no vault is open', () => {
     render(<App />);
-    expect(screen.getByRole('heading', { level: 1, name: 'Notes In My Way' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 1, name: 'Liber Linteum' })).toBeInTheDocument();
   });
 
   it('shows indexing progress while opening', () => {
@@ -3698,7 +3698,7 @@ describe('App routing', () => {
     render(<App />);
     act(() => useVaultStore.setState({ status: 'open' }));
     expect(
-      screen.queryByRole('heading', { level: 1, name: 'Notes In My Way' }),
+      screen.queryByRole('heading', { level: 1, name: 'Liber Linteum' }),
     ).not.toBeInTheDocument();
   });
 
@@ -3716,7 +3716,7 @@ describe('App routing', () => {
   });
 
   it('shows the backend version from app_info', async () => {
-    mockIPC((cmd) => (cmd === 'app_info' ? { name: 'Notes In My Way', version: '0.1.0' } : []));
+    mockIPC((cmd) => (cmd === 'app_info' ? { name: 'Liber Linteum', version: '0.1.0' } : []));
     render(<App />);
     await waitFor(() => expect(screen.getByText('v0.1.0')).toBeInTheDocument());
   });
@@ -3725,7 +3725,7 @@ describe('App routing', () => {
 
 - [ ] **Step 2: Run the tests to verify they fail**
 
-Run: `pnpm --filter @nimw/desktop exec vitest run src/features/welcome src/app/App.test.tsx`
+Run: `pnpm --filter @liber/desktop exec vitest run src/features/welcome src/app/App.test.tsx`
 
 Expected: FAIL: 10 failed | 4 passed (buttons still disabled, no `Opening vault…` status, no toasts, no recent list).
 
@@ -4334,7 +4334,7 @@ index 1efecc1..119dbab 100644
 
 - [ ] **Step 4: Run the tests to verify they pass**
 
-Run: `pnpm --filter @nimw/desktop exec vitest run src/features/welcome src/app`
+Run: `pnpm --filter @liber/desktop exec vitest run src/features/welcome src/app`
 
 Expected: PASS: 22 tests (incl. `review_focus recent vaults: open, missing (unmounted) and forget`).
 
@@ -4619,7 +4619,7 @@ describe('ExplorerTree (EXP-01, NFR-10)', () => {
 
 - [ ] **Step 2: Run the tests to verify they fail**
 
-Run: `pnpm --filter @nimw/desktop exec vitest run src/features/explorer`
+Run: `pnpm --filter @liber/desktop exec vitest run src/features/explorer`
 
 Expected: FAIL: `Failed to resolve import "./ExplorerTree"` and `Failed to resolve import "./nameRules"`.
 
@@ -4630,7 +4630,7 @@ The `finished` ref in `RenameInput` matters: removing the input after Enter/Esca
 Create `apps/desktop/src/features/explorer/nameRules.ts`:
 
 ````ts
-// Client-side mirror of the backend's name rule (nimw-session `validate_name`,
+// Client-side mirror of the backend's name rule (liber-session `validate_name`,
 // M1a spec amendment 9) for instant feedback. The backend stays authoritative.
 
 const FORBIDDEN = ['/', '\\', '#', '|', '^', '[', ']', ':', '*', '"', '<', '>', '?'];
@@ -5185,7 +5185,7 @@ index 119dbab..72b16d3 100644
 
 - [ ] **Step 4: Run the tests to verify they pass**
 
-Run: `pnpm --filter @nimw/desktop exec vitest run src/features/explorer`
+Run: `pnpm --filter @liber/desktop exec vitest run src/features/explorer`
 
 Expected: PASS: 15 tests (incl. `review_focus renders only rows of expanded folders`).
 
@@ -5480,14 +5480,14 @@ index 93b1644..d655853 100644
      render(<App />);
      act(() => useVaultStore.setState({ status: 'open' }));
      expect(
-       screen.queryByRole('heading', { level: 1, name: 'Notes In My Way' }),
+       screen.queryByRole('heading', { level: 1, name: 'Liber Linteum' }),
      ).not.toBeInTheDocument();
 +    expect(screen.getByRole('tree', { name: 'Files' })).toBeInTheDocument();
 +  });
 +
 +  it('still renders when not running inside Tauri (IPC unavailable)', async () => {
 +    render(<App />);
-+    expect(screen.getByRole('heading', { level: 1, name: 'Notes In My Way' })).toBeInTheDocument();
++    expect(screen.getByRole('heading', { level: 1, name: 'Liber Linteum' })).toBeInTheDocument();
 +    await new Promise((resolve) => setTimeout(resolve, 0));
 +    expect(screen.queryByText(/^v\d/)).not.toBeInTheDocument();
    });
@@ -5497,7 +5497,7 @@ index 93b1644..d655853 100644
 
 - [ ] **Step 2: Run the tests to verify they fail**
 
-Run: `pnpm --filter @nimw/desktop exec vitest run src/features/page src/features/shell src/stores/dirFor.test.ts`
+Run: `pnpm --filter @liber/desktop exec vitest run src/features/page src/features/shell src/stores/dirFor.test.ts`
 
 Expected: FAIL: `Failed to resolve import "./PageView"`, `Failed to resolve import "./AppShell"`, `TypeError: dirFor is not a function`.
 
@@ -6233,7 +6233,7 @@ index 72b16d3..46e3226 100644
 
 - [ ] **Step 4: Run the tests to verify they pass**
 
-Run: `pnpm --filter @nimw/desktop exec vitest run`
+Run: `pnpm --filter @liber/desktop exec vitest run`
 
 Expected: PASS: 112 tests.
 
@@ -6285,7 +6285,7 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 
 **Interfaces:**
 - Consumes: Tasks 5–8 (stores, `ExplorerTree`, `TreeRow`, `AppShell`, `Sidebar`), Task 4 `backlinkCount`, `pickFolder`.
-- Produces: `drop.ts`: `ROOT_DROP_ID`, `planDrop(from, target) -> string | null`, `dropEntry(from, target) -> Promise<boolean>`; `deleteFlow.requestDelete(path)`; `ExplorerDnd` (dnd-kit `DndContext`, pointer sensor distance 5, keyboard sensor Space/Space/Escape, root drop zone); `TreeRow` is draggable (all) and droppable (folders) — only dnd-kit *listeners* are spread; `ExplorerTree` gains `dragging?`; `ContextMenu({menu, onClose})` + `MenuState`; dialogs `Dialog` (focus trap, Escape, restore focus), `ConfirmDeleteDialog`, `MoveToDialog`, `SettingsDialog`, `DialogHost`; `useGlobalShortcuts(menuOpen)`; `AppShell` wires menu, dialogs, shortcuts; i18n `menu.*`, `dialogs.*`, `settings.*`; `.nimw-menu` styles in `base.css`.
+- Produces: `drop.ts`: `ROOT_DROP_ID`, `planDrop(from, target) -> string | null`, `dropEntry(from, target) -> Promise<boolean>`; `deleteFlow.requestDelete(path)`; `ExplorerDnd` (dnd-kit `DndContext`, pointer sensor distance 5, keyboard sensor Space/Space/Escape, root drop zone); `TreeRow` is draggable (all) and droppable (folders) — only dnd-kit *listeners* are spread; `ExplorerTree` gains `dragging?`; `ContextMenu({menu, onClose})` + `MenuState`; dialogs `Dialog` (focus trap, Escape, restore focus), `ConfirmDeleteDialog`, `MoveToDialog`, `SettingsDialog`, `DialogHost`; `useGlobalShortcuts(menuOpen)`; `AppShell` wires menu, dialogs, shortcuts; i18n `menu.*`, `dialogs.*`, `settings.*`; `.liber-menu` styles in `base.css`.
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -6582,7 +6582,7 @@ describe('global shortcuts (spec §3.5)', () => {
 
 - [ ] **Step 2: Run the tests to verify they fail**
 
-Run: `pnpm --filter @nimw/desktop exec vitest run src/features/explorer/drop.test.ts src/features/shell/Interactions.test.tsx`
+Run: `pnpm --filter @liber/desktop exec vitest run src/features/explorer/drop.test.ts src/features/shell/Interactions.test.tsx`
 
 Expected: FAIL: `Failed to resolve import "./drop"` and `Failed to resolve import "../explorer/drop"`.
 
@@ -6862,7 +6862,7 @@ export function ContextMenu({ menu, onClose }: { menu: MenuState; onClose: () =>
       ref={box}
       role="menu"
       aria-label={t('menu.label', { name: displayName(node) })}
-      className="nimw-menu"
+      className="liber-menu"
       style={{ position: 'fixed', left: menu.anchor.x, top: menu.anchor.y }}
       onKeyDown={onKeyDown}
     >
@@ -7432,7 +7432,7 @@ index 4693ffc..61cdf63 100644
  }
 +
 +/* Explorer context menu (rendered at the pointer / focused row). */
-+.nimw-menu {
++.liber-menu {
 +  z-index: 35;
 +  min-width: 180px;
 +  display: flex;
@@ -7444,7 +7444,7 @@ index 4693ffc..61cdf63 100644
 +  box-shadow: var(--shadow-panel);
 +}
 +
-+.nimw-menu [role='menuitem'] {
++.liber-menu [role='menuitem'] {
 +  text-align: left;
 +  border: 0;
 +  background: none;
@@ -7455,8 +7455,8 @@ index 4693ffc..61cdf63 100644
 +  cursor: pointer;
 +}
 +
-+.nimw-menu [role='menuitem']:hover,
-+.nimw-menu [role='menuitem']:focus-visible {
++.liber-menu [role='menuitem']:hover,
++.liber-menu [role='menuitem']:focus-visible {
 +  background: var(--color-accent-soft);
 +}
 ````
@@ -7565,7 +7565,7 @@ index 46e3226..a5e8b66 100644
 
 - [ ] **Step 4: Run the tests to verify they pass**
 
-Run: `pnpm --filter @nimw/desktop exec vitest run`
+Run: `pnpm --filter @liber/desktop exec vitest run`
 
 Expected: PASS: 124 tests, no warnings.
 
@@ -7607,18 +7607,18 @@ Expected: PASS — Vitest 124, Rust 156 (`exp_03_trash_through_ipc` and the two 
 
 - [ ] **Step 2: Build the bundled app**
 
-Run: `pnpm --filter @nimw/desktop tauri build --debug --bundles app`
+Run: `pnpm --filter @liber/desktop tauri build --debug --bundles app`
 
-Expected: `target/debug/bundle/macos/Notes In My Way.app`.
+Expected: `target/debug/bundle/macos/Liber Linteum.app`.
 
 - [ ] **Step 3: Real-window screenshots (agent: launch + screenshot only — no synthetic keystrokes or clicks)**
 
 Run:
 ```bash
-open -n "target/debug/bundle/macos/Notes In My Way.app"
+open -n "target/debug/bundle/macos/Liber Linteum.app"
 sleep 4
 screencapture -x <scratchpad>/m1b-welcome.png
-pkill -f "Notes In My Way.app/Contents/MacOS"
+pkill -f "Liber Linteum.app/Contents/MacOS"
 ```
 Expected (view the PNG): the welcome card with **enabled** Create / Open buttons, the Notion button disabled with "Notion import arrives in a later milestone.", the version label, and a "Recent" section (empty on a fresh config dir). Opening a vault needs the native folder picker, i.e. a human — Step 4.
 
@@ -7648,8 +7648,8 @@ Create `docs/handoff/2026-10-12-m1b-app-integration-handoff.md` in the style of 
 6. **Recipes** — add a command end-to-end (Rust fn → `configure` → `build.rs` → capability → `src/ipc` → store → component → tests), add a setting, add a dialog, add a context-menu action, add a shortcut.
 7. **Tests inventory** — every test file and what it pins (requirement IDs and Review Focus), how to run focused tests, which tests touch the OS trash.
 8. **Rulings made on your behalf** — every "Plan note" below plus any ruling the executing controller recorded, each with what it costs if wrong.
-9. **Known gaps / deferred** — at least: dnd-kit keyboard drag and pointer DnD verified only by hand; no undo; no multi-window; `.nimw/vault.json` still not written; page view is raw Markdown until M2; remaining M1a minors (M1a hand-off §11 j–m, p–s).
-10. **Troubleshooting** — settings reset (`settings.json.bad`), stale tree, a command "not allowed" (permission checklist), pnpm release-age gate, `pnpm build:ui` before cargo, tests that need `NIMW_TRASH_TESTS=1`.
+9. **Known gaps / deferred** — at least: dnd-kit keyboard drag and pointer DnD verified only by hand; no undo; no multi-window; `.liber/vault.json` still not written; page view is raw Markdown until M2; remaining M1a minors (M1a hand-off §11 j–m, p–s).
+10. **Troubleshooting** — settings reset (`settings.json.bad`), stale tree, a command "not allowed" (permission checklist), pnpm release-age gate, `pnpm build:ui` before cargo, tests that need `LIBER_TRASH_TESTS=1`.
 
 - [ ] **Step 6: Commit**
 
@@ -7668,7 +7668,7 @@ Each note was forced by something found while building and testing the replay; t
 
 1. **Task order:** the explorer tree (Task 7) comes before the app shell (Task 8), so the shell renders the real tree instead of a placeholder. Cost if wrong: none (same deliverables).
 2. **`configure(builder, Option<AppDirs>)`** (spec §2.2 said only "one app state per window"). Tests pass temp config/cache dirs so they never read or write the user's settings; with known dirs the state is managed on the builder directly because the mock runtime does not run `setup` during `build()`. `AppState` gains `cache_dir` (needed by `vault_open`).
-3. **`VaultSession::backlinks_into`** was added to `nimw-session` so `backlink_count` on a folder counts links from *outside* the folder into it (links between files inside the folder don't break when the folder is trashed).
+3. **`VaultSession::backlinks_into`** was added to `liber-session` so `backlink_count` on a folder counts links from *outside* the folder into it (links between files inside the folder don't break when the folder is trashed).
 4. **`page_get` for a non-UTF-8 `.md`**: such files are indexed as attachments, so the command reads the bytes first and returns `binary: true` (title = file stem) instead of `notFound`; other non-page paths return `notFound`.
 5. **Settings:** `SettingsPatch.language = "system"` means "follow the OS" (JSON can't express "set to null" in an optional patch field without a custom deserializer); unknown keys are kept via `#[serde(flatten)] extra` and `version` is never downgraded (Review Focus 4); `openedAt` is RFC 3339 UTC from a small built-in formatter (no date crate).
 6. **Inline-rename state lives in `vaultStore.renaming`** rather than `uiStore` (spec §3.3 listed it under `uiStore`): creating a page and starting its rename must happen atomically with the tree refresh and selection. Cost if wrong: one field in a different store.

@@ -4,7 +4,7 @@
 
 **Goal:** Covers (add, change, reposition, remove) and subtitles edited in the page header; pasted images and files dropped from the OS saved into the vault with Obsidian-compatible embeds; `[[` / `![[` autocomplete with headings; a ⌘K "Link to…" picker; "Create page" that creates folders; raw HTML blocks rendered in Live Preview; and a per-vault attachment setting that follows Obsidian's.
 
-**Architecture:** Rust owns every file that enters the vault: `nimw-vault` resolves where attachments go (Obsidian's `attachmentFolderPath` first, re-read on each save) and streams create-only copies; `nimw-session` names, dedupes, indexes and links them, and ranks `[[` suggestions with the shortest unique target. Outside paths reach Rust only from native drop events (one-use grants) or a dialog Rust opens itself; pastes travel as raw IPC bytes. The UI edits frontmatter byte-minimally (yaml Document ranges) as undoable CodeMirror transactions, and adds CodeMirror extensions for paste/drop and autocomplete.
+**Architecture:** Rust owns every file that enters the vault: `liber-vault` resolves where attachments go (Obsidian's `attachmentFolderPath` first, re-read on each save) and streams create-only copies; `liber-session` names, dedupes, indexes and links them, and ranks `[[` suggestions with the shortest unique target. Outside paths reach Rust only from native drop events (one-use grants) or a dialog Rust opens itself; pastes travel as raw IPC bytes. The UI edits frontmatter byte-minimally (yaml Document ranges) as undoable CodeMirror transactions, and adds CodeMirror extensions for paste/drop and autocomplete.
 
 **Tech Stack:** Tauri 2.12 (Rust 2024, `tauri-plugin-dialog` 2.8 Rust API), `yaml` 2.9 Document API, React 19, TypeScript 6, zustand 5, CodeMirror 6 (+ `@codemirror/autocomplete` 6.20.3, already in the lockfile), Vitest 5 + jsdom + Testing Library + axe-core, Playwright (Chromium + WebKit), pnpm 12, cargo.
 
@@ -19,13 +19,13 @@
 - The UI reaches the backend only through `apps/desktop/src/ipc/`; tests import Tauri helpers from `src/ipc/testing.ts`.
 - Every new Tauri command is `async` through `vault_commands::blocking`, listed in `build.rs` `COMMANDS`, registered in `generate_handler!`, allowed in `capabilities/main.json`, in the `COMMANDS` list of `src-tauri/tests/commands.rs` (real-ACL allowed/denied test), and its source file is in the async guard `nfr_ui_thread_never_runs_disk_or_index_commands`.
 - Outside paths enter the vault only through native drop grants (2 min, used once, ≤ 1000) or a dialog Rust opens; pastes are bytes (png/jpg/gif/webp, ≤ 64 MiB). Writes are create-only and atomic; names go through `sanitize_file_name` / `validate_name`; paths through `VaultPath` / `fs_path`.
-- Opening a vault writes nothing (VLT-02): `.nimw/vault.json` and attachment folders are created on first need only.
-- Attachment location precedence: Obsidian's `attachmentFolderPath` (when present and valid) → `.nimw/vault.json` `attachments` → `attachments/` next to the page. Modes: `vault`, `same`, `subfolder` (default `attachments`), `folder`.
-- Links NIMW writes resolve in Obsidian: wiki targets from `shortest_unique_target`; `[[file|Title]]` when a page's title differs from its file name (PG-05); media and PDFs embedded `![[…]]`, other files `[[…]]`; covers are path-style (`attachments/x.png` relative to the page, else `/Folder/x.png`).
+- Opening a vault writes nothing (VLT-02): `.liber/vault.json` and attachment folders are created on first need only.
+- Attachment location precedence: Obsidian's `attachmentFolderPath` (when present and valid) → `.liber/vault.json` `attachments` → `attachments/` next to the page. Modes: `vault`, `same`, `subfolder` (default `attachments`), `folder`.
+- Links Liber Linteum writes resolve in Obsidian: wiki targets from `shortest_unique_target`; `[[file|Title]]` when a page's title differs from its file name (PG-05); media and PDFs embedded `![[…]]`, other files `[[…]]`; covers are path-style (`attachments/x.png` relative to the page, else `/Folder/x.png`).
 - Undo covers header edits (ED-07): frontmatter changes are CodeMirror transactions; untouched YAML stays byte for byte; invalid YAML is never rewritten.
 - Safari 15 floor (WKWebView): no regex lookbehind, no `color-mix()`. i18n en + es parity (ICU `{name}`). axe-clean components.
-- Every GREEN step leaves clean (repo root): `pnpm lint`, `pnpm typecheck`, `pnpm check:i18n`, `pnpm --filter @nimw/desktop exec vitest run --maxWorkers=2`; for Rust changes also `cargo fmt --all --check && cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace` (and `pnpm build:ui && cargo deny check` before the end). Never mask exit codes (`set -o pipefail`; no `&&` after `grep`). Run prettier from the repo root.
-- Never set `NIMW_TRASH_TESTS=1` locally; never touch `~/Library/Application Support/app.notesinmyway.desktop`; agents never send keystrokes or clicks to the user's machine (Playwright only).
+- Every GREEN step leaves clean (repo root): `pnpm lint`, `pnpm typecheck`, `pnpm check:i18n`, `pnpm --filter @liber/desktop exec vitest run --maxWorkers=2`; for Rust changes also `cargo fmt --all --check && cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace` (and `pnpm build:ui && cargo deny check` before the end). Never mask exit codes (`set -o pipefail`; no `&&` after `grep`). Run prettier from the repo root.
+- Never set `LIBER_TRASH_TESTS=1` locally; never touch `~/Library/Application Support/app.liberlinteum.desktop`; agents never send keystrokes or clicks to the user's machine (Playwright only).
 - Commits: conventional commits ending with a `Co-Authored-By:` trailer naming the model that wrote the code.
 
 ## Review Focus
@@ -42,9 +42,9 @@ Five inputs the spec implies but no task test exercised, most likely to bite fir
 
 | Path | Responsibility |
 |---|---|
-| `crates/nimw-vault/src/{config,vault,fsops,hash}.rs` | Attachment policy (precedence, `dir_for`), NIMW setting writes, `create_dir_all`, streamed `import_file` |
-| `crates/nimw-index/src/{rows,index}.rs` | `LinkCandidate`, `link_candidates()` |
-| `crates/nimw-session/src/attachments.rs` | `save_attachment`, `import_attachment`, settings, `link_suggest` ranking, `cover_reference`, `sanitize_file_name` |
+| `crates/liber-vault/src/{config,vault,fsops,hash}.rs` | Attachment policy (precedence, `dir_for`), Liber Linteum setting writes, `create_dir_all`, streamed `import_file` |
+| `crates/liber-index/src/{rows,index}.rs` | `LinkCandidate`, `link_candidates()` |
+| `crates/liber-session/src/attachments.rs` | `save_attachment`, `import_attachment`, settings, `link_suggest` ranking, `cover_reference`, `sanitize_file_name` |
 | `apps/desktop/src-tauri/src/{attachment_commands,drops,state,dto,error}.rs` | Commands, drop grants, cover picker hook, DTOs, error kinds |
 | `apps/desktop/src/ipc/index.ts` | Wrappers (raw-body paste), `onDragDrop`, types |
 | `apps/desktop/src/markdown/{frontmatterEdit,headings,section}.ts` | Byte-minimal frontmatter edits; link-safe heading matching |
@@ -56,34 +56,34 @@ Five inputs the spec implies but no task test exercised, most likely to bite fir
 
 ---
 
-### Task 1: Vault: attachment policy (Obsidian first), NIMW setting writes, folders, streamed imports
+### Task 1: Vault: attachment policy (Obsidian first), Liber Linteum setting writes, folders, streamed imports
 
 **Replay commit(s):** `1c68efe` — `git cherry-pick` them to execute this task as replayed.
 
 **Files:**
-- Create: `crates/nimw-vault/tests/attachments.rs`
-- Modify: `crates/nimw-vault/src/config.rs`
-- Modify: `crates/nimw-vault/src/fsops.rs`
-- Modify: `crates/nimw-vault/src/hash.rs`
-- Modify: `crates/nimw-vault/src/lib.rs`
-- Modify: `crates/nimw-vault/src/vault.rs`
-- Modify: `crates/nimw-vault/tests/open_scan.rs`
+- Create: `crates/liber-vault/tests/attachments.rs`
+- Modify: `crates/liber-vault/src/config.rs`
+- Modify: `crates/liber-vault/src/fsops.rs`
+- Modify: `crates/liber-vault/src/hash.rs`
+- Modify: `crates/liber-vault/src/lib.rs`
+- Modify: `crates/liber-vault/src/vault.rs`
+- Modify: `crates/liber-vault/tests/open_scan.rs`
 
 **Interfaces:**
-- Produces (`nimw-vault`): `AttachmentPolicy::dir_for(&self, page: &VaultPath) -> Result<VaultPath>`; `Vault::attachment_policy(&self) -> AttachmentPolicy` (owned, re-read from disk on every call: Obsidian's `attachmentFolderPath` → `.nimw/vault.json` → `Subfolder("attachments")`); `Vault::attachment_config(&self) -> AttachmentConfig { mode: String, path: String, obsidian: Option<String> }`; `Vault::set_nimw_attachments(&self, mode: &str, path: &str) -> Result<()>` (modes `vault` | `same` | `subfolder` | `folder`; refuses bad values and never overwrites a `.nimw/vault.json` that isn't a JSON object, both as `VaultError::InvalidConfig`); `Vault::create_dir_all(&self, dir: &VaultPath) -> Result<Vec<VaultPath>>` (folders created, outermost first); `Vault::import_file(&self, src: &Path, dest: &VaultPath) -> Result<Hash>` (streamed, create-only: `AlreadyExists` / `NotFound`).
-- Changes: `attachment_policy()` used to return `&AttachmentPolicy` resolved once at open with NIMW first; `tests/open_scan.rs` follows (Obsidian's `./assets` now wins over NIMW's `same`).
+- Produces (`liber-vault`): `AttachmentPolicy::dir_for(&self, page: &VaultPath) -> Result<VaultPath>`; `Vault::attachment_policy(&self) -> AttachmentPolicy` (owned, re-read from disk on every call: Obsidian's `attachmentFolderPath` → `.liber/vault.json` → `Subfolder("attachments")`); `Vault::attachment_config(&self) -> AttachmentConfig { mode: String, path: String, obsidian: Option<String> }`; `Vault::set_liber_attachments(&self, mode: &str, path: &str) -> Result<()>` (modes `vault` | `same` | `subfolder` | `folder`; refuses bad values and never overwrites a `.liber/vault.json` that isn't a JSON object, both as `VaultError::InvalidConfig`); `Vault::create_dir_all(&self, dir: &VaultPath) -> Result<Vec<VaultPath>>` (folders created, outermost first); `Vault::import_file(&self, src: &Path, dest: &VaultPath) -> Result<Hash>` (streamed, create-only: `AlreadyExists` / `NotFound`).
+- Changes: `attachment_policy()` used to return `&AttachmentPolicy` resolved once at open with Liber Linteum first; `tests/open_scan.rs` follows (Obsidian's `./assets` now wins over Liber Linteum's `same`).
 
 - [ ] **Step 1: Write the failing test(s)**
 
-Create `crates/nimw-vault/tests/attachments.rs`:
+Create `crates/liber-vault/tests/attachments.rs`:
 
 ```rust
-//! M2c §5.3 / §7.1: where attachments go (Obsidian → `.nimw/vault.json` →
-//! default), NIMW's own setting written without losing other keys, folders
+//! M2c §5.3 / §7.1: where attachments go (Obsidian → `.liber/vault.json` →
+//! default), Liber Linteum's own setting written without losing other keys, folders
 //! created on demand and streamed create-only copies.
 
-use nimw_testkit::copy_fixture;
-use nimw_vault::{AttachmentPolicy, Hash, Vault, VaultError, VaultPath};
+use liber_testkit::copy_fixture;
+use liber_vault::{AttachmentPolicy, Hash, Vault, VaultError, VaultPath};
 
 fn vp(s: &str) -> VaultPath {
     VaultPath::new(s).unwrap()
@@ -96,11 +96,11 @@ fn fresh() -> (tempfile::TempDir, Vault) {
 }
 
 #[test]
-fn m2c_obsidian_setting_wins_over_nimw_and_is_re_read() {
+fn m2c_obsidian_setting_wins_over_liber_and_is_re_read() {
     let dir = copy_fixture("obsidian-basic"); // app.json: "./assets"
-    std::fs::create_dir(dir.path().join(".nimw")).unwrap();
+    std::fs::create_dir(dir.path().join(".liber")).unwrap();
     std::fs::write(
-        dir.path().join(".nimw/vault.json"),
+        dir.path().join(".liber/vault.json"),
         r#"{ "attachments": { "mode": "same" } }"#,
     )
     .unwrap();
@@ -113,7 +113,7 @@ fn m2c_obsidian_setting_wins_over_nimw_and_is_re_read() {
     assert_eq!(config.obsidian.as_deref(), Some("./assets"));
     assert_eq!((config.mode.as_str(), config.path.as_str()), ("same", ""));
 
-    // Obsidian's key removed while the vault is open: NIMW's setting applies.
+    // Obsidian's key removed while the vault is open: Liber Linteum's setting applies.
     std::fs::write(dir.path().join(".obsidian/app.json"), "{}").unwrap();
     assert_eq!(vault.attachment_policy(), AttachmentPolicy::SameAsNote);
     assert_eq!(vault.attachment_config().obsidian, None);
@@ -152,7 +152,7 @@ fn m2c_folder_mode_and_dirs_per_policy() {
         dir_for(&AttachmentPolicy::Folder(vp("Media"))).as_deref(),
         Some("Media")
     );
-    vault.set_nimw_attachments("folder", "Media/Img").unwrap();
+    vault.set_liber_attachments("folder", "Media/Img").unwrap();
     assert_eq!(
         vault.attachment_policy(),
         AttachmentPolicy::Folder(vp("Media/Img"))
@@ -160,27 +160,27 @@ fn m2c_folder_mode_and_dirs_per_policy() {
 }
 
 #[test]
-fn m2c_set_nimw_attachments_keeps_other_keys_and_creates_nimw_lazily() {
+fn m2c_set_liber_attachments_keeps_other_keys_and_creates_liber_lazily() {
     let (dir, vault) = fresh();
     assert!(
-        !dir.path().join(".nimw").exists(),
+        !dir.path().join(".liber").exists(),
         "VLT-02: nothing written on open"
     );
-    vault.set_nimw_attachments("same", "").unwrap();
+    vault.set_liber_attachments("same", "").unwrap();
     let json: serde_json::Value =
-        serde_json::from_slice(&std::fs::read(dir.path().join(".nimw/vault.json")).unwrap())
+        serde_json::from_slice(&std::fs::read(dir.path().join(".liber/vault.json")).unwrap())
             .unwrap();
     assert_eq!(json["attachments"]["mode"], "same");
     assert_eq!(json["version"], 1);
 
     std::fs::write(
-        dir.path().join(".nimw/vault.json"),
+        dir.path().join(".liber/vault.json"),
         r#"{ "version": 1, "exclude": ["Drafts/**"], "viewMode": "drill", "future": {"x": 1} }"#,
     )
     .unwrap();
-    vault.set_nimw_attachments("subfolder", "files").unwrap();
+    vault.set_liber_attachments("subfolder", "files").unwrap();
     let json: serde_json::Value =
-        serde_json::from_slice(&std::fs::read(dir.path().join(".nimw/vault.json")).unwrap())
+        serde_json::from_slice(&std::fs::read(dir.path().join(".liber/vault.json")).unwrap())
             .unwrap();
     assert_eq!(json["exclude"][0], "Drafts/**");
     assert_eq!(json["viewMode"], "drill");
@@ -193,7 +193,7 @@ fn m2c_set_nimw_attachments_keeps_other_keys_and_creates_nimw_lazily() {
 }
 
 #[test]
-fn m2c_set_nimw_attachments_refuses_bad_values_and_never_clobbers_broken_json() {
+fn m2c_set_liber_attachments_refuses_bad_values_and_never_clobbers_broken_json() {
     let (dir, vault) = fresh();
     for (mode, path) in [
         ("folder", "../out"),
@@ -203,20 +203,20 @@ fn m2c_set_nimw_attachments_refuses_bad_values_and_never_clobbers_broken_json() 
     ] {
         assert!(
             matches!(
-                vault.set_nimw_attachments(mode, path),
+                vault.set_liber_attachments(mode, path),
                 Err(VaultError::InvalidConfig { .. })
             ),
             "{mode} {path}"
         );
     }
-    std::fs::create_dir(dir.path().join(".nimw")).unwrap();
-    std::fs::write(dir.path().join(".nimw/vault.json"), "{ not json").unwrap();
+    std::fs::create_dir(dir.path().join(".liber")).unwrap();
+    std::fs::write(dir.path().join(".liber/vault.json"), "{ not json").unwrap();
     assert!(matches!(
-        vault.set_nimw_attachments("same", ""),
+        vault.set_liber_attachments("same", ""),
         Err(VaultError::InvalidConfig { .. })
     ));
     assert_eq!(
-        std::fs::read_to_string(dir.path().join(".nimw/vault.json")).unwrap(),
+        std::fs::read_to_string(dir.path().join(".liber/vault.json")).unwrap(),
         "{ not json"
     );
 }
@@ -270,11 +270,11 @@ fn m2c_import_file_streams_a_create_only_copy() {
 }
 ```
 
-Modify `crates/nimw-vault/tests/open_scan.rs`:
+Modify `crates/liber-vault/tests/open_scan.rs`:
 
 ```diff
---- a/crates/nimw-vault/tests/open_scan.rs
-+++ b/crates/nimw-vault/tests/open_scan.rs
+--- a/crates/liber-vault/tests/open_scan.rs
++++ b/crates/liber-vault/tests/open_scan.rs
 @@ -16,7 +16,7 @@ fn vlt_01_open_reads_obsidian_attachment_setting() {
      let vault = Vault::open(&fixture_path("obsidian-basic")).unwrap();
      assert_eq!(
@@ -289,7 +289,7 @@ Modify `crates/nimw-vault/tests/open_scan.rs`:
      assert!(!p.iter().any(|x| x.starts_with("Game Design")), "{p:?}");
      assert!(!p.iter().any(|x| x.ends_with(".mp3")));
 -    assert_eq!(vault.attachment_policy(), &AttachmentPolicy::SameAsNote);
-+    // M2c §5.3: Obsidian's `./assets` wins over NIMW's `same`.
++    // M2c §5.3: Obsidian's `./assets` wins over Liber Linteum's `same`.
 +    assert_eq!(
 +        vault.attachment_policy(),
 +        AttachmentPolicy::Subfolder("assets".into())
@@ -298,7 +298,7 @@ Modify `crates/nimw-vault/tests/open_scan.rs`:
          vault.warnings().len(),
          1,
 @@ -88,7 +92,7 @@ fn vlt_05_exclude_globs_and_bad_config_are_handled() {
-     assert!(vault.warnings()[0].contains(".nimw/vault.json"));
+     assert!(vault.warnings()[0].contains(".liber/vault.json"));
      assert_eq!(
          vault.attachment_policy(),
 -        &AttachmentPolicy::Subfolder("assets".into())
@@ -309,26 +309,26 @@ Modify `crates/nimw-vault/tests/open_scan.rs`:
 
 - [ ] **Step 2: Run them to verify they fail**
 
-Run: `cargo test -p nimw-vault --test attachments`
+Run: `cargo test -p liber-vault --test attachments`
 
-Expected: compile errors — `no method named attachment_config / set_nimw_attachments / create_dir_all / import_file found for struct Vault`, `no method named dir_for`, `can't compare &AttachmentPolicy with AttachmentPolicy`.
+Expected: compile errors — `no method named attachment_config / set_liber_attachments / create_dir_all / import_file found for struct Vault`, `no method named dir_for`, `can't compare &AttachmentPolicy with AttachmentPolicy`.
 
 - [ ] **Step 3: Implement**
 
-Modify `crates/nimw-vault/src/config.rs`:
+Modify `crates/liber-vault/src/config.rs`:
 
 ```diff
---- a/crates/nimw-vault/src/config.rs
-+++ b/crates/nimw-vault/src/config.rs
+--- a/crates/liber-vault/src/config.rs
++++ b/crates/liber-vault/src/config.rs
 @@ -1,8 +1,9 @@
  use crate::path::VaultPath;
  use serde::Deserialize;
  
--/// Where new attachments go (Q-ED-1). Resolved from `.nimw/vault.json`, else
+-/// Where new attachments go (Q-ED-1). Resolved from `.liber/vault.json`, else
 -/// Obsidian's `attachmentFolderPath`, else the default `attachments/` subfolder.
 +/// Where new attachments go (Q-ED-1). Resolved from Obsidian's
 +/// `attachmentFolderPath` when the vault has it (M2c §5.3: Obsidian wins), else
-+/// `.nimw/vault.json`, else the default `attachments/` subfolder.
++/// `.liber/vault.json`, else the default `attachments/` subfolder.
  #[derive(Debug, Clone, PartialEq, Eq)]
  pub enum AttachmentPolicy {
      /// Vault root.
@@ -354,23 +354,23 @@ Modify `crates/nimw-vault/src/config.rs`:
      }
  }
  
--/// `.nimw/vault.json` (arch §3.1). Unknown fields are ignored; M1a only reads
+-/// `.liber/vault.json` (arch §3.1). Unknown fields are ignored; M1a only reads
 -/// `exclude` and `attachments`.
-+/// `.nimw/vault.json` (arch §3.1). Unknown fields are ignored here (and kept
-+/// when NIMW writes the file, see `Vault::set_nimw_attachments`).
++/// `.liber/vault.json` (arch §3.1). Unknown fields are ignored here (and kept
++/// when Liber Linteum writes the file, see `Vault::set_liber_attachments`).
  #[derive(Debug, Default, Deserialize)]
- pub(crate) struct NimwVaultJson {
+ pub(crate) struct LiberVaultJson {
      #[serde(default)]
-@@ -50,7 +62,7 @@ pub(crate) struct NimwVaultJson {
-     pub attachments: Option<NimwAttachments>,
+@@ -50,7 +62,7 @@ pub(crate) struct LiberVaultJson {
+     pub attachments: Option<LiberAttachments>,
  }
  
 -#[derive(Debug, Deserialize)]
 +#[derive(Debug, Clone, Deserialize)]
- pub(crate) struct NimwAttachments {
+ pub(crate) struct LiberAttachments {
      pub mode: String,
      #[serde(default)]
-@@ -64,6 +76,9 @@ impl NimwAttachments {
+@@ -64,6 +76,9 @@ impl LiberAttachments {
              "vault" => VaultPath::new(self.path.trim_matches('/'))
                  .ok()
                  .map(AttachmentPolicy::Folder),
@@ -380,11 +380,11 @@ Modify `crates/nimw-vault/src/config.rs`:
              "same" => Some(AttachmentPolicy::SameAsNote),
              "subfolder" => {
                  let sub = self.path.trim_matches('/');
-@@ -76,6 +91,16 @@ impl NimwAttachments {
+@@ -76,6 +91,16 @@ impl LiberAttachments {
      }
  }
  
-+/// NIMW's attachment setting as stored (or the default), plus Obsidian's
++/// Liber Linteum's attachment setting as stored (or the default), plus Obsidian's
 +/// `attachmentFolderPath` when the vault has a usable one — which then wins.
 +#[derive(Debug, Clone, PartialEq, Eq)]
 +pub struct AttachmentConfig {
@@ -399,11 +399,11 @@ Modify `crates/nimw-vault/src/config.rs`:
      #[serde(rename = "attachmentFolderPath")]
 ```
 
-Modify `crates/nimw-vault/src/fsops.rs`:
+Modify `crates/liber-vault/src/fsops.rs`:
 
 ```diff
---- a/crates/nimw-vault/src/fsops.rs
-+++ b/crates/nimw-vault/src/fsops.rs
+--- a/crates/liber-vault/src/fsops.rs
++++ b/crates/liber-vault/src/fsops.rs
 @@ -2,7 +2,7 @@ use crate::error::{Result, VaultError, io_err};
  use crate::hash::Hash;
  use crate::path::VaultPath;
@@ -502,11 +502,11 @@ Modify `crates/nimw-vault/src/fsops.rs`:
          std::fs::create_dir(self.fs_path(path)?).map_err(|e| io_err(path.as_str(), e))
 ```
 
-Modify `crates/nimw-vault/src/hash.rs`:
+Modify `crates/liber-vault/src/hash.rs`:
 
 ```diff
---- a/crates/nimw-vault/src/hash.rs
-+++ b/crates/nimw-vault/src/hash.rs
+--- a/crates/liber-vault/src/hash.rs
++++ b/crates/liber-vault/src/hash.rs
 @@ -9,6 +9,10 @@ impl Hash {
          Hash(*blake3::hash(bytes).as_bytes())
      }
@@ -520,11 +520,11 @@ Modify `crates/nimw-vault/src/hash.rs`:
      }
 ```
 
-Modify `crates/nimw-vault/src/lib.rs`:
+Modify `crates/liber-vault/src/lib.rs`:
 
 ```diff
---- a/crates/nimw-vault/src/lib.rs
-+++ b/crates/nimw-vault/src/lib.rs
+--- a/crates/liber-vault/src/lib.rs
++++ b/crates/liber-vault/src/lib.rs
 @@ -10,7 +10,7 @@ mod scan;
  mod vault;
  mod watch;
@@ -536,16 +536,16 @@ Modify `crates/nimw-vault/src/lib.rs`:
  pub use hash::Hash;
 ```
 
-Modify `crates/nimw-vault/src/vault.rs`:
+Modify `crates/liber-vault/src/vault.rs`:
 
 ```diff
---- a/crates/nimw-vault/src/vault.rs
-+++ b/crates/nimw-vault/src/vault.rs
+--- a/crates/liber-vault/src/vault.rs
++++ b/crates/liber-vault/src/vault.rs
 @@ -1,5 +1,9 @@
--use crate::config::{AttachmentPolicy, NimwVaultJson, ObsidianAppJson};
+-use crate::config::{AttachmentPolicy, LiberVaultJson, ObsidianAppJson};
 -use crate::error::{Result, VaultError};
 +use crate::config::{
-+    AttachmentConfig, AttachmentPolicy, NimwAttachments, NimwVaultJson, ObsidianAppJson,
++    AttachmentConfig, AttachmentPolicy, LiberAttachments, LiberVaultJson, ObsidianAppJson,
 +};
 +use crate::error::{Result, VaultError, io_err};
 +use crate::is_hidden_name;
@@ -565,20 +565,20 @@ Modify `crates/nimw-vault/src/vault.rs`:
          }
          let mut warnings = Vec::new();
  
--        let nimw: NimwVaultJson = read_json(&root, ".nimw/vault.json", &mut warnings);
+-        let liber: LiberVaultJson = read_json(&root, ".liber/vault.json", &mut warnings);
 -        let obsidian: ObsidianAppJson = read_json(&root, ".obsidian/app.json", &mut warnings);
-+        let nimw: NimwVaultJson = read_json(&root, NIMW_JSON, &mut warnings);
++        let liber: LiberVaultJson = read_json(&root, LIBER_JSON, &mut warnings);
 +        // Read once here only to report a broken file; the attachment policy
 +        // is re-read on every use (M2c §5.3).
 +        let _: ObsidianAppJson = read_json(&root, OBSIDIAN_JSON, &mut warnings);
  
          let mut builder = GlobSetBuilder::new();
-         for pattern in &nimw.exclude {
+         for pattern in &liber.exclude {
 @@ -43,22 +48,9 @@ impl Vault {
          }
          let excludes = builder.build().unwrap_or_else(|_| GlobSet::empty());
  
--        let attachments = nimw
+-        let attachments = liber
 -            .attachments
 -            .as_ref()
 -            .and_then(|a| a.policy())
@@ -605,20 +605,20 @@ Modify `crates/nimw-vault/src/vault.rs`:
 -        &self.attachments
 +    /// Where new attachments go, re-read from disk so a config edit while the
 +    /// vault is open applies at once (M2c §5.3): Obsidian's
-+    /// `attachmentFolderPath` wins, then `.nimw/vault.json`, then the default.
++    /// `attachmentFolderPath` wins, then `.liber/vault.json`, then the default.
 +    pub fn attachment_policy(&self) -> AttachmentPolicy {
-+        let (nimw, obsidian) = self.attachment_sources();
++        let (liber, obsidian) = self.attachment_sources();
 +        obsidian
 +            .map(|(_, policy)| policy)
-+            .or_else(|| nimw.and_then(|a| a.policy()))
++            .or_else(|| liber.and_then(|a| a.policy()))
 +            .unwrap_or_default()
 +    }
 +
-+    /// NIMW's own attachment setting (or the default) and Obsidian's, for the
++    /// Liber Linteum's own attachment setting (or the default) and Obsidian's, for the
 +    /// Settings dialog.
 +    pub fn attachment_config(&self) -> AttachmentConfig {
-+        let (nimw, obsidian) = self.attachment_sources();
-+        let (mode, path) = match nimw.filter(|a| a.policy().is_some()) {
++        let (liber, obsidian) = self.attachment_sources();
++        let (mode, path) = match liber.filter(|a| a.policy().is_some()) {
 +            Some(a) => (a.mode, a.path),
 +            None => ("subfolder".to_string(), "attachments".to_string()),
 +        };
@@ -629,12 +629,12 @@ Modify `crates/nimw-vault/src/vault.rs`:
 +        }
 +    }
 +
-+    /// Stores NIMW's attachment setting in `.nimw/vault.json` (created on first
++    /// Stores Liber Linteum's attachment setting in `.liber/vault.json` (created on first
 +    /// need, VLT-02), keeping every other key. A file that isn't a JSON object
 +    /// is never overwritten.
-+    pub fn set_nimw_attachments(&self, mode: &str, path: &str) -> Result<()> {
++    pub fn set_liber_attachments(&self, mode: &str, path: &str) -> Result<()> {
 +        let invalid = |reason: &str| VaultError::InvalidConfig {
-+            file: NIMW_JSON.to_string(),
++            file: LIBER_JSON.to_string(),
 +            reason: reason.to_string(),
 +        };
 +        let path = path.trim().trim_matches('/');
@@ -643,7 +643,7 @@ Modify `crates/nimw-vault/src/vault.rs`:
 +            "subfolder" | "folder" => path,
 +            _ => return Err(invalid(&format!("unknown attachment mode {mode:?}"))),
 +        };
-+        let attachments = NimwAttachments {
++        let attachments = LiberAttachments {
 +            mode: mode.to_string(),
 +            path: stored.to_string(),
 +        };
@@ -652,7 +652,7 @@ Modify `crates/nimw-vault/src/vault.rs`:
 +        {
 +            return Err(invalid(&format!("invalid attachment folder {path:?}")));
 +        }
-+        let file = VaultPath::new(NIMW_JSON)?;
++        let file = VaultPath::new(LIBER_JSON)?;
 +        let (mut map, expected) = match self.read(&file) {
 +            Ok((bytes, hash)) => match serde_json::from_slice(&bytes) {
 +                Ok(serde_json::Value::Object(map)) => (map, Some(hash)),
@@ -666,9 +666,9 @@ Modify `crates/nimw-vault/src/vault.rs`:
 +            "attachments".to_string(),
 +            serde_json::json!({ "mode": mode, "path": stored }),
 +        );
-+        let dir = self.fs_path(&VaultPath::new(".nimw")?)?;
++        let dir = self.fs_path(&VaultPath::new(".liber")?)?;
 +        if !dir.is_dir() {
-+            std::fs::create_dir(&dir).map_err(|e| io_err(".nimw", e))?;
++            std::fs::create_dir(&dir).map_err(|e| io_err(".liber", e))?;
 +        }
 +        let mut text =
 +            serde_json::to_string_pretty(&serde_json::Value::Object(map)).expect("valid JSON");
@@ -677,16 +677,16 @@ Modify `crates/nimw-vault/src/vault.rs`:
 +        Ok(())
 +    }
 +
-+    /// NIMW's stored attachment setting and Obsidian's (value + policy) when
++    /// Liber Linteum's stored attachment setting and Obsidian's (value + policy) when
 +    /// usable. Errors read as "not set": `open` already reported them.
-+    fn attachment_sources(&self) -> (Option<NimwAttachments>, Option<(String, AttachmentPolicy)>) {
++    fn attachment_sources(&self) -> (Option<LiberAttachments>, Option<(String, AttachmentPolicy)>) {
 +        let mut ignored = Vec::new();
-+        let nimw: NimwVaultJson = read_json(&self.root, NIMW_JSON, &mut ignored);
++        let liber: LiberVaultJson = read_json(&self.root, LIBER_JSON, &mut ignored);
 +        let obsidian: ObsidianAppJson = read_json(&self.root, OBSIDIAN_JSON, &mut ignored);
 +        let obsidian = obsidian.attachment_folder_path.and_then(|value| {
 +            AttachmentPolicy::from_obsidian(&value).map(|policy| (value, policy))
 +        });
-+        (nimw.attachments, obsidian)
++        (liber.attachments, obsidian)
      }
  
      /// Non-fatal configuration problems found while opening.
@@ -694,7 +694,7 @@ Modify `crates/nimw-vault/src/vault.rs`:
      }
  }
  
-+const NIMW_JSON: &str = ".nimw/vault.json";
++const LIBER_JSON: &str = ".liber/vault.json";
 +const OBSIDIAN_JSON: &str = ".obsidian/app.json";
 +
  fn read_json<T: serde::de::DeserializeOwned + Default>(
@@ -704,21 +704,21 @@ Modify `crates/nimw-vault/src/vault.rs`:
 
 - [ ] **Step 4: Run them to verify they pass, then the gate**
 
-Run: `cargo test -p nimw-vault && cargo fmt --all && cargo clippy -p nimw-vault --all-targets -- -D warnings`
+Run: `cargo test -p liber-vault && cargo fmt --all && cargo clippy -p liber-vault --all-targets -- -D warnings`
 
-Expected: `attachments`: 7 passed; every other nimw-vault test passes; clippy clean.
+Expected: `attachments`: 7 passed; every other liber-vault test passes; clippy clean.
 
 - [ ] **Step 5: Commit**
 
 ```bash
 git add -A
 git commit -F- <<'MSG'
-feat(vault): attachment policy — Obsidian first, re-read per use; NIMW setting writes; streamed imports
+feat(vault): attachment policy — Obsidian first, re-read per use; Liber Linteum setting writes; streamed imports
 
-M2c §5.3/§7.1: Obsidian's attachmentFolderPath wins over .nimw/vault.json
+M2c §5.3/§7.1: Obsidian's attachmentFolderPath wins over .liber/vault.json
 (re-read on every use, so config edits apply while the vault is open);
-'folder' mode; AttachmentPolicy::dir_for; set_nimw_attachments keeps other
-keys, creates .nimw lazily and never overwrites a broken file;
+'folder' mode; AttachmentPolicy::dir_for; set_liber_attachments keeps other
+keys, creates .liber lazily and never overwrites a broken file;
 create_dir_all; import_file streams a create-only copy via a hidden temp.
 
 Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
@@ -732,26 +732,26 @@ MSG
 **Replay commit(s):** `1747ab3` — `git cherry-pick` them to execute this task as replayed.
 
 **Files:**
-- Create: `crates/nimw-session/src/attachments.rs`
-- Create: `crates/nimw-session/tests/attachments.rs`
+- Create: `crates/liber-session/src/attachments.rs`
+- Create: `crates/liber-session/tests/attachments.rs`
 - Modify: `apps/desktop/src-tauri/src/error.rs`
 - Modify: `apps/desktop/src-tauri/tests/errors.rs`
 - Modify: `apps/desktop/src/i18n/locales/en.json`
 - Modify: `apps/desktop/src/i18n/locales/es.json`
 - Modify: `apps/desktop/src/ipc/index.ts`
-- Modify: `crates/nimw-index/src/index.rs`
-- Modify: `crates/nimw-index/src/lib.rs`
-- Modify: `crates/nimw-index/src/rows.rs`
-- Modify: `crates/nimw-session/Cargo.toml`
-- Modify: `crates/nimw-session/src/error.rs`
-- Modify: `crates/nimw-session/src/lib.rs`
-- Modify: `crates/nimw-session/src/session.rs`
+- Modify: `crates/liber-index/src/index.rs`
+- Modify: `crates/liber-index/src/lib.rs`
+- Modify: `crates/liber-index/src/rows.rs`
+- Modify: `crates/liber-session/Cargo.toml`
+- Modify: `crates/liber-session/src/error.rs`
+- Modify: `crates/liber-session/src/lib.rs`
+- Modify: `crates/liber-session/src/session.rs`
 - Generated: `Cargo.lock` (by the commands in the steps; commit it)
 
 **Interfaces:**
 - Consumes Task 1's vault API.
-- Produces (`nimw-session`): `pub struct Attached { path: VaultPath, link: String, copied: bool }`; `VaultSession::save_attachment(&self, page: &VaultPath, name: &str, bytes: &[u8]) -> Result<Attached>`; `VaultSession::import_attachment(&self, page: &VaultPath, src: &Path) -> Result<Attached>` (inside-vault files: `copied: false`; folders: `SessionError::NotAFile`; `.md` files are indexed as pages); `VaultSession::attachment_settings(&self) -> AttachmentConfig`; `VaultSession::set_attachment_settings(&self, mode: &str, path: &str) -> Result<()>` (`SessionError::NotPermitted` while Obsidian's setting applies; names checked with `validate_name`); `pub struct LinkSuggestion { path: String, kind: FileKind, title: Option<String>, target: String }`; `VaultSession::link_suggest(&self, source: &VaultPath, query: &str, embed: bool, limit: usize) -> Result<Vec<LinkSuggestion>>`; `pub fn cover_reference(page: &VaultPath, file: &VaultPath) -> String`; `pub fn sanitize_file_name(name: &str) -> String`; `SessionError::{NotPermitted(String), NotAFile(String)}`.
-- Produces (`nimw-index`): `pub struct LinkCandidate { path, kind: FileKind, title: Option<String>, mtime_ns: i64 }`, `Index::link_candidates(&self) -> Result<Vec<LinkCandidate>>`.
+- Produces (`liber-session`): `pub struct Attached { path: VaultPath, link: String, copied: bool }`; `VaultSession::save_attachment(&self, page: &VaultPath, name: &str, bytes: &[u8]) -> Result<Attached>`; `VaultSession::import_attachment(&self, page: &VaultPath, src: &Path) -> Result<Attached>` (inside-vault files: `copied: false`; folders: `SessionError::NotAFile`; `.md` files are indexed as pages); `VaultSession::attachment_settings(&self) -> AttachmentConfig`; `VaultSession::set_attachment_settings(&self, mode: &str, path: &str) -> Result<()>` (`SessionError::NotPermitted` while Obsidian's setting applies; names checked with `validate_name`); `pub struct LinkSuggestion { path: String, kind: FileKind, title: Option<String>, target: String }`; `VaultSession::link_suggest(&self, source: &VaultPath, query: &str, embed: bool, limit: usize) -> Result<Vec<LinkSuggestion>>`; `pub fn cover_reference(page: &VaultPath, file: &VaultPath) -> String`; `pub fn sanitize_file_name(name: &str) -> String`; `SessionError::{NotPermitted(String), NotAFile(String)}`.
+- Produces (`liber-index`): `pub struct LinkCandidate { path, kind: FileKind, title: Option<String>, mtime_ns: i64 }`, `Index::link_candidates(&self) -> Result<Vec<LinkCandidate>>`.
 - Produces (app): `ErrorKind::{NotPermitted, NotAFile, TooLarge}` (`notPermitted` / `notAFile` / `tooLarge` on the wire), mapped in `error.rs`, typed in `src/ipc/index.ts` and translated (`errors.*`, en + es).
 
 **Notes:** `pnpm check:i18n` runs `node scripts/check-i18n.ts` and needs Node ≥ 22.18 (`.nvmrc`: 24). If the shell defaults to Node 20 it fails with `ERR_UNKNOWN_FILE_EXTENSION`; put Node 24 first on `PATH`.
@@ -785,18 +785,18 @@ Modify `apps/desktop/src-tauri/tests/errors.rs`:
          kind(SessionError::Vault(VaultError::Io {
 ```
 
-Create `crates/nimw-session/tests/attachments.rs`:
+Create `crates/liber-session/tests/attachments.rs`:
 
 ```rust
 //! M2c §5, §7.1, §7.2: attachments saved/imported for a page (policy, folders,
 //! dedupe, sanitizing, inside-vault drops, indexing), vault settings and link
 //! suggestions.
 
-use nimw_index::FileKind;
-use nimw_markdown::LinkKind;
-use nimw_session::{SessionError, SessionEvent, VaultSession, cover_reference, sanitize_file_name};
-use nimw_testkit::copy_fixture;
-use nimw_vault::VaultPath;
+use liber_index::FileKind;
+use liber_markdown::LinkKind;
+use liber_session::{SessionError, SessionEvent, VaultSession, cover_reference, sanitize_file_name};
+use liber_testkit::copy_fixture;
+use liber_vault::VaultPath;
 use std::time::{Duration, SystemTime};
 
 fn vp(s: &str) -> VaultPath {
@@ -1097,9 +1097,9 @@ fn m2c_cover_reference_is_relative_inside_the_page_folder_else_rooted() {
 
 - [ ] **Step 2: Run them to verify they fail**
 
-Run: `cargo test -p nimw-session --test attachments`
+Run: `cargo test -p liber-session --test attachments`
 
-Expected: compile errors — `unresolved imports nimw_session::cover_reference, nimw_session::sanitize_file_name`; `no method named save_attachment / import_attachment / link_suggest / attachment_settings / set_attachment_settings`; `no variant NotAFile / NotPermitted`. (`cargo test -p nimw-desktop --test errors` then fails with E0004 `non-exhaustive patterns: NotPermitted(_) and NotAFile(_)` until `error.rs` maps them.)
+Expected: compile errors — `unresolved imports liber_session::cover_reference, liber_session::sanitize_file_name`; `no method named save_attachment / import_attachment / link_suggest / attachment_settings / set_attachment_settings`; `no variant NotAFile / NotPermitted`. (`cargo test -p liber-desktop --test errors` then fails with E0004 `non-exhaustive patterns: NotPermitted(_) and NotAFile(_)` until `error.rs` maps them.)
 
 - [ ] **Step 3: Implement**
 
@@ -1186,18 +1186,18 @@ Modify `apps/desktop/src/ipc/index.ts`:
  export interface CommandError {
 ```
 
-Modify `crates/nimw-index/src/index.rs`:
+Modify `crates/liber-index/src/index.rs`:
 
 ```diff
---- a/crates/nimw-index/src/index.rs
-+++ b/crates/nimw-index/src/index.rs
+--- a/crates/liber-index/src/index.rs
++++ b/crates/liber-index/src/index.rs
 @@ -1,4 +1,6 @@
 -use crate::rows::{FileKind, FileRow, LinkRow, PageRow, Stat, TreeNode, ext_of, split_path};
 +use crate::rows::{
 +    FileKind, FileRow, LinkCandidate, LinkRow, PageRow, Stat, TreeNode, ext_of, split_path,
 +};
  use crate::schema::{SCHEMA, SCHEMA_VERSION};
- use nimw_markdown::{FileSet, LinkKind, PageMeta, Tag, link_key, name_key, resolve};
+ use liber_markdown::{FileSet, LinkKind, PageMeta, Tag, link_key, name_key, resolve};
  use rusqlite::{Connection, OptionalExtension, Row, params};
 @@ -209,6 +211,23 @@ impl Index {
          Ok(nodes)
@@ -1225,11 +1225,11 @@ Modify `crates/nimw-index/src/index.rs`:
              .conn
 ```
 
-Modify `crates/nimw-index/src/lib.rs`:
+Modify `crates/liber-index/src/lib.rs`:
 
 ```diff
---- a/crates/nimw-index/src/lib.rs
-+++ b/crates/nimw-index/src/lib.rs
+--- a/crates/liber-index/src/lib.rs
++++ b/crates/liber-index/src/lib.rs
 @@ -6,7 +6,7 @@ mod rows;
  mod schema;
  
@@ -1241,11 +1241,11 @@ Modify `crates/nimw-index/src/lib.rs`:
  use sha2::{Digest, Sha256};
 ```
 
-Modify `crates/nimw-index/src/rows.rs`:
+Modify `crates/liber-index/src/rows.rs`:
 
 ```diff
---- a/crates/nimw-index/src/rows.rs
-+++ b/crates/nimw-index/src/rows.rs
+--- a/crates/liber-index/src/rows.rs
++++ b/crates/liber-index/src/rows.rs
 @@ -45,6 +45,15 @@ pub struct Stat {
      pub hash: Option<String>,
  }
@@ -1264,34 +1264,34 @@ Modify `crates/nimw-index/src/rows.rs`:
  pub struct TreeNode {
 ```
 
-Modify `crates/nimw-session/Cargo.toml`:
+Modify `crates/liber-session/Cargo.toml`:
 
 ```diff
---- a/crates/nimw-session/Cargo.toml
-+++ b/crates/nimw-session/Cargo.toml
+--- a/crates/liber-session/Cargo.toml
++++ b/crates/liber-session/Cargo.toml
 @@ -7,6 +7,7 @@ license.workspace = true
  publish.workspace = true
  
  [dependencies]
 +dunce.workspace = true
- nimw-index = { path = "../nimw-index" }
- nimw-markdown = { path = "../nimw-markdown" }
- nimw-vault = { path = "../nimw-vault" }
+ liber-index = { path = "../liber-index" }
+ liber-markdown = { path = "../liber-markdown" }
+ liber-vault = { path = "../liber-vault" }
 ```
 
-Create `crates/nimw-session/src/attachments.rs`:
+Create `crates/liber-session/src/attachments.rs`:
 
 ```rust
 //! M2c §5 and §7.1–7.2: files saved or imported for a page (pasted images,
-//! dropped files, covers), NIMW's attachment setting and `[[` suggestions.
+//! dropped files, covers), Liber Linteum's attachment setting and `[[` suggestions.
 
 use crate::error::{Result, SessionError};
 use crate::session::{
     FORBIDDEN_NAME_CHARS, VaultSession, clamp_ns, folder_row, is_page_path, validate_name,
 };
-use nimw_index::{FileKind, FileRow, LinkCandidate};
-use nimw_markdown::{LinkKind, link_key, name_key, shortest_unique_target};
-use nimw_vault::{AttachmentConfig, Hash, VaultError, VaultPath};
+use liber_index::{FileKind, FileRow, LinkCandidate};
+use liber_markdown::{LinkKind, link_key, name_key, shortest_unique_target};
+use liber_vault::{AttachmentConfig, Hash, VaultError, VaultPath};
 use std::path::Path;
 
 /// A file saved into (or found in) the vault for a page.
@@ -1403,12 +1403,12 @@ impl VaultSession {
         self.place(page, &name, |dest| self.vault.import_file(&real, dest))
     }
 
-    /// NIMW's attachment setting and Obsidian's (which wins when present).
+    /// Liber Linteum's attachment setting and Obsidian's (which wins when present).
     pub fn attachment_settings(&self) -> AttachmentConfig {
         self.vault.attachment_config()
     }
 
-    /// Stores NIMW's attachment setting. Refused while Obsidian's applies.
+    /// Stores Liber Linteum's attachment setting. Refused while Obsidian's applies.
     pub fn set_attachment_settings(&self, mode: &str, path: &str) -> Result<()> {
         if self.vault.attachment_config().obsidian.is_some() {
             return Err(SessionError::NotPermitted(
@@ -1427,7 +1427,7 @@ impl VaultSession {
             }
             _ => {}
         }
-        self.vault.set_nimw_attachments(mode, path)?;
+        self.vault.set_liber_attachments(mode, path)?;
         Ok(())
     }
 
@@ -1489,7 +1489,7 @@ impl VaultSession {
         &self,
         page: &VaultPath,
         name: &str,
-        write: impl Fn(&VaultPath) -> nimw_vault::Result<Hash>,
+        write: impl Fn(&VaultPath) -> liber_vault::Result<Hash>,
     ) -> Result<Attached> {
         let dir = self.vault.attachment_policy().dir_for(page)?;
         for folder in self.vault.create_dir_all(&dir)? {
@@ -1618,11 +1618,11 @@ fn field_score(q: &str, field: &str, subsequence: bool) -> Option<u8> {
 }
 ```
 
-Modify `crates/nimw-session/src/error.rs`:
+Modify `crates/liber-session/src/error.rs`:
 
 ```diff
---- a/crates/nimw-session/src/error.rs
-+++ b/crates/nimw-session/src/error.rs
+--- a/crates/liber-session/src/error.rs
++++ b/crates/liber-session/src/error.rs
 @@ -15,6 +15,12 @@ pub enum SessionError {
      /// where a link points; the file was left unchanged.
      #[error("not rewritten: {0}")]
@@ -1638,14 +1638,14 @@ Modify `crates/nimw-session/src/error.rs`:
  pub type Result<T> = std::result::Result<T, SessionError>;
 ```
 
-Modify `crates/nimw-session/src/lib.rs`:
+Modify `crates/liber-session/src/lib.rs`:
 
 ```diff
---- a/crates/nimw-session/src/lib.rs
-+++ b/crates/nimw-session/src/lib.rs
+--- a/crates/liber-session/src/lib.rs
++++ b/crates/liber-session/src/lib.rs
 @@ -1,6 +1,7 @@
  //! One open vault: indexing, watching and file operations, composed from
- //! `nimw-vault` (filesystem), `nimw-markdown` (parsing) and `nimw-index` (cache).
+ //! `liber-vault` (filesystem), `liber-markdown` (parsing) and `liber-index` (cache).
  
 +mod attachments;
  mod editing;
@@ -1661,11 +1661,11 @@ Modify `crates/nimw-session/src/lib.rs`:
  pub use session::{VaultSession, index_db_path};
 ```
 
-Modify `crates/nimw-session/src/session.rs`:
+Modify `crates/liber-session/src/session.rs`:
 
 ```diff
---- a/crates/nimw-session/src/session.rs
-+++ b/crates/nimw-session/src/session.rs
+--- a/crates/liber-session/src/session.rs
++++ b/crates/liber-session/src/session.rs
 @@ -384,7 +384,7 @@ pub(crate) fn clamp_ns(ns: i128) -> i64 {
  /// Characters that cannot appear in a file or folder name created by the app:
  /// path separators, characters that break `[[wikilinks]]` (`#`, `|`, `^`, `[`,
@@ -1678,17 +1678,17 @@ Modify `crates/nimw-session/src/session.rs`:
 
 - [ ] **Step 4: Run them to verify they pass, then the gate**
 
-Run: `cargo test --workspace && cargo clippy --workspace --all-targets -- -D warnings && pnpm lint && pnpm typecheck && pnpm check:i18n && pnpm --filter @nimw/desktop exec vitest run --maxWorkers=2`
+Run: `cargo test --workspace && cargo clippy --workspace --all-targets -- -D warnings && pnpm lint && pnpm typecheck && pnpm check:i18n && pnpm --filter @liber/desktop exec vitest run --maxWorkers=2`
 
 Expected: `attachments`: 11 passed (with the Review Focus pin below: still 11, one test longer); workspace green; i18n parity OK.
 
 - [ ] **Step 5: Review Focus pin: an odd dropped name is sanitized and still resolves** (replay commit `3991f33`)
 
-Modify `crates/nimw-session/tests/attachments.rs`:
+Modify `crates/liber-session/tests/attachments.rs`:
 
 ```diff
---- a/crates/nimw-session/tests/attachments.rs
-+++ b/crates/nimw-session/tests/attachments.rs
+--- a/crates/liber-session/tests/attachments.rs
++++ b/crates/liber-session/tests/attachments.rs
 @@ -119,6 +119,18 @@ fn m2c_import_copies_outside_files_and_links_inside_ones() {
      assert_eq!(md.path.as_str(), "attachments/Draft.md");
      assert_eq!(md.link, "Draft");
@@ -1710,7 +1710,7 @@ Modify `crates/nimw-session/tests/attachments.rs`:
      assert!(matches!(err, SessionError::NotAFile(_)), "{err:?}");
 ```
 
-Run: `cargo test -p nimw-session --test attachments`
+Run: `cargo test -p liber-session --test attachments`
 
 Expected: 11 passed (the pin passes on arrival: it guards `sanitize_file_name` + linking).
 
@@ -1761,7 +1761,7 @@ MSG
 
 **Interfaces:**
 - Consumes Task 2's session API.
-- Produces (Rust): commands `attachment_paste` (raw body; headers `x-nimw-page`, `x-nimw-name`, percent-encoded; png/jpg/gif/webp; `MAX_PASTE_BYTES` = 64 MiB → `tooLarge`), `attachment_import(page: String, paths: Vec<String>) -> Vec<{source, ok?: {path, link, copied}, err?: CommandError}>`, `cover_pick(page: String) -> Option<{path, reference}>`, `link_suggest(source, query, embed) -> Vec<{path, kind: "page"|"attachment", title, target}>` (≤ 50), `vault_settings_get() -> {attachments: {mode, path}, obsidian}`, `vault_settings_set(patch: {attachments?: {mode, path}})`; `PageDto.coverY`; module `drops` (`DropGrants`, `on_window_event`, `on_webview_event`; 2 min, used once, ≤ 1000); `AppState::{grant_drops, take_drop_grant, set_cover_picker, cover_picker}`.
+- Produces (Rust): commands `attachment_paste` (raw body; headers `x-liber-page`, `x-liber-name`, percent-encoded; png/jpg/gif/webp; `MAX_PASTE_BYTES` = 64 MiB → `tooLarge`), `attachment_import(page: String, paths: Vec<String>) -> Vec<{source, ok?: {path, link, copied}, err?: CommandError}>`, `cover_pick(page: String) -> Option<{path, reference}>`, `link_suggest(source, query, embed) -> Vec<{path, kind: "page"|"attachment", title, target}>` (≤ 50), `vault_settings_get() -> {attachments: {mode, path}, obsidian}`, `vault_settings_set(patch: {attachments?: {mode, path}})`; `PageDto.coverY`; module `drops` (`DropGrants`, `on_window_event`, `on_webview_event`; 2 min, used once, ≤ 1000); `AppState::{grant_drops, take_drop_grant, set_cover_picker, cover_picker}`.
 - Produces (TS, `src/ipc/index.ts`): `Page.coverY: number | null`; types `Attached`, `ImportResult`, `CoverPick`, `LinkSuggestion`, `AttachmentMode`, `VaultSettings`, `VaultSettingsPatch`; `attachmentPaste(page, name, bytes: Uint8Array)`, `attachmentImport(page, paths)`, `coverPick(page)`, `linkSuggest(source, query, embed)`, `vaultSettingsGet()`, `vaultSettingsSet(patch)`.
 
 **Notes:** Building regenerates `permissions/autogenerated/*.toml` for the new commands — they are tracked; commit them. The linker warning `duplicate symbol __EMBED_INFO_PLIST` in `commands` predates M2c.
@@ -1825,7 +1825,7 @@ Modify `apps/desktop/src-tauri/tests/commands.rs`:
 +    vault
 +}
 +
-+/// M2c §7.5: NIMW's attachment setting over IPC; Obsidian's wins and blocks it.
++/// M2c §7.5: Liber Linteum's attachment setting over IPC; Obsidian's wins and blocks it.
 +#[test]
 +fn m2c_vault_settings_round_trip_over_ipc() {
 +    let h = harness();
@@ -1846,7 +1846,7 @@ Modify `apps/desktop/src-tauri/tests/commands.rs`:
 +        saved["attachments"],
 +        json!({ "mode": "folder", "path": "Media" })
 +    );
-+    assert!(vault.path().join(".nimw/vault.json").is_file());
++    assert!(vault.path().join(".liber/vault.json").is_file());
 +    let err = call(
 +        &h.main,
 +        "vault_settings_set",
@@ -1883,7 +1883,7 @@ Modify `apps/desktop/src-tauri/tests/commands.rs`:
 +        raw_request(
 +            "attachment_paste",
 +            b"\x89PNG".to_vec(),
-+            &[("x-nimw-page", page), ("x-nimw-name", name)],
++            &[("x-liber-page", page), ("x-liber-name", name)],
 +        ),
 +    )
 +    .map(|r| r.deserialize::<Value>().unwrap())
@@ -1912,7 +1912,7 @@ Modify `apps/desktop/src-tauri/tests/commands.rs`:
 +                raw_request(
 +                    "attachment_paste",
 +                    body,
-+                    &[("x-nimw-page", page), ("x-nimw-name", name)],
++                    &[("x-liber-page", page), ("x-liber-name", name)],
 +                ),
 +            )
 +            .map(|r| r.deserialize::<Value>().unwrap())
@@ -1923,7 +1923,7 @@ Modify `apps/desktop/src-tauri/tests/commands.rs`:
 +    assert_eq!(refuse(Vec::new(), "x.png"), "invalidName");
 +    assert_eq!(
 +        refuse(
-+            vec![0u8; nimw_desktop::attachment_commands::MAX_PASTE_BYTES + 1],
++            vec![0u8; liber_desktop::attachment_commands::MAX_PASTE_BYTES + 1],
 +            "x.png"
 +        ),
 +        "tooLarge"
@@ -1943,7 +1943,7 @@ Modify `apps/desktop/src-tauri/tests/commands.rs`:
 +    std::fs::write(&dropped, b"%PDF").unwrap();
 +    std::fs::write(&secret, b"key").unwrap();
 +    let window = h.main.as_ref().window();
-+    nimw_desktop::drops::on_window_event(
++    liber_desktop::drops::on_window_event(
 +        &window,
 +        &tauri::WindowEvent::DragDrop(tauri::DragDropEvent::Drop {
 +            paths: vec![dropped.clone(), outside.path().to_path_buf()],
@@ -1988,7 +1988,7 @@ Modify `apps/desktop/src-tauri/tests/commands.rs`:
 +    let outside = tempfile::tempdir().unwrap();
 +    let image = outside.path().join("sky.png");
 +    std::fs::write(&image, b"\x89PNG").unwrap();
-+    let state = h.app.state::<nimw_desktop::state::AppState>();
++    let state = h.app.state::<liber_desktop::state::AppState>();
 +    let picked = image.clone();
 +    state.set_cover_picker(Some(Arc::new(move || Some(picked.clone()))));
 +    let cover = call(
@@ -2104,8 +2104,8 @@ describe('M2c ipc commands', () => {
         bytes,
         {
           headers: {
-            'x-nimw-page': 'Notes%2FD%C3%ADa%201.md',
-            'x-nimw-name': 'Pasted%20image%201.png',
+            'x-liber-page': 'Notes%2FD%C3%ADa%201.md',
+            'x-liber-name': 'Pasted%20image%201.png',
           },
         },
       ],
@@ -2116,9 +2116,9 @@ describe('M2c ipc commands', () => {
 
 - [ ] **Step 2: Run them to verify they fail**
 
-Run: `cargo test -p nimw-desktop --test commands  (and: pnpm --filter @nimw/desktop exec vitest run src/ipc/attachments.test.ts)`
+Run: `cargo test -p liber-desktop --test commands  (and: pnpm --filter @liber/desktop exec vitest run src/ipc/attachments.test.ts)`
 
-Expected: Rust: `couldn't read src/attachment_commands.rs`, `cannot find drops / attachment_commands in nimw_desktop`, `no method named set_cover_picker`. TS: `TypeError: attachmentImport is not a function`, `attachmentPaste is not a function`.
+Expected: Rust: `couldn't read src/attachment_commands.rs`, `cannot find drops / attachment_commands in liber_desktop`, `no method named set_cover_picker`. TS: `TypeError: attachmentImport is not a function`, `attachmentPaste is not a function`.
 
 - [ ] **Step 3: Implement**
 
@@ -2176,7 +2176,7 @@ Create `apps/desktop/src-tauri/src/attachment_commands.rs`:
 ```rust
 //! M2c page extras (spec §7): pasted and dropped attachments, cover upload,
 //! `[[` suggestions and the vault's attachment setting. Thin wrappers over
-//! `nimw-session`; outside paths only come from native drops (`drops`) or a
+//! `liber-session`; outside paths only come from native drops (`drops`) or a
 //! dialog Rust opens itself (spec §8).
 
 use crate::dto::{
@@ -2186,8 +2186,8 @@ use crate::dto::{
 use crate::error::{CmdResult, CommandError, ErrorKind};
 use crate::state::AppState;
 use crate::vault_commands::blocking;
-use nimw_session::cover_reference;
-use nimw_vault::VaultPath;
+use liber_session::cover_reference;
+use liber_vault::VaultPath;
 use percent_encoding::percent_decode_str;
 use std::path::PathBuf;
 use tauri::ipc::{InvokeBody, Request};
@@ -2208,7 +2208,7 @@ fn invalid(message: impl Into<String>) -> CommandError {
 }
 
 /// The page path, file name and bytes of a paste: a raw body with
-/// percent-encoded `x-nimw-page` / `x-nimw-name` headers.
+/// percent-encoded `x-liber-page` / `x-liber-name` headers.
 fn paste_parts(request: &Request<'_>) -> CmdResult<(String, String, Vec<u8>)> {
     let InvokeBody::Raw(bytes) = request.body() else {
         return Err(invalid("expected the image bytes as a raw body"));
@@ -2231,8 +2231,8 @@ fn paste_parts(request: &Request<'_>) -> CmdResult<(String, String, Vec<u8>)> {
             .map_err(|_| invalid(format!("{name} is not UTF-8")))
     };
     Ok((
-        header("x-nimw-page")?,
-        header("x-nimw-name")?,
+        header("x-liber-page")?,
+        header("x-liber-name")?,
         bytes.clone(),
     ))
 }
@@ -2552,8 +2552,8 @@ Modify `apps/desktop/src-tauri/src/dto.rs`:
 +    pub copied: bool,
 +}
 +
-+impl From<nimw_session::Attached> for AttachedDto {
-+    fn from(a: nimw_session::Attached) -> AttachedDto {
++impl From<liber_session::Attached> for AttachedDto {
++    fn from(a: liber_session::Attached) -> AttachedDto {
 +        AttachedDto {
 +            path: a.path.to_string(),
 +            link: a.link,
@@ -2589,7 +2589,7 @@ Modify `apps/desktop/src-tauri/src/dto.rs`:
 +    pub target: String,
 +}
 +
-+/// `.nimw/vault.json` attachments: `vault` | `same` | `subfolder` | `folder`.
++/// `.liber/vault.json` attachments: `vault` | `same` | `subfolder` | `folder`.
 +#[derive(Debug, Clone, Serialize, serde::Deserialize, PartialEq, Eq)]
 +pub struct AttachmentsDto {
 +    pub mode: String,
@@ -2658,7 +2658,7 @@ Modify `apps/desktop/src-tauri/src/state.rs`:
 +use crate::drops::DropGrants;
  use crate::error::CommandError;
  use crate::settings::SettingsStore;
- use nimw_session::VaultSession;
+ use liber_session::VaultSession;
 -use std::path::PathBuf;
 -use std::sync::{Arc, Mutex};
 +use std::path::{Path, PathBuf};
@@ -2671,7 +2671,7 @@ Modify `apps/desktop/src-tauri/src/state.rs`:
  pub struct AppState {
      session: Mutex<Option<Arc<VaultSession>>>,
      pub settings: SettingsStore,
-     /// OS cache dir; index databases live under `<cache_dir>/nimw/…`.
+     /// OS cache dir; index databases live under `<cache_dir>/liber/…`.
      pub cache_dir: PathBuf,
 +    /// Paths the OS dropped onto the window, importable once (M2c §8).
 +    drop_grants: Mutex<DropGrants>,
@@ -2816,8 +2816,8 @@ Modify `apps/desktop/src/ipc/index.ts`:
 +  ipcCall(() =>
 +    invoke<Attached>('attachment_paste', bytes, {
 +      headers: {
-+        'x-nimw-page': encodeURIComponent(page),
-+        'x-nimw-name': encodeURIComponent(name),
++        'x-liber-page': encodeURIComponent(page),
++        'x-liber-name': encodeURIComponent(name),
 +      },
 +    }),
 +  );
@@ -2832,13 +2832,13 @@ Modify `apps/desktop/src/ipc/index.ts`:
 +export const vaultSettingsSet = (patch: VaultSettingsPatch) =>
 +  call<VaultSettings>('vault_settings_set', { patch });
  
- /** URL of a vault file for <img>/<audio> through the `nimw-asset:` protocol
+ /** URL of a vault file for <img>/<audio> through the `liber-asset:` protocol
   *  (M2a §2.5); WebView2 on Windows reaches custom protocols over http. */
 ```
 
 - [ ] **Step 4: Run them to verify they pass, then the gate**
 
-Run: `cargo test -p nimw-desktop --test commands m2c && cargo test --workspace && cargo fmt --all --check && cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace && pnpm lint && pnpm typecheck && pnpm check:i18n && pnpm --filter @nimw/desktop exec vitest run --maxWorkers=2`
+Run: `cargo test -p liber-desktop --test commands m2c && cargo test --workspace && cargo fmt --all --check && cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace && pnpm lint && pnpm typecheck && pnpm check:i18n && pnpm --filter @liber/desktop exec vitest run --maxWorkers=2`
 
 Expected: 5 `m2c_*` command tests pass (6 with the pin below); `drops` unit test passes; the allowed/denied ACL test covers the six new commands; vitest green.
 
@@ -2872,7 +2872,7 @@ Modify `apps/desktop/src-tauri/tests/commands.rs`:
 +    let outside = tempfile::tempdir().unwrap();
 +    let image = outside.path().join("sky.png");
 +    std::fs::write(&image, b"\x89PNG").unwrap();
-+    let state = h.app.state::<nimw_desktop::state::AppState>();
++    let state = h.app.state::<liber_desktop::state::AppState>();
 +    state.set_cover_picker(Some(Arc::new(move || Some(image.clone()))));
 +    let cover = call(&h.main, "cover_pick", json!({ "page": "Chars/Rex.md" })).unwrap();
 +    assert_eq!(
@@ -2889,7 +2889,7 @@ Modify `apps/desktop/src-tauri/tests/commands.rs`:
 +}
 ```
 
-Run: `cargo test -p nimw-desktop --test commands m2c`
+Run: `cargo test -p liber-desktop --test commands m2c`
 
 Expected: 6 passed.
 
@@ -3090,7 +3090,7 @@ Modify `apps/desktop/src/stores/editorStore.test.tsx`:
 
 - [ ] **Step 2: Run them to verify they fail**
 
-Run: `pnpm --filter @nimw/desktop exec vitest run src/markdown/frontmatterEdit.test.ts src/stores/editorStore.test.tsx`
+Run: `pnpm --filter @liber/desktop exec vitest run src/markdown/frontmatterEdit.test.ts src/stores/editorStore.test.tsx`
 
 Expected: `Failed to resolve import "./frontmatterEdit"`; then `TypeError: editor(...).editFrontmatter is not a function` (3 tests).
 
@@ -3339,7 +3339,7 @@ Modify `apps/desktop/src/stores/editorStore.ts`:
 
 - [ ] **Step 4: Run them to verify they pass, then the gate**
 
-Run: `pnpm lint && pnpm typecheck && pnpm check:i18n && pnpm --filter @nimw/desktop exec vitest run --maxWorkers=2`
+Run: `pnpm lint && pnpm typecheck && pnpm check:i18n && pnpm --filter @liber/desktop exec vitest run --maxWorkers=2`
 
 Expected: frontmatterEdit 8 passed, editorStore 16 passed (18 with the pins), gate green.
 
@@ -3382,7 +3382,7 @@ Modify `apps/desktop/src/stores/editorStore.test.tsx`:
      await editor().open('A.md');
 ```
 
-Run: `pnpm --filter @nimw/desktop exec vitest run src/stores/editorStore.test.tsx`
+Run: `pnpm --filter @liber/desktop exec vitest run src/stores/editorStore.test.tsx`
 
 Expected: 18 passed.
 
@@ -3487,7 +3487,7 @@ describe('Cover (M2c §2)', () => {
     await waitFor(() =>
       expect(document.querySelector('img[data-cover]')).toHaveAttribute(
         'src',
-        'nimw-asset://localhost/Chars/attachments/sky.png',
+        'liber-asset://localhost/Chars/attachments/sky.png',
       ),
     );
     expect(disk.calls.some(([c]) => c === 'vault_tree')).toBe(true);
@@ -3717,7 +3717,7 @@ Modify `apps/desktop/src/test/fakeDisk.ts`:
 
 - [ ] **Step 2: Run them to verify they fail**
 
-Run: `pnpm --filter @nimw/desktop exec vitest run src/features/page/Cover.test.tsx`
+Run: `pnpm --filter @liber/desktop exec vitest run src/features/page/Cover.test.tsx`
 
 Expected: 8 failed — `Unable to find … button "Add cover"`, `role="group" and name "Cover"`, `textbox "Subtitle"`; the read-only test passes (it pins the absence of controls).
 
@@ -4286,7 +4286,7 @@ Modify `apps/desktop/src/i18n/locales/es.json`:
 
 - [ ] **Step 4: Run them to verify they pass, then the gate**
 
-Run: `pnpm lint && pnpm typecheck && pnpm check:i18n && pnpm --filter @nimw/desktop exec vitest run --maxWorkers=2`
+Run: `pnpm lint && pnpm typecheck && pnpm check:i18n && pnpm --filter @liber/desktop exec vitest run --maxWorkers=2`
 
 Expected: page tests 34 passed; gate green.
 
@@ -4487,13 +4487,13 @@ describe('drop (M2c §5.2)', () => {
     vi.spyOn(document, 'elementFromPoint').mockReturnValue(viewOf().contentDOM);
     vi.spyOn(viewOf(), 'posAtCoords').mockReturnValue(4); // start of "two"
     await act(() => emit('tauri://drag-over', payload(20, 30)));
-    expect(viewOf().contentDOM.querySelector('.cm-nimw-drop-caret')).not.toBeNull();
+    expect(viewOf().contentDOM.querySelector('.cm-liber-drop-caret')).not.toBeNull();
     await act(() => emit('tauri://drag-drop', payload(20, 30, ['/u/a.png', '/u/b.zip', '/u/dir'])));
     await vi.waitFor(() =>
       expect(viewOf().state.doc.toString()).toBe('one\n![[a.png]]\n[[b.zip]]two\n'),
     );
     expect(imported).toEqual([{ page: 'P.md', paths: ['/u/a.png', '/u/b.zip', '/u/dir'] }]);
-    expect(viewOf().contentDOM.querySelector('.cm-nimw-drop-caret')).toBeNull();
+    expect(viewOf().contentDOM.querySelector('.cm-liber-drop-caret')).toBeNull();
     expect(useToastStore.getState().toasts.at(-1)?.message).toBe('Some files weren’t attached');
     expect(useToastStore.getState().toasts.at(-1)?.detail).toEqual([
       "dir: Folders can't be attached.",
@@ -4542,7 +4542,7 @@ describe('drop (M2c §5.2)', () => {
 
 - [ ] **Step 2: Run them to verify they fail**
 
-Run: `pnpm --filter @nimw/desktop exec vitest run src/features/editor/attachments.test.tsx`
+Run: `pnpm --filter @liber/desktop exec vitest run src/features/editor/attachments.test.tsx`
 
 Expected: `Failed to resolve import "./attachments"`.
 
@@ -4637,7 +4637,7 @@ const setDropAt = StateEffect.define<number | null>();
 class CaretWidget extends WidgetType {
   toDOM(): HTMLElement {
     const el = document.createElement('span');
-    el.className = 'cm-nimw-drop-caret';
+    el.className = 'cm-liber-drop-caret';
     el.setAttribute('aria-hidden', 'true');
     return el;
   }
@@ -4658,7 +4658,7 @@ const dropAt = StateField.define<number | null>({
 });
 
 const caretTheme = EditorView.baseTheme({
-  '.cm-nimw-drop-caret': {
+  '.cm-liber-drop-caret': {
     display: 'inline-block',
     width: '2px',
     height: '1.2em',
@@ -4974,7 +4974,7 @@ Modify `apps/desktop/src/stores/editorStore.ts`:
 
 - [ ] **Step 4: Run them to verify they pass, then the gate**
 
-Run: `pnpm lint && pnpm typecheck && pnpm check:i18n && pnpm --filter @nimw/desktop exec vitest run --maxWorkers=2`
+Run: `pnpm lint && pnpm typecheck && pnpm check:i18n && pnpm --filter @liber/desktop exec vitest run --maxWorkers=2`
 
 Expected: attachments 8 passed (9 with the pin); gate green.
 
@@ -5009,7 +5009,7 @@ Modify `apps/desktop/src/features/editor/attachments.test.tsx`:
      const disk = fakeDisk({ 'P.md': 'x\n' });
 ```
 
-Run: `pnpm --filter @nimw/desktop exec vitest run src/features/editor/attachments.test.tsx`
+Run: `pnpm --filter @liber/desktop exec vitest run src/features/editor/attachments.test.tsx`
 
 Expected: 9 passed.
 
@@ -5297,7 +5297,7 @@ Modify `apps/desktop/src/markdown/section.test.ts`:
 
 - [ ] **Step 2: Run them to verify they fail**
 
-Run: `pnpm --filter @nimw/desktop exec vitest run src/features/editor/linkComplete.test.tsx src/markdown/section.test.ts src/features/preview/Preview.test.tsx`
+Run: `pnpm --filter @liber/desktop exec vitest run src/features/editor/linkComplete.test.tsx src/markdown/section.test.ts src/features/preview/Preview.test.tsx`
 
 Expected: `Failed to resolve import "../../markdown/headings"` / `"./linkComplete"`; `expected null to contain 'body'` (section); `expected [] to deeply equal [ 'Pipes | and ^carets' ]` (Preview anchor).
 
@@ -5306,7 +5306,7 @@ Expected: `Failed to resolve import "../../markdown/headings"` / `"./linkComplet
 Add the dependency first (it is already in the lockfile, so no network is needed):
 
 ```bash
-pnpm --filter @nimw/desktop add @codemirror/autocomplete@^6.20.3 --offline
+pnpm --filter @liber/desktop add @codemirror/autocomplete@^6.20.3 --offline
 ```
 
 Modify `apps/desktop/package.json`:
@@ -5639,7 +5639,7 @@ Modify `apps/desktop/src/markdown/section.ts`:
 
 - [ ] **Step 4: Run them to verify they pass, then the gate**
 
-Run: `pnpm lint && pnpm typecheck && pnpm check:i18n && pnpm --filter @nimw/desktop exec vitest run --maxWorkers=2`
+Run: `pnpm lint && pnpm typecheck && pnpm check:i18n && pnpm --filter @liber/desktop exec vitest run --maxWorkers=2`
 
 Expected: linkComplete 9 passed; section + Preview green; gate green.
 
@@ -5826,7 +5826,7 @@ describe('Link picker (M2c §6.3)', () => {
 
 - [ ] **Step 2: Run them to verify they fail**
 
-Run: `pnpm --filter @nimw/desktop exec vitest run src/features/editor/LinkPicker.test.tsx`
+Run: `pnpm --filter @liber/desktop exec vitest run src/features/editor/LinkPicker.test.tsx`
 
 Expected: 5 failed — `Unable to find an accessible element with the role "combobox" and name "Link to…"`.
 
@@ -6236,7 +6236,7 @@ Modify `apps/desktop/src/i18n/locales/es.json`:
 
 - [ ] **Step 4: Run them to verify they pass, then the gate**
 
-Run: `pnpm lint && pnpm typecheck && pnpm check:i18n && pnpm --filter @nimw/desktop exec vitest run --maxWorkers=2`
+Run: `pnpm lint && pnpm typecheck && pnpm check:i18n && pnpm --filter @liber/desktop exec vitest run --maxWorkers=2`
 
 Expected: LinkPicker 5 passed; gate green.
 
@@ -6382,7 +6382,7 @@ describe('CreatePageDialog (M2c §7.6)', () => {
 
 - [ ] **Step 2: Run them to verify they fail**
 
-Run: `pnpm --filter @nimw/desktop exec vitest run src/features/dialogs/LinkDialogs.test.tsx`
+Run: `pnpm --filter @liber/desktop exec vitest run src/features/dialogs/LinkDialogs.test.tsx`
 
 Expected: `TypeError: createTarget is not a function` (2); `Unable to find … dialog "Create page “New idea” in Ideas/?"`.
 
@@ -6566,7 +6566,7 @@ Modify `apps/desktop/src/i18n/locales/es.json`:
 
 - [ ] **Step 4: Run them to verify they pass, then the gate**
 
-Run: `pnpm lint && pnpm typecheck && pnpm check:i18n && pnpm --filter @nimw/desktop exec vitest run --maxWorkers=2`
+Run: `pnpm lint && pnpm typecheck && pnpm check:i18n && pnpm --filter @liber/desktop exec vitest run --maxWorkers=2`
 
 Expected: LinkDialogs 5 passed; gate green.
 
@@ -6599,7 +6599,7 @@ MSG
 - Modify: `apps/desktop/src/features/editor/livePreview.ts`
 
 **Interfaces:**
-- Produces: in `livePreview.ts`, `rendersEmpty(source)` (memoized; runs `toSafeHast`), root-level `html` nodes → `blockWidget` or `cm-nimw-muted` lines.
+- Produces: in `livePreview.ts`, `rendersEmpty(source)` (memoized; runs `toSafeHast`), root-level `html` nodes → `blockWidget` or `cm-liber-muted` lines.
 
 - [ ] **Step 1: Write the failing test(s)**
 
@@ -6619,28 +6619,28 @@ Modify `apps/desktop/src/features/editor/livePreview.test.ts`:
 +      'x\n\n<div align="center">\n<b>Hi</b> <script>alert(1)</script>\n</div>\n\npara\n',
 +      0,
 +    );
-+    const widget = v.contentDOM.querySelector('.cm-nimw-widget')!;
++    const widget = v.contentDOM.querySelector('.cm-liber-widget')!;
 +    expect(widget).not.toBeNull();
 +    expect(widget.querySelector('b')).toHaveTextContent('Hi');
 +    expect(widget.querySelector('script')).toBeNull();
 +    expect(v.contentDOM.textContent).not.toContain('<div');
 +    await moveTo(v, v.state.doc.line(3).from);
-+    expect(v.contentDOM.querySelector('.cm-nimw-widget')).toBeNull();
++    expect(v.contentDOM.querySelector('.cm-liber-widget')).toBeNull();
 +    expect(line(v, 3)).toBe('<div align="center">');
 +  });
 +
 +  it('comments and blocks that sanitize to nothing keep their source, muted', () => {
 +    const v = editor('x\n\n<!-- a note -->\n\n<script>alert(1)</script>\n\npara\n', 0);
-+    expect(v.contentDOM.querySelector('.cm-nimw-widget')).toBeNull();
++    expect(v.contentDOM.querySelector('.cm-liber-widget')).toBeNull();
 +    expect(line(v, 3)).toBe('<!-- a note -->');
-+    expect(v.contentDOM.querySelectorAll('.cm-line')[2]).toHaveClass('cm-nimw-muted');
++    expect(v.contentDOM.querySelectorAll('.cm-line')[2]).toHaveClass('cm-liber-muted');
 +    expect(line(v, 5)).toBe('<script>alert(1)</script>');
-+    expect(v.contentDOM.querySelectorAll('.cm-line')[4]).toHaveClass('cm-nimw-muted');
++    expect(v.contentDOM.querySelectorAll('.cm-line')[4]).toHaveClass('cm-liber-muted');
 +  });
 +
 +  it('inline HTML inside a paragraph stays text', () => {
 +    const v = editor('x\n\na <b>bold</b> c\n', 0);
-+    expect(v.contentDOM.querySelector('.cm-nimw-widget')).toBeNull();
++    expect(v.contentDOM.querySelector('.cm-liber-widget')).toBeNull();
 +    expect(line(v, 3)).toBe('a <b>bold</b> c');
 +  });
 +});
@@ -6648,7 +6648,7 @@ Modify `apps/desktop/src/features/editor/livePreview.test.ts`:
 
 - [ ] **Step 2: Run them to verify they fail**
 
-Run: `pnpm --filter @nimw/desktop exec vitest run src/features/editor/livePreview.test.ts`
+Run: `pnpm --filter @liber/desktop exec vitest run src/features/editor/livePreview.test.ts`
 
 Expected: 2 failed — `expected null not to be null` (no widget; no muted class).
 
@@ -6704,7 +6704,7 @@ Modify `apps/desktop/src/features/editor/livePreview.ts`:
 +    if (!node.position) return;
 +    const [from, to] = rangeOf(node);
 +    if (reduced || touched(from, to)) return;
-+    if (rendersEmpty(text(from, to))) lines(from, to, lineClass('cm-nimw-muted'));
++    if (rendersEmpty(text(from, to))) lines(from, to, lineClass('cm-liber-muted'));
 +    else blockWidget(node);
 +  };
 +  page.tree.children.forEach((node) =>
@@ -6714,22 +6714,22 @@ Modify `apps/desktop/src/features/editor/livePreview.ts`:
  }
  
 @@ -394,6 +423,11 @@ const theme = EditorView.baseTheme({
-   '.cm-nimw-codeblock': { fontFamily: 'var(--font-source)', fontSize: '0.9em' },
-   '.cm-nimw-quote': { borderLeft: '3px solid var(--color-border-strong)', paddingLeft: '12px' },
-   '.cm-nimw-frontmatter': { color: 'var(--color-text-muted)', fontFamily: 'var(--font-source)' },
-+  '.cm-nimw-muted': {
+   '.cm-liber-codeblock': { fontFamily: 'var(--font-source)', fontSize: '0.9em' },
+   '.cm-liber-quote': { borderLeft: '3px solid var(--color-border-strong)', paddingLeft: '12px' },
+   '.cm-liber-frontmatter': { color: 'var(--color-text-muted)', fontFamily: 'var(--font-source)' },
++  '.cm-liber-muted': {
 +    color: 'var(--color-text-muted)',
 +    fontFamily: 'var(--font-source)',
 +    fontSize: '0.9em',
 +  },
    // Rendered HTML, not editor text: CodeMirror's pre-wrapped whitespace would
    // turn the renderer's newlines into blank lines.
-   '.cm-nimw-widget': { padding: '4px 0', cursor: 'default', whiteSpace: 'normal' },
+   '.cm-liber-widget': { padding: '4px 0', cursor: 'default', whiteSpace: 'normal' },
 ```
 
 - [ ] **Step 4: Run them to verify they pass, then the gate**
 
-Run: `pnpm lint && pnpm typecheck && pnpm check:i18n && pnpm --filter @nimw/desktop exec vitest run --maxWorkers=2`
+Run: `pnpm lint && pnpm typecheck && pnpm check:i18n && pnpm --filter @liber/desktop exec vitest run --maxWorkers=2`
 
 Expected: livePreview 17 passed; gate green.
 
@@ -6821,7 +6821,7 @@ Modify `apps/desktop/src/features/dialogs/SettingsDialog.test.tsx`:
 +    expect(screen.queryByRole('heading', { name: 'This vault' })).not.toBeInTheDocument();
 +  });
 +
-+  it("shows NIMW's setting and saves another mode at once", async () => {
++  it("shows Liber Linteum's setting and saves another mode at once", async () => {
 +    open();
 +    const where = await screen.findByRole('combobox', { name: 'New attachments go to' });
 +    await waitFor(() => expect(where).toHaveValue('subfolder'));
@@ -6874,7 +6874,7 @@ Modify `apps/desktop/src/features/dialogs/SettingsDialog.test.tsx`:
 
 - [ ] **Step 2: Run them to verify they fail**
 
-Run: `pnpm --filter @nimw/desktop exec vitest run src/features/dialogs/SettingsDialog.test.tsx`
+Run: `pnpm --filter @liber/desktop exec vitest run src/features/dialogs/SettingsDialog.test.tsx`
 
 Expected: 3 failed — `Unable to find role="combobox" and name "New attachments go to"`.
 
@@ -6953,7 +6953,7 @@ function obsidianPlace(value: string, t: TFunction): string {
 }
 
 /** "This vault" (M2c §5.4): where new attachments go, stored in
- *  `.nimw/vault.json`; read-only while Obsidian's setting applies. */
+ *  `.liber/vault.json`; read-only while Obsidian's setting applies. */
 export function VaultSettingsSection() {
   const { t } = useTranslation();
   const id = useId();
@@ -7160,7 +7160,7 @@ Modify `apps/desktop/src/i18n/locales/es.json`:
 
 - [ ] **Step 4: Run them to verify they pass, then the gate**
 
-Run: `pnpm lint && pnpm typecheck && pnpm check:i18n && pnpm --filter @nimw/desktop exec vitest run --maxWorkers=2`
+Run: `pnpm lint && pnpm typecheck && pnpm check:i18n && pnpm --filter @liber/desktop exec vitest run --maxWorkers=2`
 
 Expected: SettingsDialog 12 passed; gate green (no unhandled errors: a malformed `vault_settings_get` reply is ignored).
 
@@ -7173,7 +7173,7 @@ feat(settings): "This vault" section — where new attachments go
 
 M2c §5.4: with a vault open, Settings shows where its attachments go (a
 subfolder next to the page, the page's folder, the vault root or a folder
-in the vault), saved in .nimw/vault.json at once; a subfolder or folder
+in the vault), saved in .liber/vault.json at once; a subfolder or folder
 name is checked like any name and an unusable one is explained, not saved.
 When the vault has Obsidian's attachmentFolderPath the controls are
 disabled and say, in plain words, where files go and where to change it.
@@ -7195,9 +7195,9 @@ MSG
 - Modify: `apps/desktop/src/features/editor/linkComplete.ts`
 
 **Interfaces:**
-- Produces: `e2e/m2c.spec.ts`; `installIpcMock({ …, remoteCover?: boolean })`, `window.__nimwEmit(event, payload)`, `window.__nimwPastes`; WebKit project runs `checklist|m2b|m2c`.
+- Produces: `e2e/m2c.spec.ts`; `installIpcMock({ …, remoteCover?: boolean })`, `window.__liberEmit(event, payload)`, `window.__liberPastes`; WebKit project runs `checklist|m2b|m2c`.
 
-**Notes:** Chromium's "Desktop Chrome" device has a Windows user agent, so asset URLs are `http://nimw-asset.localhost/…` there: match the path, and count that host as local.
+**Notes:** Chromium's "Desktop Chrome" device has a Windows user agent, so asset URLs are `http://liber-asset.localhost/…` there: match the path, and count that host as local.
 
 - [ ] **Step 1: Write the failing test(s)**
 
@@ -7226,7 +7226,7 @@ Modify `apps/desktop/e2e/ipcMock.ts`:
 +  const files = new Set<string>();
 +  /** `listen` registrations, so tests can emit events (e.g. tauri://drag-drop). */
 +  const listeners: { event: string; handler: number; id: number }[] = [];
-+  w.__nimwEmit = (event: string, payload: unknown) => {
++  w.__liberEmit = (event: string, payload: unknown) => {
 +    for (const l of listeners.filter((x) => x.event === event)) {
 +      (w[`_${l.handler}`] as (e: unknown) => void)?.({ event, id: l.id, payload });
 +    }
@@ -7263,7 +7263,7 @@ Modify `apps/desktop/e2e/ipcMock.ts`:
    };
 -  const handlers: Record<string, (a: Args) => unknown> = {
 +  const handlers: Record<string, (a: Args, options?: unknown) => unknown> = {
-     app_info: () => ({ name: 'Notes In My Way', version: '0.0.0-e2e' }),
+     app_info: () => ({ name: 'Liber Linteum', version: '0.0.0-e2e' }),
      settings_get: () => ({ settings }),
      settings_set: (a) => {
 @@ -69,18 +96,73 @@ export function installIpcMock({
@@ -7272,7 +7272,7 @@ Modify `apps/desktop/e2e/ipcMock.ts`:
      page_write: (a) => {
 -      // Recorded so tests can assert what an edit saved.
 +      // Recorded so tests can assert what an edit saved; kept for page_get.
-       ((w.__nimwWrites ??= []) as unknown[]).push(a);
+       ((w.__liberWrites ??= []) as unknown[]).push(a);
 -      return { hash: 'h2' };
 +      pages[a.path as string] = a.text as string;
 +      // A new hash per write: the header refreshes when the hash changes.
@@ -7310,9 +7310,9 @@ Modify `apps/desktop/e2e/ipcMock.ts`:
 +    vault_settings_set: (a) => (a.patch as { attachments: unknown }) ?? null,
 +    attachment_paste: (_a, options) => {
 +      const headers = (options as { headers?: Record<string, string> })?.headers ?? {};
-+      const name = decodeURIComponent(headers['x-nimw-name'] ?? 'pasted.png');
++      const name = decodeURIComponent(headers['x-liber-name'] ?? 'pasted.png');
 +      files.add(`attachments/${name}`);
-+      ((w.__nimwPastes ??= []) as unknown[]).push(name);
++      ((w.__liberPastes ??= []) as unknown[]).push(name);
 +      return { path: `attachments/${name}`, link: name, copied: true };
 +    },
 +    attachment_import: (a) =>
@@ -7385,12 +7385,12 @@ async function watchNetwork(page: Page) {
     const local =
       (url.protocol === 'http:' && url.hostname === '127.0.0.1') ||
       url.protocol === 'data:' ||
-      // Vault files: nimw-asset://localhost (macOS, Linux), http://nimw-asset.localhost (Windows UA).
-      url.protocol === 'nimw-asset:' ||
-      url.hostname === 'nimw-asset.localhost';
+      // Vault files: liber-asset://localhost (macOS, Linux), http://liber-asset.localhost (Windows UA).
+      url.protocol === 'liber-asset:' ||
+      url.hostname === 'liber-asset.localhost';
     if (!local) outside.push(r.url());
   });
-  await page.route(/^https?:\/\/(?!127\.0\.0\.1|nimw-asset\.localhost)/, (route) => route.abort());
+  await page.route(/^https?:\/\/(?!127\.0\.0\.1|liber-asset\.localhost)/, (route) => route.abort());
   return outside;
 }
 
@@ -7410,11 +7410,11 @@ async function open(page: Page, name: string) {
 
 /** CSP violations: the sanitizer and the app must make none (M2a §7). */
 const csp = (page: Page) =>
-  page.evaluate(() => (window as unknown as { __nimwCspViolations: string[] }).__nimwCspViolations);
+  page.evaluate(() => (window as unknown as { __liberCspViolations: string[] }).__liberCspViolations);
 
 const lastWrite = (page: Page) =>
   page.evaluate(() => {
-    const writes = (window as unknown as { __nimwWrites?: { text: string }[] }).__nimwWrites ?? [];
+    const writes = (window as unknown as { __liberWrites?: { text: string }[] }).__liberWrites ?? [];
     return writes.at(-1)?.text ?? null;
   });
 
@@ -7464,7 +7464,7 @@ test('a pasted image is saved and embedded at the cursor', async ({ page }) => {
     .poll(() => lastWrite(page))
     .toMatch(/The second page\.!\[\[Pasted image \d{14}\.png\]\]/);
   const names = await page.evaluate(
-    () => (window as unknown as { __nimwPastes?: string[] }).__nimwPastes,
+    () => (window as unknown as { __liberPastes?: string[] }).__liberPastes,
   );
   expect(names).toEqual([expect.stringMatching(/^Pasted image \d{14}\.png$/)]);
   expect(outside).toEqual([]);
@@ -7479,19 +7479,19 @@ test('files dropped from the OS land where they were dropped', async ({ page }) 
   // Tauri reports physical pixels from the webview's corner.
   const at = { x: (box.x + 2) * ratio, y: (box.y + box.height / 2) * ratio };
   await page.evaluate((position) => {
-    const emit = (window as unknown as { __nimwEmit: (e: string, p: unknown) => void }).__nimwEmit;
+    const emit = (window as unknown as { __liberEmit: (e: string, p: unknown) => void }).__liberEmit;
     emit('tauri://drag-enter', { paths: ['/Users/me/brief.pdf'], position });
     emit('tauri://drag-over', { position });
   }, at);
-  await expect(page.locator('.cm-nimw-drop-caret')).toBeAttached();
+  await expect(page.locator('.cm-liber-drop-caret')).toBeAttached();
   await page.evaluate((position) => {
-    const emit = (window as unknown as { __nimwEmit: (e: string, p: unknown) => void }).__nimwEmit;
+    const emit = (window as unknown as { __liberEmit: (e: string, p: unknown) => void }).__liberEmit;
     emit('tauri://drag-drop', { paths: ['/Users/me/brief.pdf', '/Users/me/data.zip'], position });
   }, at);
   await expect
     .poll(() => lastWrite(page))
     .toContain('![[brief.pdf]]\n[[data.zip]]The second page.');
-  await expect(page.locator('.cm-nimw-drop-caret')).toHaveCount(0);
+  await expect(page.locator('.cm-liber-drop-caret')).toHaveCount(0);
   expect(outside).toEqual([]);
   expect(await csp(page)).toEqual([]);
 });
@@ -7528,7 +7528,7 @@ test('Create page for [[Ideas/New idea]] creates the folder and opens the page',
   page,
 }) => {
   await open(page, 'A');
-  await page.locator('.cm-nimw-link', { hasText: 'Ideas/New idea' }).click();
+  await page.locator('.cm-liber-link', { hasText: 'Ideas/New idea' }).click();
   const dialog = page.getByRole('dialog', { name: 'Create page “New idea” in Ideas/?' });
   await dialog.getByRole('button', { name: 'Create page' }).click();
   await expect(page.getByRole('textbox', { name: 'Page title' })).toHaveValue('New idea');
@@ -7553,7 +7553,7 @@ Modify `apps/desktop/playwright.config.ts`:
 
 - [ ] **Step 2: Run them to verify they fail**
 
-Run: `pnpm build:ui && PLAYWRIGHT_BROWSERS_PATH=<browsers> pnpm --filter @nimw/desktop exec playwright test e2e/m2c.spec.ts`
+Run: `pnpm build:ui && PLAYWRIGHT_BROWSERS_PATH=<browsers> pnpm --filter @liber/desktop exec playwright test e2e/m2c.spec.ts`
 
 Expected: before the ipcMock changes: `strict mode violation` (use `exact: true` for tree items), "Add cover" missing (the mock gave every page a remote cover), a stale header after Remove (the mock returned the same hash every write).
 
@@ -7563,7 +7563,7 @@ No product code in this step: the mock and configuration changes above are test 
 
 - [ ] **Step 4: Run them to verify they pass, then the gate**
 
-Run: `full gate: pnpm lint && pnpm typecheck && pnpm check:i18n && pnpm --filter @nimw/desktop exec vitest run --maxWorkers=2 && pnpm build:ui && cargo fmt --all --check && cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace && cargo deny check && pnpm test:e2e`
+Run: `full gate: pnpm lint && pnpm typecheck && pnpm check:i18n && pnpm --filter @liber/desktop exec vitest run --maxWorkers=2 && pnpm build:ui && cargo fmt --all --check && cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace && cargo deny check && pnpm test:e2e`
 
 Expected: e2e 47 passed (14 new); everything green.
 
@@ -7620,7 +7620,7 @@ Modify `apps/desktop/src/features/editor/linkComplete.ts`:
  /** `[[` autocomplete for every editor mode; Tab accepts like Enter. */
 ```
 
-Run: `pnpm lint && pnpm typecheck && pnpm check:i18n && pnpm --filter @nimw/desktop exec vitest run --maxWorkers=2`
+Run: `pnpm lint && pnpm typecheck && pnpm check:i18n && pnpm --filter @liber/desktop exec vitest run --maxWorkers=2`
 
 Expected: green; the list uses the body font, surface and accent-soft selection in light and dark.
 
@@ -7660,4 +7660,4 @@ MSG
 6. ⌘K on a selection → page and URL; Escape keeps the selection.
 7. `[[New folder/New page]]` → Create page.
 8. Settings → This vault on a vault with and without Obsidian's setting.
-9. Open the vault in Obsidian: embeds, covers (`cover:` paths), aliases resolve; `.nimw/vault.json` keeps other keys.
+9. Open the vault in Obsidian: embeds, covers (`cover:` paths), aliases resolve; `.liber/vault.json` keeps other keys.

@@ -19,7 +19,7 @@
 | Frontmatter edits from the header: undoable (⌘Z), byte-minimal (only the touched keys' text changes), CRLF kept, invalid YAML refused | done, tested |
 | Paste an image → `Pasted image YYYYMMDDHHmmss.png` in the attachments folder + `![[…]]` | done, tested |
 | Drop files from Finder → copied (or linked when already in the vault) at the drop point; Retina coordinates; folders refused | done, tested (synthetic drag-drop events) |
-| Attachment location: Obsidian's `attachmentFolderPath` wins, else `.nimw/vault.json`, else `attachments/` next to the page; Settings → This vault | done, tested |
+| Attachment location: Obsidian's `attachmentFolderPath` wins, else `.liber/vault.json`, else `attachments/` next to the page; Settings → This vault | done, tested |
 | `[[` / `![[` autocomplete (Rust ranking, PG-05 alias rule, `#` headings, `]]` handling) | done, tested |
 | ⌘K / Link button → "Link to…" picker (`[[Page\|selection]]` or `[text](url)`) | done, tested |
 | "Create page" for `[[Folder/Name]]` creates the folders | done, tested |
@@ -35,8 +35,8 @@ Totals after the fix pass: **548 vitest tests (59 files)**, **47 Playwright test
 | What | Command (repo root) |
 |---|---|
 | Everything (CI gate) | `pnpm check` |
-| UI unit tests | `pnpm --filter @nimw/desktop exec vitest run --maxWorkers=2` |
-| E2E (both engines) | once: `pnpm --filter @nimw/desktop exec playwright install chromium webkit`; then `pnpm test:e2e` |
+| UI unit tests | `pnpm --filter @liber/desktop exec vitest run --maxWorkers=2` |
+| E2E (both engines) | once: `pnpm --filter @liber/desktop exec playwright install chromium webkit`; then `pnpm test:e2e` |
 | App (dev) | `pnpm dev` (Rust changed in this milestone: restart it) |
 | i18n check | `pnpm check:i18n` needs Node ≥ 22.18 (`.nvmrc` says 24) |
 
@@ -44,11 +44,11 @@ Totals after the fix pass: **548 vitest tests (59 files)**, **47 Playwright test
 
 | File | What it does |
 |---|---|
-| `crates/nimw-vault/src/config.rs` | `AttachmentPolicy` (VaultRoot / Folder / SameAsNote / Subfolder), precedence Obsidian → NIMW → default, re-read on every use; NIMW setting writes into `.nimw/vault.json` (unknown keys kept, created lazily) |
-| `crates/nimw-vault/src/fsops.rs` | `create_dir_all` (each name checked), streamed create-only `import_file` (hidden temp → rename, never overwrites) |
-| `crates/nimw-index/src/{rows,index}.rs` | `link_candidates()` for suggestions |
-| `crates/nimw-session/src/attachments.rs` | `save_attachment` (paste bytes), `import_attachment` (dropped/picked files; inside-vault → link only), `sanitize_file_name` (`-` for refused characters, leading dot included), `cover_reference` (relative inside the page's folder, else `/…`), `link_suggest` ranking, vault settings |
-| `apps/desktop/src-tauri/src/attachment_commands.rs` | `attachment_paste` (raw IPC body, headers `x-nimw-page`/`x-nimw-name`, 64 MiB cap), `attachment_import(page, paths)`, `cover_pick(page)`, `link_suggest(source, query, embed)`, `vault_settings_get`, `vault_settings_set(patch)` |
+| `crates/liber-vault/src/config.rs` | `AttachmentPolicy` (VaultRoot / Folder / SameAsNote / Subfolder), precedence Obsidian → Liber Linteum → default, re-read on every use; Liber Linteum setting writes into `.liber/vault.json` (unknown keys kept, created lazily) |
+| `crates/liber-vault/src/fsops.rs` | `create_dir_all` (each name checked), streamed create-only `import_file` (hidden temp → rename, never overwrites) |
+| `crates/liber-index/src/{rows,index}.rs` | `link_candidates()` for suggestions |
+| `crates/liber-session/src/attachments.rs` | `save_attachment` (paste bytes), `import_attachment` (dropped/picked files; inside-vault → link only), `sanitize_file_name` (`-` for refused characters, leading dot included), `cover_reference` (relative inside the page's folder, else `/…`), `link_suggest` ranking, vault settings |
+| `apps/desktop/src-tauri/src/attachment_commands.rs` | `attachment_paste` (raw IPC body, headers `x-liber-page`/`x-liber-name`, 64 MiB cap), `attachment_import(page, paths)`, `cover_pick(page)`, `link_suggest(source, query, embed)`, `vault_settings_get`, `vault_settings_set(patch)` |
 | `apps/desktop/src-tauri/src/drops.rs` | Drop grants: paths seen in native drag-drop events (window and webview), valid 2 min, consumed on import, ≤ 1000 |
 | `apps/desktop/src-tauri/src/{state,dto,error}.rs` | `FilePicker` hook (tests inject a fake), `coverY` on `PageDto`, error kinds `tooLarge` / `notPermitted` / `notAFile` |
 
@@ -95,14 +95,14 @@ Totals after the fix pass: **548 vitest tests (59 files)**, **47 Playwright test
 
 ## 6. Recipes
 
-- **Add an attachment mode:** extend `AttachmentPolicy`, `from_obsidian`, `dir_for`, the NIMW JSON mode names, `VaultSettingsSection` options and the i18n strings, plus tests in `crates/nimw-vault` and `tests/attachments.rs`.
+- **Add an attachment mode:** extend `AttachmentPolicy`, `from_obsidian`, `dir_for`, the Liber Linteum JSON mode names, `VaultSettingsSection` options and the i18n strings, plus tests in `crates/liber-vault` and `tests/attachments.rs`.
 - **Add an embeddable extension:** update the media list in `features/editor/attachments.ts` (embed vs link), plus the preview renderer if it needs a new element.
 
 ## 7. Tests inventory (new in M2c)
 
 | Layer | Files |
 |---|---|
-| Rust crates | `crates/nimw-vault/tests/attachments.rs` (policy precedence, folder creation, streamed create-only import), `crates/nimw-vault/tests/open_scan.rs`, `crates/nimw-session/tests/attachments.rs` (save/import, dedupe, sanitizing, inside-vault links, suggestions + PG-05 alias, vault settings) |
+| Rust crates | `crates/liber-vault/tests/attachments.rs` (policy precedence, folder creation, streamed create-only import), `crates/liber-vault/tests/open_scan.rs`, `crates/liber-session/tests/attachments.rs` (save/import, dedupe, sanitizing, inside-vault links, suggestions + PG-05 alias, vault settings) |
 | Commands (real ACL) | `apps/desktop/src-tauri/tests/commands.rs` (all six commands allowed from main / denied elsewhere; raw-body paste; fake cover picker; granted vs ungranted drops; outside-folder cover is vault-rooted; hidden/missing page refused), `tests/errors.rs` (new kinds) |
 | TS | `markdown/frontmatterEdit.test.ts` (incl. a 14×27 sweep: every edit reads back exactly or is refused), `markdown/section.test.ts`, `stores/editorStore.test.tsx` (undo, CRLF, typing + header edit, refusal toast), `features/page/Cover.test.tsx`, `PageView.test.tsx`, `features/editor/attachments.test.tsx` (paste, drop, Retina vs Windows coordinates, text drags, pending drops, page switch), `linkComplete.test.tsx`, `LinkPicker.test.tsx`, `livePreview.test.ts` (HTML widgets), `features/preview/Preview.test.tsx`, `features/dialogs/LinkDialogs.test.tsx`, `SettingsDialog.test.tsx` (This vault), `ipc/attachments.test.ts`, `theme/cssCompat.test.ts` (no `:focus-visible` in shared selector lists) |
 | E2E | `e2e/m2c.spec.ts`: cover add/reposition/remove, subtitle, paste, drop (2× screen), `[[` alias, ⌘K picker, Create page with folders — Chromium + WebKit |
@@ -134,7 +134,7 @@ These come from spec §12 (design part 2) and §13 (planning):
 6. ⌘K with a selection → pick a page → `[[page|selection]]`; type a URL → `[selection](url)`.
 7. `[[New folder/New page]]` → Create page.
 8. Settings → This vault: change the mode; in a vault with Obsidian's setting, it shows read-only.
-9. Open the vault in Obsidian: links, embeds and covers resolve, and `.nimw/vault.json` keeps its other keys.
+9. Open the vault in Obsidian: links, embeds and covers resolve, and `.liber/vault.json` keeps its other keys.
 10. Which native drop event fires (window vs webview): both are handled, and the reviewer couldn't check it.
 11. Drag a selected word to another place in the text: if it doesn't move, Tauri's native drag handling swallows in-editor drags (pre-existing, not M2c).
 12. Paste an image copied from Preview or Photos (TIFF clipboards): whether it arrives as a PNG file.
@@ -147,7 +147,7 @@ These come from spec §12 (design part 2) and §13 (planning):
 | b | Link-safe heading characters may differ from Obsidian's (`:`, `\`, `%%`); please check `![[Page#Step 1: Setup]]`-style links in Obsidian | your Obsidian check |
 | c | A dropped in-vault file named `a#b.png` is linked unsanitized | later |
 | d | The heading-completion page cache never evicts; saving a reposition briefly snaps back; `" .png"` loses its extension | later |
-| e | `.nimw/vault.json` keys are re-sorted on the first NIMW write (unknown keys kept) | later |
+| e | `.liber/vault.json` keys are re-sorted on the first Liber Linteum write (unknown keys kept) | later |
 | f | Opening another vault before a copy finishes: the file is copied but not linked, silently | later |
 | g | A page closed and reopened during a copy shows the link after its next save merges | later |
 | h | `[text](url)` from the link picker doesn't escape unbalanced brackets in the selection | later |
@@ -186,12 +186,12 @@ These come from spec §12 (design part 2) and §13 (planning):
 | m2↑ | `...`-closed/BOM frontmatter got a second block prepended | refuse unconfirmed blocks | `frontmatterEdit.test.ts` ×3 |
 | m3↑ | Every text drag showed the file-drop caret/toast | ignore drags without paths | `attachments.test.tsx` |
 | m4↑ | A second drag moved a pending drop | per-drop mapped positions, separate from the caret | `attachments.test.tsx` ×2 |
-| m5↑ | Tabbing through This vault created `.nimw/vault.json` | save only real changes | `SettingsDialog.test.tsx` ×2 |
+| m5↑ | Tabbing through This vault created `.liber/vault.json` | save only real changes | `SettingsDialog.test.tsx` ×2 |
 | m7↑ | Attachment commands accepted hidden pages (`.obsidian/x.md`) | require a visible, indexed page | `tests/commands.rs` `m2c_attachments_refuse_a_hidden_or_missing_page` |
 | m8↑ | A cover picked during a page switch landed on the other page | drop the late result | `Cover.test.tsx` |
 | m9↑ | Add cover invisible on WebKit < 15.4 (`:focus-visible` in a shared list) | split rules; guard test over all CSS | `cssCompat.test.ts` |
 | m11↑ | `]]`/`|` in a ⌘K selection broke the link | link-safe alias, live selection | `LinkPicker.test.tsx` ×3 |
-| — | The refusal toast blamed "invalid YAML" for valid YAML the guard refuses | "NIMW can't safely change this note's frontmatter. Edit it in Source mode." | `editorStore.test.tsx` |
+| — | The refusal toast blamed "invalid YAML" for valid YAML the guard refuses | "Liber Linteum can't safely change this note's frontmatter. Edit it in Source mode." | `editorStore.test.tsx` |
 
 **Rulings made in the fix pass:**
 - **⌘Z after a header edit:** with focus still in the subtitle or on a cover button, ⌘Z goes to that control. CodeMirror's undo works from the text (§9 item 4).

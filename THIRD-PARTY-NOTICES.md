@@ -1,6 +1,6 @@
 # Third-party notices
 
-Licence notices for third-party software that Notes In My Way credits
+Licence notices for third-party software that Liber Linteum credits
 explicitly. Every bundled package keeps its own licence in its published
 sources.
 

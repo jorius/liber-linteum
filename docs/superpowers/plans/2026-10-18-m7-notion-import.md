@@ -5,17 +5,17 @@
 **Goal:** Import a Notion "Markdown & CSV" export zip into a new vault, after a dry-run preview.
 
 **Architecture:**
-- `crates/nimw-import` holds the whole pipeline, as pure functions over the zip and a plan:
+- `crates/liber-import` holds the whole pipeline, as pure functions over the zip and a plan:
   - `archive`: reading, nested parts, safety, limits;
   - `names`: id strip, clean, dedupe;
   - `markdown`: links, callouts, row properties;
   - `database`: CSV, inference, index page;
   - `import`: plan, preview, write.
-- It writes only through `nimw-vault`.
+- It writes only through `liber-vault`.
 - The desktop app adds five commands and one dialog. The page never sends a path.
 
 **Tech Stack:**
-- Rust: `zip` 9 (deflate via flate2 + zlib-rs only), `tempfile`, `nimw-vault`, `nimw-session` (name rules).
+- Rust: `zip` 9 (deflate via flate2 + zlib-rs only), `tempfile`, `liber-vault`, `liber-session` (name rules).
 - Frontend: React and zustand. i18n via ICU messages.
 
 **Spec:** `docs/superpowers/specs/2026-10-18-m7-notion-import-design.md`
@@ -23,7 +23,7 @@
 ## Global Constraints
 
 **Writing:**
-- Writes only inside the new vault folder, create-only, through `VaultPath` and `nimw-vault` (spec §8).
+- Writes only inside the new vault folder, create-only, through `VaultPath` and `liber-vault` (spec §8).
 - The target must not exist. Its parent must be the folder Rust just picked.
 
 **Zip limits:**
@@ -55,7 +55,7 @@
 
 ### Task 1: The archive reader
 
-**Files:** create `crates/nimw-import/src/archive.rs`; update `Cargo.toml` and `lib.rs`.
+**Files:** create `crates/liber-import/src/archive.rs`; update `Cargo.toml` and `lib.rs`.
 
 **Interfaces (produces):**
 - `pub struct Limits { entries, total, entry, ratio, text }`, with `Limits::default()`.
@@ -84,7 +84,7 @@
 
 ### Task 2: Names
 
-**Files:** create `crates/nimw-import/src/names.rs`.
+**Files:** create `crates/liber-import/src/names.rs`.
 
 **Interfaces (produces):**
 - `pub fn clean_component(raw: &str) -> String`: strip the id, sanitize, trim, handle device names, cap at 200 bytes.
@@ -104,7 +104,7 @@
 
 ### Task 3: Markdown conversion
 
-**Files:** create `crates/nimw-import/src/markdown.rs`.
+**Files:** create `crates/liber-import/src/markdown.rs`.
 
 **Interfaces:**
 - *Consumes:* a `Resolver` trait (`fn page(&self, rel: &str) -> Option<String>`, `fn database(&self, rel) -> Option<String>`, `fn asset(&self, rel) -> Option<String>`), supplied by Task 5.
@@ -125,7 +125,7 @@
 
 ### Task 4: Databases
 
-**Files:** create `crates/nimw-import/src/database.rs`.
+**Files:** create `crates/liber-import/src/database.rs`.
 
 **Interfaces (produces):**
 - `pub fn parse_csv(text: &str) -> Vec<Vec<String>>`.
@@ -143,8 +143,8 @@
 ### Task 5: Plan, preview and import
 
 **Files:**
-- create `crates/nimw-import/src/import.rs`;
-- add `Vault::import_reader` in `crates/nimw-vault/src/fsops.rs`, refactoring `import_file` to use it.
+- create `crates/liber-import/src/import.rs`;
+- add `Vault::import_reader` in `crates/liber-vault/src/fsops.rs`, refactoring `import_file` to use it.
 
 **Interfaces (produces):**
 - `pub fn plan(export: &Export) -> Result<Plan>` and `pub struct Preview { pages, databases, rows, attachments, folders, bytes, warnings }`, from `Plan::preview()`.
@@ -170,7 +170,7 @@
 - add tests in `tests/notion.rs`, with the denied list in `tests/file_windows.rs`.
 
 **Interfaces:**
-- *Consumes:* `nimw_import::{Export, plan, write, suggested_name}`.
+- *Consumes:* `liber_import::{Export, plan, write, suggested_name}`.
 - *Produces:* `notion_pick_zip`, `notion_pick_parent`, `notion_preview`, `notion_import(name)`, `notion_cancel`, plus the `notion:progress` and `menu:notionImport` events.
 
 **Tests:**

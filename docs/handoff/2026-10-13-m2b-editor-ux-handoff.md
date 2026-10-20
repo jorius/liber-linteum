@@ -28,9 +28,9 @@ Totals after the feedback round (§14): **446 vitest tests (51 files)**, **33 Pl
 | What | Command (repo root) |
 |---|---|
 | Everything (CI gate) | `pnpm check` |
-| UI unit tests | `pnpm test` (on a busy machine: `pnpm --filter @nimw/desktop exec vitest run --maxWorkers=2`) |
-| E2E (both engines) | once: `pnpm --filter @nimw/desktop exec playwright install chromium webkit`; then `pnpm test:e2e` |
-| Regenerate palette CSS after editing a palette | `pnpm --filter @nimw/desktop gen:palettes` |
+| UI unit tests | `pnpm test` (on a busy machine: `pnpm --filter @liber/desktop exec vitest run --maxWorkers=2`) |
+| E2E (both engines) | once: `pnpm --filter @liber/desktop exec playwright install chromium webkit`; then `pnpm test:e2e` |
+| Regenerate palette CSS after editing a palette | `pnpm --filter @liber/desktop gen:palettes` |
 | App (dev) | `pnpm dev` |
 
 ## 3. Backend map (`apps/desktop/src-tauri/src/`)
@@ -39,7 +39,7 @@ Totals after the feedback round (§14): **446 vitest tests (51 files)**, **33 Pl
 |---|---|
 | `settings.rs` | New types: `Palette` (lowercase ids + `custom`), `HexColor` (`#rrggbb`, stored lower-case), `FontChoice` (a `BUNDLED_FONTS` id or `system:<Family>`, ≤ 200 chars, no control characters), `FontSize` (13–20; out-of-range whole numbers ≥ 0 are **clamped**; negative numbers, fractions like `15.5` and non-numbers **reset to 15** — the type is `u32`). New `Settings`/`SettingsPatch` fields with defaults `lavender`, `#d1477a`, `atkinson-hyperlegible`, `jetbrains-mono`, `15`, `true`. `parse_lenient` resets each field on its own (warning names the key). |
 | `fonts.rs` (new) | `system_families()` with `fontdb` (local files only): English family name when a font has several, hidden `.`-families dropped, unique + sorted ignoring case; cached in a `OnceLock` per app session. Command `fonts_list` is async via `blocking()`. |
-| `menu.rs` | View menu gains **Back** (`nimw-back`) and **Forward** (`nimw-forward`) before Full Screen, **without accelerators** (the page handles ⌘[ / ⌘] itself — see §8.3). `on_menu_event` emits `menu:navigate` with `"back"` / `"forward"`. |
+| `menu.rs` | View menu gains **Back** (`liber-back`) and **Forward** (`liber-forward`) before Full Screen, **without accelerators** (the page handles ⌘[ / ⌘] itself — see §8.3). `on_menu_event` emits `menu:navigate` with `"back"` / `"forward"`. |
 | `lib.rs` | Registers `fonts::fonts_list`. |
 | `build.rs`, `capabilities/main.json` | `fonts_list` / `allow-fonts-list`. No other new permission: the menu event reaches the UI through the existing `core:event:allow-listen`. |
 | Workspace `Cargo.toml` | `fontdb = "0.24.0"` (MIT; pulls `ttf-parser`, `memmap2`, `fontconfig-parser`, `roxmltree`, `slotmap`, all MIT/Apache/Zlib — `cargo deny` clean). |
@@ -55,7 +55,7 @@ Tests: `tests/settings.rs` (3 new), `tests/commands.rs` (`m2b_settings_round_tri
 | `theme/derive.ts` | `derive(hex)` → `{light, dark}` tokens: accent darkened until ≥ 4.8:1 on white, lightened until ≥ 6:1 on the dark surface, chroma capped 0.17/0.13, neutrals tinted toward the hue (not for greys, chroma < 0.03). |
 | `theme/paletteCss.ts` | `paletteVars(p, mode)` (mock token → app CSS variables, in-between shades mixed as **hex**, no runtime `color-mix`), `paletteCss(p)` (light block + both dark blocks). |
 | `theme/palettes.css` | **Generated** by `scripts/gen-palettes.ts` (ignored by prettier; a test fails if it is stale). |
-| `theme/appearance.ts` | `applyAppearance(settings)`: `data-palette` on `<html>`, a `<style id="nimw-custom-palette">` for the custom accent, and `--font-live`, `--font-source`, `--font-size-editor`. Called from `settingsStore.apply`. |
+| `theme/appearance.ts` | `applyAppearance(settings)`: `data-palette` on `<html>`, a `<style id="liber-custom-palette">` for the custom accent, and `--font-live`, `--font-source`, `--font-size-editor`. Called from `settingsStore.apply`. |
 | `theme/fonts.ts`, `theme/fonts.css` | `LIVE_FONTS`, `SOURCE_FONTS`, `fontStack(choice, kind)` (installed families quoted and escaped before the default stack), `systemChoice`, `systemFamily`; the @fontsource imports. |
 | `theme/tokens.css` | Defaults for the new tokens (`--color-sidebar-selected`, `--color-highlight-bg`, `--color-code-bg`) and the font variables. |
 | `features/dialogs/SettingsDialog.tsx` | Sections Appearance / Editor / Files; `Swatch`, `AccentEditor` (colour input + hex field with inline error + contrast line), `FontSelect` (bundled + installed optgroups). |
@@ -80,9 +80,9 @@ Tests: `tests/settings.rs` (3 new), `tests/commands.rs` (`m2b_settings_round_tri
 
 ## 6. Recipes
 
-- **Add a palette:** add its id to `PALETTE_IDS` (`ipc/index.ts`) and to `Palette` in `settings.rs` (lowercase), add the 15 light + 15 dark tokens to `theme/palettes.ts`, add `settings.palettes.<id>` in `en.json` and `es.json`, run `pnpm --filter @nimw/desktop gen:palettes`. `palettes.test.ts` checks the contrast floors and that the CSS is current.
+- **Add a palette:** add its id to `PALETTE_IDS` (`ipc/index.ts`) and to `Palette` in `settings.rs` (lowercase), add the 15 light + 15 dark tokens to `theme/palettes.ts`, add `settings.palettes.<id>` in `en.json` and `es.json`, run `pnpm --filter @liber/desktop gen:palettes`. `palettes.test.ts` checks the contrast floors and that the CSS is current.
 - **Add a toolbar item:** write a `StateCommand` in `format.ts` (test it with the `‹…›`/`¦` helpers in `format.test.ts`), optionally an `ActiveFormat` read in `activeFormats`, add an `Item` to `INLINE` or `BLOCK` in `Toolbar.tsx` (icon + `toolbar.<id>` strings in both locales), and a shortcut in `formatKeymap` if it has one.
-- **Add a bundled font:** `pnpm --filter @nimw/desktop add @fontsource/<name>`, import its `latin-*`/`latin-ext-*` files in `theme/fonts.css`, add it to `LIVE_FONTS` or `SOURCE_FONTS`, and its id to `BUNDLED_FONTS` in `settings.rs` (a test keeps the lists equal).
+- **Add a bundled font:** `pnpm --filter @liber/desktop add @fontsource/<name>`, import its `latin-*`/`latin-ext-*` files in `theme/fonts.css`, add it to `LIVE_FONTS` or `SOURCE_FONTS`, and its id to `BUNDLED_FONTS` in `settings.rs` (a test keeps the lists equal).
 
 ## 7. Tests inventory (new in M2b)
 
@@ -149,7 +149,7 @@ Tests: `tests/settings.rs` (3 new), `tests/commands.rs` (`m2b_settings_round_tri
 
 | Symptom | Fix |
 |---|---|
-| `palettes.css is generated from palettes.ts` fails | run `pnpm --filter @nimw/desktop gen:palettes`; never run prettier on that file (it's in `.prettierignore` — run prettier from the repo root) |
+| `palettes.css is generated from palettes.ts` fails | run `pnpm --filter @liber/desktop gen:palettes`; never run prettier on that file (it's in `.prettierignore` — run prettier from the repo root) |
 | Installed fonts missing from the pickers | `fonts_list` must be in `build.rs` + `capabilities/main.json` (`allow-fonts-list`); outside the app the list is empty by design |
 | ⌘[ indents instead of going back | `editorKeymap` must keep filtering `Mod-[` / `Mod-]` |
 | View → Back does nothing | `installMenuNavigationIfTauri()` must run in `main.tsx`; the UI needs `core:event:allow-listen` |
@@ -189,11 +189,11 @@ Jose's notes after running the branch, and what changed. Spec: M2b §12 (it also
 
 | Feedback | Root cause / decision | Change | Test(s) |
 |---|---|---|---|
-| "Clicking a link in Live Preview edits it; I need Ctrl+click" | By design in M2a (⌘-click). Obsidian follows on a plain click. | `livePreview.ts` `linkClick`: a plain left click on a `.cm-nimw-link` whose lines the selection doesn't touch follows it; on the cursor line the click places the cursor; shift/alt-click left alone; ⌘/Ctrl-click unchanged | `livePreview.test.ts` "a plain click on a link (as in Obsidian)" ×3; e2e "a plain click on a link in Live Preview opens the page" (Chromium + WebKit) |
+| "Clicking a link in Live Preview edits it; I need Ctrl+click" | By design in M2a (⌘-click). Obsidian follows on a plain click. | `livePreview.ts` `linkClick`: a plain left click on a `.cm-liber-link` whose lines the selection doesn't touch follows it; on the cursor line the click places the cursor; shift/alt-click left alone; ⌘/Ctrl-click unchanged | `livePreview.test.ts` "a plain click on a link (as in Obsidian)" ×3; e2e "a plain click on a link in Live Preview opens the page" (Chromium + WebKit) |
 | "Line numbers toggle, in preview, source and split" | New | `lineNumbers` setting (Rust `Settings`/`SettingsPatch`/lenient parse; TS types + defaults); `Editor.tsx` `gutterSlot` compartment, reconfigured live and when a cached page is swapped in; gutter themed (muted, Source font); Live Preview centres gutter + text as a group (`Editor.module.css`) | `tests/settings.rs`, `tests/commands.rs` (real ACL round trip), `Editor.test.tsx` "line numbers" ×2, `SettingsDialog.test.tsx` |
 | "There's no toggle for the formatter bar at all" | It existed (the "Aa" chip next to "Saved", and Settings → Editor) but didn't read as a control | Header button → bordered "Format" + icon, tooltip "Hide/Show the formatting toolbar"; View → Toggle Formatting Toolbar / Toggle Line Numbers (`menu.rs` → `menu:toggle` → `stores/menuToggles.ts`) | `PageView.test.tsx` (label, tooltip both ways), `tests/menu.rs` `toggle_items_emit_menu_toggle` + outline, `menuToggles.test.ts` |
 | "Edit / Global view should look like close and settings" | Tall pill with a 1.5 px dark outline next to 40 px thin-bordered squares | `Shell.module.css` `.toggle`/`.tg`: same 40 px box, border, radius and background as `.iconButtonLight`; segments 32 px | e2e "the Edit · Global view group matches the settings and close buttons" (computed height/border/radius/background equal) |
-| (found while screenshotting) A table in Live Preview sat under ~330 px of blank lines | Block widgets inherited CodeMirror's `white-space: break-spaces`; the renderer's `\n` text nodes became lines | `.cm-nimw-widget { white-space: normal }` | e2e "a table or callout in Live Preview has no blank lines above it" (RED: 325.75 px gap) |
+| (found while screenshotting) A table in Live Preview sat under ~330 px of blank lines | Block widgets inherited CodeMirror's `white-space: break-spaces`; the renderer's `\n` text nodes became lines | `.cm-liber-widget { white-space: normal }` | e2e "a table or callout in Live Preview has no blank lines above it" (RED: 325.75 px gap) |
 
 **Please check in the real window** (restart `pnpm dev` — this round changed Rust: settings + menu):
 

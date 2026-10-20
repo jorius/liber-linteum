@@ -44,7 +44,7 @@ All nine merge commits carry an SSH signature (`git log --show-signature` report
 
 ### 1.2 Text and code files are searchable (index schema 5)
 
-- **Which files:** exactly the ones the text view opens: `nimw_session::is_text_path` (the M4b part 2 extension and name list) plus `is_text_content` (UTF-8, no NUL byte, at most 2 MB). A `.txt` that isn't UTF-8 or is bigger than 2 MB stays a plain attachment, with no warning.
+- **Which files:** exactly the ones the text view opens: `liber_session::is_text_path` (the M4b part 2 extension and name list) plus `is_text_content` (UTF-8, no NUL byte, at most 2 MB). A `.txt` that isn't UTF-8 or is bigger than 2 MB stays a plain attachment, with no warning.
 - **What's indexed:** a `page_text` row with the file name as title and name, its folders, and the whole text as body. No tags, no links. For every other purpose (links, Global View, explorer, cards) a text file stays an attachment.
 - **In the search dialog:**
   - a text hit shows its extension (`TXT`, `JSON`, `LOG`) in place of a thumbnail, or a code glyph for names without one (`Makefile`);
@@ -58,7 +58,7 @@ All nine merge commits carry an SSH signature (`git log --show-signature` report
 
 - **New: `docs/architecture/index-and-database.md`** — where each vault's database lives (the app cache folder, `cache_dir_name`), the SQLite setup and pragmas, every table, column, index, trigger and the FTS5 external-content table at schema 5, the version history (1 → 5), the indexing pipeline from scan to watcher, how search sits on top, invariants and failure modes, how to inspect it with `sqlite3`, how to force a rebuild, and the performance budgets and tests.
 - **New: `docs/README.md`** — where to start, and a table of every milestone's spec and hand-off.
-- **`README.md`** — status (it still said "M0 scaffold"), Node 24, the 7 crates, the two capability files, `pnpm test:e2e` and `NIMW_E2E_PORT`, the release perf tests, the Windows cargo-xwin cross-build, and `libasound2-dev` on Linux.
+- **`README.md`** — status (it still said "M0 scaffold"), Node 24, the 7 crates, the two capability files, `pnpm test:e2e` and `LIBER_E2E_PORT`, the release perf tests, the Windows cargo-xwin cross-build, and `libasound2-dev` on Linux.
 - **Architecture design** — a new **§0 "As built"** listing where the code differs from the v1 design, §3.2 pointing to the new reference, and a Status column in the milestone table.
 - **Product spec** — only factually settled rows: EXP-03 now describes the vault Trash, persona status cells, and changelog lines for 2026-10-15 and 2026-10-18. No requirement was rewritten.
 
@@ -87,14 +87,14 @@ All nine merge commits carry an SSH signature (`git log --show-signature` report
   - internal links become `[[wikilinks]]` (with the folder when the name is ambiguous); links to a database CSV point at its index page; asset links become vault-relative embeds; external links stay;
   - `<aside>` becomes a `> [!note]` callout, `<details>/<summary>` a foldable `> [!note]-` callout; other HTML is kept as written (the renderer sanitizes it);
   - **databases:** each row's CSV columns become frontmatter (dates to ISO, ranges `A → B` as quoted ISO ranges, numbers, checkboxes to booleans, multi-select to lists, relations to `[[links]]`); `_all.csv` is preferred; the database becomes `Tasks.md` with a Markdown table linking every row, beside its `Tasks/` folder of row pages; a row with no page gets one.
-- **Untrusted input:** every path component is rebuilt, never used as given. `..`, absolute paths, drive letters, UNC, NUL and symlink entries are skipped with a warning; `.obsidian`, `.git`, `.nimw` become `-obsidian`, `-git`, `-nimw`; Windows device names are refused (also after truncation). Limits on entry count, total size, compression ratio, Markdown text (1 GiB) and multi-part parts are checked before anything is expanded. Writes are create-only inside the brand-new folder.
+- **Untrusted input:** every path component is rebuilt, never used as given. `..`, absolute paths, drive letters, UNC, NUL and symlink entries are skipped with a warning; `.obsidian`, `.git`, `.liber` become `-obsidian`, `-git`, `-liber`; Windows device names are refused (also after truncation). Limits on entry count, total size, compression ratio, Markdown text (1 GiB) and multi-part parts are checked before anything is expanded. Writes are create-only inside the brand-new folder.
 - **Failure and cancel:** the partial vault is kept with a report saying how far it got. The dialog offers **Open it anyway** and **Show in Finder / Explorer** (acting only on the vault Rust recorded).
 - **Speed:** a synthetic 5,000-page export with 1,000 rows and 500 attachments previews in about 80 ms and imports in about 0.6 s (budget 60 s).
 - **Crates:** `zip` 9.0.5 (MIT; deflate via `flate2` + `zlib-rs`, MIT/Apache-2.0 and Zlib), `tempfile` (MIT/Apache-2.0) for multi-part exports.
 
 ### 1.6 Index pragmas
 
-`crates/nimw-index/src/index.rs` now sets `cache_size = -32000` (about 32 MB per open vault, a ceiling, not memory reserved up front) and `temp_store = MEMORY`. Profiling showed search reading pages from disk on every query with SQLite's default 2 MB cache, and the facet temp tables going to a file. After the change, search p95 dropped from about 50 ms to about 44 ms on the same loaded machine, with 1,000 text files added to the reference vault.
+`crates/liber-index/src/index.rs` now sets `cache_size = -32000` (about 32 MB per open vault, a ceiling, not memory reserved up front) and `temp_store = MEMORY`. Profiling showed search reading pages from disk on every query with SQLite's default 2 MB cache, and the facet temp tables going to a file. After the change, search p95 dropped from about 50 ms to about 44 ms on the same loaded machine, with 1,000 text files added to the reference vault.
 
 ### 1.7 `cargo deny` advisory ignores
 
@@ -224,12 +224,12 @@ Fixed, each with a test that failed first except where noted:
 
 Built from the `feat/batch6` tip into the repo's own `target/` (it survives reboots):
 
-- **Mac:** `target/release/bundle/macos/Notes In My Way.app` — ad-hoc signed only. Quit any running copy (⌘Q) and open the new one.
-- **Windows:** `target/x86_64-pc-windows-msvc/release/bundle/nsis/Notes In My Way_0.1.0_x64-setup.exe` — unsigned (SmartScreen: More info → Run anyway). Cross-built on the Mac:
+- **Mac:** `target/release/bundle/macos/Liber Linteum.app` — ad-hoc signed only. Quit any running copy (⌘Q) and open the new one.
+- **Windows:** `target/x86_64-pc-windows-msvc/release/bundle/nsis/Liber Linteum_0.1.0_x64-setup.exe` — unsigned (SmartScreen: More info → Run anyway). Cross-built on the Mac:
 
   ```bash
   cd apps/desktop
-  export CARGO_HOME=$HOME/.nimw-cross/cargo RUSTUP_HOME=$HOME/.nimw-cross/rustup RUSTUP_TOOLCHAIN=1.99.0 XWIN_ACCEPT_LICENSE=1
+  export CARGO_HOME=$HOME/.liber-cross/cargo RUSTUP_HOME=$HOME/.liber-cross/rustup RUSTUP_TOOLCHAIN=1.99.0 XWIN_ACCEPT_LICENSE=1
   export PATH="/opt/homebrew/opt/rustup/bin:$CARGO_HOME/bin:/opt/homebrew/opt/llvm/bin:/opt/homebrew/opt/lld/bin:$PATH"
   pnpm tauri build --runner cargo-xwin --target x86_64-pc-windows-msvc --bundles nsis
   ```
@@ -259,7 +259,7 @@ Also open from earlier rounds: the older `vault_open(path)` gap (a compromised p
 |---|---|
 | `cargo deny` fails on RUSTSEC-2026-0370/0371/0372 | the ignores are in `deny.toml` on this branch; on an older branch, cherry-pick that change |
 | Tests in two worktrees give identical "before/after" numbers | they share a `CARGO_TARGET_DIR` and reuse stale binaries; give each worktree its own target dir, or `cargo clean -p` the workspace crates |
-| `read fixture dir: NotFound` in cargo tests | a test binary was built in a removed worktree: `cargo clean -p nimw-testkit -p nimw-desktop -p nimw-session -p nimw-vault -p nimw-index -p nimw-markdown -p nimw-audio -p nimw-import` |
+| `read fixture dir: NotFound` in cargo tests | a test binary was built in a removed worktree: `cargo clean -p liber-testkit -p liber-desktop -p liber-session -p liber-vault -p liber-index -p liber-markdown -p liber-audio -p liber-import` |
 | The app opens in English on a Spanish Mac | `CFBundleLocalizations` must be in `src-tauri/Info.plist` (pinned by `tests/bundle.rs`) |
 | No sound recorded on macOS, no error | the microphone permission was denied: System Settings → Privacy & Security → Microphone |
 | Linux build fails in `alsa-sys` | install `libasound2-dev` |

@@ -20,7 +20,7 @@ Take a note without setting anything up, and open any single Markdown or text fi
   - **File → New Quick Note** (⌘⇧N, from any window, including while a vault is open);
   - **Quick notes** in the recent list (with its own icon).
 - **First use:** a dialog, "Where should quick notes live?", offers:
-  - the default `~/Documents/Notes In My Way/Scratchpad`;
+  - the default `~/Documents/Liber Linteum/Scratchpad`;
   - **Choose folder…**, a folder dialog opened by Rust (the M2c §8 rule);
   - **Create**.
 
@@ -30,7 +30,7 @@ Take a note without setting anything up, and open any single Markdown or text fi
   - is created as `Quick note YYYY-MM-DD HH.mm.md` (deduplicated) at the Scratchpad's root;
   - opens with the cursor in the text.
 - **Naming from the first line:**
-  - while a note still has its generated name (tracked in `.nimw/vault.json` `autoNamed: [paths]`), the file is renamed after typing settles (2 s idle, or blur) to its first line;
+  - while a note still has its generated name (tracked in `.liber/vault.json` `autoNamed: [paths]`), the file is renamed after typing settles (2 s idle, or blur) to its first line;
   - the first line loses `# ` and Markdown, is cut to 60 characters, goes through the vault name rules (`-` for refused characters) and is deduplicated;
   - a manual rename (title or explorer) removes the flag, and auto-renaming stops;
   - an empty first line keeps the generated name.
@@ -38,7 +38,7 @@ Take a note without setting anything up, and open any single Markdown or text fi
 ## 3. Single-file windows
 
 - **Ways to open a file:**
-  - **macOS:** Finder "Open With" (`CFBundleDocumentTypes` for `.md`, `.markdown` and `.txt` with role Editor and rank **Alternate**, so NIMW never takes over the default app); dragging onto the Dock icon (`RunEvent::Opened`);
+  - **macOS:** Finder "Open With" (`CFBundleDocumentTypes` for `.md`, `.markdown` and `.txt` with role Editor and rank **Alternate**, so Liber Linteum never takes over the default app); dragging onto the Dock icon (`RunEvent::Opened`);
   - **File → Open File…** (⌘O), a dialog opened by Rust;
   - **Windows / Linux:** file paths on the command line, with a second launch forwarded to the running app (`tauri-plugin-single-instance`).
 - **The window:** each file opens in its own window (label `file-<n>`, about 900 × 700), loading the same frontend in **single-file mode**:
@@ -105,14 +105,14 @@ These override §2, §4 and §5 where they conflict. Plan: `docs/superpowers/pla
 
 1. **Each vault has its own scratch place**, besides the global Scratchpad:
    - a folder inside the vault, `Scratchpad/` by default;
-   - its name is a vault setting, `scratchpadFolder` in `.nimw/vault.json`, changed in **Settings → This vault**;
+   - its name is a vault setting, `scratchpadFolder` in `.liber/vault.json`, changed in **Settings → This vault**;
    - it is created on first use, never when the vault opens.
 2. **The explorer pins it** at the top of the tree, above the other folders and divided from them, with a pencil icon and a note count (the pages inside it, at any depth). Otherwise it is an ordinary folder: it expands, renames, takes drops and has the context menu.
 3. **Where ⌘⇧N and File → New Quick Note put the note:**
    - with a vault open, in that vault's scratch folder (no vault switch);
    - with no vault open (the Welcome screen), in the global Scratchpad, as §2 says;
    - the Welcome screen's **Quick note** button always uses the global Scratchpad.
-4. **Naming from the first line** works the same in both places: `autoNamed` in that vault's `.nimw/vault.json`, with vault-relative paths.
+4. **Naming from the first line** works the same in both places: `autoNamed` in that vault's `.liber/vault.json`, with vault-relative paths.
 5. **One creation path:** the session creates a quick note in a folder it is given (`create_quick_note(dir, base)`). The command picks the folder; no folder comes from the page.
 
 ### Rulings taken on Jose's behalf
@@ -164,7 +164,7 @@ Plan: `docs/superpowers/plans/2026-10-15-m4c-single-files.md`. These override §
 7. **Files outside the folder** (absolute paths, `file:` URLs, `../`): not shown in a single-file window (M4b part 3 §9's allow-list lives in a vault's index).
 8. **Following a link:** a note or text file in the folder opens in its own window (the heading isn't kept); a document or media file opens in its default app (the M4b part 3 allow-list, no confirmation dialog); a missing page says so (no vault to create it in).
 9. **No attachments:** pasting images, dropping files and the Attach button are off; `[[` suggestions are empty.
-10. **Width is the window's own**, for as long as it is open (no `.nimw/vault.json` to keep it in). Reset to default and the default's own width clear it.
+10. **Width is the window's own**, for as long as it is open (no `.liber/vault.json` to keep it in). Reset to default and the default's own width clear it.
 11. **Rename:** the title field edits the name; the extension and the folder stay; names refused in a vault are refused here.
 12. **Outside changes:** the watcher is non-recursive (`Vault::watch_folder`). Deleted with unsaved text → the text is kept with **Save again** (writes the file again where it was). Deleted with nothing unsaved → "This file was deleted or moved" with **Close window**. Rewritten outside as something the app can't edit, with unsaved text → **Save a copy** (`<stem> (conflict).<ext>` next to it). A rename outside reads as a deletion.
 13. **Conflict copies** are written next to the file, create-only — the one file a window writes besides its own.
@@ -194,7 +194,7 @@ A fresh-context Opus review of `ba67c0a..2a8bd14`, focused on security. It found
 3. **I3 — a followed link opens only a real document or media file.** The link is resolved, and both its name and its real target must be on the documents-and-media list; the real path is opened.
 4. **I4 — no visible name reaches a hidden file.**
    - `Vault::visible_fs_path` also refuses a path whose real location is hidden, as reached through a symlink or a Windows 8.3 short name such as `SSH~1`.
-   - `nimw-asset` uses it for file windows and the main vault, and so do the file windows' note reads and link follows.
+   - `liber-asset` uses it for file windows and the main vault, and so do the file windows' note reads and link follows.
    - A file window is served media and documents only.
 5. **m1:** launch arguments are read with `args_os()`, so a file name that isn't UTF-8 is skipped instead of panicking.
 6. **m2 — size caps.**

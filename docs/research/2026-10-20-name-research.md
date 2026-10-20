@@ -1,5 +1,7 @@
 # Naming brief: a new name for "Notes In My Way"
 
+**Chosen (2026-10-20): Liber Linteum.**
+
 **Sources covered:** Tolkien's Elvish, Latin, Greek, Chibcha (Muisca) and Inca (Quechua and Aymara).
 
 ## How to read this

@@ -5,10 +5,10 @@
 **Goal:** Delete moves items into the vault's own `.trash/`, which has a Trash view (Restore, Delete from vault, Empty Trash). Archive moves items into `.archive/`; archived pages stay indexed and linkable but are hidden from the explorer, the Global View and default search.
 
 **Architecture:**
-- **`nimw-vault`:**
+- **`liber-vault`:**
   - learns one exception to "hidden is invisible": the root `.archive` folder is scanned, stat-ed, watched and served (`is_hidden_path`).
-  - Item records live in `.nimw/trash.json` and `.nimw/archive.json`, through the existing `update_json_object`.
-- **`nimw-session`:** a new `bin.rs` module holds the moves:
+  - Item records live in `.liber/trash.json` and `.liber/archive.json`, through the existing `update_json_object`.
+- **`liber-session`:** a new `bin.rs` module holds the moves:
   - **trash** is a vault rename into `.trash/` plus an index removal;
   - **restore** is a rename back plus `apply([Changed])`;
   - **archive / unarchive** are `rename_with_hook`, so links are rewritten;
@@ -20,14 +20,14 @@
   - an archived-page banner;
   - search's MEDIA row becomes SHOW, with an Archived chip.
 
-**Tech stack:** Rust (nimw-vault, nimw-session, nimw-index, Tauri 2 commands), React 19 + zustand, Vitest, Playwright.
+**Tech stack:** Rust (liber-vault, liber-session, liber-index, Tauri 2 commands), React 19 + zustand, Vitest, Playwright.
 
 **Spec:** `docs/superpowers/specs/2026-10-15-m5b-feedback-design.md` §5, plus the amendments in §13.
 
 ## Global Constraints
 
 - Every command is async through `blocking()`, with real-ACL tests. Bin commands are denied in `file-*` windows.
-- NEVER set `NIMW_TRASH_TESTS=1`. OS-trash calls are injected (`*_via`) in tests.
+- NEVER set `LIBER_TRASH_TESTS=1`. OS-trash calls are injected (`*_via`) in tests.
 - i18n en + es; axe-clean in light and dark; the Safari 15 floor (no lookbehind, `structuredClone` or `color-mix` in new code).
 - Notes are never written by trash or restore. Archive and unarchive rewrite links only when the `rewriteLinks` setting is on, the same rule as rename.
 - Signed commits ending with `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`.
@@ -36,7 +36,7 @@
 
 1. **A crash between moving an item and recording it.** The record is written first and the move second. Listing drops records whose item is gone, and shows unrecorded `.trash` entries (Obsidian's, or crash leftovers) with no original path.
 2. **Restoring onto an existing path.** Returns `AlreadyExists` unless `keepBoth`, which picks `name 1`; the item is never overwritten.
-3. **Trashing the Scratchpad folder, `.nimw`, `.trash`, `.archive` itself or the vault root.** Refused with a clear error. Otherwise the scratch-folder setting would follow the folder into `.trash`.
+3. **Trashing the Scratchpad folder, `.liber`, `.trash`, `.archive` itself or the vault root.** Refused with a clear error. Otherwise the scratch-folder setting would follow the folder into `.trash`.
 4. **Unsaved text in a page being trashed or archived.** `flushAll` runs before the move, and the open page follows the move (archive) or clears (trash).
 5. **An archived page reached through a link.** It opens, with a banner offering Unarchive. Links to it count as resolved.
 
@@ -45,21 +45,21 @@
 ### Task 1: The archive is visible to the vault
 
 **Files:**
-- Modify: `crates/nimw-vault/src/lib.rs`, `scan.rs`, `watch.rs`, `fsops.rs`
+- Modify: `crates/liber-vault/src/lib.rs`, `scan.rs`, `watch.rs`, `fsops.rs`
 - Modify: `apps/desktop/src-tauri/src/asset.rs`
 
 **Interfaces:**
-- Produces: `nimw_vault::ARCHIVE_DIR = ".archive"`, `TRASH_DIR = ".trash"`, and `is_hidden_path(&str) -> bool`, which is true when any component is hidden, except a leading `.archive`.
+- Produces: `liber_vault::ARCHIVE_DIR = ".archive"`, `TRASH_DIR = ".trash"`, and `is_hidden_path(&str) -> bool`, which is true when any component is hidden, except a leading `.archive`.
 
 - [ ] Test `archive_is_scanned_and_stat_ed_but_other_hidden_folders_are_not`: a vault with `.archive/P/a.md`, `.trash/b.md` and `.obsidian/c.md` scans to the `.archive` entries only, and `stat(".archive/P/a.md")` is `Some`. It fails first.
 - [ ] Use `is_hidden_path` in `walk`, where a root-level `.archive` is allowed, and in `stat`, `watch` and `visible_fs_path`. Use it for the asset check in `asset.rs`.
-- [ ] The test passes, and `cargo test -p nimw-vault` passes.
+- [ ] The test passes, and `cargo test -p liber-vault` passes.
 - [ ] Commit.
 
 ### Task 2: Session trash, restore and permanent delete
 
 **Files:**
-- Create: `crates/nimw-session/src/bin.rs`
+- Create: `crates/liber-session/src/bin.rs`
 - Modify: `session.rs` (`trash` now moves into `.trash`), `lib.rs`
 
 **Interfaces:**
@@ -81,14 +81,14 @@
   - permanent delete calls the injected OS trash and forgets the records and sizes;
   - links to a trashed page become unresolved, and resolve again after restore.
 - [ ] Implement.
-- [ ] Run `cargo test -p nimw-session`; it passes.
+- [ ] Run `cargo test -p liber-session`; it passes.
 - [ ] Commit.
 
 ### Task 3: Session archive and unarchive; index and search flag
 
 **Files:**
 - Modify: `bin.rs`, `session.rs` (`tree` hides `.archive`), `global_view.rs` (hides `.archive`)
-- Modify: `crates/nimw-index/src/search.rs` (`SearchQuery.archived`, `Facets.archived`, exclusion by default)
+- Modify: `crates/liber-index/src/search.rs` (`SearchQuery.archived`, `Facets.archived`, exclusion by default)
 
 **Interfaces:**
 - Produces:

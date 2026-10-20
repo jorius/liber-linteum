@@ -34,7 +34,7 @@ Find any page fast, by what it's called, where it lives, how it's tagged or link
 
 The non-negotiables are as before.
 
-## 2. Index (`crates/nimw-index`, schema v2)
+## 2. Index (`crates/liber-index`, schema v2)
 
 - **A schema bump to 2,** which triggers the existing rebuild on open (§3.2 meta).
 - **New table:** `fts`, an FTS5 virtual table with `content=''` (contentless), `tokenize='unicode61 remove_diacritics 2'`, and columns `title, name, folders, tags, links, body`. The rowid equals `files.rowid` of the page.
@@ -46,7 +46,7 @@ The non-negotiables are as before.
 - **Writes stay in sync:** `upsert_page`, `remove` and `rename` update `fts` and `page_text` in the same transaction as `pages`.
 - **Ranking:** `bm25(fts, 10.0, 8.0, 5.0, 6.0, 4.0, 1.0)` for title, name, folders, tags, links and body. Rows whose match touches any non-body column get a constant bonus, so a metadata match always outranks a body-only match (SR-02). Ties go to the shorter path, then the most recently modified.
 
-## 3. Query and filters (`crates/nimw-session/src/search.rs`)
+## 3. Query and filters (`crates/liber-session/src/search.rs`)
 
 - **`search(query: SearchQuery) -> SearchPage`**
   - `SearchQuery { text, project?, folder?, tags: Vec, linksTo?, linksFrom?, hasImage?, hasAudio?, offset, limit ≤ 50 }`.
@@ -179,7 +179,7 @@ Jose, 2026-10-15: "let's go with the scratchpad feature … then the search filt
 8. **Links to files outside the vault aren't vault links.**
    - **The `links` column** skips `file:` URLs, Windows and UNC paths, and relative paths that climb above the vault root. A `/`-leading target counts, because Obsidian reads it from the vault root first.
    - **`linksTo` / `linksFrom`** use only resolved vault targets, which outside links never have.
-9. **The vault's scratch folder** (M4c; `.nimw/vault.json` `scratchpadFolder`) holds ordinary pages, which are searched like any other.
+9. **The vault's scratch folder** (M4c; `.liber/vault.json` `scratchpadFolder`) holds ordinary pages, which are searched like any other.
 
 ### Query and filters
 
@@ -211,7 +211,7 @@ Jose, 2026-10-15: "let's go with the scratchpad feature … then the search filt
     - Active filters always appear, with a count of 0 when nothing matches.
 14. **An empty text with filters** lists the matching pages, most recently modified first, 50 at a time. With no filters either, it's Recent: the 20 most recently modified pages.
 15. **`indexing`** is true while a full re-index runs, such as after a watcher overflow. The index built on open finishes before the vault opens, so a search can't race it.
-16. **Where the code lives:** the queries, parsing and facets are in `crates/nimw-index/src/search.rs`, because the index owns the SQLite connection. `nimw-session` adds `VaultSession::search` and the `indexing` flag.
+16. **Where the code lives:** the queries, parsing and facets are in `crates/liber-index/src/search.rs`, because the index owns the SQLite connection. `liber-session` adds `VaultSession::search` and the `indexing` flag.
 
 ### UI
 
@@ -261,7 +261,7 @@ A fresh-context review of `ba67c0a..73f909c` found no Critical issues. Its findi
 
 Jose asked for `.txt` files to be searchable (2026-10-18). This reverses ruling 5 of §10, which left text and code files out.
 
-**Which files.** A file counts when the text view opens it (M4b part 2 §6). That means `nimw_session::is_text_path` (the same extension and name list) plus `is_text_content` (UTF-8, no NUL byte, at most `TEXT_MAX_BYTES`, 2 MB). There is no second list. A `.txt` that isn't UTF-8, or that is larger than the cap, stays an ordinary attachment, with no warning and no error.
+**Which files.** A file counts when the text view opens it (M4b part 2 §6). That means `liber_session::is_text_path` (the same extension and name list) plus `is_text_content` (UTF-8, no NUL byte, at most `TEXT_MAX_BYTES`, 2 MB). There is no second list. A `.txt` that isn't UTF-8, or that is larger than the cap, stays an ordinary attachment, with no warning and no error.
 
 **What's indexed.** Index schema **5** adds no new table. A text file gets a `page_text` row:
 - **title and name:** the file name with its extension (`todo.txt`);

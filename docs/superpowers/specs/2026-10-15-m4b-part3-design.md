@@ -73,7 +73,7 @@
 
 **Placement**, per page:
 - **Top** (default, today's header band), **Left** or **Right**.
-- Stored in `.nimw/vault.json`:
+- Stored in `.liber/vault.json`:
   - `coverSides: { "<page path>": "left" | "right" }` (absent = top);
   - `coverWidths: { "<page path>": <px> }` (absent = 280).
 - Both follow renames and moves and are forgotten on delete, through the same choke points as `coverHeights`.
@@ -232,11 +232,11 @@ A page broken into its components and shown with the same graph tools.
 | Relative to the note | `![[../Assets/x.png]]` |
 | Absolute path on disk | `![](file:///D:/Mind_PC/Assets/x.png)` |
 
-- **Storage:** `.nimw/vault.json` `attachmentLinkFormat: "shortest" | "vault" | "relative" | "absolute"`.
+- **Storage:** `.liber/vault.json` `attachmentLinkFormat: "shortest" | "vault" | "relative" | "absolute"`.
 - **When it's unset:**
   - Obsidian's `newLinkFormat` in `.obsidian/app.json` decides: `shortest` → shortest, `absolute` → full path in the vault, `relative` → relative.
   - Otherwise, shortest.
-  - The settings row says "Following Obsidian's setting" when that applies. Choosing an option sets NIMW's own value; Obsidian's file is never written.
+  - The settings row says "Following Obsidian's setting" when that applies. Choosing an option sets Liber Linteum's own value; Obsidian's file is never written.
 - **What it applies to:** everything the app inserts as an attachment: paste, drop, and Attach → Copy. The `cover:` frontmatter keeps its own relative form.
 
 **Settings → Editor → Show where attachments are on disk** (app setting `showAttachmentPaths`, default off):
@@ -259,14 +259,14 @@ A page broken into its components and shown with the same graph tools.
 - Relative paths `./x.png` and `../Assets/x.png`, resolved against the note's folder:
   - inside the vault, a normal vault file;
   - above the vault root, an external file on disk.
-- **URL schemes:** a single drive letter is not a scheme. `has_scheme` (in `nimw-markdown` and `nimw-session`) needs at least two characters, so `D:\…` is a path and `mailto:`/`https:` are still URLs.
+- **URL schemes:** a single drive letter is not a scheme. `has_scheme` (in `liber-markdown` and `liber-session`) needs at least two characters, so `D:\…` is a path and `mailto:`/`https:` are still URLs.
 
 **Resolution:**
 - It runs in Rust (indexer and `links_resolve`). Each link resolves to one of: a vault file (as today), an **external file** (an absolute path that exists), or missing.
 - The index records external targets separately from vault targets. Backlinks, the Global View and the page graph ignore them; they aren't pages.
 
 **Rendering:**
-- **How external media is served:** through `nimw-asset:` under a reserved prefix that `VaultPath` validation can never produce, so it can't collide with a vault path.
+- **How external media is served:** through `liber-asset:` under a reserved prefix that `VaultPath` validation can never produce, so it can't collide with a vault path.
 - **The allow-list:**
   - the protocol serves an external path only if it is the resolved target of a link in an indexed note of the open vault;
   - only regular files, never hidden files;
@@ -339,7 +339,7 @@ Built in three streams in parallel, each with its own plan, worktree and signed 
 
 ### The editor's cover crop (§2)
 - **Audit result:** the header band's image already sat in an absolutely positioned, definite layer, and the new strip uses the same layer.
-- **How it was checked:** an e2e with a Windows (WebView2) user agent serves the asset host `http://nimw-asset.localhost` a 400 × 1200 SVG. It confirms in both engines that each image fills its frame exactly and carries the stored focus.
+- **How it was checked:** an e2e with a Windows (WebView2) user agent serves the asset host `http://liber-asset.localhost` a 400 × 1200 SVG. It confirms in both engines that each image fills its frame exactly and carries the stored focus.
 - **Result:** no editor-side change was needed. The card fix is Stream A's.
 
 ### Side covers (§3)
@@ -367,7 +367,7 @@ Built in three streams in parallel, each with its own plan, worktree and signed 
 ### Card covers (§2) and side strips on cards (§3)
 
 **Cause, confirmed:**
-- A Chromium e2e with WebView2's user agent (vault files over `http://nimw-asset.localhost`, served by the test) failed with the card image at 238 × 1190 inside its 96 px frame. WebKit passed.
+- A Chromium e2e with WebView2's user agent (vault files over `http://liber-asset.localhost`, served by the test) failed with the card image at 238 × 1190 inside its 96 px frame. WebKit passed.
 - With the fix, the frame is a definite box and the image fills it absolutely, so `object-position` crops it.
 - The editor's header band is Stream B's to audit.
 
@@ -440,7 +440,7 @@ Built in three streams in parallel, each with its own plan, worktree and signed 
 - `pageStore.jump` is consumed once by the editor showing that path.
 - The cursor goes to the block's start, scrolled to the middle.
 - Offsets past a text that changed since are clamped.
-- The flash is a line decoration (`cm-nimw-flash`, accent-soft) that lasts 1 s.
+- The flash is a line decoration (`cm-liber-flash`, accent-soft) that lasts 1 s.
 
 **Rendering:**
 - React Flow's visible-only rendering applies past 150 cards. Smaller maps render every card, which jsdom tests also rely on (it can't measure).

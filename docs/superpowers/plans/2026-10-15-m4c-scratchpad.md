@@ -4,9 +4,9 @@
 
 **Goal:** Take a quick note without setting anything up: in the open vault's own scratch folder (pinned at the top of the explorer), or — with no vault open — in a global Scratchpad folder chosen on first use and opened as an ordinary vault labelled "Quick notes". New notes are named after their first line until you rename them yourself.
 
-**Architecture:** Rust owns every path and every name. The Scratchpad's folder reaches `settings.json` only through `scratchpad_set`, which accepts the default location or the folder the user just picked in a dialog Rust opened; `scratchpad_open` takes no path from the page. Quick notes are created (in a folder the command picks: the vault's `scratchpadFolder`, default `Scratchpad/`, or the global Scratchpad's root) and auto-renamed by `nimw-session` (`.nimw/vault.json` `autoNamed`), which reads the saved file and derives the name itself (`nimw-markdown::first_line_text`). The UI adds a Welcome button, File → New Quick Note (⌘⇧N), a first-use dialog, the recent-list entry, the pinned scratch folder in the explorer, two Settings rows, and an idle/blur watcher that asks Rust to rename.
+**Architecture:** Rust owns every path and every name. The Scratchpad's folder reaches `settings.json` only through `scratchpad_set`, which accepts the default location or the folder the user just picked in a dialog Rust opened; `scratchpad_open` takes no path from the page. Quick notes are created (in a folder the command picks: the vault's `scratchpadFolder`, default `Scratchpad/`, or the global Scratchpad's root) and auto-renamed by `liber-session` (`.liber/vault.json` `autoNamed`), which reads the saved file and derives the name itself (`liber-markdown::first_line_text`). The UI adds a Welcome button, File → New Quick Note (⌘⇧N), a first-use dialog, the recent-list entry, the pinned scratch folder in the explorer, two Settings rows, and an idle/blur watcher that asks Rust to rename.
 
-**Tech Stack:** Rust (nimw-markdown, nimw-vault, nimw-session, Tauri 2 desktop crate, tauri-plugin-dialog), React 19 + zustand, Vitest + Testing Library + axe, Playwright (Chromium + WebKit).
+**Tech Stack:** Rust (liber-markdown, liber-vault, liber-session, Tauri 2 desktop crate, tauri-plugin-dialog), React 19 + zustand, Vitest + Testing Library + axe, Playwright (Chromium + WebKit).
 
 **Spec:** `docs/superpowers/specs/2026-10-14-m4c-scratchpad-design.md` §2, §4 "Picked folders", §5 (Scratchpad parts). Amendments from this planning are §7 of the same file, including Jose's 2026-10-15 addition: a scratch folder in every vault.
 
@@ -17,8 +17,8 @@
 - axe-clean (light and dark), keyboard parity.
 - Safari 15 floor: no regex lookbehind, no `color-mix()`, no `structuredClone`, no `Array.prototype.at`/`findLast`.
 - No network. No path from the page is trusted for the Scratchpad.
-- Never touch the user's real `~/Documents` or `~/Library/Application Support/app.notesinmyway.desktop` from tests: the default location and the folder dialog are injectable.
-- Shared files (`lib.rs`, `menu.rs`, `build.rs`, `capabilities/main.json`, i18n JSON, `ipc/index.ts`, `e2e/ipcMock.ts`, Welcome) get small, additive edits; new code lives in `scratchpad_commands.rs`, `nimw-session/src/quick_notes.rs`, `nimw-vault/src/auto_named.rs`, `nimw-markdown/src/first_line.rs` and `src/features/scratchpad/`.
+- Never touch the user's real `~/Documents` or `~/Library/Application Support/app.liberlinteum.desktop` from tests: the default location and the folder dialog are injectable.
+- Shared files (`lib.rs`, `menu.rs`, `build.rs`, `capabilities/main.json`, i18n JSON, `ipc/index.ts`, `e2e/ipcMock.ts`, Welcome) get small, additive edits; new code lives in `scratchpad_commands.rs`, `liber-session/src/quick_notes.rs`, `liber-vault/src/auto_named.rs`, `liber-markdown/src/first_line.rs` and `src/features/scratchpad/`.
 - Signed commits ending with `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`.
 
 ## Review Focus
@@ -35,10 +35,10 @@
 ## File structure
 
 **Rust**
-- Create `crates/nimw-markdown/src/first_line.rs` — `first_line_text(source) -> Option<String>`: the visible text of the body's first non-blank line.
-- Create `crates/nimw-vault/src/scratch.rs` — in `.nimw/vault.json`: the `autoNamed` array (read, set, forget) and `scratchpadFolder` (read, set, follow renames).
-- Create `crates/nimw-session/src/quick_notes.rs` — `create_quick_note(dir, base)`, `auto_name`, `quick_note_stem`, `set_scratch_folder`.
-- Modify `crates/nimw-session/src/global_view.rs` (`follow_layout`) and `session.rs` (`forget_page_sizes`): renamed or removed paths lose their flag; a top-level rename of the scratch folder moves the setting.
+- Create `crates/liber-markdown/src/first_line.rs` — `first_line_text(source) -> Option<String>`: the visible text of the body's first non-blank line.
+- Create `crates/liber-vault/src/scratch.rs` — in `.liber/vault.json`: the `autoNamed` array (read, set, forget) and `scratchpadFolder` (read, set, follow renames).
+- Create `crates/liber-session/src/quick_notes.rs` — `create_quick_note(dir, base)`, `auto_name`, `quick_note_stem`, `set_scratch_folder`.
+- Modify `crates/liber-session/src/global_view.rs` (`follow_layout`) and `session.rs` (`forget_page_sizes`): renamed or removed paths lose their flag; a top-level rename of the scratch folder moves the setting.
 - Create `apps/desktop/src-tauri/src/scratchpad_commands.rs` — `ScratchpadState` and the eight commands.
 - Modify `settings.rs` (`scratchpad_path`, `set_scratchpad_path`, recent `scratchpad` flag), `dto.rs` (`VaultInfo.scratchpad`), `vault_commands.rs` (`open_session` sets the flag; made `pub(crate)`), `menu.rs` (File → New Quick Note), `lib.rs`, `build.rs`, `capabilities/main.json`.
 - Create `apps/desktop/src-tauri/tests/scratchpad.rs`; extend `tests/menu.rs`.
@@ -51,11 +51,11 @@
 
 ---
 
-### Task 1: The first line's visible text (nimw-markdown)
+### Task 1: The first line's visible text (liber-markdown)
 
 **Files:**
-- Create: `crates/nimw-markdown/src/first_line.rs`
-- Modify: `crates/nimw-markdown/src/lib.rs` (module + `pub use first_line::first_line_text;`)
+- Create: `crates/liber-markdown/src/first_line.rs`
+- Modify: `crates/liber-markdown/src/lib.rs` (module + `pub use first_line::first_line_text;`)
 
 **Interfaces:**
 - Produces: `pub fn first_line_text(source: &str) -> Option<String>` — the body after the frontmatter (and a BOM), first line that isn't blank; Markdown flattened (heading marks, list and quote markers, task boxes, emphasis, strike, inline code kept as its text, `[text](url)` → `text`, `![alt](x)` → nothing, `[[target|alias]]` → `alias`, `[[target#h]]` → `target`, `![[embed]]` → nothing, `#tag` → `tag`, raw HTML tags dropped); whitespace collapsed; `None` when nothing is left.
@@ -95,7 +95,7 @@ fn m4c_nothing_usable_is_none() {
 
 - [ ] **Step 2: Run them to see them fail**
 
-Run: `cargo test -p nimw-markdown first_line`
+Run: `cargo test -p liber-markdown first_line`
 Expected: FAIL (module/function missing).
 
 - [ ] **Step 3: Implement**
@@ -134,18 +134,18 @@ pub fn first_line_text(source: &str) -> Option<String> {
 
 - [ ] **Step 4: Run them to see them pass**
 
-Run: `cargo test -p nimw-markdown first_line`
+Run: `cargo test -p liber-markdown first_line`
 Expected: PASS (4 tests).
 
 - [ ] **Step 5: Commit** — `feat(markdown): the visible text of a note's first line (M4c §2)`
 
 ---
 
-### Task 2: `autoNamed` and `scratchpadFolder` in `.nimw/vault.json` (nimw-vault)
+### Task 2: `autoNamed` and `scratchpadFolder` in `.liber/vault.json` (liber-vault)
 
 **Files:**
-- Create: `crates/nimw-vault/src/scratch.rs`; test file `crates/nimw-vault/tests/scratch.rs`
-- Modify: `crates/nimw-vault/src/lib.rs` (`mod scratch; pub use scratch::DEFAULT_SCRATCH_FOLDER;`)
+- Create: `crates/liber-vault/src/scratch.rs`; test file `crates/liber-vault/tests/scratch.rs`
+- Modify: `crates/liber-vault/src/lib.rs` (`mod scratch; pub use scratch::DEFAULT_SCRATCH_FOLDER;`)
 
 **Interfaces:**
 - Produces (on `Vault`):
@@ -163,15 +163,15 @@ Expected: PASS (4 tests).
 #[test]
 fn m4c_auto_named_round_trip_keeps_other_keys() {
     let dir = tempfile::tempdir().unwrap();
-    std::fs::create_dir(dir.path().join(".nimw")).unwrap();
-    std::fs::write(dir.path().join(".nimw/vault.json"), r#"{"version":1,"pageWidth":"full"}"#).unwrap();
+    std::fs::create_dir(dir.path().join(".liber")).unwrap();
+    std::fs::write(dir.path().join(".liber/vault.json"), r#"{"version":1,"pageWidth":"full"}"#).unwrap();
     let vault = Vault::open(dir.path()).unwrap();
     vault.set_auto_named("Quick note 1.md", true).unwrap();
     vault.set_auto_named("Quick note 2.md", true).unwrap();
     assert_eq!(vault.auto_named().into_iter().collect::<Vec<_>>(), ["Quick note 1.md", "Quick note 2.md"]);
     vault.set_auto_named("Quick note 1.md", false).unwrap();
     vault.forget_auto_named(&["Quick note 2.md".into()]).unwrap();
-    let json: serde_json::Value = serde_json::from_slice(&std::fs::read(dir.path().join(".nimw/vault.json")).unwrap()).unwrap();
+    let json: serde_json::Value = serde_json::from_slice(&std::fs::read(dir.path().join(".liber/vault.json")).unwrap()).unwrap();
     assert_eq!(json, serde_json::json!({"version": 1, "pageWidth": "full"}));
 }
 
@@ -179,7 +179,7 @@ fn m4c_auto_named_round_trip_keeps_other_keys() {
 fn m4c_forgetting_a_folder_drops_the_notes_inside_it_and_nothing_else() { /* "F/a.md","F/b.md","Fx.md" → forget ["F"] → ["Fx.md"] */ }
 
 #[test]
-fn m4c_unchanged_lists_are_not_rewritten() { /* set false on a missing entry → no .nimw dir created */ }
+fn m4c_unchanged_lists_are_not_rewritten() { /* set false on a missing entry → no .liber dir created */ }
 
 #[test]
 fn m4c_hand_edited_garbage_is_ignored() { /* "autoNamed": ["a.md", 3, null] → {"a.md"}; "scratchpadFolder": "../x" / ".hid" / 3 → "Scratchpad" */ }
@@ -191,21 +191,21 @@ fn m4c_scratch_folder_defaults_is_set_and_follows_top_level_renames() {
 }
 ```
 
-- [ ] **Step 2: Run them to see them fail** — `cargo test -p nimw-vault --test scratch` → FAIL (no such methods).
+- [ ] **Step 2: Run them to see them fail** — `cargo test -p liber-vault --test scratch` → FAIL (no such methods).
 
-- [ ] **Step 3: Implement** with `read_json(self.root(), NIMW_JSON, …)` for reads and `self.update_json_object(NIMW_JSON, create, |map| …)` for writes (sorted, de-duplicated array; `map.remove("autoNamed")` when empty).
+- [ ] **Step 3: Implement** with `read_json(self.root(), LIBER_JSON, …)` for reads and `self.update_json_object(LIBER_JSON, create, |map| …)` for writes (sorted, de-duplicated array; `map.remove("autoNamed")` when empty).
 
 - [ ] **Step 4: Run them to see them pass** — PASS (5 tests).
 
-- [ ] **Step 5: Commit** — `feat(vault): autoNamed quick notes and the scratch folder in .nimw/vault.json (M4c §2, §7)`
+- [ ] **Step 5: Commit** — `feat(vault): autoNamed quick notes and the scratch folder in .liber/vault.json (M4c §2, §7)`
 
 ---
 
-### Task 3: Creating and auto-naming quick notes (nimw-session)
+### Task 3: Creating and auto-naming quick notes (liber-session)
 
 **Files:**
-- Create: `crates/nimw-session/src/quick_notes.rs`
-- Modify: `crates/nimw-session/src/lib.rs` (`mod quick_notes; pub use quick_notes::{AutoName, MAX_QUICK_NAME, quick_note_stem};`), `global_view.rs` (`follow_layout`: `self.vault.forget_auto_named(&froms)`), `session.rs` (`forget_page_sizes`: `self.vault.forget_auto_named(removed)`)
+- Create: `crates/liber-session/src/quick_notes.rs`
+- Modify: `crates/liber-session/src/lib.rs` (`mod quick_notes; pub use quick_notes::{AutoName, MAX_QUICK_NAME, quick_note_stem};`), `global_view.rs` (`follow_layout`: `self.vault.forget_auto_named(&froms)`), `session.rs` (`forget_page_sizes`: `self.vault.forget_auto_named(removed)`)
 
 **Interfaces:**
 - Consumes: `first_line_text` (Task 1); `auto_named`, `set_auto_named`, `forget_auto_named` (Task 2).
@@ -213,7 +213,7 @@ fn m4c_scratch_folder_defaults_is_set_and_follows_top_level_renames() {
   - `pub const MAX_QUICK_NAME: usize = 60;`
   - `pub fn quick_note_stem(text: &str) -> Option<String>` — `first_line_text`, refused characters → `-` (`sanitize_file_name` rules, leading dot too), cut to 60 characters, trimmed; `None` when empty, only dashes, or a Windows device name (`CON`, `PRN`, `AUX`, `NUL`, `COM1`–`COM9`, `LPT1`–`LPT9`).
   - `impl VaultSession { pub fn create_quick_note(&self, dir: &VaultPath, base: &str) -> Result<VaultPath> }` — in `dir` (created with its parents when missing, and indexed): `base.md`, else `base 1.md`, `base 2.md`… (create-only writes); flags it (a failed flag write is a `Warning` event, the note stays). One path serves the global Scratchpad (`dir` = root) and every vault's scratch folder.
-  - `impl VaultSession { pub fn set_scratch_folder(&self, name: &str, rewrite_links: bool) -> Result<Option<RenameOutcome>> }` — validates the name (`validate_name`, top-level, not `.nimw`/`.obsidian`); when the current folder exists and `name` is free, renames it on disk (links rewritten as the setting says) and returns the outcome; when `name` is an existing folder, adopts it; a file of that name → `AlreadyExists`; then stores the setting.
+  - `impl VaultSession { pub fn set_scratch_folder(&self, name: &str, rewrite_links: bool) -> Result<Option<RenameOutcome>> }` — validates the name (`validate_name`, top-level, not `.liber`/`.obsidian`); when the current folder exists and `name` is free, renames it on disk (links rewritten as the setting says) and returns the outcome; when `name` is an existing folder, adopts it; a file of that name → `AlreadyExists`; then stores the setting.
   - `pub struct AutoName { pub path: VaultPath, pub renamed: Option<RenameOutcome>, pub auto_named: bool }`
   - `impl VaultSession { pub fn auto_name(&self, path: &VaultPath, rewrite_links: bool) -> Result<AutoName> }` — not flagged → unchanged, `auto_named: false`; reads the saved file; no usable stem → unchanged; target = first free of `stem`, `stem 1`, … in the same folder (case-insensitive, the note itself doesn't count); target equal to the note (ignoring case) → unchanged; else `rename` and flag the new path.
   - Renames (in-app or seen by the watcher) and removals drop the flags of the paths they touch.
@@ -223,7 +223,7 @@ fn m4c_scratch_folder_defaults_is_set_and_follows_top_level_renames() {
 ```rust
 #[test] fn m4c_quick_notes_are_deduplicated_and_flagged() { /* create twice with the same base at the root → "Q.md", "Q 1.md"; both in vault.auto_named() */ }
 #[test] fn m4c_a_vault_scratch_folder_is_created_on_first_use() { /* no "Scratchpad/" → create_quick_note(Scratchpad, "Q") → "Scratchpad/Q.md", the folder indexed */ }
-#[test] fn m4c_renaming_the_scratch_folder_from_settings() { /* folder with a note linked from elsewhere → set_scratch_folder("Inbox") → folder renamed, link rewritten, setting "Inbox"; "Taken" folder exists → adopted, nothing moved; a file named "Taken2" → AlreadyExists; ".nimw" → InvalidName */ }
+#[test] fn m4c_renaming_the_scratch_folder_from_settings() { /* folder with a note linked from elsewhere → set_scratch_folder("Inbox") → folder renamed, link rewritten, setting "Inbox"; "Taken" folder exists → adopted, nothing moved; a file named "Taken2" → AlreadyExists; ".liber" → InvalidName */ }
 #[test] fn m4c_auto_name_follows_the_first_line() { /* write "# Groceries\nmilk" to Q.md → auto_name → path "Groceries.md", renamed Some, auto_named true; flag moved */ }
 #[test] fn m4c_same_first_line_gets_a_number_and_does_not_ping_pong() { /* A.md "Idea", B.md "Idea" → "Idea.md", "Idea 1.md"; auto_name("Idea 1.md") again → unchanged, renamed None */ }
 #[test] fn m4c_nothing_usable_keeps_the_generated_name() { /* "", "# ", "CON", "![[x.png]]", "///" → unchanged */ }
@@ -238,9 +238,9 @@ fn m4c_scratch_folder_defaults_is_set_and_follows_top_level_renames() {
 }
 ```
 
-- [ ] **Step 2: Run them to see them fail** — `cargo test -p nimw-session quick_notes` → FAIL.
+- [ ] **Step 2: Run them to see them fail** — `cargo test -p liber-session quick_notes` → FAIL.
 - [ ] **Step 3: Implement** as described in Interfaces.
-- [ ] **Step 4: Run them to see them pass** — PASS (9 tests); `cargo test -p nimw-session` stays green.
+- [ ] **Step 4: Run them to see them pass** — PASS (9 tests); `cargo test -p liber-session` stays green.
 - [ ] **Step 5: Commit** — `feat(session): quick notes named after their first line (M4c §2)`
 
 ---
@@ -254,7 +254,7 @@ fn m4c_scratch_folder_defaults_is_set_and_follows_top_level_renames() {
 **Interfaces:**
 - Consumes: Task 3's session API.
 - Produces (commands, camelCase JSON):
-  - `scratchpad_default() -> String` — `<Documents>/Notes In My Way/Scratchpad` (test override via `ScratchpadState::set_default_dir`).
+  - `scratchpad_default() -> String` — `<Documents>/Liber Linteum/Scratchpad` (test override via `ScratchpadState::set_default_dir`).
   - `scratchpad_choose() -> Option<String>` — a folder dialog Rust opens (test override `set_folder_picker`); the pick is granted for `scratchpad_set`.
   - `scratchpad_set(path: String) -> Settings` — only the default or the granted pick; creates the folder and its parents; stores the canonical path in `scratchpadPath`; `notPermitted` otherwise.
   - `scratchpad_open() -> VaultInfo` — opens `scratchpadPath` (created again if missing); `notFound` when none is set.
@@ -277,9 +277,9 @@ fn m4c_scratch_folder_defaults_is_set_and_follows_top_level_renames() {
 #[test] fn m4c_scratch_folder_set_over_ipc() { /* rename "Scratchpad" → "Inbox" with a note inside → outcome moved; state folder "Inbox"; invalid name → invalidName */ }
 ```
 
-- [ ] **Step 2: Run them to see them fail** — `cargo test -p nimw-desktop --test scratchpad` → FAIL (commands not registered).
+- [ ] **Step 2: Run them to see them fail** — `cargo test -p liber-desktop --test scratchpad` → FAIL (commands not registered).
 - [ ] **Step 3: Implement** (`ScratchpadState` managed in `configure`; commands registered in `lib.rs`, listed in `build.rs`, `allow-…` in `capabilities/main.json`; `open_session` made `pub(crate)` and sets `scratchpad` by comparing the canonical root with the stored path).
-- [ ] **Step 4: Run them to see them pass** — PASS; `cargo test -p nimw-desktop` green (the M1b "every command" list is untouched; this stream's list lives in `tests/scratchpad.rs`).
+- [ ] **Step 4: Run them to see them pass** — PASS; `cargo test -p liber-desktop` green (the M1b "every command" list is untouched; this stream's list lives in `tests/scratchpad.rs`).
 - [ ] **Step 5: Commit** — `feat(desktop): the Scratchpad folder, its grant and quick-note commands (M4c §2, §4)`
 
 ---
@@ -289,10 +289,10 @@ fn m4c_scratch_folder_defaults_is_set_and_follows_top_level_renames() {
 **Files:** Modify `apps/desktop/src-tauri/src/menu.rs`, `apps/desktop/src-tauri/tests/menu.rs`
 
 **Interfaces:**
-- Produces: `pub const QUICK_NOTE_ID: &str = "nimw-quick-note"; pub const QUICK_NOTE_EVENT: &str = "menu:quickNote";` A File submenu (after the app menu) with **New Quick Note** (`CmdOrCtrl+Shift+N`). The event goes to the `main` window, which is shown and focused first.
+- Produces: `pub const QUICK_NOTE_ID: &str = "liber-quick-note"; pub const QUICK_NOTE_EVENT: &str = "menu:quickNote";` A File submenu (after the app menu) with **New Quick Note** (`CmdOrCtrl+Shift+N`). The event goes to the `main` window, which is shown and focused first.
 
 - [ ] **Step 1: Failing test** — `quick_note_item_emits_menu_quick_note()` in `tests/menu.rs` (listen, fire `QUICK_NOTE_ID`, expect one event); the macOS outline test expects a "File" menu holding "New Quick Note".
-- [ ] **Step 2: Run** — `cargo test -p nimw-desktop --test menu` → FAIL.
+- [ ] **Step 2: Run** — `cargo test -p liber-desktop --test menu` → FAIL.
 - [ ] **Step 3: Implement.**
 - [ ] **Step 4: Run** → PASS.
 - [ ] **Step 5: Commit** — `feat(menu): File → New Quick Note, ⌘⇧N (M4c §2)`

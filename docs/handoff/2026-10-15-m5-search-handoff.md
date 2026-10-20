@@ -129,7 +129,7 @@ The first working version measured a p95 of about 450 ms. Three changes brought 
 | cargo | 461 passed, 3 ignored (the trash tests and the release perf test) |
 | lint, typecheck, i18n, build, fmt, clippy, deny | all clean |
 
-**Perf test:** it's `#[ignore]`. Run it with `cargo test --release -p nimw-session --test search -- --ignored`.
+**Perf test:** it's `#[ignore]`. Run it with `cargo test --release -p liber-session --test search -- --ignored`.
 
 ## 3. Needs the real window
 
@@ -189,7 +189,7 @@ M5 was cherry-picked onto `feat/m4c-scratchpad`. Conflicts were resolved by keep
 
 | File | How it was resolved |
 |---|---|
-| `nimw-session/src/lib.rs` | the search re-exports next to the quick-note ones |
+| `liber-session/src/lib.rs` | the search re-exports next to the quick-note ones |
 | `src-tauri/src/lib.rs`, `build.rs`, `capabilities/main.json` | the search command next to the M4c commands; `core:window:allow-destroy` stays removed (M4c I2) |
 | `menu.rs` | View → Search… sends `menu:search` **to the main window** (shown and focused), like New Quick Note, because file windows have no search |
 | `ipc/index.ts` | the search types and `onMenuSearch`, scoped to its own window like the other M4c listeners |
@@ -202,7 +202,7 @@ M5 was cherry-picked onto `feat/m4c-scratchpad`. Conflicts were resolved by keep
 **Combination pins** (commit `test(m4c+m5)`). These passed on first run, because the behaviour was already right:
 - `search` is in the file-window denied list (`tests/file_windows.rs`);
 - ⌘⇧F in a file window opens no search and calls no search command (`SingleFileApp.test.tsx`);
-- a quick note renamed after its first line is found by that name and not by its generated one (`crates/nimw-session/tests/search.rs`).
+- a quick note renamed after its first line is found by that name and not by its generated one (`crates/liber-session/tests/search.rs`).
 
 ### Deferred (for a later pass)
 
@@ -252,20 +252,20 @@ cd apps/desktop
 CARGO_TARGET_DIR=<repo>/target pnpm tauri build --bundles app
 ```
 
-- Output: `target/release/bundle/macos/Notes In My Way.app`.
+- Output: `target/release/bundle/macos/Liber Linteum.app`.
 - It's unsigned, so the first time you open it, right-click → Open.
 - Finder's Open With lists it after it has been launched once.
 
-**Windows (unsigned NSIS installer):** cross-compiled on the Mac with `cargo-xwin`, using the toolchain in `~/.nimw-cross`:
+**Windows (unsigned NSIS installer):** cross-compiled on the Mac with `cargo-xwin`, using the toolchain in `~/.liber-cross`:
 
 ```bash
 cd apps/desktop
-export CARGO_HOME=$HOME/.nimw-cross/cargo RUSTUP_HOME=$HOME/.nimw-cross/rustup RUSTUP_TOOLCHAIN=1.99.0 XWIN_ACCEPT_LICENSE=1
+export CARGO_HOME=$HOME/.liber-cross/cargo RUSTUP_HOME=$HOME/.liber-cross/rustup RUSTUP_TOOLCHAIN=1.99.0 XWIN_ACCEPT_LICENSE=1
 export PATH="/opt/homebrew/opt/rustup/bin:$CARGO_HOME/bin:/opt/homebrew/opt/llvm/bin:/opt/homebrew/opt/lld/bin:$PATH"
 pnpm tauri build --runner cargo-xwin --target x86_64-pc-windows-msvc --bundles nsis
 ```
 
-- Output: `target/x86_64-pc-windows-msvc/release/bundle/nsis/Notes In My Way_0.1.0_x64-setup.exe`.
+- Output: `target/x86_64-pc-windows-msvc/release/bundle/nsis/Liber Linteum_0.1.0_x64-setup.exe`.
 - SmartScreen asks for More info → Run anyway.
 
 ## 6. Troubleshooting
@@ -273,7 +273,7 @@ pnpm tauri build --runner cargo-xwin --target x86_64-pc-windows-msvc --bundles n
 | Symptom | Fix |
 |---|---|
 | Search finds nothing in a vault that has notes | The index is still rebuilding (schema 3) or failed. Check the vault opened with no error toast. The index lives in the app's cache dir, so deleting it forces a rebuild. |
-| A renamed page shows its old title in results | The rename path must re-parse moved pages whose file name changed (`rename.rs`, spec §11.1). Run `cargo test -p nimw-session --test search m5_review_i1`. |
+| A renamed page shows its old title in results | The rename path must re-parse moved pages whose file name changed (`rename.rs`, spec §11.1). Run `cargo test -p liber-session --test search m5_review_i1`. |
 | "Search failed" in the dialog | An FTS5 syntax error means the query parser let something through. Add the input to `m5_review_m3_odd_words_never_empty_the_result` and fix `search.rs` parsing. |
 | ⌘⇧F does nothing | A dialog is open (search ignores the shortcut then), or focus is in a file window, which has no search. |
 | Perf regression | Run the release perf test (`-- --ignored`). The temp-table materialization (§10.21) and facet sampling (§10.22) are the levers. |

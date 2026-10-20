@@ -5,7 +5,7 @@
 **Goal:** Every byte that crosses a vault's folder goes through one `Storage` trait, implemented today by `PlainStorage` with exactly the current behaviour, so E3 can add `EncryptedStorage` without touching callers.
 
 **Architecture:**
-- `nimw-vault` gains `storage/` with the trait, its value types and `PlainStorage`. All of today's OS-level code moves into `PlainStorage`: symlink and outside-vault checks, temp-file atomic writes, case-only renames, OS trash, and `notify` translation.
+- `liber-vault` gains `storage/` with the trait, its value types and `PlainStorage`. All of today's OS-level code moves into `PlainStorage`: symlink and outside-vault checks, temp-file atomic writes, case-only renames, OS trash, and `notify` translation.
 - `Vault` owns a `Box<dyn Storage>`. Its public API stays logical (`VaultPath`), and the raw `fs_path`/`visible_fs_path` escape hatches are replaced by narrow trait-backed methods.
 - A guard test keeps new `std::fs` calls out of vault code.
 - A test-only switch lets the whole Rust suite run against another `Storage`.
@@ -21,15 +21,15 @@
 - **Dependencies.** None added. `cargo deny check` and the cargo-xwin Windows build still pass.
 - **P1.** Zero network requests, as before.
 - **Commits.** Signed, with the trailer `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`. Never bypass signing.
-- **Gate.** The gate after every task is `$SP/check.sh all <worktree>`. Tasks 1–3 may run `cargo test -p nimw-vault` while iterating.
+- **Gate.** The gate after every task is `$SP/check.sh all <worktree>`. Tasks 1–3 may run `cargo test -p liber-vault` while iterating.
 
 ## Review Focus
 
-1. **A symlinked note** (its target inside the vault) still opens and saves through its target, and a link-rewrite on rename still refuses to replace it with a plain file. → Task 4. The existing `exp_04_symlinked_notes_stay_symlinks` (`crates/nimw-session/tests/rename.rs:388`) is the guard and must stay green unchanged.
+1. **A symlinked note** (its target inside the vault) still opens and saves through its target, and a link-rewrite on rename still refuses to replace it with a plain file. → Task 4. The existing `exp_04_symlinked_notes_stay_symlinks` (`crates/liber-session/tests/rename.rs:388`) is the guard and must stay green unchanged.
 2. **Saving over a file keeps its permissions**, for example an executable bit or read-only-for-group. Today's `set_permissions` copy must survive the move into `replace_atomic`. → Task 2, `replace_atomic_keeps_permissions` (unix).
 3. **A ranged request on a 0-byte file, or past the end, answers 416, and a full read answers 200 with the exact length.** The `Reader` length must be the file's length when it opens. → Task 5, `asset_range_on_empty_file_is_416`.
 4. **An import whose source fails mid-copy** (a read error or a full disk) leaves no partial file behind, as `import.rs` promises ("never leave half a file"). → Task 4, `import_failed_entry_leaves_no_partial_file`.
-5. **Watch noise.** A temp file named `.<name>.nimw-tmp-…`, a hidden path, or a path under an excluded glob never reaches the session. An event on the vault root itself is `Overflow`. → Task 3, `watch_drops_temp_hidden_excluded_and_flags_root`.
+5. **Watch noise.** A temp file named `.<name>.liber-tmp-…`, a hidden path, or a path under an excluded glob never reaches the session. An event on the vault root itself is `Overflow`. → Task 3, `watch_drops_temp_hidden_excluded_and_flags_root`.
 
 ---
 
@@ -41,19 +41,19 @@ There are 151 hits in 25 files for `std::fs | fs:: | File:: | OpenOptions | read
 
 | File (hits) | Today | After E2 |
 |---|---|---|
-| `nimw-vault/src/fsops.rs` (32) | `fs_path`, `visible_fs_path`, `read`, `write_cas`, `create_dir_all`, `import_file`, `create_dir`, `rename`, `trash`, `sync_dir` | Bodies move to `PlainStorage` (`resolve`, `replace_atomic`, `create_dir`, `rename`, `trash_os`). `Vault::read/write_cas/import_file/create_dir_all/create_dir/rename/trash` keep their signatures and call `self.storage` |
-| `nimw-vault/src/scan.rs` (9) | `read_dir`, `symlink_metadata`, follow-a-symlink | `Vault::walk` uses `storage.children()`, and `storage.meta(_, Follow::InsideVault)` for symlinks; `mtime_ns()` moves into plain |
-| `nimw-vault/src/watch.rs` (7) | `notify` setup, OS→vault path translation, `exists()` | The OS side becomes `storage.watch()`. Batching, hidden and excluded filtering, sorting and dedup stay in `Vault` |
-| `nimw-vault/src/vault.rs` (5) | `canonicalize` + `is_dir` at open; `.nimw` `create_dir`; `read_json` via `std::fs::read` | `PlainStorage::open(root)`; `storage.create_dir`; `read_json(&dyn Storage, rel, …)` |
-| `nimw-vault/src/layout.rs` (1) | `to_fs_path(root).symlink_metadata()` | `storage.meta(_, Follow::No).is_some()` |
-| `nimw-vault/src/icon.rs` (via `read_json(root)`) | `vault_icon_at(root)` | `vault_icon_at(root)` keeps its signature and reads through `PlainStorage::open(root)`. It serves the recent list, which never opens a session |
-| `nimw-session/src/bin.rs` (15) | `measure`, `page_icon`, `free_path`, `is_dir`, `bin_dir`, `parents_are_folders`, `trash_list`, `trash_delete_via` gone check, `prune_archive` `remove_dir` | `vault.meta(_, Follow::No)`, `vault.children()`, `vault.read()`, `vault.remove_empty_dir()` |
-| `nimw-session/src/quick_notes.rs` (1) | `read_dir(root)` for an exact-case name | `vault.children(&VaultPath::root())` |
-| `nimw-session/src/rename.rs` (1) | `symlink_metadata(fs_path)` (is it a symlink?) | `vault.meta(path, Follow::No)?.kind == Kind::Symlink` |
-| `nimw-session/src/session.rs` (1) | `metadata(fs_path).created()` for folder sort | `vault.meta(_, Follow::InsideVault)?.created` |
-| `nimw-session/src/attachments.rs` (2 of 5) | `from_fs_path(root, real)` (is the dropped file already inside?); `fs_path` for an absolute `file://` link | `vault.vault_path_of(&real)`; `vault.os_path(path, OsUse::FileUrl)` |
-| `nimw-session/src/external.rs` (path line 302) | `from_fs_path(root, real)` | `vault.vault_path_of(&real)` |
-| `nimw-import/src/import.rs` (3 of 4: lines 566, 567, 586) | `fs_path` + `OpenOptions::create_new` + `remove_file` on failure | `vault.create_new(path)` and `vault.remove_file(path)` |
+| `liber-vault/src/fsops.rs` (32) | `fs_path`, `visible_fs_path`, `read`, `write_cas`, `create_dir_all`, `import_file`, `create_dir`, `rename`, `trash`, `sync_dir` | Bodies move to `PlainStorage` (`resolve`, `replace_atomic`, `create_dir`, `rename`, `trash_os`). `Vault::read/write_cas/import_file/create_dir_all/create_dir/rename/trash` keep their signatures and call `self.storage` |
+| `liber-vault/src/scan.rs` (9) | `read_dir`, `symlink_metadata`, follow-a-symlink | `Vault::walk` uses `storage.children()`, and `storage.meta(_, Follow::InsideVault)` for symlinks; `mtime_ns()` moves into plain |
+| `liber-vault/src/watch.rs` (7) | `notify` setup, OS→vault path translation, `exists()` | The OS side becomes `storage.watch()`. Batching, hidden and excluded filtering, sorting and dedup stay in `Vault` |
+| `liber-vault/src/vault.rs` (5) | `canonicalize` + `is_dir` at open; `.liber` `create_dir`; `read_json` via `std::fs::read` | `PlainStorage::open(root)`; `storage.create_dir`; `read_json(&dyn Storage, rel, …)` |
+| `liber-vault/src/layout.rs` (1) | `to_fs_path(root).symlink_metadata()` | `storage.meta(_, Follow::No).is_some()` |
+| `liber-vault/src/icon.rs` (via `read_json(root)`) | `vault_icon_at(root)` | `vault_icon_at(root)` keeps its signature and reads through `PlainStorage::open(root)`. It serves the recent list, which never opens a session |
+| `liber-session/src/bin.rs` (15) | `measure`, `page_icon`, `free_path`, `is_dir`, `bin_dir`, `parents_are_folders`, `trash_list`, `trash_delete_via` gone check, `prune_archive` `remove_dir` | `vault.meta(_, Follow::No)`, `vault.children()`, `vault.read()`, `vault.remove_empty_dir()` |
+| `liber-session/src/quick_notes.rs` (1) | `read_dir(root)` for an exact-case name | `vault.children(&VaultPath::root())` |
+| `liber-session/src/rename.rs` (1) | `symlink_metadata(fs_path)` (is it a symlink?) | `vault.meta(path, Follow::No)?.kind == Kind::Symlink` |
+| `liber-session/src/session.rs` (1) | `metadata(fs_path).created()` for folder sort | `vault.meta(_, Follow::InsideVault)?.created` |
+| `liber-session/src/attachments.rs` (2 of 5) | `from_fs_path(root, real)` (is the dropped file already inside?); `fs_path` for an absolute `file://` link | `vault.vault_path_of(&real)`; `vault.os_path(path, OsUse::FileUrl)` |
+| `liber-session/src/external.rs` (path line 302) | `from_fs_path(root, real)` | `vault.vault_path_of(&real)` |
+| `liber-import/src/import.rs` (3 of 4: lines 566, 567, 586) | `fs_path` + `OpenOptions::create_new` + `remove_file` on failure | `vault.create_new(path)` and `vault.remove_file(path)` |
 | `src-tauri/src/asset.rs` (5) | `.trash` image: `root.join` + `symlink_metadata`; `respond_file(&Path)` opens and seeks a file | `vault.meta(".trash/<n>", Follow::No)`; `vault.open_read(path, Reach::Visible / Any)` → `respond(reader, mime, range)` |
 | `src-tauri/src/editor_commands.rs` (path line 318) | `fs_path` → open with the default app | `vault.os_path(vp, OsUse::Open)` |
 | `src-tauri/src/file_commands.rs` (2: lines 125, 291) | `metadata(fs_path).len()`; `fs_path` for opening | `vault.meta(..).len`; `vault.os_path(vp, OsUse::Open)` |
@@ -70,22 +70,22 @@ There are 151 hits in 25 files for `std::fs | fs:: | File:: | OpenOptions | read
 | `src-tauri/src/editor_commands.rs` (`check_openable`, 4) | Inspects the OS path that `os_path(Open)` returned, which is today the file itself (E3: a decrypted temp copy) |
 | `src-tauri/src/audio_commands.rs` (17) | Takes live in the app cache dir and reach the vault only through `session.import_attachment` → `Vault::import_file`. E3 redesigns this (spec §4.2) |
 | `src-tauri/src/notion_commands.rs` (1) | Checks the import target folder that doesn't exist yet |
-| `nimw-audio/src/record.rs` (2) | Writes a take to the cache path it is given |
-| `nimw-import/src/archive.rs` (5) | Reads the user's export zip, plus an OS temp file for a nested zip. It is input outside any vault |
-| `nimw-import/src/import.rs` (lines 555, 558) | Creates the new vault's own folder before `Vault::open` |
-| `nimw-index/src/index.rs` (3) | The index DB in the app cache (E3: `:memory:` for encrypted vaults, spec §5.1) |
-| `nimw-session/src/attachments.rs` (lines 103–118) | `metadata`/`canonicalize` of the *outside* source file being imported |
-| `nimw-testkit/src/lib.rs` (15) | Test-only crate that writes fixtures (whole file allow-listed; E3 converts fixtures into encrypted vaults through `Storage`) |
+| `liber-audio/src/record.rs` (2) | Writes a take to the cache path it is given |
+| `liber-import/src/archive.rs` (5) | Reads the user's export zip, plus an OS temp file for a nested zip. It is input outside any vault |
+| `liber-import/src/import.rs` (lines 555, 558) | Creates the new vault's own folder before `Vault::open` |
+| `liber-index/src/index.rs` (3) | The index DB in the app cache (E3: `:memory:` for encrypted vaults, spec §5.1) |
+| `liber-session/src/attachments.rs` (lines 103–118) | `metadata`/`canonicalize` of the *outside* source file being imported |
+| `liber-testkit/src/lib.rs` (15) | Test-only crate that writes fixtures (whole file allow-listed; E3 converts fixtures into encrypted vaults through `Storage`) |
 
 ---
 
 ## File structure
 
-- `crates/nimw-vault/src/storage/mod.rs`: the `Storage` trait, value types, `open_storage()` (with the test switch), and `PassThrough` (test-only).
-- `crates/nimw-vault/src/storage/plain.rs`: `PlainStorage`. All OS calls of the vault crate live here.
-- `crates/nimw-vault/src/storage/plain_watch.rs`: `PlainStorage::watch`, holding `notify` and the OS→`VaultPath` translation moved from `watch.rs`.
+- `crates/liber-vault/src/storage/mod.rs`: the `Storage` trait, value types, `open_storage()` (with the test switch), and `PassThrough` (test-only).
+- `crates/liber-vault/src/storage/plain.rs`: `PlainStorage`. All OS calls of the vault crate live here.
+- `crates/liber-vault/src/storage/plain_watch.rs`: `PlainStorage::watch`, holding `notify` and the OS→`VaultPath` translation moved from `watch.rs`.
 - Modified: `fsops.rs`, `scan.rs`, `watch.rs`, `vault.rs`, `layout.rs`, `icon.rs`, `lib.rs`; the session, import and src-tauri files in the table above.
-- `crates/nimw-vault/tests/seam_guard.rs`: the guard.
+- `crates/liber-vault/tests/seam_guard.rs`: the guard.
 - `docs/architecture/storage-seam.md`: a short reference, linked from `docs/README.md`.
 
 ---
@@ -93,12 +93,12 @@ There are 151 hits in 25 files for `std::fs | fs:: | File:: | OpenOptions | read
 ### Task 1: The `Storage` trait and `PlainStorage` reads
 
 **Files:**
-- Create: `crates/nimw-vault/src/storage/mod.rs`, `crates/nimw-vault/src/storage/plain.rs`
-- Modify: `crates/nimw-vault/src/lib.rs` (add `mod storage;` and the re-exports)
-- Test: `crates/nimw-vault/tests/storage_plain.rs`
+- Create: `crates/liber-vault/src/storage/mod.rs`, `crates/liber-vault/src/storage/plain.rs`
+- Modify: `crates/liber-vault/src/lib.rs` (add `mod storage;` and the re-exports)
+- Test: `crates/liber-vault/tests/storage_plain.rs`
 
 **Interfaces:**
-- Produces (all re-exported from `nimw_vault`):
+- Produces (all re-exported from `liber_vault`):
 
 ```rust
 pub trait ReadSeek: std::io::Read + std::io::Seek + Send {}
@@ -168,23 +168,23 @@ impl PlainStorage { pub fn open(root: &std::path::Path) -> Result<PlainStorage>;
 - [ ] **Step 1: Write the failing tests** in `tests/storage_plain.rs`, each with its own `tempfile::tempdir()`:
   - `meta_reports_logical_len_and_physical_mtime`: write 5 bytes with `std::fs`. Then `meta(p, Follow::No)` is `Some(Meta { kind: File, len: 5, .. })` with `mtime_ns > 0`, and a missing path is `Ok(None)`.
   - `meta_follow_inside_vault` (unix): with `link.md → a.md` inside the vault, `Follow::No` gives `Kind::Symlink` and `Follow::InsideVault` gives `Kind::File, len` of `a.md`. With `out.md → /etc/hosts`, `Follow::InsideVault` is `Err(VaultError::OutsideVault(_))`. A dangling `gone.md → missing.md` is also `Err(OutsideVault(_))`. That is today's `symlink_target_meta` → `None` → "symlink points outside the vault" message, which `scan` keeps.
-  - `children_lists_hidden_names_and_reports_unreadable`: `.nimw`, `a.md` and `B` all appear as `Child::Entry` with the right kinds.
+  - `children_lists_hidden_names_and_reports_unreadable`: `.liber`, `a.md` and `B` all appear as `Child::Entry` with the right kinds.
   - `read_and_open_read_return_the_same_bytes`: `open_read(p, Reach::Any)` has `len == 11`. Seek to 6, read 5, and get `b"world"`.
   - `open_read_visible_refuses_hidden_real_target` (unix): `v.png → .secret/k.png`. `Reach::Visible` gives `Err(OutsideVault)` and `Reach::Any` gives `Ok`. This mirrors the existing `write_ops.rs:182` cases.
   - `resolve_refuses_parent_symlink_outside` (unix): `sub → /tmp/elsewhere`, and `read("sub/x.md")` gives `Err(OutsideVault)`.
-- [ ] **Step 2: Run** `cargo test -p nimw-vault --test storage_plain`. Expected: FAIL to compile (`Storage`, `PlainStorage` not found).
+- [ ] **Step 2: Run** `cargo test -p liber-vault --test storage_plain`. Expected: FAIL to compile (`Storage`, `PlainStorage` not found).
 - [ ] **Step 3: Implement** the types and the trait in `storage/mod.rs`. In `plain.rs`, implement `PlainStorage::open` (today's `Vault::open` canonicalize and `is_dir` checks, same errors) and `name`, `location`, `meta`, `children`, `read` and `open_read`.
   - Move `fs_path` → `PlainStorage::resolve(&self, &VaultPath) -> Result<PathBuf>` and `visible_fs_path` → `resolve_visible`, bodies unchanged.
   - Move `mtime_ns` from `scan.rs`.
   - Leave the write methods and `watch` as `unimplemented!()` until Task 2 and Task 3. They are unreachable, because `Vault` doesn't use `PlainStorage` yet.
-- [ ] **Step 4: Run** `cargo test -p nimw-vault --test storage_plain`. Expected: 6 passed.
+- [ ] **Step 4: Run** `cargo test -p liber-vault --test storage_plain`. Expected: 6 passed.
 - [ ] **Step 5: Commit**: `feat(vault): Storage trait and PlainStorage reads (E2)`.
 
 ### Task 2: `PlainStorage` writes, renames, trash and OS paths
 
 **Files:**
-- Modify: `crates/nimw-vault/src/storage/plain.rs`
-- Test: `crates/nimw-vault/tests/storage_plain.rs`, and move the `nfr_08_injected_failure…` unit test from `fsops.rs` into a `#[cfg(test)]` module in `plain.rs`
+- Modify: `crates/liber-vault/src/storage/plain.rs`
+- Test: `crates/liber-vault/tests/storage_plain.rs`, and move the `nfr_08_injected_failure…` unit test from `fsops.rs` into a `#[cfg(test)]` module in `plain.rs`
 
 **Interfaces:**
 - Consumes: Task 1's types.
@@ -207,10 +207,10 @@ impl PlainStorage { pub fn open(root: &std::path::Path) -> Result<PlainStorage>;
   - `remove_empty_dir_refuses_non_empty`: `Err(VaultError::Io{..})`, and the folder still exists.
   - `rename_refuses_existing_target`, `rename_missing_source_is_not_found`.
   - `rename_case_only` (`#[cfg(any(target_os = "macos", windows))]`, skipped at runtime unless the temp volume is case-insensitive): `a.md` → `A.md` succeeds, and the listing shows `A.md`.
-  - `trash_os_missing_is_not_found`. Never call a real OS trash in tests; `NIMW_TRASH_TESTS` stays off.
+  - `trash_os_missing_is_not_found`. Never call a real OS trash in tests; `LIBER_TRASH_TESTS` stays off.
   - `os_path_matches_resolve_for_every_use`: for each `OsUse`, it returns `root.join("a.md")`.
   - `vault_path_of_maps_inside_and_rejects_outside`: `root/x/y.md` → `Some("x/y.md")`, and `/tmp/z` → `None`.
-- [ ] **Step 2: Run** `cargo test -p nimw-vault --test storage_plain`. Expected: the new tests FAIL (panics at `unimplemented!`).
+- [ ] **Step 2: Run** `cargo test -p liber-vault --test storage_plain`. Expected: the new tests FAIL (panics at `unimplemented!`).
 - [ ] **Step 3: Implement.** Move the bodies from `fsops.rs`:
   - the `write_cas_inner` temp/rename part → `replace_atomic`;
   - the `import_file` copy loop → `replace_atomic` reading from `&mut dyn Read`;
@@ -223,18 +223,18 @@ impl PlainStorage { pub fn open(root: &std::path::Path) -> Result<PlainStorage>;
   - `remove_empty_dir` is `std::fs::remove_dir`.
   - `os_path` is `resolve` for every `OsUse` in plain storage.
   - `vault_path_of` is `VaultPath::from_fs_path(&self.root, os).ok()`.
-- [ ] **Step 4: Run** `cargo test -p nimw-vault --test storage_plain`. Expected: all pass.
+- [ ] **Step 4: Run** `cargo test -p liber-vault --test storage_plain`. Expected: all pass.
 - [ ] **Step 5: Commit**: `feat(vault): PlainStorage writes, renames, trash and OS paths (E2)`.
 
-### Task 3: `Vault` runs on `Storage` (nimw-vault internals and the watcher)
+### Task 3: `Vault` runs on `Storage` (liber-vault internals and the watcher)
 
 **Files:**
-- Create: `crates/nimw-vault/src/storage/plain_watch.rs`
+- Create: `crates/liber-vault/src/storage/plain_watch.rs`
 - Modify:
-  - `vault.rs` (struct field, `open`, `open_with`, `read_json`, `.nimw` creation);
+  - `vault.rs` (struct field, `open`, `open_with`, `read_json`, `.liber` creation);
   - `fsops.rs` (thin wrappers);
   - `scan.rs`, `watch.rs`, `layout.rs`, `icon.rs`, `lib.rs`.
-- Modify tests: `crates/nimw-vault/tests/write_ops.rs:182-185`, `crates/nimw-vault/tests/open_scan.rs:185,290-291`. Move the `watch.rs` unit tests on `PathFilter` into `plain_watch.rs`.
+- Modify tests: `crates/liber-vault/tests/write_ops.rs:182-185`, `crates/liber-vault/tests/open_scan.rs:185,290-291`. Move the `watch.rs` unit tests on `PathFilter` into `plain_watch.rs`.
 
 **Interfaces:**
 - Consumes: `Storage`, `PlainStorage`, `RawEvent`, `WatchGuard`, `Follow`, `Reach`, `OsUse`, `Replace` (Tasks 1–2).
@@ -266,11 +266,11 @@ impl Vault {
   - otherwise the path is translated with today's `PathFilter::visible` canonical-parent logic, minus the hidden/excluded filter, and becomes `Changed` if `exists()`, else `Removed`.
 - `Vault::watch_with` keeps the debounce thread (`DEBOUNCE`, `MAX_BATCH_WAIT`). It receives `RawEvent`s, drops root, hidden (`is_hidden_path`) and excluded paths, collapses any batch containing `Overflow` to `[Overflow]`, then sorts and dedups as today.
 
-- [ ] **Step 1: Write the failing test** `watch_drops_temp_hidden_excluded_and_flags_root` in `crates/nimw-vault/tests/watch.rs`, driving `Vault::open_with` with a test `Storage` (a struct in the test file that delegates to `PlainStorage` and whose `watch` stores the sink so the test can inject `RawEvent`s):
-  - inject `Changed(".a.md.nimw-tmp-1-0")`, `Changed(".nimw/vault.json")`, `Changed("build/x.md")` with the exclude `build/**` in `.nimw/vault.json`, and `Changed("ok.md")`;
+- [ ] **Step 1: Write the failing test** `watch_drops_temp_hidden_excluded_and_flags_root` in `crates/liber-vault/tests/watch.rs`, driving `Vault::open_with` with a test `Storage` (a struct in the test file that delegates to `PlainStorage` and whose `watch` stores the sink so the test can inject `RawEvent`s):
+  - inject `Changed(".a.md.liber-tmp-1-0")`, `Changed(".liber/vault.json")`, `Changed("build/x.md")` with the exclude `build/**` in `.liber/vault.json`, and `Changed("ok.md")`;
   - expect exactly one batch, `[WatchEvent::Changed("ok.md")]`;
   - then inject `Overflow` and `Changed("ok.md")` and expect `[WatchEvent::Overflow]`.
-- [ ] **Step 2: Run** `cargo test -p nimw-vault --test watch`. Expected: FAIL to compile (`open_with` not found).
+- [ ] **Step 2: Run** `cargo test -p liber-vault --test watch`. Expected: FAIL to compile (`open_with` not found).
 - [ ] **Step 3: Implement the rewiring:**
   - `Vault { storage: Box<dyn Storage>, … }`. `Vault::open(root)` = `open_with(open_storage(root)?)`, where `open_storage` is Task 6's switch; for now it is `Box::new(PlainStorage::open(root)?)`.
   - `read_json(storage: &dyn Storage, rel, warnings)` reads with `storage.read`, mapping `NotFound` → default as today.
@@ -284,14 +284,14 @@ impl Vault {
     - `write_ops.rs:182-185` → `vault.open_read(&p(x), Reach::Visible)`: refused cases `Err(OutsideVault)`; `ok.png` `Ok`; `missing.png` `Err(NotFound)`. This is the same decision with a different signal for a missing file; record it as a ruling.
     - `open_scan.rs:185` → `vault.os_path(.., OsUse::Open)`.
     - `open_scan.rs:290-291` → `open_read(.., Reach::Visible)`, `is_ok` / `is_err` on files that exist.
-- [ ] **Step 4: Run** `cargo test -p nimw-vault`. Expected: all pass, the moved tests included.
+- [ ] **Step 4: Run** `cargo test -p liber-vault`. Expected: all pass, the moved tests included.
 - [ ] **Step 5: Commit**: `refactor(vault): Vault runs on Storage; fs_path/visible_fs_path removed (E2)`.
 
-### Task 4: nimw-session and nimw-import on the Vault API
+### Task 4: liber-session and liber-import on the Vault API
 
 **Files:**
-- Modify: `crates/nimw-session/src/{bin.rs,quick_notes.rs,rename.rs,session.rs,attachments.rs,external.rs}`, `crates/nimw-import/src/import.rs`
-- Test: `crates/nimw-session/tests/rename.rs`, `crates/nimw-import/src/import.rs` (its test module)
+- Modify: `crates/liber-session/src/{bin.rs,quick_notes.rs,rename.rs,session.rs,attachments.rs,external.rs}`, `crates/liber-import/src/import.rs`
+- Test: `crates/liber-session/tests/rename.rs`, `crates/liber-import/src/import.rs` (its test module)
 
 **Interfaces:**
 - Consumes: Task 3's `Vault` methods.
@@ -304,7 +304,7 @@ impl Vault {
     3. Run `write(…)`. The vault has no `Big.bin` at its planned path, the report's warnings mention `Big.bin`, and every other file was written.
 
     `exp_04_symlinked_notes_stay_symlinks` (rename.rs:388) is the Review Focus guard; it stays as it is.
-- [ ] **Step 2: Run** `cargo test -p nimw-session --test rename` and `cargo test -p nimw-import`. Expected: the import test PASSES on today's code, because today's `remove_file` already cleans up. That makes it a regression guard, not a RED; note it in the ledger. Then confirm it goes RED by temporarily deleting the `remove_file` line, and restore the line.
+- [ ] **Step 2: Run** `cargo test -p liber-session --test rename` and `cargo test -p liber-import`. Expected: the import test PASSES on today's code, because today's `remove_file` already cleans up. That makes it a regression guard, not a RED; note it in the ledger. Then confirm it goes RED by temporarily deleting the `remove_file` line, and restore the line.
 - [ ] **Step 3: Implement**, replacing each routed line from the inventory table:
   - `bin.rs`:
     - `measure(&Vault, &VaultPath)` recurses with `children` and `Kind`, never following symlinks;
@@ -335,7 +335,7 @@ impl Vault {
   - `asset_range_on_empty_file_is_416`: on a 0-byte `e.wav`, `bytes=0-` gives status 416 with `Content-Range: bytes */0`, and no range gives 200 with an empty body.
   - `asset_range_reads_from_reader_offset`: a 100-byte file, `bytes=10-19`, gives 206 with body `[10..20]` and `Content-Range: bytes 10-19/100`.
   - `asset_trashed_image_symlink_is_404` (unix): `.trash/x.png` as a symlink gives 404, as today.
-- [ ] **Step 2: Run** `cargo test -p nimw-desktop --test asset`. Use the crate's actual package name from `apps/desktop/src-tauri/Cargo.toml`. Expected: the new tests fail to compile, because the `respond` shape isn't reachable yet, or they fail.
+- [ ] **Step 2: Run** `cargo test -p liber-desktop --test asset`. Use the crate's actual package name from `apps/desktop/src-tauri/Cargo.toml`. Expected: the new tests fail to compile, because the `respond` shape isn't reachable yet, or they fail.
 - [ ] **Step 3: Implement.**
   - `serve_from` uses `vault.open_read(&path, Reach::Visible)`, mapping `Err` → 404 as today, then `respond(reader, mime, range)`.
   - `serve_trashed_image` checks `vault.meta(".trash", No)` is `Dir` and `vault.meta(".trash/<n>", No)` is `File`, then `open_read(.., Reach::Any)`.
@@ -346,11 +346,11 @@ impl Vault {
 ### Task 6: The seam guard, the test-storage switch, and docs
 
 **Files:**
-- Create: `crates/nimw-vault/tests/seam_guard.rs`, `docs/architecture/storage-seam.md`
+- Create: `crates/liber-vault/tests/seam_guard.rs`, `docs/architecture/storage-seam.md`
 - Modify:
-  - `crates/nimw-vault/src/storage/mod.rs` (`open_storage`, `PassThrough`);
-  - `crates/nimw-vault/Cargo.toml` (`[features] test-storage = []`);
-  - the `[dev-dependencies]` of `nimw-session`, `nimw-import` and src-tauri (`nimw-vault = { path = …, features = ["test-storage"] }`);
+  - `crates/liber-vault/src/storage/mod.rs` (`open_storage`, `PassThrough`);
+  - `crates/liber-vault/Cargo.toml` (`[features] test-storage = []`);
+  - the `[dev-dependencies]` of `liber-session`, `liber-import` and src-tauri (`liber-vault = { path = …, features = ["test-storage"] }`);
   - `docs/README.md`.
 
 **Interfaces:**
@@ -358,31 +358,31 @@ impl Vault {
 
 ```rust
 /// The storage `Vault::open` uses: `PlainStorage`, unless built with
-/// `test-storage` (or `cfg(test)`) and `NIMW_TEST_STORAGE` names another.
+/// `test-storage` (or `cfg(test)`) and `LIBER_TEST_STORAGE` names another.
 /// Unknown names panic, so a typo can't silently test plain storage.
 pub(crate) fn open_storage(root: &Path) -> Result<Box<dyn Storage>>;
 #[cfg(any(test, feature = "test-storage"))]
 pub struct PassThrough(PlainStorage);   // name() == "pass-through"; every method delegates
 ```
 
-- The test switch values in E2 are `plain` (the default) and `pass-through`. E3 adds `encrypted`, and then must make fixtures go through `Storage`: `nimw-testkit` writes plaintext with `std::fs` today.
+- The test switch values in E2 are `plain` (the default) and `pass-through`. E3 adds `encrypted`, and then must make fixtures go through `Storage`: `liber-testkit` writes plaintext with `std::fs` today.
 
 - [ ] **Step 1: Write the failing tests:**
   - `seam_guard` in `tests/seam_guard.rs`. It walks `crates/*/src/**/*.rs` and `apps/desktop/src-tauri/src/**/*.rs` from `CARGO_MANIFEST_DIR/../..`, and considers only lines before a file's first `#[cfg(test)]`. It matches `std::fs|\bfs::|File::|OpenOptions|read_dir|symlink_metadata|canonicalize|notify::|trash::|to_fs_path\(`.
-    - **Allowed:** files under `crates/nimw-vault/src/storage/`, `crates/nimw-testkit/`, `apps/desktop/src-tauri/src/settings.rs`, and any line carrying `// seam: outside (`.
+    - **Allowed:** files under `crates/liber-vault/src/storage/`, `crates/liber-testkit/`, `apps/desktop/src-tauri/src/settings.rs`, and any line carrying `// seam: outside (`.
     - **Assertion:** the list of offending `path:line` is empty.
-    - **Self-test:** a second test, `seam_guard_catches_an_offender`, feeds the matcher one in-memory line `let x = std::fs::read(p);` with the path `crates/nimw-session/src/x.rs` and expects one offender.
-  - `test_switch_selects_pass_through` in `storage/mod.rs` `#[cfg(test)]`. With `NIMW_TEST_STORAGE=pass-through` set via a scoped env guard, `Vault::open(tmp).storage_name() == "pass-through"`; unset, it is `"plain"`.
-- [ ] **Step 2: Run** `cargo test -p nimw-vault --test seam_guard`. Expected: FAIL, listing any line Tasks 4–5 missed. Mark each truly outside line with `// seam: outside (<reason>)` using the reasons from the inventory, and route anything else.
-- [ ] **Step 3: Implement** `open_storage`, which reads `NIMW_TEST_STORAGE` only under `cfg(any(test, feature = "test-storage"))`, and `PassThrough`. Write `docs/architecture/storage-seam.md` in at most one page:
+    - **Self-test:** a second test, `seam_guard_catches_an_offender`, feeds the matcher one in-memory line `let x = std::fs::read(p);` with the path `crates/liber-session/src/x.rs` and expects one offender.
+  - `test_switch_selects_pass_through` in `storage/mod.rs` `#[cfg(test)]`. With `LIBER_TEST_STORAGE=pass-through` set via a scoped env guard, `Vault::open(tmp).storage_name() == "pass-through"`; unset, it is `"plain"`.
+- [ ] **Step 2: Run** `cargo test -p liber-vault --test seam_guard`. Expected: FAIL, listing any line Tasks 4–5 missed. Mark each truly outside line with `// seam: outside (<reason>)` using the reasons from the inventory, and route anything else.
+- [ ] **Step 3: Implement** `open_storage`, which reads `LIBER_TEST_STORAGE` only under `cfg(any(test, feature = "test-storage"))`, and `PassThrough`. Write `docs/architecture/storage-seam.md` in at most one page:
   - the trait table, with the same "why" column as Task 1;
   - logical vs physical `Meta` fields;
   - the outside list;
-  - how to run the suite on another storage: `NIMW_TEST_STORAGE=pass-through cargo test --workspace`.
+  - how to run the suite on another storage: `LIBER_TEST_STORAGE=pass-through cargo test --workspace`.
 
   Link it from `docs/README.md`.
-- [ ] **Step 4: Run** `cargo test -p nimw-vault --test seam_guard`, then `NIMW_TEST_STORAGE=pass-through cargo test --workspace`, then `$SP/check.sh all <worktree>`. Expected: the guard passes; the workspace suite passes on pass-through; ALL-OK.
-- [ ] **Step 5: Commit**: `test(vault): seam guard and NIMW_TEST_STORAGE switch; docs: storage seam (E2)`.
+- [ ] **Step 4: Run** `cargo test -p liber-vault --test seam_guard`, then `LIBER_TEST_STORAGE=pass-through cargo test --workspace`, then `$SP/check.sh all <worktree>`. Expected: the guard passes; the workspace suite passes on pass-through; ALL-OK.
+- [ ] **Step 5: Commit**: `test(vault): seam guard and LIBER_TEST_STORAGE switch; docs: storage seam (E2)`.
 
 ---
 

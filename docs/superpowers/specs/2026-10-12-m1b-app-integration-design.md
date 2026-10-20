@@ -3,7 +3,7 @@
 > **Status:** Approved in design review · **Date:** 2026-10-12
 > **Roles:** Jose — tech lead (decisions below are DECIDED)
 > **Parent docs:** product spec `docs/product-spec.md` · architecture `docs/superpowers/specs/2026-10-12-architecture-design.md` · M1a design `docs/superpowers/specs/2026-10-12-m1a-vault-core-design.md` · hand-offs `docs/handoff/2026-10-12-m0-scaffold-handoff.md`, `docs/handoff/2026-10-12-m1a-vault-core-handoff.md`
-> **Scope:** connect the M1a engine (`nimw-session`) to the desktop app: Tauri commands/events, a settings store, working welcome actions, the app shell with an explorer, a read-only page view, dialogs and toasts.
+> **Scope:** connect the M1a engine (`liber-session`) to the desktop app: Tauri commands/events, a settings store, working welcome actions, the app shell with an explorer, a read-only page view, dialogs and toasts.
 
 ---
 
@@ -41,7 +41,7 @@ Success means:
 ### 2.1 New dependencies
 | Crate / package | Version | License | Purpose |
 |---|---|---|---|
-| `nimw-session`, `nimw-vault` (workspace path deps) | — | GPL-3.0-or-later | engine |
+| `liber-session`, `liber-vault` (workspace path deps) | — | GPL-3.0-or-later | engine |
 | `tauri-plugin-dialog` | 2.8.x | MIT/Apache-2.0 | native folder picker only |
 | `@tauri-apps/plugin-dialog` | ^2.8.2 | MIT/Apache-2.0 | JS side of the picker (imported only in `src/ipc/`) |
 | `serde_json` (existing) | | | settings file |
@@ -58,7 +58,7 @@ pub struct AppState {
 One app state per window (M1b has one window). Opening a vault replaces the session (dropping the old one stops its watcher).
 
 ### 2.3 Settings store (`src-tauri/src/settings.rs`)
-File: `<app_config_dir>/settings.json` (Tauri `app.path().app_config_dir()`, i.e. per bundle identifier `app.notesinmyway.desktop`). Written atomically (temp file in the same directory, fsync, rename).
+File: `<app_config_dir>/settings.json` (Tauri `app.path().app_config_dir()`, i.e. per bundle identifier `app.liberlinteum.desktop`). Written atomically (temp file in the same directory, fsync, rename).
 
 ```json
 {
@@ -108,7 +108,7 @@ Every command returns `Result<T, CommandError>` serialized as `{ kind, message }
 - `build.rs` AppManifest lists every command above; `capabilities/main.json` grants each `allow-<command>` to window `main` only, plus `dialog:allow-open` (folder picker). Nothing else (no `core:default`).
 - `tests/ipc.rs` asserts each command is callable from `main` and denied from another window label.
 
-### 2.8 Engine additions (`nimw-session`, from the M1a hand-off)
+### 2.8 Engine additions (`liber-session`, from the M1a hand-off)
 - `SessionEvent::Warning(String)` replaces the `Indexed(IndexReport { files: 0, … })` workaround for watcher warnings (M1a §11 o).
 - `trash()` releases the index lock before the OS trash call and re-acquires it afterwards (M1a §11 n).
 
@@ -176,8 +176,8 @@ Top bar "Close vault" → `vault_close` → Welcome (the closed vault first in R
 ### 5.1 Rust
 - `settings.rs` unit tests: defaults, round-trip, patch merge, corrupt file → defaults + warning + `.bad` copy, recent list dedupe/cap/missing flag, atomic write leaves no temp files.
 - Error mapping unit tests (`From<SessionError>`).
-- `tests/ipc.rs` (real context + ACL, mock runtime): every new command allowed from `main`, denied from another window; `vault_open` on a fixture copy; `vault_tree`; `page_get` (incl. truncated/binary); `entry_rename` returns `RenameOutcomeDto`; `entry_trash` (behind `NIMW_TRASH_TESTS=1`); traversal strings (`../x`) → `outsideVault`; `vault_create` on a non-empty folder → `notEmpty`.
-- `nimw-session`: `SessionEvent::Warning` emitted for watcher warnings; trash no longer holds the index lock during the OS call.
+- `tests/ipc.rs` (real context + ACL, mock runtime): every new command allowed from `main`, denied from another window; `vault_open` on a fixture copy; `vault_tree`; `page_get` (incl. truncated/binary); `entry_rename` returns `RenameOutcomeDto`; `entry_trash` (behind `LIBER_TRASH_TESTS=1`); traversal strings (`../x`) → `outsideVault`; `vault_create` on a non-empty folder → `notEmpty`.
+- `liber-session`: `SessionEvent::Warning` emitted for watcher warnings; trash no longer holds the index lock during the OS call.
 
 ### 5.2 Frontend (Vitest + Testing Library + axe, mocked IPC)
 - Stores: status transitions, tree refresh after ops, 100 ms coalescing (fake timers), settings applied before first render, toast on rename with failures.
@@ -195,7 +195,7 @@ Top bar "Close vault" → `vault_close` → Welcome (the closed vault first in R
 
 ## 6. Out of scope (→ later)
 - Editing (M2), Global View (M3), search (M5), audio (M6), Notion import (M7), signing/installers (M8).
-- Multiple windows / vaults at once; undo of renames; writing `.nimw/vault.json` (exclude globs editable by hand only).
+- Multiple windows / vaults at once; undo of renames; writing `.liber/vault.json` (exclude globs editable by hand only).
 - Remaining M1a deferred minors (hand-off §11 j–m, p–s) unless a M1b task touches the same code.
 
 ## 7. Spec self-review notes

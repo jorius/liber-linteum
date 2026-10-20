@@ -28,7 +28,7 @@
 
 ### 2.1 Menus replace the top-bar buttons
 - **Settings:**
-  - macOS: **Notes In My Way → Settings… ⌘,**.
+  - macOS: **Liber Linteum → Settings… ⌘,**.
   - Windows and Linux: **File → Settings… Ctrl+,**, since the app menu doesn't exist there.
   - ⌘, keeps working from the page.
 - **New Vault menu**, between File and Edit:
@@ -110,8 +110,8 @@
   - in the recent-vault list for vaults.
 - **Storage (Obsidian-compatible):**
   - **Pages:** frontmatter `icon: "🚀"`. It travels with the note and is readable by Obsidian plugins that use the same key. Writing it uses the existing frontmatter edit path (CAS, undoable while the page is open).
-  - **Folders:** `.nimw/vault.json` `folderIcons: { "path": "🚀" }`. It follows renames and moves, and is forgotten on delete, like `coverHeights`.
-  - **The vault:** `.nimw/vault.json` `icon`.
+  - **Folders:** `.liber/vault.json` `folderIcons: { "path": "🚀" }`. It follows renames and moves, and is forgotten on delete, like `coverHeights`.
+  - **The vault:** `.liber/vault.json` `icon`.
 - **The picker:**
   - a popover with a search field, recent picks and categories, plus **Remove**;
   - it is keyboard-operable as an ARIA grid, axe-clean, and searchable in en and es names;
@@ -125,7 +125,7 @@
 - **Deleting moves to `<vault>/.trash/`**, as Obsidian's "Move to Obsidian trash" option does, instead of the OS trash. This applies to everything: the trash icon, the menu, Delete and ⌘⌫. It covers pages, folders and attachments.
   - The confirmation dialog stays as it is, saying "Move … to Trash?".
   - A name clash inside `.trash` gets a suffix: ` 1`, ` 2`.
-- **Record:** `.nimw/trash.json` keeps each item's original path, the time it was trashed and its path inside `.trash`. A `.trash` folder written by Obsidian shows its items too, with no original path known; they restore to the vault root.
+- **Record:** `.liber/trash.json` keeps each item's original path, the time it was trashed and its path inside `.trash`. A `.trash` folder written by Obsidian shows its items too, with no original path known; they restore to the vault root.
 - **Links:** when a page goes to the Trash, links to it become unresolved, as for a delete today; they are not rewritten.
 - **Undo:** the existing undo toast for delete restores from `.trash`.
 
@@ -146,7 +146,7 @@
 - **Not shown elsewhere:** items in the Trash are excluded from the explorer, the index (so search, links and Global View don't see them) and the watcher's page events, since `.trash` is already a hidden name.
 
 ### 5.3 Archive
-- **Archive moves an item** (page or folder) into `<vault>/.archive/`, mirroring its original path (`Projects/Old.md` → `.archive/Projects/Old.md`). It is recorded in `.nimw/archive.json` with its original path and the time.
+- **Archive moves an item** (page or folder) into `<vault>/.archive/`, mirroring its original path (`Projects/Old.md` → `.archive/Projects/Old.md`). It is recorded in `.liber/archive.json` with its original path and the time.
 - **Entry points:** **Archive** in the row's … menu and the page's header menu. **Unarchive** in the Archived view moves the item back, with the same clash handling as Restore.
 - **Archived items stay working:**
   - they remain in the index, flagged `archived`;
@@ -208,7 +208,7 @@ Jose chose full editor width, centred.
 |---|---|---|
 | A | §2, §6: menus, floating button, top bar removed, title in header, sidebar collapse, auto save | `menu.rs`, `AppShell`, `TopBar` (removed), `PageHeader`/`PageHeading`, `Sidebar` layout, the `settings` fields `autoSave`, `sidebarCollapsed`, `actionButton` |
 | B | §3, §4: row quick actions, emoji icons and picker | `features/explorer/*` rows, `features/icons/*` (new), the frontmatter `icon` read/write, `folderIcons`/`icon` in vault.json, the emoji data |
-| C | §5: Trash and Archive | `nimw-vault` trash/archive ops, `nimw-index` archived flag, the Trash and Archived views, the delete path |
+| C | §5: Trash and Archive | `liber-vault` trash/archive ops, `liber-index` archived flag, the Trash and Archived views, the delete path |
 | D | §7: fixes | `SearchDialog` layout, wide-table layout, ⌘F |
 
 - **Conflicts:**
@@ -231,7 +231,7 @@ Jose chose full editor width, centred.
   - the wide table;
   - ⌘F.
 - **Floors:** the Safari 15 floor and `freezePrototype`-safe; no network.
-- **`NIMW_TRASH_TESTS` stays off:** tests that would empty to the real OS trash use the existing gated path.
+- **`LIBER_TRASH_TESTS` stays off:** tests that would empty to the real OS trash use the existing gated path.
 
 ## 10. Rulings to confirm (taken for Jose)
 
@@ -240,7 +240,7 @@ Jose chose full editor width, centred.
 3. **Settings on Windows and Linux:** under File, since there is no app menu.
 4. **Deleting now goes to the vault's `.trash`**, not the OS trash. Deleting from the Trash sends files to the OS trash, never destroying them.
 5. **Archive is a move into `.archive/`** with links rewritten, so Obsidian sees archived notes in `.archive` (a hidden folder there too).
-6. **Page icons live in frontmatter `icon:`;** folder and vault icons live in `.nimw/vault.json`.
+6. **Page icons live in frontmatter `icon:`;** folder and vault icons live in `.liber/vault.json`.
 7. **Emoji only** for icons: no custom images, no skin tones, for now.
 8. **Auto save off asks before leaving unsaved text,** per page. "Unsaved" turns red only after 600 ms with auto save on.
 9. **⌘F opens search** until in-note find exists.
@@ -253,7 +253,7 @@ These rulings come from planning the shell. Each lists its cost if wrong.
 
 1. **No app menu on Windows or Linux.** The native menu is installed on macOS only (`with_app_menu`). §2.1's "File → Settings…" therefore can't be the Windows path.
    - On every platform, clicking the vault name in the sidebar opens a **vault menu** popover: **Settings…**, **Open another vault…**, **Close vault**.
-   - On macOS the same actions are also in the native menus: Notes In My Way → Settings… ⌘, and the Vault menu.
+   - On macOS the same actions are also in the native menus: Liber Linteum → Settings… ⌘, and the Vault menu.
    - Cost: none. Adding a Windows menu bar later remains possible.
 2. **Open Recent ▸ is left out of the native Vault menu.** It would need the menu rebuilt whenever the recent list changes. Close Vault returns to the Welcome screen, which lists recent vaults. Cost: one extra click.
 3. **Accelerators that would fire twice.** The page already handles ⌘, and ⌘O.
@@ -286,11 +286,11 @@ These override §3 and §4 where they conflict.
 
 1. **One source.** Every explorer `TreeNode` carries its icon.
    - **Pages:** frontmatter `icon:`, indexed as `pages.icon`. **Index schema 4**, with the usual rebuild on open. Stream C uses 5 if it needs a bump.
-   - **Folders:** `.nimw/vault.json` `folderIcons`.
-   - **The vault:** `VaultInfo.icon` and `RecentVault.icon`, read from `.nimw/vault.json` `icon`.
+   - **Folders:** `.liber/vault.json` `folderIcons`.
+   - **The vault:** `VaultInfo.icon` and `RecentVault.icon`, read from `.liber/vault.json` `icon`.
 
    Breadcrumbs, Global View cards, search hits, the `[[` list and the page header look icons up by path in the tree. `GvCard`, `SearchHit` and `Page` are unchanged.
-2. **Validation.** Rust's `nimw_markdown::is_icon` decides: one grapheme, at most 32 bytes, and a pictographic character, a keycap or a flag. Symbols that render as text (© with no VS16) are refused. An invalid `icon:` or `folderIcons` value is ignored on read and refused on write (`invalidName`).
+2. **Validation.** Rust's `liber_markdown::is_icon` decides: one grapheme, at most 32 bytes, and a pictographic character, a keycap or a flag. Symbols that render as text (© with no VS16) are refused. An invalid `icon:` or `folderIcons` value is ignored on read and refused on write (`invalidName`).
    - shortcut: the pictographic ranges are kept by hand, not the UCD property.
 3. **Commands:** `folder_icon_set(path, icon|null)` and `vault_icon_set(icon|null)`, in the main window only and refused in `file-*` windows. Page icons need no command: they are written like `related:`, through the open document or a compare-and-swap write. A new icon shows on its row immediately, before the save is indexed.
 4. **Placement:**
@@ -329,14 +329,14 @@ These override §5 where they conflict.
 ### Where things live
 
 1. **`.archive` is the one hidden folder the vault reads.**
-   - `nimw_vault::is_hidden_path` treats a path as hidden when any component is hidden, except a leading `.archive`. Scan, stat, the watcher, `visible_fs_path` and the `nimw-asset` check all use it, so archived pages are indexed and their images are served.
-   - `.trash`, `.nimw`, `.obsidian` and `.archive/.x` stay hidden.
+   - `liber_vault::is_hidden_path` treats a path as hidden when any component is hidden, except a leading `.archive`. Scan, stat, the watcher, `visible_fs_path` and the `liber-asset` check all use it, so archived pages are indexed and their images are served.
+   - `.trash`, `.liber`, `.obsidian` and `.archive/.x` stay hidden.
    - `is_archived(path)` names the Archive and everything in it.
 2. **No schema bump.** "Archived" is the path prefix `.archive/`, read at query time:
    - `VaultSession::tree` drops archived paths;
    - the Global View leaves them out of the root and of a page's neighbours;
    - search excludes them unless `archived: true`.
-3. **Records** (`.nimw/trash.json`, `.nimw/archive.json`) are `{"items": {"<path now>": {"from", "at"}}}`. Each is written *before* the move and dropped if the move fails.
+3. **Records** (`.liber/trash.json`, `.liber/archive.json`) are `{"items": {"<path now>": {"from", "at"}}}`. Each is written *before* the move and dropped if the move fails.
    - The lists ignore records whose item is gone (deleted outside the app, or a crash before the move); they're filtered in memory, not rewritten.
    - Trash entries with no record (Obsidian's own `.trash`, or a crash after the move) show "From another app" and restore to the vault root.
    - Pages put into `.archive` by hand are listed one by one, and come back to their path minus `.archive/`.
@@ -403,7 +403,7 @@ These override §5 where they conflict.
 
 ## 15. Final review — Trash, Archive and icons
 
-The Opus review of `855c6ea..5f961aa` found 2 Important and 8 Minor issues; M1 was re-graded Important by effect. Fixed with a test that failed first (`crates/nimw-session/src/bin.rs` `m5b_review_*`, `features/bin/Bin.test.tsx` "M5b final review", `stores/editorStore.test.tsx` `flushBefore`):
+The Opus review of `855c6ea..5f961aa` found 2 Important and 8 Minor issues; M1 was re-graded Important by effect. Fixed with a test that failed first (`crates/liber-session/src/bin.rs` `m5b_review_*`, `features/bin/Bin.test.tsx` "M5b final review", `stores/editorStore.test.tsx` `flushBefore`):
 
 1. **I1, records trusted as restore places.**
    - A Trash or Archive record naming a hidden place (`.git/hooks/…`, `.obsidian/…`) or an unusable name is treated as unrecorded: the root for the Trash, the path under `.archive` for the Archive.
@@ -495,7 +495,7 @@ Settings categories are being mocked separately and aren't part of this round.
 
 ### 17.4 Sort by
 - **The orders:** Name A→Z (the default, never stored), Name Z→A, Modified newest or oldest first, Created newest first.
-- **Storage:** per folder in `.nimw/vault.json` `folderSorts`, with `""` for the vault root. It follows renames and is forgotten on delete, like `folderIcons`.
+- **Storage:** per folder in `.liber/vault.json` `folderSorts`, with `""` for the vault root. It follows renames and is forgotten on delete, like `folderIcons`.
 - **Commands:** `folder_sort_get` and `folder_sort_set`, main window only.
 - **Where the order is applied:** the session orders the tree (`order_folders`); the UI keeps the order it's given.
 - **Rulings:**
@@ -535,7 +535,7 @@ Settings categories are being mocked separately and aren't part of this round.
   - `pages` (a folder's pages, however deep);
   - `icon` (a page's frontmatter emoji, or a folder's).
 
-  `nimw-asset` serves images directly in a real `.trash` folder for thumbnails: nothing else in it, and never through a link.
+  `liber-asset` serves images directly in a real `.trash` folder for thumbnails: nothing else in it, and never through a link.
 - **Rulings:**
   1. **Groups:** "Earlier this week" means the last seven days, after Today and Yesterday. Older items group by date; items with no recorded time go under "Date unknown".
   2. **Sorting:**
@@ -634,7 +634,7 @@ Jose, 2026-10-15: "add a Favorites section right below the Scratchpad section."
 **Order:** drag a favourite among the others, or **Move up / Move down in Favorites** in its row menu.
 
 **Storage:**
-- `.nimw/vault.json` `favorites: [path, …]`.
+- `.liber/vault.json` `favorites: [path, …]`.
 - Commands `favorites_get` and `favorites_set(paths)` (main window only; refused in file windows) read and replace the whole list.
 - Rust refuses escaping or hidden paths, and drops missing entries and repeats.
 - Entries follow renames and moves in place, are forgotten when deleted from the vault, and follow items into the Trash, so Restore brings them back.

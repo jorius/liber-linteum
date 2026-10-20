@@ -34,7 +34,7 @@
 | What | How it behaves |
 |---|---|
 | Entry points | **Take a quick note** on the Welcome screen. **File → New Quick Note** (⌘⇧N; Ctrl+Shift+N on Windows/Linux), from any window. **Quick notes** in the recent list, with its own icon. |
-| First use | A dialog, "Where should quick notes live?", offers the default `~/Documents/Notes In My Way/Scratchpad` or **Choose folder…**, a folder dialog opened by Rust. **Create** makes the folder and its parents. The choice is saved as `scratchpadPath` in `settings.json`. |
+| First use | A dialog, "Where should quick notes live?", offers the default `~/Documents/Liber Linteum/Scratchpad` or **Choose folder…**, a folder dialog opened by Rust. **Create** makes the folder and its parents. The choice is saved as `scratchpadPath` in `settings.json`. |
 | What it is | An ordinary vault (index, explorer, Global View, search) flagged as the Scratchpad. Wherever the vault name shows (sidebar, breadcrumb, explorer), it reads **Quick notes** (**Notas rápidas** in Spanish). |
 | A new quick note | `Quick note 2026-10-15 09.05.md` (Spanish: `Nota rápida …`), local time, deduplicated with ` 1`, ` 2`. It opens with the cursor in the text. |
 | Moving it | **Settings → Files → Quick notes folder (no vault open) → Change…** points to another folder. Existing notes stay where they are. |
@@ -44,7 +44,7 @@
 
 | What | How it behaves |
 |---|---|
-| Where | A `Scratchpad/` folder inside the vault. Its name is set in **Settings → This vault → Quick notes folder** and stored as `.nimw/vault.json` `scratchpadFolder`. It's created on first use, never just by opening the vault. |
+| Where | A `Scratchpad/` folder inside the vault. Its name is set in **Settings → This vault → Quick notes folder** and stored as `.liber/vault.json` `scratchpadFolder`. It's created on first use, never just by opening the vault. |
 | Sidebar | Pinned at the top of the explorer, above the other folders and divided from them, with a pencil icon and a note count. Otherwise it's a normal folder: it expands, renames, takes drops and has the context menu. |
 | ⌘⇧N with a vault open | The new quick note goes into **that vault's** scratch folder, with no vault switch. With no vault open, it goes to the global Scratchpad. The Welcome button always uses the global Scratchpad. |
 | Renaming it in Settings | Renames the folder on disk and rewrites links per "Update links". An existing folder of the new name is adopted. A case-only change (`Scratchpad` → `scratchpad`) renames in place. Windows device names (`CON`, `NUL`…), trailing dots and spaces, hidden names, `..`, nested and absolute values are refused. |
@@ -63,7 +63,7 @@
   - names are compared in NFC;
   - a name with nothing usable, or a Windows device name, keeps the generated name.
 - **Never steals a linked name:** if any page in the vault already has that link name (e.g. `Shopping/Groceries.md`), the quick note becomes `Groceries 1`. So no other note's link changes meaning, and nothing is rewritten.
-- **When it stops:** following the first line ends when you rename the note yourself (title or explorer), move it, or delete it. It also ends if the note changed outside the app between sessions (Obsidian, sync, Finder). The flag lives in `.nimw/vault.json` `autoNamed`.
+- **When it stops:** following the first line ends when you rename the note yourself (title or explorer), move it, or delete it. It also ends if the note changed outside the app between sessions (Obsidian, sync, Finder). The flag lives in `.liber/vault.json` `autoNamed`.
 - **Never fights you:** no rename runs while a title or explorer rename is open, or while focus moves to the title; the title keeps what you're typing.
 - **Not applied:** a derived name differing only in letter case ("meeting" → "Meeting").
 
@@ -71,7 +71,7 @@
 
 | What | How it behaves |
 |---|---|
-| Ways to open a file | **macOS:** Finder → Open With → Notes In My Way (`.md`, `.markdown`, `.txt`; rank Alternate, so it never takes over the default app), or drop the file on the Dock icon. **Everywhere:** **File → Open File…** (**⌘⇧O**; ⌘O still opens a folder as a vault) and **Open a file** on the Welcome screen. **Windows/Linux:** paths on the command line; a second launch hands its paths to the running app. On Windows that's "Open with → Choose another app". |
+| Ways to open a file | **macOS:** Finder → Open With → Liber Linteum (`.md`, `.markdown`, `.txt`; rank Alternate, so it never takes over the default app), or drop the file on the Dock icon. **Everywhere:** **File → Open File…** (**⌘⇧O**; ⌘O still opens a folder as a vault) and **Open a file** on the Welcome screen. **Windows/Linux:** paths on the command line; a second launch hands its paths to the running app. On Windows that's "Open with → Choose another app". |
 | Which files | `.md`/`.markdown` as Markdown; everything the text view opens (M4b part 2) as text. Images, PDFs and programs never get a window. |
 | The window | One window per file, about 900 × 700. Re-opening a file focuses its window. Contents: <ul><li>a top bar with the renamable file name, plus the subtitle for `.md`;</li><li>a compact header band: Saved, word count, Format, the mode switch, width;</li><li>the editor with all its modes, the toolbar and the outline.</li></ul> No sidebar, no Global View, no vault features, no attachments (paste, drop and Attach are off, and `[[` suggestions are empty). |
 | Links | Markdown links resolve relative to the file's folder. `[[wikilinks]]` resolve by name in the folder and its subfolders (depth ≤ 3). A note or text file opens in its own window. A document or media file opens in its default app, only if both the link name and the real target are on the documents-and-media list. A missing page says so. Nothing above the folder (`../`), nothing hidden, no symlinks out, no outside files. |
@@ -90,7 +90,7 @@
   - `capabilities/file.json` (for `file-*` windows) holds only the file commands, settings, fonts, `url_open`, `app_info`, events and `window_close_self`.
   - Vault, Scratchpad and quick-note commands are denied there; real-ACL tests cover both directions.
   - The window plugin's `destroy` (which takes any label) is gone from both capabilities; a window can only close itself.
-- **Asset serving.** `nimw-asset:` keys on the requesting webview. A file window gets its folder only, media and documents only, and `/.external/` is 403.
+- **Asset serving.** `liber-asset:` keys on the requesting webview. A file window gets its folder only, media and documents only, and `/.external/` is 403.
   - `Vault::visible_fs_path` refuses a path whose **real** location is hidden, reached through a symlink or a Windows 8.3 short name such as `SSH~1`.
   - This also hardens the main vault's asset serving.
 - **The Scratchpad folder grant.** `scratchpad_set` accepts only the default or the folder just picked in a Rust dialog. `scratchpadPath` can't be written through `settings_set`, and `scratchpad_open` takes no path.
@@ -141,7 +141,7 @@ Finder "Open With", dropping on the Dock and several windows only work in a **bu
    - **Files:** "Quick notes folder (no vault open)" shows; Change… opens a folder dialog.
 6. **⌘⇧N with Settings open:** nothing happens until Settings closes.
 7. **Open With.**
-   - In Finder, right-click a `.md` outside any vault → Open With → Notes In My Way. A file window opens with the editor; the main window opens too.
+   - In Finder, right-click a `.md` outside any vault → Open With → Liber Linteum. A file window opens with the editor; the main window opens too.
    - Repeat with a `.txt`.
    - Open the same file again: the existing window is focused.
 8. **Dock and ⌘⇧O.**
@@ -168,7 +168,7 @@ Finder "Open With", dropping on the Dock and several windows only work in a **bu
    - **Take a quick note** on Welcome, then Ctrl+Shift+N with a vault open: one note per press, in the pinned Scratchpad folder.
    - Names follow the first line (try accents and an emoji).
    - The scratch folder rename refuses `CON` and `name.`.
-2. **Open with.** Right-click a `.md` → Open with → Choose another app → Notes In My Way: a file window opens.
+2. **Open with.** Right-click a `.md` → Open with → Choose another app → Liber Linteum: a file window opens.
    - With the app already running, do it again with another file: it goes to the running app as a second window, with no second app instance.
    - The app must **not** have become the default for `.txt`: Notepad still opens `.txt` on a double-click.
 3. **Ctrl+Shift+O** opens Open File…
@@ -183,7 +183,7 @@ No Critical findings, 4 Important, 8 Minor. All Important findings and m1–m4 w
 - **I1:** two opens of the same file at once, or a re-open while the window is closing, could revoke the live window's grant. Its saves then failed with unsaved text.
 - **I2:** a file window could destroy the main window (the window plugin takes any label), skipping save-on-close. Replaced by `window_close_self`.
 - **I3:** a link named like a document could open a symlinked `.chm`/`.iso`/`.xlsm` with no confirmation. Now the real target is checked too.
-- **I4:** symlinks and Windows 8.3 short names (`SSH~1/id_ed25519`) could reach hidden files through `nimw-asset`. Now the real path is checked, which also hardens the main vault.
+- **I4:** symlinks and Windows 8.3 short names (`SSH~1/id_ed25519`) could reach hidden files through `liber-asset`. Now the real path is checked, which also hardens the main vault.
 - **m1:** a non-UTF-8 command-line argument crashed the launch.
 - **m2:** huge files were read whole, risking an out-of-memory crash that loses every window's text. Size caps added.
 - **m3:** "Save again" could strand the text in a conflict copy the window can't write.
@@ -263,11 +263,11 @@ Built from the M5 tip, which contains all of M4c. See the M5 hand-off (`docs/han
 - The first launch needs right-click → Open, because it's unsigned.
 - Finder's Open With list may take a moment to pick up the new app. If it doesn't, launch the app once from the bundle.
 
-**Windows:** cross-compiled with `cargo-xwin` and NSIS, as before (toolchain in `~/.nimw-cross`):
+**Windows:** cross-compiled with `cargo-xwin` and NSIS, as before (toolchain in `~/.liber-cross`):
 
 ```bash
 cd apps/desktop
-export CARGO_HOME=$HOME/.nimw-cross/cargo RUSTUP_HOME=$HOME/.nimw-cross/rustup RUSTUP_TOOLCHAIN=1.99.0 XWIN_ACCEPT_LICENSE=1
+export CARGO_HOME=$HOME/.liber-cross/cargo RUSTUP_HOME=$HOME/.liber-cross/rustup RUSTUP_TOOLCHAIN=1.99.0 XWIN_ACCEPT_LICENSE=1
 export PATH="/opt/homebrew/opt/rustup/bin:$CARGO_HOME/bin:/opt/homebrew/opt/llvm/bin:/opt/homebrew/opt/lld/bin:$PATH"
 pnpm tauri build --runner cargo-xwin --target x86_64-pc-windows-msvc --bundles nsis
 ```
@@ -283,5 +283,5 @@ The installer is unsigned: SmartScreen asks for More info → Run anyway.
 | A file window says it has no file of its own | Its grant is missing: the window label isn't in `FileWindows`. Check `file_windows.rs` (`grant`/`opened`) and that `Destroyed` only revokes its own `Arc`. |
 | A file window shows a broken image that's in the folder | The asset is hidden (name or real path), not a media/document type, or outside the folder. Check `Vault::visible_fs_path` and `mime_for`. |
 | A quick note stopped renaming itself | Its `autoNamed` flag was cleared: it was renamed or moved by you, or changed outside the app since the index last saw it. This is by design (§10.2). |
-| `cargo test` fails with `read fixture dir: NotFound` | A test binary was built in a removed worktree. Run `cargo clean -p nimw-testkit -p nimw-desktop -p nimw-session -p nimw-vault -p nimw-index -p nimw-markdown`. |
+| `cargo test` fails with `read fixture dir: NotFound` | A test binary was built in a removed worktree. Run `cargo clean -p liber-testkit -p liber-desktop -p liber-session -p liber-vault -p liber-index -p liber-markdown`. |
 | The Windows build fails to link single-instance | Check the target-gated dependency in `src-tauri/Cargo.toml`, and run `cargo xwin check --target x86_64-pc-windows-msvc`. |

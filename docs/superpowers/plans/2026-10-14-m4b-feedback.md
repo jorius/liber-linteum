@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Answer Jose's real-window feedback on M2c–M4. The page text starts about 25% from the top under a compact header band, with the cover as its background. Buttons take the palette. The `[[` list gets a search line, and the ⌘K picker stays on screen. Pasted TIFF, BMP and HEIC images are saved as PNG. NIMW can override Obsidian's attachment folder. Related pages become chips, the Global View gets "Connect cards", and the Dock icon sits inside Apple's grid.
+**Goal:** Answer Jose's real-window feedback on M2c–M4. The page text starts about 25% from the top under a compact header band, with the cover as its background. Buttons take the palette. The `[[` list gets a search line, and the ⌘K picker stays on screen. Pasted TIFF, BMP and HEIC images are saved as PNG. Liber Linteum can override Obsidian's attachment folder. Related pages become chips, the Global View gets "Connect cards", and the Dock icon sits inside Apple's grid.
 
 **Architecture:**
 - **Shell and header.** The shell moves the page title and subtitle into the top bar (`PageHeading`), and the sidebar names the vault. `Cover` becomes the header band: a render-prop component that draws the cover as a background, while `PageHeader` places its rows on veiled pills.
@@ -12,7 +12,7 @@
 **Tech Stack:**
 - React 19 + TS, CodeMirror 6 (`@codemirror/autocomplete` sections), zustand;
 - Vitest (jsdom; node env for the CSS and icon guards), Playwright (Chromium + WebKit);
-- Rust (`nimw-vault`, `nimw-session`, Tauri commands);
+- Rust (`liber-vault`, `liber-session`, Tauri commands);
 - `sips` and `tauri icon` for the macOS icon.
 
 No new dependency.
@@ -68,7 +68,7 @@ No new dependency.
 | `features/page/PageHeading.tsx`, `NoteTitle.tsx` | the top bar's page heading; the band's "Title in the note" |
 | `features/page/Cover.tsx`, `PageHeader.tsx`, `ModeToggle.tsx`, `PageView.module.css` | the header band, reposition after a pick, icons |
 | `app/icons.tsx` | 14 px icons for the band and the mode switch |
-| `crates/nimw-vault/src/{config,vault}.rs`, `crates/nimw-session/src/attachments.rs`, `src-tauri/src/{dto,attachment_commands}.rs`, `ipc/index.ts`, `features/dialogs/VaultSettingsSection.tsx` | `overrideObsidian` |
+| `crates/liber-vault/src/{config,vault}.rs`, `crates/liber-session/src/attachments.rs`, `src-tauri/src/{dto,attachment_commands}.rs`, `ipc/index.ts`, `features/dialogs/VaultSettingsSection.tsx` | `overrideObsidian` |
 | `features/editor/linkComplete.ts`, `theme/base.css` | the search line, debounce, announcement |
 | `features/editor/placePopup.ts`, `PickerPopup.tsx`, `LinkPicker.tsx` | anchored, clamped, flipping picker |
 | `features/editor/attachments.ts` | paste conversion to PNG |
@@ -79,8 +79,8 @@ No new dependency.
 
 **Commands (repo root):**
 - `export PATH="$HOME/.nvm/versions/node/v24.21.0/bin:$PATH"`.
-- Vitest: `pnpm --filter @nimw/desktop exec vitest run --maxWorkers=2 <paths>`.
-- E2E: `pnpm build:ui`, then `PLAYWRIGHT_BROWSERS_PATH=<browsers> pnpm --filter @nimw/desktop exec playwright test <spec>`.
+- Vitest: `pnpm --filter @liber/desktop exec vitest run --maxWorkers=2 <paths>`.
+- E2E: `pnpm build:ui`, then `PLAYWRIGHT_BROWSERS_PATH=<browsers> pnpm --filter @liber/desktop exec playwright test <spec>`.
 - Rust: `cargo test -p <crate> --test <file>`.
 - Full gate: lint, typecheck, i18n, vitest, build, fmt, clippy, cargo test, deny, e2e.
 
@@ -138,7 +138,7 @@ Then create `theme/buttons.test.ts` (node environment). It has three tests:
 The full file is in commit `0fd7042`.
 
 - [ ] **Step 2: Run them to see them fail.**
-Run: `pnpm --filter @nimw/desktop exec vitest run --maxWorkers=2 src/theme/palettes.test.ts src/theme/buttons.test.ts`
+Run: `pnpm --filter @liber/desktop exec vitest run --maxWorkers=2 src/theme/palettes.test.ts src/theme/buttons.test.ts`
 Expected: FAIL. The veil and danger tokens are undefined, `buttons.css` doesn't exist, and the dialogs still use `styles.button`, `styles.primary` and `styles.danger`.
 
 - [ ] **Step 3: Implement.**
@@ -183,7 +183,7 @@ export const DANGER = {
 7. The Global View connect bar's Cancel becomes `btn btn-secondary btn-sm`, and the `.connectBar button` rule goes.
 
 - [ ] **Step 4: Run them to see them pass.**
-Run: the same command, then `pnpm --filter @nimw/desktop exec vitest run --maxWorkers=2`.
+Run: the same command, then `pnpm --filter @liber/desktop exec vitest run --maxWorkers=2`.
 Expected: PASS, with no other test changed.
 
 - [ ] **Step 5: Commit.**
@@ -222,7 +222,7 @@ Spec §1 (sidebar header, top bar).
     render(<AppShell />);
     const side = screen.getByRole('complementary', { name: 'Files · Digital Brain' });
     expect(side).toHaveTextContent('Digital Brain');
-    expect(side).not.toHaveTextContent('Notes In My Way');
+    expect(side).not.toHaveTextContent('Liber Linteum');
     await act(() => openPage('Art/rex.md'));
     const bar = screen.getByRole('banner');
     const title = await within(bar).findByRole('textbox', { name: 'Page title' });
@@ -238,8 +238,8 @@ Spec §1 (sidebar header, top bar).
 ```
 
 - [ ] **Step 2: Run it to see it fail.**
-Run: `pnpm --filter @nimw/desktop exec vitest run --maxWorkers=2 src/features/shell/AppShell.test.tsx`
-Expected: FAIL. The sidebar says "Notes In My Way", and the title textbox is not in the banner.
+Run: `pnpm --filter @liber/desktop exec vitest run --maxWorkers=2 src/features/shell/AppShell.test.tsx`
+Expected: FAIL. The sidebar says "Liber Linteum", and the title textbox is not in the banner.
 
 - [ ] **Step 3: Implement.**
 
@@ -289,7 +289,7 @@ function GvHeading() {
 - **Tests.** Update the old banner assertion in `AppShell.test.tsx`, and make the page tests render `<PageScreen/>`.
 
 - [ ] **Step 4: Run them to see them pass.**
-Run: `pnpm --filter @nimw/desktop exec vitest run --maxWorkers=2`
+Run: `pnpm --filter @liber/desktop exec vitest run --maxWorkers=2`
 Expected: PASS.
 
 - [ ] **Step 5: Commit.**
@@ -350,7 +350,7 @@ Update the earlier I3 focus tests. "Add cover puts the keyboard on the position 
 Add the e2e `e2e/m4b.spec.ts` › "M4b §1: with a cover, the text starts in the top 35% of the window": `.cm-content`'s top is under 35% of a 900 px viewport, and the top bar holds the title and Edit. In `m2c.spec.ts`, the slider is focused right after Add cover.
 
 - [ ] **Step 2: Run them to see them fail.**
-Run: `pnpm --filter @nimw/desktop exec vitest run --maxWorkers=2 src/features/page/Cover.test.tsx`
+Run: `pnpm --filter @liber/desktop exec vitest run --maxWorkers=2 src/features/page/Cover.test.tsx`
 Expected: FAIL. There is no `data-band` and no pills, and Add cover doesn't open the slider.
 
 - [ ] **Step 3: Implement.** The core of `Cover.tsx`:
@@ -408,7 +408,7 @@ The band CSS:
 `ModeToggle` gets `PenIcon`, `CodeIcon` and `ColumnsIcon` beside its labels. `fakeDisk`'s `page_get` gets `tags: tagsOf(text)`.
 
 - [ ] **Step 4: Run them to see them pass.**
-Run: `pnpm --filter @nimw/desktop exec vitest run --maxWorkers=2`, then `pnpm build:ui` and `playwright test e2e/m4b.spec.ts e2e/m2c.spec.ts`.
+Run: `pnpm --filter @liber/desktop exec vitest run --maxWorkers=2`, then `pnpm build:ui` and `playwright test e2e/m4b.spec.ts e2e/m2c.spec.ts`.
 Expected: PASS in Chromium and WebKit. The full e2e gave 126 passed and 8 skipped (opt-in perf).
 
 - [ ] **Step 5: Commit.**
@@ -445,7 +445,7 @@ describe('review focus: text on the veil over any cover (M4b §1)', () => {
 ```
 
 - [ ] **Step 7: Run it to see it fail.**
-Run: `pnpm --filter @nimw/desktop exec vitest run --maxWorkers=2 src/theme/palettes.test.ts -t "review focus"`
+Run: `pnpm --filter @liber/desktop exec vitest run --maxWorkers=2 src/theme/palettes.test.ts -t "review focus"`
 Expected: FAIL in "muted text in a pill…", because the rule doesn't redefine the token. A probe with `--color-text-muted` in the loop gave a worst case of **4.01:1** at 88% (body: 6.70, text: 8.79).
 
 - [ ] **Step 8: Fix and run.** In `PageView.module.css`:
@@ -464,45 +464,45 @@ Run the same command. Expected: PASS (`src/theme`: 181 tests).
 
 ---
 
-### Task 4: NIMW's attachment place can override Obsidian's
+### Task 4: Liber Linteum's attachment place can override Obsidian's
 
 Spec §5.
 
 **Files:**
 - Modify:
-  - `crates/nimw-vault/src/{config,vault}.rs`, `crates/nimw-session/src/attachments.rs`;
+  - `crates/liber-vault/src/{config,vault}.rs`, `crates/liber-session/src/attachments.rs`;
   - `apps/desktop/src-tauri/src/{dto,attachment_commands}.rs`;
   - `ipc/index.ts`, `features/dialogs/VaultSettingsSection.tsx`, `i18n/locales/{en,es}.json`.
 - Test:
-  - `crates/nimw-vault/tests/attachments.rs`, `crates/nimw-session/tests/attachments.rs` (signature updates);
+  - `crates/liber-vault/tests/attachments.rs`, `crates/liber-session/tests/attachments.rs` (signature updates);
   - `apps/desktop/src-tauri/tests/commands.rs`;
   - `features/dialogs/SettingsDialog.test.tsx`.
 
 **Interfaces:**
 - Produces:
-  - **`.nimw/vault.json`:** `attachments.overrideObsidian: bool` (default false);
-  - **vault:** `AttachmentConfig.override_obsidian`, `Vault::set_nimw_attachments(mode, path, override_obsidian: Option<bool>)` (`None` keeps the stored flag);
+  - **`.liber/vault.json`:** `attachments.overrideObsidian: bool` (default false);
+  - **vault:** `AttachmentConfig.override_obsidian`, `Vault::set_liber_attachments(mode, path, override_obsidian: Option<bool>)` (`None` keeps the stored flag);
   - **session:** `Session::set_attachment_settings(mode, path, Option<bool>)`, `Session::set_attachment_override(on)`;
   - **DTO (camelCase):** `VaultSettingsDto { attachments, obsidian, overrideObsidian }`, `VaultSettingsPatch { attachments?, overrideObsidian? }`. `overrideObsidian` is **top-level**, not inside `attachments`.
 
 - [ ] **Step 1: Write the failing tests.**
 
 ```rust
-/// M4b §5: NIMW's own setting can override Obsidian's when the user says so;
+/// M4b §5: Liber Linteum's own setting can override Obsidian's when the user says so;
 /// `.obsidian/app.json` is never written.
 #[test]
-fn m4b_nimw_override_wins_over_obsidian_until_turned_off() {
+fn m4b_liber_override_wins_over_obsidian_until_turned_off() {
     let dir = copy_fixture("obsidian-basic"); // app.json: "./assets"
     let app_json = std::fs::read(dir.path().join(".obsidian/app.json")).unwrap();
     let vault = Vault::open(dir.path()).unwrap();
     assert!(!vault.attachment_config().override_obsidian);
-    vault.set_nimw_attachments("same", "", Some(true)).unwrap();
+    vault.set_liber_attachments("same", "", Some(true)).unwrap();
     assert_eq!(vault.attachment_policy(), AttachmentPolicy::SameAsNote);
     // Changing the place keeps the override (None leaves the flag as is).
-    vault.set_nimw_attachments("folder", "Media", None).unwrap();
+    vault.set_liber_attachments("folder", "Media", None).unwrap();
     assert!(vault.attachment_config().override_obsidian);
-    // Off: Obsidian's applies again; NIMW's choice is kept for next time.
-    vault.set_nimw_attachments("folder", "Media", Some(false)).unwrap();
+    // Off: Obsidian's applies again; Liber Linteum's choice is kept for next time.
+    vault.set_liber_attachments("folder", "Media", Some(false)).unwrap();
     assert_eq!(vault.attachment_policy(), AttachmentPolicy::Subfolder("assets".into()));
     // …stored place still "folder"/"Media"; app.json bytes unchanged
 }
@@ -510,23 +510,23 @@ fn m4b_nimw_override_wins_over_obsidian_until_turned_off() {
 
 Further tests:
 - **Commands:** `m4b_vault_settings_override_obsidian_over_ipc`, a real-ACL round trip with `{ overrideObsidian: true }`, an override-only patch, and the M2c round-trip JSON gaining `"overrideObsidian": false`.
-- **TS:** `SettingsDialog.test.tsx` › "M4b §5: a switch lets NIMW use its own place; off restores Obsidian's".
+- **TS:** `SettingsDialog.test.tsx` › "M4b §5: a switch lets Liber Linteum use its own place; off restores Obsidian's".
 
 - [ ] **Step 2: Run them to see them fail.**
-Run: `cargo test -p nimw-vault --test attachments` and `pnpm --filter @nimw/desktop exec vitest run --maxWorkers=2 src/features/dialogs/SettingsDialog.test.tsx`
-Expected: FAIL to compile (no `override_obsidian`, and `set_nimw_attachments` takes 2 arguments). The TS test fails because the switch doesn't exist.
+Run: `cargo test -p liber-vault --test attachments` and `pnpm --filter @liber/desktop exec vitest run --maxWorkers=2 src/features/dialogs/SettingsDialog.test.tsx`
+Expected: FAIL to compile (no `override_obsidian`, and `set_liber_attachments` takes 2 arguments). The TS test fails because the switch doesn't exist.
 
 - [ ] **Step 3: Implement.** Precedence in `vault.rs`:
 
 ```rust
-        let overrides = nimw.as_ref().is_some_and(|a| a.override_obsidian);
-        match nimw.and_then(|a| a.policy()) {
+        let overrides = liber.as_ref().is_some_and(|a| a.override_obsidian);
+        match liber.and_then(|a| a.policy()) {
             Some(policy) if overrides => policy,
             ours => obsidian.map(|(_, policy)| policy).or(ours).unwrap_or_default(),
         }
 ```
 
-`set_nimw_attachments` writes `overrideObsidian` only when it is given or was already present (`kept`). In the session:
+`set_liber_attachments` writes `overrideObsidian` only when it is given or was already present (`kept`). In the session:
 
 ```rust
     pub fn set_attachment_settings(&self, mode: &str, path: &str, override_obsidian: Option<bool>) -> Result<()> {
@@ -536,7 +536,7 @@ Expected: FAIL to compile (no `override_obsidian`, and `set_nimw_attachments` ta
         if config.obsidian.is_some() && !overrides && !same_place {
             // refused, as in M2c: Obsidian's setting applies
         }
-        self.vault.set_nimw_attachments(mode, path, override_obsidian)?;
+        self.vault.set_liber_attachments(mode, path, override_obsidian)?;
         // …
     }
     pub fn set_attachment_override(&self, on: bool) -> Result<()> {
@@ -551,7 +551,7 @@ In `VaultSettingsSection`:
 - `own` state;
 - `toggleOwn(on)` sends `{ attachments: { mode, path }, overrideObsidian: true }`, or `{ overrideObsidian: false }`;
 - `locked = obsidian !== null && !own`;
-- when Obsidian has a setting, the hint `vault.obsidianSet` ("Obsidian puts new attachments in {value} ({place}).") and a checkbox `vault.override` ("Use a different place in Notes In My Way") show;
+- when Obsidian has a setting, the hint `vault.obsidianSet` ("Obsidian puts new attachments in {value} ({place}).") and a checkbox `vault.override` ("Use a different place in Liber Linteum") show;
 - `vault.obsidianHint` gains "…, or use a different place here."
 
 - [ ] **Step 4: Run them to see them pass.**
@@ -559,7 +559,7 @@ Run: `cargo test --workspace`, `cargo clippy --workspace --all-targets -- -D war
 Expected: PASS.
 
 - [ ] **Step 5: Commit.**
-Subject: "feat(attachments): NIMW can use its own place for new attachments over Obsidian's setting (M4b §5)" (replay: `0c60c8f`).
+Subject: "feat(attachments): Liber Linteum can use its own place for new attachments over Obsidian's setting (M4b §5)" (replay: `0c60c8f`).
 
 ---
 
@@ -568,14 +568,14 @@ Subject: "feat(attachments): NIMW can use its own place for new attachments over
 Spec §4 (autocomplete).
 
 **Files:**
-- Modify: `features/editor/linkComplete.ts`, `theme/base.css` (`.nimw-sr-only`), `i18n/locales/{en,es}.json` (`linkComplete.*`)
+- Modify: `features/editor/linkComplete.ts`, `theme/base.css` (`.liber-sr-only`), `i18n/locales/{en,es}.json` (`linkComplete.*`)
 - Test: `features/editor/linkComplete.test.tsx`
 
 **Interfaces:**
 - Produces:
   - `SUGGEST_DEBOUNCE_MS = 80`;
-  - the header `div.cm-nimw-search` (aria-hidden), holding `.cm-nimw-search-text` and `.cm-nimw-search-count`;
-  - the live region `[data-nimw-complete-status][role=status]`.
+  - the header `div.cm-liber-search` (aria-hidden), holding `.cm-liber-search-text` and `.cm-liber-search-count`;
+  - the live region `[data-liber-complete-status][role=status]`.
 
 - [ ] **Step 1: Write the failing tests.** Add the describe "the search line and debounce (M4b §4)" with three tests:
 - "the list opens with what was typed and how many pages match";
@@ -589,13 +589,13 @@ Spec §4 (autocomplete).
       act(() => v.dispatch({ changes: { from: v.state.doc.length, insert: ch }, selection: { anchor: v.state.doc.length + 1 }, userEvent: 'input.type' }));
       await act(() => new Promise((r) => setTimeout(r, 20)));
     }
-    await vi.waitFor(() => expect(document.querySelector('.cm-nimw-search')).toHaveTextContent('gen'));
+    await vi.waitFor(() => expect(document.querySelector('.cm-liber-search')).toHaveTextContent('gen'));
     expect(queries).toEqual(['gen']);
 ```
 
 - [ ] **Step 2: Run them to see them fail.**
-Run: `pnpm --filter @nimw/desktop exec vitest run --maxWorkers=2 src/features/editor/linkComplete.test.tsx`
-Expected: FAIL. There is no `.cm-nimw-search`, and queries are `['g','ge','gen']`.
+Run: `pnpm --filter @liber/desktop exec vitest run --maxWorkers=2 src/features/editor/linkComplete.test.tsx`
+Expected: FAIL. There is no `.cm-liber-search`, and queries are `['g','ge','gen']`.
 
 - [ ] **Step 3: Implement.** In the file source:
 
@@ -607,7 +607,7 @@ Expected: FAIL. There is no `.cm-nimw-search`, and queries are `['g','ge','gen']
     return { from: q.from, options: res.value.map((s) => ({ ...fileOption(s, q), section })), filter: false };
 ```
 
-The heading source does the same, with `searchSection(q.query, found.length)`. `searchSection` returns a `CompletionSection` whose `header()` builds the line (magnifier SVG, "Search: {query}" or "Type to filter", and "{count} matches"). It calls `announce()` with `linkComplete.matchesFor` or `linkComplete.matches`, which writes to a single polite `role=status` region with the `.nimw-sr-only` class. The theme makes the header `position: sticky; top: 0`.
+The heading source does the same, with `searchSection(q.query, found.length)`. `searchSection` returns a `CompletionSection` whose `header()` builds the line (magnifier SVG, "Search: {query}" or "Type to filter", and "{count} matches"). It calls `announce()` with `linkComplete.matchesFor` or `linkComplete.matches`, which writes to a single polite `role=status` region with the `.liber-sr-only` class. The theme makes the header `position: sticky; top: 0`.
 
 Strings (en):
 - `"search": "Search: {query}"`;
@@ -645,7 +645,7 @@ Subject: "feat(editor): the [[ list opens with a search line and asks Rust once 
 ```
 
 - [ ] **Step 7: Run it.**
-Run: `pnpm --filter @nimw/desktop exec vitest run --maxWorkers=2 src/features/editor/linkComplete.test.tsx -t "review focus"`
+Run: `pnpm --filter @liber/desktop exec vitest run --maxWorkers=2 src/features/editor/linkComplete.test.tsx -t "review focus"`
 Expected: PASS. This is a pin: the `context.aborted` check after the pause already holds it.
 
 - [ ] **Step 8: Commit.** Use `$SP/m4b-pending/2-task5-escape-debounce.msg` (pending).
@@ -690,7 +690,7 @@ Spec §4 (⌘K picker).
 ```
 
 - [ ] **Step 2: Run them to see them fail.**
-Run: `pnpm --filter @nimw/desktop exec vitest run --maxWorkers=2 src/features/editor/placePopup.test.ts src/features/editor/LinkPicker.test.tsx`
+Run: `pnpm --filter @liber/desktop exec vitest run --maxWorkers=2 src/features/editor/placePopup.test.ts src/features/editor/LinkPicker.test.tsx`
 Expected: FAIL. `./placePopup` doesn't resolve, and the picker doesn't move.
 
 - [ ] **Step 3: Implement.**
@@ -748,7 +748,7 @@ Spec §4 (paste).
 - "SVG is left to the editor's own paste (never decoded or saved)".
 
 - [ ] **Step 2: Run them to see them fail.**
-Run: `pnpm --filter @nimw/desktop exec vitest run --maxWorkers=2 src/features/editor/attachments.test.tsx`
+Run: `pnpm --filter @liber/desktop exec vitest run --maxWorkers=2 src/features/editor/attachments.test.tsx`
 Expected: FAIL. `image/tiff` isn't taken by the paste handler.
 
 - [ ] **Step 3: Implement.**
@@ -1002,7 +1002,7 @@ Then, from the repo root, with `<tmp>` a new absolute folder:
 
 ```bash
 sips -s format png apps/desktop/src-tauri/icons/app-icon-macos.svg -o <tmp>/icon.png
-pnpm -F @nimw/desktop tauri icon <tmp>/icon.png -o <tmp>/out
+pnpm -F @liber/desktop tauri icon <tmp>/icon.png -o <tmp>/out
 cp <tmp>/out/icon.icns apps/desktop/src-tauri/icons/icon.icns
 ```
 
@@ -1025,16 +1025,16 @@ Spec §8 (E2E).
 - Test: `e2e/m4b.spec.ts` (Add cover → reposition stays in `m2c.spec.ts`, from Task 3)
 
 - [ ] **Step 1: Write the e2e tests.** In `m4b.spec.ts`:
-- **Helpers:** a `watchNetwork` (a request is local only for 127.0.0.1, `data:` or `nimw-asset`; others are aborted), and `stayedLocal(page, outside)`, which asserts no outside requests and no CSP violations. Every test ends with it.
+- **Helpers:** a `watchNetwork` (a request is local only for 127.0.0.1, `data:` or `liber-asset`; others are aborted), and `stayedLocal(page, outside)`, which asserts no outside requests and no CSP violations. Every test ends with it.
 - **Fixture:** `PAGES` adds `Long.md` (120 numbered lines).
 - **Tests:**
-  - "M4b §1: the title and subtitle are edited in the top bar": a rename gives `__nimwRenames` = `[{ from: 'B.md', to: 'Beta notes.md' }]`, and the subtitle Enter writes `subtitle: Second thoughts`;
+  - "M4b §1: the title and subtitle are edited in the top bar": a rename gives `__liberRenames` = `[{ from: 'B.md', to: 'Beta notes.md' }]`, and the subtitle Enter writes `subtitle: Second thoughts`;
   - "M4b §4: the ⌘K picker follows the text as it scrolls, and stays in the window": select "Line 8", ⌘K, then wheel 200 and wheel 6000 (the box stays inside the 8 px margins and the input keeps focus);
   - "M4b §6: a Related chip is added through the picker, opens its page, and is removed": scope the options to the "Pages" listbox (the format select has options too); Back returns to A;
   - "M4b §6: Connect cards picks the card to connect from, then the other": Alpha, then Long, gives `related:\n  - "[[Long]]"` and one manual edge.
 
 - [ ] **Step 2: Run them.**
-Run: `pnpm build:ui && PLAYWRIGHT_BROWSERS_PATH=<browsers> pnpm --filter @nimw/desktop exec playwright test e2e/m4b.spec.ts`
+Run: `pnpm build:ui && PLAYWRIGHT_BROWSERS_PATH=<browsers> pnpm --filter @liber/desktop exec playwright test e2e/m4b.spec.ts`
 Expected: FAIL in both engines with a timeout on `getByRole('button', { name: 'Back to A' })`. A chip opened its page as a direct navigation, which resets the trail.
 
 - [ ] **Step 3: Fix, then run.**

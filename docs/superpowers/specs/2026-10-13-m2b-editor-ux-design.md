@@ -141,7 +141,7 @@ Token meanings: `bg` page background · `surface` cards/header/editor · `border
 ## 11. Amendments from planning (plan `docs/superpowers/plans/2026-10-13-m2b-editor-ux.md`, replayed end-to-end)
 These override the sections above where they conflict.
 
-1. **Custom palette** is applied as a generated `<style id="nimw-custom-palette">` element (light + dark blocks), not inline custom properties on `<html>` — a palette needs both light and dark values, which inline properties cannot express.
+1. **Custom palette** is applied as a generated `<style id="liber-custom-palette">` element (light + dark blocks), not inline custom properties on `<html>` — a palette needs both light and dark values, which inline properties cannot express.
 2. **Derived tokens** (`bg-dots`, `surface-subtle`, `border-strong`, `text-faint`, `accent-hover`) are computed to hex when `palettes.css` is generated (and in `derive.ts` for the custom accent), not with runtime `color-mix()` — Safari 15 lacks it.
 3. **View → Back / Forward** menu items carry no keyboard accelerators: the page handles ⌘[ / ⌘] itself, and a menu accelerator could fire the navigation twice. The menu items still work by click and emit `menu:navigate`.
 4. **Toolbar active state** comes from CodeMirror's Lezer syntax tree (available in every mode), not the remark model (absent in Source mode); `==highlight==` is detected by scanning the cursor line.
