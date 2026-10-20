@@ -1,0 +1,21 @@
+[package]
+name = "nimw-crypto"
+description = "Vault encryption core: secrets, key derivation, key slots, STREAM file format, names."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+getrandom.workspace = true
+hkdf.workspace = true
+hmac.workspace = true
+rand_core.workspace = true
+region.workspace = true
+serde_json.workspace = true
+sha2.workspace = true
+thiserror.workspace = true
+zeroize.workspace = true
+
+[lints]
+workspace = true
