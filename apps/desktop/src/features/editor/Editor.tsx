@@ -14,7 +14,7 @@ import { tagHighlighter, tags } from '@lezer/highlight';
 import { diffIndices } from 'node-diff3';
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import type { EditorMode, PickedFile } from '../../ipc';
+import { windowLabel, type EditorMode, type PickedFile } from '../../ipc';
 import { usePageStore } from '../../stores/pageStore';
 import { usePageWidth, useWideElements } from '../../stores/pageWidthStore';
 import { isTextPath } from '../../stores/textFiles';
@@ -345,7 +345,10 @@ function createState(d: PageDoc, mode: EditorMode, label: string, numbers: boole
   });
 }
 
-const spellOn = () => useSettingsStore.getState().settings.spellcheck;
+/** Spelling runs in the main window only: a single-file window has no vault
+ *  to keep added words in, and its capability has no spell commands. */
+const MAIN_WINDOW = windowLabel() === 'main';
+const spellOn = () => MAIN_WINDOW && useSettingsStore.getState().settings.spellcheck;
 
 export interface EditorProps {
   doc: PageDoc;
@@ -470,7 +473,7 @@ export function Editor({ doc, mode, label }: EditorProps) {
     });
   }, [showNumbers]);
 
-  const spellEnabled = useSettingsStore((s) => s.settings.spellcheck);
+  const spellEnabled = useSettingsStore((s) => MAIN_WINDOW && s.settings.spellcheck);
   useLayoutEffect(() => {
     const v = view.current;
     if (!v || isTextPath(current.current.path)) return;
