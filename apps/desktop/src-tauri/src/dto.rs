@@ -96,6 +96,14 @@ impl From<RenameOutcome> for RenameOutcomeDto {
     }
 }
 
+/// Add sub-page (round 3 §9): the folder, the page's new path, and the move.
+#[derive(Debug, Clone, Serialize)]
+pub struct FolderPageDto {
+    pub folder: String,
+    pub page: String,
+    pub outcome: RenameOutcomeDto,
+}
+
 #[derive(Debug, Clone, Serialize)]
 pub struct ProgressPayload {
     pub done: usize,

@@ -13,6 +13,7 @@ const COMMANDS: &[&str] = &[
     "entry_create_page",
     "entry_create_folder",
     "entry_rename",
+    "entry_make_folder_page",
     "entry_trash",
     "settings_get",
     "settings_set",

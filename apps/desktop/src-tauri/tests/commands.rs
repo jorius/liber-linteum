@@ -26,6 +26,7 @@ const COMMANDS: &[&str] = &[
     "entry_create_page",
     "entry_create_folder",
     "entry_rename",
+    "entry_make_folder_page",
     "entry_trash",
     "settings_get",
     "settings_set",
@@ -3016,4 +3017,41 @@ fn spell_review_caches_vault_settings_and_failed_dictionaries() {
     )
     .unwrap();
     assert_eq!(check(&h, &["Ioque", "zzqx"], "en"), [true, false]);
+}
+
+/// Round 3 §9: Add sub-page turns a page into its folder's page.
+#[test]
+fn subpages_make_folder_page_command() {
+    let h = harness();
+    let vault = tempfile::tempdir().unwrap();
+    std::fs::write(vault.path().join("P.md"), "# P\n").unwrap();
+    std::fs::write(vault.path().join("Q.md"), "See [[P]].\n").unwrap();
+    call(&h.main, "vault_open", json!({ "path": vault.path() })).unwrap();
+    let out = call(&h.main, "entry_make_folder_page", json!({ "page": "P.md" })).unwrap();
+    assert_eq!(out["folder"], "P");
+    assert_eq!(out["page"], "P/P.md");
+    assert_eq!(out["outcome"]["failed"], json!([]));
+    assert!(vault.path().join("P/P.md").is_file());
+    assert_eq!(
+        kind(
+            call(
+                &h.main,
+                "entry_make_folder_page",
+                json!({ "page": "P/P.md" })
+            )
+            .unwrap_err()
+        ),
+        "alreadyExists"
+    );
+    assert_eq!(
+        kind(
+            call(
+                &h.main,
+                "entry_make_folder_page",
+                json!({ "page": ".archive/X.md" })
+            )
+            .unwrap_err()
+        ),
+        "notPermitted"
+    );
 }

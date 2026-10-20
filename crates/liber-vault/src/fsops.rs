@@ -270,6 +270,37 @@ impl Vault {
         std::fs::rename(&src, &dst).map_err(|e| io_err(from.as_str(), e))
     }
 
+    /// The child of `dir` named `name`, or failing that one whose name only
+    /// differs in letter case or Unicode form (round 3 §9). Exact wins.
+    pub fn child_named(&self, dir: &VaultPath, name: &str) -> Result<Option<VaultPath>> {
+        let full = self.fs_path(dir)?;
+        let entries = match std::fs::read_dir(&full) {
+            Ok(e) => e,
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(None),
+            Err(e) => return Err(io_err(dir.as_str(), e)),
+        };
+        let names: Vec<String> = entries
+            .filter_map(|e| e.ok()?.file_name().into_string().ok())
+            .collect();
+        let found = names
+            .iter()
+            .find(|n| *n == name)
+            .or_else(|| names.iter().find(|n| fold(n) == fold(name)));
+        found.map(|n| dir.join(n)).transpose()
+    }
+
+    /// A folder's own page: `X/X.md`, or a file whose name differs from it
+    /// only in case (round 3b §6.1, round 3 §9). Never for the vault root.
+    pub fn folder_page_of(&self, folder: &VaultPath) -> Option<VaultPath> {
+        if folder.is_root() {
+            return None;
+        }
+        let page = self
+            .child_named(folder, &format!("{}.md", folder.file_name()))
+            .ok()??;
+        self.fs_path(&page).ok()?.is_file().then_some(page)
+    }
+
     /// Whether two vault paths name the same entry on disk, e.g. `Notes` and
     /// `notes` (or `á`/`Á`) on a case-insensitive file system.
     pub fn same_entry(&self, a: &VaultPath, b: &VaultPath) -> bool {
@@ -313,6 +344,12 @@ fn sync_dir(dir: &Path) {
 
 #[cfg(not(unix))]
 fn sync_dir(_dir: &Path) {}
+
+/// Names compared without letter case or Unicode form.
+fn fold(name: &str) -> String {
+    use unicode_normalization::UnicodeNormalization;
+    name.nfc().collect::<String>().to_lowercase()
+}
 
 #[cfg(test)]
 mod tests {

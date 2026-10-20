@@ -658,3 +658,90 @@ fn r3b_review_case_only_pair_rename_with_an_accented_letter() {
         .collect();
     assert_eq!(inner, vec!["Árbol.md".to_string()]);
 }
+
+fn names(dir: &tempfile::TempDir, rel: &str) -> Vec<String> {
+    let mut v: Vec<String> = std::fs::read_dir(dir.path().join(rel))
+        .unwrap()
+        .map(|e| e.unwrap().file_name().to_string_lossy().into_owned())
+        .collect();
+    v.sort();
+    v
+}
+
+/// Round 3 §9: `SmartJob/Smartjob.md` is its folder's page despite the case.
+#[test]
+fn subpages_case_variant_page_renames_with_its_folder() {
+    let (dir, _c, s) = vault_with(&[
+        ("SmartJob/Smartjob.md", b"# S\n"),
+        ("SmartJob/Teams.md", b""),
+    ]);
+    s.rename(&vp("SmartJob"), &vp("Work"), true).unwrap();
+    assert_eq!(names(&dir, "Work"), vec!["Teams.md", "Work.md"]);
+}
+
+#[test]
+fn subpages_renaming_a_case_variant_page_moves_its_folder() {
+    let (dir, _c, s) = vault_with(&[
+        ("SmartJob/Smartjob.md", b"# S\n"),
+        ("SmartJob/Teams.md", b""),
+    ]);
+    let out = s
+        .rename(&vp("SmartJob/Smartjob.md"), &vp("SmartJob/Career.md"), true)
+        .unwrap();
+    assert_eq!(names(&dir, "Career"), vec!["Career.md", "Teams.md"]);
+    assert!(out.pair.is_some());
+}
+
+/// "Match the page name to the folder": a case-only page rename that leaves
+/// the folder where it is.
+#[test]
+fn subpages_matching_the_page_name_keeps_the_folder() {
+    let (dir, _c, s) = vault_with(&[("SmartJob/Smartjob.md", b"# S\n")]);
+    let out = s
+        .rename(
+            &vp("SmartJob/Smartjob.md"),
+            &vp("SmartJob/SmartJob.md"),
+            true,
+        )
+        .unwrap();
+    assert_eq!(names(&dir, "."), vec!["SmartJob"]);
+    assert_eq!(names(&dir, "SmartJob"), vec!["SmartJob.md"]);
+    assert!(out.pair.is_none());
+}
+
+/// Add sub-page on a plain page: `P.md` becomes `P/P.md`, links follow.
+#[test]
+fn subpages_plain_page_becomes_its_folder_page() {
+    let (dir, _c, s) = vault_with(&[
+        ("Notes/P.md", b"# P\n"),
+        ("Other.md", b"See [p](Notes/P.md).\n"),
+    ]);
+    let (folder, page, _out) = s.make_folder_page(&vp("Notes/P.md"), true).unwrap();
+    assert_eq!((folder, page), (vp("Notes/P"), vp("Notes/P/P.md")));
+    assert_eq!(names(&dir, "Notes"), vec!["P"]);
+    assert_eq!(names(&dir, "Notes/P"), vec!["P.md"]);
+    assert_eq!(read(&dir, "Other.md"), "See [p](Notes/P/P.md).\n");
+}
+
+#[test]
+fn subpages_existing_folder_without_a_page_takes_it() {
+    let (dir, _c, s) = vault_with(&[("P.md", b""), ("p/child.md", b"")]);
+    let (folder, page, _) = s.make_folder_page(&vp("P.md"), true).unwrap();
+    assert_eq!((folder, page), (vp("p"), vp("p/p.md")));
+    assert_eq!(names(&dir, "p"), vec!["child.md", "p.md"]);
+}
+
+#[test]
+fn subpages_refuses_and_moves_nothing() {
+    // The folder name is taken by a file.
+    let (dir, _c, s) = vault_with(&[("P.md", b""), ("P", b"not a folder")]);
+    assert!(s.make_folder_page(&vp("P.md"), true).is_err());
+    assert_eq!(names(&dir, "."), vec!["P", "P.md"]);
+    // The folder already has its own page.
+    let (dir, _c, s) = vault_with(&[("Q.md", b""), ("Q/Q.md", b"")]);
+    assert!(s.make_folder_page(&vp("Q.md"), true).is_err());
+    assert_eq!(names(&dir, "."), vec!["Q", "Q.md"]);
+    // It is already its folder's page.
+    assert!(s.make_folder_page(&vp("Q/Q.md"), true).is_err());
+    assert_eq!(names(&dir, "Q"), vec!["Q.md"]);
+}

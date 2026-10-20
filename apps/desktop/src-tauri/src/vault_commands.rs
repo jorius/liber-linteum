@@ -277,6 +277,23 @@ pub(crate) fn entry_rename_impl(
         .into())
 }
 
+/// Add sub-page (round 3 §9): `P.md` becomes `P/P.md`, links rewritten.
+pub(crate) fn entry_make_folder_page_impl(
+    state: &AppState,
+    page: String,
+) -> CmdResult<crate::dto::FolderPageDto> {
+    crate::vault_commands::not_archived(&page)?;
+    let rewrite = state.settings.get().0.rewrite_links;
+    let (folder, page, outcome) = state
+        .session()?
+        .make_folder_page(&VaultPath::new(&page)?, rewrite)?;
+    Ok(crate::dto::FolderPageDto {
+        folder: folder.to_string(),
+        page: page.to_string(),
+        outcome: outcome.into(),
+    })
+}
+
 /// Moves an item into the vault's Trash (M5b §5.1); its path there.
 pub(crate) fn entry_trash_impl(state: &AppState, path: String) -> CmdResult<String> {
     Ok(state.session()?.trash(&VaultPath::new(&path)?)?.to_string())
@@ -358,6 +375,17 @@ pub async fn entry_rename<R: Runtime>(
 ) -> CmdResult<RenameOutcomeDto> {
     blocking(app, move |app| {
         entry_rename_impl(&app.state::<AppState>(), from, to)
+    })
+    .await
+}
+
+#[tauri::command]
+pub async fn entry_make_folder_page<R: Runtime>(
+    app: AppHandle<R>,
+    page: String,
+) -> CmdResult<crate::dto::FolderPageDto> {
+    blocking(app, move |app| {
+        entry_make_folder_page_impl(&app.state::<AppState>(), page)
     })
     .await
 }
