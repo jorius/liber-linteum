@@ -2,3 +2,5 @@
 fixtures/** -text
 # Hunspell dictionaries are vendored byte for byte.
 crates/liber-spell/dictionaries/** -text
+# Frozen crypto test vectors: compared byte for byte, so never line-ending converted.
+crates/liber-crypto/tests/vectors/** -text

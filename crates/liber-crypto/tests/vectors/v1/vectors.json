@@ -1,0 +1,106 @@
+{
+  "device": {
+    "device_id": "José's MacBook",
+    "secret": "f8bd4884a75a6c952ad123d3169ae8f9e8964da5d268b5b33d24a39bfdbe5954"
+  },
+  "epoch": 1,
+  "files": [
+    {
+      "len": 0,
+      "name": "file-0.libere",
+      "plaintext_rule": "i % 251",
+      "salt": "d6536ce0e52994df67c8a812009efb780d10fa3a45bb6cd79dd7c07d05c782e9"
+    },
+    {
+      "len": 1,
+      "name": "file-1.libere",
+      "plaintext_rule": "i % 251",
+      "salt": "8513243eff3dd5bab64811e7e471096ea25b623d04abf4b1d1ad21eab4651a8f"
+    },
+    {
+      "len": 65535,
+      "name": "file-65535.libere",
+      "plaintext_rule": "i % 251",
+      "salt": "562e21e6a641a49caa079370d2c577f4aaa1b0c8366f9cdd26b187c832578fa5"
+    },
+    {
+      "len": 65536,
+      "name": "file-65536.libere",
+      "plaintext_rule": "i % 251",
+      "salt": "36f0a5652fb824227dd9e7d1e4f33c720b48e0268d6c48d46e2a0c0d41b76fa4"
+    },
+    {
+      "len": 200000,
+      "name": "file-200000.libere",
+      "plaintext_rule": "i % 251",
+      "salt": "de7368690ff8bbb2e1f2178e13a46764e2bc0f1d1853ccc9ba61221a2a98c6b8"
+    }
+  ],
+  "keyring": {
+    "recovery_code": "LIBER-DRYG-FJVR-MRC6-HDGJ-PAY8-KTZS-HRGX-8ARV-XFSF-EMXP-S009-TSGS-GFEG-GM00"
+  },
+  "names": [
+    {
+      "kind": "file",
+      "name": "Notes.md",
+      "on_disk": "_pErZ0eQGBoKuG2wRG1xI3E6LoRFeJ66.libere",
+      "parent": "00000000000000000000000000000000"
+    },
+    {
+      "folder_id": "93452c06a19571eb54c20a5eb1b7e7e3",
+      "kind": "folder",
+      "name": "Projects",
+      "on_disk": "DLTzEfAh7VhTHR6PGy9agbeElMesANYljEA_lihLvXTrcEAMRezf8g",
+      "parent": "00000000000000000000000000000000"
+    },
+    {
+      "kind": "file",
+      "name": "Plan.md",
+      "on_disk": "9x8UyoXAA5OylsVgZAzwVTDNXbgvGMM.libere",
+      "parent": "93452c06a19571eb54c20a5eb1b7e7e3"
+    },
+    {
+      "kind": "file",
+      "name": "Café notes.md",
+      "on_disk": "WW1xmypt69DcpnGHSQtNr-ELqxIbKv8DqQlWbG4j.libere",
+      "parent": "93452c06a19571eb54c20a5eb1b7e7e3"
+    },
+    {
+      "folder_id": "4d45a17a0861f34d2feb1efbbead41b8",
+      "kind": "folder",
+      "name": "Résumé",
+      "on_disk": "rNFpwrgQSq3WgImbTLgu_d1NzezQQvsvXUFtBynSx7MXTGQJmCbNGQ",
+      "parent": "93452c06a19571eb54c20a5eb1b7e7e3"
+    },
+    {
+      "kind": "file",
+      "name": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx.md",
+      "on_disk": "dZdNwbJ3T_xhGvPLAsbIx1IVrqHFeG578NXoeih0xUgt4pDvfLrvNfJGwTzvyrVU4-W293ui5rQKvHf-7cLY1O6JEZ2NdhMMs1a3k0kIxbE9TEOXiK2p0i6Gpa-69GAVTVoW9j36yT26OYBIa-_WvLx98O4JOcdWnak8GMiNKERM-tGLgXUgCLL5aL5wpdcdF2GLzJ7yayYoZYdHh69CGSnKOexxSVHWcQ.libere",
+      "parent": "93452c06a19571eb54c20a5eb1b7e7e3",
+      "short": {
+        "on_disk": "p47ektygmpfovhshuvtshl52h4ygr467.liberl",
+        "side_file": "p47ektygmpfovhshuvtshl52h4ygr467.libern"
+      }
+    }
+  ],
+  "params": {
+    "m_kib": 64,
+    "p": 1,
+    "t": 1
+  },
+  "passphrase": "correct horse ⚡ batterie",
+  "recovery_code": "LIBER-ZDS9-CHT4-WPMV-X60F-CR58-JN2Z-6Z09-23Z9-RK8B-MCCQ-PHTE-HG9K-7J30-26DD",
+  "rotated": {
+    "epoch": 2,
+    "recovery_code": "LIBER-H5MS-14R2-P4VR-VHAM-05BE-BX4Y-S3SC-MZ75-7MHS-H5TJ-8XXQ-HHQN-7RHG-5PCT",
+    "vk": "efa1dc58d77b5696c8a32a21cc50b4a71579d967bb85387e88a4cfa5537558dc"
+  },
+  "subkeys": {
+    "content": "9e100fa787a6d4859a428355890a1116f476b2095e90f50aaab34a3cda4a12f1",
+    "header": "f1f2b9a38678587dbda8f0798f61148f64170daa078c6ab7e3e89a5093ff7c34",
+    "index": "96c0e3b53f560ae88c7e2a8a52b5e26fa28fc8b21865ce68e7dbcef9090a0f4a",
+    "name": "610214615d00859b06676f699f4f4e85e5ba55dc89f0df983786c69e9177d47b589589090ad4795dbf64e6ea014f514aa34ec021d4a5dde167b261acf72db7a8"
+  },
+  "vault_id": "7ab0f47fdb72cbca3df0c43aa03e3e13",
+  "vk": "63fb1a9b4ba90fa6cf3292cec0abcff79778ce3ad3b889f437fafae21db22b41"
+}

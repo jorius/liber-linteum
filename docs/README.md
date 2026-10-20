@@ -9,6 +9,7 @@ Where to start, depending on what you need.
 | **What** the app does and why | [`product-spec.md`](product-spec.md): requirements with IDs (`GV-04`, `SR-02`…), personas, decision log |
 | **How** it is built | [`superpowers/specs/2026-10-12-architecture-design.md`](superpowers/specs/2026-10-12-architecture-design.md): start at §0 "As built" for where the code differs from the v1 design |
 | The index, its SQLite database and how indexing works | [`architecture/index-and-database.md`](architecture/index-and-database.md) |
+| The encrypted-vault format, byte by byte (for implementers) | [`security/vault-format-v1.md`](security/vault-format-v1.md): headers, slots, keyring, STREAM files, names, vectors |
 | One milestone in detail | its spec in [`superpowers/specs/`](superpowers/specs/) (`YYYY-MM-DD-<milestone>-design.md`); later sections hold the amendments, review findings and rulings |
 | How a milestone was planned task by task | [`superpowers/plans/`](superpowers/plans/) |
 | What a round delivered, its reviews, rulings to confirm and real-window checklists | [`handoff/`](handoff/): one per round, newest is `2026-10-18-batch6-handoff.md` |

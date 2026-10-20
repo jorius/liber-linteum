@@ -45,7 +45,7 @@
   - The file header is 48 bytes: `LIBER`, version 1, suite 1, log2 chunk size 16, a 32-byte salt, a u32 BE epoch, then 4 zero bytes. Chunks are 64 KiB.
   - The file key is HKDF-SHA-256(K_content, salt = file salt, info = `liber/v1/file`).
   - The chunk nonce is an 11-byte BE counter followed by a last-flag byte; the AAD is the 48-byte header.
-  - Names use AES-SIV-256 with AD = `vault_id`, `epoch` (u32 BE), `parent folder id`; the encoding is Base64url without padding. Files get the `.libere` suffix. A folder's plaintext is `folder_id ‖ name`. Names longer than 200 bytes become `<hash>.liberl` plus a `<hash>.libern` side file.
+  - Names use AES-SIV-256 with AD = four headers `vault_id`, `epoch` (u32 BE), `parent folder id`, kind (`b"f"` file, `b"d"` folder); the encoding is Base64url without padding. Files get the `.libere` suffix. A folder's plaintext is `folder_id ‖ name`. Names longer than 200 bytes become `<hash>.liberl` plus a `<hash>.libern` side file.
 - **The writer only appends** (spec §4.2). `StreamWriter` is generic over `W: Write` only, never `Seek`, and each chunk is encrypted exactly once.
 - **Signed commits** end with `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`. Never bypass signing.
 - **The gate:** `cargo fmt --all --check`, `cargo clippy --workspace --all-targets -- -D warnings`, `cargo test --workspace` and `cargo deny check` all pass. In practice, run `$SP/check.sh all <worktree>`.
@@ -107,7 +107,7 @@
 - Produces:
   - `pub struct RecoveryCode(Secret<32>)`, with these methods:
     - `generate() -> Self`
-    - `to_display(&self) -> String`, which returns `LIBER-` followed by 14 groups of 4 separated by `-`: 13 data groups, then 1 checksum group.
+    - `to_display(&self) -> String`, which returns `LIBER-` followed by 14 groups of 4 separated by `-`: 13 data groups, then 1 checksum group. Display is 75 characters; `parse` accepts 56 characters bare or 61 with the prefix (hyphens and spaces ignored).
     - `parse(s: &str) -> Result<Self>`
     - `secret(&self) -> &Secret<32>`
   - `pub struct Argon2Params { pub m_kib: u32, pub t: u32, pub p: u32 }`, with these constants:

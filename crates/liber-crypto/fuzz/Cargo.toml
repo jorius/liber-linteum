@@ -1,0 +1,44 @@
+[package]
+name = "liber-crypto-fuzz"
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys = "0.4.13"
+liber-crypto = { path = ".." }
+
+# Own workspace: libfuzzer-sys is NCSA-licensed, so this crate stays out of the root
+# workspace and out of `cargo deny`.
+[workspace]
+
+[[bin]]
+name = "header"
+path = "fuzz_targets/header.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "keyring"
+path = "fuzz_targets/keyring.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "stream"
+path = "fuzz_targets/stream.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "names"
+path = "fuzz_targets/names.rs"
+test = false
+doc = false
+bench = false

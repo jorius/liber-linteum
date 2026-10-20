@@ -13,3 +13,5 @@ apps/desktop/src/theme/palettes.css
 # Local Claude Code settings and agent worktrees (not project files)
 .claude/
 apps/desktop/src/features/icons/emoji.json
+# Frozen crypto test vectors are byte-exact.
+crates/liber-crypto/tests/vectors
