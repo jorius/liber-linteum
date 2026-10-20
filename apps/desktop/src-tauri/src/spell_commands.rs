@@ -10,9 +10,11 @@ use crate::vault_commands::blocking;
 use nimw_session::VaultSession;
 use nimw_spell::{BUNDLED, SpellError, Speller, validate};
 use serde::Serialize;
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex, Weak};
+use std::time::SystemTime;
 use tauri::{AppHandle, Manager, Runtime};
 use tauri_plugin_dialog::DialogExt;
 
@@ -27,6 +29,21 @@ pub struct SpellState {
     /// Words ignored in the open vault's session; reset when another session
     /// (a different vault, or the same one reopened) is open.
     ignores: Mutex<(Weak<VaultSession>, HashSet<String>)>,
+    /// Imported dictionaries that failed to load, with their files' times
+    /// then: not retried until the files change (round 3b final review #12).
+    failed: Mutex<HashMap<String, Option<(SystemTime, SystemTime)>>>,
+    /// The open vault's spelling settings, kept until `.nimw/vault.json`
+    /// changes rather than read on every check (final review #12).
+    vault: Mutex<Option<VaultSpelling>>,
+    loads: AtomicUsize,
+    reads: AtomicUsize,
+}
+
+struct VaultSpelling {
+    session: Weak<VaultSession>,
+    stamp: Option<(SystemTime, u64)>,
+    dictionaries: Option<Vec<String>>,
+    words: Vec<String>,
 }
 
 impl SpellState {
@@ -42,6 +59,41 @@ impl SpellState {
                 HashSet::new()
             }
         }
+    }
+
+    /// (dictionary loads attempted, vault settings reads), for tests.
+    #[doc(hidden)]
+    pub fn counters(&self) -> (usize, usize) {
+        (
+            self.loads.load(Ordering::Relaxed),
+            self.reads.load(Ordering::Relaxed),
+        )
+    }
+
+    /// The open vault's (dictionary override, added words).
+    fn vault_spelling(&self, session: &Arc<VaultSession>) -> (Option<Vec<String>>, Vec<String>) {
+        let vault = session.vault();
+        let stamp = vault.spelling_stamp();
+        let mut slot = self.vault.lock().unwrap_or_else(|e| e.into_inner());
+        match slot.as_ref() {
+            Some(c) if c.session.ptr_eq(&Arc::downgrade(session)) && c.stamp == stamp => {}
+            _ => {
+                self.reads.fetch_add(1, Ordering::Relaxed);
+                *slot = Some(VaultSpelling {
+                    session: Arc::downgrade(session),
+                    stamp,
+                    dictionaries: vault.spelling_dictionaries(),
+                    words: vault.spelling_words(),
+                });
+            }
+        }
+        let c = slot.as_ref().expect("filled above");
+        (c.dictionaries.clone(), c.words.clone())
+    }
+
+    /// Forgets the cached vault settings after this module writes them.
+    fn vault_changed(&self) {
+        *self.vault.lock().unwrap_or_else(|e| e.into_inner()) = None;
     }
 
     fn ignore(&self, session: &Arc<VaultSession>, word: String) {
@@ -119,14 +171,29 @@ fn ensure(spell: &SpellState, state: &AppState, id: &str) -> bool {
         return false;
     }
     let (aff, dic) = files(&folder(state, id));
-    spell.speller.load_files(id, &aff, &dic).is_ok()
+    let times = (|| {
+        let t = |p: &Path| std::fs::metadata(p).and_then(|m| m.modified()).ok();
+        Some((t(&aff)?, t(&dic)?))
+    })();
+    let mut failed = spell.failed.lock().unwrap_or_else(|e| e.into_inner());
+    if failed.get(id) == Some(&times) {
+        return false;
+    }
+    spell.loads.fetch_add(1, Ordering::Relaxed);
+    let ok = spell.speller.load_files(id, &aff, &dic).is_ok();
+    if ok {
+        failed.remove(id);
+    } else {
+        failed.insert(id.to_string(), times);
+    }
+    ok
 }
 
 fn active(spell: &SpellState, state: &AppState, lang: &str) -> Vec<String> {
     let from_vault = state
         .session()
         .ok()
-        .and_then(|s| s.vault().spelling_dictionaries());
+        .and_then(|s| spell.vault_spelling(&s).0);
     let ids = from_vault
         .or(state.settings.get().0.spell_dictionaries)
         .unwrap_or_else(|| {
@@ -262,9 +329,15 @@ pub(crate) fn spell_remove_impl(spell: &SpellState, state: &AppState, id: String
         {
             ids.retain(|d| *d != id);
             vault.set_spelling_dictionaries(Some(&ids))?;
+            spell.vault_changed();
         }
     }
     spell.speller.unload(&id);
+    spell
+        .failed
+        .lock()
+        .unwrap_or_else(|e| e.into_inner())
+        .remove(&id);
     let dir = folder(state, &id);
     if dir.exists() {
         std::fs::remove_dir_all(dir)?;
@@ -288,7 +361,7 @@ pub(crate) fn spell_check_impl(
     let session = state.session().ok();
     let mut extra = spell.ignores(session.as_ref());
     if let Some(s) = &session {
-        extra.extend(s.vault().spelling_words());
+        extra.extend(spell.vault_spelling(s).1);
     }
     Ok(spell.speller.check(&active, &extra, &words))
 }
@@ -300,14 +373,20 @@ fn valid_word(word: &str) -> CmdResult<()> {
     ok.then_some(()).ok_or_else(|| invalid("not a single word"))
 }
 
-pub(crate) fn spell_vault_set_impl(state: &AppState, ids: Option<Vec<String>>) -> CmdResult<()> {
+pub(crate) fn spell_vault_set_impl(
+    spell: &SpellState,
+    state: &AppState,
+    ids: Option<Vec<String>>,
+) -> CmdResult<()> {
     if let Some(unknown) = ids.iter().flatten().find(|id| !known(state, id)) {
         return Err(invalid(format!("unknown dictionary {unknown}")));
     }
-    Ok(state
+    state
         .session()?
         .vault()
-        .set_spelling_dictionaries(ids.as_deref())?)
+        .set_spelling_dictionaries(ids.as_deref())?;
+    spell.vault_changed();
+    Ok(())
 }
 
 #[tauri::command]
@@ -385,11 +464,12 @@ pub async fn spell_suggest<R: Runtime>(
 pub async fn spell_add_word<R: Runtime>(app: AppHandle<R>, word: String) -> CmdResult<()> {
     blocking(app, move |app| {
         valid_word(&word)?;
-        Ok(app
-            .state::<AppState>()
+        app.state::<AppState>()
             .session()?
             .vault()
-            .add_spelling_word(&word)?)
+            .add_spelling_word(&word)?;
+        app.state::<SpellState>().vault_changed();
+        Ok(())
     })
     .await
 }
@@ -416,11 +496,12 @@ pub async fn spell_words<R: Runtime>(app: AppHandle<R>) -> CmdResult<Vec<String>
 #[tauri::command]
 pub async fn spell_remove_word<R: Runtime>(app: AppHandle<R>, word: String) -> CmdResult<()> {
     blocking(app, move |app| {
-        Ok(app
-            .state::<AppState>()
+        app.state::<AppState>()
             .session()?
             .vault()
-            .remove_spelling_word(&word)?)
+            .remove_spelling_word(&word)?;
+        app.state::<SpellState>().vault_changed();
+        Ok(())
     })
     .await
 }
@@ -443,7 +524,7 @@ pub async fn spell_vault_set<R: Runtime>(
     ids: Option<Vec<String>>,
 ) -> CmdResult<()> {
     blocking(app, move |app| {
-        spell_vault_set_impl(&app.state::<AppState>(), ids)
+        spell_vault_set_impl(&app.state::<SpellState>(), &app.state::<AppState>(), ids)
     })
     .await
 }

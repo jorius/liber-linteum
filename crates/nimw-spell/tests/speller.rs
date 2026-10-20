@@ -133,3 +133,46 @@ fn load_files_registers_an_imported_dictionary() {
         Err(SpellError::Unknown(_))
     ));
 }
+
+// Round 3b final review #2: with no dictionary active, nothing is flagged.
+#[test]
+fn no_active_dictionary_flags_nothing() {
+    let s = loaded(&["en_US"]);
+    let none = HashSet::new();
+    assert_eq!(s.check(&[], &none, &w(&["the", "zzqx"])), vec![true, true]);
+    // Chosen, but not loaded (an imported dictionary whose files are gone).
+    assert_eq!(
+        s.check(&w(&["user:gone"]), &none, &w(&["the", "zzqx"])),
+        vec![true, true]
+    );
+}
+
+// Round 3b final review #7: an added word is accepted in title case and
+// all caps too, as Hunspell treats its own lower-case words.
+#[test]
+fn added_words_accept_title_case_and_all_caps() {
+    let s = loaded(&["en_US"]);
+    let extra: HashSet<String> = [
+        "nimw".to_string(),
+        "árbolito".to_string(),
+        "iPhone".to_string(),
+    ]
+    .into();
+    assert_eq!(
+        s.check(
+            &w(&["en_US"]),
+            &extra,
+            &w(&[
+                "nimw",
+                "Nimw",
+                "NIMW",
+                "Árbolito",
+                "ÁRBOLITO",
+                "nImw",
+                "IPHONE",
+                "iphone"
+            ])
+        ),
+        vec![true, true, true, true, true, false, true, false]
+    );
+}

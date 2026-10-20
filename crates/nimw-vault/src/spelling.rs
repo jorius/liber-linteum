@@ -41,6 +41,13 @@ impl Vault {
         })
     }
 
+    /// When `.nimw/vault.json` last changed (and its size), so callers can
+    /// keep the spelling settings until it does; `None` when it's absent.
+    pub fn spelling_stamp(&self) -> Option<(std::time::SystemTime, u64)> {
+        let meta = std::fs::metadata(self.root().join(NIMW_JSON)).ok()?;
+        Some((meta.modified().ok()?, meta.len()))
+    }
+
     pub fn spelling_words(&self) -> Vec<String> {
         let value: Value = read_json(self.root(), NIMW_JSON, &mut Vec::new());
         strings(value.get(WORDS)).unwrap_or_default()

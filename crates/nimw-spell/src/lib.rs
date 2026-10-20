@@ -55,6 +55,32 @@ fn nfc(word: &str) -> String {
     word.nfc().collect()
 }
 
+/// The spellings of `word` an added word may have been written in, as
+/// Hunspell does for its own words: a Title or ALL-CAPS word also matches its
+/// lower-case form, and an ALL-CAPS word its Title form (round 3b final
+/// review #7). Mixed case (`nImw`) matches only itself.
+fn case_forms(word: &str) -> Vec<String> {
+    let mut forms = vec![word.to_string()];
+    let mut chars = word.chars();
+    let Some(first) = chars.next() else {
+        return forms;
+    };
+    let rest: String = chars.collect();
+    let lower = word.to_lowercase();
+    let all_caps = word.chars().any(char::is_alphabetic) && word == word.to_uppercase();
+    let title = first.is_uppercase() && rest == rest.to_lowercase();
+    if all_caps || title {
+        forms.push(lower.clone());
+    }
+    if all_caps {
+        let mut t = lower.chars();
+        if let Some(f) = t.next() {
+            forms.push(f.to_uppercase().chain(t).collect());
+        }
+    }
+    forms
+}
+
 fn read(path: &Path) -> Result<String, SpellError> {
     let len = fs::metadata(path)
         .map_err(|_| SpellError::Unreadable(path.to_path_buf()))?
@@ -130,15 +156,20 @@ impl Speller {
 
     /// Whether each word is spelled right: accepted by any active (loaded)
     /// dictionary, or in `extra` (the vault's words and the session's
-    /// ignores). Ids that aren't loaded are skipped.
+    /// ignores). Ids that aren't loaded are skipped; with no dictionary left,
+    /// nothing is flagged (round 3b final review #2).
     pub fn check(&self, active: &[String], extra: &HashSet<String>, words: &[String]) -> Vec<bool> {
         let dicts = self.active(active);
+        if dicts.is_empty() {
+            return vec![true; words.len()];
+        }
         let extra: HashSet<String> = extra.iter().map(|w| nfc(w)).collect();
         words
             .iter()
             .map(|word| {
                 let word = nfc(word);
-                extra.contains(&word) || dicts.iter().any(|d| d.check(&word))
+                case_forms(&word).iter().any(|f| extra.contains(f))
+                    || dicts.iter().any(|d| d.check(&word))
             })
             .collect()
     }

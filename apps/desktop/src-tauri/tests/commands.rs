@@ -2970,3 +2970,50 @@ fn settings_default_and_patch_spelling_fields() {
     assert_eq!(s["spellcheck"], false);
     assert_eq!(s["spellDictionaries"], json!(["es_CO", "en_US"]));
 }
+
+/// Round 3b final review #12: a check reads `.nimw/vault.json` only when it
+/// changed, and a dictionary that failed to parse isn't re-read until its
+/// files change. Round 3b final review #2: no dictionary → nothing flagged.
+#[test]
+fn spell_review_caches_vault_settings_and_failed_dictionaries() {
+    let h = harness();
+    let state = h.app.state::<nimw_desktop::state::AppState>();
+    let spell = h.app.state::<nimw_desktop::spell_commands::SpellState>();
+    let vault = open_fixture(&h, "obsidian-basic");
+    // A registered import whose files don't parse.
+    let dir = h._config.path().join("dictionaries/user-broken");
+    std::fs::create_dir_all(&dir).unwrap();
+    std::fs::write(dir.join("index.aff"), "not an aff").unwrap();
+    std::fs::write(dir.join("index.dic"), "x").unwrap();
+    state
+        .settings
+        .modify(|s| {
+            s.imported_dictionaries
+                .push(nimw_desktop::settings::ImportedDictionary {
+                    id: "user:broken".into(),
+                    name: "Broken".into(),
+                });
+            s.spell_dictionaries = Some(vec!["user:broken".into()]);
+        })
+        .unwrap();
+    // Nothing usable is active: nothing is flagged.
+    assert_eq!(check(&h, &["the", "zzqx"], "en"), [true, true]);
+    let after_first = spell.counters();
+    assert_eq!(check(&h, &["the", "zzqx"], "en"), [true, true]);
+    assert_eq!(
+        spell.counters(),
+        after_first,
+        "nothing re-read on the second check"
+    );
+    // An outside edit to vault.json is seen.
+    let json = vault.path().join(".nimw/vault.json");
+    std::fs::create_dir_all(json.parent().unwrap()).unwrap();
+    std::fs::write(&json, r#"{"spellingWords":["Ioque"]}"#).unwrap();
+    call(
+        &h.main,
+        "settings_set",
+        json!({ "patch": { "spellDictionaries": ["en_US"] } }),
+    )
+    .unwrap();
+    assert_eq!(check(&h, &["Ioque", "zzqx"], "en"), [true, false]);
+}
