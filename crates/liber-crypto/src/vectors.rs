@@ -179,14 +179,14 @@ fn vectors_are_stable() {
 
 #[test]
 fn python_cross_check() {
-    let skip = || println!("SKIP: python3 + cryptography not available");
+    let skip = |why: &str| println!("SKIP: python3 + cryptography not available{why}");
     // A missing python3, or a stub that can't run one (the Windows Store alias), counts as absent.
     let runs = Command::new("python3")
         .args(["-I", "-c", ""])
         .output()
         .is_ok_and(|o| o.status.success());
     if !runs {
-        return skip();
+        return skip("");
     }
     let script = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/xcheck/xcheck.py");
     let out = Command::new("python3")
@@ -198,7 +198,10 @@ fn python_cross_check() {
     let stdout = String::from_utf8_lossy(&out.stdout);
     match out.status.code() {
         Some(0) => print!("{stdout}"),
-        Some(77) => skip(),
+        Some(77) => skip(&format!(
+            ": {}",
+            String::from_utf8_lossy(&out.stderr).trim()
+        )),
         _ => panic!(
             "xcheck failed ({}):\n{stdout}{}",
             out.status,
