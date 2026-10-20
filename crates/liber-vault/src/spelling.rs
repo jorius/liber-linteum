@@ -44,7 +44,11 @@ impl Vault {
     /// When `.liber/vault.json` last changed (and its size), so callers can
     /// keep the spelling settings until it does; `None` when it's absent.
     pub fn spelling_stamp(&self) -> Option<(std::time::SystemTime, u64)> {
-        let meta = std::fs::metadata(self.root().join(LIBER_JSON)).ok()?;
+        let meta = std::fs::metadata(
+            self.root()
+                .join(crate::meta_dir::resolve(self.root(), LIBER_JSON)),
+        )
+        .ok()?;
         Some((meta.modified().ok()?, meta.len()))
     }
 

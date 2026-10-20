@@ -8,7 +8,9 @@ use globset::{Glob, GlobSet, GlobSetBuilder};
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 
-/// An open vault folder. Opening reads configuration but never writes (VLT-02).
+/// An open vault folder. Opening reads configuration and writes nothing of
+/// the user's (VLT-02); its one write is moving a legacy `.nimw/` settings
+/// folder to `.liber/` (`meta_dir::migrate`).
 #[derive(Debug)]
 pub struct Vault {
     pub(crate) root: PathBuf,
@@ -176,6 +178,7 @@ impl Vault {
         create: bool,
         edit: &mut impl FnMut(&mut serde_json::Map<String, serde_json::Value>),
     ) -> Result<()> {
+        let rel = &crate::meta_dir::resolve(&self.root, rel);
         let file = VaultPath::new(rel)?;
         let (mut map, expected) = match self.read(&file) {
             Ok((bytes, hash)) => match serde_json::from_slice(&bytes) {
@@ -197,9 +200,12 @@ impl Vault {
             return Ok(());
         }
         map.entry("version").or_insert(1.into());
-        let dir = self.fs_path(&VaultPath::new(".liber")?)?;
+        // The settings folder appears on first need (VLT-02); the legacy one,
+        // when `rel` resolved there, already exists.
+        let meta = rel.split('/').next().unwrap_or(rel);
+        let dir = self.fs_path(&VaultPath::new(meta)?)?;
         if !dir.is_dir() {
-            std::fs::create_dir(&dir).map_err(|e| io_err(".liber", e))?;
+            std::fs::create_dir(&dir).map_err(|e| io_err(meta, e))?;
         }
         let mut text =
             serde_json::to_string_pretty(&serde_json::Value::Object(map)).expect("valid JSON");
@@ -288,7 +294,7 @@ pub(crate) fn read_json<T: serde::de::DeserializeOwned + Default>(
     rel: &str,
     warnings: &mut Vec<String>,
 ) -> T {
-    let path = root.join(rel);
+    let path = root.join(crate::meta_dir::resolve(root, rel));
     let Ok(bytes) = std::fs::read(&path) else {
         return T::default();
     };

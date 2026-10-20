@@ -21,14 +21,11 @@ fn parse(value: &serde_json::Value) -> Option<String> {
 }
 
 /// The icon of the vault at `root`, read without opening it (the recent
-/// vaults list). A vault not reopened since the rename keeps its settings in
-/// the legacy folder: peek there without moving anything.
+/// vaults list); a vault not reopened since the rename is read where its
+/// settings still are, without moving anything.
 pub fn vault_icon_at(root: &Path) -> Option<String> {
-    let legacy = format!("{}/vault.json", crate::LEGACY_META_DIR);
-    [LIBER_JSON, legacy.as_str()].into_iter().find_map(|rel| {
-        let value: serde_json::Value = read_json(root, rel, &mut Vec::new());
-        value.get(VAULT).and_then(parse)
-    })
+    let value: serde_json::Value = read_json(root, LIBER_JSON, &mut Vec::new());
+    value.get(VAULT).and_then(parse)
 }
 
 impl Vault {

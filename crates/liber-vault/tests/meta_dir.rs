@@ -120,3 +120,76 @@ fn icon_peek_does_not_migrate() {
     assert!(dir.path().join(LEGACY_META_DIR).is_dir());
     assert!(!dir.path().join(META_DIR).exists());
 }
+
+/// Puts a folder's mode back on drop, so a failed assert still lets the
+/// temp dir be removed.
+#[cfg(unix)]
+struct ReadOnly<'a>(&'a Path);
+
+#[cfg(unix)]
+impl<'a> ReadOnly<'a> {
+    fn new(p: &'a Path) -> Self {
+        use std::os::unix::fs::PermissionsExt;
+        fs::set_permissions(p, fs::Permissions::from_mode(0o555)).unwrap();
+        ReadOnly(p)
+    }
+}
+
+#[cfg(unix)]
+impl Drop for ReadOnly<'_> {
+    fn drop(&mut self) {
+        use std::os::unix::fs::PermissionsExt;
+        let _ = fs::set_permissions(self.0, fs::Permissions::from_mode(0o755));
+    }
+}
+
+/// Rename review I1: while the move hasn't happened (read-only root, a folder
+/// held open on Windows), the settings are read and written where they are;
+/// a later writable open moves them with everything kept.
+#[cfg(unix)]
+#[test]
+fn unmoved_legacy_folder_is_read_and_written_in_place() {
+    let dir = tempfile::tempdir().unwrap();
+    write(
+        dir.path(),
+        &legacy("vault.json"),
+        r#"{"favorites":["A.md"]}"#,
+    );
+    write(
+        dir.path(),
+        &legacy("trash.json"),
+        r#"{"items":{".trash/B.md":{"from":"Notes/B.md","at":1}}}"#,
+    );
+    write(dir.path(), "A.md", "# A");
+    {
+        let _ro = ReadOnly::new(dir.path());
+        let v = Vault::open(dir.path()).unwrap();
+        assert_eq!(v.favorites(), vec!["A.md".to_string()]);
+        assert_eq!(
+            v.bin_records(liber_vault::Bin::Trash)[".trash/B.md"].from,
+            "Notes/B.md"
+        );
+        v.add_spelling_word("x").unwrap();
+        assert!(v.spelling_stamp().is_some());
+        assert!(!dir.path().join(META_DIR).exists());
+        let raw = fs::read_to_string(dir.path().join(legacy("vault.json"))).unwrap();
+        assert!(raw.contains("A.md") && raw.contains("\"x\""), "{raw}");
+        assert_eq!(v.spelling_words(), vec!["x".to_string()]);
+    }
+    let v = Vault::open(dir.path()).unwrap();
+    assert!(!dir.path().join(LEGACY_META_DIR).exists());
+    assert_eq!(v.favorites(), vec!["A.md".to_string()]);
+    assert_eq!(v.spelling_words(), vec!["x".to_string()]);
+}
+
+/// Rename review M2: with both folders, `.liber/` is the only source, so an
+/// icon left in the old folder doesn't come back.
+#[test]
+fn both_exist_icon_comes_from_liber_only() {
+    let dir = tempfile::tempdir().unwrap();
+    write(dir.path(), &legacy("vault.json"), r#"{"icon":"🛡️"}"#);
+    write(dir.path(), ".liber/vault.json", r#"{"favorites":[]}"#);
+    let v = Vault::open(dir.path()).unwrap();
+    assert_eq!(v.vault_icon(), None);
+    assert_eq!(vault_icon_at(dir.path()), None);
+}

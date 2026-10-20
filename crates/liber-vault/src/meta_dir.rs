@@ -9,6 +9,19 @@ pub const META_DIR: &str = ".liber";
 /// Its name before the rename (Notes In My Way).
 pub const LEGACY_META_DIR: &str = ".nimw";
 
+/// `rel` in the folder that holds the vault's settings now. While the move
+/// hasn't happened (`.liber/` absent, `.nimw/` a folder: read-only media, a
+/// folder held open on Windows), `.liber/…` reads and writes go to `.nimw/…`,
+/// so nothing reads as empty and nothing is split across both folders.
+pub(crate) fn resolve(root: &Path, rel: &str) -> String {
+    match rel.strip_prefix(META_DIR).and_then(|r| r.strip_prefix('/')) {
+        Some(rest) if !root.join(META_DIR).exists() && root.join(LEGACY_META_DIR).is_dir() => {
+            format!("{LEGACY_META_DIR}/{rest}")
+        }
+        _ => rel.to_string(),
+    }
+}
+
 /// Moves `root/.nimw` to `root/.liber` when only the old folder exists. A
 /// failed move (read-only media) or a vault holding both leaves everything as
 /// it is and says so in `warnings`; a vault with neither gets nothing (VLT-02).
