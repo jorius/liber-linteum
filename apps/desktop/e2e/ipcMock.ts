@@ -244,6 +244,24 @@ export function installIpcMock({
       ((w.__liberRenames ??= []) as unknown[]).push({ from, to });
       return { moved: [[from, to]], updatedFiles: [], updatedLinks: 0, failed: [] };
     },
+    // ---- Round 3 §9: Add sub-page / moving under a page ----
+    entry_make_folder_page: (a) => {
+      const page = a.page as string;
+      const cut = page.lastIndexOf('/');
+      const dir = cut < 0 ? '' : page.slice(0, cut);
+      const stem = page.slice(cut + 1).replace(/\.md$/i, '');
+      const folder = join(dir, stem);
+      const target = `${folder}/${stem}.md`;
+      madeFolders.add(folder);
+      pages[target] = pages[page];
+      delete pages[page];
+      const outcome = { moved: [[page, target]], updatedFiles: [], updatedLinks: 0, failed: [], pair: null };
+      return { folder, page: target, outcome };
+    },
+    entry_reveal: (a) => {
+      ((w.__liberReveals ??= []) as unknown[]).push(a.path);
+      return null;
+    },
     // ---- M5b §5: the vault's Trash and Archive (pages only) ----
     entry_trash: (a) => {
       const from = a.path as string;
