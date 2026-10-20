@@ -681,7 +681,8 @@ mod tests {
         ]);
         for p in [
             "Scratchpad",
-            ".liber",
+            liber_vault::META_DIR,
+            liber_vault::LEGACY_META_DIR,
             ".trash",
             ".archive",
             ".obsidian/x.json",

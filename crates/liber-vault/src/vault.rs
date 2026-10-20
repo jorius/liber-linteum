@@ -34,6 +34,7 @@ impl Vault {
             )));
         }
         let mut warnings = Vec::new();
+        crate::meta_dir::migrate(&root, &mut warnings);
 
         let liber = read_liber_json(&root, &mut warnings);
         // Read once here only to report a broken file; the attachment policy

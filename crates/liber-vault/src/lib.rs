@@ -13,6 +13,7 @@ mod hash;
 mod icon;
 mod layout;
 mod link_format;
+mod meta_dir;
 mod page_width;
 mod path;
 mod scan;
@@ -32,6 +33,7 @@ pub use hash::Hash;
 pub use icon::vault_icon_at;
 pub use layout::CardPosition;
 pub use link_format::{LinkFormat, LinkFormats};
+pub use meta_dir::{LEGACY_META_DIR, META_DIR};
 pub use page_width::{PageWidth, PageWidths};
 pub use path::VaultPath;
 pub use scan::{Entry, EntryKind, Scan};
@@ -73,7 +75,15 @@ mod tests {
 
     #[test]
     fn vlt_05_dot_folders_are_hidden() {
-        for name in [".obsidian", ".git", ".liber", ".trash", ".", ".."] {
+        for name in [
+            ".obsidian",
+            ".git",
+            super::META_DIR,
+            super::LEGACY_META_DIR,
+            ".trash",
+            ".",
+            "..",
+        ] {
             assert!(is_hidden_name(name), "{name} should be hidden");
         }
     }
