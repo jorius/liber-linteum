@@ -324,6 +324,12 @@ impl VaultHeader {
         {
             return Err(CryptoError::Params("merged header would exceed its limits"));
         }
+        // Each copy removed a different passphrase: the union would leave no way in.
+        if passphrase_count(&slots) == 0 || recovery_slot_ids(&slots).next().is_none() {
+            return Err(CryptoError::Params(
+                "merge would leave no passphrase or recovery slot",
+            ));
+        }
         let n = added
             .iter()
             .filter(|id| slots.iter().any(|s| s.id == **id))
@@ -1008,6 +1014,28 @@ mod tests {
         v["removed"] = json!([]);
         let t = VaultHeader::parse(&serde_json::to_vec(&v).unwrap()).unwrap();
         assert!(is_auth(t.unlock(Unlock::Passphrase("pw"))));
+    }
+
+    #[test]
+    fn merge_never_leaves_no_passphrase_slot() {
+        let (mut h, u, _) = new_vault("one");
+        h.push_passphrase(&u.vk, "two", TINY).unwrap();
+        h.seal(&u);
+        let p1 = h.slots[0].id;
+        let p2 = h.slots.last().unwrap().id;
+        let base = h.to_bytes(&u).unwrap();
+        let mut a = VaultHeader::parse(&base).unwrap();
+        let mut b = VaultHeader::parse(&base).unwrap();
+        a.remove_slot(&p1).unwrap();
+        b.remove_slot(&p2).unwrap();
+        let b = VaultHeader::parse(&b.to_bytes(&u).unwrap()).unwrap();
+        let before = a.to_bytes(&u).unwrap();
+        assert!(matches!(a.merge_from(&b, &u), Err(CryptoError::Params(_))));
+        assert_eq!(a.to_bytes(&u).unwrap(), before);
+        VaultHeader::parse(&before)
+            .unwrap()
+            .unlock(Unlock::Passphrase("two"))
+            .unwrap();
     }
 
     #[test]
