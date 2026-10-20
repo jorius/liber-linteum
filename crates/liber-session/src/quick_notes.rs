@@ -539,6 +539,30 @@ mod tests {
         assert!(s.vault().auto_named().is_empty());
     }
 
+    /// Rename review M3: the first open by the renamed app has an empty
+    /// index only because the cache moved, so the old app's flags hold for
+    /// notes it doesn't see as changed.
+    #[test]
+    fn rename_review_flags_survive_the_first_open_after_the_rename() {
+        let vault = tempfile::tempdir().unwrap();
+        let root = vault.path();
+        let s = VaultSession::open(root, tempfile::tempdir().unwrap().path(), |_| {})
+            .unwrap()
+            .0;
+        s.create_quick_note(&VaultPath::root(), "Q").unwrap();
+        drop(s);
+        // As the old app left it: its settings folder, and no index here.
+        std::fs::rename(
+            root.join(liber_vault::META_DIR),
+            root.join(liber_vault::LEGACY_META_DIR),
+        )
+        .unwrap();
+        let fresh = tempfile::tempdir().unwrap();
+        let (s, _) = VaultSession::open(root, fresh.path(), |_| {}).unwrap();
+        let flags: Vec<String> = s.vault().auto_named().into_iter().collect();
+        assert_eq!(flags, ["Q.md"]);
+    }
+
     #[test]
     fn m4c_final_i4_a_case_only_change_renames_the_folder() {
         let f = open(&[("Scratchpad/a.md", "x")]);

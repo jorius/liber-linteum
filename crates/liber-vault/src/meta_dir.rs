@@ -25,9 +25,11 @@ pub(crate) fn resolve(root: &Path, rel: &str) -> String {
 /// Moves `root/.nimw` to `root/.liber` when only the old folder exists. A
 /// failed move (read-only media) or a vault holding both leaves everything as
 /// it is and says so in `warnings`; a vault with neither gets nothing (VLT-02).
-pub(crate) fn migrate(root: &Path, warnings: &mut Vec<String>) {
+/// True when the settings were found in the legacy folder.
+pub(crate) fn migrate(root: &Path, warnings: &mut Vec<String>) -> bool {
     let new = root.join(META_DIR);
     let old = root.join(LEGACY_META_DIR);
+    let legacy = !new.is_dir() && old.is_dir();
     if new.is_dir() {
         if old.is_dir() {
             warnings.push(format!(
@@ -41,4 +43,5 @@ pub(crate) fn migrate(root: &Path, warnings: &mut Vec<String>) {
             "{LEGACY_META_DIR} could not become {META_DIR} ({e}); it moves on the next writable open"
         ));
     }
+    legacy
 }

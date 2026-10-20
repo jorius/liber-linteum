@@ -16,6 +16,8 @@ pub struct Vault {
     pub(crate) root: PathBuf,
     pub(crate) excludes: GlobSet,
     warnings: Vec<String>,
+    /// The settings were found in the legacy folder when this opened.
+    legacy_settings: bool,
     /// Serializes read-modify-write updates of `.liber/*.json` (m11).
     json_lock: Mutex<()>,
 }
@@ -36,7 +38,7 @@ impl Vault {
             )));
         }
         let mut warnings = Vec::new();
-        crate::meta_dir::migrate(&root, &mut warnings);
+        let legacy_settings = crate::meta_dir::migrate(&root, &mut warnings);
 
         let liber = read_liber_json(&root, &mut warnings);
         // Read once here only to report a broken file; the attachment policy
@@ -58,6 +60,7 @@ impl Vault {
             root,
             excludes,
             warnings,
+            legacy_settings,
             json_lock: Mutex::new(()),
         })
     }
@@ -260,6 +263,12 @@ impl Vault {
                 map.remove("indexPicks");
             }
         })
+    }
+
+    /// True when opening found the settings in the legacy folder (the vault
+    /// was last opened before the rename to Liber Linteum).
+    pub fn opened_legacy_settings(&self) -> bool {
+        self.legacy_settings
     }
 
     /// Non-fatal configuration problems found while opening.

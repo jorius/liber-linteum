@@ -113,13 +113,15 @@ impl VaultSession {
         session.forget_page_sizes(&changes.removed);
         // A flag is only trusted for a note the index saw unchanged: one
         // edited, replaced or new since (Finder, Obsidian, sync, another
-        // machine's empty index) is the user's now (M4c final review I2).
-        let unseen: Vec<String> = changes
-            .created
-            .iter()
-            .chain(&changes.modified)
-            .cloned()
-            .collect();
+        // machine's empty index) is the user's now (M4c final review I2). The
+        // first open after the rename has an empty index only because the
+        // cache moved: then just the notes changed since count (rename M3).
+        let created: &[String] = if session.vault.opened_legacy_settings() {
+            &[]
+        } else {
+            &changes.created
+        };
+        let unseen: Vec<String> = created.iter().chain(&changes.modified).cloned().collect();
         if let Err(e) = session.vault.forget_auto_named(&unseen) {
             session.emit(SessionEvent::Warning(format!(
                 "Quick notes changed elsewhere may still be renamed: {e}"
