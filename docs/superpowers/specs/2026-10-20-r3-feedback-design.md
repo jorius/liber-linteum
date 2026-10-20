@@ -70,8 +70,28 @@ The Source and Split modes are unchanged. Large-note limits (`LARGE_NOTE_CHARS`)
 - Each item gets a test that fails first: vitest for the logic and components, Playwright e2e for the sidebar drag, the Move dialog keyboard, and Live Preview reveal/hide.
 - The full gate (`check.sh all`) must pass on each stream and again after integration.
 
-## 5. Waiting on Jose
+## 5. Jose's decisions (2026-10-20)
 
-- **Welcome page overhaul.** Three mocks are in the brainstorm companion (A launcher, B start page with vault cards, C vault switcher). Build once he picks.
-- **Notion page icons.** The "Markdown & CSV" export carries no page icons. Checked in his zip: every page starts with `# Title`, and "📚 Resources" only has an icon because the emoji is part of its title. Getting icons (and covers) needs Notion's HTML export, which has a `page-header-icon` and a cover image per page. Decide whether the importer should accept HTML exports.
-- **Page and folder duplicates from Notion.** A Notion page with sub-pages becomes both `X.md` and a folder `X/`, so the sidebar shows "Bug Bounty" twice. A folder note convention would fix it. Not requested yet; raise it with Jose.
+- **Welcome page overhaul.** Three mocks are in the brainstorm companion: A launcher, B start page with vault cards, C vault switcher. We build once he picks.
+- **Notion page icons.** The "Markdown & CSV" export carries no page icons. I checked his zip: every page starts with `# Title`, and "📚 Resources" only has an icon because the emoji is part of its title. Notion's HTML export has a `page-header-icon` and a cover image for each page. **Decision:** the importer will accept HTML exports, *after* the round 3 feedback items are done (round 3b).
+- **Folder pages.** **Decision: merge.** A folder and its same-name page become one row (§6).
+
+## 6. Folder pages (stream D, after A–C land)
+
+A Notion page with sub-pages becomes a page plus a folder of the same name, so the sidebar listed "Bug Bounty" twice. From now on, a folder can *be* a page, as in Notion.
+
+1. **Convention.** A folder `X/` has a page when `X/X.md` exists (the "inside" convention). This is the default of Obsidian's Folder Notes plugins, so vaults stay compatible. Only the inside form is recognised. A sibling `X.md` next to `X/` stays an ordinary page.
+2. **Sidebar.** The folder row works like this:
+   - clicking its label opens `X/X.md`, and the chevron alone expands or collapses it;
+   - it is highlighted while that page is open;
+   - it shows the page's icon, or the folder's icon when the page has none;
+   - `X/X.md` is not listed again among the folder's children.
+
+   The row's context menu has the folder actions plus the page ones that make sense: favourite, icon, open in Global View.
+3. **Keeping the pair together.** Renaming the row, or renaming the page by its title, renames both, `X/X.md` → `Y/Y.md`, through the existing rename path so links are rewritten. Moving or trashing the row moves or trashes the whole folder; the trash confirmation names the page.
+4. **Creating one.**
+   - A folder without a page gets "Add a page to this folder", which creates `X/X.md` and opens it.
+   - A folder with a same-name sibling `X.md` gets "Use X.md as this folder's page", which moves it inside through the existing move path, so links are fixed.
+5. **Breadcrumb.** `X/X.md` reads `… / X`, not `… / X / X`.
+6. **Notion importer.** A page with children is written as `X/X.md` and rewritten links point there. The import report is unchanged otherwise.
+7. **Elsewhere.** Search, Global View, favourites and backlinks treat `X/X.md` as the ordinary page it is.
