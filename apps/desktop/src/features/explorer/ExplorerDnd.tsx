@@ -74,7 +74,9 @@ export function ExplorerDnd(props: ExplorerTreeProps) {
     const state = dropFeedback(String(a.id), overId);
     setFeedback(state);
     setOver(state === 'allowed' ? targetOf(o?.id) : null);
-    const folder = overId && overId !== ROOT_DROP_ID ? overId : null;
+    // Spring-loading opens folders only; a plain page has nothing to open.
+    const folder =
+      overId && overId !== ROOT_DROP_ID && nodeOf(overId)?.kind === 'folder' ? overId : null;
     spring.hover(folder && !useVaultStore.getState().expanded.has(folder) ? folder : null);
   };
   const onDragEnd = ({ active: a, over: o }: DragEndEvent) => {

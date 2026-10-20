@@ -663,3 +663,93 @@ describe('double-click a page (round 3b §8.1)', () => {
     expect(useVaultStore.getState().renaming).toBe('Lore');
   });
 });
+
+describe('sub-pages and case-insensitive folder pages (round 3 §9)', () => {
+  const labels = () => screen.getAllByRole('menuitem').map((i) => i.textContent);
+  const outcome = { moved: [], updatedFiles: [], updatedLinks: 0, failed: [], pair: null };
+
+  it('a case-variant page is the folder’s page; "Match the page name" renames it', async () => {
+    const calls = backend({ entry_rename: () => outcome, vault_tree: () => [] });
+    seed([
+      { path: 'SmartJob', kind: 'folder' },
+      { path: 'SmartJob/Smartjob.md', kind: 'page' },
+    ]);
+    render(<ContextMenu menu={{ path: 'SmartJob', anchor: { x: 0, y: 0 } }} onClose={() => {}} />);
+    expect(labels()).not.toContain('Add a page to this folder');
+    await userEvent.click(
+      screen.getByRole('menuitem', { name: 'Match the page name to the folder' }),
+    );
+    expect(calls).toContainEqual([
+      'entry_rename',
+      { from: 'SmartJob/Smartjob.md', to: 'SmartJob/SmartJob.md' },
+    ]);
+  });
+
+  it('"Add sub-page" turns a plain page into a folder page, then adds a page inside', async () => {
+    const calls = backend({
+      entry_make_folder_page: () => ({ folder: 'P', page: 'P/P.md', outcome }),
+      entry_create_page: () => 'P/Untitled.md',
+      vault_tree: () => [
+        { path: 'P', kind: 'folder' },
+        { path: 'P/P.md', kind: 'page' },
+      ],
+    });
+    seed([{ path: 'P.md', kind: 'page' }]);
+    render(<ContextMenu menu={{ path: 'P.md', anchor: { x: 0, y: 0 } }} onClose={() => {}} />);
+    await userEvent.click(screen.getByRole('menuitem', { name: 'Add sub-page' }));
+    await waitFor(() => expect(useVaultStore.getState().renaming).toBe('P/Untitled.md'));
+    expect(calls.filter(([c]) => c.startsWith('entry_'))).toEqual([
+      ['entry_make_folder_page', { page: 'P.md' }],
+      ['entry_create_page', { dir: 'P', name: 'Untitled' }],
+    ]);
+  });
+
+  it('"Add sub-page" on a folder page just adds a page inside its folder', async () => {
+    const calls = backend({ entry_create_page: () => 'Lore/Untitled.md', vault_tree: () => [] });
+    seed([
+      { path: 'Lore', kind: 'folder' },
+      { path: 'Lore/Lore.md', kind: 'page' },
+    ]);
+    await useVaultStore.getState().addSubPage('Lore/Lore.md');
+    expect(calls.map(([c]) => c)).not.toContain('entry_make_folder_page');
+    expect(calls).toContainEqual(['entry_create_page', { dir: 'Lore', name: 'Untitled' }]);
+  });
+
+  it('folders and archived pages have no "Add sub-page"; every row can be revealed', () => {
+    seed([
+      { path: 'Art', kind: 'folder' },
+      { path: '.archive', kind: 'folder' },
+      { path: '.archive/Old.md', kind: 'page' },
+    ]);
+    const { unmount } = render(
+      <ContextMenu menu={{ path: 'Art', anchor: { x: 0, y: 0 } }} onClose={() => {}} />,
+    );
+    expect(labels()).not.toContain('Add sub-page');
+    expect(
+      labels().some((l) =>
+        /^(Reveal in Finder|Show in File Explorer|Show in file manager)$/.test(l ?? ''),
+      ),
+    ).toBe(true);
+    unmount();
+    render(
+      <ContextMenu menu={{ path: '.archive/Old.md', anchor: { x: 0, y: 0 } }} onClose={() => {}} />,
+    );
+    expect(labels()).not.toContain('Add sub-page');
+    expect(labels().some((l) => /Finder|Explorer|file manager/.test(l ?? ''))).toBe(true);
+  });
+
+  it('page rows offer "Move to…" and reveal calls entry_reveal with the vault path', async () => {
+    const calls = backend({ entry_reveal: () => null });
+    seed(nodes, { expanded: new Set(['Art']) });
+    render(
+      <ContextMenu menu={{ path: 'Art/rex.md', anchor: { x: 0, y: 0 } }} onClose={() => {}} />,
+    );
+    expect(labels()).toContain('Move to…');
+    await userEvent.click(
+      screen.getByRole('menuitem', {
+        name: /^(Reveal in Finder|Show in File Explorer|Show in file manager)$/,
+      }),
+    );
+    expect(calls).toContainEqual(['entry_reveal', { path: 'Art/rex.md' }]);
+  });
+});

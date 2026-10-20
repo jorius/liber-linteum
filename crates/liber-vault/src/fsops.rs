@@ -270,6 +270,33 @@ impl Vault {
         std::fs::rename(&src, &dst).map_err(|e| io_err(from.as_str(), e))
     }
 
+    /// The child of `dir` named `name`, or failing that one whose name only
+    /// differs in letter case or Unicode form (round 3 §9). Exact wins.
+    pub fn child_named(&self, dir: &VaultPath, name: &str) -> Result<Option<VaultPath>> {
+        let full = self.fs_path(dir)?;
+        let entries = match std::fs::read_dir(&full) {
+            Ok(e) => e,
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(None),
+            Err(e) => return Err(io_err(dir.as_str(), e)),
+        };
+        let names: Vec<String> = entries
+            .filter_map(|e| e.ok()?.file_name().into_string().ok())
+            .collect();
+        pick_child(&names, name).map(|n| dir.join(n)).transpose()
+    }
+
+    /// A folder's own page: `X/X.md`, or a file whose name differs from it
+    /// only in case (round 3b §6.1, round 3 §9). Never for the vault root.
+    pub fn folder_page_of(&self, folder: &VaultPath) -> Option<VaultPath> {
+        if folder.is_root() {
+            return None;
+        }
+        let page = self
+            .child_named(folder, &format!("{}.md", folder.file_name()))
+            .ok()??;
+        self.fs_path(&page).ok()?.is_file().then_some(page)
+    }
+
     /// Whether two vault paths name the same entry on disk, e.g. `Notes` and
     /// `notes` (or `á`/`Á`) on a case-insensitive file system.
     pub fn same_entry(&self, a: &VaultPath, b: &VaultPath) -> bool {
@@ -314,9 +341,34 @@ fn sync_dir(dir: &Path) {
 #[cfg(not(unix))]
 fn sync_dir(_dir: &Path) {}
 
+/// `name` among `names`: the exact one if present, else any case variant.
+fn pick_child<'a>(names: &'a [String], name: &str) -> Option<&'a String> {
+    names
+        .iter()
+        .find(|n| *n == name)
+        .or_else(|| names.iter().find(|n| fold(n) == fold(name)))
+}
+
+/// Names compared without letter case or Unicode form.
+fn fold(name: &str) -> String {
+    use unicode_normalization::UnicodeNormalization;
+    name.nfc().collect::<String>().to_lowercase()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Review #8: the exact name wins over a case variant whatever the listing
+    /// order (runs everywhere; the on-disk twin of this needs Linux).
+    #[test]
+    fn subpages_review_exact_name_wins_in_any_order() {
+        let both = |a: &str, b: &str| vec![a.to_string(), b.to_string()];
+        assert_eq!(pick_child(&both("x.md", "X.md"), "X.md").unwrap(), "X.md");
+        assert_eq!(pick_child(&both("X.md", "x.md"), "X.md").unwrap(), "X.md");
+        assert_eq!(pick_child(&both("x.md", "y.md"), "X.md").unwrap(), "x.md");
+        assert_eq!(pick_child(&both("a.md", "b.md"), "X.md"), None);
+    }
 
     #[test]
     fn nfr_08_injected_failure_leaves_target_untouched_and_no_temp_file() {

@@ -274,6 +274,63 @@ export function installIpcMock({
       ((w.__liberRenames ??= []) as unknown[]).push({ from, to });
       return { moved: [[from, to]], updatedFiles: [], updatedLinks: 0, failed: [] };
     },
+    // ---- Round 3 §9: Add sub-page / moving under a page ----
+    entry_make_folder_page: (a) => {
+      const page = a.page as string;
+      const cut = page.lastIndexOf('/');
+      const dir = cut < 0 ? '' : page.slice(0, cut);
+      const stem = page.slice(cut + 1).replace(/\.md$/i, '');
+      const folder = join(dir, stem);
+      const target = `${folder}/${stem}.md`;
+      madeFolders.add(folder);
+      pages[target] = pages[page];
+      delete pages[page];
+      const outcome = {
+        moved: [[page, target]],
+        updatedFiles: [],
+        updatedLinks: 0,
+        failed: [],
+        pair: null,
+      };
+      return { folder, page: target, outcome };
+    },
+    entry_move_under_page: (a) => {
+      const item = a.item as string;
+      const page = a.page as string;
+      const cut = page.lastIndexOf('/');
+      const dir = cut < 0 ? '' : page.slice(0, cut);
+      const stem = page.slice(cut + 1).replace(/\.md$/i, '');
+      const outcome = (moved: string[][]) => ({
+        moved,
+        updatedFiles: [],
+        updatedLinks: 0,
+        failed: [],
+        pair: null,
+      });
+      const isOwn = dir !== '' && page === `${dir}/${dir.split('/').pop()}.md`;
+      const folder = isOwn ? dir : join(dir, stem);
+      const after = isOwn ? page : `${folder}/${stem}.md`;
+      const target = `${folder}/${item.split('/').pop()}`;
+      if (pages[target] !== undefined) throw { kind: 'alreadyExists', message: target };
+      if (!isOwn) {
+        madeFolders.add(folder);
+        pages[after] = pages[page];
+        delete pages[page];
+      }
+      pages[target] = pages[item];
+      delete pages[item];
+      ((w.__liberRenames ??= []) as unknown[]).push({ from: item, to: target });
+      return {
+        folder,
+        page: after,
+        converted: isOwn ? null : outcome([[page, after]]),
+        moved: outcome([[item, target]]),
+      };
+    },
+    entry_reveal: (a) => {
+      ((w.__liberReveals ??= []) as unknown[]).push(a.path);
+      return null;
+    },
     // ---- M5b §5: the vault's Trash and Archive (pages only) ----
     entry_trash: (a) => {
       const from = a.path as string;

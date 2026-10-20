@@ -248,7 +248,12 @@
     "open": "Abrir",
     "unarchive": "Desarchivar",
     "addFolderPage": "Añadir una página a esta carpeta",
-    "useAsFolderPage": "Usar {name}.md como página de esta carpeta"
+    "useAsFolderPage": "Usar {name}.md como página de esta carpeta",
+    "addSubPage": "Añadir subpágina",
+    "matchFolderPageName": "Igualar el nombre de la página al de la carpeta",
+    "revealMac": "Mostrar en Finder",
+    "revealWindows": "Mostrar en el Explorador de archivos",
+    "revealOther": "Mostrar en el gestor de archivos"
   },
   "dialogs": {
     "cancel": "Cancelar",
@@ -420,7 +425,7 @@
         "search": "Buscar",
         "files": "Ir a los archivos",
         "newPage": "Nueva página",
-        "quickNote": "Crear una nota rápida nueva en esta bóveda",
+        "quickNote": "Crear una nota rápida nueva para esta bóveda",
         "save": "Guardar",
         "link": "Insertar un enlace",
         "bold": "Negrita",

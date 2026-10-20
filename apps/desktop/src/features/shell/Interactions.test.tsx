@@ -104,7 +104,8 @@ describe('the Archive (M5b round 2)', () => {
       within(menu)
         .getAllByRole('menuitem')
         .map((i) => i.textContent),
-    ).toEqual(['Open', 'Unarchive', 'Sort by', 'Delete']);
+      // Round 3 §9.4: archived items can be revealed too (jsdom reads as Linux).
+    ).toEqual(['Open', 'Unarchive', 'Show in file manager', 'Sort by', 'Delete']);
     await userEvent.click(within(menu).getByRole('menuitem', { name: 'Unarchive' }));
     await waitFor(() =>
       expect(calls.filter(([c]) => c === 'archive_restore')).toEqual([
@@ -126,8 +127,10 @@ describe('context menu', () => {
     expect(items.map((i) => i.textContent)).toEqual([
       'New page',
       'New folder',
+      'Add sub-page',
       'Rename',
       'Move to…',
+      'Show in file manager',
       'Icon…',
       'Sort by',
       'Archive',
@@ -323,7 +326,8 @@ describe('move (EXP-02)', () => {
       .getAllByRole('treeitem')
       .filter((o) => o.getAttribute('aria-disabled') !== 'true')
       .map((o) => o.textContent);
-    expect(enabled).toEqual(['Vault root', 'Games']);
+    // Round 3 §9.3: pages are targets too.
+    expect(enabled).toEqual(['Vault root', 'rex', 'Games', 'Welcome']);
     expect(within(tree).getByRole('treeitem', { name: /^Art/ })).toHaveAttribute(
       'aria-disabled',
       'true',

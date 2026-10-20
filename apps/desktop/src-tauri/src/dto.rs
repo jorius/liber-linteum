@@ -96,6 +96,24 @@ impl From<RenameOutcome> for RenameOutcomeDto {
     }
 }
 
+/// Add sub-page (round 3 §9): the folder, the page's new path, and the move.
+#[derive(Debug, Clone, Serialize)]
+pub struct FolderPageDto {
+    pub folder: String,
+    pub page: String,
+    pub outcome: RenameOutcomeDto,
+}
+
+/// Moving under a page (round 3 §9.3): the folder, the page's path after,
+/// the page's own conversion (when it happened) and the item's move.
+#[derive(Debug, Clone, Serialize)]
+pub struct MoveUnderDto {
+    pub folder: String,
+    pub page: String,
+    pub converted: Option<RenameOutcomeDto>,
+    pub moved: RenameOutcomeDto,
+}
+
 #[derive(Debug, Clone, Serialize)]
 pub struct ProgressPayload {
     pub done: usize,

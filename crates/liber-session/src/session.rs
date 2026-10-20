@@ -572,6 +572,8 @@ pub(crate) fn validate_name(name: &str) -> Result<&str> {
         || trimmed.contains(FORBIDDEN_NAME_CHARS)
         || trimmed.chars().any(char::is_control)
         || is_hidden_name(trimmed)
+        // Windows drops a trailing dot, so disk and index would disagree.
+        || trimmed.ends_with('.')
     {
         return Err(SessionError::InvalidName(name.to_string()));
     }
@@ -595,6 +597,16 @@ pub(crate) fn subtree_files(stats: &HashMap<String, Stat>, path: &VaultPath) -> 
 mod tests {
     use super::*;
     use std::sync::atomic::AtomicBool;
+
+    /// Review #7: Windows drops a trailing dot (`P.` is created as `P`), so
+    /// the index and the disk would disagree; refused everywhere for one rule.
+    #[test]
+    fn subpages_review_a_trailing_dot_is_not_a_name() {
+        assert!(validate_name("P.").is_err());
+        assert!(validate_name("P..").is_err());
+        assert_eq!(validate_name("P.md").unwrap(), "P.md");
+        assert_eq!(validate_name(" Notes ").unwrap(), "Notes");
+    }
 
     /// M1b (M1a hand-off §11 n): the OS trash call may block on a permission
     /// prompt, so the index must not be locked while it runs.

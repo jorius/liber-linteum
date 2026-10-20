@@ -28,5 +28,6 @@ pub use liber_index::{
     FacetCount, FacetPage, Facets, SearchHit, SearchPage, SearchQuery, SnippetPart,
 };
 pub use quick_notes::{AutoName, MAX_QUICK_NAME, device_name, quick_note_stem};
+pub use rename::MoveUnderOutcome;
 pub use session::{VaultSession, index_db_path};
 pub use text_files::{TEXT_MAX_BYTES, is_text_content, is_text_path};

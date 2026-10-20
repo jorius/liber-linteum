@@ -239,10 +239,14 @@ export const TreeRow = forwardRef<HTMLLIElement, TreeRowProps>(function TreeRow(
   const archived = isArchived(node.path);
   // A folder page's ★ and ☺ act on its page (round 3b §6.2).
   const target = page ?? node;
-  // Drag source (any item) and drop target (folders). Only the listeners are
-  // spread: dnd-kit's attributes would replace the treeitem role and tabindex.
+  // Drag source (any item) and drop target (folders, and pages: round 3 §9.3).
+  // Only the listeners are spread: dnd-kit's attributes would replace the
+  // treeitem role and tabindex.
   const drag = useDraggable({ id: node.path, disabled: renaming });
-  const drop = useDroppable({ id: node.path, disabled: node.kind !== 'folder' });
+  const drop = useDroppable({
+    id: node.path,
+    disabled: node.kind !== 'folder' && (node.kind !== 'page' || archived),
+  });
   const setRefs = (el: HTMLLIElement | null) => {
     drag.setNodeRef(el);
     drop.setNodeRef(el);

@@ -41,7 +41,8 @@ describe('Move dialog folder tree (round 3 §3.2)', () => {
   it('shows the vault root and folders as a tree, with the current folder opened and marked', () => {
     render(<MoveToDialog path="Cyber/Linux/File Descriptors.md" onClose={vi.fn()} />);
     // Root and the current folder's ancestors are open; Networking is closed.
-    expect(names()).toEqual(['', 'Cyber', 'Cyber/Linux', 'Cyber/Networking', 'Notes']);
+    // Pages are targets too (round 3 §9.3): Report.md sits at the root.
+    expect(names()).toEqual(['', 'Cyber', 'Cyber/Linux', 'Cyber/Networking', 'Notes', 'Report.md']);
     expect(row('Vault root')).toHaveAttribute('aria-level', '1');
     expect(row('Cyber')).toHaveAttribute('aria-level', '2');
     expect(row('Cyber')).toHaveAttribute('aria-expanded', 'true');
@@ -56,7 +57,7 @@ describe('Move dialog folder tree (round 3 §3.2)', () => {
 
   it("leaves out a folder's own subtree when moving the folder", () => {
     render(<MoveToDialog path="Cyber/Networking" onClose={vi.fn()} />);
-    expect(names()).toEqual(['', 'Cyber', 'Cyber/Linux', 'Notes']);
+    expect(names()).toEqual(['', 'Cyber', 'Cyber/Linux', 'Notes', 'Report.md']);
     expect(row(/^Cyber.*current/i)).toHaveAttribute('aria-disabled', 'true');
   });
 
@@ -131,5 +132,30 @@ describe('Move dialog folder tree (round 3 §3.2)', () => {
     const { container } = render(<MoveToDialog path="Report.md" onClose={vi.fn()} />);
     const r = await axe.run(container);
     expect(r.violations.map((v) => v.id)).toEqual([]);
+  });
+});
+
+describe('pages are move targets too (round 3 §9.3)', () => {
+  it('lists pages with their icons; choosing one moves the item under it', async () => {
+    const moveUnder = vi.fn(async () => ({ ok: true, value: undefined }));
+    const withPages = [
+      ...nodes,
+      { path: 'Notes/Ideas.md', kind: 'page', icon: '💡' },
+      { path: 'Notes/Notes.md', kind: 'page' },
+    ];
+    useVaultStore.setState({ nodes: withPages, moveUnder } as never);
+    const onClose = vi.fn();
+    render(<MoveToDialog path="Cyber/Linux/File Descriptors.md" onClose={onClose} />);
+    await userEvent.click(row('Notes'));
+    await userEvent.keyboard('{ArrowRight}');
+    // A folder page shows once, as its folder; plain pages are rows.
+    expect(names()).toContain('Notes/Ideas.md');
+    expect(names()).not.toContain('Notes/Notes.md');
+    expect(names()).toContain('Report.md');
+    expect(row('Ideas')).toHaveTextContent('💡');
+    await userEvent.type(screen.getByRole('searchbox'), 'ide');
+    expect(names()).toEqual(['', 'Notes', 'Notes/Ideas.md']);
+    await userEvent.dblClick(row('Ideas'));
+    expect(moveUnder).toHaveBeenCalledWith('Cyber/Linux/File Descriptors.md', 'Notes/Ideas.md');
   });
 });

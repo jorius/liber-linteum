@@ -619,6 +619,20 @@ export const entryCreateFolder = (parent: string, name: string) =>
   call<string>('entry_create_folder', { parent, name });
 export const entryRename = (from: string, to: string) =>
   call<RenameOutcome>('entry_rename', { from, to });
+/** Add sub-page (round 3 §9): `P.md` becomes `P/P.md`, links rewritten. */
+export const entryMakeFolderPage = (page: string) =>
+  call<{ folder: string; page: string; outcome: RenameOutcome }>('entry_make_folder_page', {
+    page,
+  });
+/** Moves `item` under the page `page` in one step (round 3 §9.3): the page
+ *  becomes its folder's page first when needed; refused before anything moves. */
+export const entryMoveUnderPage = (item: string, page: string) =>
+  call<{ folder: string; page: string; converted: RenameOutcome | null; moved: RenameOutcome }>(
+    'entry_move_under_page',
+    { item, page },
+  );
+/** Shows a vault item in the OS file manager (round 3 §9.4). */
+export const entryReveal = (path: string) => call<null>('entry_reveal', { path });
 /** Moves an item into the vault's Trash (M5b §5.1); its path there. */
 export const entryTrash = (path: string) => call<string>('entry_trash', { path });
 export const settingsGet = () => call<SettingsResponse>('settings_get');

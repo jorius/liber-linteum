@@ -1,5 +1,5 @@
 import { useTranslation } from 'react-i18next';
-import { isFolderPage, nameOf, parentOf } from '../../stores/tree';
+import { folderPageOf, nameOf, parentOf } from '../../stores/tree';
 import { useVaultStore } from '../../stores/vaultStore';
 import { ItemIcon, useIcons } from '../icons/ItemIcon';
 import styles from './PageView.module.css';
@@ -16,7 +16,7 @@ export function Breadcrumb({ path }: { path: string }) {
   const folders: string[] = [];
   for (let p = parentOf(path); p; p = parentOf(p)) folders.unshift(p);
   // A folder page (round 3b §6.5) is its folder: `… / X`, not `… / X / X`.
-  const folderPage = isFolderPage(path);
+  const folderPage = useVaultStore((s) => folderPageOf(parentOf(path), s.children) === path);
   if (folderPage) folders.pop();
   const page = nameOf(path).replace(/\.md$/i, '');
   const icon = icons.get(path) ?? (folderPage ? icons.get(parentOf(path)) : undefined);

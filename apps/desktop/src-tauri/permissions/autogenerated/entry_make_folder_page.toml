@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-entry-make-folder-page"
+description = "Enables the entry_make_folder_page command without any pre-configured scope."
+commands.allow = ["entry_make_folder_page"]
+
+[[permission]]
+identifier = "deny-entry-make-folder-page"
+description = "Denies the entry_make_folder_page command without any pre-configured scope."
+commands.deny = ["entry_make_folder_page"]

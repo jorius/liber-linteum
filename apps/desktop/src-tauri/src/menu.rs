@@ -14,7 +14,9 @@
 //! last window is gone. The window plugin's `destroy` permission it uses is
 //! already granted (`core:window:allow-destroy`).
 
-use tauri::menu::{AboutMetadata, Menu, MenuEvent, MenuItem, PredefinedMenuItem, Submenu};
+use tauri::menu::{
+    AboutMetadata, Menu, MenuEvent, MenuItem, MenuItemKind, PredefinedMenuItem, Submenu,
+};
 use tauri::{AppHandle, Emitter, Manager, Runtime};
 
 /// Id of our Quit item.
@@ -46,6 +48,43 @@ pub const SEARCH_EVENT: &str = "menu:search";
 pub const SCREEN_EVENT: &str = "menu:screen";
 /// Id of File → Create New Scratchpad in This Vault (M4c §2; renamed in round 3 §2.4).
 pub const QUICK_NOTE_ID: &str = "liber-quick-note";
+/// File → Create New Scratchpad names the open vault (round 3 §9.4); names
+/// longer than this many characters are cut with "…".
+const VAULT_NAME_MAX: usize = 40;
+
+/// The quick-note item's label: the open vault's name, or the generic label.
+pub fn quick_note_label(vault: Option<&str>) -> String {
+    let Some(name) = vault else {
+        return "Create New Scratchpad in This Vault".into();
+    };
+    use unicode_normalization::UnicodeNormalization;
+    use unicode_segmentation::UnicodeSegmentation;
+    // Counted and cut in whole visible characters (accents, emoji), then `&`
+    // doubled: menus read a lone `&` as a mnemonic marker.
+    let name: String = name.nfc().collect();
+    let chars: Vec<&str> = name.graphemes(true).collect();
+    let short = if chars.len() > VAULT_NAME_MAX {
+        format!("{}…", chars[..VAULT_NAME_MAX - 1].concat())
+    } else {
+        name
+    };
+    format!("Create New Scratchpad for {}", short.replace('&', "&&"))
+}
+
+/// Renames the quick-note item after the vault that opened or closed.
+pub fn show_vault_in_menu<R: Runtime>(app: &AppHandle<R>, vault: Option<&str>) {
+    fn find<R: Runtime>(items: Vec<MenuItemKind<R>>) -> Option<MenuItem<R>> {
+        items.into_iter().find_map(|i| match i {
+            MenuItemKind::MenuItem(m) if m.id() == QUICK_NOTE_ID => Some(m),
+            MenuItemKind::Submenu(s) => find(s.items().ok()?),
+            _ => None,
+        })
+    }
+    if let Some(item) = app.menu().and_then(|m| find(m.items().ok()?)) {
+        let _ = item.set_text(quick_note_label(vault));
+    }
+}
+
 /// Event telling the main window to take a quick note (no payload).
 pub const QUICK_NOTE_EVENT: &str = "menu:quickNote";
 /// Id of File → Open File… (M4c §3).
@@ -125,7 +164,7 @@ pub fn app_menu<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
     let quick_note = MenuItem::with_id(
         app,
         QUICK_NOTE_ID,
-        "Create New Scratchpad in This Vault",
+        quick_note_label(None),
         true,
         Some("CmdOrCtrl+Shift+N"),
     )?;
@@ -355,5 +394,66 @@ pub fn request_quit<R: Runtime>(app: &AppHandle<R>) {
     }
     for window in windows.into_values() {
         let _ = window.close();
+    }
+}
+
+#[cfg(test)]
+mod label_tests {
+    use super::quick_note_label;
+
+    #[test]
+    fn quick_note_label_names_the_vault_and_shortens_long_names() {
+        assert_eq!(
+            quick_note_label(None),
+            "Create New Scratchpad in This Vault"
+        );
+        assert_eq!(
+            quick_note_label(Some("Smartjob")),
+            "Create New Scratchpad for Smartjob"
+        );
+        let long = "Á".repeat(60);
+        let label = quick_note_label(Some(&long));
+        assert_eq!(
+            label,
+            format!("Create New Scratchpad for {}…", "Á".repeat(39))
+        );
+        assert_eq!(
+            quick_note_label(Some(&"x".repeat(40))),
+            format!("Create New Scratchpad for {}", "x".repeat(40))
+        );
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::quick_note_label;
+
+    /// Review #3: `&` is a mnemonic marker in menus; it must show as itself.
+    #[test]
+    fn subpages_review_an_ampersand_in_the_vault_name_survives() {
+        assert_eq!(
+            quick_note_label(Some("R&D")),
+            "Create New Scratchpad for R&&D"
+        );
+    }
+
+    /// Review #4: the cut keeps whole characters, accents and emoji included.
+    #[test]
+    fn subpages_review_long_names_are_cut_between_characters() {
+        let decomposed = format!("{}e\u{301}", "a".repeat(38)); // 39 chars as typed, NFD
+        assert_eq!(
+            quick_note_label(Some(&decomposed)),
+            format!("Create New Scratchpad for {}\u{e9}", "a".repeat(38))
+        );
+        let long = format!("{}e\u{301}xyz", "a".repeat(38));
+        assert_eq!(
+            quick_note_label(Some(&long)),
+            format!("Create New Scratchpad for {}\u{e9}…", "a".repeat(38))
+        );
+        let emoji = format!("{}👩‍💻tail", "a".repeat(38));
+        assert_eq!(
+            quick_note_label(Some(&emoji)),
+            format!("Create New Scratchpad for {}👩‍💻…", "a".repeat(38))
+        );
     }
 }

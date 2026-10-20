@@ -242,3 +242,99 @@ A fresh-context review of round 3b plus spell checking found 4 Important and 8 M
 - **Database index (#9).** It claims its rows folder's page (`Tasks/Tasks.md`) before row pages are named, so a row titled like its database becomes `Tasks/Tasks 1.md`.
 - **Folder pages (#10).** Only sub-pages (a `.md` page or a database) make a page a folder page. A page whose folder holds only attachments stays `X.md`, with its attachments where Notion put them. _Ruling:_ the earlier `b6_review_i5` test expected `Home/Home.md` for a page with one attached CSV and now expects `Home.md`.
 - **Flaky sidebar drag (found in the gate).** A pointer release saved the width from the last _rendered_ state. On a busy machine the release can arrive before the last move renders, so the edge snapped back to 270. The release now computes the width from its own position, and the e2e waits for the edge and checks `aria-valuenow`.
+
+## 9. Sub-pages and case-insensitive folder pages (2026-10-20)
+
+Jose, after testing his vault: a folder `SmartJob/` holding `Smartjob.md` didn't merge into one row, and he wants sub-pages: "I don't see how to attach a current page to another page."
+
+### 9.1 Case-insensitive folder pages
+
+- **One shared rule.** A folder `X/` has its own page when it contains `X.md`, or else a page whose name differs from `X.md` only in letter case or Unicode form (NFC, lower-cased). An exact name wins over a case variant. A folder named `X.md` never counts.
+- **Where the rule lives.**
+  - Rust: `Vault::folder_page_of` and `Vault::child_named` (`liber-vault/src/fsops.rs`).
+  - UI: `folderPageOf` (`stores/tree.ts`), used by the tree, the breadcrumb, the delete dialog and the menus.
+  - `isFolderPage` (name-only) is gone. The breadcrumb now asks the tree.
+- **Paired renames** (`paired_rename`) find the page through `folder_page_of`, so `SmartJob → Work` takes `Smartjob.md` along as `Work/Work.md`.
+- **"Match the page name to the folder"** (es: "Igualar el nombre de la página al de la carpeta") appears on a folder whose page differs only in case. It renames `X/x.md` to `X/X.md` through the ordinary rename. That rename leaves the folder where it is: the pair's second step is skipped when it would rename the folder to its own name.
+
+### 9.2 Add sub-page
+
+- **Where:** page rows only (not folder rows, not Archived rows) get "Add sub-page" (es: "Añadir subpágina").
+- **On a plain page `P.md`,** one Rust command, `entry_make_folder_page`, does three things:
+  1. creates `P/`, or reuses an existing sibling folder of that name in any letter case that has no page;
+  2. moves `P.md` to `P/P.md` through the ordinary rename, so links are rewritten;
+  3. the UI then creates "Untitled" inside, with the inline rename started, exactly like New page.
+- **On a page that is already a folder page,** it just creates the new page in that folder.
+- **Refused, with nothing moved,** when:
+  - a file holds the name `P`;
+  - the folder `P/` already has its own page;
+  - the page already is a folder page (for the command itself);
+  - the page is archived;
+  - the write fails, e.g. on a read-only vault. A folder the command had just created is removed again.
+- **Undo:** the app has no undo for moves or renames, so "Add sub-page" isn't undoable either. A user reverses it by dragging the page back out and deleting the new page.
+
+### 9.3 Moving under a page
+
+- **Sidebar drag and drop.** A page row is a drop target, ringed like a folder target, with pointer or keyboard drag.
+  - Dropping item I onto page P first makes P a folder page if it isn't one, then moves I into `P/`. Both go through the existing move paths, so links follow.
+  - Forbidden drops (greyed):
+    - onto itself;
+    - into its own descendant;
+    - where it already is;
+    - a folder onto its own folder page;
+    - onto an archived page, or an archived item onto a page.
+  - Spring-loading only opens folders.
+- **Move to… dialog.** Pages are targets too, with their icons and without `.md`. A folder page appears once, as its folder's row. The filter matches page names. Choosing a page does the same conversion, then the move.
+- **Context menu:** "Move to…" already exists on page rows. No separate "Move under a page…" item.
+
+### 9.4 Reveal in the file manager, and the File menu names the vault
+
+- **Reveal item.**
+  - Every row's context menu (pages, folders, folder pages, attachments, text files, archived items) gets it.
+  - Labels: "Reveal in Finder" on macOS, "Show in File Explorer" on Windows, "Show in file manager" on Linux. es: "Mostrar en Finder", "Mostrar en el Explorador de archivos", "Mostrar en el gestor de archivos".
+  - It goes through the new `entry_reveal(path)` command, which takes a vault path, resolves it inside the open vault and refuses anything outside it or missing.
+  - TODO(E4): hide it in encrypted vaults, where it would show ciphertext names.
+- **File menu.**
+  - The item reads "Create New Scratchpad for <vault name>" while a vault is open, "Create New Scratchpad for Quick notes" for the global Scratchpad, and the generic "Create New Scratchpad in This Vault" otherwise.
+  - Names longer than 40 characters are cut with "…".
+  - It updates on vault open, create and close. A vault has no in-app rename; renaming its folder means reopening it.
+  - The native menu stays English-only, as before.
+  - The Settings → Shortcuts row says "Create new scratchpad for this vault" (es: "Crear una nota rápida nueva para esta bóveda").
+
+### 9.5 Rulings (builder)
+
+1. **The conversion is one Rust command** (`entry_make_folder_page`), not a create-folder plus a rename from the UI. That way the refusals and the cleanup of a just-made folder sit in one place. *Cost if wrong:* none; it reuses the rename.
+2. **A sibling folder `P/` that already has its own page refuses** Add sub-page and moving under `P.md`, rather than merging two pages. *Cost if wrong:* the user moves things by hand.
+3. **A page target's folder is predicted by exact name** in the drop rules (`P.md` → `P/`). The case-insensitive reuse of an existing sibling folder happens in Rust. *Cost if wrong:* a drop could look allowed onto a page whose case-variant sibling folder already holds the item; Rust then refuses it with a toast.
+4. **"Open folder in Finder" is not a separate item.** Reveal on a folder already shows it selected in its parent.
+5. **The menu label updates from Rust** where a session opens or closes (`open_session`, `vault_close`). Notion import and the Scratchpad go through the same `open_session`.
+
+### 9.6 Review fixes (2026-10-20)
+
+A fresh review found one Important issue and seven Minor ones. All are fixed, each with a test that failed first unless noted otherwise.
+
+1. **Moving under a page is one Rust command**, `entry_move_under_page(item, page)`, used by drops and by Move to….
+   - **Checked before anything moves:**
+     - the item is the page itself or contains it;
+     - a name clash in the target folder (case variants count when the disk says so);
+     - the item is already in that folder;
+     - the folder is the item, or a case variant of it;
+     - hidden or archived paths.
+   - **Rollback:** if the move still fails, the page's conversion is undone, and a folder the command made is removed from disk and index.
+   - **Before:** a refused drop could leave `Projects.md` moved to `projects/projects.md`.
+2. **The conversion's clean-up also removes the made folder from the index.** A page under a hidden folder (`.trash/x.md`) is refused before anything is made.
+3. **The vault name's `&` is escaped (`&&`) in the File menu.** Before, "R&D" showed as "RD".
+4. **The vault name is cut by whole characters (graphemes), after NFC.** Accents and emoji stay intact. The `&` escape happens after the cut, so the length counts visible characters.
+5. **`.MD`, in any case, is a page for Add sub-page and moves under a page.** The folder page keeps its own extension, e.g. `Notes/Notes.MD`.
+6. **Reveal in Finder refuses hidden paths** (`.git`, `.obsidian`, `.liber`…), as the rest of the app does. Archived items can still be revealed.
+7. **Names ending in `.` are refused on every platform.** Windows silently drops a trailing dot, so the disk and the index would disagree. The app's other name rules (Windows-forbidden characters) already apply everywhere.
+8. **Test gaps closed:**
+   - two distinct case-variant pages stay apart (case-sensitive disks, Linux CI);
+   - exact-name-wins is checked through the name picker on every OS;
+   - links from a converted page are rewritten;
+   - the drag e2e asserts `aria-expanded="true"`;
+   - a keyboard drag onto a page;
+   - opening a vault, opening the Scratchpad, and closing rename the File-menu item through the real session functions.
+
+**Ruling (from "declined to judge"):** an existing sibling folder with a different letter case is reused as the page's folder only when the disk treats the two names as one entry. That covers case-insensitive APFS and NTFS, checked with `same_entry`. On a case-sensitive disk, `Notes.md` gets its own `Notes/` beside an unrelated `notes/`.
+- *Cost if wrong:* on Linux, two folders whose names differ only in case can coexist, which is what that file system allows anyway.

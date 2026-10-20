@@ -26,6 +26,9 @@ const COMMANDS: &[&str] = &[
     "entry_create_page",
     "entry_create_folder",
     "entry_rename",
+    "entry_make_folder_page",
+    "entry_move_under_page",
+    "entry_reveal",
     "entry_trash",
     "settings_get",
     "settings_set",
@@ -3108,4 +3111,126 @@ fn theme_import_caps_what_it_reads_not_what_metadata_says() {
     let err = call(&h.main, "theme_import", json!({})).unwrap_err();
     assert_eq!(kind(err), "invalidInput");
     writer.join().unwrap();
+
+/// Round 3 §9: Add sub-page turns a page into its folder's page.
+#[test]
+fn subpages_make_folder_page_command() {
+    let h = harness();
+    let vault = tempfile::tempdir().unwrap();
+    std::fs::write(vault.path().join("P.md"), "# P\n").unwrap();
+    std::fs::write(vault.path().join("Q.md"), "See [[P]].\n").unwrap();
+    call(&h.main, "vault_open", json!({ "path": vault.path() })).unwrap();
+    let out = call(&h.main, "entry_make_folder_page", json!({ "page": "P.md" })).unwrap();
+    assert_eq!(out["folder"], "P");
+    assert_eq!(out["page"], "P/P.md");
+    assert_eq!(out["outcome"]["failed"], json!([]));
+    assert!(vault.path().join("P/P.md").is_file());
+    assert_eq!(
+        kind(
+            call(
+                &h.main,
+                "entry_make_folder_page",
+                json!({ "page": "P/P.md" })
+            )
+            .unwrap_err()
+        ),
+        "alreadyExists"
+    );
+    assert_eq!(
+        kind(
+            call(
+                &h.main,
+                "entry_make_folder_page",
+                json!({ "page": ".archive/X.md" })
+            )
+            .unwrap_err()
+        ),
+        "notPermitted"
+    );
+}
+
+/// Round 3 §9.4: Reveal in Finder only shows items inside the open vault.
+/// (Only refusals are exercised: a success would open the real file manager.)
+#[test]
+fn subpages_entry_reveal_refuses_outside_and_missing() {
+    let h = harness();
+    assert_eq!(
+        kind(call(&h.main, "entry_reveal", json!({ "path": "a.md" })).unwrap_err()),
+        "noVault"
+    );
+    let vault = tempfile::tempdir().unwrap();
+    let outside = tempfile::tempdir().unwrap();
+    std::fs::write(outside.path().join("secret.md"), "").unwrap();
+    #[cfg(unix)]
+    std::os::unix::fs::symlink(outside.path(), vault.path().join("link")).unwrap();
+    call(&h.main, "vault_open", json!({ "path": vault.path() })).unwrap();
+    assert!(call(&h.main, "entry_reveal", json!({ "path": "../secret.md" })).is_err());
+    assert!(call(&h.main, "entry_reveal", json!({ "path": "/etc/hosts" })).is_err());
+    assert_eq!(
+        kind(call(&h.main, "entry_reveal", json!({ "path": "missing.md" })).unwrap_err()),
+        "notFound"
+    );
+    #[cfg(unix)]
+    assert_eq!(
+        kind(call(&h.main, "entry_reveal", json!({ "path": "link/secret.md" })).unwrap_err()),
+        "outsideVault"
+    );
+    // Review #6: hidden folders stay hidden, as everywhere else in the app.
+    std::fs::create_dir_all(vault.path().join(".git/objects")).unwrap();
+    for hidden in [".git", ".git/objects", ".liber"] {
+        std::fs::create_dir_all(vault.path().join(hidden)).unwrap();
+        assert_eq!(
+            kind(call(&h.main, "entry_reveal", json!({ "path": hidden })).unwrap_err()),
+            "outsideVault",
+            "{hidden}"
+        );
+    }
+}
+
+/// Review #1: moving under a page is one command; a clash refuses before
+/// the page moves.
+#[test]
+fn subpages_move_under_page_command() {
+    let h = harness();
+    let vault = tempfile::tempdir().unwrap();
+    std::fs::write(vault.path().join("P.md"), "# P\n").unwrap();
+    std::fs::create_dir_all(vault.path().join("Art")).unwrap();
+    std::fs::write(vault.path().join("Art/a.md"), "").unwrap();
+    std::fs::write(vault.path().join("Art/b.md"), "").unwrap();
+    call(&h.main, "vault_open", json!({ "path": vault.path() })).unwrap();
+    let out = call(
+        &h.main,
+        "entry_move_under_page",
+        json!({ "item": "Art/a.md", "page": "P.md" }),
+    )
+    .unwrap();
+    assert_eq!(out["folder"], "P");
+    assert_eq!(out["page"], "P/P.md");
+    assert_eq!(out["converted"]["moved"], json!([["P.md", "P/P.md"]]));
+    assert_eq!(out["moved"]["moved"], json!([["Art/a.md", "P/a.md"]]));
+    // `P/a.md` exists now: `a.md`'s namesake can't go there too.
+    std::fs::write(vault.path().join("Art/a.md"), "").unwrap();
+    call(&h.main, "vault_open", json!({ "path": vault.path() })).unwrap();
+    assert_eq!(
+        kind(
+            call(
+                &h.main,
+                "entry_move_under_page",
+                json!({ "item": "Art/a.md", "page": "P/P.md" })
+            )
+            .unwrap_err()
+        ),
+        "alreadyExists"
+    );
+    assert_eq!(
+        kind(
+            call(
+                &h.main,
+                "entry_move_under_page",
+                json!({ "item": ".archive/x.md", "page": "P/P.md" })
+            )
+            .unwrap_err()
+        ),
+        "notPermitted"
+    );
 }

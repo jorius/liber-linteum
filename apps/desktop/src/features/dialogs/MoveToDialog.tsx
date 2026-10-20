@@ -1,16 +1,18 @@
 import { useEffect, useId, useRef, useState, type CSSProperties, type KeyboardEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { FolderIcon } from '../../app/icons';
-import { childrenByParent, nameOf, parentOf } from '../../stores/tree';
+import type { TreeNode } from '../../ipc';
+import { childrenByParent, folderPageOf, nameOf, parentOf } from '../../stores/tree';
 import { useVaultStore } from '../../stores/vaultStore';
 import { dropEntry, planDrop } from '../explorer/drop';
-import { displayName } from '../explorer/TreeRow';
+import { displayName, Icon } from '../explorer/TreeRow';
 import { ItemIcon } from '../icons/ItemIcon';
 import { Dialog } from './Dialog';
 import styles from './Dialogs.module.css';
 
 interface Row {
   path: string;
+  node?: TreeNode;
   icon?: string;
   level: number;
   hasChildren: boolean;
@@ -48,19 +50,26 @@ export function MoveToDialog({ path, onClose }: { path: string; onClose: () => v
 
   if (!node) return null;
 
-  // Folders it can go into or past: not hidden, not itself or inside itself.
+  // Folders it can go into or past, and pages it can go under (round 3 §9.3):
+  // not hidden, not itself or inside itself. A folder page is its folder's row.
+  const all = childrenByParent(nodes);
   const children = childrenByParent(
     nodes.filter(
       (n) =>
-        n.kind === 'folder' && !hidden(n.path) && n.path !== path && !n.path.startsWith(`${path}/`),
+        (n.kind === 'folder' ||
+          (n.kind === 'page' && folderPageOf(parentOf(n.path), all) !== n.path)) &&
+        !hidden(n.path) &&
+        n.path !== path &&
+        !n.path.startsWith(`${path}/`),
     ),
   );
+  const label = (p: string) => nameOf(p).replace(/\.md$/i, '');
   const q = query.trim().toLowerCase();
   const keep = new Set<string>();
   if (q) {
     for (const list of children.values()) {
       for (const f of list) {
-        if (nameOf(f.path).toLowerCase().includes(q)) {
+        if (label(f.path).toLowerCase().includes(q)) {
           keep.add(f.path);
           for (const a of ancestors(f.path)) keep.add(a);
         }
@@ -71,7 +80,7 @@ export function MoveToDialog({ path, onClose }: { path: string; onClose: () => v
   const walk = (parent: string, level: number) => {
     for (const f of children.get(parent) ?? []) {
       if (q && !keep.has(f.path)) continue;
-      rows.push({ path: f.path, icon: f.icon, level, hasChildren: children.has(f.path) });
+      rows.push({ path: f.path, node: f, icon: f.icon, level, hasChildren: children.has(f.path) });
       if (q || open.has(f.path)) walk(f.path, level + 1);
     }
   };
@@ -213,9 +222,15 @@ export function MoveToDialog({ path, onClose }: { path: string; onClose: () => v
                   </svg>
                 )}
               </span>
-              {r.icon ? <ItemIcon icon={r.icon} /> : <FolderIcon />}
+              {r.icon ? (
+                <ItemIcon icon={r.icon} />
+              ) : r.node?.kind === 'page' ? (
+                <Icon node={r.node} expanded={false} />
+              ) : (
+                <FolderIcon />
+              )}
               <span className={styles.moveName}>
-                {r.path ? nameOf(r.path) : t('dialogs.move.root')}
+                {r.path ? label(r.path) : t('dialogs.move.root')}
               </span>
               {r.path === current && (
                 <span className={styles.moveCurrent}>{t('dialogs.move.current')}</span>
