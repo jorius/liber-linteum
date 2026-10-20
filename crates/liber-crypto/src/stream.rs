@@ -408,6 +408,51 @@ mod tests {
 
     const SEG: usize = CHUNK_LEN + TAG_LEN;
 
+    /// Fails its `fail_at`-th write call once (1 is the header), then succeeds.
+    struct Flaky {
+        calls: usize,
+        fail_at: usize,
+        out: Vec<u8>,
+    }
+
+    impl Write for Flaky {
+        fn write(&mut self, b: &[u8]) -> io::Result<usize> {
+            self.calls += 1;
+            if self.calls == self.fail_at {
+                return Err(io::Error::other("disk full"));
+            }
+            self.out.extend_from_slice(b);
+            Ok(b.len())
+        }
+        fn flush(&mut self) -> io::Result<()> {
+            Ok(())
+        }
+    }
+
+    #[test]
+    fn writer_is_poisoned_after_an_io_error() {
+        // 2 fails chunk 0's ciphertext, 3 its tag (the ciphertext is already out).
+        for fail_at in [2, 3] {
+            let k = Secret::<32>::random();
+            let mut f = Flaky {
+                calls: 0,
+                fail_at,
+                out: Vec::new(),
+            };
+            let mut w = StreamWriter::new(&mut f, &k, 1).unwrap();
+            w.write_all(&[1; CHUNK_LEN]).unwrap();
+            assert!(w.write_all(&[2]).is_err(), "the first emit fails");
+            // The sink works again, but chunk 0 must never be encrypted or written a second time.
+            assert!(w.write_all(&[2]).is_err(), "{fail_at}: retry");
+            assert!(w.finish().is_err(), "{fail_at}: finish");
+            assert_eq!(f.calls, fail_at, "{fail_at}: no write after the error");
+            assert!(
+                f.out.len() < HEADER_LEN + SEG,
+                "{fail_at}: chunk 0 written once at most"
+            );
+        }
+    }
+
     fn plaintext(n: usize) -> Vec<u8> {
         (0..n).map(|i| (i * 31 + i / 251) as u8).collect()
     }
