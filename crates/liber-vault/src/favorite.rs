@@ -28,7 +28,7 @@ impl Vault {
     /// The favorites, re-read on every call; entries that aren't strings are
     /// left out.
     pub fn favorites(&self) -> Vec<String> {
-        let value: Value = read_json(self.root(), LIBER_JSON, &mut Vec::new());
+        let value: Value = read_json(self.storage(), LIBER_JSON, &mut Vec::new());
         list(value.get(KEY))
     }
 

@@ -4,7 +4,7 @@
 
 use crate::ImportError;
 use std::cell::RefCell;
-use std::fs::File;
+use std::fs::File; // seam: outside (the user's export zip, not a vault)
 use std::io::{Read, Seek, Write};
 use std::path::Path;
 use zip::ZipArchive;
@@ -81,7 +81,7 @@ impl Export {
     /// Opens `path` and lists its files. A zip holding nothing but `.zip`
     /// files is Notion's multi-part export: each part is read in turn.
     pub fn open(path: &Path, limits: &Limits) -> Result<Export, ImportError> {
-        let mut outer = ZipArchive::new(File::open(path)?).map_err(zip_err)?;
+        let mut outer = ZipArchive::new(File::open(path)?).map_err(zip_err)?; // seam: outside (the user's export zip, not a vault)
         let mut export = Export {
             parts: Vec::new(),
             entries: Vec::new(),
@@ -109,7 +109,7 @@ impl Export {
             // total before any is copied, as the files inside them do.
             let mut parts: u64 = 0;
             for i in files {
-                let mut tmp = tempfile::tempfile()?;
+                let mut tmp = tempfile::tempfile()?; // seam: outside (an OS temp file for a nested zip part)
                 {
                     let mut part = outer.by_index(i).map_err(zip_err)?;
                     check_size(

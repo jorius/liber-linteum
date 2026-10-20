@@ -1,11 +1,12 @@
 use crate::config::{
     AttachmentConfig, AttachmentPolicy, LiberAttachments, LiberVaultJson, ObsidianAppJson,
 };
-use crate::error::{Result, VaultError, io_err};
+use crate::error::{Result, VaultError};
 use crate::is_hidden_name;
 use crate::path::VaultPath;
+use crate::storage::{Follow, Kind, Storage, open_storage};
 use globset::{Glob, GlobSet, GlobSetBuilder};
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::sync::Mutex;
 
 /// An open vault folder. Opening reads configuration and writes nothing of
@@ -13,7 +14,7 @@ use std::sync::Mutex;
 /// before the rename (`LEGACY_META_DIR`) to `.liber/` (`meta_dir::migrate`).
 #[derive(Debug)]
 pub struct Vault {
-    pub(crate) root: PathBuf,
+    storage: Box<dyn Storage>,
     pub(crate) excludes: GlobSet,
     warnings: Vec<String>,
     /// The settings were found in the legacy folder when this opened.
@@ -24,26 +25,18 @@ pub struct Vault {
 
 impl Vault {
     pub fn open(root: &Path) -> Result<Vault> {
-        let root = dunce::canonicalize(root).map_err(|e| match e.kind() {
-            std::io::ErrorKind::NotFound => VaultError::NotFound(root.display().to_string()),
-            _ => VaultError::Io {
-                path: root.display().to_string(),
-                source: e,
-            },
-        })?;
-        if !root.is_dir() {
-            return Err(VaultError::NotFound(format!(
-                "{} is not a folder",
-                root.display()
-            )));
-        }
-        let mut warnings = Vec::new();
-        let legacy_settings = crate::meta_dir::migrate(&root, &mut warnings);
+        Vault::open_with(open_storage(root)?)
+    }
 
-        let liber = read_liber_json(&root, &mut warnings);
+    /// Opens the vault that `storage` holds.
+    pub fn open_with(storage: Box<dyn Storage>) -> Result<Vault> {
+        let mut warnings = Vec::new();
+        let legacy_settings = crate::meta_dir::migrate(&*storage, &mut warnings);
+
+        let liber = read_liber_json(&*storage, &mut warnings);
         // Read once here only to report a broken file; the attachment policy
         // is re-read on every use (M2c §5.3).
-        let _: ObsidianAppJson = read_json(&root, OBSIDIAN_JSON, &mut warnings);
+        let _: ObsidianAppJson = read_json(&*storage, OBSIDIAN_JSON, &mut warnings);
 
         let mut builder = GlobSetBuilder::new();
         for pattern in &liber.exclude {
@@ -57,7 +50,7 @@ impl Vault {
         let excludes = builder.build().unwrap_or_else(|_| GlobSet::empty());
 
         Ok(Vault {
-            root,
+            storage,
             excludes,
             warnings,
             legacy_settings,
@@ -65,9 +58,14 @@ impl Vault {
         })
     }
 
-    /// Canonical absolute root (Windows `\\?\` stripped).
+    /// Canonical absolute root (Windows `\\?\` stripped), for identity only
+    /// (recent list, index, scratchpad); content goes through the storage.
     pub fn root(&self) -> &Path {
-        &self.root
+        self.storage.location()
+    }
+
+    pub(crate) fn storage(&self) -> &dyn Storage {
+        &*self.storage
     }
 
     /// Where new attachments go, re-read from disk so a config edit while the
@@ -181,7 +179,7 @@ impl Vault {
         create: bool,
         edit: &mut impl FnMut(&mut serde_json::Map<String, serde_json::Value>),
     ) -> Result<()> {
-        let rel = &crate::meta_dir::resolve(&self.root, rel);
+        let rel = &crate::meta_dir::resolve(self.storage(), rel);
         let file = VaultPath::new(rel)?;
         let (mut map, expected) = match self.read(&file) {
             Ok((bytes, hash)) => match serde_json::from_slice(&bytes) {
@@ -205,10 +203,13 @@ impl Vault {
         map.entry("version").or_insert(1.into());
         // The settings folder appears on first need (VLT-02); the legacy one,
         // when `rel` resolved there, already exists.
-        let meta = rel.split('/').next().unwrap_or(rel);
-        let dir = self.fs_path(&VaultPath::new(meta)?)?;
-        if !dir.is_dir() {
-            std::fs::create_dir(&dir).map_err(|e| io_err(meta, e))?;
+        let dir = VaultPath::new(rel.split('/').next().unwrap_or(rel))?;
+        let is_dir = matches!(
+            self.storage.meta(&dir, Follow::InsideVault),
+            Ok(Some(m)) if m.kind == Kind::Dir
+        );
+        if !is_dir {
+            self.storage.create_dir(&dir)?;
         }
         let mut text =
             serde_json::to_string_pretty(&serde_json::Value::Object(map)).expect("valid JSON");
@@ -221,8 +222,8 @@ impl Vault {
     /// usable. Errors read as "not set": `open` already reported them.
     fn attachment_sources(&self) -> (Option<LiberAttachments>, Option<(String, AttachmentPolicy)>) {
         let mut ignored = Vec::new();
-        let liber = read_liber_json(&self.root, &mut ignored);
-        let obsidian: ObsidianAppJson = read_json(&self.root, OBSIDIAN_JSON, &mut ignored);
+        let liber = read_liber_json(self.storage(), &mut ignored);
+        let obsidian: ObsidianAppJson = read_json(self.storage(), OBSIDIAN_JSON, &mut ignored);
         let obsidian = obsidian.attachment_folder_path.and_then(|value| {
             AttachmentPolicy::from_obsidian(&value).map(|policy| (value, policy))
         });
@@ -232,7 +233,7 @@ impl Vault {
     /// `indexPicks` from `.liber/vault.json` (folder → page; GV-02), re-read on
     /// every call like the attachment policy. Unreadable: none.
     pub fn index_picks(&self) -> std::collections::HashMap<String, String> {
-        let liber = read_liber_json(&self.root, &mut Vec::new());
+        let liber = read_liber_json(self.storage(), &mut Vec::new());
         liber.index_picks
     }
 
@@ -293,18 +294,20 @@ pub(crate) fn pick_holds(folder: &str, page: &str) -> bool {
 }
 
 /// `.liber/vault.json`, field by field (final review m9).
-fn read_liber_json(root: &Path, warnings: &mut Vec<String>) -> LiberVaultJson {
-    let value: serde_json::Value = read_json(root, LIBER_JSON, warnings);
+fn read_liber_json(storage: &dyn Storage, warnings: &mut Vec<String>) -> LiberVaultJson {
+    let value: serde_json::Value = read_json(storage, LIBER_JSON, warnings);
     LiberVaultJson::from_value(&value, warnings)
 }
 
 pub(crate) fn read_json<T: serde::de::DeserializeOwned + Default>(
-    root: &Path,
+    storage: &dyn Storage,
     rel: &str,
     warnings: &mut Vec<String>,
 ) -> T {
-    let path = root.join(crate::meta_dir::resolve(root, rel));
-    let Ok(bytes) = std::fs::read(&path) else {
+    let Ok(path) = VaultPath::new(&crate::meta_dir::resolve(storage, rel)) else {
+        return T::default();
+    };
+    let Ok(bytes) = storage.read(&path) else {
         return T::default();
     };
     match serde_json::from_slice(&bytes) {

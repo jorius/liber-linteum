@@ -1,9 +1,8 @@
 use crate::error::{Result, VaultError};
 use crate::is_hidden_path;
 use crate::path::VaultPath;
+use crate::storage::{RawEvent, WatchGuard};
 use crate::vault::Vault;
-use notify::{Event, RecommendedWatcher, RecursiveMode, Watcher as _};
-use std::path::{Path, PathBuf};
 use std::sync::mpsc::{self, RecvTimeoutError};
 use std::time::{Duration, Instant};
 
@@ -30,7 +29,7 @@ pub enum WatchEvent {
 /// Active watch; dropping it stops watching (the batching thread ends when
 /// the backend watcher, and with it the event sender, is dropped).
 pub struct Watcher {
-    _watcher: RecommendedWatcher,
+    _guard: WatchGuard,
 }
 
 impl std::fmt::Debug for Watcher {
@@ -52,7 +51,7 @@ impl Vault {
     where
         F: Fn(Vec<WatchEvent>) + Send + 'static,
     {
-        self.watch_with(RecursiveMode::Recursive, callback)
+        self.watch_with(true, callback)
     }
 
     /// [`Vault::watch`] for the root folder's own entries only, never the
@@ -61,25 +60,21 @@ impl Vault {
     where
         F: Fn(Vec<WatchEvent>) + Send + 'static,
     {
-        self.watch_with(RecursiveMode::NonRecursive, callback)
+        self.watch_with(false, callback)
     }
 
-    fn watch_with<F>(&self, mode: RecursiveMode, callback: F) -> Result<Watcher>
+    fn watch_with<F>(&self, recursive: bool, callback: F) -> Result<Watcher>
     where
         F: Fn(Vec<WatchEvent>) + Send + 'static,
     {
-        let filter = PathFilter {
-            root: self.root.clone(),
-            excludes: self.excludes.clone(),
-        };
-        let (tx, rx) = mpsc::channel::<notify::Result<Event>>();
-        let mut watcher = notify::recommended_watcher(move |res| {
-            let _ = tx.send(res);
-        })
-        .map_err(|e| VaultError::Watch(e.to_string()))?;
-        watcher
-            .watch(&self.root, mode)
-            .map_err(|e| VaultError::Watch(e.to_string()))?;
+        let excludes = self.excludes.clone();
+        let (tx, rx) = mpsc::channel::<RawEvent>();
+        let guard = self.storage().watch(
+            recursive,
+            Box::new(move |ev| {
+                let _ = tx.send(ev);
+            }),
+        )?;
         std::thread::Builder::new()
             .name("liber-watch".into())
             .spawn(move || {
@@ -105,7 +100,7 @@ impl Vault {
                             }
                         }
                     }
-                    let batch = filter.translate(raw);
+                    let batch = batch(&excludes, raw);
                     if !batch.is_empty() {
                         callback(batch);
                     }
@@ -115,118 +110,82 @@ impl Vault {
                 }
             })
             .map_err(|e| VaultError::Watch(e.to_string()))?;
-        Ok(Watcher { _watcher: watcher })
+        Ok(Watcher { _guard: guard })
     }
 }
 
-struct PathFilter {
-    root: PathBuf,
-    excludes: globset::GlobSet,
-}
-
-impl PathFilter {
-    fn translate(&self, raw: Vec<notify::Result<Event>>) -> Vec<WatchEvent> {
-        let mut out: Vec<WatchEvent> = Vec::new();
-        for res in raw {
-            let event = match res {
-                Ok(event) => event,
-                Err(_) => return vec![WatchEvent::Overflow],
-            };
-            if event.need_rescan() {
+/// One debounced batch: `Overflow` if any event says so or names the root
+/// (defence in depth: a storage should already send `Overflow` for it), else
+/// the visible paths (hidden and excluded ones dropped), one event each,
+/// sorted.
+/// A path's last event wins: storage classifies a path when its event
+/// arrives, while the old watcher looked once, after the debounce.
+pub(crate) fn batch(excludes: &globset::GlobSet, raw: Vec<RawEvent>) -> Vec<WatchEvent> {
+    let visible = |p: &VaultPath| !(is_hidden_path(p.as_str()) || excludes.is_match(p.as_str()));
+    let mut removed = std::collections::HashMap::new();
+    for ev in raw {
+        match ev {
+            RawEvent::Overflow => return vec![WatchEvent::Overflow],
+            RawEvent::Changed(p) | RawEvent::Removed(p) if p.is_root() => {
                 return vec![WatchEvent::Overflow];
             }
-            for p in &event.paths {
-                if self.is_root(p) {
-                    return vec![WatchEvent::Overflow];
-                }
-                if let Some(path) = self.visible(p) {
-                    out.push(if p.exists() {
-                        WatchEvent::Changed(path)
-                    } else {
-                        WatchEvent::Removed(path)
-                    });
-                }
-            }
-        }
-        out.sort_by(|a, b| format!("{a:?}").cmp(&format!("{b:?}")));
-        out.dedup();
-        out
-    }
-
-    fn is_root(&self, p: &Path) -> bool {
-        dunce::canonicalize(p).is_ok_and(|c| c == self.root)
-    }
-
-    /// Vault path for `p` unless it is outside, the root, hidden or excluded.
-    fn visible(&self, p: &Path) -> Option<VaultPath> {
-        let canonical_parent = p.parent().and_then(|d| dunce::canonicalize(d).ok());
-        let p = match (canonical_parent, p.file_name()) {
-            (Some(dir), Some(name)) => dir.join(name),
-            _ => p.to_path_buf(),
+            RawEvent::Changed(p) if visible(&p) => removed.insert(p, false),
+            RawEvent::Removed(p) if visible(&p) => removed.insert(p, true),
+            _ => None,
         };
-        let vp = VaultPath::from_fs_path(&self.root, &p).ok()?;
-        if vp.is_root() || is_hidden_path(vp.as_str()) || self.excludes.is_match(vp.as_str()) {
-            return None;
-        }
-        Some(vp)
     }
+    let mut out: Vec<WatchEvent> = removed
+        .into_iter()
+        .map(|(p, gone)| {
+            if gone {
+                WatchEvent::Removed(p)
+            } else {
+                WatchEvent::Changed(p)
+            }
+        })
+        .collect();
+    out.sort_by(|a, b| format!("{a:?}").cmp(&format!("{b:?}")));
+    out
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use notify::event::{CreateKind, Flag};
-    use notify::{Event, EventKind};
 
-    fn filter(root: &Path) -> PathFilter {
-        PathFilter {
-            root: dunce::canonicalize(root).unwrap(),
-            excludes: globset::GlobSet::empty(),
+    /// The last event on a path wins, as when paths were classified after
+    /// the debounce: modified-then-deleted is gone, deleted-then-recreated is
+    /// changed.
+    #[test]
+    fn vlt_04_last_event_on_a_path_wins() {
+        let p = VaultPath::new("a.md").unwrap();
+        let none = globset::GlobSet::empty();
+        let changed = RawEvent::Changed(p.clone());
+        let removed = RawEvent::Removed(p.clone());
+        assert_eq!(
+            batch(&none, vec![changed.clone(), removed.clone()]),
+            [WatchEvent::Removed(p.clone())]
+        );
+        assert_eq!(
+            batch(&none, vec![removed, changed]),
+            [WatchEvent::Changed(p)]
+        );
+    }
+
+    /// Final review M4: a storage reporting a change on the root itself
+    /// (`Changed("")`/`Removed("")`) gets a rescan, not silence.
+    #[test]
+    fn vlt_04_root_path_event_becomes_overflow() {
+        let none = globset::GlobSet::empty();
+        let root = VaultPath::root();
+        let a = VaultPath::new("a.md").unwrap();
+        for ev in [
+            RawEvent::Changed(root.clone()),
+            RawEvent::Removed(root.clone()),
+        ] {
+            assert_eq!(
+                batch(&none, vec![RawEvent::Changed(a.clone()), ev]),
+                [WatchEvent::Overflow]
+            );
         }
-    }
-
-    /// Final review I4: a backend "rescan needed" signal (events were lost, no
-    /// paths) must become `Overflow`, never be dropped.
-    #[test]
-    fn vlt_04_rescan_flag_becomes_overflow() {
-        let dir = tempfile::tempdir().unwrap();
-        let f = filter(dir.path());
-        let rescan = Event::new(EventKind::Other).set_flag(Flag::Rescan);
-        assert_eq!(f.translate(vec![Ok(rescan)]), vec![WatchEvent::Overflow]);
-        assert_eq!(
-            f.translate(vec![Err(notify::Error::generic("queue overflow"))]),
-            vec![WatchEvent::Overflow]
-        );
-    }
-
-    /// An event on the vault root itself means "something in here changed"
-    /// (e.g. FSEvents must-scan-subdirs): rescan.
-    #[test]
-    fn vlt_04_root_event_becomes_overflow() {
-        let dir = tempfile::tempdir().unwrap();
-        let f = filter(dir.path());
-        let root_ev = Event::new(EventKind::Create(CreateKind::Any)).add_path(f.root.clone());
-        assert_eq!(f.translate(vec![Ok(root_ev)]), vec![WatchEvent::Overflow]);
-    }
-
-    #[test]
-    fn vlt_04_file_events_are_classified_by_disk_state() {
-        let dir = tempfile::tempdir().unwrap();
-        let f = filter(dir.path());
-        std::fs::write(f.root.join("a.md"), "x").unwrap();
-        let ev =
-            |p: &str| Ok(Event::new(EventKind::Create(CreateKind::File)).add_path(f.root.join(p)));
-        assert_eq!(
-            f.translate(vec![
-                ev("a.md"),
-                ev("gone.md"),
-                ev("a.md"),
-                ev(".hidden/x.md")
-            ]),
-            vec![
-                WatchEvent::Changed(VaultPath::new("a.md").unwrap()),
-                WatchEvent::Removed(VaultPath::new("gone.md").unwrap()),
-            ]
-        );
     }
 }

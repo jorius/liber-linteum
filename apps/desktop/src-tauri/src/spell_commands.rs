@@ -41,7 +41,7 @@ pub struct SpellState {
 
 struct VaultSpelling {
     session: Weak<VaultSession>,
-    stamp: Option<(SystemTime, u64)>,
+    stamp: Option<(i128, u64)>,
     dictionaries: Option<Vec<String>>,
     words: Vec<String>,
 }
@@ -172,7 +172,7 @@ fn ensure(spell: &SpellState, state: &AppState, id: &str) -> bool {
     }
     let (aff, dic) = files(&folder(state, id));
     let times = (|| {
-        let t = |p: &Path| std::fs::metadata(p).and_then(|m| m.modified()).ok();
+        let t = |p: &Path| std::fs::metadata(p).and_then(|m| m.modified()).ok(); // seam: outside (imported dictionaries live in the app config dir)
         Some((t(&aff)?, t(&dic)?))
     })();
     let mut failed = spell.failed.lock().unwrap_or_else(|e| e.into_inner());
@@ -277,11 +277,11 @@ pub(crate) fn spell_import_file(
         .expect("an unused id");
     let dir = folder(state, &id);
     let (to_aff, to_dic) = files(&dir);
-    let copied = std::fs::create_dir_all(&dir)
-        .and_then(|_| std::fs::copy(&aff, &to_aff))
-        .and_then(|_| std::fs::copy(&dic, &to_dic));
+    let copied = std::fs::create_dir_all(&dir) // seam: outside (imported dictionaries live in the app config dir)
+        .and_then(|_| std::fs::copy(&aff, &to_aff)) // seam: outside (imported dictionaries live in the app config dir)
+        .and_then(|_| std::fs::copy(&dic, &to_dic)); // seam: outside (imported dictionaries live in the app config dir)
     if let Err(e) = copied {
-        let _ = std::fs::remove_dir_all(&dir);
+        let _ = std::fs::remove_dir_all(&dir); // seam: outside (imported dictionaries live in the app config dir)
         return Err(e.into());
     }
     let entry = ImportedDictionary {
@@ -292,7 +292,7 @@ pub(crate) fn spell_import_file(
         .settings
         .modify(|s| s.imported_dictionaries.push(entry))
     {
-        let _ = std::fs::remove_dir_all(&dir);
+        let _ = std::fs::remove_dir_all(&dir); // seam: outside (imported dictionaries live in the app config dir)
         return Err(e.into());
     }
     Ok(DictionaryDto {
@@ -340,7 +340,7 @@ pub(crate) fn spell_remove_impl(spell: &SpellState, state: &AppState, id: String
         .remove(&id);
     let dir = folder(state, &id);
     if dir.exists() {
-        std::fs::remove_dir_all(dir)?;
+        std::fs::remove_dir_all(dir)?; // seam: outside (imported dictionaries live in the app config dir)
     }
     Ok(())
 }

@@ -180,9 +180,12 @@ fn review_focus_symlinks_outside_vault_and_folder_symlinks_are_skipped() {
 #[test]
 fn vault_path_maps_back_from_fs() {
     let vault = Vault::open(&fixture_path("obsidian-basic")).unwrap();
-    let fs = VaultPath::new("Game Design/Game 1.md")
-        .unwrap()
-        .to_fs_path(vault.root());
+    let fs = vault
+        .os_path(
+            &VaultPath::new("Game Design/Game 1.md").unwrap(),
+            liber_vault::OsUse::Open,
+        )
+        .unwrap();
     assert!(fs.is_file());
 }
 
@@ -287,9 +290,45 @@ fn m5b_archive_is_scanned_stat_ed_and_served_but_other_hidden_folders_are_not() 
     assert!(vault.stat(&vp(".archive/P/a.md")).unwrap().is_some());
     assert!(vault.stat(&vp(".trash/b.md")).unwrap().is_none());
     assert!(vault.stat(&vp("P/.archive/d.md")).unwrap().is_none());
-    assert!(vault.visible_fs_path(&vp(".archive/P/a.md")).is_ok());
-    assert!(vault.visible_fs_path(&vp(".archive/.x/h.md")).is_err());
+    let visible = liber_vault::Reach::Visible;
+    assert!(vault.open_read(&vp(".archive/P/a.md"), visible).is_ok());
+    assert!(vault.open_read(&vp(".archive/.x/h.md"), visible).is_err());
     assert!(liber_vault::is_hidden_path(".trash/b.md"));
     assert!(!liber_vault::is_hidden_path(".archive"));
     assert!(liber_vault::is_hidden_path(".archive/.x"));
+}
+
+/// E2: the walk runs on `Storage`, and every skip message keeps the text it
+/// had (scan reports them as they are).
+#[cfg(unix)]
+#[test]
+fn e2_scan_skip_messages_keep_their_text() {
+    use std::os::unix::fs::PermissionsExt;
+    let dir = tempfile::tempdir().unwrap();
+    let outside = tempfile::tempdir().unwrap();
+    let root = dir.path();
+    std::fs::create_dir(root.join("Projects")).unwrap();
+    std::os::unix::fs::symlink(outside.path(), root.join("leakdir")).unwrap();
+    std::os::unix::fs::symlink(root.join("Projects"), root.join("loop")).unwrap();
+    std::fs::write(root.join("a\\b.md"), "x").unwrap();
+    let locked = root.join("locked");
+    std::fs::create_dir(&locked).unwrap();
+    std::fs::set_permissions(&locked, std::fs::Permissions::from_mode(0o000)).unwrap();
+    let readable = std::fs::read_dir(&locked).is_ok(); // running as root
+    let vault = Vault::open(root).unwrap();
+    let scan = vault.scan();
+    std::fs::set_permissions(&locked, std::fs::Permissions::from_mode(0o755)).unwrap();
+    let mut skipped = scan.unwrap().skipped;
+    skipped.sort();
+    let mut expected = vec![
+        format!("{}: invalid name", vault.root().join("a\\b.md").display()),
+        "leakdir: symlink points outside the vault".to_string(),
+        "loop: symlinked folder not followed".to_string(),
+    ];
+    if !readable {
+        let denied = std::io::Error::from_raw_os_error(13); // EACCES
+        expected.push(format!("locked: folder not readable ({denied})"));
+    }
+    expected.sort();
+    assert_eq!(skipped, expected);
 }

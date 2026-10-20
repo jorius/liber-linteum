@@ -119,6 +119,7 @@ fn byte_ranges_for_audio_seeking() {
     );
     assert_eq!(r.status, 206);
     assert_eq!(r.body, full[2..=5]);
+    assert!(accepts_ranges(&r), "{:?}", r.headers);
     assert!(
         r.headers
             .iter()
@@ -414,4 +415,84 @@ fn b6_review_i6_long_media_is_served_in_bounded_pieces() {
         "{:?}",
         rest.headers
     );
+}
+
+fn accepts_ranges(r: &liber_desktop::asset::AssetResponse) -> bool {
+    r.headers
+        .iter()
+        .any(|(k, v)| k == "Accept-Ranges" && v == "bytes")
+}
+
+fn content_range(r: &liber_desktop::asset::AssetResponse) -> Option<&str> {
+    r.headers
+        .iter()
+        .find(|(k, _)| k == "Content-Range")
+        .map(|(_, v)| v.as_str())
+}
+
+/// E2 review focus 3: a range of an empty file (or past the end) is 416, and
+/// a full read is 200 with exactly the file's bytes.
+#[test]
+fn asset_range_on_empty_file_is_416() {
+    let vault = tempfile::tempdir().unwrap();
+    std::fs::write(vault.path().join("e.wav"), b"").unwrap();
+    std::fs::write(vault.path().join("f.wav"), [7u8; 10]).unwrap();
+    let (app, _c, _k) = open(vault.path());
+    let state = app.state::<AppState>();
+    let r = serve(&state, "/e.wav", Some("bytes=0-"));
+    assert_eq!((r.status, content_range(&r)), (416, Some("bytes */0")));
+    let r = serve(&state, "/e.wav", None);
+    assert_eq!((r.status, r.body.len()), (200, 0));
+    assert!(accepts_ranges(&r), "{:?}", r.headers);
+    let r = serve(&state, "/f.wav", Some("bytes=10-"));
+    assert_eq!((r.status, content_range(&r)), (416, Some("bytes */10")));
+    assert_eq!(serve(&state, "/f.wav", None).body, [7u8; 10]);
+}
+
+#[test]
+fn asset_range_reads_from_reader_offset() {
+    let vault = tempfile::tempdir().unwrap();
+    let bytes: Vec<u8> = (0..100).collect();
+    std::fs::write(vault.path().join("a.wav"), &bytes).unwrap();
+    let (app, _c, _k) = open(vault.path());
+    let state = app.state::<AppState>();
+    let r = serve(&state, "/a.wav", Some("bytes=10-19"));
+    assert_eq!(r.status, 206);
+    assert_eq!(r.body, bytes[10..20]);
+    assert_eq!(content_range(&r), Some("bytes 10-19/100"));
+}
+
+/// A folder is never a file to serve, whatever the range (as `respond_file`'s
+/// `is_file` check before E2).
+#[test]
+fn asset_folder_is_404() {
+    let vault = tempfile::tempdir().unwrap();
+    std::fs::create_dir(vault.path().join("d.png")).unwrap();
+    let (app, _c, _k) = open(vault.path());
+    let state = app.state::<AppState>();
+    for range in [None, Some("bytes=0-"), Some("bytes=999999-")] {
+        assert_eq!(serve(&state, "/d.png", range).status, 404, "{range:?}");
+    }
+}
+
+#[cfg(unix)]
+#[test]
+fn asset_trashed_image_symlink_is_404() {
+    let vault = tempfile::tempdir().unwrap();
+    std::fs::write(vault.path().join("real.png"), b"png!").unwrap();
+    std::fs::create_dir(vault.path().join(".trash")).unwrap();
+    std::os::unix::fs::symlink(
+        vault.path().join("real.png"),
+        vault.path().join(".trash/x.png"),
+    )
+    .unwrap();
+    let (app, _c, _k) = open(vault.path());
+    let state = app.state::<AppState>();
+    assert_eq!(serve(&state, "/.trash/x.png", None).status, 404);
+    // A `.trash` that is itself a link is refused too.
+    std::fs::remove_dir_all(vault.path().join(".trash")).unwrap();
+    std::fs::create_dir(vault.path().join("t")).unwrap();
+    std::fs::write(vault.path().join("t/y.png"), b"png!").unwrap();
+    std::os::unix::fs::symlink(vault.path().join("t"), vault.path().join(".trash")).unwrap();
+    assert_eq!(serve(&state, "/.trash/y.png", None).status, 404);
 }

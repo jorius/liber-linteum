@@ -106,7 +106,7 @@ impl Vault {
         key: &str,
         parse: impl Fn(&serde_json::Value) -> Option<T>,
     ) -> BTreeMap<String, T> {
-        let value: serde_json::Value = read_json(self.root(), LIBER_JSON, &mut Vec::new());
+        let value: serde_json::Value = read_json(self.storage(), LIBER_JSON, &mut Vec::new());
         let mut out = BTreeMap::new();
         if let Some(pages) = value.get(key).and_then(|v| v.as_object()) {
             for (path, entry) in pages {

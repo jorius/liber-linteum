@@ -19,6 +19,7 @@ unicode-segmentation.workspace = true
 [dev-dependencies]
 criterion.workspace = true
 liber-testkit = { path = "../liber-testkit" }
+liber-vault = { path = "../liber-vault", features = ["test-storage"] }
 proptest.workspace = true
 serde_json.workspace = true
 tempfile.workspace = true

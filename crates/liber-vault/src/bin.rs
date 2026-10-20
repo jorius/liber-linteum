@@ -34,7 +34,7 @@ pub struct BinRecord {
 impl Vault {
     /// The bin's records by the item's path now; malformed entries are left out.
     pub fn bin_records(&self, bin: Bin) -> BTreeMap<String, BinRecord> {
-        let value: Value = read_json(self.root(), bin.file(), &mut Vec::new());
+        let value: Value = read_json(self.storage(), bin.file(), &mut Vec::new());
         let Some(items) = value.get("items").and_then(Value::as_object) else {
             return BTreeMap::new();
         };

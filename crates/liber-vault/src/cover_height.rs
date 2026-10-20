@@ -31,7 +31,7 @@ impl Vault {
     /// Pages with their own cover height, re-read on every call; unreadable
     /// entries are left out, one by one.
     pub fn cover_heights(&self) -> BTreeMap<String, u32> {
-        let value: serde_json::Value = read_json(self.root(), LIBER_JSON, &mut Vec::new());
+        let value: serde_json::Value = read_json(self.storage(), LIBER_JSON, &mut Vec::new());
         let mut out = BTreeMap::new();
         if let Some(pages) = value.get(KEY).and_then(|v| v.as_object()) {
             for (path, height) in pages {

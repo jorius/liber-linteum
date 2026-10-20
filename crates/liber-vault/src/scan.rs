@@ -1,9 +1,8 @@
-use crate::error::{Result, io_err};
+use crate::error::{Result, VaultError};
 use crate::path::VaultPath;
+use crate::storage::{Child, Follow, Kind, Meta, OsUse};
 use crate::vault::Vault;
 use crate::{ARCHIVE_DIR, is_hidden_name, is_hidden_path};
-use std::path::Path;
-use std::time::UNIX_EPOCH;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum EntryKind {
@@ -25,14 +24,6 @@ pub struct Entry {
 pub struct Scan {
     pub entries: Vec<Entry>,
     pub skipped: Vec<String>,
-}
-
-pub(crate) fn mtime_ns(meta: &std::fs::Metadata) -> i128 {
-    meta.modified()
-        .ok()
-        .and_then(|t| t.duration_since(UNIX_EPOCH).ok())
-        .map(|d| d.as_nanos() as i128)
-        .unwrap_or(0)
 }
 
 impl Vault {
@@ -59,53 +50,55 @@ impl Vault {
         if path.is_root() || is_hidden_path(path.as_str()) || self.is_excluded(path.as_str()) {
             return Ok(None);
         }
-        let full = path.to_fs_path(&self.root);
-        Ok(self.entry_for(path.clone(), &full, &mut Vec::new()))
+        let Ok(Some(meta)) = self.storage().meta(path, Follow::No) else {
+            return Ok(None);
+        };
+        Ok(self.entry_for(path.clone(), meta, &mut Vec::new()))
     }
 
     fn walk(&self, start: &VaultPath, recursive: bool) -> Result<Scan> {
         let mut out = Scan::default();
         let mut stack = vec![start.clone()];
         while let Some(dir) = stack.pop() {
-            let fs_dir = dir.to_fs_path(&self.root);
-            let read = match std::fs::read_dir(&fs_dir) {
-                Ok(read) => read,
-                Err(e) if e.kind() == std::io::ErrorKind::NotFound && dir != *start => continue,
+            let children = match self.storage().children(&dir) {
+                Ok(children) => children,
+                Err(VaultError::NotFound(_)) if dir != *start => continue,
                 // One unreadable subfolder must not make the vault unopenable
                 // (final review I3): report it and keep scanning.
                 Err(e) if dir != *start => {
+                    let reason = match &e {
+                        VaultError::Io { source, .. } => source.to_string(),
+                        e => e.to_string(),
+                    };
                     out.skipped
-                        .push(format!("{dir}: folder not readable ({e})"));
+                        .push(format!("{dir}: folder not readable ({reason})"));
                     continue;
                 }
-                Err(e) => return Err(io_err(dir.as_str(), e)),
+                Err(e) => return Err(e),
             };
-            for item in read {
-                let item = match item {
-                    Ok(item) => item,
-                    Err(e) => {
-                        out.skipped.push(format!("{dir}: entry not readable ({e})"));
+            for child in children {
+                let (name, meta) = match child {
+                    Child::Entry { name, meta } => (name, meta),
+                    Child::Unreadable(reason) => {
+                        out.skipped.push(reason);
                         continue;
                     }
                 };
-                let os_name = item.file_name();
-                let Some(name) = os_name.to_str() else {
-                    out.skipped
-                        .push(format!("{}: name is not UTF-8", item.path().display()));
-                    continue;
-                };
-                if is_hidden_name(name) && !(dir.is_root() && name == ARCHIVE_DIR) {
+                if is_hidden_name(&name) && !(dir.is_root() && name == ARCHIVE_DIR) {
                     continue;
                 }
-                let Ok(path) = dir.join(name) else {
-                    out.skipped
-                        .push(format!("{}: invalid name", item.path().display()));
+                let Ok(path) = dir.join(&name) else {
+                    let shown = match self.storage().os_path(&dir, OsUse::Reveal) {
+                        Ok(os) => os.join(&name).display().to_string(),
+                        Err(_) => format!("{dir}/{name}"),
+                    };
+                    out.skipped.push(format!("{shown}: invalid name"));
                     continue;
                 };
                 if self.is_excluded(path.as_str()) {
                     continue;
                 }
-                if let Some(entry) = self.entry_for(path, &item.path(), &mut out.skipped) {
+                if let Some(entry) = self.entry_for(path, meta, &mut out.skipped) {
                     if entry.kind == EntryKind::Dir && recursive {
                         stack.push(entry.path.clone());
                     }
@@ -117,48 +110,36 @@ impl Vault {
         Ok(out)
     }
 
-    fn entry_for(&self, path: VaultPath, full: &Path, skipped: &mut Vec<String>) -> Option<Entry> {
-        let lmeta = full.symlink_metadata().ok()?;
-        let meta = if lmeta.file_type().is_symlink() {
-            match self.symlink_target_meta(full) {
-                Some(m) if m.is_file() => m,
-                Some(_) => {
+    /// The entry for `path`, whose unfollowed stat is `meta`: a symlink to a
+    /// file inside the vault reads as that file; other symlinks are skipped.
+    fn entry_for(&self, path: VaultPath, meta: Meta, skipped: &mut Vec<String>) -> Option<Entry> {
+        let meta = if meta.kind == Kind::Symlink {
+            match self.storage().meta(&path, Follow::InsideVault) {
+                Ok(Some(m)) if m.kind == Kind::File => m,
+                Ok(Some(_)) => {
                     skipped.push(format!("{path}: symlinked folder not followed"));
                     return None;
                 }
-                None => {
+                Err(VaultError::OutsideVault(_)) => {
                     skipped.push(format!("{path}: symlink points outside the vault"));
                     return None;
                 }
+                // Gone or unreadable since the listing: nothing there.
+                _ => return None,
             }
         } else {
-            lmeta
+            meta
         };
-        if meta.is_dir() {
-            Some(Entry {
-                path,
-                kind: EntryKind::Dir,
-                mtime_ns: mtime_ns(&meta),
-                size: 0,
-            })
-        } else if meta.is_file() {
-            Some(Entry {
-                path,
-                kind: EntryKind::File,
-                mtime_ns: mtime_ns(&meta),
-                size: meta.len(),
-            })
-        } else {
-            None
-        }
-    }
-
-    /// Metadata of a symlink's target if the target is inside the vault.
-    fn symlink_target_meta(&self, link: &Path) -> Option<std::fs::Metadata> {
-        let target = dunce::canonicalize(link).ok()?;
-        if !target.starts_with(&self.root) {
-            return None;
-        }
-        std::fs::metadata(&target).ok()
+        let kind = match meta.kind {
+            Kind::Dir => EntryKind::Dir,
+            Kind::File => EntryKind::File,
+            Kind::Symlink | Kind::Other => return None,
+        };
+        Some(Entry {
+            path,
+            kind,
+            mtime_ns: meta.mtime_ns,
+            size: meta.len,
+        })
     }
 }

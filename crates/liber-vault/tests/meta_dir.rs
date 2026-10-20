@@ -1,9 +1,14 @@
 //! Rename to Liber Linteum: a vault's `.nimw/` folder becomes `.liber/` on
 //! open, never merged and never deleted.
 
-use liber_vault::{LEGACY_META_DIR, META_DIR, Vault, WARN_BOTH, WARN_UNMOVED, vault_icon_at};
+mod support;
+
+#[cfg(unix)]
+use liber_vault::WARN_UNMOVED;
+use liber_vault::{LEGACY_META_DIR, META_DIR, Vault, WARN_BOTH, vault_icon_at};
 use std::fs;
 use std::path::Path;
+use support::Spy;
 
 fn write(root: &Path, rel: &str, text: &str) {
     let p = root.join(rel);
@@ -192,4 +197,37 @@ fn both_exist_icon_comes_from_liber_only() {
     let v = Vault::open(dir.path()).unwrap();
     assert_eq!(v.vault_icon(), None);
     assert_eq!(vault_icon_at(dir.path()), None);
+}
+
+/// E2: the move is a vault rename like any other, through `Storage`.
+#[test]
+fn legacy_folder_moves_through_storage() {
+    let dir = tempfile::tempdir().unwrap();
+    write(
+        dir.path(),
+        &legacy("vault.json"),
+        r#"{"favorites":["A.md"]}"#,
+    );
+    let spy = Spy::open(dir.path());
+    let renames = spy.renames.clone();
+    let v = Vault::open_with(Box::new(spy)).unwrap();
+    assert_eq!(
+        *renames.lock().unwrap(),
+        [(LEGACY_META_DIR.to_string(), META_DIR.to_string())]
+    );
+    assert_eq!(v.favorites(), vec!["A.md".to_string()]);
+}
+
+/// A legacy folder that is a symlink to a folder inside the vault counts as
+/// the legacy folder, as `is_dir` (which follows links) did.
+#[cfg(unix)]
+#[test]
+fn legacy_folder_linked_inside_the_vault_is_moved() {
+    let dir = tempfile::tempdir().unwrap();
+    write(dir.path(), "cfg/vault.json", r#"{"favorites":["A.md"]}"#);
+    std::os::unix::fs::symlink(dir.path().join("cfg"), dir.path().join(LEGACY_META_DIR)).unwrap();
+    let v = Vault::open(dir.path()).unwrap();
+    assert!(v.opened_legacy_settings());
+    assert!(dir.path().join(META_DIR).is_dir());
+    assert_eq!(v.favorites(), vec!["A.md".to_string()]);
 }

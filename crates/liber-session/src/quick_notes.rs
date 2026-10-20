@@ -8,7 +8,7 @@ use crate::session::validate_name;
 use crate::{RenameOutcome, Result, SessionError, SessionEvent, VaultSession};
 use liber_index::FileKind;
 use liber_markdown::{first_line_text, link_key, name_key};
-use liber_vault::{EntryKind, VaultError, VaultPath};
+use liber_vault::{Child, EntryKind, VaultError, VaultPath};
 use std::collections::HashSet;
 use unicode_segmentation::UnicodeSegmentation;
 
@@ -237,9 +237,10 @@ impl VaultSession {
 
     /// The vault root holds an entry named exactly `name` (letter case too).
     fn has_exact_entry(&self, name: &str) -> bool {
-        std::fs::read_dir(self.vault.root())
-            .map(|dir| dir.flatten().any(|e| e.file_name() == name))
-            .unwrap_or(false)
+        self.vault.children(&VaultPath::root()).is_ok_and(|c| {
+            c.iter()
+                .any(|c| matches!(c, Child::Entry { name: n, .. } if n == name))
+        })
     }
 
     /// Creates `dir` and its missing parents as indexed folders.

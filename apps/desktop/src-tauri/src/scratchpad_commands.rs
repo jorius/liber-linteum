@@ -135,8 +135,8 @@ pub(crate) fn scratchpad_set_impl<R: Runtime>(
             "{path} wasn't picked for quick notes"
         )));
     }
-    std::fs::create_dir_all(&wanted)?;
-    let canonical = dunce::canonicalize(&wanted)?;
+    std::fs::create_dir_all(&wanted)?; // seam: outside (creates the global Scratchpad folder in app data)
+    let canonical = dunce::canonicalize(&wanted)?; // seam: outside (creates the global Scratchpad folder in app data)
     let settings = app
         .state::<AppState>()
         .settings
@@ -154,7 +154,7 @@ pub(crate) fn scratchpad_open_impl<R: Runtime>(app: &AppHandle<R>) -> CmdResult<
         ));
     };
     // Deleted since (or its drive was away): made again (spec §7.18).
-    std::fs::create_dir_all(&path)?;
+    std::fs::create_dir_all(&path)?; // seam: outside (creates the global Scratchpad folder in app data)
     open_session(app, std::path::Path::new(&path))
 }
 

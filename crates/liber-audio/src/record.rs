@@ -4,7 +4,7 @@
 use crate::AudioError;
 use crate::host::{Ended, Host, Sink, StreamFormat};
 use crate::level::{Level, Meter};
-use std::fs::File;
+use std::fs::File; // seam: outside (a take in the app cache dir; E3 redesigns recordings, spec §4.2)
 use std::io::{BufWriter, Seek, Write};
 use std::path::Path;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -102,7 +102,7 @@ impl LazyFile<'_> {
         f: impl FnOnce(&mut BufWriter<File>) -> std::io::Result<T>,
     ) -> std::io::Result<T> {
         if self.file.is_none() {
-            self.file = Some(BufWriter::new(File::create(self.path)?));
+            self.file = Some(BufWriter::new(File::create(self.path)?)); // seam: outside (a take in the app cache dir; E3 redesigns recordings, spec §4.2)
         }
         f(self.file.as_mut().expect("created above"))
     }

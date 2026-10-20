@@ -17,7 +17,14 @@ thiserror.workspace = true
 trash.workspace = true
 unicode-normalization.workspace = true
 
+[features]
+# `LIBER_TEST_STORAGE` picks the storage `Vault::open` uses (tests only; see
+# docs/architecture/storage-seam.md).
+test-storage = []
+
 [dev-dependencies]
+# Its own integration tests follow the switch too.
+liber-vault = { path = ".", features = ["test-storage"] }
 liber-testkit = { path = "../liber-testkit" }
 proptest.workspace = true
 tempfile.workspace = true

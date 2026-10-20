@@ -5,6 +5,7 @@
 
 use crate::error::{Result, VaultError};
 use crate::path::VaultPath;
+use crate::storage::Follow;
 use crate::vault::{Vault, read_json};
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, HashMap, HashSet};
@@ -31,7 +32,7 @@ impl Vault {
     /// entry (final review m8): a malformed level or entry, or one a later
     /// version adds, is skipped on its own.
     pub fn layout_level(&self, level: &str) -> BTreeMap<String, CardPosition> {
-        let layout: serde_json::Value = read_json(self.root(), LAYOUT_JSON, &mut Vec::new());
+        let layout: serde_json::Value = read_json(self.storage(), LAYOUT_JSON, &mut Vec::new());
         let Some(cards) = layout
             .get("levels")
             .and_then(|levels| levels.get(level))
@@ -246,7 +247,7 @@ impl Vault {
     fn path_exists(&self, path: &str) -> bool {
         path.is_empty()
             || VaultPath::new(path)
-                .is_ok_and(|p| p.to_fs_path(self.root()).symlink_metadata().is_ok())
+                .is_ok_and(|p| matches!(self.storage().meta(&p, Follow::No), Ok(Some(_))))
     }
 
     /// True when a level key's folder or page still exists.

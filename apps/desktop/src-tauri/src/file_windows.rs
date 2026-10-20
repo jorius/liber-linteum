@@ -124,7 +124,7 @@ impl FileGrant {
 
     /// The file's absolute path.
     pub fn real_path(&self) -> PathBuf {
-        self.name().to_fs_path(self.vault.root())
+        self.name().to_fs_path(self.vault.root()) // seam: outside (single-file window: one plain file outside any vault, M4c §3)
     }
 
     /// Its window is built.
@@ -219,10 +219,11 @@ impl FileWindows {
         path: &Path,
         live: impl Fn(&str) -> bool,
     ) -> CmdResult<(String, Arc<FileGrant>, bool)> {
-        let real = dunce::canonicalize(path).map_err(|e| {
+        let real = dunce::canonicalize(path); // seam: outside (single-file window: one plain file outside any vault, M4c §3)
+        let real = real.map_err(|e| {
             CommandError::new(ErrorKind::NotFound, format!("{}: {e}", path.display()))
         })?;
-        let meta = std::fs::metadata(&real)?;
+        let meta = std::fs::metadata(&real)?; // seam: outside (single-file window: one plain file outside any vault, M4c §3)
         if !meta.is_file() {
             return Err(CommandError::new(
                 ErrorKind::NotAFile,

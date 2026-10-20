@@ -16,7 +16,7 @@ use crate::state::AppState;
 use crate::vault_commands::blocking;
 use liber_markdown::resolve;
 use liber_session::is_text_content;
-use liber_vault::{Hash, Vault, VaultError, VaultPath, is_hidden_name};
+use liber_vault::{Follow, Hash, OsUse, Vault, VaultError, VaultPath, is_hidden_name};
 use serde::Serialize;
 use std::path::{Path, PathBuf};
 use tauri::{AppHandle, Emitter, Manager, Runtime, WebviewUrl, WebviewWindowBuilder, Window};
@@ -62,7 +62,7 @@ fn home_vault(state: &AppState, file: &Path) -> Option<HomeVault> {
         .into_iter()
         .filter(|r| !r.missing)
         .filter_map(|r| {
-            let root = dunce::canonicalize(&r.path).ok()?;
+            let root = dunce::canonicalize(&r.path).ok()?; // seam: outside (matching a single file against recent vaults by canonical path)
             let page = VaultPath::from_fs_path(&root, file).ok()?;
             if page.is_root() || page.as_str().split('/').any(is_hidden_name) {
                 return None;
@@ -100,7 +100,9 @@ fn text_for(kind: FileKind, path: &VaultPath, bytes: Vec<u8>) -> CmdResult<Strin
 /// by its name and by where it resolves (M4c review I4).
 fn folder_path(vault: &Vault, path: &str) -> CmdResult<VaultPath> {
     let vp = VaultPath::new(path)?;
-    if vp.as_str().split('/').any(is_hidden_name) || vault.visible_fs_path(&vp).is_err() {
+    // Reveal resolves like `Reach::Visible` without opening: a missing file
+    // or a folder is left to the caller's own check.
+    if vp.as_str().split('/').any(is_hidden_name) || vault.os_path(&vp, OsUse::Reveal).is_err() {
         return Err(not_permitted(format!("hidden: {path}")));
     }
     Ok(vp)
@@ -122,7 +124,11 @@ pub(crate) fn file_info_impl(state: &AppState, grant: &FileGrant) -> CmdResult<F
 pub(crate) fn file_read_impl(grant: &FileGrant) -> CmdResult<PageText> {
     let name = grant.name();
     // It may have grown since it opened: never read a huge file whole (M4c review m2).
-    let len = std::fs::metadata(grant.vault().fs_path(&name)?)?.len();
+    let len = grant
+        .vault()
+        .meta(&name, Follow::InsideVault)?
+        .ok_or_else(|| VaultError::NotFound(name.to_string()))?
+        .len;
     check_size(grant.kind(), len, name.as_str())?;
     let (bytes, hash) = grant.vault().read(&name)?;
     Ok(PageText {
@@ -288,7 +294,7 @@ pub(crate) fn file_follow_impl<R: Runtime>(
         Some(_) => return Err(CommandError::new(ErrorKind::NotAFile, path)),
         None => return Err(CommandError::new(ErrorKind::NotFound, path)),
     }
-    let full = grant.vault().fs_path(&vp)?;
+    let full = grant.vault().os_path(&vp, OsUse::Open)?;
     if file_kind(vp.file_name()).is_some() {
         open_file_window(app, &full)?;
         return Ok(Followed::Window);
@@ -304,7 +310,7 @@ pub(crate) fn file_follow_impl<R: Runtime>(
 /// media file by the link's name *and* by what it resolves to, so a
 /// `report.pdf` symlink to a `.chm` stays shut (M4c review I3).
 fn document_to_open(vp: &VaultPath, full: &Path) -> CmdResult<PathBuf> {
-    let real = dunce::canonicalize(full)
+    let real = dunce::canonicalize(full) // seam: outside (the real target of a followed link, M4c review I3)
         .map_err(|e| CommandError::new(ErrorKind::NotFound, format!("{vp}: {e}")))?;
     check_external_openable(vp.as_str(), &real)?;
     check_openable(&real)?;

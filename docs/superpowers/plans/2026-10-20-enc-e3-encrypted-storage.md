@@ -151,7 +151,8 @@
 - Consumes: Task 1, and `StreamWriter::{new, finish}`.
 - Produces: the `Storage` write methods for `EncryptedStorage`.
   - **`replace_atomic`.** Encrypt into `<physical dir>/.<random hex>.liber-tmp`, then `finish()`, `sync_all`, and rename onto the physical name. `Replace::CreateOnly` refuses when the logical entry exists.
-  - **`create_new`.** Returns `Box<dyn Write + Send>` wrapping `StreamWriter<File>`, which writes to a temp name. `flush()` finishes the stream (once), syncs, and renames into place. Later writes fail. `Drop` without `flush` deletes the temp file, so an incomplete stream never appears.
+  - **`create_new`.** Returns `Box<dyn NewFile>` wrapping `StreamWriter<File>`, which writes to a temp name. `flush()` is durability only and never ends the stream (a recorder flushes periodically). `NewFile::finish()` finishes the stream, syncs, and renames into place. `Drop` without `finish` deletes the temp file, so an incomplete stream never appears.
+  - **`same_entry`.** Resolves both logical paths with its own name resolution (case folding included) and compares the results. No decryption of content, and no `os_path`.
   - **`create_dir`.** A random `FolderId` and `encrypt_folder`.
   - **`remove_file` / `remove_empty_dir`.** These also remove the long-name side file.
   - **`rename`.**
@@ -171,9 +172,10 @@
     - `replace_atomic("n.md", "v2", Overwrite)` gives `v2`, and the physical file's first 48 bytes differ, because the salt is fresh.
     - `CreateOnly` again gives `Err(AlreadyExists)`.
   - `encrypted_save_failure_keeps_previous_version` (Review Focus 1): use a `#[cfg(test)]` injectable failure in `replace_atomic` after the first chunk, on a 200 000-byte save. The old content is still readable, and no temp file is listed by `children`.
-  - `create_new_streams_and_finalises_on_flush`:
-    - Write 150 000 bytes in 7 KiB pieces, then `flush()`. `read` equals the input.
-    - A writer dropped without `flush` leaves no entry at all.
+  - `create_new_streams_and_finalises_on_finish`:
+    - Write 150 000 bytes in 7 KiB pieces, calling `flush()` after several of them, then `finish()`. `read` equals the input.
+    - A writer dropped without `finish` (flushed or not) leaves no entry at all.
+  - `same_entry_folds_case`: with folder `Notes`, `same_entry("Notes", "notes")` is true, and `same_entry("Notes", "missing")` is false.
   - `folder_rename_touches_only_its_name` (Review Focus 2): set up `A/Notes.md` and `B/Notes.md`, then rename `A` → `C`. `C/Notes.md` and `B/Notes.md` both read, and `B`'s physical directory listing is byte-identical before and after.
   - `move_file_between_folders`: `A/x.md` → `B/x.md`. It reads, and the physical file under `A` is gone.
   - `case_clash_is_refused`: with `a.md` present, `create_dir("A.md")` and `replace_atomic("A.md", .., CreateOnly)` both give `Err(AlreadyExists)` on every OS.
@@ -385,7 +387,7 @@
   - `vault_lock` while recording:
     1. signal stop;
     2. join the record thread;
-    3. **flush (finalise) the stream**;
+    3. **`finish()` the stream** (a periodic `flush()` never ends it);
     4. leave the take in `.liber/recording/` for the next unlock to recover;
     5. return.
 
@@ -463,7 +465,7 @@
 
 1. **One E2 trait addition.** The only new trait method is `as_encrypted()`, with a default of `None`. Lock, salvage and the unreadable list stay inherent on `EncryptedStorage`, so `PlainStorage` doesn't grow. *Cost if wrong:* small; a later storage would need its own accessor.
 2. **`liber-crypto` gets a `test-params` feature** that exposes `create_insecure`. Without it, the encrypted switch suite would run the 64 MiB Argon2 floor on every fixture open. Real create paths still enforce the floor. *Cost if wrong:* a feature flag a release build must never enable. `cargo tree -e features` on the desktop release build is checked in Task 8.
-3. **`create_new` finalises on `flush()`** and deletes on `Drop` without it, so a half-written streamed file never appears. Both callers (the importer and the recorder) must call `flush()`. *Cost if wrong:* an importer that forgets would silently skip the file. Task 4's encrypted switch run catches it.
+3. **`create_new` commits on `NewFile::finish()`** (E2 final review I1) and deletes on `Drop` without it, so a half-written streamed file never appears; `flush()` is durability only. Both callers (the importer, which already calls `finish()` since E2, and the recorder) must call `finish()`. *Cost if wrong:* a caller that forgets would silently skip the file. Task 4's encrypted switch run catches it.
 4. **Unreadable entries:** E3/E4 list them with "Show in Finder". "Export" of their content belongs with E5's decrypted export. *Cost if wrong:* the user can't copy an unreadable entry's content out until E5.
 5. **Merged header conflict copies go to the OS trash**, never deleted. *Cost if wrong:* clutter in the trash.
 6. **Rollback is refused**, not opened read-only with a warning. That's simpler and safe, and spec §16 #18 allows either. *Cost if wrong:* a user who restores an old backup must ask for help.

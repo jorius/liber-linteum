@@ -73,8 +73,8 @@ const KEY: &str = "attachmentLinkFormat";
 impl Vault {
     /// Both settings, re-read on every call; unreadable ones count as unset.
     pub fn link_formats(&self) -> LinkFormats {
-        let liber: serde_json::Value = read_json(self.root(), LIBER_JSON, &mut Vec::new());
-        let obsidian: ObsidianAppJson = read_json(self.root(), OBSIDIAN_JSON, &mut Vec::new());
+        let liber: serde_json::Value = read_json(self.storage(), LIBER_JSON, &mut Vec::new());
+        let obsidian: ObsidianAppJson = read_json(self.storage(), OBSIDIAN_JSON, &mut Vec::new());
         LinkFormats {
             own: liber
                 .get(KEY)

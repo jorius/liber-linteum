@@ -3,7 +3,7 @@ use crate::events::RenameOutcome;
 use crate::events::SessionEvent;
 use crate::session::{VaultSession, is_page_path, subtree_files, validate_name, write_loaded};
 use liber_markdown::{FileSet, LinkKind, link_key, parse_page, resolve, shortest_unique_target};
-use liber_vault::{VaultError, VaultPath};
+use liber_vault::{Follow, Kind, VaultError, VaultPath};
 use percent_encoding::{AsciiSet, CONTROLS, utf8_percent_encode};
 use std::collections::{BTreeSet, HashMap};
 use std::ops::Range;
@@ -156,12 +156,7 @@ impl VaultSession {
         to: &VaultPath,
         rewrite_links: bool,
     ) -> Result<RenameOutcome> {
-        let exists = |p: &VaultPath| {
-            self.vault
-                .fs_path(p)
-                .is_ok_and(|f| f.symlink_metadata().is_ok())
-        };
-        let is_folder = self.vault.fs_path(from).is_ok_and(|f| f.is_dir());
+        let is_folder = self.is_dir(from);
         let pair = paired_rename(from, to, is_folder, |f| self.vault.folder_page_of(f));
         // The pair's second step is checked before anything moves (round 3b
         // final review #1): its name, and a clash in the coordinates it has
@@ -174,7 +169,7 @@ impl VaultSession {
                 _ => p.clone(),
             };
             let (a_now, b_now) = (now(a), now(b));
-            if exists(&b_now) && !self.vault.same_entry(&a_now, &b_now) {
+            if self.exists(&b_now) && !self.vault.same_entry(&a_now, &b_now) {
                 return Err(VaultError::AlreadyExists(b.to_string()).into());
             }
         }
@@ -322,7 +317,7 @@ impl VaultSession {
         let exact = parent.join(stem)?;
         match self.vault.child_named(&parent, stem)? {
             Some(f) if reuse_folder(f.file_name() == stem, self.vault.same_entry(&f, &exact)) => {
-                if !self.vault.fs_path(&f)?.is_dir() {
+                if !self.is_dir(&f) {
                     return Err(VaultError::AlreadyExists(f.to_string()).into());
                 }
                 if let Some(own) = self.vault.folder_page_of(&f) {
@@ -364,9 +359,7 @@ impl VaultSession {
 
     /// Takes a folder this module just made away again, from disk and index.
     fn drop_created_folder(&self, folder: &VaultPath) {
-        if let Ok(full) = self.vault.fs_path(folder) {
-            let _ = std::fs::remove_dir(full); // only ever an empty folder
-        }
+        let _ = self.vault.remove_empty_dir(folder); // only ever an empty folder
         let _ = self.index().transaction(|tx| tx.remove(folder.as_str()));
     }
 
@@ -505,8 +498,8 @@ impl VaultSession {
     ) -> Result<usize> {
         // Never replace a symlinked note with a plain file: its links are
         // updated through the real file instead (final review M1).
-        let full = self.vault.fs_path(path)?;
-        if std::fs::symlink_metadata(&full).is_ok_and(|m| m.file_type().is_symlink()) {
+        let link = self.vault.meta(path, Follow::No);
+        if link.is_ok_and(|m| m.is_some_and(|m| m.kind == Kind::Symlink)) {
             let (text, _) = self.vault.read_to_string(path)?;
             if plan.edits_for(path.as_str(), &text).is_empty() {
                 return Ok(0);

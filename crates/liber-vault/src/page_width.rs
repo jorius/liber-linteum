@@ -47,7 +47,7 @@ pub struct PageWidths {
 impl Vault {
     /// The vault's page-width settings, re-read on every call.
     pub fn page_widths(&self) -> PageWidths {
-        let value: serde_json::Value = read_json(self.root(), LIBER_JSON, &mut Vec::new());
+        let value: serde_json::Value = read_json(self.storage(), LIBER_JSON, &mut Vec::new());
         let mut out = PageWidths {
             vault: value.get("pageWidth").and_then(PageWidth::parse),
             ..PageWidths::default()

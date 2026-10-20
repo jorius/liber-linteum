@@ -2884,6 +2884,7 @@ dependencies = [
  "dunce",
  "globset",
  "liber-testkit",
+ "liber-vault",
  "notify",
  "proptest",
  "serde",
