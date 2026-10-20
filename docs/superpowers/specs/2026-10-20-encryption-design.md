@@ -208,7 +208,7 @@ The rule is that **nothing derived from an encrypted vault's content is written 
 
 ## 6. Unlock, lock, auto-lock
 
-1. **Opening an encrypted vault** (from Welcome, recent vaults, or the Vault menu) shows an **Unlock** screen in the Welcome style. It has a passphrase field, then "Use Touch ID" (if this device has a slot), then "Use recovery key". If the keyring is unlocked and has a slot, it opens without asking.
+1. **Opening an encrypted vault** (from Welcome, recent vaults, or the Vault menu) shows an **Unlock** screen in the Welcome style. It has a passphrase field, then "Use Touch ID" (if this device has a slot), then "Use recovery key". If the keyring is unlocked and the vault is enrolled in it (§3.3), it opens without asking.
    - **A wrong passphrase** gives a plain error. There is no lockout counter; it would be pointless offline, since Argon2id is the rate limit.
 2. **Lock** happens on:
    - Vault → Lock (with a shortcut);
