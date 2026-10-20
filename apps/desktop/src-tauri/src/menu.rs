@@ -57,15 +57,18 @@ pub fn quick_note_label(vault: Option<&str>) -> String {
     let Some(name) = vault else {
         return "Create New Scratchpad in This Vault".into();
     };
-    let short = if name.chars().count() > VAULT_NAME_MAX {
-        format!(
-            "{}…",
-            name.chars().take(VAULT_NAME_MAX - 1).collect::<String>()
-        )
+    use unicode_normalization::UnicodeNormalization;
+    use unicode_segmentation::UnicodeSegmentation;
+    // Counted and cut in whole visible characters (accents, emoji), then `&`
+    // doubled: menus read a lone `&` as a mnemonic marker.
+    let name: String = name.nfc().collect();
+    let chars: Vec<&str> = name.graphemes(true).collect();
+    let short = if chars.len() > VAULT_NAME_MAX {
+        format!("{}…", chars[..VAULT_NAME_MAX - 1].concat())
     } else {
-        name.to_string()
+        name
     };
-    format!("Create New Scratchpad for {short}")
+    format!("Create New Scratchpad for {}", short.replace('&', "&&"))
 }
 
 /// Renames the quick-note item after the vault that opened or closed.
@@ -417,6 +420,40 @@ mod label_tests {
         assert_eq!(
             quick_note_label(Some(&"x".repeat(40))),
             format!("Create New Scratchpad for {}", "x".repeat(40))
+        );
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::quick_note_label;
+
+    /// Review #3: `&` is a mnemonic marker in menus; it must show as itself.
+    #[test]
+    fn subpages_review_an_ampersand_in_the_vault_name_survives() {
+        assert_eq!(
+            quick_note_label(Some("R&D")),
+            "Create New Scratchpad for R&&D"
+        );
+    }
+
+    /// Review #4: the cut keeps whole characters, accents and emoji included.
+    #[test]
+    fn subpages_review_long_names_are_cut_between_characters() {
+        let decomposed = format!("{}e\u{301}", "a".repeat(38)); // 39 chars as typed, NFD
+        assert_eq!(
+            quick_note_label(Some(&decomposed)),
+            format!("Create New Scratchpad for {}\u{e9}", "a".repeat(38))
+        );
+        let long = format!("{}e\u{301}xyz", "a".repeat(38));
+        assert_eq!(
+            quick_note_label(Some(&long)),
+            format!("Create New Scratchpad for {}\u{e9}…", "a".repeat(38))
+        );
+        let emoji = format!("{}👩‍💻tail", "a".repeat(38));
+        assert_eq!(
+            quick_note_label(Some(&emoji)),
+            format!("Create New Scratchpad for {}👩‍💻…", "a".repeat(38))
         );
     }
 }

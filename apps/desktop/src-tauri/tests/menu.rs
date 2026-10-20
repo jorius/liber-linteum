@@ -433,6 +433,56 @@ fn quick_note_item_names_the_open_vault() {
     );
 }
 
+/// Review #8: opening a vault, the global Scratchpad, and closing rename the
+/// item through the same functions the commands run.
+#[cfg(target_os = "macos")]
+fn quick_note_item_follows_open_and_close() {
+    use tauri::Manager;
+    let parent = tempfile::tempdir().unwrap();
+    let vault = parent.path().join("R&D");
+    let scratch = parent.path().join("Scratch");
+    std::fs::create_dir(&vault).unwrap();
+    std::fs::create_dir(&scratch).unwrap();
+    let texts: Arc<std::sync::Mutex<Vec<String>>> = Arc::default();
+    let log = texts.clone();
+    build_app("quicknote-open").run_return(move |handle, event| {
+        if let RunEvent::Ready = event {
+            let text = |h: &tauri::AppHandle<MockRuntime>| {
+                outline(&h.menu().unwrap())
+                    .into_iter()
+                    .flat_map(|(_, items)| items)
+                    .find(|(_, id, _)| id == liber_desktop::menu::QUICK_NOTE_ID)
+                    .map(|(_, _, t)| t)
+                    .unwrap()
+            };
+            liber_desktop::vault_commands::open_session(handle, &vault).unwrap();
+            log.lock().unwrap().push(text(handle));
+            let scratch = dunce::canonicalize(&scratch).unwrap();
+            handle
+                .state::<liber_desktop::state::AppState>()
+                .settings
+                .set_scratchpad_path(Some(scratch.to_string_lossy().into_owned()))
+                .unwrap();
+            liber_desktop::vault_commands::open_session(handle, &scratch).unwrap();
+            log.lock().unwrap().push(text(handle));
+            liber_desktop::vault_commands::close_session(handle);
+            log.lock().unwrap().push(text(handle));
+            for window in handle.webview_windows().into_values() {
+                window.close().unwrap();
+            }
+        }
+    });
+    assert_eq!(
+        *texts.lock().unwrap(),
+        [
+            // As shown: muda reads `&&` back as `&` (an unescaped `&` would show "RD").
+            "Create New Scratchpad for R&D".to_string(),
+            "Create New Scratchpad for Quick notes".to_string(),
+            "Create New Scratchpad in This Vault".to_string()
+        ]
+    );
+}
+
 /// M7: File → Import from Notion… opens the import in the main window only.
 fn notion_import_item_emits_to_main() {
     use tauri::Listener;
@@ -542,5 +592,7 @@ fn main() {
     {
         quick_note_item_names_the_open_vault();
         println!("test quick_note_item_names_the_open_vault ... ok");
+        quick_note_item_follows_open_and_close();
+        println!("test quick_note_item_follows_open_and_close ... ok");
     }
 }

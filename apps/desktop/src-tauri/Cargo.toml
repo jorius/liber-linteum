@@ -13,6 +13,8 @@ name = "liber_desktop"
 tauri-build.workspace = true
 
 [dependencies]
+unicode-normalization.workspace = true
+unicode-segmentation.workspace = true
 tauri.workspace = true
 tauri-plugin-dialog.workspace = true
 tauri-plugin-opener.workspace = true
