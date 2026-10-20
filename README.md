@@ -1,6 +1,8 @@
 # Liber Linteum
 
 > Renamed from Notes In My Way on 2026-10-20. Existing vaults keep working: their `.nimw/` folder becomes `.liber/` the first time they open, and the app copies its settings from `app.notesinmyway.desktop`, which it never changes.
+>
+> Once Liber Linteum has opened a vault, stop using the old app on it. The old app would recreate its old settings folder, and Liber Linteum then keeps using its own and ignores whatever the old app wrote there (it warns when a vault has both).
 
 Private, local-only notes. Plain Markdown files in folders you own, compatible
 with Obsidian vaults, with a visual **Global View** of your projects, folders
