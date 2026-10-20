@@ -43,6 +43,8 @@ fontdb = "0.24.0"
 # M6 audio clips: capture and WAV (MP3 deferred: LAME does not cross-build for Windows)
 cpal = "0.18.2"
 hound = "3.5.1"
+# Spell checking: pure-Rust Hunspell (MPL-2.0)
+spellbook = "=0.4.2"
 
 [workspace.lints.rust]
 unsafe_code = "forbid"
