@@ -85,6 +85,29 @@ The Source and Split modes are unchanged. Large-note limits (`LARGE_NOTE_CHARS`)
 
    Settings shows the mismatch today: selects are 44 px with a small radius, while text inputs are 62 px and fully rounded. Pick the select's size, about 40–44 px with `--radius-md`, and apply it everywhere, including search fields, the import dialog, and the Move dialog filter.
 
+### 3.4 Amendments (stream C, as built)
+
+1. **Root cause of the Notion dialog bug.** It passed `wide` to `Dialog` to get Search's 780 px width. `wide` also carried Search's frameless layout (`padding: 0; gap: 0`). Now `wide` is only the width, and Search's layout is a new `bare` prop (`<Dialog wide bare>`). The vault name field gets a placeholder ("Named after the export").
+   - *Ruling:* no close button in its header. The other single-pane dialogs have none either; they use Cancel and Escape. Only Settings, with its panes, has one. *Cost if wrong:* one button.
+2. **Field size.** It is **36 px**, not the 40–44 px §3.3 guessed.
+   - The screenshot was at 2×. What it showed was a 22 px native WebKit select beside a 31 px input, and 36 px is the height of `.btn`, so a field lines up with the button beside it (the Notion dialog's "Choose export…").
+   - The shared class is `.field-control` in `theme/fields.css`. Selects draw their own arrow (`appearance: none`), since WebKit's native select ignores height and radius. `.field-sm` (28 px) goes beside `.btn-sm`, which is the recorder bar's microphone select.
+   - *Cost if wrong:* one number in `fields.css`.
+3. **Fields that keep their own look.** These are inline editors or bars with their own control size, listed in `theme/fields.test.ts`:
+   - the page title and subtitle;
+   - the tree row's rename field;
+   - the Search dialog's query bar;
+   - Settings' menu search, in the dark menu;
+   - the formatting toolbar's select, 30 px like its buttons.
+
+   *Cost if wrong:* moving a file out of the exempt list.
+4. **Move dialog.**
+   - Hidden folders (any path segment starting with `.`) are not targets. That covers the Archive and the Trash.
+   - The item's own subtree is left out, not shown as disabled.
+   - The root and the ancestors of the current folder start open.
+   - Enter on the current folder does nothing. Double-click moves.
+   - Folders without an emoji show the folder glyph.
+
 ## 4. Testing
 
 - Each item gets a test that fails first: vitest for the logic and components, Playwright e2e for the sidebar drag, the Move dialog keyboard, and Live Preview reveal/hide.
