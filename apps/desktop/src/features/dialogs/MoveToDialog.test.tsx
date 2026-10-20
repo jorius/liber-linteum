@@ -72,6 +72,23 @@ describe('Move dialog folder tree (round 3 §3.2)', () => {
     expect(rename).toHaveBeenCalledWith('Report.md', 'Notes/Report.md');
   });
 
+  it('review M6: a pick the filter hides is not moved to, and one row always keeps the tab stop', async () => {
+    render(<MoveToDialog path="Report.md" onClose={vi.fn()} />);
+    const move = screen.getByRole('button', { name: 'Move' });
+    // The keyboard was on Notes, which the filter then hides.
+    await userEvent.click(row('Notes'));
+    expect(move).toBeEnabled();
+    await userEvent.type(screen.getByRole('searchbox', { name: 'Filter folders' }), 'lin');
+    expect(names()).not.toContain('Notes');
+    expect(move).toBeDisabled();
+    const stops = within(tree())
+      .getAllByRole('treeitem')
+      .filter((r) => r.tabIndex === 0);
+    expect(stops).toHaveLength(1);
+    await userEvent.click(move);
+    expect(rename).not.toHaveBeenCalled();
+  });
+
   it('the tree keys: up and down move, right opens, left closes, Enter moves', async () => {
     render(<MoveToDialog path="Report.md" onClose={vi.fn()} />);
     await userEvent.click(screen.getByRole('searchbox', { name: 'Filter folders' }));

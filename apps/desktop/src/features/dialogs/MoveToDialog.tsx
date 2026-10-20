@@ -81,6 +81,10 @@ export function MoveToDialog({ path, onClose }: { path: string; onClose: () => v
     if (q || open.has('')) walk('', 2);
   }
 
+  // Only what's on screen counts: a pick or a tab stop the filter hid is dropped.
+  const picked = rows.some((r) => r.path === selected) ? selected : null;
+  const stop = rows.some((r) => r.path === active) ? active : rows[0]?.path;
+
   const canMove = (target: string) => planDrop(path, target) !== null;
   const move = async (target: string | null) => {
     if (target === null || !canMove(target)) return;
@@ -101,7 +105,7 @@ export function MoveToDialog({ path, onClose }: { path: string; onClose: () => v
   };
 
   const onTreeKey = (e: KeyboardEvent<HTMLDivElement>) => {
-    const i = rows.findIndex((r) => r.path === active);
+    const i = rows.findIndex((r) => r.path === stop);
     const r = rows[i];
     if (!r) return;
     const go = (j: number) => rows[j] && focusRow(rows[j].path);
@@ -176,7 +180,7 @@ export function MoveToDialog({ path, onClose }: { path: string; onClose: () => v
               aria-expanded={r.hasChildren ? expanded : undefined}
               aria-selected={selected === r.path}
               aria-disabled={ok ? undefined : true}
-              tabIndex={active === r.path ? 0 : -1}
+              tabIndex={stop === r.path ? 0 : -1}
               className={styles.moveRow}
               style={{ '--level': r.level - 1 } as CSSProperties}
               onClick={() => {
@@ -228,8 +232,8 @@ export function MoveToDialog({ path, onClose }: { path: string; onClose: () => v
         <button
           type="button"
           className="btn btn-primary"
-          disabled={selected === null}
-          onClick={() => void move(selected)}
+          disabled={picked === null}
+          onClick={() => void move(picked)}
         >
           {t('dialogs.move.confirm')}
         </button>
