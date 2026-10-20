@@ -104,7 +104,7 @@ describe('the Archive (M5b round 2)', () => {
       within(menu)
         .getAllByRole('menuitem')
         .map((i) => i.textContent),
-    // Round 3 §9.4: archived items can be revealed too (jsdom reads as Linux).
+      // Round 3 §9.4: archived items can be revealed too (jsdom reads as Linux).
     ).toEqual(['Open', 'Unarchive', 'Show in file manager', 'Sort by', 'Delete']);
     await userEvent.click(within(menu).getByRole('menuitem', { name: 'Unarchive' }));
     await waitFor(() =>
