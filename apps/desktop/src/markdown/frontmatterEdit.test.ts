@@ -237,13 +237,13 @@ describe('setFrontmatter never corrupts the frontmatter (final review C2)', () =
 });
 
 describe('setFrontmatter never puts a second block in front of one (final review Minor 2)', () => {
-  it('refuses a block closed with `...` (nimw-markdown reads it, remark does not)', () => {
+  it('refuses a block closed with `...` (liber-markdown reads it, remark does not)', () => {
     const text = '---\ntags: [x]\n...\n\nbody\n';
     expect(setFrontmatter(text, { subtitle: 'S' })).toEqual({ ok: false });
     expect(setFrontmatter(text, { cover: null })).toEqual({ ok: false });
   });
 
-  it('refuses a block whose fences have trailing spaces (remark reads it, nimw-markdown does not)', () => {
+  it('refuses a block whose fences have trailing spaces (remark reads it, liber-markdown does not)', () => {
     expect(setFrontmatter('---\ntitle: a\n--- \n\nbody\n', { subtitle: 'S' })).toEqual({
       ok: false,
     });

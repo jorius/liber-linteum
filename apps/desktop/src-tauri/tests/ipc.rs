@@ -1,5 +1,5 @@
 //! Drives the real IPC path: real `generate_context!()` (tauri.conf.json plus the
-//! capability files) and the real command registration from `nimw_desktop::configure`.
+//! capability files) and the real command registration from `liber_desktop::configure`.
 //! Capability or registration mistakes that the UI would swallow fail here instead.
 
 use tauri::test::MockRuntime;
@@ -12,11 +12,11 @@ use tauri::{
 
 fn build_app() -> App<MockRuntime> {
     // Temp config/cache dirs so tests never read or write the user's settings.
-    let dirs = nimw_desktop::AppDirs {
-        config: std::env::temp_dir().join(format!("nimw-ipc-cfg-{}", std::process::id())),
-        cache: std::env::temp_dir().join(format!("nimw-ipc-cache-{}", std::process::id())),
+    let dirs = liber_desktop::AppDirs {
+        config: std::env::temp_dir().join(format!("liber-ipc-cfg-{}", std::process::id())),
+        cache: std::env::temp_dir().join(format!("liber-ipc-cache-{}", std::process::id())),
     };
-    nimw_desktop::configure(mock_builder(), Some(dirs))
+    liber_desktop::configure(mock_builder(), Some(dirs))
         .build(tauri::generate_context!())
         .expect("failed to build app with the real context")
 }
@@ -53,7 +53,7 @@ fn app_info_is_callable_from_the_main_window() {
 
     assert_eq!(
         value,
-        serde_json::json!({ "name": "Notes In My Way", "version": "0.1.0" })
+        serde_json::json!({ "name": "Liber Linteum", "version": "0.1.0" })
     );
 }
 

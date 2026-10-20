@@ -13,7 +13,8 @@ const FOCUSABLE =
  *  Escape closes even when nothing inside has focus (WebKit doesn't focus a
  *  clicked checkbox or button), a click on the backdrop closes, and closing
  *  first blurs the focused field so a value typed but not confirmed is saved.
- *  `wide` (Search, M5 §4): 780 px; `panes` (Settings, M5b §18): a menu and
+ *  `wide` (Search, M5 §4; the Notion import): 780 px; `bare` (Search): no
+ *  padding or gaps, its regions lay themselves out; `panes` (Settings, M5b §18): a menu and
  *  a pane side by side; `hideTitle`: the title names the dialog for screen
  *  readers only. */
 export function Dialog({
@@ -23,6 +24,7 @@ export function Dialog({
   returnFocus,
   dismissible = false,
   wide = false,
+  bare = false,
   panes = false,
   hideTitle = false,
   alert = false,
@@ -35,6 +37,7 @@ export function Dialog({
   returnFocus?: () => HTMLElement | null | undefined;
   dismissible?: boolean;
   wide?: boolean;
+  bare?: boolean;
   panes?: boolean;
   hideTitle?: boolean;
   /** A question that interrupts (M5b final review M4): `alertdialog`. */
@@ -146,7 +149,7 @@ export function Dialog({
         aria-modal="true"
         aria-labelledby="dialog-title"
         aria-describedby={describedBy}
-        className={`${styles.dialog} ${wide ? styles.wide : ''} ${panes ? styles.panes : ''}`}
+        className={`${styles.dialog} ${wide ? styles.wide : ''} ${bare ? styles.bare : ''} ${panes ? styles.panes : ''}`}
         onKeyDown={onKeyDown}
       >
         <h2 id="dialog-title" className={hideTitle ? styles.srOnly : styles.title}>

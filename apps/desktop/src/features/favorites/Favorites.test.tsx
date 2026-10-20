@@ -129,7 +129,9 @@ describe('Favorites (M5b §19)', () => {
   it('the star takes one out; the heading collapses, remembered per vault', async () => {
     const sets = await open(['Zed.md', 'Welcome.md']);
     const { unmount } = render(<ExplorerTree />);
-    await userEvent.click(screen.getByRole('button', { name: 'Remove Zed from Favorites' }));
+    await userEvent.click(
+      within(section()).getByRole('button', { name: 'Remove Zed from Favorites' }),
+    );
     expect(sets.at(-1)).toEqual(['Welcome.md']);
     const heading = within(section()).getByRole('button', { name: 'Favorites' });
     await userEvent.click(heading);
@@ -256,7 +258,7 @@ describe('Favorites (M5b §19)', () => {
     const close = vi.fn();
     render(<ContextMenu menu={{ path: 'Welcome.md', anchor: { x: 0, y: 0 } }} onClose={close} />);
     await userEvent.click(screen.getByRole('menuitem', { name: 'Move up in Favorites' }));
-    expect(document.querySelector('[data-nimw-status]')).toHaveTextContent(
+    expect(document.querySelector('[data-liber-status]')).toHaveTextContent(
       'Welcome moved to 1 of 2 in Favorites',
     );
   });
@@ -266,5 +268,17 @@ describe('Favorites (M5b §19)', () => {
     const { container } = render(<ExplorerTree />);
     const result = await act(() => axe.run(container));
     expect(result.violations).toEqual([]);
+  });
+});
+
+describe('double-click (round 3b §8.1)', () => {
+  it('a Favorites page row opens the page for editing from the Global View', async () => {
+    await open(['Zed.md']);
+    useUiStore.setState({ screen: 'global' });
+    render(<ExplorerTree />);
+    await userEvent.dblClick(within(section()).getByRole('button', { name: 'Zed' }));
+    expect(useUiStore.getState().screen).toBe('edit');
+    expect(usePageStore.getState().editorFocus).toBe(true);
+    useUiStore.setState({ screen: 'edit' });
   });
 });

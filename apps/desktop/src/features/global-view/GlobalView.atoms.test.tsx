@@ -161,7 +161,7 @@ describe('See atoms (M4b part 3 §6)', () => {
     // The image's thumbnail is its vault file.
     const image = screen.getByRole('group', { name: 'Image' });
     expect(image.querySelector('img')?.getAttribute('src')).toBe(
-      'nimw-asset://localhost/assets/rex.png',
+      'liber-asset://localhost/assets/rex.png',
     );
 
     // Structure: page → intro, Abilities; Abilities → 2 blocks, Weak spots → 1 block.

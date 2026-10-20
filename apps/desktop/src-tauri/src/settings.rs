@@ -143,8 +143,8 @@ impl From<FontChoice> for String {
 }
 
 /// How wide pages read by default (M4b part 2 §1); vaults and pages can
-/// override it in `.nimw/vault.json`.
-pub use nimw_vault::PageWidth;
+/// override it in `.liber/vault.json`.
+pub use liber_vault::PageWidth;
 
 /// How a Global View click opens the next level (M3a §5, GV-13).
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
@@ -262,7 +262,7 @@ pub const MAX_COVER_HEIGHT: u16 = 600;
 
 /// The default cover height in px for pages without their own (cover
 /// resize), clamped to 132–600 (an out-of-range number is clamped, not
-/// reset). Pages keep their own in `.nimw/vault.json`.
+/// reset). Pages keep their own in `.liber/vault.json`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(from = "u32", into = "u16")]
 pub struct CoverHeight(u16);
@@ -292,6 +292,43 @@ impl From<u32> for CoverHeight {
 impl From<CoverHeight> for u16 {
     fn from(h: CoverHeight) -> u16 {
         h.0
+    }
+}
+
+pub const MIN_SIDEBAR_WIDTH: u16 = 200;
+pub const MAX_SIDEBAR_WIDTH: u16 = 560;
+
+/// The sidebar's width in px (round 3 §2.1), app-wide, clamped to 200–560
+/// (an out-of-range number is clamped, not reset).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(from = "u32", into = "u16")]
+pub struct SidebarWidth(u16);
+
+impl SidebarWidth {
+    pub fn new(px: u32) -> SidebarWidth {
+        SidebarWidth(px.clamp(u32::from(MIN_SIDEBAR_WIDTH), u32::from(MAX_SIDEBAR_WIDTH)) as u16)
+    }
+
+    pub fn get(self) -> u16 {
+        self.0
+    }
+}
+
+impl Default for SidebarWidth {
+    fn default() -> SidebarWidth {
+        SidebarWidth(270)
+    }
+}
+
+impl From<u32> for SidebarWidth {
+    fn from(px: u32) -> SidebarWidth {
+        SidebarWidth::new(px)
+    }
+}
+
+impl From<SidebarWidth> for u16 {
+    fn from(w: SidebarWidth) -> u16 {
+        w.0
     }
 }
 
@@ -345,8 +382,16 @@ pub struct Settings {
     pub auto_save: bool,
     /// The sidebar is collapsed (M5b §2.5), app-wide.
     pub sidebar_collapsed: bool,
+    /// The sidebar's width (round 3 §2.1), app-wide.
+    pub sidebar_width: SidebarWidth,
     /// Where the floating Edit / Global View / Search button sits (M5b §2.2).
     pub action_button: ActionButton,
+    /// Spell checking in the editor (spell checking spec §4).
+    pub spellcheck: bool,
+    /// The dictionaries checked, in order; `None` = the app language's.
+    pub spell_dictionaries: Option<Vec<String>>,
+    /// Dictionaries imported from disk; changed only by the spell commands.
+    pub imported_dictionaries: Vec<ImportedDictionary>,
     pub recent_vaults: Vec<RecentVault>,
     /// Keys this build does not know (written by a newer version); kept on save.
     #[serde(flatten)]
@@ -379,7 +424,11 @@ impl Default for Settings {
             scratchpad_path: None,
             auto_save: true,
             sidebar_collapsed: false,
+            sidebar_width: SidebarWidth::default(),
             action_button: ActionButton::BottomRight,
+            spellcheck: true,
+            spell_dictionaries: None,
+            imported_dictionaries: Vec::new(),
             recent_vaults: Vec::new(),
             extra: serde_json::Map::new(),
         }
@@ -411,7 +460,18 @@ pub struct SettingsPatch {
     pub show_attachment_paths: Option<bool>,
     pub auto_save: Option<bool>,
     pub sidebar_collapsed: Option<bool>,
+    pub sidebar_width: Option<SidebarWidth>,
     pub action_button: Option<ActionButton>,
+    pub spellcheck: Option<bool>,
+    pub spell_dictionaries: Option<Vec<String>>,
+}
+
+/// A dictionary imported from disk; its files live in
+/// `<config>/dictionaries/<folder_name(id)>/index.{aff,dic}`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ImportedDictionary {
+    pub id: String,
+    pub name: String,
 }
 
 /// A recent vault as shown on the welcome screen.
@@ -424,7 +484,7 @@ pub struct RecentVaultDto {
     pub missing: bool,
     /// The global Scratchpad (M4c §2): shown as "Quick notes".
     pub scratchpad: bool,
-    /// The vault's emoji (M5b §4), read from its `.nimw/vault.json`.
+    /// The vault's emoji (M5b §4), read from its `.liber/vault.json`.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub icon: Option<String>,
 }
@@ -482,7 +542,11 @@ fn parse_lenient(text: &str) -> Result<(Settings, Vec<String>), serde_json::Erro
     field!("scratchpadPath", scratchpad_path);
     field!("autoSave", auto_save);
     field!("sidebarCollapsed", sidebar_collapsed);
+    field!("sidebarWidth", sidebar_width);
     field!("actionButton", action_button);
+    field!("spellcheck", spellcheck);
+    field!("spellDictionaries", spell_dictionaries);
+    field!("importedDictionaries", imported_dictionaries);
     match map.remove("recentVaults") {
         None => {}
         Some(Value::Array(items)) => {
@@ -636,8 +700,17 @@ impl SettingsStore {
         if let Some(v) = patch.sidebar_collapsed {
             next.sidebar_collapsed = v;
         }
+        if let Some(v) = patch.sidebar_width {
+            next.sidebar_width = v;
+        }
         if let Some(v) = patch.action_button {
             next.action_button = v;
+        }
+        if let Some(v) = patch.spellcheck {
+            next.spellcheck = v;
+        }
+        if let Some(v) = patch.spell_dictionaries {
+            next.spell_dictionaries = Some(v);
         }
         self.save(&next)?;
         *s = next.clone();
@@ -674,8 +747,8 @@ impl SettingsStore {
                 opened_at: r.opened_at.clone(),
                 missing: !Path::new(&r.path).is_dir(),
                 scratchpad: s.scratchpad_path.as_deref() == Some(r.path.as_str()),
-                icon: nimw_vault::vault_icon_at(Path::new(&r.path))
-                    .filter(|i| nimw_markdown::is_icon(i)),
+                icon: liber_vault::vault_icon_at(Path::new(&r.path))
+                    .filter(|i| liber_markdown::is_icon(i)),
             })
             .collect()
     }
@@ -691,9 +764,29 @@ impl SettingsStore {
         Ok(next)
     }
 
+    /// The folder settings.json lives in (imported dictionaries go beside it).
+    pub fn dir(&self) -> &Path {
+        self.path.parent().expect("settings path has a parent")
+    }
+
+    /// Applies an edit no patch may make (imported dictionaries), saved atomically.
+    pub fn modify(&self, edit: impl FnOnce(&mut Settings)) -> std::io::Result<Settings> {
+        let mut s = self.lock();
+        let mut next = s.clone();
+        edit(&mut next);
+        self.save(&next)?;
+        *s = next.clone();
+        Ok(next)
+    }
+
     /// The global Scratchpad is the vault at `root` (canonical).
     pub fn is_scratchpad(&self, root: &Path) -> bool {
         self.lock().scratchpad_path.as_deref() == Some(root.to_string_lossy().as_ref())
+    }
+
+    /// Whether `path` is on the recent list, exactly as stored.
+    pub fn is_recent(&self, path: &str) -> bool {
+        self.lock().recent_vaults.iter().any(|r| r.path == path)
     }
 
     pub fn forget(&self, path: &str) -> std::io::Result<()> {

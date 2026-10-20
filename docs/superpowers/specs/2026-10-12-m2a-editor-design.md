@@ -46,7 +46,7 @@ Success means:
 | `embed` | `![[target]]`, `![[target#heading]]`, `![[img.png\|300]]` / `\|300x200` | `embed { target, heading?, size? }` |
 | `callout` (mdast transform on blockquotes) | `> [!type] Title`, `> [!type]- Title` (folded), `> [!type]+` | `callout { calloutType, title, foldable, folded }` |
 | `highlight` | `==text==` | `highlight` |
-| `tag` | `#tag`, `#nested/tag` — Obsidian rules identical to `nimw-markdown` | `tag { name }` |
+| `tag` | `#tag`, `#nested/tag` — Obsidian rules identical to `liber-markdown` | `tag { name }` |
 | `columns` (container directive) | `::::columns` … `:::column` … `:::` … `::::` | `columns` → `column[]` |
 | `comment` | `%% … %%` (inline and block) | `comment` (not rendered) |
 
@@ -65,7 +65,7 @@ export function parsePage(text: string): ParsedPage;
 `parsePage` is pure, synchronous, and runs on a 150 ms debounce after edits.
 
 ### 2.3 Link resolution
-New backend command `links_resolve({ source, targets: { kind, target }[] }) → (string | null)[]` using `nimw_markdown::resolve` with the session's current `FileSet`. The editor batches unresolved targets per parse and caches results per page until `vault:changed` touches any file (cache cleared).
+New backend command `links_resolve({ source, targets: { kind, target }[] }) → (string | null)[]` using `liber_markdown::resolve` with the session's current `FileSet`. The editor batches unresolved targets per parse and caches results per page until `vault:changed` touches any file (cache cleared).
 
 ### 2.4 Sanitizer (`markdown/sanitize.ts`)
 - Raw HTML (`html` nodes) goes through **DOMPurify** with an allowlist: tags `a b strong i em u s del ins mark sub sup kbd code pre br hr p span div blockquote ul ol li table thead tbody tr th td details summary img audio video source h1–h6`; attributes `href src alt title width height data-color data-bg open controls`. Everything else is removed (incl. `style`, `on*`, `iframe`, `object`, `embed`, `form`, `script`, SVG/MathML).
@@ -80,7 +80,7 @@ New backend command `links_resolve({ source, targets: { kind, target }[] }) → 
 `tauri.conf.json` enables `assetProtocol` with an **empty static scope**; `vault_open/create` set the runtime scope to the vault root (`app.asset_protocol_scope().allow_directory(root, true)`) and `vault_close`/switching revokes the previous root (`forbid_directory`). The CSP already allows `asset:` / `http://asset.localhost` in `img-src` and `media-src`.
 
 ### 2.6 Parity fixtures
-`fixtures/markdown/*.md` with `*.expected.json` (`{ links: [{kind, target, heading, alias}], tags: [] }`). The TS model (Vitest) and `nimw-markdown` (cargo test) both assert against them.
+`fixtures/markdown/*.md` with `*.expected.json` (`{ links: [{kind, target, heading, alias}], tags: [] }`). The TS model (Vitest) and `liber-markdown` (cargo test) both assert against them.
 
 ---
 
@@ -159,7 +159,7 @@ Covers/subtitle editing, paste/drop attachments, `[[` autocomplete (**M2b**); Gl
 ## 10. Amendments from planning (plan `docs/superpowers/plans/2026-10-12-m2a-editor.md`, replayed end-to-end)
 These override the sections above where they conflict.
 
-1. **Vault files are served by our own `nimw-asset:` URI scheme protocol** (§2.4, §2.5, §7). Tauri's asset protocol scope cannot be reliably revoked, so a previously opened vault would stay readable. The custom protocol resolves each request against the *currently open* vault root (`VaultPath` validation: no `..`, no absolute paths, no symlink escapes) and returns 404 once the vault is closed. Tauri's `assetProtocol` stays disabled; the CSP lists `nimw-asset:` (not `asset:`) in `img-src`/`media-src`. The sanitizer rewrites vault paths to `nimw-asset:` URLs. Test: a closed vault's files are no longer served.
+1. **Vault files are served by our own `liber-asset:` URI scheme protocol** (§2.4, §2.5, §7). Tauri's asset protocol scope cannot be reliably revoked, so a previously opened vault would stay readable. The custom protocol resolves each request against the *currently open* vault root (`VaultPath` validation: no `..`, no absolute paths, no symlink escapes) and returns 404 once the vault is closed. Tauri's `assetProtocol` stays disabled; the CSP lists `liber-asset:` (not `asset:`) in `img-src`/`media-src`. The sanitizer rewrites vault paths to `liber-asset:` URLs. Test: a closed vault's files are no longer served.
 2. **External opening goes through our own commands** (§3.4, §4): `url_open` (http/https/mailto only, validated in Rust) and `file_open_external` (vault files only), both after the in-app confirmation. `tauri-plugin-opener` is used from Rust only; the webview gets **no** `opener:*` permission and `@tauri-apps/plugin-opener` is not a dependency. ACL tests cover the new commands.
 3. **Sanitizer is `hast-util-sanitize`** (+ `hast-util-raw`) instead of DOMPurify (§2.4, §8): it works on the hast tree, so source positions survive for Split scroll sync, and needs no DOM. Same allowlist. `dompurify` is not a dependency.
 4. **Only the container directive form** (`:::name` / `::::columns`) is recognised (§2.1). Inline/leaf directive syntax is disabled because it would turn ordinary text such as `3:2` into a directive.
@@ -171,4 +171,4 @@ These override the sections above where they conflict.
 10. **Parity fixtures are guards, not RED steps** (§2.6): the Rust side already exists, so they pass as soon as they are written.
 11. **Autosave on blur** (§3.3) is explicitly tested in Task 7 (was missing in the first plan draft).
 12. **Known performance limit:** a single 200 KB *paragraph* parses slowly in remark (~1.4 s; normal 200 KB notes ~0.35 s). The large-note fallback (§3.2) still applies; recorded in the M2a hand-off. Vitest may stall on a loaded machine — run with `--maxWorkers=2` if workers time out.
-13. **Final-review amendments** (M2a hand-off §13): links and tags inside `%% %%` comments are not indexed (as Obsidian; Rust and TS agree, fixtures added); callout titles keep inline links/formatting; `**#tag**` is a tag. The macOS app menu is our own so ⌘Q goes through the close guard (Dock Quit / logout still bypass it — known limit). A navigation guard keeps the webview on the app's own origin; `nimw-asset:` responses carry `Content-Security-Policy: default-src 'none'; sandbox`. `file_open_external` opens only regular, non-executable files. Closing the window with an unsaveable page keeps it open with a warning; a second close quits.
+13. **Final-review amendments** (M2a hand-off §13): links and tags inside `%% %%` comments are not indexed (as Obsidian; Rust and TS agree, fixtures added); callout titles keep inline links/formatting; `**#tag**` is a tag. The macOS app menu is our own so ⌘Q goes through the close guard (Dock Quit / logout still bypass it — known limit). A navigation guard keeps the webview on the app's own origin; `liber-asset:` responses carry `Content-Security-Policy: default-src 'none'; sandbox`. `file_open_external` opens only regular, non-executable files. Closing the window with an unsaveable page keeps it open with a warning; a second close quits.

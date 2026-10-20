@@ -64,7 +64,7 @@ describe('Global View card (M3a §4)', () => {
     expect(screen.getByText('Page')).toBeInTheDocument();
     const img = document.querySelector('img')!;
     expect(img.getAttribute('src')).toBe(
-      'nimw-asset://localhost/Character%20Design/assets/rex-cover.png',
+      'liber-asset://localhost/Character%20Design/assets/rex-cover.png',
     );
     expect(img.style.objectPosition).toBe('50% 40%');
     expect(img.getAttribute('alt')).toBe('');

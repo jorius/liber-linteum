@@ -15,7 +15,7 @@ Plan: `docs/superpowers/plans/2026-10-12-m2a-editor.md`
 |---|---|
 | Markdown model (`src/markdown/`): parse, extensions, frontmatter, sanitizer, incremental re-parse | done, tested (unit + TS/Rust parity fixtures + seeded fuzz vs full parse) |
 | Backend: `page_read`, `page_write` (CAS + conflict payload), `page_create_conflict_copy`, `links_resolve`, `url_open`, `file_open_external` | done, async, ACL-tested |
-| `nimw-asset:` protocol (vault files for `<img>/<audio>`) | done, tested (types, traversal, hidden files, ranges, no vault) |
+| `liber-asset:` protocol (vault files for `<img>/<audio>`) | done, tested (types, traversal, hidden files, ranges, no vault) |
 | Page documents: autosave 500 ms, retry 1 s→30 s, 3-way merge, conflict copies, rename follow, deleted-while-dirty, quit flush | done, tested |
 | Editor: Live Preview / Source / Split, scroll sync, ⌘-click / Mod-Enter links | done, tested in jsdom |
 | Rendered pane: all node types, embeds, callouts, columns, privacy placeholders | done, tested (+ axe) |
@@ -36,26 +36,26 @@ clean.
 |---|---|
 | Everything (the CI gate) | `pnpm check` |
 | UI unit tests | `pnpm test` |
-| Zero-network test | `pnpm --filter @nimw/desktop exec playwright install chromium webkit` once, then `pnpm test:e2e` |
+| Zero-network test | `pnpm --filter @liber/desktop exec playwright install chromium webkit` once, then `pnpm test:e2e` |
 | Rust | `pnpm build:ui && cargo test --workspace` |
 | App (dev) | `pnpm dev` |
 
-`cargo test -p nimw-desktop` needs `apps/desktop/dist` (run `pnpm build:ui`
-first). `NIMW_TRASH_TESTS=1` stays for CI only (it uses the real OS Trash).
+`cargo test -p liber-desktop` needs `apps/desktop/dist` (run `pnpm build:ui`
+first). `LIBER_TRASH_TESTS=1` stays for CI only (it uses the real OS Trash).
 
 ## 3. Backend map (`apps/desktop/src-tauri/src/`)
 
 | File | What it does |
 |---|---|
 | `menu.rs` | Our own macOS app menu (About, Services, Hide/Hide Others/Show All, **our** Quit ⌘Q; Edit: Undo/Redo/Cut/Copy/Paste/Select All; View: Full Screen; Window: Minimize/Zoom/Close). Quit closes every window through its close request, so the UI's save-before-close runs (review I1). Tests: `tests/menu.rs` (custom harness: menus must be built on the main thread). |
-| `navigation.rs` | Navigation guard plugin: the webview may only show `tauri://localhost`, `http(s)://tauri.localhost`, `about:blank` and (debug builds) the Vite dev server `http://localhost:1420`. A vault file (`nimw-asset:`) or web page can never become the top-level document. |
+| `navigation.rs` | Navigation guard plugin: the webview may only show `tauri://localhost`, `http(s)://tauri.localhost`, `about:blank` and (debug builds) the Vite dev server `http://localhost:1420`. A vault file (`liber-asset:`) or web page can never become the top-level document. |
 | `editor_commands.rs` | The six M2a commands. `file_open_external` only opens a regular file (no folders, so no `.app` bundles), refuses program/script/installer extensions (denylist `EXECUTABLE_EXTENSIONS`) and, on Unix, extensionless files with an exec bit (`check_openable`). Each is `*_impl(&AppState, …)` plus an `async` wrapper through `vault_commands::blocking` (never on the UI thread). |
-| `asset.rs` | `nimw-asset:` — `serve(&AppState, uri_path, range)` resolves through the current session's `VaultPath` (no `..`, no absolute paths, no symlink escapes), refuses hidden files and the root (403), 404 without a vault or for symlink escapes, `Range` → 206/416. Every response carries `Content-Security-Policy: default-src 'none'; sandbox` and `X-Content-Type-Options: nosniff`. |
+| `asset.rs` | `liber-asset:` — `serve(&AppState, uri_path, range)` resolves through the current session's `VaultPath` (no `..`, no absolute paths, no symlink escapes), refuses hidden files and the root (403), 404 without a vault or for symlink escapes, `Range` → 206/416. Every response carries `Content-Security-Policy: default-src 'none'; sandbox` and `X-Content-Type-Options: nosniff`. |
 | `lib.rs` | Registers the opener plugin (Rust API only), the navigation guard, the menu-event handler, the protocol (on a thread) and the commands; `run()` installs the app menu (`menu::with_app_menu`). |
 | `error.rs` | `ErrorKind::{Binary, InvalidUrl}`; `CommandError.conflict` flattens `{currentText, currentHash}` into a `conflict` error. |
 | `settings.rs` | `editorMode: livePreview \| source \| split` (unknown value → default + warning). |
 | `vault_commands.rs` | `vault_open` no longer fails when recents can't be saved: the failure becomes an index warning. |
-| `crates/nimw-session/src/editing.rs` | `write_page` (CAS + reindex + resolve), `create_conflict_copy` (`<stem> (conflict).md`, `(conflict 2)`…), `resolve_links`. |
+| `crates/liber-session/src/editing.rs` | `write_page` (CAS + reindex + resolve), `create_conflict_copy` (`<stem> (conflict).md`, `(conflict 2)`…), `resolve_links`. |
 
 Permissions (`capabilities/main.json`): `allow-page-read`, `allow-page-write`,
 `allow-page-create-conflict-copy`, `allow-links-resolve`, `allow-url-open`,
@@ -63,7 +63,7 @@ Permissions (`capabilities/main.json`): `allow-page-read`, `allow-page-write`,
 window itself after saving). No `opener:*` permission: the webview cannot call
 the opener plugin; `plugin:opener|open_url` is "not allowed" (tested).
 
-CSP: `img-src`/`media-src` allow `nimw-asset: http://nimw-asset.localhost`
+CSP: `img-src`/`media-src` allow `liber-asset: http://liber-asset.localhost`
 (instead of Tauri's `asset:`); nothing else changed.
 
 ## 4. Frontend map (`apps/desktop/src/`)
@@ -114,11 +114,11 @@ CSP: `img-src`/`media-src` allow `nimw-asset: http://nimw-asset.localhost`
 | `src/theme/palette.test.ts` | palette contrast ≥ 4.5:1 in light and dark |
 | `tests/syntax-target.test.ts` | lint rule: no regex lookbehind |
 | `e2e/zero-network.spec.ts` | zero requests + zero CSP violations, three modes |
-| `src-tauri/tests/{commands,asset,settings}.rs`, `crates/nimw-session/tests/editing.rs`, `crates/nimw-markdown/tests/parity.rs` | backend |
+| `src-tauri/tests/{commands,asset,settings}.rs`, `crates/liber-session/tests/editing.rs`, `crates/liber-markdown/tests/parity.rs` | backend |
 
 ## 8. Rulings made on your behalf (deviations from the spec)
 
-1. **Own `nimw-asset:` protocol instead of Tauri's asset protocol + scope.** Tauri's scope can only add directories (no revoke), so a previous vault would stay readable. The protocol resolves every request through the current session instead. Spec §2.5/§7 "scope set on open and revoked on close" is met by construction and tested ("no vault → 404").
+1. **Own `liber-asset:` protocol instead of Tauri's asset protocol + scope.** Tauri's scope can only add directories (no revoke), so a previous vault would stay readable. The protocol resolves every request through the current session instead. Spec §2.5/§7 "scope set on open and revoked on close" is met by construction and tested ("no vault → 404").
 2. **Opening URLs/files through our own commands** (`url_open`, `file_open_external`, scheme-checked in Rust) instead of granting `opener:allow-open-url` to the webview. Smaller attack surface; same behaviour.
 3. **`hast-util-sanitize` instead of DOMPurify:** it works on the tree, so source positions survive (Split scroll sync, M4 dragging). `dompurify` is not a dependency.
 4. **Container directives only** (`:::name`), not the text form, which would turn `3:2` into a directive.
@@ -142,7 +142,7 @@ Agent screenshots must be launch-only (no synthetic keystrokes). Please check:
 5. Breadcrumb: folder segment reveals and focuses the folder; vault segment collapses the tree.
 6. ⌘-click a link; Mod-Enter; unresolved link → Create page; external link → browser after confirmation.
 7. A page with remote images: "Remote image blocked (privacy)" placeholder.
-8. Images and audio from the vault (`nimw-asset:`) play/show; audio seeking (ranges).
+8. Images and audio from the vault (`liber-asset:`) play/show; audio seeking (ranges).
 9. Quit with unsaved text (⌘Q right after typing): the text is on disk.
 10. Make a page unsaveable (e.g. `chmod a-w` the file, or delete it in Finder while it has unsaved text), press ⌘Q: the window stays open with the warning + "Open"; a second ⌘Q quits.
 11. The menu: ⌘Z / ⌘⇧Z / ⌘X / ⌘C / ⌘V / ⌘A in the editor, ⌘H, ⌥⌘H, ⌘W, ⌘M, About shows the app name.
@@ -163,7 +163,7 @@ Agent screenshots must be launch-only (no synthetic keystrokes). Please check:
 | i | `%%` comment masking can change Markdown meaning (`%%x%% text` after a blank line → indented code; `foo %%x%%\nbar` → hard break) | later |
 | j | `page_write` conflict payload decodes with `from_utf8_lossy` (a non-UTF-8 external rewrite is merged with U+FFFD) | later |
 | k | "Create page" from an unresolved link ignores folders in the target | M2b |
-| l | `nimw-asset`: one thread per request; `Range` reads the whole file | later perf (M6 audio) |
+| l | `liber-asset`: one thread per request; `Range` reads the whole file | later perf (M6 audio) |
 | m | Perf test takes the min of 5 runs; Live Preview decoration rebuild on cross-line cursor moves is unmeasured | later perf |
 | n | Rust indexes tags/wikilinks inside Markdown link text (`[#t](u)`), TS does not | later parity |
 | o | Pages with reference definitions re-parse fully when the edited block contains `[` (correct, slower on huge pages) | later perf |
@@ -173,11 +173,11 @@ Agent screenshots must be launch-only (no synthetic keystrokes). Please check:
 
 | Symptom | Fix |
 |---|---|
-| Images don't show | `tauri.conf.json` CSP must list `nimw-asset: http://nimw-asset.localhost` in `img-src`/`media-src` |
+| Images don't show | `tauri.conf.json` CSP must list `liber-asset: http://liber-asset.localhost` in `img-src`/`media-src` |
 | "not allowed" on a new command | `build.rs` list + `capabilities/main.json` + ACL test |
 | ⌘Z/⌘C/⌘V stop working | the Edit menu in `menu.rs` must keep its predefined items (WKWebView routes the shortcuts through the menu) |
 | A link/embed opens nothing | the navigation guard blocks top-level navigation by design; links go through `followLink` → `url_open`/`file_open_external` |
-| `pnpm test:e2e` can't find a browser | `pnpm --filter @nimw/desktop exec playwright install chromium webkit` |
+| `pnpm test:e2e` can't find a browser | `pnpm --filter @liber/desktop exec playwright install chromium webkit` |
 | e2e fails with `csp:`/violations | something reached the DOM with a remote URL: the sanitizer, not the CSP, must stop it |
 
 ## 12. Next steps

@@ -1,6 +1,6 @@
 # Third-party notices
 
-Licence notices for third-party software that Notes In My Way credits
+Licence notices for third-party software that Liber Linteum credits
 explicitly. Every bundled package keeps its own licence in its published
 sources.
 
@@ -85,3 +85,27 @@ authorization of the copyright holder.
 
 SPDX-License-Identifier: Unicode-3.0
 ```
+
+## Spell checking: spellbook and the bundled dictionaries
+
+Spell checking runs entirely on this computer (spell checking spec). The app
+links [spellbook](https://github.com/helix-editor/spellbook) 0.4.2 by Michael
+Davis, under the Mozilla Public License 2.0
+(<https://www.mozilla.org/MPL/2.0/>); its source is at that repository,
+unmodified.
+
+Three Hunspell dictionaries are compiled into the app, unchanged, from their
+[wooorm/dictionaries](https://github.com/wooorm/dictionaries) packages. Each
+licence text ships with the app (in its resources, under `licenses/`) and is
+kept in this repository:
+
+- **English (US)**: `dictionary-en@4.0.0`, from SCOWL
+  (<http://wordlist.aspell.net/dicts/>), under `(MIT AND BSD)`. Licence:
+  `crates/liber-spell/dictionaries/en_US/LICENSE`.
+- **Spanish**: `dictionary-es@4.0.0`, from RLA-ES
+  (<https://github.com/sbosio/rla-es>), under
+  `(GPL-3.0 OR LGPL-3.0 OR MPL-1.1)`, used under GPL-3.0. Licence:
+  `crates/liber-spell/dictionaries/es/LICENSE`.
+- **Spanish (Colombia)**: `dictionary-es-co@2.0.0`, from RLA-ES, under
+  `(GPL-3.0 OR LGPL-3.0 OR MPL-1.1)`, used under GPL-3.0. Licence:
+  `crates/liber-spell/dictionaries/es_CO/LICENSE`.

@@ -1,9 +1,9 @@
-//! M5 §5: search — one command, a thin wrapper over `nimw-session`.
+//! M5 §5: search — one command, a thin wrapper over `liber-session`.
 
 use crate::error::CmdResult;
 use crate::state::AppState;
 use crate::vault_commands::blocking;
-use nimw_session::{FacetCount, FacetPage, SearchHit, SearchPage, SearchQuery, SnippetPart};
+use liber_session::{FacetCount, FacetPage, SearchHit, SearchPage, SearchQuery, SnippetPart};
 use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Manager, Runtime};
 

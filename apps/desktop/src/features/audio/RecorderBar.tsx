@@ -113,6 +113,7 @@ export function RecorderBar() {
             <label htmlFor={deviceId}>{t('audio.microphone')}</label>
             <select
               id={deviceId}
+              className="field-control field-sm"
               value={s.deviceId ?? ''}
               disabled={!s.devices.length}
               onChange={(e) => useRecorderStore.setState({ deviceId: e.target.value })}

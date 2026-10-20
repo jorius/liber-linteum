@@ -4,14 +4,14 @@ import styles from './Preview.module.css';
 
 /** In Live Preview's wide frame (M5b §7.2), a table wider at its natural
  *  width than the text takes the whole frame: the frame is marked
- *  `data-wide-full` for the editor's CSS. The frame reaches --nimw-wide-m
+ *  `data-wide-full` for the editor's CSS. The frame reaches --liber-wide-m
  *  past the text on each side (Editor.tsx). */
 function markWideFull(el: HTMLElement) {
-  const frame = el.closest<HTMLElement>('.cm-nimw-widget[data-wide-kind="tables"]');
+  const frame = el.closest<HTMLElement>('.cm-liber-widget[data-wide-kind="tables"]');
   const table = el.firstElementChild as HTMLElement | null;
   if (!frame || !table) return;
   const on = !!frame.closest('[data-wide-tables]');
-  const m = on ? parseFloat(getComputedStyle(frame).getPropertyValue('--nimw-wide-m')) || 0 : 0;
+  const m = on ? parseFloat(getComputedStyle(frame).getPropertyValue('--liber-wide-m')) || 0 : 0;
   let full = false;
   if (m > 0) {
     const width = table.style.width;

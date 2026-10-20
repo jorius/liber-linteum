@@ -2,8 +2,8 @@
 //! capabilities, mock runtime, temp dirs. The zip and folder dialogs are
 //! replaced through `NotionState`.
 
-use nimw_desktop::AppDirs;
-use nimw_desktop::notion_commands::NotionState;
+use liber_desktop::AppDirs;
+use liber_desktop::notion_commands::NotionState;
 use serde_json::{Value, json};
 use std::io::Write;
 use std::path::{Path, PathBuf};
@@ -42,7 +42,7 @@ fn harness() -> Harness {
         config: config.path().to_path_buf(),
         cache: cache.path().to_path_buf(),
     };
-    let app = nimw_desktop::configure(mock_builder(), Some(dirs))
+    let app = liber_desktop::configure(mock_builder(), Some(dirs))
         .build(tauri::generate_context!())
         .expect("app builds with the real context");
     let main = WebviewWindowBuilder::new(&app, "main", Default::default())
@@ -186,7 +186,7 @@ fn m7_preview_then_import_opens_the_new_vault_at_its_report() {
     assert_eq!(done["report"], "Notion import report.md");
     assert_eq!(done["cancelled"], false);
     assert_eq!(
-        std::fs::read_to_string(root.join("Home.md")).unwrap(),
+        std::fs::read_to_string(root.join("Home/Home.md")).unwrap(),
         "# Home\n\n[[Child]]\n"
     );
     // The new vault is the open one.

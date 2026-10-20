@@ -41,13 +41,13 @@
   - with reduced motion, a single bar with no animation.
 - **Keyboard:** focus moves to Start recording when the bar opens, then to Stop & insert once recording. Escape cancels: while recording, it asks "Discard this recording?" (Discard / Keep recording).
 - **Errors:**
-  - **Microphone permission denied:** "Notes In My Way can't use the microphone. Allow it in System Settings → Privacy & Security → Microphone." The bar stays open with a Retry button.
+  - **Microphone permission denied:** "Liber Linteum can't use the microphone. Allow it in System Settings → Privacy & Security → Microphone." The bar stays open with a Retry button.
   - **The device disappears mid-take:** the clip recorded so far is saved and inserted, with a toast.
 - **Limits:** one recording at a time, app-wide. Record clip is disabled when the page isn't editable (binary or truncated).
 
-## 3. Backend (`crates/nimw-audio`, `apps/desktop/src-tauri/src/audio_commands.rs`)
+## 3. Backend (`crates/liber-audio`, `apps/desktop/src-tauri/src/audio_commands.rs`)
 
-- **`nimw-audio` (no Tauri dependency):**
+- **`liber-audio` (no Tauri dependency):**
   - `trait CaptureSource { fn start(&mut self, on_frames) …; fn stop(); }`;
   - `CpalSource` (the real one) and `SyntheticSource` (tests: a sine wave or silence, deterministic);
   - `WavWriter` (hound, 16-bit PCM at the device rate, mono or stereo as the device);
@@ -159,7 +159,7 @@ Jose confirmed the spec on 2026-10-18 ("Keep as written"). It predates M4b part 
 1. **WAV only for now; MP3 is deferred.**
    - `mp3lame-encoder` (LGPL-3.0, LAME 3.100) builds on macOS, but its `mp3lame-sys` build runs LAME's autotools `configure`, which can't target MSVC from the Mac. Windows builds are cross-compiled with cargo-xwin. Three tries failed: as is ("cannot run C compiled programs"), with `MP3LAME_SYS_OVERRIDE_HOST=x86_64-w64-mingw32` ("/lib/cpp fails sanity check"), and with `CPP="clang-cl -E"`.
    - Shipping MP3 on two systems out of three breaks the "all desktop OSes ship together" rule.
-   - So: no MP3 encoder dependency, no WAV|MP3 toggle and no `recordingFormat` setting yet, since there is nothing to choose. `RecordingFormat` stays in `nimw-audio` for when MP3 returns.
+   - So: no MP3 encoder dependency, no WAV|MP3 toggle and no `recordingFormat` setting yet, since there is nothing to choose. `RecordingFormat` stays in `liber-audio` for when MP3 returns.
    - **The way back:** a pure-Rust encoder, or building LAME's C files with `cc` and its `configMS.h`, as `mp3lame-sys` already does on a Windows host.
 2. **Where the controls go:**
    - **Record clip:** a microphone button in the page header controls, beside Format. The top bar is gone (M5b §2.3), and the formatting toolbar is optional.

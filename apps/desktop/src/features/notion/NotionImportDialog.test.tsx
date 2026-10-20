@@ -172,6 +172,21 @@ describe('Notion import dialog (M7 §3)', () => {
   });
 });
 
+describe('Notion import dialog layout (round 3 §3.1)', () => {
+  it("keeps the dialog's padding and gaps: it is wide, not frameless like Search", () => {
+    standard();
+    render(<NotionHost />);
+    const dialog = screen.getByRole('dialog', { name: 'Import from Notion' });
+    const style = getComputedStyle(dialog);
+    expect(style.paddingLeft).toBe('24px');
+    expect(style.rowGap || style.gap).not.toBe('0px');
+    expect(screen.getByRole('textbox', { name: 'Vault name' })).toHaveAttribute(
+      'placeholder',
+      'Named after the export',
+    );
+  });
+});
+
 describe('validVaultName', () => {
   it('takes a plain folder name only', () => {
     for (const ok of ['Wiki', 'Team wiki 2', 'Canción']) expect(validVaultName(ok)).toBe(true);

@@ -12,6 +12,7 @@ import { usePageWidthStore } from '../../stores/pageWidthStore';
 import { validateName } from '../explorer/nameRules';
 import { ScratchFolderSetting } from '../scratchpad/ScratchFolderSetting';
 import styles from './Dialogs.module.css';
+import { VaultSpelling } from './SpellingSettings';
 
 const MODES: AttachmentMode[] = ['subfolder', 'same', 'vault', 'folder'];
 
@@ -36,8 +37,8 @@ function obsidianPlace(value: string, t: TFunction): string {
 }
 
 /** "This vault" (M2c §5.4): where new attachments go, stored in
- *  `.nimw/vault.json`. When Obsidian has its own setting, it applies unless
- *  "Use a different place in Notes In My Way" is on (M4b §5); Obsidian's file
+ *  `.liber/vault.json`. When Obsidian has its own setting, it applies unless
+ *  "Use a different place in Liber Linteum" is on (M4b §5); Obsidian's file
  *  is never written. */
 export function VaultSettingsSection() {
   const { t } = useTranslation();
@@ -55,8 +56,8 @@ export function VaultSettingsSection() {
   const [obsidianFormat, setObsidianFormat] = useState<LinkFormat | null>(null);
   const [loaded, setLoaded] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  // What `.nimw/vault.json` holds (as loaded, then as last saved): saving the
-  // same again would create `.nimw/` for nothing (final review M5).
+  // What `.liber/vault.json` holds (as loaded, then as last saved): saving the
+  // same again would create `.liber/` for nothing (final review M5).
   const stored = useRef<{ mode: AttachmentMode; path: string } | null>(null);
 
   useEffect(() => {
@@ -125,7 +126,7 @@ export function VaultSettingsSection() {
     }
   };
 
-  /** The override switch: on stores NIMW's current place with it; off keeps
+  /** The override switch: on stores Liber Linteum's current place with it; off keeps
    *  the place for next time. */
   const toggleOwn = async (on: boolean) => {
     const res = await vaultSettingsSet(
@@ -140,7 +141,7 @@ export function VaultSettingsSection() {
     setError(null);
   };
 
-  /** NIMW's own link format; `default` follows Obsidian's (else shortest). */
+  /** Liber Linteum's own link format; `default` follows Obsidian's (else shortest). */
   const changeFormat = async (next: LinkFormat | 'default') => {
     const res = await vaultSettingsSet({ attachmentLinkFormat: next });
     if (!res.ok) {
@@ -162,7 +163,7 @@ export function VaultSettingsSection() {
       <label className={styles.field}>
         <span>{t('vault.attachmentsLabel')}</span>
         <select
-          className={styles.select}
+          className="field-control"
           value={mode}
           disabled={locked || !loaded}
           onChange={(e) => changeMode(e.target.value as AttachmentMode)}
@@ -194,7 +195,7 @@ export function VaultSettingsSection() {
         <label className={styles.field}>
           <span>{t(mode === 'subfolder' ? 'vault.subfolderName' : 'vault.folderPath')}</span>
           <input
-            className={styles.textInput}
+            className={`field-control ${styles.textInput}`}
             value={path}
             spellCheck={false}
             aria-invalid={error !== null}
@@ -218,7 +219,7 @@ export function VaultSettingsSection() {
         <span>{t('settings.links.label')}</span>
         <select
           id={formatId}
-          className={styles.select}
+          className="field-control"
           value={followsObsidian ? 'default' : effectiveFormat}
           disabled={!loaded}
           aria-describedby={formatHintId}
@@ -248,7 +249,7 @@ export function VaultSettingsSection() {
         <span>{t('vault.pageWidth')}</span>
         <select
           id={widthId}
-          className={styles.select}
+          className="field-control"
           value={vaultWidth ?? 'default'}
           disabled={!loaded}
           onChange={(e) =>
@@ -264,6 +265,7 @@ export function VaultSettingsSection() {
         </select>
       </label>
       <ScratchFolderSetting />
+      <VaultSpelling />
     </section>
   );
 }

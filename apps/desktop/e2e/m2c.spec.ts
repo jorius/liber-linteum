@@ -19,12 +19,12 @@ async function watchNetwork(page: Page) {
     const local =
       (url.protocol === 'http:' && url.hostname === '127.0.0.1') ||
       url.protocol === 'data:' ||
-      // Vault files: nimw-asset://localhost (macOS, Linux), http://nimw-asset.localhost (Windows UA).
-      url.protocol === 'nimw-asset:' ||
-      url.hostname === 'nimw-asset.localhost';
+      // Vault files: liber-asset://localhost (macOS, Linux), http://liber-asset.localhost (Windows UA).
+      url.protocol === 'liber-asset:' ||
+      url.hostname === 'liber-asset.localhost';
     if (!local) outside.push(r.url());
   });
-  await page.route(/^https?:\/\/(?!127\.0\.0\.1|nimw-asset\.localhost)/, (route) => route.abort());
+  await page.route(/^https?:\/\/(?!127\.0\.0\.1|liber-asset\.localhost)/, (route) => route.abort());
   return outside;
 }
 
@@ -44,11 +44,14 @@ async function open(page: Page, name: string) {
 
 /** CSP violations: the sanitizer and the app must make none (M2a §7). */
 const csp = (page: Page) =>
-  page.evaluate(() => (window as unknown as { __nimwCspViolations: string[] }).__nimwCspViolations);
+  page.evaluate(
+    () => (window as unknown as { __liberCspViolations: string[] }).__liberCspViolations,
+  );
 
 const lastWrite = (page: Page) =>
   page.evaluate(() => {
-    const writes = (window as unknown as { __nimwWrites?: { text: string }[] }).__nimwWrites ?? [];
+    const writes =
+      (window as unknown as { __liberWrites?: { text: string }[] }).__liberWrites ?? [];
     return writes.at(-1)?.text ?? null;
   });
 
@@ -100,7 +103,7 @@ test('a pasted image is saved and embedded at the cursor', async ({ page }) => {
     .poll(() => lastWrite(page))
     .toMatch(/The second page\.!\[\[Pasted image \d{14}\.png\]\]/);
   const names = await page.evaluate(
-    () => (window as unknown as { __nimwPastes?: string[] }).__nimwPastes,
+    () => (window as unknown as { __liberPastes?: string[] }).__liberPastes,
   );
   expect(names).toEqual([expect.stringMatching(/^Pasted image \d{14}\.png$/)]);
   expect(outside).toEqual([]);
@@ -125,21 +128,21 @@ test.describe('on a 2× screen', () => {
     expect(await page.evaluate(() => window.devicePixelRatio)).toBe(2);
     const at = { x: (box.x + 2) * ratio, y: (box.y + box.height / 2) * ratio };
     await page.evaluate((position) => {
-      const emit = (window as unknown as { __nimwEmit: (e: string, p: unknown) => void })
-        .__nimwEmit;
+      const emit = (window as unknown as { __liberEmit: (e: string, p: unknown) => void })
+        .__liberEmit;
       emit('tauri://drag-enter', { paths: ['/Users/me/brief.pdf'], position });
       emit('tauri://drag-over', { position });
     }, at);
-    await expect(page.locator('.cm-nimw-drop-caret')).toBeAttached();
+    await expect(page.locator('.cm-liber-drop-caret')).toBeAttached();
     await page.evaluate((position) => {
-      const emit = (window as unknown as { __nimwEmit: (e: string, p: unknown) => void })
-        .__nimwEmit;
+      const emit = (window as unknown as { __liberEmit: (e: string, p: unknown) => void })
+        .__liberEmit;
       emit('tauri://drag-drop', { paths: ['/Users/me/brief.pdf', '/Users/me/data.zip'], position });
     }, at);
     await expect
       .poll(() => lastWrite(page))
       .toContain('![[brief.pdf]]\n[[data.zip]]The second page.');
-    await expect(page.locator('.cm-nimw-drop-caret')).toHaveCount(0);
+    await expect(page.locator('.cm-liber-drop-caret')).toHaveCount(0);
     expect(outside).toEqual([]);
     expect(await csp(page)).toEqual([]);
   });
@@ -177,7 +180,7 @@ test('Create page for [[Ideas/New idea]] creates the folder and opens the page',
   page,
 }) => {
   await open(page, 'A');
-  await page.locator('.cm-nimw-link', { hasText: 'Ideas/New idea' }).click();
+  await page.locator('.cm-liber-link', { hasText: 'Ideas/New idea' }).click();
   const dialog = page.getByRole('dialog', { name: 'Create page “New idea” in Ideas/?' });
   await dialog.getByRole('button', { name: 'Create page' }).click();
   await expect(page.getByRole('textbox', { name: 'Page title' })).toHaveValue('New idea');

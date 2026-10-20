@@ -8,6 +8,7 @@ import { usePageStore } from '../../stores/pageStore';
 import { useUiStore } from '../../stores/uiStore';
 import { childrenByParent } from '../../stores/tree';
 import { resetVaultStore, useVaultStore } from '../../stores/vaultStore';
+import { useFavoritesStore } from '../favorites/favoritesStore';
 import { useScratchpadStore } from '../scratchpad/scratchpadStore';
 import { ContextMenu } from './ContextMenu';
 import { ExplorerTree, visibleRows } from './ExplorerTree';
@@ -276,44 +277,180 @@ describe('the pinned scratch folder (M4c §7.2)', () => {
   });
 });
 
+describe('folder pages (round 3b §6.2)', () => {
+  it("a folder's own page isn't listed under it", () => {
+    const children = childrenByParent([
+      { path: 'Lore', kind: 'folder' },
+      { path: 'Lore/Lore.md', kind: 'page' },
+      { path: 'Lore/Other.md', kind: 'page' },
+      { path: 'Lore.md', kind: 'page' },
+    ]);
+    expect(visibleRows(children, new Set(['Lore'])).map((r) => r.node.path)).toEqual([
+      'Lore',
+      'Lore/Other.md',
+      'Lore.md',
+    ]);
+  });
+
+  const lore: TreeNode[] = [
+    { path: 'Lore', kind: 'folder', icon: '📁' },
+    { path: 'Lore/Lore.md', kind: 'page', icon: '🛡️' },
+    { path: 'Lore/Other.md', kind: 'page' },
+    { path: 'Welcome.md', kind: 'page' },
+  ];
+  const realLoad = usePageStore.getState().load;
+  const spyLoad = () => {
+    const load = vi.fn(async () => {});
+    usePageStore.setState({ load });
+    return load;
+  };
+  afterEach(() => usePageStore.setState({ load: realLoad, path: null }));
+  const loreRow = () => screen.getByRole('treeitem', { name: 'Lore' });
+
+  it('clicking the name opens the page, selects the folder and leaves it closed', async () => {
+    const load = spyLoad();
+    seed(lore);
+    render(<ExplorerTree />);
+    await userEvent.click(within(loreRow()).getByText('Lore'));
+    expect(load).toHaveBeenCalledWith('Lore/Lore.md');
+    expect(useVaultStore.getState().selected).toBe('Lore');
+    expect(useVaultStore.getState().expanded.has('Lore')).toBe(false);
+  });
+
+  it('the chevron alone expands and collapses, and opens nothing', async () => {
+    const load = spyLoad();
+    seed(lore);
+    render(<ExplorerTree />);
+    const twisty = loreRow().querySelector('[data-twisty]')!;
+    await userEvent.click(twisty);
+    expect(useVaultStore.getState().expanded.has('Lore')).toBe(true);
+    await userEvent.click(loreRow().querySelector('[data-twisty]')!);
+    expect(useVaultStore.getState().expanded.has('Lore')).toBe(false);
+    expect(load).not.toHaveBeenCalled();
+  });
+
+  it('Enter opens the page; → and ← still expand and collapse', async () => {
+    const load = spyLoad();
+    seed(lore);
+    render(<ExplorerTree />);
+    loreRow().focus();
+    await userEvent.keyboard('{ArrowRight}');
+    expect(useVaultStore.getState().expanded.has('Lore')).toBe(true);
+    await userEvent.keyboard('{ArrowLeft}');
+    expect(useVaultStore.getState().expanded.has('Lore')).toBe(false);
+    await userEvent.keyboard('{Enter}');
+    expect(load).toHaveBeenCalledWith('Lore/Lore.md');
+  });
+
+  it("shows the page's icon, else the folder's; marked current while its page is open", () => {
+    seed(lore);
+    usePageStore.setState({ path: 'Lore/Lore.md' });
+    const { unmount } = render(<ExplorerTree />);
+    expect(loreRow()).toHaveTextContent('🛡️');
+    expect(loreRow()).not.toHaveTextContent('📁');
+    expect(loreRow()).toHaveAttribute('aria-current', 'page');
+    unmount();
+    usePageStore.setState({ path: 'Welcome.md' });
+    seed(lore.map((n) => (n.path === 'Lore/Lore.md' ? { ...n, icon: undefined } : n)));
+    render(<ExplorerTree />);
+    expect(loreRow()).toHaveTextContent('📁');
+    expect(loreRow()).not.toHaveAttribute('aria-current');
+  });
+
+  it("★ on the row stars the folder's page", async () => {
+    const calls = backend({ favorites_set: () => null, favorites_get: () => [] });
+    useFavoritesStore.setState({ paths: [] });
+    seed(lore);
+    render(<ExplorerTree />);
+    await userEvent.click(within(loreRow()).getByRole('button', { name: 'Lore in Favorites' }));
+    expect(useFavoritesStore.getState().paths).toContain('Lore/Lore.md');
+    expect(calls.some(([c]) => c === 'favorites_set')).toBe(true);
+  });
+
+  it('the pinned Scratchpad with its own page still pins first and opens it', async () => {
+    const load = spyLoad();
+    useScratchpadStore.setState({ folder: 'Scratchpad' });
+    seed([
+      { path: 'Art', kind: 'folder' },
+      { path: 'Scratchpad', kind: 'folder' },
+      { path: 'Scratchpad/Scratchpad.md', kind: 'page' },
+    ]);
+    render(<ExplorerTree />);
+    expect(items()[0]).toHaveAttribute('data-path', 'Scratchpad');
+    await userEvent.click(within(items()[0]).getByText('Scratchpad'));
+    expect(load).toHaveBeenCalledWith('Scratchpad/Scratchpad.md');
+    useScratchpadStore.getState().reset();
+  });
+
+  it('in the Archive a folder page opens its page (read-only there) and offers no ★ or ☺', async () => {
+    const load = spyLoad();
+    seed([
+      { path: '.archive', kind: 'folder' },
+      { path: '.archive/Old', kind: 'folder' },
+      { path: '.archive/Old/Old.md', kind: 'page' },
+    ]);
+    render(<ExplorerTree root=".archive" />);
+    const row = screen.getByRole('treeitem', { name: 'Old' });
+    await userEvent.click(within(row).getByText('Old'));
+    expect(load).toHaveBeenCalledWith('.archive/Old/Old.md');
+    expect(within(row).queryByRole('button', { name: 'Old in Favorites' })).toBeNull();
+  });
+});
+
 describe('row quick actions (M5b §3)', () => {
   const actions = (name: string) =>
     within(screen.getByRole('treeitem', { name }))
       .getAllByRole('button')
       .map((b) => b.getAttribute('aria-label'));
 
-  it('folders get + ☺ 🗑 …, pages ☺ 🗑 …, attachments 🗑 …; none is a Tab stop', () => {
+  it('round 3 §2.3: folders and pages get ★ ☺ 🗑, attachments 🗑; no "+" or "…"; none is a Tab stop', () => {
     seed(nodes, { expanded: new Set(['Art']) });
     render(<ExplorerTree onRequestMenu={() => undefined} />);
     expect(actions('Games')).toEqual([
-      'New page in Games',
+      'Games in Favorites',
       'Icon for Games',
       'Move Games to Trash',
-      'Actions for Games',
     ]);
     expect(actions('Welcome')).toEqual([
+      'Welcome in Favorites',
       'Icon for Welcome',
       'Move Welcome to Trash',
-      'Actions for Welcome',
     ]);
-    expect(actions('cover.png')).toEqual(['Move cover.png to Trash', 'Actions for cover.png']);
+    expect(actions('cover.png')).toEqual(['Move cover.png to Trash']);
     for (const b of within(screen.getByRole('tree')).getAllByRole('button')) {
       expect(b).toHaveAttribute('tabindex', '-1');
     }
   });
 
-  it('+ makes a page inside the folder without opening the row', async () => {
-    const calls = backend({
-      entry_create_page: (a) => `${a.dir}/Untitled.md`,
-      vault_tree: () => nodes,
-    });
+  it('round 3 §2.3: ★ adds the item to Favorites and fills; again takes it out', async () => {
+    backend({ favorites_set: () => null, favorites_get: () => [] });
+    useFavoritesStore.setState({ paths: [] });
     seed();
     render(<ExplorerTree />);
-    await userEvent.click(screen.getByRole('button', { name: 'New page in Games' }));
-    await waitFor(() =>
-      expect(calls.find(([c]) => c === 'entry_create_page')?.[1]).toMatchObject({ dir: 'Games' }),
-    );
-    expect(useVaultStore.getState().expanded.has('Games')).toBe(true);
+    // Review M7: one fixed name; the state is only aria-pressed (and the tooltip).
+    const starOf = () =>
+      within(screen.getByRole('treeitem', { name: 'Welcome' })).getByRole('button', {
+        name: 'Welcome in Favorites',
+      });
+    expect(starOf()).toHaveAttribute('aria-pressed', 'false');
+    expect(starOf()).toHaveAttribute('title', 'Add Welcome to Favorites');
+    await userEvent.click(starOf());
+    await waitFor(() => expect(useFavoritesStore.getState().paths).toEqual(['Welcome.md']));
+    const star = starOf();
+    expect(star).toHaveAttribute('aria-pressed', 'true');
+    expect(star).toHaveAttribute('title', 'Remove Welcome from Favorites');
+    expect(useVaultStore.getState().selected).toBeNull(); // the row wasn't activated
+    await userEvent.click(star);
+    await waitFor(() => expect(useFavoritesStore.getState().paths).toEqual([]));
+  });
+
+  it('round 3 §2.3: the icon action is a full-contrast glyph, not the faded smiley', () => {
+    seed();
+    render(<ExplorerTree />);
+    const pick = screen.getByRole('button', { name: 'Icon for Games' });
+    expect(pick).not.toHaveAttribute('data-empty');
+    expect(pick.querySelector('svg')).not.toBeNull();
+    expect(pick.textContent).not.toContain('☺');
   });
 
   it('🗑 asks for confirmation through the trash action', async () => {
@@ -397,5 +534,132 @@ describe('the row menu (M5b §3, §4)', () => {
     await userEvent.click(screen.getByRole('menuitem', { name: 'Delete' }));
     expect(useUiStore.getState().dialog).toEqual({ type: 'delete', path: 'Art/cover.png' });
     act(() => useUiStore.getState().closeDialog());
+  });
+});
+
+describe('the folder-page menu actions (round 3b §6.4)', () => {
+  const labels = () => screen.getAllByRole('menuitem').map((i) => i.textContent);
+  const realLoad = usePageStore.getState().load;
+  afterEach(() => usePageStore.setState({ load: realLoad }));
+
+  it('"Add a page to this folder" creates X/X.md and opens it', async () => {
+    const calls = backend({
+      entry_create_page: () => 'Lore/Lore.md',
+      vault_tree: () => [
+        { path: 'Lore', kind: 'folder' },
+        { path: 'Lore/Lore.md', kind: 'page' },
+      ],
+    });
+    const load = vi.fn(async () => {});
+    usePageStore.setState({ load });
+    seed([{ path: 'Lore', kind: 'folder' }]);
+    render(<ContextMenu menu={{ path: 'Lore', anchor: { x: 0, y: 0 } }} onClose={() => {}} />);
+    expect(labels()).toContain('Add a page to this folder');
+    expect(labels()).not.toContain('Use Lore.md as this folder’s page');
+    await userEvent.click(screen.getByRole('menuitem', { name: 'Add a page to this folder' }));
+    await waitFor(() => expect(load).toHaveBeenCalledWith('Lore/Lore.md'));
+    expect(calls).toContainEqual(['entry_create_page', { dir: 'Lore', name: 'Lore' }]);
+    expect(useVaultStore.getState().renaming).toBeNull();
+  });
+
+  it('"Use Lore.md as this folder’s page" moves the namesake page inside', async () => {
+    const calls = backend({
+      entry_rename: () => ({
+        moved: [],
+        updatedFiles: [],
+        updatedLinks: 0,
+        failed: [],
+        pair: null,
+      }),
+      vault_tree: () => [
+        { path: 'Lore', kind: 'folder' },
+        { path: 'Lore/Lore.md', kind: 'page' },
+      ],
+    });
+    seed([
+      { path: 'Lore', kind: 'folder' },
+      { path: 'Lore.md', kind: 'page' },
+    ]);
+    render(<ContextMenu menu={{ path: 'Lore', anchor: { x: 0, y: 0 } }} onClose={() => {}} />);
+    await userEvent.click(
+      screen.getByRole('menuitem', { name: 'Use Lore.md as this folder’s page' }),
+    );
+    expect(calls).toContainEqual(['entry_rename', { from: 'Lore.md', to: 'Lore/Lore.md' }]);
+  });
+
+  it('a folder with a page offers neither, and its Favorites action stars the page', async () => {
+    backend({ favorites_set: () => null });
+    useFavoritesStore.setState({ paths: [] });
+    seed([
+      { path: 'Lore', kind: 'folder' },
+      { path: 'Lore/Lore.md', kind: 'page' },
+    ]);
+    render(<ContextMenu menu={{ path: 'Lore', anchor: { x: 0, y: 0 } }} onClose={() => {}} />);
+    expect(labels()).not.toContain('Add a page to this folder');
+    await userEvent.click(screen.getByRole('menuitem', { name: 'Add to Favorites' }));
+    expect(useFavoritesStore.getState().paths).toEqual(['Lore/Lore.md']);
+  });
+
+  it('an archived folder offers neither', () => {
+    seed([
+      { path: '.archive', kind: 'folder' },
+      { path: '.archive/Lore', kind: 'folder' },
+    ]);
+    render(
+      <ContextMenu menu={{ path: '.archive/Lore', anchor: { x: 0, y: 0 } }} onClose={() => {}} />,
+    );
+    expect(labels()).not.toContain('Add a page to this folder');
+  });
+});
+
+describe('double-click a page (round 3b §8.1)', () => {
+  const realLoad = usePageStore.getState().load;
+  const loads: string[] = [];
+  const load = vi.fn(async (p: string) => {
+    loads.push(p);
+    usePageStore.setState({ path: p });
+  });
+  afterEach(() => {
+    usePageStore.setState({ load: realLoad, path: null, editorFocus: false });
+    useUiStore.setState({ screen: 'edit' });
+    loads.length = 0;
+  });
+  const start = (screenNow: 'edit' | 'global', open: string | null, list = nodes) => {
+    usePageStore.setState({ load, path: open, editorFocus: false });
+    useUiStore.setState({ screen: screenNow });
+    seed(list);
+    render(<ExplorerTree />);
+  };
+  const row = (name: string) => screen.getByRole('treeitem', { name });
+
+  it('from the Global View it opens the page for editing, without renaming', async () => {
+    start('global', 'Welcome.md');
+    await userEvent.dblClick(row('Welcome'));
+    expect(useUiStore.getState().screen).toBe('edit');
+    expect(usePageStore.getState().editorFocus).toBe(true);
+    expect(useVaultStore.getState().renaming).toBeNull();
+  });
+
+  it('on the page already open for editing it renames it', async () => {
+    start('edit', 'Welcome.md');
+    await userEvent.dblClick(row('Welcome'));
+    expect(useVaultStore.getState().renaming).toBe('Welcome.md');
+  });
+
+  it('on another page it opens that one; the first click switching pages starts no rename', async () => {
+    start('edit', 'Art/rex.md');
+    await userEvent.dblClick(row('Welcome'));
+    expect(loads).toContain('Welcome.md');
+    expect(useVaultStore.getState().renaming).toBeNull();
+    expect(usePageStore.getState().editorFocus).toBe(true);
+  });
+
+  it('a folder page row renames the folder when its page is the one open', async () => {
+    start('edit', 'Lore/Lore.md', [
+      { path: 'Lore', kind: 'folder' },
+      { path: 'Lore/Lore.md', kind: 'page' },
+    ]);
+    await userEvent.dblClick(within(row('Lore')).getByText('Lore'));
+    expect(useVaultStore.getState().renaming).toBe('Lore');
   });
 });

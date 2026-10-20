@@ -302,7 +302,7 @@ describe('frontmatter edits from the header (M2c §4)', () => {
       expect(await editor().editFrontmatter({ subtitle: null })).toBe(false);
       expect(disk.writes()).toEqual([]);
       expect(useToastStore.getState().toasts.at(-1)?.message).toBe(
-        'NIMW can’t safely change this note’s frontmatter. Edit it in Source mode.',
+        'Liber Linteum can’t safely change this note’s frontmatter. Edit it in Source mode.',
       );
     }
   });

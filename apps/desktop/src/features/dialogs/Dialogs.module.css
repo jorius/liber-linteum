@@ -23,16 +23,20 @@
   gap: 14px;
 }
 
-/* Search (M5 §4). Its own regions scroll (M5b §7.1): the box never does,
-   so no engine can shrink the filters under the results. */
+/* Search (M5 §4), the Notion import (M7 §3). */
 .wide {
   width: min(780px, calc(100% - 32px));
+}
+
+/* Search lays out its own regions, which scroll (M5b §7.1): the box never
+   does, so no engine can shrink the filters under the results. */
+.bare {
   padding: 0;
   gap: 0;
   overflow: hidden;
 }
 
-.wide > * {
+.bare > * {
   flex: none;
 }
 
@@ -64,15 +68,6 @@
   gap: 6px;
   font: 600 13px var(--font-body);
   color: var(--color-text-body);
-}
-
-.select {
-  font: 400 14px var(--font-body);
-  color: var(--color-text);
-  background: var(--color-surface-subtle);
-  border: 1px solid var(--color-border-strong);
-  border-radius: var(--radius-md);
-  padding: 6px 8px;
 }
 
 .fieldset {
@@ -171,26 +166,17 @@
 
 .colorInput {
   width: 44px;
-  height: 32px;
+  height: 36px;
   padding: 2px;
   border: 1px solid var(--color-border-strong);
   border-radius: var(--radius-sm);
   background: var(--color-surface-subtle);
 }
 
+/* A field (fields.css) in the mono font, as wide as a hex colour. */
 .hexInput {
-  font: 400 14px var(--font-mono);
-  width: 10ch;
-  color: var(--color-text);
-  background: var(--color-surface-subtle);
-  border: 1px solid var(--color-border-strong);
-  border-radius: var(--radius-md);
-  padding: 6px 8px;
-}
-
-.hexInput[aria-invalid='true'],
-.textInput[aria-invalid='true'] {
-  border-color: var(--color-warn-border);
+  font-family: var(--font-mono);
+  width: 12ch;
 }
 
 /* A field in a fieldset takes its own row (a relationship's label). */
@@ -198,17 +184,10 @@
   flex: 1 1 100%;
 }
 
-/* A text field (a relationship's label, up to 40 characters; a search): the
-   body font, the dialog's width (M3b final review m12). */
+/* A text field (fields.css) as wide as the dialog: a relationship's label, a
+   search (M3b final review m12). */
 .textInput {
-  box-sizing: border-box;
-  font: 400 14px var(--font-body);
   width: 100%;
-  color: var(--color-text);
-  background: var(--color-surface-subtle);
-  border: 1px solid var(--color-border-strong);
-  border-radius: var(--radius-md);
-  padding: 6px 8px;
 }
 
 .error {
@@ -513,4 +492,82 @@
   border: 1px solid var(--color-border-strong);
   border-radius: var(--radius-sm);
   background: var(--color-surface-subtle);
+}
+
+/* The Move dialog's folder tree (round 3 §3.2). */
+.moveTree {
+  display: flex;
+  flex-direction: column;
+  max-height: 320px;
+  overflow-y: auto;
+  padding: 4px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+}
+
+.moveRow {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 32px;
+  padding: 0 8px 0 calc(4px + var(--level) * 18px);
+  border-radius: var(--radius-sm);
+  font-size: 14px;
+  color: var(--color-text);
+  cursor: pointer;
+}
+
+.moveRow:hover {
+  background: var(--color-surface-subtle);
+}
+
+.moveRow[aria-selected='true'] {
+  background: var(--color-accent-soft);
+  font-weight: 600;
+}
+
+.moveRow[aria-disabled='true'] {
+  color: var(--color-text-muted);
+  cursor: default;
+}
+
+.moveRow:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: -2px;
+}
+
+.moveRow > svg {
+  flex: none;
+  width: 16px;
+  height: 16px;
+}
+
+.moveChevron {
+  flex: none;
+  width: 16px;
+  display: inline-grid;
+  place-items: center;
+  color: var(--color-text-muted);
+}
+
+.moveChevron svg {
+  transition: transform 0.12s;
+}
+
+.moveChevron[data-open] svg {
+  transform: rotate(90deg);
+}
+
+.moveName {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.moveCurrent {
+  flex: none;
+  margin-left: auto;
+  font-size: 12px;
+  color: var(--color-text-muted);
 }

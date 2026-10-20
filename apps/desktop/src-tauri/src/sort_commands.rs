@@ -1,11 +1,11 @@
 //! Folder orders (M5b round 2): how a folder (or the vault root, `""`) lists
-//! its entries, kept in `.nimw/vault.json`; the session applies them to the
+//! its entries, kept in `.liber/vault.json`; the session applies them to the
 //! tree.
 
 use crate::error::{CmdResult, CommandError, ErrorKind};
 use crate::state::AppState;
 use crate::vault_commands::blocking;
-use nimw_vault::{EntryKind, FolderSort, VaultPath, is_archived, is_hidden_name};
+use liber_vault::{EntryKind, FolderSort, VaultPath, is_archived, is_hidden_name};
 use tauri::{AppHandle, Manager, Runtime};
 
 /// `""` (the root), or a folder in the vault: visible, or in the Archive.

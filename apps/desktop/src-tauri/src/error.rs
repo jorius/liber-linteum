@@ -1,8 +1,8 @@
 //! The single error type every command returns (M1b spec §2.6), serialized as
 //! `{ "kind": "...", "message": "..." }` for the UI to translate.
 
-use nimw_session::SessionError;
-use nimw_vault::VaultError;
+use liber_session::SessionError;
+use liber_vault::VaultError;
 use serde::Serialize;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
@@ -31,6 +31,8 @@ pub enum ErrorKind {
     TooLarge,
     /// Not a text file the app opens (M4b part 2 §6).
     NotAText,
+    /// A value the command refuses: a word or dictionary id (spell checking).
+    InvalidInput,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]

@@ -62,7 +62,7 @@ describe('parsePage — wikilinks and embeds (M2a §2.1)', () => {
   });
 });
 
-describe('parsePage — links list (spec §2.2, parity with nimw-markdown)', () => {
+describe('parsePage — links list (spec §2.2, parity with liber-markdown)', () => {
   it('lists wiki, embed, markdown and markdown_image links with decoded targets', () => {
     const src =
       '[[Sparda]] ![[rex.png|300]] [p](DMC/Sparda.md#Palette) [g](</Game Design/Game 1.md>) ' +

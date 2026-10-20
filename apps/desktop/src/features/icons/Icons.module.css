@@ -20,13 +20,6 @@
 .search {
   flex: 1;
   min-width: 0;
-  box-sizing: border-box;
-  padding: 6px 8px;
-  border: 1px solid var(--color-border-strong);
-  border-radius: var(--radius-sm);
-  background: var(--color-bg);
-  color: var(--color-text);
-  font: 400 14px var(--font-body);
 }
 
 .remove {

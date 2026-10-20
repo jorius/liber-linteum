@@ -84,14 +84,17 @@ function applyText(text: string, closed: boolean) {
   };
 }
 
-function fileOption(s: LinkSuggestion, q: LinkQuery): Completion {
+/** A file option: its emoji (M5b §4), if any, shows in a leading box. */
+interface FileCompletion extends Completion {
+  icon?: string;
+}
+
+function fileOption(s: LinkSuggestion, q: LinkQuery): FileCompletion {
   const alias = q.embed ? null : aliasFor(s);
   const label = s.title ?? baseName(s.path);
-  // The page's optional emoji (M5b §4) shows; matching stays on the name.
-  const icon = iconsOf(useVaultStore.getState().nodes).get(s.path);
   return {
     label,
-    ...(icon ? { displayLabel: `${icon} ${label}` } : {}),
+    icon: iconsOf(useVaultStore.getState().nodes).get(s.path),
     detail: s.path,
     type: s.kind === 'page' ? 'text' : 'variable',
     apply: applyText(alias ? `${s.target}|${alias}` : s.target, q.closed),
@@ -165,16 +168,16 @@ function searchSection(query: string, count: number): CompletionSection {
     name: 'search',
     header: () => {
       const line = document.createElement('div');
-      line.className = 'cm-nimw-search';
+      line.className = 'cm-liber-search';
       line.setAttribute('aria-hidden', 'true');
       line.innerHTML = SEARCH_ICON;
       const what = document.createElement('span');
-      what.className = 'cm-nimw-search-text';
+      what.className = 'cm-liber-search-text';
       what.textContent = typed
         ? i18next.t('linkComplete.search', { query: typed })
         : i18next.t('linkComplete.typeToFilter');
       const count_ = document.createElement('span');
-      count_.className = 'cm-nimw-search-count';
+      count_.className = 'cm-liber-search-count';
       count_.textContent = matches;
       line.append(what, count_);
       return line;
@@ -240,7 +243,7 @@ const theme = EditorView.theme({
     background: 'var(--color-accent-soft)',
     color: 'var(--color-text-strong)',
   },
-  '.cm-tooltip.cm-tooltip-autocomplete .cm-nimw-search': {
+  '.cm-tooltip.cm-tooltip-autocomplete .cm-liber-search': {
     position: 'sticky',
     top: '0',
     display: 'flex',
@@ -252,16 +255,25 @@ const theme = EditorView.theme({
     color: 'var(--color-text-muted)',
     fontSize: '12.5px',
   },
-  '.cm-tooltip.cm-tooltip-autocomplete .cm-nimw-search-text': {
+  '.cm-tooltip.cm-tooltip-autocomplete .cm-liber-search-text': {
     color: 'var(--color-text)',
     fontWeight: '600',
     overflow: 'hidden',
     textOverflow: 'ellipsis',
     whiteSpace: 'nowrap',
   },
-  '.cm-tooltip.cm-tooltip-autocomplete .cm-nimw-search-count': {
+  '.cm-tooltip.cm-tooltip-autocomplete .cm-liber-search-count': {
     marginLeft: 'auto',
     flex: 'none',
+  },
+  '.cm-tooltip.cm-tooltip-autocomplete .cm-liber-linkIcon': {
+    display: 'inline-flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: '18px',
+    marginRight: '6px',
+    verticalAlign: 'middle',
+    color: 'var(--color-text-muted)',
   },
   '.cm-tooltip.cm-tooltip-autocomplete .cm-completionDetail': {
     marginLeft: '10px',
@@ -270,10 +282,49 @@ const theme = EditorView.theme({
   },
 });
 
+const SVG = 'http://www.w3.org/2000/svg';
+/** Round 3b §8.2: an option's icon box: the page's emoji, else the page or
+ *  file glyph (the explorer's). Headings get none. */
+function iconBox(c: FileCompletion): Node | null {
+  if (c.type !== 'text' && c.type !== 'variable') return null;
+  const box = document.createElement('span');
+  box.className = 'cm-liber-linkIcon';
+  box.setAttribute('aria-hidden', 'true');
+  if (c.icon) {
+    box.textContent = c.icon;
+    return box;
+  }
+  const svg = document.createElementNS(SVG, 'svg');
+  for (const [k, v] of Object.entries({
+    width: '14',
+    height: '14',
+    viewBox: '0 0 24 24',
+    fill: 'none',
+    stroke: 'currentColor',
+    'stroke-width': '2',
+    'stroke-linejoin': 'round',
+  }))
+    svg.setAttribute(k, v);
+  const shape =
+    c.type === 'text' ? ['M6 3h8l4 4v14H6z'] : ['M4 4h16v16H4z', 'M4 16l5-5 4 4 3-3 4 4'];
+  for (const d of shape) {
+    const path = document.createElementNS(SVG, 'path');
+    path.setAttribute('d', d);
+    svg.appendChild(path);
+  }
+  box.appendChild(svg);
+  return box;
+}
+
 /** `[[` autocomplete for every editor mode; Tab accepts like Enter. */
 export function linkCompletion(): Extension {
   return [
-    autocompletion({ override: [linkSource], icons: false, activateOnTyping: true }),
+    autocompletion({
+      override: [linkSource],
+      icons: false,
+      activateOnTyping: true,
+      addToOptions: [{ render: iconBox, position: 20 }],
+    }),
     Prec.highest(keymap.of([{ key: 'Tab', run: acceptCompletion }])),
     theme,
   ];

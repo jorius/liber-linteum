@@ -1,4 +1,4 @@
-# Hand-off: M0 Scaffold — Notes In My Way
+# Hand-off: M0 Scaffold — Liber Linteum
 
 > **Date:** 2026-10-12 · **Branch:** merged into `main` (merge commit `b7532b4`; the 20 M0 commits sat on `feat/m0-scaffold` on top of `9c47e19`; branch deleted). Not pushed; no remote configured.
 > **Audience:** Jose (tech lead), or anyone continuing this work by hand without an AI agent.
@@ -72,7 +72,7 @@ Requirement IDs are referenced in commit messages, test names and code comments 
 | Q-SEC-1..4 | Encryption **post-MVP**, whole-vault; unreadable by other tools while locked (accepted); lost password = lost data, with a clear warning |
 | Q-FMT-1 | Tier B: columns, **toggles** (foldable callouts), **highlights** `==x==`, **colored text** `<span data-color>`, dividers. No callout colors / page icons |
 | Q-PG-1 | Subtitle from frontmatter `subtitle:` |
-| Q-GV-1 | Index note = page named like the folder or `index.md`; else user pick (stored in `.nimw/vault.json`); else folder summary card |
+| Q-GV-1 | Index note = page named like the folder or `index.md`; else user pick (stored in `.liber/vault.json`); else folder summary card |
 | Q-GV-2 | Root pages appear at level 0 as page cards |
 | Q-GV-3 | Single-clicking a page shows its neighborhood (outgoing links, backlinks, relationships) |
 | Q-GV-4 | Manual relationships may have an optional label |
@@ -104,7 +104,7 @@ Requirement IDs are referenced in commit messages, test names and code comments 
 | i18n | i18next + ICU message format |
 | License | **GPL-3.0-or-later** |
 | Platforms | macOS, Windows, Linux (.deb, .AppImage) **shipped simultaneously** |
-| Bundle identifier | `app.notesinmyway.desktop` — names OS config/cache dirs; **must not change after first release**. Change it now if you own a domain |
+| Bundle identifier | `app.liberlinteum.desktop` — names OS config/cache dirs; **must not change after first release**. Change it now if you own a domain |
 
 ---
 
@@ -151,10 +151,10 @@ All from the repo root.
 |---|---|---|
 | `pnpm dev` | `tauri dev`: starts Vite on `http://localhost:1420`, compiles the Rust shell, opens the window. Frontend hot-reloads; Rust changes trigger a rebuild | Dev mode has **no CSP** (`devCsp: null`) because Vite injects an inline React-refresh script |
 | `pnpm build` | `tauri build`: production installers for the current OS | Unsigned; signing is M8 |
-| `pnpm --filter @nimw/desktop tauri build --debug --no-bundle` | Fast production-CSP debug binary at `target/debug/nimw-desktop` | Use this to check the real CSP/capabilities |
+| `pnpm --filter @liber/desktop tauri build --debug --no-bundle` | Fast production-CSP debug binary at `target/debug/liber-desktop` | Use this to check the real CSP/capabilities |
 | `pnpm build:ui` | `tsc --noEmit && vite build` → `apps/desktop/dist` | Needed before cargo commands |
 | `pnpm test` | Vitest, all frontend tests | `pnpm test -- <path>` does **not** filter |
-| `pnpm --filter @nimw/desktop exec vitest run <files>` | Focused Vitest run | e.g. `... vitest run src/i18n` |
+| `pnpm --filter @liber/desktop exec vitest run <files>` | Focused Vitest run | e.g. `... vitest run src/i18n` |
 | `pnpm lint` | ESLint (incl. network ban) + `prettier --check .` | `pnpm format` fixes Prettier diffs |
 | `pnpm typecheck` | `tsc --noEmit` | |
 | `pnpm check:i18n` | Locale key-parity check (`node scripts/check-i18n.ts`, uses Node type stripping) | Exit 1 lists missing keys as `es: welcome.recent` |
@@ -194,26 +194,26 @@ Each crate is a stub with **one real, tested function** that M1+ will use. None 
 
 | Crate | Public API today | Requirement | Tests | Notes for the future |
 |---|---|---|---|---|
-| `nimw-markdown` | `extract_title(source: &str, file_stem: &str) -> String` — visible text of the first non-empty H1 (ATX or setext), inline formatting flattened, whitespace collapsed; YAML frontmatter is skipped (pulldown-cmark `ENABLE_YAML_STYLE_METADATA_BLOCKS`); else the file stem | PG-01 | 8 | Becomes the metadata extractor (frontmatter, tags, links with byte offsets) in M1. Uses `pulldown-cmark 0.13.4` without default features |
-| `nimw-vault` | `is_hidden_name(name: &str) -> bool` — true for names starting with `.` (incl. `.` and `..`) | VLT-05 | 2 | Becomes scanning, watching (`notify`), atomic CAS writes, trash, link rewrite in M1 |
-| `nimw-index` | `cache_dir_name(vault_abs_path: &Path) -> String` — first 16 hex chars of SHA-256 of the path's OS-encoded bytes (caller must canonicalize) | arch §3.1 | 2 | Becomes the SQLite/FTS5 index in M1/M5. Windows `\\?\` prefix normalization is still TODO (§15) |
-| `nimw-audio` | `enum RecordingFormat { Wav (default), Mp3 }`, `.extension()`, serde `"wav"`/`"mp3"` | AUD-02, Q-AUD-1 | 3 | Becomes cpal capture + WAV/MP3 encoding in M6 |
-| `nimw-import` | `strip_notion_id(name: &str) -> String` — removes a trailing ` <32 lowercase hex>` before end/`.`/`_` (keeps extension and `_all.csv`), last match wins, UTF-8 safe | IMP-02 | 5 | Becomes the Notion importer in M7. Edge: a name that is *only* an ID returns `""` (§15) |
+| `liber-markdown` | `extract_title(source: &str, file_stem: &str) -> String` — visible text of the first non-empty H1 (ATX or setext), inline formatting flattened, whitespace collapsed; YAML frontmatter is skipped (pulldown-cmark `ENABLE_YAML_STYLE_METADATA_BLOCKS`); else the file stem | PG-01 | 8 | Becomes the metadata extractor (frontmatter, tags, links with byte offsets) in M1. Uses `pulldown-cmark 0.13.4` without default features |
+| `liber-vault` | `is_hidden_name(name: &str) -> bool` — true for names starting with `.` (incl. `.` and `..`) | VLT-05 | 2 | Becomes scanning, watching (`notify`), atomic CAS writes, trash, link rewrite in M1 |
+| `liber-index` | `cache_dir_name(vault_abs_path: &Path) -> String` — first 16 hex chars of SHA-256 of the path's OS-encoded bytes (caller must canonicalize) | arch §3.1 | 2 | Becomes the SQLite/FTS5 index in M1/M5. Windows `\\?\` prefix normalization is still TODO (§15) |
+| `liber-audio` | `enum RecordingFormat { Wav (default), Mp3 }`, `.extension()`, serde `"wav"`/`"mp3"` | AUD-02, Q-AUD-1 | 3 | Becomes cpal capture + WAV/MP3 encoding in M6 |
+| `liber-import` | `strip_notion_id(name: &str) -> String` — removes a trailing ` <32 lowercase hex>` before end/`.`/`_` (keeps extension and `_all.csv`), last match wins, UTF-8 safe | IMP-02 | 5 | Becomes the Notion importer in M7. Edge: a name that is *only* an ID returns `""` (§15) |
 
 ### 6.3 Tauri shell (`apps/desktop/src-tauri/`)
 
 | File | Purpose |
 |---|---|
-| `Cargo.toml` | Crate `nimw-desktop`, lib name `nimw_desktop`. Deps: `tauri 2.12.3`, `serde`. Dev-deps: `serde_json`, `tauri` with `test` feature. Does **not** inherit `unsafe_code = "forbid"` (Tauri macros may emit `unsafe`) |
+| `Cargo.toml` | Crate `liber-desktop`, lib name `liber_desktop`. Deps: `tauri 2.12.3`, `serde`. Dev-deps: `serde_json`, `tauri` with `test` feature. Does **not** inherit `unsafe_code = "forbid"` (Tauri macros may emit `unsafe`) |
 | `build.rs` | `tauri_build::try_build` with an **AppManifest listing `["app_info"]`**. This switches Tauri to "every app command needs an explicit permission" mode and autogenerates `permissions/autogenerated/app_info.toml` (`allow-app-info`/`deny-app-info`) |
 | `capabilities/main.json` | The only capability: window `main` may call **only** `allow-app-info`. No `core:default`, no plugins |
 | `tauri.conf.json` | Product name, version 0.1.0, identifier, window (1280×820, min 900×600, label `main`), **production CSP** (exact string in §9), `freezePrototype: true`, `withGlobalTauri: false`, `dangerousDisableAssetCspModification: ["style-src"]`, `devCsp: null`, bundle targets `app, dmg, msi, nsis, deb, appimage`, macOS min 12.0 |
 | `Info.plist` | Merged into the macOS bundle: `CFBundleLocalizations = [en, es]` so WKWebView reports Spanish in `navigator.languages` on a Spanish Mac (unverified — §14) |
-| `src/main.rs` | Binary entry; hides the console on Windows release builds; calls `nimw_desktop::run()` |
+| `src/main.rs` | Binary entry; hides the console on Windows release builds; calls `liber_desktop::run()` |
 | `src/lib.rs` | `configure(builder)` registers commands (shared by `run()` and tests); `run()` builds with `generate_context!()` |
 | `src/commands.rs` | `AppInfo { name, version }` (camelCase serde), `build_app_info()` (name constant + `CARGO_PKG_VERSION`), `#[tauri::command] app_info()` + 2 unit tests |
 | `tests/ipc.rs` | 3 integration tests driving the **real** context + capability through Tauri's mock runtime (see §10) |
-| `icons/` | Generated from `icons/app-icon.svg` (prototype brand mark) via `pnpm --filter @nimw/desktop tauri icon src-tauri/icons/app-icon.svg`. Only desktop icons kept |
+| `icons/` | Generated from `icons/app-icon.svg` (prototype brand mark) via `pnpm --filter @liber/desktop tauri icon src-tauri/icons/app-icon.svg`. Only desktop icons kept |
 | `permissions/autogenerated/app_info.toml` | Generated by `tauri-build`; tracked by Tauri convention; do not edit |
 | `gen/schemas/` | Generated, git-ignored |
 
@@ -221,7 +221,7 @@ Each crate is a stub with **one real, tested function** that M1+ will use. None 
 
 | File | Purpose |
 |---|---|
-| `package.json` | `@nimw/desktop` (ESM). Scripts: `dev` (vite), `build`, `tauri`, `test` (vitest run), `lint`, `typecheck`, `check:i18n` |
+| `package.json` | `@liber/desktop` (ESM). Scripts: `dev` (vite), `build`, `tauri`, `test` (vitest run), `lint`, `typecheck`, `check:i18n` |
 | `index.html` | Root `<div id="root">`, no inline scripts (CSP `script-src 'self'`) |
 | `vite.config.ts` | Port 1420 strict; ignores `src-tauri` in watch; build target `es2021/chrome105/safari15`; **`assetsInlineLimit: 0`** (fonts must never become `data:` URIs, CSP `font-src 'self'`); Vitest: jsdom, `css: true`, setup file, test globs |
 | `tsconfig.json` | Strict, bundler resolution, `allowImportingTsExtensions` (for the Node-run i18n script), types `vite/client` + `node` |
@@ -251,7 +251,7 @@ Each crate is a stub with **one real, tested function** that M1+ will use. None 
 
 ### 7.1 Startup sequence (production)
 
-1. OS starts `nimw-desktop` → `main()` → `nimw_desktop::run()`.
+1. OS starts `liber-desktop` → `main()` → `liber_desktop::run()`.
 2. `run()` = `configure(Builder::default())` (registers `app_info`) + `generate_context!()` (embeds `tauri.conf.json`, the capability files and `apps/desktop/dist`).
 3. Tauri opens window `main` and serves `dist/index.html` over its custom protocol with the CSP header from `tauri.conf.json` (style-src left untouched by Tauri's nonce injection).
 4. `main.tsx`: CSS tokens + fonts load (local files, `font-src 'self'`) → `applyTheme('system')` (no `data-theme`, so CSS follows the OS) → `detectLanguage(navigator.languages)` → `initI18n(lang)` (also sets `<html lang>`) → render `<App/>`.
@@ -268,12 +268,12 @@ Welcome (version label)
             → ACL check: window "main" has capability "main" granting "allow-app-info"
                                                  capabilities/main.json + build.rs AppManifest
               → commands::app_info()             src-tauri/src/commands.rs
-              ← { "name": "Notes In My Way", "version": "0.1.0" }  (camelCase serde)
+              ← { "name": "Liber Linteum", "version": "0.1.0" }  (camelCase serde)
 ```
 
 If any link breaks:
 - **Inside Tauri:** the label is hidden **and** `console.error('app_info IPC failed', …)` appears in devtools.
-- **Plain browser (`pnpm --filter @nimw/desktop dev`):** the label is hidden silently (no Tauri internals).
+- **Plain browser (`pnpm --filter @liber/desktop dev`):** the label is hidden silently (no Tauri internals).
 - **Tests:** `tests/ipc.rs` fails (real context + ACL), `ipc.test.ts` / `ScreenRouter.test.tsx` / `useAppVersion.test.tsx` cover the TS side.
 
 ### 7.3 Theme flow
@@ -290,7 +290,7 @@ If any link breaks:
 
 ### 8.1 Add a new backend command (the pattern every milestone follows)
 
-1. **Core logic** in the right `crates/nimw-*` crate, with unit tests (no Tauri).
+1. **Core logic** in the right `crates/liber-*` crate, with unit tests (no Tauri).
 2. **Command** in `apps/desktop/src-tauri/src/commands.rs` (or a new module): `#[tauri::command] pub fn my_cmd(...) -> Result<T, Error>`; keep it a thin adapter over the crate.
 3. **Register** it in `lib.rs` → `configure()` → `generate_handler![commands::app_info, commands::my_cmd]`.
 4. **Declare** it in `build.rs` → `AppManifest::new().commands(&["app_info", "my_cmd"])`.
@@ -303,7 +303,7 @@ Forgetting step 4 or 5 → the call is rejected by the ACL; the IPC integration 
 
 ### 8.2 Add a Tauri plugin (e.g. dialog, opener for the donations link)
 
-`pnpm --filter @nimw/desktop tauri add <plugin>` then grant **only** the needed permissions in `capabilities/main.json`, scoped as tightly as possible (e.g. opener scoped to the single donations URL, arch §6.1). Network plugins (`http`, `updater`, `shell`, `websocket`, `upload`) are **banned** in `deny.toml` and must stay banned. Import the plugin's JS API only inside `src/ipc/`.
+`pnpm --filter @liber/desktop tauri add <plugin>` then grant **only** the needed permissions in `capabilities/main.json`, scoped as tightly as possible (e.g. opener scoped to the single donations URL, arch §6.1). Network plugins (`http`, `updater`, `shell`, `websocket`, `upload`) are **banned** in `deny.toml` and must stay banned. Import the plugin's JS API only inside `src/ipc/`.
 
 ### 8.3 Add a UI string
 
@@ -335,7 +335,7 @@ Principle P1 / NFR-04: the app makes **zero** network requests. Four layers enfo
 | # | Layer | Where | What it blocks | How to check |
 |---|---|---|---|---|
 | 1 | **CSP** (runtime, webview) | `tauri.conf.json` → `app.security.csp` | Any `fetch`/XHR/WebSocket/EventSource to anything but IPC; remote images/fonts/media/frames/objects; forms; `<base>` | Built app devtools: no CSP violations; a remote `<img>` would be blocked |
-| 2 | **Capability allowlist** (runtime, IPC) | `build.rs` AppManifest + `capabilities/main.json` | Any backend command or plugin not explicitly granted to window `main` | `cargo test -p nimw-desktop --test ipc` |
+| 2 | **Capability allowlist** (runtime, IPC) | `build.rs` AppManifest + `capabilities/main.json` | Any backend command or plugin not explicitly granted to window `main` | `cargo test -p liber-desktop --test ipc` |
 | 3 | **ESLint bans** (build time, TS) | `apps/desktop/eslint.config.js` | Globals `fetch`, `XMLHttpRequest`, `WebSocket`, `EventSource`; the same via `window.`/`globalThis.`/`self.` (dot, bracket, destructuring); `sendBeacon` on any object chain; importing `@tauri-apps/api`, `@tauri-apps/api/*` or `@tauri-apps/plugin-*` outside `src/ipc/` (`@tauri-apps/api/mocks` allowed only in `*.test.ts(x)`) | `pnpm lint`; `tests/network-ban.test.ts` |
 | 4 | **cargo-deny bans** (build time, Rust) | `deny.toml` | Crates `reqwest`, `ureq`, `isahc`, `curl`, `hyper`, `h2`, `attohttpc`, `tungstenite`, `tokio-tungstenite`, `tauri-plugin-{http,updater,shell,websocket,upload}` in the **desktop** dependency graph | `cargo deny check` |
 
@@ -361,11 +361,11 @@ Known limits (documented, accepted): dynamic computed keys (`const k='fetch'; wi
 
 | Location | Test | Pins |
 |---|---|---|
-| `crates/nimw-markdown/src/title.rs` | `pg_01_title_from_first_h1`, `pg_01_falls_back_to_file_stem`, `pg_01_h2_is_not_a_title`, `pg_01_ignores_hash_lines_inside_frontmatter`, `pg_01_first_h1_anywhere_in_the_page`, `pg_01_setext_h1_counts`, `pg_01_inline_formatting_is_flattened`, `pg_01_empty_h1_is_skipped` | PG-01 incl. H1 look-alikes (Review Focus 2) |
-| `crates/nimw-vault/src/lib.rs` | `vlt_05_dot_folders_are_hidden`, `vlt_05_regular_names_are_visible` | VLT-05 |
-| `crates/nimw-index/src/lib.rs` | `cache_name_is_sha256_prefix_of_path` (fixed vectors), `cache_name_is_16_lowercase_hex_chars` | arch §3.1 |
-| `crates/nimw-audio/src/lib.rs` | `aud_02_default_format_is_wav`, `aud_02_extensions`, `aud_02_serializes_lowercase` | AUD-02, Q-AUD-1 |
-| `crates/nimw-import/src/lib.rs` | `imp_02_strips_id_from_page_file`, `imp_02_strips_id_from_folder`, `imp_02_keeps_database_csv_suffix`, `imp_02_handles_dots_and_non_ascii_in_name`, `imp_02_leaves_non_ids_untouched` | IMP-02 (Review Focus 3) |
+| `crates/liber-markdown/src/title.rs` | `pg_01_title_from_first_h1`, `pg_01_falls_back_to_file_stem`, `pg_01_h2_is_not_a_title`, `pg_01_ignores_hash_lines_inside_frontmatter`, `pg_01_first_h1_anywhere_in_the_page`, `pg_01_setext_h1_counts`, `pg_01_inline_formatting_is_flattened`, `pg_01_empty_h1_is_skipped` | PG-01 incl. H1 look-alikes (Review Focus 2) |
+| `crates/liber-vault/src/lib.rs` | `vlt_05_dot_folders_are_hidden`, `vlt_05_regular_names_are_visible` | VLT-05 |
+| `crates/liber-index/src/lib.rs` | `cache_name_is_sha256_prefix_of_path` (fixed vectors), `cache_name_is_16_lowercase_hex_chars` | arch §3.1 |
+| `crates/liber-audio/src/lib.rs` | `aud_02_default_format_is_wav`, `aud_02_extensions`, `aud_02_serializes_lowercase` | AUD-02, Q-AUD-1 |
+| `crates/liber-import/src/lib.rs` | `imp_02_strips_id_from_page_file`, `imp_02_strips_id_from_folder`, `imp_02_keeps_database_csv_suffix`, `imp_02_handles_dots_and_non_ascii_in_name`, `imp_02_leaves_non_ids_untouched` | IMP-02 (Review Focus 3) |
 | `apps/desktop/src-tauri/src/commands.rs` | `app_info_reports_name_and_crate_version`, `app_info_serializes_camel_case` | IPC payload contract |
 | `apps/desktop/src-tauri/tests/ipc.rs` | `app_info_is_callable_from_the_main_window`, `unregistered_command_is_rejected`, `app_info_is_denied_outside_the_main_window` | Real context + ACL path (mutation-verified: removing `allow-app-info` makes the first fail) |
 
@@ -456,8 +456,8 @@ Update 2026-10-12 (after Ghostty got Screen Recording permission): the agent lau
 ### 14.1 Real window, production CSP — ✅ verified on macOS
 
 ```bash
-pnpm --filter @nimw/desktop tauri build --debug --no-bundle
-./target/debug/nimw-desktop
+pnpm --filter @liber/desktop tauri build --debug --no-bundle
+./target/debug/liber-desktop
 ```
 
 - [x] Welcome card renders with **Bricolage Grotesque** (title) and **Plus Jakarta Sans** (body) — bundled fonts load under the production CSP.
@@ -466,13 +466,13 @@ pnpm --filter @nimw/desktop tauri build --debug --no-bundle
 - [ ] **Keyboard focus — not verified, and a likely gap.** In WKWebView (like Safari), **Tab skips buttons unless macOS "Keyboard navigation" is enabled** (System Settings → Keyboard → Keyboard navigation; on this Mac `AppleKeyboardUIMode` is unset = off). The welcome screen has only buttons, so with the default macOS setting Tab may reach nothing. The focus-ring CSS fix is verified in Chromium; the reachability question is tracked for M1 (§15). The agent did not complete this check because synthetic Option+Tab is bound to a window switcher on this machine.
 - [ ] Devtools console check for CSP violations: not done in the real window (verified 0 violations in the browser run instead).
 
-Note: the unbundled binary shows "nimw-desktop" in the macOS menu bar; the bundled `.app` shows "Notes In My Way" with its own Dock icon (expected).
+Note: the unbundled binary shows "liber-desktop" in the macOS menu bar; the bundled `.app` shows "Liber Linteum" with its own Dock icon (expected).
 
 ### 14.2 Dark mode — ✅ verified
 - [x] Real window follows the OS appearance live: switching macOS Light ↔ Dark repainted the background and card without restart (your Dark setting was restored afterwards).
 
 ### 14.3 Spanish OS locale (Q-I18N-1) — ✅ verified (bundled app)
-- [x] `pnpm --filter @nimw/desktop tauri build --debug --bundles app`, then `open -n "target/debug/bundle/macos/Notes In My Way.app" --args -AppleLanguages '(es)'` → the UI starts in **Spanish** ("Notas privadas…", Español pressed, "Idioma"). The bundle's `Info.plist` contains `CFBundleLocalizations = [en, es]`.
+- [x] `pnpm --filter @liber/desktop tauri build --debug --bundles app`, then `open -n "target/debug/bundle/macos/Liber Linteum.app" --args -AppleLanguages '(es)'` → the UI starts in **Spanish** ("Notas privadas…", Español pressed, "Idioma"). The bundle's `Info.plist` contains `CFBundleLocalizations = [en, es]`.
 - The Rust `sys-locale` fallback is therefore **not needed** for macOS. Still to check on Windows (WebView2) and Linux (WebKitGTK, follows `LANG`).
 
 ### 14.4 CI on real runners
@@ -511,10 +511,10 @@ Note: the unbundled binary shows "nimw-desktop" in the macOS menu bar; the bundl
 ## 16. Troubleshooting
 
 ### 16.1 `cargo build`/`test` fails: "frontendDist … ../dist doesn't exist"
-`tauri::generate_context!()` embeds `apps/desktop/dist`. Run `pnpm build:ui` first (CI does). Crates under `crates/` don't need it: `cargo test -p nimw-markdown` works without a UI build.
+`tauri::generate_context!()` embeds `apps/desktop/dist`. Run `pnpm build:ui` first (CI does). Crates under `crates/` don't need it: `cargo test -p liber-markdown` works without a UI build.
 
 ### 16.2 A command call fails with "… not allowed"
-The ACL rejected it. Check the three places in recipe 8.1 steps 3–5 (handler, `build.rs` AppManifest, `capabilities/main.json`). `cargo test -p nimw-desktop --test ipc` reproduces it.
+The ACL rejected it. Check the three places in recipe 8.1 steps 3–5 (handler, `build.rs` AppManifest, `capabilities/main.json`). `cargo test -p liber-desktop --test ipc` reproduces it.
 
 ### 16.3 ESLint: "Import backend calls from src/ipc/ only."
 You imported `@tauri-apps/api…` or a plugin outside `src/ipc/`. Add a typed wrapper in `src/ipc/index.ts` and import that.
@@ -523,7 +523,7 @@ You imported `@tauri-apps/api…` or a plugin outside `src/ipc/`. Add a typed wr
 pnpm 12 blocks very fresh releases (supply-chain protection). Prefer waiting/using an older version; if you must, add an **exact-version** entry under `minimumReleaseAgeExclude` in `pnpm-workspace.yaml` with a dated comment.
 
 ### 16.5 `pnpm test -- src/foo` runs everything
-Known: arguments aren't forwarded as filters. Use `pnpm --filter @nimw/desktop exec vitest run src/foo`.
+Known: arguments aren't forwarded as filters. Use `pnpm --filter @liber/desktop exec vitest run src/foo`.
 
 ### 16.6 Styles missing in the built app but fine in `pnpm dev`
 Dev has no CSP. Check devtools for CSP violations; confirm `dangerousDisableAssetCspModification: ["style-src"]` is still present and no asset got inlined as `data:` (keep `assetsInlineLimit: 0`).
@@ -553,9 +553,9 @@ The push to `main` triggers CI (§11). Then do §14 and watch the first run (§1
 
 Concrete starting points:
 1. **Plan it first** (the way M0 was planned): a `docs/superpowers/plans/<date>-m1-vault.md` with tasks per crate.
-2. `nimw-vault`: vault scan (respect `is_hidden_name` + attachment folders + exclude globs from `.nimw/vault.json`), `notify` watcher (200 ms debounce), atomic compare-and-swap `write_file(path, content, expected_hash)`, OS trash (`trash` crate), path canonicalization + "inside vault" validation for every IPC path argument (arch §6.3).
-3. `nimw-markdown`: grow `extract_title` into full metadata extraction (frontmatter keys from arch §3.3, `#tags`, `[[links]]`/embeds with byte offsets).
-4. `nimw-index`: SQLite schema from arch §3.2 (WAL, FTS5 `unicode61 remove_diacritics 2`), incremental re-parse by `(mtime, size)`; place DB at `<OS cache dir>/nimw/<cache_dir_name>/index.sqlite` (normalize Windows `\\?\` first).
+2. `liber-vault`: vault scan (respect `is_hidden_name` + attachment folders + exclude globs from `.liber/vault.json`), `notify` watcher (200 ms debounce), atomic compare-and-swap `write_file(path, content, expected_hash)`, OS trash (`trash` crate), path canonicalization + "inside vault" validation for every IPC path argument (arch §6.3).
+3. `liber-markdown`: grow `extract_title` into full metadata extraction (frontmatter keys from arch §3.3, `#tags`, `[[links]]`/embeds with byte offsets).
+4. `liber-index`: SQLite schema from arch §3.2 (WAL, FTS5 `unicode61 remove_diacritics 2`), incremental re-parse by `(mtime, size)`; place DB at `<OS cache dir>/liber/<cache_dir_name>/index.sqlite` (normalize Windows `\\?\` first).
 5. Shell: commands `open_vault`, `create_vault`, `vault_tree`, `read_file`, `write_file`, `create_entry`, `rename_entry`, `move_entry`, `trash_entry`, events `index:progress`, `vault:changed` — each via recipe 8.1. Add `tauri-plugin-dialog` for folder pickers (recipe 8.2).
 6. UI: enable the welcome buttons, explorer sidebar (`features/explorer/`), drive `App`'s `screen` from vault state, recent vaults list (needs a settings store in the OS config dir → also persists language and theme).
 7. Carry over §15 items tagged M1.

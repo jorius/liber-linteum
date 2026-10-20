@@ -23,7 +23,7 @@ function showOnRow(path: string, icon: string | null) {
 
 /** Sets (or, with `null`, removes) an optional emoji icon (M5b §4): a page's
  *  goes in its frontmatter (`icon:`), through its open document or a
- *  compare-and-swap write; a folder's and the vault's in `.nimw/vault.json`. */
+ *  compare-and-swap write; a folder's and the vault's in `.liber/vault.json`. */
 export async function setIcon(target: IconTarget, icon: string | null): Promise<boolean> {
   if (target.kind === 'page') {
     const done = await editRelations(target.path, (text) => setFrontmatter(text, { icon }));

@@ -116,7 +116,7 @@ export async function editRelations(
 
 /** A wiki target a `[[…]]` link can hold: `#`, `|` and `^` would start a
  *  heading, an alias or a block, `[`/`]` end the link, and both kinds of
- *  quote can't be written without YAML escapes, which nimw-markdown
+ *  quote can't be written without YAML escapes, which liber-markdown
  *  doesn't index (final review m4). */
 const linkable = (target: string) =>
   !/[#|^[\]]/.test(target) && !(target.includes("'") && target.includes('"'));

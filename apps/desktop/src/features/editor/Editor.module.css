@@ -53,37 +53,37 @@
 
 /* Wide elements (M4b part 3): on a `wide` page the kinds named on the host
    (data-wide-*) escape the measure. Editor.tsx measures how far past the
-   text they may reach: --nimw-wide-m on both sides, then --nimw-wide-r on
+   text they may reach: --liber-wide-m on both sides, then --liber-wide-r on
    the right (the two match since M5b §7.2 moved the line numbers to the
    editor's edge). A rendered block is a frame reaching m past the text on
    both sides, and its content is centred in it by auto margins: a block
    that fits the text stays aligned with it, a wider one grows evenly, and
    one wider than the frame keeps its left edge and grows right, up to r
    (auto margins resolve to 0 when the content overflows). */
-.live[data-wide-tables] :global(.cm-nimw-widget[data-wide-kind='tables']),
-.live[data-wide-maths] :global(.cm-nimw-widget[data-wide-kind='maths']),
-.live[data-wide-images] :global(.cm-nimw-widget[data-wide-kind='images']),
-.live[data-wide-diagrams] :global(.cm-nimw-widget[data-wide-kind='diagrams']) {
+.live[data-wide-tables] :global(.cm-liber-widget[data-wide-kind='tables']),
+.live[data-wide-maths] :global(.cm-liber-widget[data-wide-kind='maths']),
+.live[data-wide-images] :global(.cm-liber-widget[data-wide-kind='images']),
+.live[data-wide-diagrams] :global(.cm-liber-widget[data-wide-kind='diagrams']) {
   display: flex;
   box-sizing: border-box;
-  width: calc(100% + 2 * var(--nimw-wide-m, 0px));
-  margin-left: calc(-1 * var(--nimw-wide-m, 0px));
+  width: calc(100% + 2 * var(--liber-wide-m, 0px));
+  margin-left: calc(-1 * var(--liber-wide-m, 0px));
 }
 
-.live[data-wide-tables] :global(.cm-nimw-widget[data-wide-kind='tables'] > *),
-.live[data-wide-maths] :global(.cm-nimw-widget[data-wide-kind='maths'] > *),
-.live[data-wide-images] :global(.cm-nimw-widget[data-wide-kind='images'] > *) {
+.live[data-wide-tables] :global(.cm-liber-widget[data-wide-kind='tables'] > *),
+.live[data-wide-maths] :global(.cm-liber-widget[data-wide-kind='maths'] > *),
+.live[data-wide-images] :global(.cm-liber-widget[data-wide-kind='images'] > *) {
   flex: none;
   box-sizing: border-box;
   width: max-content;
-  min-width: calc(100% - 2 * var(--nimw-wide-m, 0px));
-  max-width: calc(100% - var(--nimw-wide-m, 0px) + var(--nimw-wide-r, 0px));
+  min-width: calc(100% - 2 * var(--liber-wide-m, 0px));
+  max-width: calc(100% - var(--liber-wide-m, 0px) + var(--liber-wide-r, 0px));
   margin: 0 auto;
 }
 
 /* A diagram's SVG is sized by the box it gets (width 100%, capped at its
    own size) and centred in it: the box takes the whole frame. */
-.live[data-wide-diagrams] :global(.cm-nimw-widget[data-wide-kind='diagrams'] > *) {
+.live[data-wide-diagrams] :global(.cm-liber-widget[data-wide-kind='diagrams'] > *) {
   flex: 1 1 auto;
   min-width: 0;
 }
@@ -92,12 +92,12 @@
    editor's left padding to its right one, its columns sharing the room.
    TableScroll marks its frame (data-wide-full) once it measures wider than
    the text. */
-.live[data-wide-tables] :global(.cm-nimw-widget[data-wide-kind='tables'][data-wide-full] > *) {
+.live[data-wide-tables] :global(.cm-liber-widget[data-wide-kind='tables'][data-wide-full] > *) {
   width: 100%;
   max-width: 100%;
 }
 
-.live[data-wide-tables] :global(.cm-nimw-widget[data-wide-kind='tables'][data-wide-full] table) {
+.live[data-wide-tables] :global(.cm-liber-widget[data-wide-kind='tables'][data-wide-full] table) {
   width: 100%;
 }
 
@@ -110,20 +110,20 @@
 }
 
 /* Code, and a table, maths or diagram being edited: its lines share one
-   box as wide as the block's widest line (--nimw-ch, set by Live Preview),
+   box as wide as the block's widest line (--liber-ch, set by Live Preview),
    within the same reach, placed the same way. */
 .live[data-wide-tables] :global(.cm-line[data-wide-src='tables']),
 .live[data-wide-code] :global(.cm-line[data-wide-src='code']),
 .live[data-wide-diagrams] :global(.cm-line[data-wide-src='diagrams']),
 .live[data-wide-maths] :global(.cm-line[data-wide-src='maths']) {
-  --nimw-w: clamp(
+  --liber-w: clamp(
     100%,
-    calc(var(--nimw-ch, 0) * 1ch + 16px),
-    calc(100% + var(--nimw-wide-m, 0px) + var(--nimw-wide-r, 0px))
+    calc(var(--liber-ch, 0) * 1ch + 16px),
+    calc(100% + var(--liber-wide-m, 0px) + var(--liber-wide-r, 0px))
   );
   box-sizing: border-box;
-  width: var(--nimw-w);
-  margin-left: calc(-1 * min(var(--nimw-wide-m, 0px), (var(--nimw-w) - 100%) / 2));
+  width: var(--liber-w);
+  margin-left: calc(-1 * min(var(--liber-wide-m, 0px), (var(--liber-w) - 100%) / 2));
 }
 
 .source :global(.cm-content) {
@@ -225,15 +225,7 @@
 }
 
 .linkPickerInput {
-  box-sizing: border-box;
   width: 100%;
-  height: 32px;
-  padding: 0 8px;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-sm);
-  background: var(--color-surface);
-  color: var(--color-text);
-  font: 14px var(--font-body);
 }
 
 .linkPickerInput:focus {
@@ -258,6 +250,30 @@
   color: var(--color-text);
   font: 14px var(--font-body);
   cursor: pointer;
+}
+
+/* A page option (round 3b §8.2): its icon box beside the title and path. */
+.linkPickerPage {
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr);
+  column-gap: 8px;
+  align-items: center;
+}
+
+.linkPickerPage > :not(.linkPickerIcon) {
+  grid-column: 2;
+}
+
+.linkPickerIcon {
+  grid-row: 1 / span 2;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  font-size: 15px;
+  line-height: 1;
+  color: var(--color-text-muted);
 }
 
 .linkPickerOption[aria-selected='true'] {

@@ -33,7 +33,7 @@ const loaded = (el: HTMLMediaElement, duration: number) => {
 
 describe('AudioPlayer (M6 §4)', () => {
   it('plays and pauses, names the clip, and tells the position', async () => {
-    render(<AudioPlayer src="nimw-asset://localhost/a.wav" name="a.wav" />);
+    render(<AudioPlayer src="liber-asset://localhost/a.wav" name="a.wav" />);
     const audio = document.querySelector('audio')!;
     expect(audio).toHaveAttribute('preload', 'metadata');
     expect(audio).not.toHaveAttribute('controls');
@@ -61,8 +61,8 @@ describe('AudioPlayer (M6 §4)', () => {
   it('plays one clip at a time, and stops when the page changes or it goes', async () => {
     const { unmount } = render(
       <>
-        <AudioPlayer src="nimw-asset://localhost/a.wav" name="a.wav" />
-        <AudioPlayer src="nimw-asset://localhost/b.wav" name="b.wav" />
+        <AudioPlayer src="liber-asset://localhost/a.wav" name="a.wav" />
+        <AudioPlayer src="liber-asset://localhost/b.wav" name="b.wav" />
       </>,
     );
     const [a, b] = [...document.querySelectorAll('audio')];
@@ -78,7 +78,7 @@ describe('AudioPlayer (M6 §4)', () => {
   });
 
   it('has no axe violations', async () => {
-    const { container } = render(<AudioPlayer src="nimw-asset://localhost/a.wav" name="a.wav" />);
+    const { container } = render(<AudioPlayer src="liber-asset://localhost/a.wav" name="a.wav" />);
     loaded(document.querySelector('audio')!, 12);
     const violations = (await axe.run(container)).violations;
     expect(violations.map((v) => v.id)).toEqual([]);

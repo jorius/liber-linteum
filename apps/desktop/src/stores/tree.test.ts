@@ -1,6 +1,15 @@
 import { describe, expect, it } from 'vitest';
 import type { TreeNode } from '../ipc';
-import { childrenByParent, joinPath, nameOf, nextFreeName, parentOf, remap } from './tree';
+import {
+  childrenByParent,
+  folderPageOf,
+  isFolderPage,
+  joinPath,
+  nameOf,
+  nextFreeName,
+  parentOf,
+  remap,
+} from './tree';
 
 const nodes: TreeNode[] = [
   { path: 'Projects', kind: 'folder' },
@@ -37,5 +46,29 @@ describe('tree helpers', () => {
     expect(remap('a/b/c.md', 'a/b', 'x')).toBe('x/c.md');
     expect(remap('a/bc.md', 'a/b', 'x')).toBeNull();
     expect(remap('z.md', 'a', 'b')).toBeNull();
+  });
+});
+
+describe('folder pages (round 3b §6.1)', () => {
+  const list = (paths: string[]): TreeNode[] =>
+    paths.map((path) => ({ path, kind: path.endsWith('.md') ? 'page' : 'folder' }));
+
+  it('folderPageOf finds X/X.md only, with the exact name', () => {
+    const children = childrenByParent(
+      list(['X', 'X/X.md', 'Y', 'Y/y.md', 'Z', 'Z.md', 'A/B', 'A/B/B.md']),
+    );
+    expect(folderPageOf('X', children)).toBe('X/X.md');
+    expect(folderPageOf('Y', children)).toBeNull();
+    expect(folderPageOf('Z', children)).toBeNull();
+    expect(folderPageOf('A/B', children)).toBe('A/B/B.md');
+    expect(folderPageOf('', children)).toBeNull();
+  });
+
+  it('isFolderPage needs a parent of the same name', () => {
+    expect(isFolderPage('X/X.md')).toBe(true);
+    expect(isFolderPage('A/B/B.md')).toBe(true);
+    expect(isFolderPage('X/x.md')).toBe(false);
+    expect(isFolderPage('X.md')).toBe(false);
+    expect(isFolderPage('X/X.txt')).toBe(false);
   });
 });

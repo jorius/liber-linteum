@@ -36,6 +36,7 @@ export type ErrorKind =
   | 'notAFile'
   | 'tooLarge'
   | 'notAText'
+  | 'invalidInput'
   | 'io';
 
 export interface CommandError {
@@ -129,6 +130,8 @@ export interface RenameOutcome {
   updatedFiles: string[];
   updatedLinks: number;
   failed: [string, string][];
+  /** Round 3b §6.3: the folder page's second rename, in paths after the first. */
+  pair?: [string, string] | null;
 }
 
 export type Theme = 'system' | 'light' | 'dark';
@@ -204,8 +207,16 @@ export interface Settings {
   autoSave: boolean;
   /** The sidebar is collapsed (M5b §2.5). */
   sidebarCollapsed: boolean;
+  /** The sidebar's width in px (round 3 §2.1), 200–560; 270 by default. */
+  sidebarWidth: number;
   /** Where the floating Edit / Global View / Search button sits (M5b §2.2). */
   actionButton: ActionButtonPlace;
+  /** Spell checking in the editor (spell checking spec §4). */
+  spellcheck: boolean;
+  /** The dictionaries checked, in order; `null` = the app language's. */
+  spellDictionaries: string[] | null;
+  /** Dictionaries imported from disk (changed only by the spell commands). */
+  importedDictionaries: { id: string; name: string }[];
 }
 
 export type ActionButtonPlace = 'bottomRight' | 'bottomLeft' | 'topRight';
@@ -259,7 +270,10 @@ export interface SettingsPatch {
   showAttachmentPaths?: boolean;
   autoSave?: boolean;
   sidebarCollapsed?: boolean;
+  sidebarWidth?: number;
   actionButton?: ActionButtonPlace;
+  spellcheck?: boolean;
+  spellDictionaries?: string[];
 }
 
 export interface SettingsResponse {
@@ -276,7 +290,7 @@ export interface WriteResult {
   hash: string;
 }
 
-/** Mirrors `nimw_markdown::LinkKind::as_str`. */
+/** Mirrors `liber_markdown::LinkKind::as_str`. */
 export type LinkKind = 'wiki' | 'embed' | 'markdown' | 'markdown_image' | 'related' | 'cover';
 
 export interface LinkTarget {
@@ -371,7 +385,7 @@ export interface VaultSettings {
   attachments: { mode: AttachmentMode; path: string };
   /** Obsidian's `attachmentFolderPath` when set (it wins unless overridden). */
   obsidian: string | null;
-  /** NIMW's place wins over Obsidian's (M4b §5). */
+  /** Liber Linteum's place wins over Obsidian's (M4b §5). */
   overrideObsidian: boolean;
   /** The vault's default page width (`null`: the app's; M4b part 2 §1). */
   pageWidth: PageWidth | null;
@@ -383,9 +397,9 @@ export interface VaultSettings {
   coverSides: Record<string, 'left' | 'right'>;
   /** Side covers' own strip widths in px (§3). */
   coverWidths: Record<string, number>;
-  /** NIMW's own link format for new attachments (M4b part 3 §8). */
+  /** Liber Linteum's own link format for new attachments (M4b part 3 §8). */
   attachmentLinkFormat?: LinkFormat | null;
-  /** Obsidian's `newLinkFormat` (applies while NIMW has none of its own). */
+  /** Obsidian's `newLinkFormat` (applies while Liber Linteum has none of its own). */
   obsidianLinkFormat?: LinkFormat | null;
 }
 
@@ -601,6 +615,8 @@ export const settingsGet = () => call<SettingsResponse>('settings_get');
 export const settingsSet = (patch: SettingsPatch) => call<Settings>('settings_set', { patch });
 export const vaultsRecent = () => call<RecentVault[]>('vaults_recent');
 export const vaultsForget = (path: string) => call<void>('vaults_forget', { path });
+/** Shows a recent vault's folder in Finder or Explorer (R3 §7). */
+export const vaultsReveal = (path: string) => call<void>('vaults_reveal', { path });
 export const pageRead = (path: string) =>
   fileName !== null ? fileText(path) : call<PageText>('page_read', { path });
 export const pageWrite = (path: string, text: string, expectedHash: string) =>
@@ -648,8 +664,8 @@ export const attachmentPaste = (page: string, name: string, bytes: Uint8Array) =
   ipcCall(() =>
     invoke<Attached>('attachment_paste', bytes, {
       headers: {
-        'x-nimw-page': encodeURIComponent(page),
-        'x-nimw-name': encodeURIComponent(name),
+        'x-liber-page': encodeURIComponent(page),
+        'x-liber-name': encodeURIComponent(name),
       },
     }),
   );
@@ -740,6 +756,36 @@ export const folderSortSet = (path: string, sort: FolderSort) =>
   call<null>('folder_sort_set', { path, sort });
 /** The vault's own emoji (M5b §4); `null` removes it. */
 export const vaultIconSet = (icon: string | null) => call<null>('vault_icon_set', { icon });
+// ---- spell checking (local dictionaries only) ----
+
+export interface SpellDictionary {
+  id: string;
+  name: string;
+  bundled: boolean;
+  /** False when an imported dictionary's files are gone or don't parse. */
+  available: boolean;
+}
+
+/** Whether each word is spelled right; `lang` (the UI's language) picks the
+ *  default dictionary when none is chosen. */
+export const spellCheck = (words: string[], lang: string) =>
+  call<boolean[]>('spell_check', { words, lang });
+export const spellSuggest = (word: string, lang: string) =>
+  call<string[]>('spell_suggest', { word, lang });
+export const spellDictionaries = () => call<SpellDictionary[]>('spell_dictionaries');
+/** Picks a .aff/.dic pair on disk; `null` when cancelled. */
+export const spellImport = () => call<SpellDictionary | null>('spell_import');
+export const spellRemove = (id: string) => call<void>('spell_remove', { id });
+/** Adds a word to the open vault's dictionary. */
+export const spellAddWord = (word: string) => call<void>('spell_add_word', { word });
+/** Ignores a word until the vault closes. */
+export const spellIgnore = (word: string) => call<void>('spell_ignore', { word });
+export const spellWords = () => call<string[]>('spell_words');
+export const spellRemoveWord = (word: string) => call<void>('spell_remove_word', { word });
+/** The open vault's own dictionaries; `null` = the app's. */
+export const spellVaultGet = () => call<string[] | null>('spell_vault_get');
+export const spellVaultSet = (ids: string[] | null) => call<void>('spell_vault_set', { ids });
+
 /** The vault's favorites, in the order they were added (M5b §19). */
 export const favoritesGet = () => call<string[]>('favorites_get');
 /** Replaces the favorites; Rust drops missing entries and repeats and
@@ -921,13 +967,13 @@ export const entryArchive = (path: string) => call<RenameOutcome>('entry_archive
 export const archiveRestore = (path: string, keepBoth: boolean) =>
   call<RenameOutcome>('archive_restore', { path, keepBoth });
 
-/** URL of a vault file for <img>/<audio> through the `nimw-asset:` protocol
+/** URL of a vault file for <img>/<audio> through the `liber-asset:` protocol
  *  (M2a §2.5); WebView2 on Windows reaches custom protocols over http. */
 export function assetUrl(path: string): string {
   const encoded = path.split('/').map(encodeURIComponent).join('/');
   return /Windows/i.test(navigator.userAgent)
-    ? `http://nimw-asset.localhost/${encoded}`
-    : `nimw-asset://localhost/${encoded}`;
+    ? `http://liber-asset.localhost/${encoded}`
+    : `liber-asset://localhost/${encoded}`;
 }
 
 /** URL of a linked file outside the vault (M4b part 3 §9): its absolute
@@ -936,8 +982,8 @@ export function assetUrl(path: string): string {
 export function externalAssetUrl(path: string): string {
   const encoded = `.external/${encodeURIComponent(path)}`;
   return /Windows/i.test(navigator.userAgent)
-    ? `http://nimw-asset.localhost/${encoded}`
-    : `nimw-asset://localhost/${encoded}`;
+    ? `http://liber-asset.localhost/${encoded}`
+    : `liber-asset://localhost/${encoded}`;
 }
 
 // ---- events ----
@@ -991,7 +1037,7 @@ export const onNotionProgress = (
 /** View → Search… in the app menu (M5 §4). */
 export const onMenuSearch = (cb: () => void): Promise<UnlistenFn> =>
   listen<null>('menu:search', () => cb(), mine());
-/** Notes In My Way → Settings… (M5b §2.1). */
+/** Liber Linteum → Settings… (M5b §2.1). */
 export const onMenuSettings = (cb: () => void): Promise<UnlistenFn> =>
   listen<null>('menu:settings', () => cb(), mine());
 /** Vault → Open Vault… / Close Vault (M5b §2.1). */

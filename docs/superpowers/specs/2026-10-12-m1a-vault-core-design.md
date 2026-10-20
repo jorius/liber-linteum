@@ -12,7 +12,7 @@
 M1a turns the M0 crate stubs into a working, fully tested vault engine: open an existing (Obsidian) vault without changing it, index it, keep the index in sync with changes made by other programs, and perform file operations — create, rename/move with link rewriting, trash — safely.
 
 Success means:
-1. Opening any fixture vault changes **no** file bytes or mtimes and creates no `.nimw/` folder (VLT-02).
+1. Opening any fixture vault changes **no** file bytes or mtimes and creates no `.liber/` folder (VLT-02).
 2. Titles, tags and links are extracted and resolved by Obsidian's rules (PG-01, PG-04, PG-05).
 3. External creates/edits/deletes/renames are reflected in the index without restart (VLT-04).
 4. Renaming or moving a page, attachment or folder rewrites every reference so no link changes target (EXP-02, EXP-04).
@@ -32,21 +32,21 @@ Success means:
 | Ambiguity | Rewrite affected links to the **shortest form that still resolves to the same file** |
 | Benchmarks | Yes: criterion benches on a generated 10k-note vault |
 | Test data | Synthetic fixture vaults in the repo only (no personal vaults) |
-| Orchestration | New crate **`nimw-session`** composing vault + markdown + index |
+| Orchestration | New crate **`liber-session`** composing vault + markdown + index |
 
 ---
 
 ## 2. Crates and dependencies
 
 ```
-nimw-session ──► nimw-vault      (filesystem only)
-      │     ──► nimw-markdown   (pure parsing, no I/O)
-      └────► nimw-index      (SQLite cache) ──► nimw-markdown (record types only)
+liber-session ──► liber-vault      (filesystem only)
+      │     ──► liber-markdown   (pure parsing, no I/O)
+      └────► liber-index      (SQLite cache) ──► liber-markdown (record types only)
 ```
 
-- `nimw-vault` and `nimw-markdown` depend on no internal crate.
-- No crate depends on Tauri (M0 rule). `apps/desktop/src-tauri` will depend on `nimw-session` only (M1b).
-- `nimw-audio` and `nimw-import` are untouched in M1a.
+- `liber-vault` and `liber-markdown` depend on no internal crate.
+- No crate depends on Tauri (M0 rule). `apps/desktop/src-tauri` will depend on `liber-session` only (M1b).
+- `liber-audio` and `liber-import` are untouched in M1a.
 
 ### 2.1 New third-party crates (all GPL-3.0-compatible licenses, no network code)
 
@@ -63,7 +63,7 @@ nimw-session ──► nimw-vault      (filesystem only)
 | `dunce` | 1.0.x | CC0/MIT-0/Apache-2.0 | vault | strip Windows `\\?\` prefixes |
 | `unicode-normalization` | 0.1.x | MIT/Apache-2.0 | markdown | NFC keys for name matching |
 | `thiserror` | 2.0.x | MIT/Apache-2.0 | all | error enums |
-| `serde`, `serde_json` | 1.x | MIT/Apache-2.0 | vault | `.nimw/vault.json`, `.obsidian/app.json` |
+| `serde`, `serde_json` | 1.x | MIT/Apache-2.0 | vault | `.liber/vault.json`, `.obsidian/app.json` |
 | `rayon` | 1.12.x | MIT/Apache-2.0 | session | parallel parsing |
 | dev: `tempfile` 3.27.x, `proptest` 1.12.x, `criterion` 0.8.x | | MIT/Apache-2.0 | all | tests/benches |
 
@@ -71,7 +71,7 @@ nimw-session ──► nimw-vault      (filesystem only)
 
 ---
 
-## 3. `nimw-vault` — filesystem only
+## 3. `liber-vault` — filesystem only
 
 All paths crossing the crate boundary are **vault-relative**.
 
@@ -84,7 +84,7 @@ All paths crossing the crate boundary are **vault-relative**.
 ### 3.2 `Vault`
 - `Vault::open(root: &Path) -> Result<Vault>`:
   - canonicalizes `root` and strips Windows `\\?\` (via `dunce`);
-  - reads, if present: `.obsidian/app.json` (only `attachmentFolderPath`) and `.nimw/vault.json` (arch §3.1 schema; only `exclude` and `attachments` are used in M1a);
+  - reads, if present: `.obsidian/app.json` (only `attachmentFolderPath`) and `.liber/vault.json` (arch §3.1 schema; only `exclude` and `attachments` are used in M1a);
   - **writes nothing**.
 - `root() -> &Path`, `attachment_dirs() -> AttachmentPolicy` (the resolved policy, used by the index to mark attachment folders hidden from the Global View later).
 - `scan() -> Result<Vec<Entry>>` where `Entry { path: VaultPath, kind: EntryKind (File|Dir), mtime_ns: i128, size: u64 }`:
@@ -95,7 +95,7 @@ All paths crossing the crate boundary are **vault-relative**.
 - `write_cas(path, content: &[u8], expected: Option<Hash>) -> Result<Hash>`:
   - `expected = Some(h)`: fails with `Conflict { current: Hash }` if the file's current hash ≠ `h`;
   - `expected = None`: create-only, fails with `AlreadyExists` if the path exists;
-  - writes to a temp file in the **same directory** (`.<name>.nimw-tmp-<random>`, hidden so watchers/scans skip it), `fsync`s it, renames over the target, `fsync`s the directory (Unix); on any error the temp file is removed;
+  - writes to a temp file in the **same directory** (`.<name>.liber-tmp-<random>`, hidden so watchers/scans skip it), `fsync`s it, renames over the target, `fsync`s the directory (Unix); on any error the temp file is removed;
   - preserves the existing file's permissions on overwrite.
 - `create_dir(path)`, `rename(from, to)` (fails with `AlreadyExists` if `to` exists; case-only renames on case-insensitive filesystems are supported via a two-step rename through a temp name), `trash(path)` (via `trash` crate; `NotFound` if missing).
 - `Hash`: BLAKE3, 32 bytes; `to_hex()`, `from_hex()`.
@@ -106,11 +106,11 @@ All paths crossing the crate boundary are **vault-relative**.
 - Dropping the `Watcher` stops watching.
 
 ### 3.4 Errors
-`VaultError::{NotFound(path), AlreadyExists(path), Conflict { path, current: Hash }, OutsideVault(String), NotUtf8(path), InvalidConfig { file, reason }, Io { path, source }}`. A malformed `.nimw/vault.json` or `.obsidian/app.json` is **not** fatal: `open` succeeds with defaults and returns the problem in `Vault::warnings()`.
+`VaultError::{NotFound(path), AlreadyExists(path), Conflict { path, current: Hash }, OutsideVault(String), NotUtf8(path), InvalidConfig { file, reason }, Io { path, source }}`. A malformed `.liber/vault.json` or `.obsidian/app.json` is **not** fatal: `open` succeeds with defaults and returns the problem in `Vault::warnings()`.
 
 ---
 
-## 4. `nimw-markdown` — pure parsing
+## 4. `liber-markdown` — pure parsing
 
 ### 4.1 Output types
 ```rust
@@ -157,7 +157,7 @@ pub fn parse_page(source: &str, file_stem: &str) -> PageMeta;
 - **Excerpt:** plain text of paragraphs and list items after the first H1 (or from the start if there is none), whitespace collapsed, truncated to 200 chars on a char boundary with `…`.
 - **has_image / has_audio:** any Embed / MarkdownImage / Markdown link whose target extension (case-insensitive) is in `{png, jpg, jpeg, gif, webp, svg, avif, bmp}` / `{wav, mp3, m4a}`.
 
-### 4.4 Link resolution (PG-05) — `nimw_markdown::resolve`
+### 4.4 Link resolution (PG-05) — `liber_markdown::resolve`
 A pure function over the set of vault file paths so it can be used by both the index and the rename planner:
 
 ```rust
@@ -175,10 +175,10 @@ Rules:
 
 ---
 
-## 5. `nimw-index` — SQLite cache
+## 5. `liber-index` — SQLite cache
 
 ### 5.1 Location and lifecycle
-- `Index::open(db_path) -> Result<Index>`; the caller (session) passes `<OS cache dir>/nimw/<cache_dir_name(vault)>/index.sqlite`.
+- `Index::open(db_path) -> Result<Index>`; the caller (session) passes `<OS cache dir>/liber/<cache_dir_name(vault)>/index.sqlite`.
 - `PRAGMA journal_mode=WAL; foreign_keys=ON`. `meta.schema_version` ≠ `SCHEMA_VERSION` (1) or open/integrity failure → delete the file (and `-wal`/`-shm`) and create fresh. The index is a cache; nothing is lost.
 
 ### 5.2 Schema v1
@@ -201,7 +201,7 @@ Rules:
 
 ---
 
-## 6. `nimw-session` — one open vault
+## 6. `liber-session` — one open vault
 
 ### 6.1 Lifecycle
 ```rust
@@ -218,7 +218,7 @@ impl VaultSession {
 ```
 
 ### 6.2 Opening (incremental index)
-1. `Vault::open`, then `Index::open(cache_root/nimw/<cache_dir_name>/index.sqlite)`.
+1. `Vault::open`, then `Index::open(cache_root/liber/<cache_dir_name>/index.sqlite)`.
 2. `scan()`; diff against `files` by `(mtime_ns, size)`.
 3. New/changed entries: read + hash; same hash as stored → update stat only; otherwise `.md` → parse (in parallel with `rayon`), others → attachment row.
 4. Rows missing from disk → removed.
@@ -271,7 +271,7 @@ impl VaultSession {
 - Tests copy a fixture into a `tempfile::TempDir` before any mutating test; the committed fixtures are never written.
 
 ### 7.2 Required tests (named with requirement IDs)
-- **VLT-02:** open every fixture; assert all file bytes + mtimes unchanged and no `.nimw/` created.
+- **VLT-02:** open every fixture; assert all file bytes + mtimes unchanged and no `.liber/` created.
 - **PG-01/04/05:** one test per §4 rule (titles, tags, each link form, each resolution rule, tie-breaks, unresolved → resolved on create).
 - **EXP-02/04:** rename page, attachment, folder; move between folders; ambiguity-inducing rename; links from moved files; encoded/angle/alias/heading preservation; frontmatter `related`/`cover` rewrite; `rewrite_links = false`; conflict retry (file changed between plan and write) and persistent-conflict reporting.
 - **EXP-03:** trash removes from disk (to OS trash) and index; links become unresolved.
@@ -279,7 +279,7 @@ impl VaultSession {
 - **NFR-08:** `write_cas` never leaves partial content (proptest + injected failure after temp write); temp files never appear in scans/trees.
 - **Property tests:** a rename-with-rewrite changes no bytes outside link target ranges; every link's resolved target is preserved (mapped through the rename) across random renames in random vaults.
 
-### 7.3 Benchmarks (`crates/nimw-session/benches/`, criterion)
+### 7.3 Benchmarks (`crates/liber-session/benches/`, criterion)
 - Deterministic generator: 10,000 notes, ~400 folders up to 6 levels, avg 8 links/note (mix of kinds), 3 tags/note, frontmatter on 50%, 1,000 attachments.
 - Benches: first full index; reopen with no changes; re-index one modified file; rename a page with 100 backlinks.
 - Targets (NFR-03): first index < 30 s, single-file re-index < 100 ms. Results are recorded in the M1a hand-off; regressions are reviewed, not CI-gated (CI runners are noisy).
@@ -290,12 +290,12 @@ impl VaultSession {
 
 - Tauri commands, events, capabilities; settings store (`settings.json`, language/theme persistence, recent vaults, "rewrite links" setting); welcome actions; explorer UI; read-only page view; toasts; keyboard reachability decision — **M1b**.
 - FTS / search — M5. Global View queries (`gv_level`, aggregation) — M3. Card positions (`layout.json`) — M3. Index-note picks — M3.
-- Writing `.nimw/vault.json` (M1a only reads it).
+- Writing `.liber/vault.json` (M1a only reads it).
 - Undo of renames.
 
 ## 9. Spec self-review notes
 - Every success criterion in §1 maps to tests in §7.2/§7.3.
-- Section dependencies are acyclic (§2). The rename planner depends only on `nimw-markdown::resolve` + index reads, so it is unit-testable without a filesystem.
+- Section dependencies are acyclic (§2). The rename planner depends only on `liber-markdown::resolve` + index reads, so it is unit-testable without a filesystem.
 - Ambiguities resolved explicitly: Unicode/case handling (paths stored as on disk, NFC+lowercase only for matching — §3.1, §4.4.1), tie-break order (§4.4.3), crash ordering (§6.4), own-write window (§6.5, 2 s), batch size (§6.2, 500), progress cadence (§6.2, 200).
 
 ---
@@ -310,6 +310,6 @@ These supersede the sections they name; the M1a plan (`docs/superpowers/plans/20
 4. **Markdown destinations (§6.4):** a plain destination that needs a space is %-encoded instead of `<…>`-wrapped (wrapping would break a `#heading` suffix); encoded stays encoded, angle stays angle.
 5. **Session events (§6.1/§6.3):** `create_page`, `create_folder`, `rename`, `trash` return results and do not emit `Changed`; `Changed` is only for external changes.
 6. **Fixtures (§7.1):** `.trash/` replaces the `.git/` stub (git cannot commit a nested `.git`); NFD names are created at test runtime (git on macOS re-normalizes names); `.gitattributes` keeps fixture bytes exact.
-7. **Test kit:** a test-only crate `nimw-testkit` (fixture copies, snapshots, polling helpers, 10k-note generator).
-8. **Watcher debouncing (final review, supersedes the library choice in amendment 1):** `notify-debouncer-mini` silently drops path-less "rescan needed" signals, so `nimw-vault` debounces raw `notify` 8.2 events itself (200 ms of quiet, batches capped at 2 s). Rescan flags, backend errors and events on the vault root become `Overflow`; a `Changed` on an already-indexed folder reconciles its subtree.
+7. **Test kit:** a test-only crate `liber-testkit` (fixture copies, snapshots, polling helpers, 10k-note generator).
+8. **Watcher debouncing (final review, supersedes the library choice in amendment 1):** `notify-debouncer-mini` silently drops path-less "rescan needed" signals, so `liber-vault` debounces raw `notify` 8.2 events itself (200 ms of quiet, batches capped at 2 s). Rescan flags, backend errors and events on the vault root become `Overflow`; a `Changed` on an already-indexed folder reconciles its subtree.
 9. **Rename safety (final review):** names created or renamed by the app may not contain `/ \ # | ^ [ ] : * " < > ?`, control characters, or start with `.`; every rewrite is checked before writing (no overlapping edits; same links, each still resolving to its file) and symlinked notes are never written — refused files are reported in `RenameOutcome.failed`.

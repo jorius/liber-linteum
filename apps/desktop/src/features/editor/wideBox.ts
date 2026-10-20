@@ -2,7 +2,7 @@
 // measure while the kinds chosen in Settings escape it, centred on the text
 // column, up to the editor's width. Live Preview's host says which kinds
 // (data-wide-*) and how far they may reach past the text on each side
-// (--nimw-wide-m, --nimw-wide-r); the CSS in Editor.module.css does the rest.
+// (--liber-wide-m, --liber-wide-r); the CSS in Editor.module.css does the rest.
 import type { PageWidth, WideElements } from '../../ipc';
 
 /** Live Preview's side padding around the measure (Editor.module.css). */

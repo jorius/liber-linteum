@@ -96,7 +96,7 @@ test('a dragged card keeps its place after a reload (GV-31); Reset layout restor
   expect(moved.y - before!.y).toBeGreaterThan(30);
   // Saved after the debounce; a reload (restart) reads it back.
   await expect
-    .poll(() => page.evaluate(() => localStorage.getItem('nimw-e2e-layout') ?? ''))
+    .poll(() => page.evaluate(() => localStorage.getItem('liber-e2e-layout') ?? ''))
     .toContain('Beta');
   await page.reload();
   await page.getByRole('button', { name: /^vault/ }).click();
@@ -125,11 +125,11 @@ test('a drag is saved under its own level even when the breadcrumb is clicked at
   await expect(card(page, 'Beta')).toBeVisible();
   await expect
     .poll(() =>
-      page.evaluate(() => JSON.parse(localStorage.getItem('nimw-e2e-layout') ?? '{}') as object),
+      page.evaluate(() => JSON.parse(localStorage.getItem('liber-e2e-layout') ?? '{}') as object),
     )
     .toHaveProperty(['Alpha', 'Alpha/One.md']);
   const layout = await page.evaluate(
-    () => JSON.parse(localStorage.getItem('nimw-e2e-layout') ?? '{}') as Record<string, object>,
+    () => JSON.parse(localStorage.getItem('liber-e2e-layout') ?? '{}') as Record<string, object>,
   );
   expect(layout[''] ?? {}).not.toHaveProperty(['Alpha/One.md']);
 });

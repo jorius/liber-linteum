@@ -1,7 +1,7 @@
 # M7 — Notion importer: Design
 
 **Status:** Jose answered the three open questions on 2026-10-18. Everything else below is a ruling taken for him; they are listed in §12 for him to confirm.
-- **Grounding:** product spec §9.3 (IMP-01–IMP-04, Q-IMP-1 and Q-IMP-2, all DECIDED). `crates/nimw-import` (`strip_notion_id`) exists since M0.
+- **Grounding:** product spec §9.3 (IMP-01–IMP-04, Q-IMP-1 and Q-IMP-2, all DECIDED). `crates/liber-import` (`strip_notion_id`) exists since M0.
 - **Branch:** `feat/m7-import`, from `feat/batch6` (`de2378e`, the same as `main`).
 
 ## 1. Goal
@@ -46,7 +46,7 @@ Nothing is written before the user has seen what will happen.
 - **Keyboard:** the steps are in tab order; Enter on the last enabled button acts; Escape cancels the dialog (and asks to cancel a running import).
 - **Floors:** axe-clean in light and dark; i18n in en and es; the Safari 15 floor.
 
-## 4. Reading the zip (`nimw-import::archive`)
+## 4. Reading the zip (`liber-import::archive`)
 
 Every byte of the zip is untrusted input.
 
@@ -57,7 +57,7 @@ Every byte of the zip is untrusted input.
   - symlink entries (Unix mode `S_IFLNK`);
   - directory-only entries are ignored, since folders come from file paths.
 
-  Backslashes are read as separators. Each refused entry becomes a warning. Names never reach the disk as given anyway: every component is rebuilt by §5 and written through `nimw-vault`'s `VaultPath`.
+  Backslashes are read as separators. Each refused entry becomes a warning. Names never reach the disk as given anyway: every component is rebuilt by §5 and written through `liber-vault`'s `VaultPath`.
 - **Limits** (bomb protection), refusing the export with a clear error:
 
   | Limit | Value |
@@ -72,7 +72,7 @@ Every byte of the zip is untrusted input.
 - **Encodings:** UTF-8 names when flagged, otherwise the zip crate's CP437 decoding. Markdown and CSV that isn't valid UTF-8 is decoded lossily, with a warning. Notion writes UTF-8, with a BOM on CSVs, which is stripped.
 - **Where it works:** straight from the archive. Only nested part zips go to temp files, which are deleted when the import ends.
 
-## 5. Names (`nimw-import::names`)
+## 5. Names (`liber-import::names`)
 
 For every path component:
 1. **Strip** Notion's ` <32 hex>` id (`strip_notion_id`, M0).
@@ -86,7 +86,7 @@ For every path component:
 
 The original-to-new path map is the one source for links (§6) and for row matching (§7).
 
-## 6. Pages (`nimw-import::markdown`)
+## 6. Pages (`liber-import::markdown`)
 
 **Links:**
 - `[Text](Some%20Page%20<id>.md)` → `[[Target|Text]]`, or `[[Target]]` when `Text` equals the name. The link is relative to the page's own folder, and percent-decoded.
@@ -107,7 +107,7 @@ The original-to-new path map is the one source for links (§6) and for row match
 
 **Icons and covers:** the Markdown export carries no page icon or cover metadata, so none is imported. Images a page shows stay as images.
 
-## 7. Databases (`nimw-import::database`)
+## 7. Databases (`liber-import::database`)
 
 - **Which CSV:** a database comes as `Tasks <id>.csv`, often with `Tasks <id>_all.csv` (every row, every property), plus a folder `Tasks <id>/` of row pages. `_all.csv` is used when present, otherwise the plain CSV. The other is ignored.
 - **CSV parsing:** RFC 4180, so quoted fields, `""` escapes and newlines inside quotes work. A leading BOM is stripped. The first row is the header, and the **first column is the title** (Notion's Name).
@@ -132,7 +132,7 @@ The original-to-new path map is the one source for links (§6) and for row match
   - a Markdown table with one row per CSV row: the first cell is `[[<folder>/<Row>\|<Row>]]`, the other cells the raw CSV values, with `|` escaped and newlines as `<br>`.
 - A database with no folder (an inline database) gets its index page and its row pages, made from the CSV alone.
 
-## 8. Writing (`nimw-import::import`)
+## 8. Writing (`liber-import::import`)
 
 - **Target:** `<parent>/<name>`.
   - It must not exist. It is created with `create_dir`, never merged into an existing folder.
@@ -175,7 +175,7 @@ The page never names a path. A test hook replaces each dialog, as `ScratchpadSta
 
 ## 11. Testing
 
-- **Rust (`nimw-import`)**, against synthetic exports built in the tests with the `zip` crate's writer:
+- **Rust (`liber-import`)**, against synthetic exports built in the tests with the `zip` crate's writer:
   - id stripping, collisions, and dropping the common export root;
   - nested part zips, plus a zip inside an ordinary export that stays an attachment;
   - zip-slip entries (`../x`, `/abs`, `C:x`, symlinks), refused with warnings;

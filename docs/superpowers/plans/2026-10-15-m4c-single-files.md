@@ -5,15 +5,15 @@
 **Goal:** Open any single Markdown, text or code file from Finder, the Dock, File → Open File… or the command line, each in its own lightweight window with the editor, and nothing from a vault — a window that can read and write only that file.
 
 **Architecture:**
-- **A window grant per file (Rust, `file_windows.rs`):** opening a file records `{label → grant}` in a managed `FileWindows` registry *before* the window exists. A grant holds a `nimw_vault::Vault` opened read-only-config at the file's folder (its path checks: no `..`, no absolute paths, no symlink escapes, hidden names refused), the file's name in that folder, its kind (Markdown page or text file) and a non-recursive folder watcher filtered to the file. Re-opening a file whose grant exists focuses that window. The grant goes when its window is destroyed.
+- **A window grant per file (Rust, `file_windows.rs`):** opening a file records `{label → grant}` in a managed `FileWindows` registry *before* the window exists. A grant holds a `liber_vault::Vault` opened read-only-config at the file's folder (its path checks: no `..`, no absolute paths, no symlink escapes, hidden names refused), the file's name in that folder, its kind (Markdown page or text file) and a non-recursive folder watcher filtered to the file. Re-opening a file whose grant exists focuses that window. The grant goes when its window is destroyed.
 - **Commands without paths (`file_commands.rs`):** `file_info`, `file_read`, `file_write(text, expectedHash)`, `file_conflict_copy(text)`, `file_recreate`, `file_rename(newName)` act on the calling window's grant (`tauri::Window::label()`). Read-only helpers resolve links and read sibling notes inside the folder. `file_follow(path)` opens a folder-relative file the user clicked: Markdown and text in another file window, documents and media in their default app. `file_open_in_vault` hands the page to the main window. `file_open_dialog` is the Rust-side Open File… dialog.
 - **Capabilities:** `capabilities/file.json` for windows `file-*` lists only the file commands, settings, fonts, `url_open`, `app_info`, event listen/unlisten and window destroy. Vault commands are denied there; the file commands are denied in `main` (except the dialog). Real-ACL tests cover both directions.
-- **Assets:** the `nimw-asset:` handler serves a file window's requests from its grant's folder (same checks as the vault; `/.external/` is refused), keyed by the URI-scheme context's webview label.
+- **Assets:** the `liber-asset:` handler serves a file window's requests from its grant's folder (same checks as the vault; `/.external/` is refused), keyed by the URI-scheme context's webview label.
 - **Opening:** macOS `RunEvent::Opened` and `bundle.fileAssociations` (role Editor, rank Alternate; in `tauri.macos.conf.json` only — the Windows installer's association macro replaces the default app); Windows/Linux command-line paths at launch and from a second launch via `tauri-plugin-single-instance` (registered in `run()` only, never in tests); File → Open File… (⌘⇧O) in the macOS menu, the same shortcut in the page elsewhere, and an "Open a file" button on the Welcome screen.
 - **Menu events** go to the focused window only (a toggle broadcast to two windows flipped the setting twice).
 - **Frontend:** the same bundle. A window whose label starts with `file-` boots `SingleFileApp`. The IPC layer remaps the page commands (`page_read`/`text_read` → `file_read`, writes, conflict copies, re-creation, link resolution; outside files and `[[` suggestions are empty) so `PageDoc`, `editorStore`, the Editor and the preview work unchanged. `openPage`/`followLink` open other files through `file_follow`. Width is per window (session only). Paste/drop of attachments and the Attach button are off.
 
-**Tech Stack:** Rust (Tauri 2.12, `nimw-vault`, `nimw-session` helpers, `nimw-markdown::resolve`), `tauri-plugin-single-instance` 2.5 (Windows/Linux only); React 19 + TS, zustand, CodeMirror 6; Vitest, Playwright (Chromium + WebKit).
+**Tech Stack:** Rust (Tauri 2.12, `liber-vault`, `liber-session` helpers, `liber-markdown::resolve`), `tauri-plugin-single-instance` 2.5 (Windows/Linux only); React 19 + TS, zustand, CodeMirror 6; Vitest, Playwright (Chromium + WebKit).
 
 **Spec:** `docs/superpowers/specs/2026-10-14-m4c-scratchpad-design.md` §3, §4 (path grants, capabilities), §5 (single-file tests). §8 records this stream's amendments.
 
@@ -36,9 +36,9 @@
 
 ---
 
-### Task 1: `nimw-vault` — a non-recursive folder watch
+### Task 1: `liber-vault` — a non-recursive folder watch
 
-**Files:** Modify `crates/nimw-vault/src/watch.rs`.
+**Files:** Modify `crates/liber-vault/src/watch.rs`.
 
 **Interfaces:** Produces `Vault::watch_folder<F>(&self, callback: F) -> Result<Watcher>` — same batching and filtering as `watch`, `RecursiveMode::NonRecursive`; events in subfolders never reach it.
 
@@ -52,7 +52,7 @@
 **Interfaces (produces):**
 ```rust
 pub enum FileKind { Page, Text }                    // serde "page" | "text"
-pub fn file_kind(name: &str) -> Option<FileKind>;   // .md/.markdown → Page; nimw_session::is_text_path → Text
+pub fn file_kind(name: &str) -> Option<FileKind>;   // .md/.markdown → Page; liber_session::is_text_path → Text
 pub struct FileGrant { /* vault: Vault at the folder, name: Mutex<VaultPath>, kind, watcher */ }
 impl FileGrant {
   pub fn name(&self) -> VaultPath; pub fn kind(&self) -> FileKind; pub fn vault(&self) -> &Vault;
@@ -72,7 +72,7 @@ pub fn grant_for(app, label) -> CmdResult<Arc<FileGrant>>;  // `notPermitted` wi
 
 - [ ] Tests (unit, no app): `.md`, `.markdown`, `.txt`, `.json`, `Makefile` eligible; `.png`, `.exe`, `.pdf`, no extension not; `grant` refuses a folder (`notAFile`), a missing file (`notFound`), an ineligible one (`notAText`); the same file through `./x/../note.md` or a symlink gets the same label with `existed = true`; two files get `file-1`, `file-2`.
 - [ ] Tests (mock app): `open_file_window` creates a window labelled `file-N` titled with the file name; opening it again returns the same label and creates no second window; destroying the window revokes the grant.
-- [ ] Implement; run `cargo test -p nimw-desktop --test file_windows`; commit.
+- [ ] Implement; run `cargo test -p liber-desktop --test file_windows`; commit.
 
 ### Task 3: file commands
 
@@ -86,7 +86,7 @@ file_write(text, expectedHash) -> WriteResult { hash }  // CAS; conflict reply a
 file_conflict_copy(text) -> String                      // "<stem> (conflict).md" next to it, create-only
 file_recreate() -> String                               // the file again, empty, create-only (orphan "Save again")
 file_rename(newName) -> String                          // same folder, same extension; window title follows
-file_links_resolve(targets) -> (String|null)[]          // nimw_markdown::resolve over the folder (depth ≤ 3)
+file_links_resolve(targets) -> (String|null)[]          // liber_markdown::resolve over the folder (depth ≤ 3)
 file_note_read(path) -> PageText                        // read-only: another note or text file in the folder
 file_follow(path) -> "window" | "opened"                // md/text → another file window; doc/media → default app
 file_open_in_vault() -> ()                              // main window opens the vault at this page
@@ -122,7 +122,7 @@ file_open_dialog() -> ()                                // Rust-side dialog → 
 
 **Interfaces:** `pub fn paths_from_args(args: &[String], cwd: &Path) -> Vec<PathBuf>` (skips flags and `-psn_…`, joins relative paths on `cwd`, keeps eligible existing files); `pub fn paths_from_urls(urls: &[url::Url]) -> Vec<PathBuf>` (`file:` only); `pub fn open_paths(app, paths)`.
 - [ ] Tests: args parsing; urls parsing; the menu has File → Open File… with `CmdOrCtrl+Shift+O`; menu events reach only the focused window.
-- [ ] Implement; run `cargo test -p nimw-desktop`; commit.
+- [ ] Implement; run `cargo test -p liber-desktop`; commit.
 
 ### Task 8: IPC — file commands and the file-window remap
 

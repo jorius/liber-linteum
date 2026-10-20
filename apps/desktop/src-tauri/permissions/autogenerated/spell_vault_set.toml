@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-spell-vault-set"
+description = "Enables the spell_vault_set command without any pre-configured scope."
+commands.allow = ["spell_vault_set"]
+
+[[permission]]
+identifier = "deny-spell-vault-set"
+description = "Denies the spell_vault_set command without any pre-configured scope."
+commands.deny = ["spell_vault_set"]

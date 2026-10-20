@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { backlinkCount } from '../../ipc';
 import { useSettingsStore } from '../../stores/settingsStore';
+import { folderPageOf, nameOf } from '../../stores/tree';
 import { useVaultStore } from '../../stores/vaultStore';
 import { displayName } from '../explorer/TreeRow';
 import { Dialog } from './Dialog';
@@ -12,6 +13,7 @@ export function ConfirmDeleteDialog({ path, onClose }: { path: string; onClose: 
   const { t } = useTranslation();
   const node = useVaultStore((s) => s.nodes.find((n) => n.path === path));
   const items = useVaultStore((s) => s.nodes.filter((n) => n.path.startsWith(`${path}/`)).length);
+  const page = useVaultStore((s) => folderPageOf(path, s.children));
   const [links, setLinks] = useState<number | null>(null);
   const [dontAsk, setDontAsk] = useState(false);
 
@@ -40,6 +42,9 @@ export function ConfirmDeleteDialog({ path, onClose }: { path: string; onClose: 
     >
       {node.kind === 'folder' && (
         <p className={styles.text}>{t('dialogs.delete.items', { count: items })}</p>
+      )}
+      {page && (
+        <p className={styles.text}>{t('dialogs.delete.folderPage', { name: nameOf(path) })}</p>
       )}
       <p className={styles.text}>
         {links === null ? '…' : t('dialogs.delete.links', { count: links })}

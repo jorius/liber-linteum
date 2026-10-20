@@ -41,7 +41,7 @@ describe('the emoji picker (M5b §4)', () => {
     await waitFor(() => expect(cells()[0]).toHaveAccessibleName('rocket'));
     await userEvent.keyboard('{ArrowDown}{Enter}');
     expect(onPick).toHaveBeenCalledWith('🚀');
-    expect(JSON.parse(localStorage.getItem('nimw.recentIcons')!)).toEqual(['🚀']);
+    expect(JSON.parse(localStorage.getItem('liber.recentIcons')!)).toEqual(['🚀']);
   });
 
   it('moves through the grid with arrows; Escape closes', async () => {
@@ -66,7 +66,7 @@ describe('the emoji picker (M5b §4)', () => {
   });
 
   it('shows recent picks first and has no axe violations', async () => {
-    localStorage.setItem('nimw.recentIcons', JSON.stringify(['🐉']));
+    localStorage.setItem('liber.recentIcons', JSON.stringify(['🐉']));
     mount();
     await waitFor(() => expect(cells()[0]).toHaveTextContent('🐉'));
     expect(screen.getByRole('button', { name: 'Recent' })).toHaveAttribute('aria-pressed', 'true');

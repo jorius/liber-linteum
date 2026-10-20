@@ -14,7 +14,7 @@ import { tagHighlighter, tags } from '@lezer/highlight';
 import { diffIndices } from 'node-diff3';
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import type { EditorMode, PickedFile } from '../../ipc';
+import { windowLabel, type EditorMode, type PickedFile } from '../../ipc';
 import { usePageStore } from '../../stores/pageStore';
 import { usePageWidth, useWideElements } from '../../stores/pageWidthStore';
 import { isTextPath } from '../../stores/textFiles';
@@ -44,6 +44,8 @@ import { notifyViewReset, notifyViewUpdate, setCurrentView } from './viewUpdates
 import { Toolbar } from './Toolbar';
 import { hideView, pageDocOf, showView, storedState, storeState } from './views';
 import { LIVE_PADDING, wideAttrs, wideExtents } from './wideBox';
+import { setSpellMenuOpener, spellcheck, type WordRange } from './spell';
+import { SpellMenu } from './SpellMenu';
 import { toggleTaskIn } from './widgets';
 
 /** The Split pane of the component currently showing each view. */
@@ -59,6 +61,8 @@ const languageSlot = new Compartment();
 /** Archived pages are read-only (M5b round 2): no typing, and no edits from
  *  the toolbar or keys; changes from the disk still show. */
 const readOnlySlot = new Compartment();
+/** Spell checking, pages only (spell checking spec): off leaves it out. */
+const spellSlot = new Compartment();
 const readOnly = [
   EditorState.readOnly.of(true),
   EditorView.editable.of(false),
@@ -88,11 +92,11 @@ const sourceHighlight = HighlightStyle.define([
 const codeHighlighter = tagHighlighter([
   {
     tag: [tags.keyword, tags.bool, tags.null, tags.atom, tags.tagName],
-    class: 'cm-nimw-code-keyword',
+    class: 'cm-liber-code-keyword',
   },
-  { tag: [tags.string, tags.regexp, tags.special(tags.string)], class: 'cm-nimw-code-string' },
-  { tag: [tags.number, tags.integer, tags.float], class: 'cm-nimw-code-number' },
-  { tag: tags.comment, class: 'cm-nimw-code-comment' },
+  { tag: [tags.string, tags.regexp, tags.special(tags.string)], class: 'cm-liber-code-string' },
+  { tag: [tags.number, tags.integer, tags.float], class: 'cm-liber-code-number' },
+  { tag: tags.comment, class: 'cm-liber-code-comment' },
   {
     tag: [
       tags.function(tags.variableName),
@@ -100,30 +104,35 @@ const codeHighlighter = tagHighlighter([
       tags.propertyName,
       tags.attributeName,
     ],
-    class: 'cm-nimw-code-function',
+    class: 'cm-liber-code-function',
   },
-  { tag: [tags.typeName, tags.className, tags.namespace], class: 'cm-nimw-code-type' },
-  { tag: [tags.annotation, tags.modifier, tags.self], class: 'cm-nimw-code-meta' },
-  { tag: [tags.operator, tags.punctuation, tags.bracket], class: 'cm-nimw-code-punct' },
+  { tag: [tags.typeName, tags.className, tags.namespace], class: 'cm-liber-code-type' },
+  { tag: [tags.annotation, tags.modifier, tags.self], class: 'cm-liber-code-meta' },
+  { tag: [tags.operator, tags.punctuation, tags.bracket], class: 'cm-liber-code-punct' },
 ]);
 
 const theme = EditorView.theme({
-  '.cm-nimw-code-keyword': { color: 'var(--code-keyword)' },
-  '.cm-nimw-code-string': { color: 'var(--code-string)' },
-  '.cm-nimw-code-number': { color: 'var(--code-number)' },
-  '.cm-nimw-code-comment': { color: 'var(--code-comment)', fontStyle: 'italic' },
-  '.cm-nimw-code-function': { color: 'var(--code-function)' },
-  '.cm-nimw-code-type': { color: 'var(--code-type)' },
-  '.cm-nimw-code-meta': { color: 'var(--code-meta)' },
-  '.cm-nimw-code-punct': { color: 'var(--code-punct)' },
+  '.cm-liber-code-keyword': { color: 'var(--code-keyword)' },
+  '.cm-liber-code-string': { color: 'var(--code-string)' },
+  '.cm-liber-code-number': { color: 'var(--code-number)' },
+  '.cm-liber-code-comment': { color: 'var(--code-comment)', fontStyle: 'italic' },
+  '.cm-liber-code-function': { color: 'var(--code-function)' },
+  '.cm-liber-code-type': { color: 'var(--code-type)' },
+  '.cm-liber-code-meta': { color: 'var(--code-meta)' },
+  '.cm-liber-code-punct': { color: 'var(--code-punct)' },
   '&': { height: '100%', color: 'var(--color-text)', backgroundColor: 'transparent' },
   '&.cm-focused': { outline: 'none' },
+  '.cm-liber-misspelled': {
+    textDecoration: 'underline wavy var(--color-danger)',
+    textDecorationSkipInk: 'none',
+    textUnderlineOffset: '3px',
+  },
   '.cm-scroller': {
     fontFamily: 'var(--font-live)',
     fontSize: 'var(--font-size-editor)',
     lineHeight: '1.7',
   },
-  '&.cm-nimw-source .cm-scroller': {
+  '&.cm-liber-source .cm-scroller': {
     fontFamily: 'var(--font-source)',
     fontSize: 'calc(var(--font-size-editor) * 0.9)',
     lineHeight: '1.6',
@@ -145,10 +154,10 @@ const theme = EditorView.theme({
 
 function modeExtensions(mode: EditorMode): Extension {
   return mode === 'livePreview'
-    ? [livePreview(), EditorView.editorAttributes.of({ class: 'cm-nimw-live' })]
+    ? [livePreview(), EditorView.editorAttributes.of({ class: 'cm-liber-live' })]
     : [
         syntaxHighlighting(sourceHighlight),
-        EditorView.editorAttributes.of({ class: 'cm-nimw-source' }),
+        EditorView.editorAttributes.of({ class: 'cm-liber-source' }),
       ];
 }
 
@@ -330,10 +339,16 @@ function createState(d: PageDoc, mode: EditorMode, label: string, numbers: boole
       // An atom clicked in the Global View flashes here (M4b part 3 §6).
       flash,
       gutterSlot.of(gutter(numbers)),
+      spellSlot.of(spellOn() ? spellcheck() : []),
       followers,
     ],
   });
 }
+
+/** Spelling runs in the main window only: a single-file window has no vault
+ *  to keep added words in, and its capability has no spell commands. */
+const MAIN_WINDOW = windowLabel() === 'main';
+const spellOn = () => MAIN_WINDOW && useSettingsStore.getState().settings.spellcheck;
 
 export interface EditorProps {
   doc: PageDoc;
@@ -367,6 +382,10 @@ export function Editor({ doc, mode, label }: EditorProps) {
   const [picker, setPicker] = useState(false);
   const [attach, setAttach] = useState<PickedFile[] | null>(null);
   const [langPicker, setLangPicker] = useState<{ at: number; anchor: HTMLElement } | null>(null);
+  const [spellMenu, setSpellMenu] = useState<{
+    target: WordRange;
+    anchor: { x: number; y: number };
+  } | null>(null);
   const [active, setActive] = useState<Set<ActiveFormat>>(() => new Set());
   const showFormats = useCallback((state: EditorState) => {
     const next = activeFormats(state);
@@ -387,6 +406,7 @@ export function Editor({ doc, mode, label }: EditorProps) {
     setLinkPickerOpener(v, () => setPicker(true));
     setAttachChooser(v, setAttach);
     setLanguagePickerOpener(v, (at, anchor) => setLangPicker({ at, anchor }));
+    setSpellMenuOpener(v, (target, anchor) => setSpellMenu({ target, anchor }));
     showFormats(v.state);
     setCurrentView(v);
     showLanguage(v, current.current);
@@ -400,6 +420,7 @@ export function Editor({ doc, mode, label }: EditorProps) {
       setLinkPickerOpener(v, null);
       setAttachChooser(v, null);
       setLanguagePickerOpener(v, null);
+      setSpellMenuOpener(v, null);
       v.destroy();
       view.current = null;
     };
@@ -427,6 +448,8 @@ export function Editor({ doc, mode, label }: EditorProps) {
         modeSlot.reconfigure(modeExtensions(mode)),
         labelSlot.reconfigure(labelled(label)),
         gutterSlot.reconfigure(gutter(showNumbers || isTextPath(doc.path))),
+        // A page's stored state may predate a change to the setting.
+        ...(isTextPath(doc.path) ? [] : [spellSlot.reconfigure(spellOn() ? spellcheck() : [])]),
       ],
     });
     setText(doc.text);
@@ -449,6 +472,13 @@ export function Editor({ doc, mode, label }: EditorProps) {
       effects: gutterSlot.reconfigure(gutter(showNumbers || isTextPath(current.current.path))),
     });
   }, [showNumbers]);
+
+  const spellEnabled = useSettingsStore((s) => MAIN_WINDOW && s.settings.spellcheck);
+  useLayoutEffect(() => {
+    const v = view.current;
+    if (!v || isTextPath(current.current.path)) return;
+    v.dispatch({ effects: spellSlot.reconfigure(spellEnabled ? spellcheck() : []) });
+  }, [spellEnabled]);
 
   // Back from the Global View (a card opened in the editor, ⌘1): the keyboard
   // comes back here, with the selection it had, once the editor shows —
@@ -517,8 +547,8 @@ export function Editor({ doc, mode, label }: EditorProps) {
     const v = toolbarView;
     if (!h) return;
     if (!v || width !== 'wide' || mode !== 'livePreview') {
-      h.style.removeProperty('--nimw-wide-m');
-      h.style.removeProperty('--nimw-wide-r');
+      h.style.removeProperty('--liber-wide-m');
+      h.style.removeProperty('--liber-wide-r');
       return;
     }
     const measure = () => {
@@ -531,8 +561,8 @@ export function Editor({ doc, mode, label }: EditorProps) {
         leftBound: Math.max(scroller.left, gutters ? gutters.right : scroller.left) + LIVE_PADDING,
         rightBound: scroller.left + v.scrollDOM.clientWidth - LIVE_PADDING,
       });
-      h.style.setProperty('--nimw-wide-m', `${m}px`);
-      h.style.setProperty('--nimw-wide-r', `${r}px`);
+      h.style.setProperty('--liber-wide-m', `${m}px`);
+      h.style.setProperty('--liber-wide-r', `${r}px`);
     };
     measure();
     const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(measure);
@@ -563,6 +593,17 @@ export function Editor({ doc, mode, label }: EditorProps) {
         <Toolbar view={toolbarView} active={active} />
       )}
       {picker && toolbarView && <LinkPicker view={toolbarView} onClose={() => setPicker(false)} />}
+      {spellMenu && toolbarView && (
+        <SpellMenu
+          view={toolbarView}
+          target={spellMenu.target}
+          anchor={spellMenu.anchor}
+          onClose={(refocus) => {
+            setSpellMenu(null);
+            if (refocus) toolbarView.focus();
+          }}
+        />
+      )}
       {attach && toolbarView && (
         <AttachChoice view={toolbarView} files={attach} onClose={() => setAttach(null)} />
       )}

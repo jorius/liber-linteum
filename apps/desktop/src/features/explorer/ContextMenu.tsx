@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
 import { useTranslation } from 'react-i18next';
-import { parentOf } from '../../stores/tree';
+import { folderPageOf, joinPath, nameOf, parentOf } from '../../stores/tree';
 import { useUiStore } from '../../stores/uiStore';
 import { useVaultStore } from '../../stores/vaultStore';
 import { EmojiPicker } from '../icons/EmojiPicker';
@@ -55,6 +55,24 @@ export function ContextMenu({ menu, onClose }: { menu: MenuState; onClose: () =>
 
   if (!node) return null;
   const dir = node.kind === 'folder' ? node.path : parentOf(node.path);
+  // A folder's own page (round 3b §6): Favorites and Icon act on it.
+  const children = useVaultStore.getState().children;
+  const page = node.kind === 'folder' ? folderPageOf(node.path, children) : null;
+  const target = page ?? node.path;
+  const namesake = joinPath(parentOf(node.path), `${nameOf(node.path)}.md`);
+  const hasNamesake =
+    node.kind === 'folder' && !!children.get(parentOf(node.path))?.some((n) => n.path === namesake);
+  const folderPage: [string, () => void][] =
+    node.kind !== 'folder' || page
+      ? []
+      : hasNamesake
+        ? [
+            [
+              t('menu.useAsFolderPage', { name: nameOf(node.path) }),
+              () => void vault().rename(namesake, `${node.path}/${nameOf(node.path)}.md`),
+            ],
+          ]
+        : [[t('menu.addFolderPage'), () => void vault().createFolderPage(node.path)]];
   const vault = useVaultStore.getState;
   // The Archive is read-only (M5b round 2): open, unarchive, sort or trash.
   const archived = isArchived(node.path);
@@ -70,6 +88,7 @@ export function ContextMenu({ menu, onClose }: { menu: MenuState; onClose: () =>
     : [
         [t('menu.newPage'), () => void vault().createPage(dir)],
         [t('menu.newFolder'), () => void vault().createFolder(dir)],
+        ...folderPage,
         [t('menu.rename'), () => vault().startRename(node.path)],
         [t('menu.move'), () => useUiStore.getState().openDialog({ type: 'move', path: node.path })],
         ...(node.kind === 'attachment'
@@ -79,7 +98,7 @@ export function ContextMenu({ menu, onClose }: { menu: MenuState; onClose: () =>
         [t('menu.archive'), () => void archiveItem(node.path)],
         [t('menu.delete'), () => requestTrash(node.path)],
         // Favorites (M5b §19): pages and folders; a favorite also moves in the list.
-        ...favoriteActions(node.path, node.kind, favorites, t),
+        ...favoriteActions(target, page ? 'page' : node.kind, favorites, t),
       ];
 
   const sortIndex = actions.findIndex(([label]) => label === t('menu.sortBy'));
@@ -107,16 +126,17 @@ export function ContextMenu({ menu, onClose }: { menu: MenuState; onClose: () =>
   }
 
   if (picking) {
-    const kind = node.kind === 'folder' ? 'folder' : 'page';
+    const kind = node.kind === 'folder' && !page ? 'folder' : 'page';
+    const iconOf = page ? children.get(node.path)?.find((n) => n.path === page)?.icon : node.icon;
     return (
       <EmojiPicker
         anchor={() => ({ top: menu.anchor.y, bottom: menu.anchor.y, left: menu.anchor.x })}
         label={t('icons.pickFor', { name: displayName(node) })}
-        hasIcon={!!node.icon}
+        hasIcon={!!iconOf}
         onClose={onClose}
         onPick={(emoji) => {
           onClose();
-          void setIcon({ kind, path: node.path }, emoji);
+          void setIcon({ kind, path: target }, emoji);
         }}
       />
     );
@@ -141,7 +161,7 @@ export function ContextMenu({ menu, onClose }: { menu: MenuState; onClose: () =>
       ref={box}
       role="menu"
       aria-label={t('menu.label', { name: displayName(node) })}
-      className="nimw-menu"
+      className="liber-menu"
       style={{ position: 'fixed', left: menu.anchor.x, top: menu.anchor.y }}
       onKeyDown={onKeyDown}
     >

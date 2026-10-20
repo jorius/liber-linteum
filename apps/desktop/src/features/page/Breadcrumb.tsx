@@ -1,5 +1,5 @@
 import { useTranslation } from 'react-i18next';
-import { nameOf, parentOf } from '../../stores/tree';
+import { isFolderPage, nameOf, parentOf } from '../../stores/tree';
 import { useVaultStore } from '../../stores/vaultStore';
 import { ItemIcon, useIcons } from '../icons/ItemIcon';
 import styles from './PageView.module.css';
@@ -15,7 +15,11 @@ export function Breadcrumb({ path }: { path: string }) {
   const icons = useIcons();
   const folders: string[] = [];
   for (let p = parentOf(path); p; p = parentOf(p)) folders.unshift(p);
+  // A folder page (round 3b §6.5) is its folder: `… / X`, not `… / X / X`.
+  const folderPage = isFolderPage(path);
+  if (folderPage) folders.pop();
   const page = nameOf(path).replace(/\.md$/i, '');
+  const icon = icons.get(path) ?? (folderPage ? icons.get(parentOf(path)) : undefined);
   return (
     <nav aria-label={t('page.breadcrumb')} className={styles.breadcrumb}>
       <ol>
@@ -36,7 +40,7 @@ export function Breadcrumb({ path }: { path: string }) {
         ))}
         <li>
           <span aria-current="page" title={page}>
-            <ItemIcon icon={icons.get(path)} />
+            <ItemIcon icon={icon} />
             {page}
           </span>
         </li>

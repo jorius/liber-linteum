@@ -3,7 +3,8 @@ import { forwardRef, useEffect, useId, useRef, useState, type KeyboardEvent } fr
 import { useTranslation } from 'react-i18next';
 import type { TreeNode } from '../../ipc';
 import { isArchived } from '../../stores/tree';
-import { useVaultStore } from '../../stores/vaultStore';
+import { StarIcon } from '../favorites/FavoritesSection';
+import { useFavoritesStore } from '../favorites/favoritesStore';
 import { IconButton, ItemIcon } from '../icons/ItemIcon';
 import { QuickNoteIcon } from '../scratchpad/QuickNoteIcon';
 import styles from './Explorer.module.css';
@@ -31,16 +32,61 @@ interface TreeRowProps {
   focused: boolean;
   renaming: boolean;
   dropTarget?: boolean;
-  onActivate: (node: TreeNode) => void;
+  /** `clicks`: the click's detail (2 on a double-click's second click). */
+  onActivate: (node: TreeNode, clicks?: number) => void;
   onFocusRow: (path: string) => void;
   onCommitRename: (node: TreeNode, name: string) => void;
   onCancelRename: () => void;
-  /** Opens the row's context menu (the "…" button). */
-  onMenu?: (path: string, anchor: { x: number; y: number }) => void;
   /** The vault's scratch folder, pinned first (M4c §7.2): its note count. */
   pinnedCount?: number;
   /** The first root row under the pinned scratch folder. */
   divider?: boolean;
+  /** A folder's own page, `X/X.md` (round 3b §6.2): the row stands for it. */
+  page?: TreeNode | null;
+  /** That page is the one open in the editor. */
+  current?: boolean;
+  /** Expands or collapses the folder (a folder page's chevron). */
+  onToggle?: (node: TreeNode) => void;
+}
+
+/** The row's ★ (round 3 §2.3): adds the item to Favorites or takes it out. */
+function FavoriteAction({ path, name }: { path: string; name: string }) {
+  const { t } = useTranslation();
+  const on = useFavoritesStore((s) => s.paths.includes(path));
+  // One fixed name; aria-pressed carries the state (the tooltip says the action).
+  return (
+    <button
+      type="button"
+      tabIndex={-1}
+      className={styles.action}
+      aria-pressed={on}
+      aria-label={t('favorites.toggleNamed', { name })}
+      title={t(on ? 'favorites.removeNamed' : 'favorites.addNamed', { name })}
+      onClick={() => void useFavoritesStore.getState().toggle(path)}
+    >
+      <StarIcon filled={on} size={13} />
+    </button>
+  );
+}
+
+/** "Add an icon": a face with a plus, at full contrast (round 3 §2.3). */
+function EmojiAddGlyph() {
+  return (
+    <svg
+      width="14"
+      height="14"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M21 11.5V12a9 9 0 1 1-9-9h.5" />
+      <path d="M8 14s1.5 2 4 2 4-2 4-2M9 9h.01M15 9h.01M16 5h6M19 2v6" />
+    </svg>
+  );
 }
 
 function TrashGlyph() {
@@ -179,9 +225,11 @@ export const TreeRow = forwardRef<HTMLLIElement, TreeRowProps>(function TreeRow(
     onFocusRow,
     onCommitRename,
     onCancelRename,
-    onMenu,
     pinnedCount,
     divider,
+    page = null,
+    current = false,
+    onToggle,
   },
   ref,
 ) {
@@ -189,6 +237,8 @@ export const TreeRow = forwardRef<HTMLLIElement, TreeRowProps>(function TreeRow(
   const name = displayName(node);
   // The Archive is read-only (M5b round 2): no new page inside, no icon.
   const archived = isArchived(node.path);
+  // A folder page's ★ and ☺ act on its page (round 3b §6.2).
+  const target = page ?? node;
   // Drag source (any item) and drop target (folders). Only the listeners are
   // spread: dnd-kit's attributes would replace the treeitem role and tabindex.
   const drag = useDraggable({ id: node.path, disabled: renaming });
@@ -219,23 +269,36 @@ export const TreeRow = forwardRef<HTMLLIElement, TreeRowProps>(function TreeRow(
       aria-level={level}
       aria-selected={selected}
       aria-expanded={node.kind === 'folder' ? expanded : undefined}
+      aria-current={current ? 'page' : undefined}
       tabIndex={focused ? 0 : -1}
       data-path={node.path}
       data-name={name}
       data-divider={divider || undefined}
       className={classes}
       style={{ paddingLeft: 8 + (level - 1) * 16 }}
-      onClick={() => onActivate(node)}
+      onClick={(e) => onActivate(node, e.detail)}
       onFocus={() => onFocusRow(node.path)}
     >
       {/* An optional emoji (M5b §4) stands in for the page glyph, and
           follows a folder's chevron. */}
       {node.kind === 'page' && node.icon ? (
         <ItemIcon icon={node.icon} />
+      ) : page ? (
+        // Only the chevron expands a folder page; the rest of the row opens it.
+        <span
+          data-twisty
+          className={styles.twisty}
+          onClick={(e) => {
+            e.stopPropagation();
+            onToggle?.(node);
+          }}
+        >
+          <Icon node={node} expanded={expanded} />
+        </span>
       ) : (
         <Icon node={node} expanded={expanded} />
       )}
-      {node.kind === 'folder' && <ItemIcon icon={node.icon} />}
+      {node.kind === 'folder' && <ItemIcon icon={page?.icon ?? node.icon} />}
       {pinnedCount !== undefined && (
         <span className={styles.pinIcon} data-quick-note-icon>
           <QuickNoteIcon size={14} />
@@ -260,33 +323,26 @@ export const TreeRow = forwardRef<HTMLLIElement, TreeRowProps>(function TreeRow(
         </span>
       )}
       {!renaming && (
-        // Quick actions (M5b §3), for the pointer: shown on hover, focus and
-        // selection; the keyboard has Delete, the menu and its keys. Their
-        // clicks and keys (the picker's too) stay out of the row and tree.
+        // Quick actions (round 3 §2.3: ★ ☺ 🗑), for the pointer: shown on
+        // hover, focus and selection; right-click, Delete and Shift+F10 do the
+        // rest. Their clicks and keys (the picker's too) stay out of the row.
         <span
           className={styles.actions}
           onClick={(e) => e.stopPropagation()}
           onPointerDown={(e) => e.stopPropagation()}
           onKeyDown={(e) => e.stopPropagation()}
         >
-          {node.kind === 'folder' && !archived && (
-            <button
-              type="button"
-              tabIndex={-1}
-              className={styles.action}
-              aria-label={t('explorer.newPageIn', { name })}
-              title={t('explorer.newPageIn', { name })}
-              onClick={() => void useVaultStore.getState().createPage(node.path)}
-            >
-              +
-            </button>
+          {node.kind !== 'attachment' && !archived && (
+            <FavoriteAction path={target.path} name={name} />
           )}
           {node.kind !== 'attachment' && !archived && (
             <IconButton
-              target={{ kind: node.kind, path: node.path }}
-              icon={node.icon}
+              target={
+                page ? { kind: 'page', path: page.path } : { kind: node.kind, path: node.path }
+              }
+              icon={target.icon}
               name={name}
-              glyph="☺"
+              glyph={<EmojiAddGlyph />}
               label={t('icons.pickFor', { name })}
               tabIndex={-1}
               className={styles.action}
@@ -303,24 +359,6 @@ export const TreeRow = forwardRef<HTMLLIElement, TreeRowProps>(function TreeRow(
             <TrashGlyph />
           </button>
         </span>
-      )}
-      {onMenu && !renaming && (
-        <button
-          type="button"
-          tabIndex={-1}
-          className={styles.more}
-          aria-label={t('menu.label', { name })}
-          aria-haspopup="menu"
-          // Pointer users' way to the menu (keyboard: Shift+F10 / ContextMenu key).
-          onPointerDown={(e) => e.stopPropagation()}
-          onClick={(e) => {
-            e.stopPropagation();
-            const rect = e.currentTarget.getBoundingClientRect();
-            onMenu(node.path, { x: rect.left, y: rect.bottom });
-          }}
-        >
-          …
-        </button>
       )}
     </li>
   );

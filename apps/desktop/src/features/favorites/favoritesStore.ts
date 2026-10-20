@@ -1,5 +1,5 @@
 // Favorites (M5b §19): the vault's ordered list, kept by Rust in
-// `.nimw/vault.json` (it follows renames, the Trash and the Archive there).
+// `.liber/vault.json` (it follows renames, the Trash and the Archive there).
 import i18next from 'i18next';
 import { create } from 'zustand';
 import { favoritesGet, favoritesSet, type TreeNode } from '../../ipc';

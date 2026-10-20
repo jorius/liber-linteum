@@ -15,7 +15,7 @@ afterEach(async () => {
 describe('App routing', () => {
   it('shows the welcome screen while no vault is open', () => {
     render(<App />);
-    expect(screen.getByRole('heading', { level: 1, name: 'Notes In My Way' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 1, name: 'Liber Linteum' })).toBeInTheDocument();
   });
 
   it('shows indexing progress while opening', () => {
@@ -32,14 +32,14 @@ describe('App routing', () => {
     render(<App />);
     act(() => useVaultStore.setState({ status: 'open' }));
     expect(
-      screen.queryByRole('heading', { level: 1, name: 'Notes In My Way' }),
+      screen.queryByRole('heading', { level: 1, name: 'Liber Linteum' }),
     ).not.toBeInTheDocument();
     expect(screen.getByRole('tree', { name: 'Files' })).toBeInTheDocument();
   });
 
   it('still renders when not running inside Tauri (IPC unavailable)', async () => {
     render(<App />);
-    expect(screen.getByRole('heading', { level: 1, name: 'Notes In My Way' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 1, name: 'Liber Linteum' })).toBeInTheDocument();
     await new Promise((resolve) => setTimeout(resolve, 0));
     expect(screen.queryByText(/^v\d/)).not.toBeInTheDocument();
   });
@@ -58,7 +58,7 @@ describe('App routing', () => {
   });
 
   it('shows the backend version from app_info', async () => {
-    mockIPC((cmd) => (cmd === 'app_info' ? { name: 'Notes In My Way', version: '0.1.0' } : []));
+    mockIPC((cmd) => (cmd === 'app_info' ? { name: 'Liber Linteum', version: '0.1.0' } : []));
     render(<App />);
     await waitFor(() => expect(screen.getByText('v0.1.0')).toBeInTheDocument());
   });

@@ -110,7 +110,7 @@ export function MermaidView({ source }: { source: string }) {
             // Its own error drawing would be left at the end of <body>.
             suppressErrorRendering: true,
           });
-          const id = `nimw-mermaid-${++seq}`;
+          const id = `liber-mermaid-${++seq}`;
           try {
             const svg = inertSvg((await mermaid.render(id, source)).svg);
             cache.set(key, svg);

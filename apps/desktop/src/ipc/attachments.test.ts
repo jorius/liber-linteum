@@ -59,8 +59,8 @@ describe('M2c ipc commands', () => {
         bytes,
         {
           headers: {
-            'x-nimw-page': 'Notes%2FD%C3%ADa%201.md',
-            'x-nimw-name': 'Pasted%20image%201.png',
+            'x-liber-page': 'Notes%2FD%C3%ADa%201.md',
+            'x-liber-name': 'Pasted%20image%201.png',
           },
         },
       ],

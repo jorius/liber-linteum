@@ -11,7 +11,7 @@
 
 ## 1. Goal and success criteria
 
-Make a page feel finished: a cover, a subtitle, pasted screenshots, dropped files, and links you can find without remembering file names. Everything NIMW writes stays readable and resolvable in Obsidian.
+Make a page feel finished: a cover, a subtitle, pasted screenshots, dropped files, and links you can find without remembering file names. Everything Liber Linteum writes stays readable and resolvable in Obsidian.
 
 1. **Cover:** add (upload), change, reposition and remove a cover from the page header. It is stored as frontmatter `cover:` and `cover-y:`.
 2. **Subtitle:** edited in place under the title and stored as frontmatter `subtitle:`.
@@ -31,7 +31,7 @@ Make a page feel finished: a cover, a subtitle, pasted screenshots, dropped file
 - i18n en + es parity; axe-clean;
 - Safari 15 floor: no regex lookbehind, no `color-mix`;
 - undo through CodeMirror history (ED-07);
-- opening a vault writes nothing (VLT-02): `.nimw/vault.json` and attachment folders are created only on first need.
+- opening a vault writes nothing (VLT-02): `.liber/vault.json` and attachment folders are created only on first need.
 
 ---
 
@@ -112,11 +112,11 @@ Make a page feel finished: a cover, a subtitle, pasted screenshots, dropped file
   - while copying, the save status reads "Copying files…".
 - **Refresh:** after paste or drop the UI calls `vaultStore.refreshTree()`, because the watcher doesn't report the app's own writes.
 
-### 5.3 Where files go (`nimw-vault` `AttachmentPolicy`)
+### 5.3 Where files go (`liber-vault` `AttachmentPolicy`)
 
 - **Precedence:** Jose's choice, which reverses the M1a order.
   1. Obsidian's `attachmentFolderPath` in `.obsidian/app.json`, when the key is present.
-  2. `.nimw/vault.json` `attachments`.
+  2. `.liber/vault.json` `attachments`.
   3. The default `attachments/` subfolder next to the page.
 - **The four modes:**
   - `vault`: the vault root;
@@ -124,13 +124,13 @@ Make a page feel finished: a cover, a subtitle, pasted screenshots, dropped file
   - `subfolder`: a named subfolder next to the page (default `attachments`);
   - `folder`: a fixed vault folder (Obsidian's `assets` form).
 - **Obsidian's values** map as today (`AttachmentPolicy::from_obsidian`).
-- **Freshness:** the policy is re-read on every attachment save and on `vault_settings_get`. That's cheap: two small files. So an edit to Obsidian's or NIMW's config while the vault is open takes effect without reopening.
+- **Freshness:** the policy is re-read on every attachment save and on `vault_settings_get`. That's cheap: two small files. So an edit to Obsidian's or Liber Linteum's config while the vault is open takes effect without reopening.
 - **Folders:** the target folder is created on first save, including intermediate folders, each name checked with `validate_name`.
 - **Names:**
   - a dropped file keeps its name;
   - a taken name becomes `name 1.ext`, `name 2.ext`, … (create-only writes; `AlreadyExists` retries the next number);
   - a name failing `validate_name` (e.g. `a:b.png`) has the bad characters replaced by `-`.
-- **The `<link>`** in an embed is Rust's `shortest_unique_target` from the page to the new file: `Pasted image ….png`, or a longer path when the name is ambiguous. Extensions are kept for non-pages, and the result resolves back to the same file in NIMW and in Obsidian.
+- **The `<link>`** in an embed is Rust's `shortest_unique_target` from the page to the new file: `Pasted image ….png`, or a longer path when the name is ambiguous. Extensions are kept for non-pages, and the result resolves back to the same file in Liber Linteum and in Obsidian.
 - **A dropped file that already lives inside the vault** (its canonical path is under the vault root) is not copied. Only its `<link>` is returned.
 
 ### 5.4 Settings → This vault (`SettingsDialog.tsx`)
@@ -188,7 +188,7 @@ Make a page feel finished: a cover, a subtitle, pasted screenshots, dropped file
 - **Escape** closes the picker and returns focus to the editor with the selection intact.
 - **Keyboard:** the picker opens for ⌘K too (replacing M2b's `[text](url)` insertion; M2b §11.5 is superseded).
 
-## 7. Backend (`apps/desktop/src-tauri/src/attachment_commands.rs`, new; `nimw-session`, `nimw-vault`)
+## 7. Backend (`apps/desktop/src-tauri/src/attachment_commands.rs`, new; `liber-session`, `liber-vault`)
 
 **Rules for every new command:**
 - registered in `build.rs` `COMMANDS`, `generate_handler!`, `capabilities/main.json` and the test `COMMANDS` list;
@@ -196,7 +196,7 @@ Make a page feel finished: a cover, a subtitle, pasted screenshots, dropped file
 - a real-ACL test in `tests/commands.rs`;
 - errors use the existing `ErrorKind`, plus `TooLarge` and `NotPermitted` (new, mapped and translated in the UI).
 
-### 7.1 Session additions (`crates/nimw-session`)
+### 7.1 Session additions (`crates/liber-session`)
 
 - **Attachment indexing:** `reindex_attachment(path, hash)`.
   - It upserts `files` with `FileKind::Attachment`, then runs `resolve_affected` on `link_key(path)`, so an inserted embed resolves immediately.
@@ -210,7 +210,7 @@ Make a page feel finished: a cover, a subtitle, pasted screenshots, dropped file
   - It refuses directories, and anything that isn't a regular file after following symlinks.
 - **Vault settings:**
   - `vault_settings()` returns `{ attachments: {mode, path}, obsidian: Option<String> }`;
-  - `set_vault_settings(patch)` writes `.nimw/vault.json` through the vault's atomic write (hidden path, not indexed). It preserves unknown keys, creates `.nimw/` lazily and refreshes the in-memory policy.
+  - `set_vault_settings(patch)` writes `.liber/vault.json` through the vault's atomic write (hidden path, not indexed). It preserves unknown keys, creates `.liber/` lazily and refreshes the in-memory policy.
 
 ### 7.2 `link_suggest(source: String, query: String, embed: bool) -> Vec<LinkSuggestion>`
 
@@ -223,7 +223,7 @@ Make a page feel finished: a cover, a subtitle, pasted screenshots, dropped file
 ### 7.3 Attachments
 
 - **`attachment_paste`** takes the raw IPC body (`tauri::ipc::Request`, `InvokeBody::Raw`).
-  - The headers are `x-nimw-page` (percent-encoded vault path) and `x-nimw-name` (percent-encoded file name).
+  - The headers are `x-liber-page` (percent-encoded vault path) and `x-liber-name` (percent-encoded file name).
   - The body is capped at 64 MiB (`TooLarge`).
   - The extension must be one of png, jpg, gif or webp (`InvalidName`).
   - It returns `{ path, link }`.
@@ -252,7 +252,7 @@ Make a page feel finished: a cover, a subtitle, pasted screenshots, dropped file
 ### 7.7 Raw HTML in Live Preview (`livePreview.ts`)
 
 - **Which nodes:** root-level mdast `html` nodes (flow HTML) become block `PreviewWidget`s, like tables, unless the selection touches them. Inline HTML inside a paragraph stays as text.
-- **Empty results stay as source:** an HTML node whose sanitized render is empty (comments, `<script>`-only) keeps showing its source, styled `cm-nimw-frontmatter`-muted, so nothing silently disappears.
+- **Empty results stay as source:** an HTML node whose sanitized render is empty (comments, `<script>`-only) keeps showing its source, styled `cm-liber-frontmatter`-muted, so nothing silently disappears.
 
 ## 8. Security
 
@@ -266,13 +266,13 @@ Make a page feel finished: a cover, a subtitle, pasted screenshots, dropped file
   - **Paste:** the page sends bytes, never paths.
 - **The dialog plugin's JS `open`** stays limited to the folder picker (directory-only use; documented in the capability description).
 - **Written names are validated** (`validate_name`); paths go through `VaultPath` / `fs_path` (no symlink escapes); hidden temp files are used; writes are create-only and atomic.
-- **Pasted image types** are png, jpg, gif and webp. Dropped files of any type are allowed, because they are only copied; serving them stays behind `nimw-asset`'s sandbox CSP, and opening externally keeps M2a's `check_openable` rules.
+- **Pasted image types** are png, jpg, gif and webp. Dropped files of any type are allowed, because they are only copied; serving them stays behind `liber-asset`'s sandbox CSP, and opening externally keeps M2a's `check_openable` rules.
 
 ## 9. Testing
 
 - **Rust:**
   - `save_attachment` and `import_attachment`: policy × modes, dedupe, a name clash on a case-insensitive FS, invalid names, inside-vault no-copy, directory refused, symlink to a file;
-  - precedence of the Obsidian / NIMW / default policy;
+  - precedence of the Obsidian / Liber Linteum / default policy;
   - `link_suggest` ranking and the alias rule (PG-05 example);
   - `vault_settings` round trip preserving unknown keys;
   - drop grants (expiry, consume, refuse).
@@ -342,7 +342,7 @@ Make a page feel finished: a cover, a subtitle, pasted screenshots, dropped file
 
 These override the sections above where they conflict.
 
-1. **Attachment policy** (§5.3): `Vault::attachment_policy()` re-reads both config files on every call and returns an owned policy. NIMW's own modes gain `folder` (Obsidian's fixed-folder form); `vault` with a path still reads as a folder (M1a compatibility). An Obsidian value that isn't a usable path is ignored (NIMW's setting applies) and isn't reported as "Set by Obsidian".
+1. **Attachment policy** (§5.3): `Vault::attachment_policy()` re-reads both config files on every call and returns an owned policy. Liber Linteum's own modes gain `folder` (Obsidian's fixed-folder form); `vault` with a path still reads as a folder (M1a compatibility). An Obsidian value that isn't a usable path is ignored (Liber Linteum's setting applies) and isn't reported as "Set by Obsidian".
 2. **Dropped Markdown files** are copied like any file, indexed as pages (title parsed) and linked as `[[name]]`.
 3. **Error kinds:** besides `tooLarge` and `notPermitted`, `notAFile` (a dropped folder). Dropped and pasted names are sanitized with `-` for every character `validate_name` refuses, a leading dot included; empty becomes `file`.
 4. **Ranking** (§6, §7.2): match quality first; the page/attachment preference (`[[` / `![[`) breaks ties, then shorter path, then newer file. Subsequence matching applies to names and titles, not paths. An empty query sorts by that preference, then by modification time. `link_suggest` returns `{ path, kind, title, target }` (no `mtime`).
@@ -352,8 +352,8 @@ These override the sections above where they conflict.
 8. **Link picker** (§6.3): the opener registry is `linkPickerOpen.ts` (`linkPicker.ts` would shadow `LinkPicker.tsx` on case-insensitive file systems). Without a React editor host, ⌘K keeps the Markdown `[text](url)` insertion. Pages only, at most 8.
 9. **Create page** (§7.6): a target with a leading `/` is vault-root-relative too; the "in Folder/" title is used only for path targets.
 10. **Paste** (§5.1): a clipboard that also has `text/plain` (e.g. an image copied from a browser with its URL) is pasted as text by CodeMirror.
-11. **Drop** (§5.2): the position falls back to the cursor when `posAtCoords` has none; the pending insertion point is a mapped StateField, so typing while files copy can't misplace them; the caret is `.cm-nimw-drop-caret`. Grants are recorded from both the window and the webview drag-drop events (webview windows report drops on the window).
-12. **HTML blocks** (§7.7): muted with `cm-nimw-muted`; "renders nothing" is decided by running the sanitizer (memoized per block text).
+11. **Drop** (§5.2): the position falls back to the cursor when `posAtCoords` has none; the pending insertion point is a mapped StateField, so typing while files copy can't misplace them; the caret is `.cm-liber-drop-caret`. Grants are recorded from both the window and the webview drag-drop events (webview windows report drops on the window).
+12. **HTML blocks** (§7.7): muted with `cm-liber-muted`; "renders nothing" is decided by running the sanitizer (memoized per block text).
 13. **This vault** (§5.4): labelled "New attachments go to" with "A subfolder next to the page / The page's folder / The vault root / A folder in the vault"; a subfolder or folder name is saved on Enter or blur; when Obsidian's setting applies, the text says in plain words where files go.
 14. **Autocomplete list** is styled with a scoped `EditorView.theme` (a base theme loses to `@codemirror/autocomplete`'s own); `@codemirror/autocomplete` is declared `^6.20.3` like the other CodeMirror packages.
 15. **Tooling:** `pnpm check:i18n` needs Node ≥ 22.18 (`.nvmrc`: 24); the e2e mock gains `remoteCover`, a new hash per write (the header refreshes on it) and an event bus for `tauri://drag-*`.
@@ -367,7 +367,7 @@ These override the sections above where they conflict.
    - added keys use the map's indentation;
    - every edit is re-parsed (remark's and the Rust/Obsidian view) and refused unless it reads back exactly as the patch with every other key unchanged.
 3. **Unconfirmed blocks (Minor 2):** a header edit is refused when the text opens with a BOM + `---`, or with a `---` line that a later `---`/`...` line could close but remark doesn't treat as frontmatter. A note that merely starts with a thematic break still gets a new block.
-4. **The refusal toast** reads "NIMW can't safely change this note's frontmatter. Edit it in Source mode."
+4. **The refusal toast** reads "Liber Linteum can't safely change this note's frontmatter. Edit it in Source mode."
 5. **Paste/drop target page (I1):** the page is captured when the paste or drop starts; a result arriving after a page switch goes into that page's stored editor state and text (still undoable), never into the page on screen; nothing is inserted once another vault is open.
 6. **Drags without files (Minor 3)**, such as text drags, are ignored (paths remembered from `enter`).
 7. **Pending drops (Minor 4)** have their own mapped positions, one per drop, separate from the hover caret.

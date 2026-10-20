@@ -85,7 +85,7 @@ export function LanguagePicker({
   return (
     <div ref={box} className={styles.linkPicker} style={place ?? undefined}>
       <input
-        className={styles.linkPickerInput}
+        className={`field-control ${styles.linkPickerInput}`}
         role="combobox"
         aria-label={t('code.pickLanguage')}
         aria-expanded={options.length > 0}

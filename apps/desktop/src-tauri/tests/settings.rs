@@ -1,6 +1,6 @@
 //! Settings store (M1b spec §2.3).
 
-use nimw_desktop::settings::{
+use liber_desktop::settings::{
     MAX_RECENT, Settings, SettingsPatch, SettingsStore, Theme, rfc3339_utc,
 };
 use std::path::Path;
@@ -186,7 +186,7 @@ fn review_focus_unknown_value_from_newer_version_resets_only_that_field() {
 /// M2a §3.2: the last-used editor mode is a global setting.
 #[test]
 fn ed_01_editor_mode_defaults_to_live_preview_and_persists() {
-    use nimw_desktop::settings::EditorMode;
+    use liber_desktop::settings::EditorMode;
     let dir = tempfile::tempdir().unwrap();
     let s = store(dir.path());
     assert_eq!(s.get().0.editor_mode, EditorMode::LivePreview);
@@ -215,7 +215,7 @@ fn ed_01_editor_mode_defaults_to_live_preview_and_persists() {
 /// and reset on its own when a value can't be understood.
 #[test]
 fn m2b_appearance_and_editor_settings_default_and_persist() {
-    use nimw_desktop::settings::{FontChoice, FontSize, HexColor, Palette};
+    use liber_desktop::settings::{FontChoice, FontSize, HexColor, Palette};
     let dir = tempfile::tempdir().unwrap();
     let s = store(dir.path());
     let d = s.get().0;
@@ -252,7 +252,7 @@ fn m2b_appearance_and_editor_settings_default_and_persist() {
 
 #[test]
 fn m2b_each_new_setting_is_reset_on_its_own() {
-    use nimw_desktop::settings::{FontSize, Palette};
+    use liber_desktop::settings::{FontSize, Palette};
     let dir = tempfile::tempdir().unwrap();
     std::fs::write(
         dir.path().join("settings.json"),
@@ -285,7 +285,7 @@ fn m2b_each_new_setting_is_reset_on_its_own() {
 
 #[test]
 fn m2b_font_size_is_clamped_and_font_choices_are_bounded() {
-    use nimw_desktop::settings::{FontChoice, FontSize, HexColor};
+    use liber_desktop::settings::{FontChoice, FontSize, HexColor};
     let dir = tempfile::tempdir().unwrap();
     std::fs::write(dir.path().join("settings.json"), r#"{"fontSize":40}"#).unwrap();
     assert_eq!(store(dir.path()).get().0.font_size, FontSize::new(20));
@@ -315,7 +315,7 @@ fn m2b_font_size_is_clamped_and_font_choices_are_bounded() {
 /// reset on their own when unreadable.
 #[test]
 fn m3a_global_view_settings_default_persist_and_reset() {
-    use nimw_desktop::settings::{GlobalViewEdges, GlobalViewMode};
+    use liber_desktop::settings::{GlobalViewEdges, GlobalViewMode};
     let dir = tempfile::tempdir().unwrap();
     let s = store(dir.path());
     let d = s.get().0;
@@ -367,7 +367,7 @@ fn m3a_global_view_settings_default_persist_and_reset() {
 /// and reset on its own when unreadable.
 #[test]
 fn m4b2_page_width_setting_default_persist_and_reset() {
-    use nimw_desktop::settings::PageWidth;
+    use liber_desktop::settings::PageWidth;
     let dir = tempfile::tempdir().unwrap();
     let s = store(dir.path());
     assert_eq!(s.get().0.page_width, PageWidth::Readable);
@@ -394,7 +394,7 @@ fn m4b2_page_width_setting_default_persist_and_reset() {
 /// M4b part 3 (wide elements §2): `wide` is an app-wide width too.
 #[test]
 fn m4b3_page_width_wide_persists() {
-    use nimw_desktop::settings::PageWidth;
+    use liber_desktop::settings::PageWidth;
     let dir = tempfile::tempdir().unwrap();
     let s = store(dir.path());
     s.update(SettingsPatch {
@@ -414,7 +414,7 @@ fn m4b3_page_width_wide_persists() {
 /// (from a newer version) survives a save.
 #[test]
 fn m4b3_wide_elements_defaults_missing_keys_and_unknown_keys() {
-    use nimw_desktop::settings::WideElements;
+    use liber_desktop::settings::WideElements;
     let dir = tempfile::tempdir().unwrap();
     let wide = store(dir.path()).get().0.wide_elements;
     assert!(wide.tables && wide.diagrams);
@@ -517,7 +517,7 @@ fn m4b3_show_attachment_paths_default_persist_and_reset() {
 /// resets only its own field.
 #[test]
 fn m5b_auto_save_sidebar_and_action_button_default_persist_and_reset() {
-    use nimw_desktop::settings::ActionButton;
+    use liber_desktop::settings::ActionButton;
     let dir = tempfile::tempdir().unwrap();
     let s = store(dir.path());
     let d = s.get().0;
@@ -561,7 +561,7 @@ fn m5b_auto_save_sidebar_and_action_button_default_persist_and_reset() {
 /// a number.
 #[test]
 fn cover_height_setting_default_persist_clamp_and_reset() {
-    use nimw_desktop::settings::CoverHeight;
+    use liber_desktop::settings::CoverHeight;
     let dir = tempfile::tempdir().unwrap();
     let s = store(dir.path());
     assert_eq!(s.get().0.cover_height, CoverHeight::new(200));
@@ -593,4 +593,39 @@ fn cover_height_setting_default_persist_clamp_and_reset() {
     assert_eq!(s.cover_height.get(), 200);
     assert_eq!(s.theme, Theme::Dark);
     assert!(warning.unwrap().contains("coverHeight"));
+}
+
+/// Round 3 §2.1: the sidebar's width, 270 px by default, persisted, clamped
+/// to 200–560 and reset on its own when it isn't a number.
+#[test]
+fn sidebar_width_setting_default_persist_clamp_and_reset() {
+    use liber_desktop::settings::SidebarWidth;
+    let dir = tempfile::tempdir().unwrap();
+    let s = store(dir.path());
+    assert_eq!(s.get().0.sidebar_width.get(), 270);
+    s.update(SettingsPatch {
+        sidebar_width: Some(SidebarWidth::new(380)),
+        ..Default::default()
+    })
+    .unwrap();
+    let saved: serde_json::Value =
+        serde_json::from_str(&std::fs::read_to_string(dir.path().join("settings.json")).unwrap())
+            .unwrap();
+    assert_eq!(saved["sidebarWidth"], 380);
+    assert_eq!(store(dir.path()).get().0.sidebar_width.get(), 380);
+    for (text, px) in [
+        (r#"{"sidebarWidth":20}"#, 200),
+        (r#"{"sidebarWidth":5000}"#, 560),
+    ] {
+        std::fs::write(dir.path().join("settings.json"), text).unwrap();
+        assert_eq!(store(dir.path()).get().0.sidebar_width.get(), px, "{text}");
+    }
+    std::fs::write(
+        dir.path().join("settings.json"),
+        r#"{"sidebarWidth":"wide"}"#,
+    )
+    .unwrap();
+    let (s, warning) = store(dir.path()).get();
+    assert_eq!(s.sidebar_width.get(), 270);
+    assert!(warning.unwrap().contains("sidebarWidth"));
 }

@@ -73,7 +73,8 @@ describe('the recent list (M4c §7.19)', () => {
     render(<RecentList />);
     const quick = await screen.findByRole('button', { name: /^Quick notes/ });
     expect(quick.querySelector('[data-quick-note-icon]')).not.toBeNull();
-    expect(screen.getByRole('button', { name: 'Remove Quick notes from recent' })).toBeVisible();
+    // R3 §7: row actions show on hover or focus, so check it's there, not painted.
+    expect(screen.getByRole('button', { name: 'Remove Quick notes from recent' })).toBeEnabled();
     await userEvent.click(quick);
     await waitFor(() => expect(useVaultStore.getState().status).toBe('open'));
     expect(calls.find(([c]) => c === 'scratchpad_open')?.[1]).toEqual({});
@@ -130,7 +131,7 @@ describe('Settings → This vault: the scratch folder (M4c §7.8)', () => {
     const field = screen.getByRole('textbox', { name: 'Quick notes folder' });
     expect(field).toHaveValue('Scratchpad');
     // M5b round 2: as wide as the selects around it, not a 10-character box.
-    expect(field).toHaveClass(dialogs.textInput);
+    expect(field).toHaveClass(dialogs.textInput, 'field-control');
     await userEvent.clear(field);
     await userEvent.type(field, 'Inbox{Enter}');
     await waitFor(() =>

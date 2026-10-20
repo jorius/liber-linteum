@@ -1,21 +1,26 @@
 {
   "app": {
-    "name": "Notes In My Way",
+    "name": "Liber Linteum",
     "tagline": "Notas privadas que viven en tu disco. Sin nube, sin cuentas, sin telemetría.",
     "version": "v{version}",
     "credits": "Vista global hecha con React Flow (MIT)."
   },
   "welcome": {
     "language": "Idioma",
-    "create": "Crear una bóveda nueva",
-    "open": "Abrir una carpeta como bóveda",
+    "create": "Bóveda nueva",
+    "open": "Abrir carpeta como bóveda",
     "openObsidian": "Abrir una bóveda de Obsidian",
-    "importNotion": "Importar una exportación de Notion",
-    "recent": "Recientes",
+    "importNotion": "Importar desde Notion…",
+    "recent": "Bóvedas recientes",
     "noRecent": "Aún no hay bóvedas recientes.",
     "forget": "Quitar {name} de recientes",
-    "missing": "Carpeta no encontrada",
-    "quickNote": "Tomar una nota rápida"
+    "missing": "No se puede abrir",
+    "quickNote": "Nota rápida",
+    "moreWays": "Más formas de empezar",
+    "openFile": "Abrir un solo archivo…",
+    "filter": "Filtrar bóvedas",
+    "noMatch": "Ninguna bóveda coincide con «{query}».",
+    "reveal": "{os, select, mac {Mostrar {name} en el Finder} windows {Mostrar {name} en el Explorador} other {Mostrar {name} en el gestor de archivos}}"
   },
   "languages": {
     "en": "English",
@@ -40,6 +45,7 @@
     "notAFile": "Las carpetas no se pueden adjuntar.",
     "tooLarge": "Ese archivo es demasiado grande para pegarlo.",
     "notAText": "Este archivo no se puede abrir como texto: no es texto UTF-8 o supera los 2 MB.",
+    "invalidInput": "Ese valor no es válido aquí.",
     "io": "Algo salió mal: {message}"
   },
   "toasts": {
@@ -47,6 +53,8 @@
     "renameFailed": "{count, plural, one {Renombrado. No se pudo actualizar # archivo} other {Renombrado. No se pudieron actualizar # archivos}}",
     "trashed": "Movido a la papelera",
     "openedWithWarnings": "{count, plural, one {Abierta con # advertencia} other {Abierta con # advertencias}}",
+    "metaDirBoth": "Esta bóveda también tiene su carpeta de ajustes de antes del cambio de nombre. Se usa la actual; la antigua queda intacta.",
+    "metaDirUnmoved": "La carpeta de ajustes de esta bóveda de antes del cambio de nombre no se pudo mover ({error}). Se usa donde está y se moverá la próxima vez que se abra con permiso de escritura.",
     "dismiss": "Cerrar",
     "details": "Detalles",
     "liveUpdatesUnavailable": "Las actualizaciones en vivo no están disponibles: los cambios hechos fuera de la app aparecen al reabrir la bóveda.",
@@ -88,6 +96,8 @@
     "closeVault": "Cerrar bóveda",
     "actions": "Acciones",
     "hideSidebar": "Ocultar la barra lateral",
+    "resizeSidebar": "Cambiar el ancho de la barra lateral",
+    "resizeSidebarHint": "Arrastra para cambiar el ancho de la barra lateral; doble clic para restablecerlo",
     "showSidebar": "Mostrar la barra lateral",
     "settingsItem": "Ajustes…",
     "openAnother": "Abrir otra bóveda…"
@@ -110,7 +120,7 @@
     "breadcrumb": "Ruta",
     "titleLabel": "Título de la página",
     "titleTaken": "Ya hay una página llamada «{name}» en esta carpeta.",
-    "frontmatterInvalid": "NIMW no puede cambiar con seguridad el frontmatter de esta nota. Edítalo en el modo Código.",
+    "frontmatterInvalid": "Liber Linteum no puede cambiar con seguridad el frontmatter de esta nota. Edítalo en el modo Código.",
     "titleInNote": "Título en la nota: {title}",
     "subtitleLabel": "Subtítulo",
     "subtitlePlaceholder": "Añade un subtítulo",
@@ -136,10 +146,10 @@
     "notSaved": "Sin guardar",
     "orphaned": "Esta página se borró fuera de la app. Tu texto sigue aquí.",
     "saveAsNew": "Guardar como página nueva",
-    "notText": "Este archivo cambió fuera de Notes In My Way y ya no es texto plano que pueda editar. Tus cambios sin guardar siguen aquí: cópialos o guárdalos como un archivo nuevo.",
-    "notTextPage": "Esta página cambió fuera de Notes In My Way y ya no es texto que pueda editar. Tus cambios sin guardar siguen aquí: cópialos o guárdalos como una página nueva.",
-    "notTextToast": "«{name}» cambió fuera de Notes In My Way y ya no es texto plano que pueda editar. Tus cambios sin guardar siguen en la app.",
-    "tooLarge": "Este texto no se puede guardar: un archivo de texto que Notes In My Way edita tiene como máximo 2 MB y ningún carácter NUL. Sigue aquí: acórtalo para volver a guardar, o cópialo.",
+    "notText": "Este archivo cambió fuera de Liber Linteum y ya no es texto plano que pueda editar. Tus cambios sin guardar siguen aquí: cópialos o guárdalos como un archivo nuevo.",
+    "notTextPage": "Esta página cambió fuera de Liber Linteum y ya no es texto que pueda editar. Tus cambios sin guardar siguen aquí: cópialos o guárdalos como una página nueva.",
+    "notTextToast": "«{name}» cambió fuera de Liber Linteum y ya no es texto plano que pueda editar. Tus cambios sin guardar siguen en la app.",
+    "tooLarge": "Este texto no se puede guardar: un archivo de texto que Liber Linteum edita tiene como máximo 2 MB y ningún carácter NUL. Sigue aquí: acórtalo para volver a guardar, o cópialo.",
     "tooLargeToast": "«{name}» es demasiado grande para guardarse como texto. Tu texto sigue en la app.",
     "saveAsNewFile": "Guardar como archivo nuevo",
     "largeNote": "Vista previa simplificada para notas grandes",
@@ -236,7 +246,9 @@
     "archive": "Archivar",
     "sortBy": "Ordenar por",
     "open": "Abrir",
-    "unarchive": "Desarchivar"
+    "unarchive": "Desarchivar",
+    "addFolderPage": "Añadir una página a esta carpeta",
+    "useAsFolderPage": "Usar {name}.md como página de esta carpeta"
   },
   "dialogs": {
     "cancel": "Cancelar",
@@ -246,12 +258,16 @@
       "links": "{count, plural, =0 {Nada enlaza a este elemento.} one {# enlace apunta aquí y se romperá.} other {# enlaces apuntan aquí y se romperán.}}",
       "items": "{count, plural, one {Contiene # elemento.} other {Contiene # elementos.}}",
       "dontAsk": "No volver a preguntar",
+      "folderPage": "Su página, {name}, se va con ella.",
       "confirm": "Mover a la papelera"
     },
     "move": {
       "title": "Mover «{name}»",
       "to": "Carpeta de destino",
       "root": "Raíz de la bóveda",
+      "filter": "Filtrar carpetas",
+      "current": "actual",
+      "none": "Ninguna carpeta coincide",
       "confirm": "Mover"
     },
     "external": {
@@ -377,6 +393,10 @@
         "title": "Editor",
         "description": "Fuentes, ancho de página, portadas y guardado."
       },
+      "spelling": {
+        "title": "Ortografía",
+        "description": "Diccionarios para revisar la ortografía, todos en este equipo."
+      },
       "files": {
         "title": "Archivos y notas rápidas",
         "description": "Renombrar, borrar y dónde viven las notas rápidas."
@@ -387,7 +407,7 @@
       },
       "vault": {
         "title": "Esta bóveda",
-        "description": "Ajustes guardados con esta bóveda, en .nimw/vault.json."
+        "description": "Ajustes guardados con esta bóveda, en .liber/vault.json."
       }
     },
     "shortcuts": {
@@ -405,7 +425,7 @@
         "search": "Buscar",
         "files": "Ir a los archivos",
         "newPage": "Nueva página",
-        "quickNote": "Nueva nota rápida",
+        "quickNote": "Crear una nota rápida nueva en esta bóveda",
         "save": "Guardar",
         "link": "Insertar un enlace",
         "bold": "Negrita",
@@ -538,7 +558,7 @@
     "folderPath": "Carpeta de la bóveda",
     "obsidianSet": "Obsidian guarda los adjuntos nuevos en {value} ({place}).",
     "obsidianHint": "Cámbialo en Obsidian (Ajustes → Archivos y enlaces) o usa otro lugar aquí.",
-    "override": "Usar otro lugar en Notes In My Way",
+    "override": "Usar otro lugar en Liber Linteum",
     "obsidianRoot": "la raíz de la bóveda",
     "obsidianSame": "la carpeta de la página",
     "obsidianSubfolder": "la carpeta «{name}» junto a la página",
@@ -833,6 +853,31 @@
     "emptyHelp": "Las páginas, carpetas y adjuntos que eliminas esperan aquí, dentro de la bóveda, hasta que los eliminas definitivamente.",
     "noMatch": "Nada en la Papelera coincide con «{query}»."
   },
+  "spelling": {
+    "menu": "Ortografía: {word}",
+    "noSuggestions": "Sin sugerencias",
+    "add": "Agregar al diccionario",
+    "ignore": "Ignorar",
+    "check": "Revisar la ortografía",
+    "dictionaries": "Diccionarios",
+    "import": "Agregar diccionario desde el disco…",
+    "remove": "Quitar {name}",
+    "removeShort": "Quitar",
+    "removeAsk": "¿Quitar {name}?",
+    "noneSelected": "Ningún diccionario seleccionado: no se revisa la ortografía",
+    "unavailable": "No se pudo cargar",
+    "words": "Palabras agregadas en esta bóveda",
+    "noWords": "Aún no hay palabras",
+    "removeWord": "Quitar {word}",
+    "vault": "Ortografía",
+    "vaultApp": "Usar los diccionarios de la app",
+    "vaultCustom": "Elegir para esta bóveda",
+    "dict": {
+      "en_US": "Inglés (EE. UU.)",
+      "es": "Español",
+      "es_CO": "Español (Colombia)"
+    }
+  },
   "sort": {
     "label": "Ordenar {name} por",
     "vault": "Ordenar la bóveda",
@@ -846,7 +891,9 @@
     "title": "Favoritos",
     "add": "Añadir a Favoritos",
     "remove": "Quitar de Favoritos",
+    "addNamed": "Añadir {name} a Favoritos",
     "removeNamed": "Quitar {name} de Favoritos",
+    "toggleNamed": "{name} en Favoritos",
     "moveUp": "Subir en Favoritos",
     "moveDown": "Bajar en Favoritos",
     "movedTo": "{name} pasó a la posición {position} de {count} en Favoritos",
@@ -862,6 +909,7 @@
     "noLocation": "Ninguna carpeta elegida",
     "chooseLocation": "Elegir ubicación…",
     "name": "Nombre de la bóveda",
+    "namePlaceholder": "Toma el nombre de la exportación",
     "nameInvalid": "Usa un nombre de carpeta sencillo: sin / \\ : * ? \" < > | # ^ [ ], sin punto al inicio ni al final, sin nombres de dispositivo de Windows (CON, NUL…), de 200 bytes como mucho.",
     "previewLabel": "Vista previa",
     "reading": "Leyendo la exportación…",

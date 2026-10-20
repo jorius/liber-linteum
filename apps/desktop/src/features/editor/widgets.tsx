@@ -37,7 +37,7 @@ export class PreviewWidget extends WidgetType {
 
   toDOM(view: EditorView): HTMLElement {
     const dom = document.createElement('div');
-    dom.className = 'cm-nimw-widget';
+    dom.className = 'cm-liber-widget';
     if (this.kind) dom.dataset.wideKind = this.kind;
     dom.addEventListener('mousedown', (e) => {
       const target = e.target as HTMLElement;
@@ -95,7 +95,7 @@ export class CheckboxWidget extends WidgetType {
     box.type = 'checkbox';
     box.checked = this.checked;
     box.tabIndex = -1;
-    box.className = 'cm-nimw-checkbox';
+    box.className = 'cm-liber-checkbox';
     box.setAttribute('aria-label', this.label);
     box.disabled = view.state.readOnly; // archived (round-2 review M4)
     box.addEventListener('mousedown', (e) => {
@@ -147,18 +147,18 @@ export class CodeBadgeWidget extends WidgetType {
 
   toDOM(view: EditorView): HTMLElement {
     const box = document.createElement('span');
-    box.className = 'cm-nimw-codebadge';
+    box.className = 'cm-liber-codebadge';
     const name = this.lang ? languageName(this.lang) : i18next.t('code.plain');
     const badge = document.createElement('button');
     badge.type = 'button';
-    badge.className = 'cm-nimw-codebadge-lang';
+    badge.className = 'cm-liber-codebadge-lang';
     badge.textContent = name;
     badge.setAttribute('aria-label', i18next.t('code.languageLabel', { name }));
     badge.addEventListener('mousedown', (e) => e.preventDefault());
     badge.addEventListener('click', () => openLanguagePicker(view, view.posAtDOM(box), badge));
     const copy = document.createElement('button');
     copy.type = 'button';
-    copy.className = 'cm-nimw-codebadge-copy';
+    copy.className = 'cm-liber-codebadge-copy';
     copy.textContent = i18next.t('code.copy');
     copy.setAttribute('aria-label', i18next.t('code.copyCode'));
     copy.addEventListener('mousedown', (e) => e.preventDefault());
@@ -169,6 +169,21 @@ export class CodeBadgeWidget extends WidgetType {
 
   ignoreEvent(): boolean {
     return true;
+  }
+}
+
+/** A bullet list's marker in Live Preview (round 3 §1); the source `-`, `*`
+ *  or `+` shows on the cursor line. */
+export class BulletWidget extends WidgetType {
+  eq(): boolean {
+    return true;
+  }
+
+  toDOM(): HTMLElement {
+    const dot = document.createElement('span');
+    dot.className = 'cm-liber-bullet';
+    dot.textContent = '•';
+    return dot;
   }
 }
 
@@ -185,7 +200,7 @@ export class InlineMathWidget extends WidgetType {
 
   toDOM(view: EditorView): HTMLElement {
     const el = document.createElement('span');
-    el.className = 'cm-nimw-math';
+    el.className = 'cm-liber-math';
     renderMath(this.tex, el, false);
     el.addEventListener('mousedown', (e) => {
       e.preventDefault();

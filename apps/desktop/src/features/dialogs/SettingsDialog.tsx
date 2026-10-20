@@ -41,6 +41,7 @@ import { keyLabel, SHORTCUT_GROUPS } from './shortcuts';
 import { useLatestSave } from './useLatestSave';
 import { ScratchpadLocation } from '../scratchpad/ScratchpadLocation';
 import { VaultSettingsSection } from './VaultSettingsSection';
+import { SpellingSettings } from './SpellingSettings';
 
 const THEMES: Theme[] = ['system', 'light', 'dark'];
 const themeKey = { system: 'themeSystem', light: 'themeLight', dark: 'themeDark' } as const;
@@ -59,7 +60,14 @@ const WIDE_KINDS: (keyof WideElements)[] = ['tables', 'code', 'diagrams', 'image
 
 /** The categories of the left menu (M5b §18), in order; `vault` only with a
  *  vault open. */
-const APP_CATEGORIES = ['general', 'appearance', 'editor', 'files', 'shortcuts'] as const;
+const APP_CATEGORIES = [
+  'general',
+  'appearance',
+  'editor',
+  'spelling',
+  'files',
+  'shortcuts',
+] as const;
 type Category = (typeof APP_CATEGORIES)[number] | 'vault';
 /** The category shown last, for the session (M5b §18). */
 let lastCategory: Category = 'general';
@@ -255,7 +263,7 @@ export function SettingsDialog({ onClose }: { onClose: () => void }) {
               <label className={styles.field}>
                 <span>{t('settings.language')}</span>
                 <select
-                  className={styles.select}
+                  className="field-control"
                   value={settings.language ?? 'system'}
                   onChange={(e) => void update({ language: e.target.value })}
                 >
@@ -320,7 +328,7 @@ export function SettingsDialog({ onClose }: { onClose: () => void }) {
               <label className={styles.field}>
                 <span>{t('settings.actionButton')}</span>
                 <select
-                  className={styles.select}
+                  className="field-control"
                   value={settings.actionButton}
                   onChange={(e) =>
                     void update({ actionButton: e.target.value as ActionButtonPlace })
@@ -353,7 +361,7 @@ export function SettingsDialog({ onClose }: { onClose: () => void }) {
               <label className={styles.field}>
                 <span>{t('settings.fontSize')}</span>
                 <select
-                  className={styles.select}
+                  className="field-control"
                   value={settings.fontSize}
                   onChange={(e) => void update({ fontSize: Number(e.target.value) })}
                 >
@@ -367,7 +375,7 @@ export function SettingsDialog({ onClose }: { onClose: () => void }) {
               <label className={styles.field}>
                 <span>{t('settings.pageWidth')}</span>
                 <select
-                  className={styles.select}
+                  className="field-control"
                   value={settings.pageWidth}
                   onChange={(e) => void update({ pageWidth: e.target.value as PageWidth })}
                 >
@@ -399,7 +407,7 @@ export function SettingsDialog({ onClose }: { onClose: () => void }) {
               <label className={styles.field}>
                 <span>{t('settings.coverHeight')}</span>
                 <select
-                  className={styles.select}
+                  className="field-control"
                   value={settings.coverHeight}
                   onChange={(e) => void update({ coverHeight: Number(e.target.value) })}
                 >
@@ -478,6 +486,7 @@ export function SettingsDialog({ onClose }: { onClose: () => void }) {
               <ScratchpadLocation />
             </>,
           )}
+          {panel('spelling', <SpellingSettings vaultOpen={vaultOpen} />)}
           {panel('shortcuts', <ShortcutList />)}
           {vaultOpen && panel('vault', <VaultSettingsSection />)}
         </div>
@@ -519,6 +528,8 @@ function CategoryIcon({ category }: { category: Category }) {
       return <WidthIcon />;
     case 'editor':
       return <PencilIcon />;
+    case 'spelling':
+      return <FormatIcon />;
     case 'files':
       return <NewPageIcon />;
     case 'shortcuts':
@@ -610,7 +621,7 @@ function AccentEditor({
         />
         <input
           type="text"
-          className={styles.hexInput}
+          className={`field-control ${styles.hexInput}`}
           aria-label={t('settings.accentHex')}
           aria-invalid={invalid}
           aria-describedby={invalid ? errorId : undefined}
@@ -659,7 +670,7 @@ function FontSelect({
   return (
     <label className={styles.field}>
       <span>{label}</span>
-      <select className={styles.select} value={value} onChange={(e) => onChange(e.target.value)}>
+      <select className="field-control" value={value} onChange={(e) => onChange(e.target.value)}>
         <optgroup label={t('settings.fontBundled')}>
           {fonts.map((f) => (
             <option key={f.id} value={f.id} style={{ fontFamily: f.stack }}>

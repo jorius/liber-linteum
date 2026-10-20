@@ -109,7 +109,7 @@ describe('Preview: every node type (M2a §4)', () => {
     expect(screen.getByText('gone').tagName).toBe('DEL');
     expect(screen.getByText('marked').tagName).toBe('MARK');
     expect(screen.getByText('code').tagName).toBe('CODE');
-    expect(screen.getByText('#idea')).toHaveAttribute('data-nimw', 'tag');
+    expect(screen.getByText('#idea')).toHaveAttribute('data-liber', 'tag');
     expect(screen.getByText('red')).toHaveAttribute('data-color', 'red');
     const done = screen.getByRole('checkbox', { name: 'done' });
     expect(done).toBeChecked();
@@ -124,7 +124,7 @@ describe('Preview: every node type (M2a §4)', () => {
       'let x = 1;\n',
     );
     expect(screen.getByRole('table')).toHaveTextContent('12');
-    const columns = screen.getByText('left').closest('[data-nimw="columns"]')!;
+    const columns = screen.getByText('left').closest('[data-liber="columns"]')!;
     expect(within(columns as HTMLElement).getByText('right')).toBeInTheDocument();
     expect(document.querySelector('hr')).not.toBeNull();
     expect(document.body.innerHTML).not.toContain('alert');
@@ -164,7 +164,7 @@ describe('Preview: links (M2a §3.4)', () => {
     expect(screen.getByRole('link', { name: 'Nope' })).toHaveAttribute('data-state', 'unresolved');
     expect(screen.getByRole('link', { name: 'md' })).toHaveAttribute('data-state', 'resolved');
     const site = screen.getByRole('link', { name: /site/ });
-    expect(site).toHaveAttribute('data-nimw', 'external');
+    expect(site).toHaveAttribute('data-liber', 'external');
     expect(site).not.toHaveAttribute('href', 'https://example.org');
   });
 
@@ -190,10 +190,10 @@ describe('Preview: links (M2a §3.4)', () => {
 });
 
 describe('Preview: embeds (M2a §4, §1.1)', () => {
-  it('images with the size syntax, through nimw-asset:, lazy', async () => {
+  it('images with the size syntax, through liber-asset:, lazy', async () => {
     show('![[rex cover.png|300]]\n');
     const img = await screen.findByRole('img', { name: 'rex cover.png' });
-    expect(img).toHaveAttribute('src', 'nimw-asset://localhost/assets/rex%20cover.png');
+    expect(img).toHaveAttribute('src', 'liber-asset://localhost/assets/rex%20cover.png');
     expect(img).toHaveAttribute('width', '300');
     expect(img).toHaveAttribute('loading', 'lazy');
   });
@@ -203,7 +203,7 @@ describe('Preview: embeds (M2a §4, §1.1)', () => {
     await waitFor(() =>
       expect(document.querySelector('audio')).toHaveAttribute(
         'src',
-        'nimw-asset://localhost/assets/voice.mp3',
+        'liber-asset://localhost/assets/voice.mp3',
       ),
     );
     expect(document.querySelector('audio')).not.toHaveAttribute('controls');
@@ -294,7 +294,7 @@ describe('callout titles (I7)', () => {
     const summary = screen.getByText('Bold').closest('summary')!;
     expect(screen.getByText('Bold').tagName).toBe('STRONG');
     expect(within(summary as HTMLElement).getByText('knight')).toHaveAttribute(
-      'data-nimw',
+      'data-liber',
       'wikilink',
     );
     expect(screen.getByText('body').closest('summary')).toBeNull();

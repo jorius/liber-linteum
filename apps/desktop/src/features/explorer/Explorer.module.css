@@ -68,6 +68,11 @@
   border-style: dashed;
 }
 
+/* A row's glyphs keep their size however long its name (round 3 §2.2). */
+.row > svg {
+  flex: none;
+}
+
 .label {
   overflow: hidden;
   text-overflow: ellipsis;
@@ -122,32 +127,6 @@
   border-radius: var(--radius-sm);
 }
 
-/* "…" menu button (M1b §10 d): shown on hover, focus and selection. */
-.more {
-  margin-left: auto;
-  flex: none;
-  border: none;
-  background: none;
-  color: inherit;
-  font: 700 14px var(--font-body);
-  line-height: 1;
-  padding: 2px 6px;
-  border-radius: var(--radius-sm);
-  cursor: pointer;
-  opacity: 0;
-}
-
-.row:hover .more,
-.row:focus .more,
-.row:focus-within .more,
-.selected .more {
-  opacity: 1;
-}
-
-.more:hover {
-  background: var(--color-sidebar-active);
-}
-
 /* The vault's scratch folder, pinned first (M4c §7.2): a pencil, its note
    count, and a divider under it and its open contents. */
 .pinIcon {
@@ -164,10 +143,6 @@
   opacity: 0.75;
 }
 
-.count + .more {
-  margin-left: 0;
-}
-
 .divider {
   margin-top: 6px;
   position: relative;
@@ -182,25 +157,24 @@
   border-top: 1px solid var(--color-sidebar-divider);
 }
 
-/* Quick actions (M5b §3): + (folders), ☺, 🗑, shown like "…". */
+/* Quick actions (round 3 §2.3): ★, ☺, 🗑 on hover, focus and selection.
+   Hidden ones take no room (but stay in the accessibility tree), so a name
+   uses the row's whole width until the pointer is on it. */
 .actions {
   margin-left: auto;
   flex: none;
   display: inline-flex;
   align-items: center;
   gap: 1px;
-  opacity: 0;
+  max-width: 0;
+  overflow: hidden;
 }
 
 .row:hover .actions,
 .row:focus .actions,
 .row:focus-within .actions,
 .selected .actions {
-  opacity: 1;
-}
-
-.actions + .more {
-  margin-left: 0;
+  max-width: none;
 }
 
 /* The pinned scratch folder's count gives way to its actions. */
@@ -227,4 +201,11 @@
 
 .action:hover {
   background: var(--color-sidebar-active);
+}
+
+/* A folder page's chevron (round 3b §6.2): the only part that expands it. */
+.twisty {
+  display: inline-flex;
+  flex: none;
+  cursor: pointer;
 }

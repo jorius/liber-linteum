@@ -69,7 +69,7 @@ export function ActionButton() {
     <div ref={box} className={styles.fab} data-place={place} onKeyDown={onKeyDown}>
       {open && (
         <div
-          id="nimw-actions"
+          id="liber-actions"
           role="group"
           aria-label={t('shell.actions')}
           className={styles.fabStack}
@@ -120,7 +120,7 @@ export function ActionButton() {
         className={styles.fabButton}
         aria-label={t('shell.actions')}
         aria-expanded={open}
-        aria-controls={open ? 'nimw-actions' : undefined}
+        aria-controls={open ? 'liber-actions' : undefined}
         aria-keyshortcuts="Meta+J Control+J"
         title={`${t('shell.actions')} (${keys('J')})`}
         onClick={() => setOpen(!open)}

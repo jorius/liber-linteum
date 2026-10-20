@@ -63,8 +63,8 @@ function transformInline(tree: Root, src: string, loc: ReturnType<typeof locator
       prev = child;
       if (child.type === 'text') {
         // Text right after markup (`**#tag**`, a table cell, inline HTML)
-        // starts a run, as in nimw-markdown: a `#` there can open a tag. A GFM
-        // literal autolink (`a@b.c#x`) is plain text to nimw-markdown.
+        // starts a run, as in liber-markdown: a `#` there can open a tag. A GFM
+        // literal autolink (`a@b.c#x`) is plain text to liber-markdown.
         const runStart = after?.type !== 'text' && !(after && isLiteralAutolink(after, src));
         const parts = scanText(src, child as Text, loc, runStart);
         if (parts) {

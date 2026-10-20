@@ -117,7 +117,7 @@ const endPending = StateEffect.define<number>();
 class CaretWidget extends WidgetType {
   toDOM(): HTMLElement {
     const el = document.createElement('span');
-    el.className = 'cm-nimw-drop-caret';
+    el.className = 'cm-liber-drop-caret';
     el.setAttribute('aria-hidden', 'true');
     return el;
   }
@@ -162,7 +162,7 @@ const pendingAt = (state: EditorState, id: number): number | undefined =>
   state.field(pending, false)?.find((p) => p.id === id)?.pos;
 
 const caretTheme = EditorView.baseTheme({
-  '.cm-nimw-drop-caret': {
+  '.cm-liber-drop-caret': {
     display: 'inline-block',
     width: '2px',
     height: '1.2em',

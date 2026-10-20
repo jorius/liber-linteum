@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-spell-add-word"
+description = "Enables the spell_add_word command without any pre-configured scope."
+commands.allow = ["spell_add_word"]
+
+[[permission]]
+identifier = "deny-spell-add-word"
+description = "Denies the spell_add_word command without any pre-configured scope."
+commands.deny = ["spell_add_word"]

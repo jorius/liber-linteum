@@ -24,12 +24,13 @@ async function open(page: Page) {
 
 const row = (page: Page, name: string) => page.getByRole('treeitem', { name, exact: true });
 
-test('a folder’s quick actions: + makes a page inside, ☺ sets its icon everywhere', async ({
+test('a folder’s menu makes a page inside; its ☺ action sets its icon everywhere', async ({
   page,
 }) => {
   const errors = await open(page);
-  await row(page, 'Lore').hover();
-  await page.getByRole('button', { name: 'New page in Lore' }).click();
+  // Round 3 §2.3: no "+" on the row any more; New page is in its menu.
+  await row(page, 'Lore').click({ button: 'right' });
+  await page.getByRole('menuitem', { name: 'New page' }).click();
   await expect(page.getByRole('textbox', { name: 'Rename' })).toBeVisible();
   await page.keyboard.press('Escape');
 
@@ -59,7 +60,7 @@ test('the header’s icon button writes the page’s frontmatter; 🗑 asks firs
   await expect
     .poll(() =>
       page.evaluate(() =>
-        ((window as unknown as { __nimwWrites?: { text: string }[] }).__nimwWrites ?? []).some(
+        ((window as unknown as { __liberWrites?: { text: string }[] }).__liberWrites ?? []).some(
           (w) => w.text.startsWith('---\nicon: 🐉\n---\n'),
         ),
       ),

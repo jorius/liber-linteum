@@ -5,8 +5,8 @@
 **Goal:** A Global View screen that shows the vault as cards, level by level (Drill-down or Expand in place), with text-link, parent/child, manual and aggregated edges, pinned card positions that survive restarts, and full keyboard use.
 
 **Architecture:**
-- **Rust (`nimw-session`, `nimw-index`):** levels and cards (`gv_children`) and edges lifted to the visible cards (`gv_edges`), read from the index. Indexed range queries keep a 200-card level at ~2 ms on 10k notes.
-- **Rust (`nimw-vault`):** `.nimw/layout.json`, which follows renames.
+- **Rust (`liber-session`, `liber-index`):** levels and cards (`gv_children`) and edges lifted to the visible cards (`gv_edges`), read from the index. Indexed range queries keep a 200-card level at ~2 ms on 10k notes.
+- **Rust (`liber-vault`):** `.liber/layout.json`, which follows renames.
 - **Commands:** four thin async commands with real-ACL tests.
 - **UI:** a zustand store (`gvStore`) owns the drill stack, expansions, loaded levels, edges and pins; pure functions place the cards (the prototype's grid, columns and neighbourhood); React Flow (`@xyflow/react` 12.12.0) draws the canvas.
 - **Editor:** stays mounted, hidden, while the Global View shows.
@@ -26,7 +26,7 @@
 - Tauri `"freezePrototype": true`: third-party code must load with `Object.prototype` frozen. The e2e IPC mock freezes it too.
 - Performance (NFR-03): a level of ≤ 200 cards < 300 ms at 10k notes; backend `gv_children` + `gv_edges` for a 200-card level < 100 ms (release).
 - Only open levels are mounted (NFR-02).
-- Opening a vault writes nothing (VLT-02): `.nimw/layout.json` appears on the first card move.
+- Opening a vault writes nothing (VLT-02): `.liber/layout.json` appears on the first card move.
 - Vitest with `--maxWorkers=2` on this machine; Node 24 first on PATH (`pnpm check:i18n` needs ≥ 22.18).
 - Any shell chain that filters output runs with `set -o pipefail`.
 - Prettier runs from the repo root: run from `apps/desktop` it misses the root ignore file and rewrites the generated `palettes.css`.
@@ -45,10 +45,10 @@ The five inputs the spec implies that ordinary feature tests would miss and that
 
 | Path | Responsibility |
 |---|---|
-| `crates/nimw-index/src/{rows,index}.rs` | `CardRow` / `PageLink`; `card_children`, `card`, `page_links_of`, `page_links_from` (indexed range per visible card) |
-| `crates/nimw-session/src/global_view.rs` | levels (`gv_children`), cards, index-note rules, attachment-folder exclusion, neighbourhoods; `gv_edges` aggregation; `follow_layout` on renames |
-| `crates/nimw-vault/src/layout.rs` | `.nimw/layout.json`: `layout_level`, `set_layout_level`, `remap_layout`; `CardPosition` |
-| `crates/nimw-vault/src/{config,vault}.rs` | `indexPicks`; the shared `.nimw` JSON read-modify-write helper |
+| `crates/liber-index/src/{rows,index}.rs` | `CardRow` / `PageLink`; `card_children`, `card`, `page_links_of`, `page_links_from` (indexed range per visible card) |
+| `crates/liber-session/src/global_view.rs` | levels (`gv_children`), cards, index-note rules, attachment-folder exclusion, neighbourhoods; `gv_edges` aggregation; `follow_layout` on renames |
+| `crates/liber-vault/src/layout.rs` | `.liber/layout.json`: `layout_level`, `set_layout_level`, `remap_layout`; `CardPosition` |
+| `crates/liber-vault/src/{config,vault}.rs` | `indexPicks`; the shared `.liber` JSON read-modify-write helper |
 | `apps/desktop/src-tauri/src/gv_commands.rs`, `dto.rs` | `gv_children`, `gv_edges`, `layout_get`, `layout_set` + DTOs |
 | `apps/desktop/src-tauri/src/settings.rs` | `globalViewMode`, `globalViewEdges` |
 | `apps/desktop/src-tauri/src/menu.rs` | View → Editor / Global View (`menu:screen`) |
@@ -64,12 +64,12 @@ The five inputs the spec implies that ordinary feature tests would miss and that
 
 **Commands used throughout (repo root):**
 - `export PATH="$HOME/.nvm/versions/node/v24.21.0/bin:$PATH"`
-- Vitest: `pnpm --filter @nimw/desktop exec vitest run --maxWorkers=2 <paths>`
+- Vitest: `pnpm --filter @liber/desktop exec vitest run --maxWorkers=2 <paths>`
 - Cargo: `cargo test -p <crate> --test <file>`
 - E2E:
   ```bash
-  pnpm --filter @nimw/desktop exec vite build
-  PLAYWRIGHT_BROWSERS_PATH=<browsers> pnpm --filter @nimw/desktop exec playwright test <spec>
+  pnpm --filter @liber/desktop exec vite build
+  PLAYWRIGHT_BROWSERS_PATH=<browsers> pnpm --filter @liber/desktop exec playwright test <spec>
   ```
 
 ---
@@ -134,7 +134,7 @@ Modify `apps/desktop/src-tauri/tests/settings.rs` (apply this diff):
 +/// reset on their own when unreadable.
 +#[test]
 +fn m3a_global_view_settings_default_persist_and_reset() {
-+    use nimw_desktop::settings::{GlobalViewEdges, GlobalViewMode};
++    use liber_desktop::settings::{GlobalViewEdges, GlobalViewMode};
 +    let dir = tempfile::tempdir().unwrap();
 +    let s = store(dir.path());
 +    let d = s.get().0;
@@ -208,8 +208,8 @@ Modify `apps/desktop/src/stores/stores.test.ts` (apply this diff):
 
 - [ ] **Step 2: Run the tests and watch them fail**
 
-Run: `cargo test -p nimw-desktop --test settings && pnpm --filter @nimw/desktop exec vitest run --maxWorkers=2 src/stores/stores.test.ts`
-Expected: Rust does not compile: `unresolved imports nimw_desktop::settings::GlobalViewEdges, GlobalViewMode`, `no field global_view_mode on type Settings`. Vitest: `M3a: the Global View defaults … fill in for an older backend` fails with `expected undefined to be 'drill'`.
+Run: `cargo test -p liber-desktop --test settings && pnpm --filter @liber/desktop exec vitest run --maxWorkers=2 src/stores/stores.test.ts`
+Expected: Rust does not compile: `unresolved imports liber_desktop::settings::GlobalViewEdges, GlobalViewMode`, `no field global_view_mode on type Settings`. Vitest: `M3a: the Global View defaults … fill in for an older backend` fails with `expected undefined to be 'drill'`.
 
 - [ ] **Step 3: Implement**
 
@@ -362,7 +362,7 @@ Modify `apps/desktop/src/stores/settingsStore.ts` (apply this diff):
 
 - [ ] **Step 4: Run the tests and watch them pass**
 
-Run: `cargo test -p nimw-desktop --test settings --test commands && pnpm --filter @nimw/desktop exec vitest run --maxWorkers=2 src/stores/stores.test.ts && pnpm --filter @nimw/desktop typecheck`
+Run: `cargo test -p liber-desktop --test settings --test commands && pnpm --filter @liber/desktop exec vitest run --maxWorkers=2 src/stores/stores.test.ts && pnpm --filter @liber/desktop typecheck`
 Expected: both cargo binaries `ok … 0 failed`; vitest `Tests 28 passed (28)`; tsc clean.
 
 - [ ] **Step 5: Commit**
@@ -388,20 +388,20 @@ EOF
 **Commits in the test run:** `f36875c`
 
 **Files:**
-- Modify: `crates/nimw-index/src/index.rs`
-- Modify: `crates/nimw-index/src/lib.rs`
-- Modify: `crates/nimw-index/src/rows.rs`
-- Create: `crates/nimw-session/src/global_view.rs`
-- Modify: `crates/nimw-session/src/lib.rs`
-- Create: `crates/nimw-session/tests/global_view.rs` (test)
-- Modify: `crates/nimw-vault/src/config.rs`
-- Modify: `crates/nimw-vault/src/vault.rs`
+- Modify: `crates/liber-index/src/index.rs`
+- Modify: `crates/liber-index/src/lib.rs`
+- Modify: `crates/liber-index/src/rows.rs`
+- Create: `crates/liber-session/src/global_view.rs`
+- Modify: `crates/liber-session/src/lib.rs`
+- Create: `crates/liber-session/tests/global_view.rs` (test)
+- Modify: `crates/liber-vault/src/config.rs`
+- Modify: `crates/liber-vault/src/vault.rs`
 
 **Interfaces:**
 - **Consumes:**
   - `Vault::attachment_policy()` and the `AttachmentPolicy` variants (M2c);
   - `Index::card_children` / `card` / `page_links_of` (added here).
-- **Produces (`nimw_session`):**
+- **Produces (`liber_session`):**
   - `GvLevel { Vault, Folder(VaultPath), Page(VaultPath) }`;
   - `CardKind { Project, Folder, Page }`;
   - `Relation { Centre, In, Out, Both }`;
@@ -409,19 +409,19 @@ EOF
   - `GvChildren { cards, centre }`;
   - `VaultSession::gv_children(&GvLevel) -> Result<GvChildren>` (missing / wrong-kind level → `SessionError::NotIndexed`);
   - `SUMMARY_TITLES = 5`.
-- **Produces (`nimw_index`):** `CardRow`, `PageLink { src, target, kind, label, directed }`.
-- **Produces (`nimw_vault`):** `Vault::index_picks() -> HashMap<String, String>`.
+- **Produces (`liber_index`):** `CardRow`, `PageLink { src, target, kind, label, directed }`.
+- **Produces (`liber_vault`):** `Vault::index_picks() -> HashMap<String, String>`.
 
 - [ ] **Step 1: Write the failing test**
 
-Create `crates/nimw-session/tests/global_view.rs`:
+Create `crates/liber-session/tests/global_view.rs`:
 
 ```rust
 //! M3a §3, §4, §8: Global View levels (vault, folder, page neighbourhood),
 //! cards (index notes, folder summaries, covers), edges and layouts.
 
-use nimw_session::{CardKind, GvCard, GvLevel, Relation, SessionEvent, VaultSession};
-use nimw_vault::VaultPath;
+use liber_session::{CardKind, GvCard, GvLevel, Relation, SessionEvent, VaultSession};
+use liber_vault::VaultPath;
 use std::path::Path;
 
 fn vp(s: &str) -> VaultPath {
@@ -487,7 +487,7 @@ fn vault() -> tempfile::TempDir {
     );
     write(
         r,
-        ".nimw/vault.json",
+        ".liber/vault.json",
         r#"{"version":1,"indexPicks":{"Gamma":"Gamma/b.md"}}"#,
     );
     dir
@@ -536,7 +536,7 @@ fn gv_02_folder_cards_preview_their_index_note_or_summarise_their_children() {
         card(&cards, "Beta").index_page.as_deref(),
         Some("Beta/only.md")
     );
-    // 3. The page picked in .nimw/vault.json.
+    // 3. The page picked in .liber/vault.json.
     let gamma = card(&cards, "Gamma");
     assert_eq!(gamma.index_page.as_deref(), Some("Gamma/b.md"));
     assert_eq!(gamma.title, "Gamma B");
@@ -640,12 +640,12 @@ fn m3a_an_obsidian_attachment_folder_is_hidden_and_a_fixed_one_too() {
 
 - [ ] **Step 2: Run the test and watch it fail**
 
-Run: `cargo test -p nimw-session --test global_view`
-Expected: does not compile: `unresolved imports nimw_session::CardKind, GvCard, GvLevel, Relation` and `no method named gv_children`.
+Run: `cargo test -p liber-session --test global_view`
+Expected: does not compile: `unresolved imports liber_session::CardKind, GvCard, GvLevel, Relation` and `no method named gv_children`.
 
 - [ ] **Step 3: Implement**
 
-Modify `crates/nimw-index/src/index.rs` (apply this diff):
+Modify `crates/liber-index/src/index.rs` (apply this diff):
 
 ```diff
 @@ -1,5 +1,6 @@
@@ -655,7 +655,7 @@ Modify `crates/nimw-index/src/index.rs` (apply this diff):
 +    split_path,
  };
  use crate::schema::{SCHEMA, SCHEMA_VERSION};
- use nimw_markdown::{FileSet, LinkKind, PageMeta, Tag, link_key, name_key, resolve};
+ use liber_markdown::{FileSet, LinkKind, PageMeta, Tag, link_key, name_key, resolve};
 @@ -54,6 +55,41 @@ fn link_row(r: &Row<'_>) -> rusqlite::Result<LinkRow> {
      })
  }
@@ -759,7 +759,7 @@ Modify `crates/nimw-index/src/index.rs` (apply this diff):
          let mut stmt = self.conn.prepare(
 ```
 
-Modify `crates/nimw-index/src/lib.rs` (apply this diff):
+Modify `crates/liber-index/src/lib.rs` (apply this diff):
 
 ```diff
 @@ -6,7 +6,9 @@ mod rows;
@@ -775,7 +775,7 @@ Modify `crates/nimw-index/src/lib.rs` (apply this diff):
  use sha2::{Digest, Sha256};
 ```
 
-Modify `crates/nimw-index/src/rows.rs` (apply this diff):
+Modify `crates/liber-index/src/rows.rs` (apply this diff):
 
 ```diff
 @@ -54,6 +54,37 @@ pub struct LinkCandidate {
@@ -818,7 +818,7 @@ Modify `crates/nimw-index/src/rows.rs` (apply this diff):
  pub struct TreeNode {
 ```
 
-Create `crates/nimw-session/src/global_view.rs`:
+Create `crates/liber-session/src/global_view.rs`:
 
 ```rust
 //! M3a §3, §4, §8: Global View levels and cards — the vault (projects and
@@ -827,9 +827,9 @@ Create `crates/nimw-session/src/global_view.rs`:
 
 use crate::error::{Result, SessionError};
 use crate::session::VaultSession;
-use nimw_index::{CardRow, FileKind, Index, PageLink};
-use nimw_markdown::{LinkKind, name_key};
-use nimw_vault::{AttachmentPolicy, VaultPath};
+use liber_index::{CardRow, FileKind, Index, PageLink};
+use liber_markdown::{LinkKind, name_key};
+use liber_vault::{AttachmentPolicy, VaultPath};
 use std::collections::{BTreeMap, HashMap};
 
 /// What one click opens (M3a §3).
@@ -1125,7 +1125,7 @@ fn has_scheme(value: &str) -> bool {
 }
 ```
 
-Modify `crates/nimw-session/src/lib.rs` (apply this diff):
+Modify `crates/liber-session/src/lib.rs` (apply this diff):
 
 ```diff
 @@ -5,6 +5,7 @@ mod attachments;
@@ -1144,13 +1144,13 @@ Modify `crates/nimw-session/src/lib.rs` (apply this diff):
  pub use session::{VaultSession, index_db_path};
 ```
 
-Modify `crates/nimw-vault/src/config.rs` (apply this diff):
+Modify `crates/liber-vault/src/config.rs` (apply this diff):
 
 ```diff
-@@ -60,6 +60,9 @@ pub(crate) struct NimwVaultJson {
+@@ -60,6 +60,9 @@ pub(crate) struct LiberVaultJson {
      pub exclude: Vec<String>,
      #[serde(default)]
-     pub attachments: Option<NimwAttachments>,
+     pub attachments: Option<LiberAttachments>,
 +    /// Folder → the page picked as its card preview (GV-02, picked in M3b).
 +    #[serde(default, rename = "indexPicks")]
 +    pub index_picks: std::collections::HashMap<String, String>,
@@ -1159,18 +1159,18 @@ Modify `crates/nimw-vault/src/config.rs` (apply this diff):
  #[derive(Debug, Clone, Deserialize)]
 ```
 
-Modify `crates/nimw-vault/src/vault.rs` (apply this diff):
+Modify `crates/liber-vault/src/vault.rs` (apply this diff):
 
 ```diff
 @@ -146,6 +146,13 @@ impl Vault {
-         (nimw.attachments, obsidian)
+         (liber.attachments, obsidian)
      }
  
-+    /// `indexPicks` from `.nimw/vault.json` (folder → page; GV-02), re-read on
++    /// `indexPicks` from `.liber/vault.json` (folder → page; GV-02), re-read on
 +    /// every call like the attachment policy. Unreadable: none.
 +    pub fn index_picks(&self) -> std::collections::HashMap<String, String> {
-+        let nimw: NimwVaultJson = read_json(&self.root, NIMW_JSON, &mut Vec::new());
-+        nimw.index_picks
++        let liber: LiberVaultJson = read_json(&self.root, LIBER_JSON, &mut Vec::new());
++        liber.index_picks
 +    }
 +
      /// Non-fatal configuration problems found while opening.
@@ -1181,13 +1181,13 @@ Modify `crates/nimw-vault/src/vault.rs` (apply this diff):
 
 - [ ] **Step 4: Run the tests and watch them pass**
 
-Run: `cargo test -p nimw-session --test global_view && cargo clippy -p nimw-session -p nimw-index -p nimw-vault --all-targets -- -D warnings`
+Run: `cargo test -p liber-session --test global_view && cargo clippy -p liber-session -p liber-index -p liber-vault --all-targets -- -D warnings`
 Expected: `6 passed; 0 failed`; clippy clean.
 
 - [ ] **Step 5: Commit**
 
 ```bash
-git add crates/nimw-index/src/index.rs crates/nimw-index/src/lib.rs crates/nimw-index/src/rows.rs crates/nimw-session/src/global_view.rs crates/nimw-session/src/lib.rs crates/nimw-session/tests/global_view.rs crates/nimw-vault/src/config.rs crates/nimw-vault/src/vault.rs
+git add crates/liber-index/src/index.rs crates/liber-index/src/lib.rs crates/liber-index/src/rows.rs crates/liber-session/src/global_view.rs crates/liber-session/src/lib.rs crates/liber-session/tests/global_view.rs crates/liber-vault/src/config.rs crates/liber-vault/src/vault.rs
 git commit -m "$(cat <<'EOF'
 feat(session): Global View levels and cards (M3a §3, §4)
 
@@ -1212,10 +1212,10 @@ EOF
 **Commits in the test run:** `ffeeda0`
 
 **Files:**
-- Modify: `crates/nimw-index/src/index.rs`
-- Modify: `crates/nimw-session/src/global_view.rs`
-- Modify: `crates/nimw-session/src/lib.rs`
-- Modify: `crates/nimw-session/tests/global_view.rs` (test)
+- Modify: `crates/liber-index/src/index.rs`
+- Modify: `crates/liber-session/src/global_view.rs`
+- Modify: `crates/liber-session/src/lib.rs`
+- Modify: `crates/liber-session/tests/global_view.rs` (test)
 
 **Interfaces:**
 - **Produces:**
@@ -1230,18 +1230,18 @@ EOF
 
 - [ ] **Step 1: Write the failing test**
 
-Modify `crates/nimw-session/tests/global_view.rs` (apply this diff):
+Modify `crates/liber-session/tests/global_view.rs` (apply this diff):
 
 ```diff
 @@ -1,7 +1,9 @@
  //! M3a §3, §4, §8: Global View levels (vault, folder, page neighbourhood),
  //! cards (index notes, folder summaries, covers), edges and layouts.
  
--use nimw_session::{CardKind, GvCard, GvLevel, Relation, SessionEvent, VaultSession};
-+use nimw_session::{
+-use liber_session::{CardKind, GvCard, GvLevel, Relation, SessionEvent, VaultSession};
++use liber_session::{
 +    CardKind, EdgeKind, GvCard, GvEdge, GvLevel, Relation, SessionEvent, VaultSession,
 +};
- use nimw_vault::VaultPath;
+ use liber_vault::VaultPath;
  use std::path::Path;
  
 @@ -33,15 +35,15 @@ fn vault() -> tempfile::TempDir {
@@ -1371,11 +1371,11 @@ Modify `crates/nimw-session/tests/global_view.rs` (apply this diff):
 +
 +/// NFR-03 (M3a §10): on a 10,000-note vault, a 200-card folder level and its
 +/// edges take < 100 ms. Release only:
-+/// `cargo test --release -p nimw-session --test global_view -- --ignored`.
++/// `cargo test --release -p liber-session --test global_view -- --ignored`.
 +#[test]
 +#[ignore = "perf: run in release with --ignored"]
 +fn nfr_03_a_200_card_level_and_its_edges_in_under_100_ms() {
-+    use nimw_testkit::{VaultShape, generate_vault};
++    use liber_testkit::{VaultShape, generate_vault};
 +    let dir = tempfile::tempdir().unwrap();
 +    generate_vault(dir.path(), VaultShape::TEN_K, 42);
 +    for i in 0..200 {
@@ -1413,12 +1413,12 @@ Modify `crates/nimw-session/tests/global_view.rs` (apply this diff):
 
 - [ ] **Step 2: Run the test and watch it fail**
 
-Run: `cargo test -p nimw-session --test global_view`
-Expected: does not compile: `unresolved imports nimw_session::EdgeKind, GvEdge`, `no method named gv_edges`.
+Run: `cargo test -p liber-session --test global_view`
+Expected: does not compile: `unresolved imports liber_session::EdgeKind, GvEdge`, `no method named gv_edges`.
 
 - [ ] **Step 3: Implement**
 
-Modify `crates/nimw-index/src/index.rs` (apply this diff):
+Modify `crates/liber-index/src/index.rs` (apply this diff):
 
 ```diff
 @@ -81,12 +81,17 @@ fn card_row(r: &Row<'_>) -> rusqlite::Result<CardRow> {
@@ -1484,7 +1484,7 @@ Modify `crates/nimw-index/src/index.rs` (apply this diff):
      /// Resolved page-to-page links from or to `path` (a page's neighbourhood).
 ```
 
-Modify `crates/nimw-session/src/global_view.rs` (apply this diff):
+Modify `crates/liber-session/src/global_view.rs` (apply this diff):
 
 ```diff
 @@ -300,3 +300,96 @@ fn has_scheme(value: &str) -> bool {
@@ -1586,7 +1586,7 @@ Modify `crates/nimw-session/src/global_view.rs` (apply this diff):
 +}
 ```
 
-Modify `crates/nimw-session/src/lib.rs` (apply this diff):
+Modify `crates/liber-session/src/lib.rs` (apply this diff):
 
 ```diff
 @@ -13,5 +13,7 @@ mod watching;
@@ -1603,13 +1603,13 @@ Modify `crates/nimw-session/src/lib.rs` (apply this diff):
 
 - [ ] **Step 4: Run the tests and watch them pass**
 
-Run: `cargo test -p nimw-session --test global_view && cargo test --release -p nimw-session --test global_view -- --ignored --nocapture`
+Run: `cargo test -p liber-session --test global_view && cargo test --release -p liber-session --test global_view -- --ignored --nocapture`
 Expected: `9 passed; 0 failed; 1 ignored`; release perf: `200-card level + edges: ~1.7 ms`, `level 0 (95 cards) + edges: ~91 ms`, `1 passed`.
 
 - [ ] **Step 5: Commit**
 
 ```bash
-git add crates/nimw-index/src/index.rs crates/nimw-session/src/global_view.rs crates/nimw-session/src/lib.rs crates/nimw-session/tests/global_view.rs
+git add crates/liber-index/src/index.rs crates/liber-session/src/global_view.rs crates/liber-session/src/lib.rs crates/liber-session/tests/global_view.rs
 git commit -m "$(cat <<'EOF'
 feat(session): Global View edges, aggregated to the visible cards (M3a §6)
 
@@ -1630,32 +1630,32 @@ EOF
 
 ---
 
-### Task 4: Vault: pinned positions in .nimw/layout.json, following renames
+### Task 4: Vault: pinned positions in .liber/layout.json, following renames
 
 **Commits in the test run:** `be285cf`
 
 **Files:**
-- Modify: `crates/nimw-session/src/global_view.rs`
-- Modify: `crates/nimw-session/src/rename.rs`
-- Modify: `crates/nimw-session/src/watching.rs`
-- Modify: `crates/nimw-session/tests/global_view.rs` (test)
-- Create: `crates/nimw-vault/src/layout.rs`
-- Modify: `crates/nimw-vault/src/lib.rs`
-- Modify: `crates/nimw-vault/src/vault.rs`
-- Create: `crates/nimw-vault/tests/layout.rs` (test)
+- Modify: `crates/liber-session/src/global_view.rs`
+- Modify: `crates/liber-session/src/rename.rs`
+- Modify: `crates/liber-session/src/watching.rs`
+- Modify: `crates/liber-session/tests/global_view.rs` (test)
+- Create: `crates/liber-vault/src/layout.rs`
+- Modify: `crates/liber-vault/src/lib.rs`
+- Modify: `crates/liber-vault/src/vault.rs`
+- Create: `crates/liber-vault/tests/layout.rs` (test)
 
 **Interfaces:**
-- **Produces (`nimw_vault`):**
+- **Produces (`liber_vault`):**
   - `CardPosition { x: f64, y: f64 }`;
   - `Vault::layout_level(&str) -> BTreeMap<String, CardPosition>` (missing or unreadable: empty);
   - `Vault::set_layout_level(&str, &BTreeMap<..>) -> Result<()>` (empty removes; created lazily; non-finite refused);
   - `Vault::remap_layout(from, to) -> Result<()>` (no file: no write);
-  - `pub(crate) update_json_object(rel, create, edit)`, now also used by `set_nimw_attachments`.
-- **Produces (`nimw_session`):** `VaultSession::follow_layout` (crate-private), called by `rename_with_hook` and the watcher's rename handling; a failure becomes `SessionEvent::Warning`.
+  - `pub(crate) update_json_object(rel, create, edit)`, now also used by `set_liber_attachments`.
+- **Produces (`liber_session`):** `VaultSession::follow_layout` (crate-private), called by `rename_with_hook` and the watcher's rename handling; a failure becomes `SessionEvent::Warning`.
 
 - [ ] **Step 1: Write the failing tests**
 
-Modify `crates/nimw-session/tests/global_view.rs` (apply this diff):
+Modify `crates/liber-session/tests/global_view.rs` (apply this diff):
 
 ```diff
 @@ -345,3 +345,47 @@ fn nfr_03_a_200_card_level_and_its_edges_in_under_100_ms() {
@@ -1665,7 +1665,7 @@ Modify `crates/nimw-session/tests/global_view.rs` (apply this diff):
 +
 +#[test]
 +fn m3a_pinned_positions_follow_in_app_and_external_renames() {
-+    use nimw_vault::{CardPosition, WatchEvent};
++    use liber_vault::{CardPosition, WatchEvent};
 +    use std::collections::BTreeMap;
 +    let dir = vault();
 +    let (_c, s) = open(dir.path());
@@ -1708,12 +1708,12 @@ Modify `crates/nimw-session/tests/global_view.rs` (apply this diff):
 +}
 ```
 
-Create `crates/nimw-vault/tests/layout.rs`:
+Create `crates/liber-vault/tests/layout.rs`:
 
 ```rust
-//! M3a §7: pinned Global View card positions in `.nimw/layout.json`.
+//! M3a §7: pinned Global View card positions in `.liber/layout.json`.
 
-use nimw_vault::{CardPosition, Vault};
+use liber_vault::{CardPosition, Vault};
 use std::collections::BTreeMap;
 
 fn fresh() -> (tempfile::TempDir, Vault) {
@@ -1733,7 +1733,7 @@ fn positions(list: &[(&str, f64, f64)]) -> BTreeMap<String, CardPosition> {
 }
 
 fn file(dir: &tempfile::TempDir) -> serde_json::Value {
-    serde_json::from_slice(&std::fs::read(dir.path().join(".nimw/layout.json")).unwrap()).unwrap()
+    serde_json::from_slice(&std::fs::read(dir.path().join(".liber/layout.json")).unwrap()).unwrap()
 }
 
 #[test]
@@ -1741,7 +1741,7 @@ fn gv_31_positions_are_saved_per_level_lazily_and_read_back() {
     let (dir, vault) = fresh();
     assert!(vault.layout_level("").is_empty());
     assert!(
-        !dir.path().join(".nimw").exists(),
+        !dir.path().join(".liber").exists(),
         "VLT-02: reading writes nothing"
     );
     vault
@@ -1760,9 +1760,9 @@ fn gv_31_positions_are_saved_per_level_lazily_and_read_back() {
 #[test]
 fn gv_32_an_empty_level_is_removed_and_unknown_keys_survive() {
     let (dir, vault) = fresh();
-    std::fs::create_dir(dir.path().join(".nimw")).unwrap();
+    std::fs::create_dir(dir.path().join(".liber")).unwrap();
     std::fs::write(
-        dir.path().join(".nimw/layout.json"),
+        dir.path().join(".liber/layout.json"),
         r#"{"version":1,"future":{"keep":true},"levels":{"Alpha":{"Alpha/x.md":{"x":1,"y":2}},"":{"Alpha":{"x":0,"y":0}}}}"#,
     )
     .unwrap();
@@ -1829,24 +1829,24 @@ fn m3a_layout_follows_renames_of_folders_and_pages() {
 fn m3a_remap_without_a_layout_writes_nothing_and_bad_numbers_are_refused() {
     let (dir, vault) = fresh();
     vault.remap_layout("a.md", "b.md").unwrap();
-    assert!(!dir.path().join(".nimw").exists());
+    assert!(!dir.path().join(".liber").exists());
     assert!(
         vault
             .set_layout_level("", &positions(&[("x", f64::NAN, 0.0)]))
             .is_err()
     );
-    assert!(!dir.path().join(".nimw").exists());
+    assert!(!dir.path().join(".liber").exists());
 }
 ```
 
 - [ ] **Step 2: Run the tests and watch them fail**
 
-Run: `cargo test -p nimw-vault --test layout && cargo test -p nimw-session --test global_view`
-Expected: does not compile: `unresolved import nimw_vault::CardPosition`, `no method named layout_level / set_layout_level`. Once the vault part exists, `m3a_pinned_positions_follow_in_app_and_external_renames` fails with `assertion failed: s.vault().layout_level("").contains_key("Projects A")`.
+Run: `cargo test -p liber-vault --test layout && cargo test -p liber-session --test global_view`
+Expected: does not compile: `unresolved import liber_vault::CardPosition`, `no method named layout_level / set_layout_level`. Once the vault part exists, `m3a_pinned_positions_follow_in_app_and_external_renames` fails with `assertion failed: s.vault().layout_level("").contains_key("Projects A")`.
 
 - [ ] **Step 3: Implement**
 
-Modify `crates/nimw-session/src/global_view.rs` (apply this diff):
+Modify `crates/liber-session/src/global_view.rs` (apply this diff):
 
 ```diff
 @@ -301,6 +301,18 @@ fn has_scheme(value: &str) -> bool {
@@ -1870,7 +1870,7 @@ Modify `crates/nimw-session/src/global_view.rs` (apply this diff):
  pub enum EdgeKind {
 ```
 
-Modify `crates/nimw-session/src/rename.rs` (apply this diff):
+Modify `crates/liber-session/src/rename.rs` (apply this diff):
 
 ```diff
 @@ -226,6 +226,7 @@ impl VaultSession {
@@ -1883,7 +1883,7 @@ Modify `crates/nimw-session/src/rename.rs` (apply this diff):
              moved: {
 ```
 
-Modify `crates/nimw-session/src/watching.rs` (apply this diff):
+Modify `crates/liber-session/src/watching.rs` (apply this diff):
 
 ```diff
 @@ -237,6 +237,9 @@ impl VaultSession {
@@ -1898,11 +1898,11 @@ Modify `crates/nimw-session/src/watching.rs` (apply this diff):
          }
 ```
 
-Create `crates/nimw-vault/src/layout.rs`:
+Create `crates/liber-vault/src/layout.rs`:
 
 ```rust
 //! M3a §7: pinned Global View card positions, per level, in
-//! `.nimw/layout.json` (arch §3.1): `{ "version": 1, "levels": { "<level
+//! `.liber/layout.json` (arch §3.1): `{ "version": 1, "levels": { "<level
 //! key>": { "<card path>": { "x": 0, "y": 0 } } } }`. Level keys: `""` (the
 //! vault), a folder path, `page:<path>`, `expand:<level key>`.
 
@@ -1911,7 +1911,7 @@ use crate::vault::{Vault, read_json};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 
-const LAYOUT_JSON: &str = ".nimw/layout.json";
+const LAYOUT_JSON: &str = ".liber/layout.json";
 
 /// Where a card was dropped on the canvas (flow coordinates).
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
@@ -2028,7 +2028,7 @@ fn remap_level_key(key: &str, from: &str, to: &str) -> Option<String> {
 }
 ```
 
-Modify `crates/nimw-vault/src/lib.rs` (apply this diff):
+Modify `crates/liber-vault/src/lib.rs` (apply this diff):
 
 ```diff
 @@ -5,6 +5,7 @@ mod config;
@@ -2049,15 +2049,15 @@ Modify `crates/nimw-vault/src/lib.rs` (apply this diff):
  pub use vault::Vault;
 ```
 
-Modify `crates/nimw-vault/src/vault.rs` (apply this diff):
+Modify `crates/liber-vault/src/vault.rs` (apply this diff):
 
 ```diff
 @@ -109,20 +109,42 @@ impl Vault {
          {
              return Err(invalid(&format!("invalid attachment folder {path:?}")));
          }
--        let file = VaultPath::new(NIMW_JSON)?;
-+        self.update_json_object(NIMW_JSON, true, |map| {
+-        let file = VaultPath::new(LIBER_JSON)?;
++        self.update_json_object(LIBER_JSON, true, |map| {
 +            map.insert(
 +                "attachments".to_string(),
 +                serde_json::json!({ "mode": mode, "path": stored }),
@@ -2065,10 +2065,10 @@ Modify `crates/nimw-vault/src/vault.rs` (apply this diff):
 +        })
 +    }
 +
-+    /// Reads the JSON object at `rel` (under `.nimw/`), lets `edit` change it
++    /// Reads the JSON object at `rel` (under `.liber/`), lets `edit` change it
 +    /// and writes it back atomically (compare-and-swap), keeping every key
 +    /// `edit` doesn't touch and adding `"version": 1`. A missing file is
-+    /// created only when `create` (VLT-02: `.nimw/` appears on first need);
++    /// created only when `create` (VLT-02: `.liber/` appears on first need);
 +    /// a file that isn't a JSON object is never overwritten.
 +    pub(crate) fn update_json_object(
 +        &self,
@@ -2099,15 +2099,15 @@ Modify `crates/nimw-vault/src/vault.rs` (apply this diff):
 -            serde_json::json!({ "mode": mode, "path": stored }),
 -        );
 +        edit(&mut map);
-         let dir = self.fs_path(&VaultPath::new(".nimw")?)?;
+         let dir = self.fs_path(&VaultPath::new(".liber")?)?;
          if !dir.is_dir() {
-             std::fs::create_dir(&dir).map_err(|e| io_err(".nimw", e))?;
+             std::fs::create_dir(&dir).map_err(|e| io_err(".liber", e))?;
 @@ -164,10 +186,10 @@ impl Vault {
      }
  }
  
--const NIMW_JSON: &str = ".nimw/vault.json";
-+pub(crate) const NIMW_JSON: &str = ".nimw/vault.json";
+-const LIBER_JSON: &str = ".liber/vault.json";
++pub(crate) const LIBER_JSON: &str = ".liber/vault.json";
  const OBSIDIAN_JSON: &str = ".obsidian/app.json";
  
 -fn read_json<T: serde::de::DeserializeOwned + Default>(
@@ -2120,21 +2120,21 @@ Modify `crates/nimw-vault/src/vault.rs` (apply this diff):
 
 - [ ] **Step 4: Run the tests and watch them pass**
 
-Run: `cargo test -p nimw-vault && cargo test -p nimw-session`
+Run: `cargo test -p liber-vault && cargo test -p liber-session`
 Expected: all `ok … 0 failed`: `layout` 4 passed, M2c's `attachments` still green through the shared helper; `global_view` 10 passed, 1 ignored.
 
 - [ ] **Step 5: Commit**
 
 ```bash
-git add crates/nimw-session/src/global_view.rs crates/nimw-session/src/rename.rs crates/nimw-session/src/watching.rs crates/nimw-session/tests/global_view.rs crates/nimw-vault/src/layout.rs crates/nimw-vault/src/lib.rs crates/nimw-vault/src/vault.rs crates/nimw-vault/tests/layout.rs
+git add crates/liber-session/src/global_view.rs crates/liber-session/src/rename.rs crates/liber-session/src/watching.rs crates/liber-session/tests/global_view.rs crates/liber-vault/src/layout.rs crates/liber-vault/src/lib.rs crates/liber-vault/src/vault.rs crates/liber-vault/tests/layout.rs
 git commit -m "$(cat <<'EOF'
-feat(vault): pinned Global View positions in .nimw/layout.json (M3a §7)
+feat(vault): pinned Global View positions in .liber/layout.json (M3a §7)
 
 Per level key ('' vault, folder, page:<path>, expand:<key>): read back,
 saved atomically (created on first need, unknown keys kept, an empty
 level removed, non-finite numbers refused) and remapped by path prefix
 when a file or folder is renamed — in the app and by another program
-(watcher renames). A shared helper now writes both .nimw JSON files.
+(watcher renames). A shared helper now writes both .liber JSON files.
 
 Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
 EOF
@@ -2324,7 +2324,7 @@ Modify `apps/desktop/src-tauri/tests/commands.rs` (apply this diff):
 +        call(&h.main, "layout_get", json!({ "level": "" })).unwrap(),
 +        json!({})
 +    );
-+    assert!(!vault.path().join(".nimw").exists(), "VLT-02");
++    assert!(!vault.path().join(".liber").exists(), "VLT-02");
 +    call(
 +        &h.main,
 +        "layout_set",
@@ -2335,7 +2335,7 @@ Modify `apps/desktop/src-tauri/tests/commands.rs` (apply this diff):
 +        call(&h.main, "layout_get", json!({ "level": "" })).unwrap(),
 +        json!({ "Game Design": { "x": 12.5, "y": -40.0 } })
 +    );
-+    assert!(vault.path().join(".nimw/layout.json").exists());
++    assert!(vault.path().join(".liber/layout.json").exists());
 +    call(
 +        &h.main,
 +        "layout_set",
@@ -2389,7 +2389,7 @@ describe('M3a ipc commands', () => {
 
 - [ ] **Step 2: Run the tests and watch them fail**
 
-Run: `cargo test -p nimw-desktop --test commands m3a && pnpm --filter @nimw/desktop exec vitest run --maxWorkers=2 src/ipc/globalView.test.ts`
+Run: `cargo test -p liber-desktop --test commands m3a && pnpm --filter @liber/desktop exec vitest run --maxWorkers=2 src/ipc/globalView.test.ts`
 Expected: three `m3a_*` command tests panic (the commands aren't registered); vitest `TypeError: gvChildren is not a function`.
 
 - [ ] **Step 3: Implement**
@@ -2466,9 +2466,9 @@ Modify `apps/desktop/src-tauri/src/dto.rs` (apply this diff):
 +    pub relation: Option<&'static str>,
 +}
 +
-+impl From<nimw_session::GvCard> for GvCardDto {
-+    fn from(c: nimw_session::GvCard) -> GvCardDto {
-+        use nimw_session::{CardKind, Relation};
++impl From<liber_session::GvCard> for GvCardDto {
++    fn from(c: liber_session::GvCard) -> GvCardDto {
++        use liber_session::{CardKind, Relation};
 +        GvCardDto {
 +            path: c.path,
 +            kind: match c.kind {
@@ -2517,14 +2517,14 @@ Modify `apps/desktop/src-tauri/src/dto.rs` (apply this diff):
 +    pub label: Option<String>,
 +}
 +
-+impl From<nimw_session::GvEdge> for GvEdgeDto {
-+    fn from(e: nimw_session::GvEdge) -> GvEdgeDto {
++impl From<liber_session::GvEdge> for GvEdgeDto {
++    fn from(e: liber_session::GvEdge) -> GvEdgeDto {
 +        GvEdgeDto {
 +            from: e.from,
 +            to: e.to,
 +            kind: match e.kind {
-+                nimw_session::EdgeKind::Link => "link",
-+                nimw_session::EdgeKind::Manual => "manual",
++                liber_session::EdgeKind::Link => "link",
++                liber_session::EdgeKind::Manual => "manual",
 +            },
 +            count: e.count,
 +            aggregated: e.aggregated,
@@ -2539,14 +2539,14 @@ Create `apps/desktop/src-tauri/src/gv_commands.rs`:
 
 ```rust
 //! M3a §8: the Global View — levels and their cards, edges between visible
-//! cards, pinned card positions. Thin wrappers over `nimw-session`.
+//! cards, pinned card positions. Thin wrappers over `liber-session`.
 
 use crate::dto::{GvEdgeDto, GvLevelDto, GvLevelResultDto};
 use crate::error::{CmdResult, CommandError, ErrorKind};
 use crate::state::AppState;
 use crate::vault_commands::blocking;
-use nimw_session::{GvLevel, MAX_VISIBLE};
-use nimw_vault::{CardPosition, VaultPath};
+use liber_session::{GvLevel, MAX_VISIBLE};
+use liber_vault::{CardPosition, VaultPath};
 use std::collections::BTreeMap;
 use tauri::{AppHandle, Manager, Runtime};
 
@@ -2750,7 +2750,7 @@ The four `apps/desktop/src-tauri/permissions/autogenerated/*.toml` files are wri
 
 - [ ] **Step 5: Run the tests and watch them pass**
 
-Run: `cargo test -p nimw-desktop --test commands && cargo clippy -p nimw-desktop --all-targets -- -D warnings && pnpm --filter @nimw/desktop exec vitest run --maxWorkers=2 src/ipc`
+Run: `cargo test -p liber-desktop --test commands && cargo clippy -p liber-desktop --all-targets -- -D warnings && pnpm --filter @liber/desktop exec vitest run --maxWorkers=2 src/ipc`
 Expected: `29 passed; 0 failed` (including `m1b_every_command_is_allowed_from_main_and_denied_elsewhere` with the four new commands); vitest `Tests 14 passed`.
 
 - [ ] **Step 6: Commit**
@@ -2838,10 +2838,10 @@ Modify `apps/desktop/src-tauri/tests/menu.rs` (apply this diff):
 +                log.lock().unwrap().push(e.payload().to_string());
 +            });
 +            for id in [
-+                nimw_desktop::menu::EDITOR_ID,
-+                nimw_desktop::menu::GLOBAL_VIEW_ID,
++                liber_desktop::menu::EDITOR_ID,
++                liber_desktop::menu::GLOBAL_VIEW_ID,
 +            ] {
-+                nimw_desktop::menu::on_menu_event(
++                liber_desktop::menu::on_menu_event(
 +                    handle,
 +                    MenuEvent {
 +                        id: MenuId::new(id),
@@ -3020,7 +3020,7 @@ Modify `apps/desktop/src/stores/navigate.test.ts` (apply this diff):
 
 - [ ] **Step 2: Run the tests and watch them fail**
 
-Run: `pnpm --filter @nimw/desktop exec vitest run --maxWorkers=2 src/features/shell src/stores && cargo test -p nimw-desktop --test menu`
+Run: `pnpm --filter @liber/desktop exec vitest run --maxWorkers=2 src/features/shell src/stores && cargo test -p liber-desktop --test menu`
 Expected: AppShell `M3a §2: Edit and Global view switch …` fails on `aria-pressed`; `⌘1 / ⌘2 …` fails with `expected 'edit' to be 'global'`; `installMenuScreen is not a function`; navigate `opening a page from anywhere … shows the editor` fails; the menu test does not compile (`cannot find value EDITOR_ID`). (An unrelated AppShell test can fail after the first one aborts with a page open; it passes once the feature exists.)
 
 - [ ] **Step 3: Implement**
@@ -3028,13 +3028,13 @@ Expected: AppShell `M3a §2: Edit and Global view switch …` fails on `aria-pre
 Modify `apps/desktop/src-tauri/src/menu.rs` (apply this diff):
 
 ```diff
-@@ -31,10 +31,17 @@ pub const LINE_NUMBERS_ID: &str = "nimw-toggle-line-numbers";
+@@ -31,10 +31,17 @@ pub const LINE_NUMBERS_ID: &str = "liber-toggle-line-numbers";
  /// Event telling the page to flip a setting; payload `"toolbar"` or
  /// `"lineNumbers"` (the settings key).
  pub const TOGGLE_EVENT: &str = "menu:toggle";
 +/// Ids of View → Editor / Global View (M3a §2).
-+pub const EDITOR_ID: &str = "nimw-screen-edit";
-+pub const GLOBAL_VIEW_ID: &str = "nimw-screen-global";
++pub const EDITOR_ID: &str = "liber-screen-edit";
++pub const GLOBAL_VIEW_ID: &str = "liber-screen-global";
 +/// Event telling the page which screen to show; payload `"edit"` or
 +/// `"global"`.
 +pub const SCREEN_EVENT: &str = "menu:screen";
@@ -3418,7 +3418,7 @@ Modify `apps/desktop/src/stores/vaultStore.ts` (apply this diff):
 
 - [ ] **Step 4: Run the tests and watch them pass**
 
-Run: `pnpm --filter @nimw/desktop exec vitest run --maxWorkers=2 src/features/shell src/stores src/i18n && cargo test -p nimw-desktop --test menu`
+Run: `pnpm --filter @liber/desktop exec vitest run --maxWorkers=2 src/features/shell src/stores src/i18n && cargo test -p liber-desktop --test menu`
 Expected: all pass; the menu prints 5 `… ok` checks including `screen_items_emit_menu_screen`.
 
 - [ ] **Step 5: Commit**
@@ -3564,7 +3564,7 @@ describe('Global View layouts (M3a §7)', () => {
 
 - [ ] **Step 2: Run the test and watch it fail**
 
-Run: `pnpm --filter @nimw/desktop exec vitest run --maxWorkers=2 src/features/global-view/layout.test.ts`
+Run: `pnpm --filter @liber/desktop exec vitest run --maxWorkers=2 src/features/global-view/layout.test.ts`
 Expected: `Failed to resolve import "./layout"`.
 
 - [ ] **Step 3: Implement**
@@ -3678,7 +3678,7 @@ export function nearestInDirection(
 
 - [ ] **Step 4: Run the tests and watch them pass**
 
-Run: `pnpm --filter @nimw/desktop exec vitest run --maxWorkers=2 src/features/global-view/layout.test.ts && pnpm --filter @nimw/desktop typecheck`
+Run: `pnpm --filter @liber/desktop exec vitest run --maxWorkers=2 src/features/global-view/layout.test.ts && pnpm --filter @liber/desktop typecheck`
 Expected: `Tests 5 passed (5)`; tsc clean. Vitest's `toBe` / `toEqual` take one argument: a message goes in `expect(value, message)`.
 
 - [ ] **Step 5: Commit**
@@ -3953,7 +3953,7 @@ Modify `apps/desktop/src/stores/stores.test.ts` (apply this diff):
 
 - [ ] **Step 2: Run the tests and watch them fail**
 
-Run: `pnpm --filter @nimw/desktop exec vitest run --maxWorkers=2 src/features/global-view/gvStore.test.ts src/stores/stores.test.ts`
+Run: `pnpm --filter @liber/desktop exec vitest run --maxWorkers=2 src/features/global-view/gvStore.test.ts src/stores/stores.test.ts`
 Expected: `Failed to resolve import "./gvStore"`; once it exists, the stores test `opening or closing a vault starts the Global View over` fails with `expected [ { kind: 'vault' }, …(1) ] to deeply equal [ { kind: 'vault' } ]`.
 
 - [ ] **Step 3: Implement**
@@ -4246,7 +4246,7 @@ Modify `apps/desktop/src/stores/vaultStore.ts` (apply this diff):
 
 - [ ] **Step 4: Run the tests and watch them pass**
 
-Run: `pnpm --filter @nimw/desktop exec vitest run --maxWorkers=2 src/stores src/features/global-view`
+Run: `pnpm --filter @liber/desktop exec vitest run --maxWorkers=2 src/stores src/features/global-view`
 Expected: all pass (`gvStore.test.ts` 7).
 
 - [ ] **Step 5: Commit**
@@ -4360,7 +4360,7 @@ describe('Global View card (M3a §4)', () => {
     expect(screen.getByText('Page')).toBeInTheDocument();
     const img = document.querySelector('img')!;
     expect(img.getAttribute('src')).toBe(
-      'nimw-asset://localhost/Character%20Design/assets/rex-cover.png',
+      'liber-asset://localhost/Character%20Design/assets/rex-cover.png',
     );
     expect(img.style.objectPosition).toBe('50% 40%');
     expect(img.getAttribute('alt')).toBe('');
@@ -4518,7 +4518,7 @@ Modify `apps/desktop/src/theme/palettes.test.ts` (apply this diff):
 
 - [ ] **Step 2: Run the tests and watch them fail**
 
-Run: `pnpm --filter @nimw/desktop exec vitest run --maxWorkers=2 src/theme/palettes.test.ts src/features/global-view/Card.test.tsx`
+Run: `pnpm --filter @liber/desktop exec vitest run --maxWorkers=2 src/theme/palettes.test.ts src/features/global-view/Card.test.tsx`
 Expected: `Global View tokens` fail for every palette (`lavender light: canvas, card border and edges` …); `Failed to resolve import "./Card"`.
 
 - [ ] **Step 3: Implement**
@@ -5042,11 +5042,11 @@ Modify `apps/desktop/src/theme/tokens.css` (apply this diff):
 
 - [ ] **Step 4: Generated files**
 
-`pnpm --filter @nimw/desktop gen:palettes` rewrites `src/theme/palettes.css` from `palettes.ts` + `paletteCss.ts`. Never format that file with prettier from `apps/desktop`.
+`pnpm --filter @liber/desktop gen:palettes` rewrites `src/theme/palettes.css` from `palettes.ts` + `paletteCss.ts`. Never format that file with prettier from `apps/desktop`.
 
 - [ ] **Step 5: Run the tests and watch them pass**
 
-Run: `pnpm --filter @nimw/desktop exec vitest run --maxWorkers=2 src/theme src/features/global-view src/i18n && pnpm --filter @nimw/desktop typecheck && pnpm --filter @nimw/desktop check:i18n`
+Run: `pnpm --filter @liber/desktop exec vitest run --maxWorkers=2 src/theme src/features/global-view src/i18n && pnpm --filter @liber/desktop typecheck && pnpm --filter @liber/desktop check:i18n`
 Expected: `Tests 117 passed`; tsc clean; `i18n OK: 2 locales in parity.`
 
 - [ ] **Step 6: Commit**
@@ -5114,7 +5114,7 @@ EOF
 - [ ] **Step 1: Add the dependency (pinned)**
 
 ```bash
-pnpm --filter @nimw/desktop add @xyflow/react   # the release-age gate picks 12.12.0 (2026-09-24)
+pnpm --filter @liber/desktop add @xyflow/react   # the release-age gate picks 12.12.0 (2026-09-24)
 # then pin it exactly in apps/desktop/package.json: "@xyflow/react": "12.12.0"
 pnpm install
 ```
@@ -5474,7 +5474,7 @@ describe('freeze-safe build transform', () => {
 
 - [ ] **Step 3: Run the tests and watch them fail**
 
-Run: `pnpm --filter @nimw/desktop exec vitest run --maxWorkers=2 src/features/global-view tests/freezeSafe.test.ts`
+Run: `pnpm --filter @liber/desktop exec vitest run --maxWorkers=2 src/features/global-view tests/freezeSafe.test.ts`
 Expected: the six `GlobalView.test.tsx` tests fail against the placeholder; `Failed to resolve import "./edges"` and `"../scripts/freezeSafe"`; `failing edge and layout reads leave the cards showing` fails (`TypeError` in `withPinned`).
 
 - [ ] **Step 4: Implement**
@@ -5511,7 +5511,7 @@ const DEFINE =
 
 export function freezeSafe() {
   return {
-    name: 'nimw-freeze-safe',
+    name: 'liber-freeze-safe',
     enforce: 'pre' as const,
     transform(code: string, id: string): string | null {
       if (!D3_COLOR_DEFINE.test(id.split('?')[0]) || !code.includes(ASSIGN)) return null;
@@ -6466,7 +6466,7 @@ Modify `apps/desktop/vite.config.ts` (apply this diff):
 
 - [ ] **Step 6: Run the tests and watch them pass**
 
-Run: `pnpm --filter @nimw/desktop exec vitest run --maxWorkers=2 && pnpm --filter @nimw/desktop typecheck && pnpm lint && pnpm --filter @nimw/desktop exec vite build`
+Run: `pnpm --filter @liber/desktop exec vitest run --maxWorkers=2 && pnpm --filter @liber/desktop typecheck && pnpm lint && pnpm --filter @liber/desktop exec vite build`
 Expected: `Test Files 64 passed`, all tests pass; build ok. Scan the bundle as in the Final gate: this task adds one `structuredClone` (React Flow, click-to-connect, disabled). Do not drop the freeze-safe plugin: without it every e2e test fails to load (`Cannot assign to read only property 'constructor' of object`).
 
 - [ ] **Step 7: Commit**
@@ -6623,7 +6623,7 @@ Modify `apps/desktop/src/features/page/PageTitle.test.tsx` (apply this diff):
 
 - [ ] **Step 2: Run the tests and watch them fail**
 
-Run: `pnpm --filter @nimw/desktop exec vitest run --maxWorkers=2 src/features/page/PageTitle.test.tsx src/features/global-view`
+Run: `pnpm --filter @liber/desktop exec vitest run --maxWorkers=2 src/features/page/PageTitle.test.tsx src/features/global-view`
 Expected: the PageTitle focus-request test and `GV-17: New entry …` fail; `entryDir is not a function`.
 
 - [ ] **Step 3: Implement**
@@ -6851,7 +6851,7 @@ Modify `apps/desktop/src/stores/pageStore.ts` (apply this diff):
 
 - [ ] **Step 4: Run the tests and watch them pass**
 
-Run: `pnpm --filter @nimw/desktop exec vitest run --maxWorkers=2 && pnpm --filter @nimw/desktop typecheck`
+Run: `pnpm --filter @liber/desktop exec vitest run --maxWorkers=2 && pnpm --filter @liber/desktop typecheck`
 Expected: `Test Files 64 passed`, `Tests 560 passed`.
 
 - [ ] **Step 5: Commit**
@@ -6926,7 +6926,7 @@ Modify `apps/desktop/src/features/global-view/gvStore.test.ts` (apply this diff)
 
 - [ ] **Step 2: Run the test and watch it fail**
 
-Run: `pnpm --filter @nimw/desktop exec vitest run --maxWorkers=2 src/features/global-view/gvStore.test.ts`
+Run: `pnpm --filter @liber/desktop exec vitest run --maxWorkers=2 src/features/global-view/gvStore.test.ts`
 Expected: `shownKey names the level the canvas holds …` fails: `shownKey` is undefined. (In e2e at Task 11's commit: the WebKit double click and the keyboard test fail, see the notes.)
 
 - [ ] **Step 3: Implement**
@@ -7078,7 +7078,7 @@ Modify `apps/desktop/src/features/global-view/gvStore.ts` (apply this diff):
 
 - [ ] **Step 4: Run the tests and watch them pass**
 
-Run: `pnpm --filter @nimw/desktop exec vitest run --maxWorkers=2 src/features/global-view src/features/shell`
+Run: `pnpm --filter @liber/desktop exec vitest run --maxWorkers=2 src/features/global-view src/features/shell`
 Expected: all pass (`gvStore.test.ts` 10).
 
 - [ ] **Step 5: Commit**
@@ -7225,13 +7225,13 @@ Modify `apps/desktop/e2e/ipcMock.ts` (apply this diff):
 +      return [...edges.values()].map((e) => ({ ...e, kind: 'link', directed: false, label: null }));
 +    },
 +    layout_get: (a) => {
-+      const all = JSON.parse(localStorage.getItem('nimw-e2e-layout') ?? '{}');
++      const all = JSON.parse(localStorage.getItem('liber-e2e-layout') ?? '{}');
 +      return all[a.level as string] ?? {};
 +    },
 +    layout_set: (a) => {
-+      const all = JSON.parse(localStorage.getItem('nimw-e2e-layout') ?? '{}');
++      const all = JSON.parse(localStorage.getItem('liber-e2e-layout') ?? '{}');
 +      all[a.level as string] = a.positions;
-+      localStorage.setItem('nimw-e2e-layout', JSON.stringify(all));
++      localStorage.setItem('liber-e2e-layout', JSON.stringify(all));
 +      return null;
 +    },
      entry_create_folder: (a) => (a.parent ? `${a.parent}/${a.name}` : (a.name as string)),
@@ -7321,7 +7321,7 @@ test('a dragged card keeps its place after a reload (GV-31); Reset layout restor
   expect(moved.y - before!.y).toBeGreaterThan(30);
   // Saved after the debounce; a reload (restart) reads it back.
   await expect
-    .poll(() => page.evaluate(() => localStorage.getItem('nimw-e2e-layout') ?? ''))
+    .poll(() => page.evaluate(() => localStorage.getItem('liber-e2e-layout') ?? ''))
     .toContain('Beta');
   await page.reload();
   await page.getByRole('button', { name: /^vault/ }).click();
@@ -7393,7 +7393,7 @@ Modify `apps/desktop/e2e/zero-network.spec.ts` (apply this diff):
 +  await page.waitForLoadState('networkidle');
 +  await page.waitForTimeout(300);
 +  const csp = await page.evaluate(
-+    () => (window as unknown as { __nimwCspViolations: string[] }).__nimwCspViolations,
++    () => (window as unknown as { __liberCspViolations: string[] }).__liberCspViolations,
 +  );
 +  expect(problems).toEqual([]);
 +  expect(csp).toEqual([]);
@@ -7403,7 +7403,7 @@ Modify `apps/desktop/e2e/zero-network.spec.ts` (apply this diff):
 
 - [ ] **Step 7: Run the tests and watch them fail**
 
-Run: `pnpm --filter @nimw/desktop exec vite build && PLAYWRIGHT_BROWSERS_PATH=<browsers> pnpm --filter @nimw/desktop exec playwright test e2e/m3a.spec.ts e2e/zero-network.spec.ts`
+Run: `pnpm --filter @liber/desktop exec vite build && PLAYWRIGHT_BROWSERS_PATH=<browsers> pnpm --filter @liber/desktop exec playwright test e2e/m3a.spec.ts e2e/zero-network.spec.ts`
 Expected: these check behaviour built in Tasks 6–12a and pass as soon as they are written. To see them fail, run them on Task 11's commit: `a double click opens the page in the editor` (WebKit) and `keyboard only …` (Chromium) fail there.
 
 - [ ] **Step 8: Implement**
@@ -7425,7 +7425,7 @@ Modify `apps/desktop/playwright.config.ts` (apply this diff):
 
 - [ ] **Step 9: Run the tests and watch them pass**
 
-Run: `for i in 1 2 3 4 5; do pnpm --filter @nimw/desktop exec playwright test e2e/m3a.spec.ts; done`
+Run: `for i in 1 2 3 4 5; do pnpm --filter @liber/desktop exec playwright test e2e/m3a.spec.ts; done`
 Expected: `12 passed` five times in a row; the full Playwright run `60 passed`.
 
 - [ ] **Step 10: Commit**
@@ -7462,11 +7462,11 @@ The keyboard e2e waits on focus (`toBeFocused`), not on time. WebKit drags move 
 ```bash
 set -o pipefail
 pnpm install --frozen-lockfile && pnpm lint && pnpm typecheck && pnpm check:i18n \
-  && pnpm --filter @nimw/desktop exec vitest run --maxWorkers=2 \
+  && pnpm --filter @liber/desktop exec vitest run --maxWorkers=2 \
   && pnpm build:ui && cargo fmt --all --check \
   && cargo clippy --workspace --all-targets -- -D warnings \
   && cargo test --workspace && cargo deny check \
-  && pnpm --filter @nimw/desktop exec playwright test
+  && pnpm --filter @liber/desktop exec playwright test
 ```
 
 Expected:
@@ -7475,7 +7475,7 @@ Expected:
 - Playwright: 60 passed (Chromium + WebKit);
 - lint, typecheck, i18n, fmt, clippy and deny clean.
 
-- [ ] Perf (release): `cargo test --release -p nimw-session --test global_view -- --ignored --nocapture`. Expected: "200-card level + edges: ~2 ms" and "level 0 (95 cards) + edges: ~90 ms", 1 passed.
+- [ ] Perf (release): `cargo test --release -p liber-session --test global_view -- --ignored --nocapture`. Expected: "200-card level + edges: ~2 ms" and "level 0 (95 cards) + edges: ~90 ms", 1 passed.
 
 - [ ] Bundle scan (Safari 15), after `pnpm build:ui`:
 

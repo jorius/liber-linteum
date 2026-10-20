@@ -20,16 +20,16 @@ export function externalTargets(tree: Root): LinkTarget[] {
   const walk = (n: Root | Element) => {
     for (const c of n.children) {
       if (c.type !== 'element') continue;
-      const { dataNimw, dataTarget, dataExternal } = c.properties;
+      const { dataLiber, dataTarget, dataExternal } = c.properties;
       let t: LinkTarget | null = null;
       if (typeof dataExternal === 'string') {
         t = { kind: c.tagName === 'a' ? 'markdown' : 'markdown_image', target: dataExternal };
       } else if (
         typeof dataTarget === 'string' &&
-        (dataNimw === 'wikilink' || dataNimw === 'embed') &&
+        (dataLiber === 'wikilink' || dataLiber === 'embed') &&
         looksExternal(dataTarget)
       ) {
-        t = { kind: dataNimw === 'embed' ? 'embed' : 'wiki', target: dataTarget };
+        t = { kind: dataLiber === 'embed' ? 'embed' : 'wiki', target: dataTarget };
       }
       if (t) out.set(keyOf(t), t);
       walk(c);

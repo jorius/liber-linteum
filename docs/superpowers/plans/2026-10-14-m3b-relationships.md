@@ -4,9 +4,9 @@
 
 **Goal:** Connect cards on the Global View (drag, or Connect to… by click and keyboard), label / direct / delete relationships stored in the source page's `related:`, pick a folder's index note, and remove the app's `color-mix()` for Safari 15.
 
-**Architecture:** Rust gains index-note picks (`.nimw/vault.json` `indexPicks`, following renames), a `link_target` command and `GvCard.indexFrom`; the indexer reads a scalar `related:`. TS gains byte-minimal `related:` edits (read back or refused, as M2c's frontmatter edits), a write path through the source page (the live editor when open, else CAS on disk with one retry), a card connections menu, a Relationships dialog (from the menu or a click on a relationship edge), connect mode and a drag-to-connect handle on React Flow, and an index-note pick dialog.
+**Architecture:** Rust gains index-note picks (`.liber/vault.json` `indexPicks`, following renames), a `link_target` command and `GvCard.indexFrom`; the indexer reads a scalar `related:`. TS gains byte-minimal `related:` edits (read back or refused, as M2c's frontmatter edits), a write path through the source page (the live editor when open, else CAS on disk with one retry), a card connections menu, a Relationships dialog (from the menu or a click on a relationship edge), connect mode and a drag-to-connect handle on React Flow, and an index-note pick dialog.
 
-**Tech Stack:** Rust (nimw-markdown, nimw-vault, nimw-session, Tauri commands), React 19 + TS + zustand, `@xyflow/react` 12.12.0, `yaml` 2 Document API, Vitest (jsdom), Playwright (Chromium + WebKit).
+**Tech Stack:** Rust (liber-markdown, liber-vault, liber-session, Tauri commands), React 19 + TS + zustand, `@xyflow/react` 12.12.0, `yaml` 2 Document API, Vitest (jsdom), Playwright (Chromium + WebKit).
 
 **Spec:** `docs/superpowers/specs/2026-10-14-m3b-relationships-design.md` (§10 records this plan's amendments).
 
@@ -19,8 +19,8 @@
 - i18n en + es parity (`pnpm check:i18n`), ICU syntax (`{name}`, `{count, plural, …}`) like the existing strings.
 - axe-clean in jsdom and in the real engines (light and dark); keyboard parity for every pointer action; focus never lands on `<body>`.
 - Safari 15 floor: no regex lookbehind, no `color-mix()` (guard test), no `structuredClone` on reachable paths (`connectOnClick={false}`).
-- Frontmatter edits keep M2c's guarantees: byte-minimal, CRLF kept, read back exactly or refused with "NIMW can’t safely change this note’s frontmatter. Edit it in Source mode."
-- Opening a vault writes nothing (VLT-02): `.nimw/vault.json` appears only for a pick.
+- Frontmatter edits keep M2c's guarantees: byte-minimal, CRLF kept, read back exactly or refused with "Liber Linteum can’t safely change this note’s frontmatter. Edit it in Source mode."
+- Opening a vault writes nothing (VLT-02): `.liber/vault.json` appears only for a pick.
 - Vitest with `--maxWorkers=2`; Node 24 first on PATH (`pnpm check:i18n` needs ≥ 22.18); Playwright browsers via `PLAYWRIGHT_BROWSERS_PATH`.
 - Test builds use their own `CARGO_TARGET_DIR` in worktrees/clones (test binaries bake fixture paths in).
 
@@ -37,16 +37,16 @@
 | Path | Responsibility |
 |---|---|
 | `apps/desktop/src/theme/{color,paletteCss}.ts`, `tokens.css`, `palettes.css` (generated) | `alpha()`; sidebar shades and backdrops as tokens |
-| `crates/nimw-markdown/src/frontmatter.rs` | scalar `related:` indexed |
-| `crates/nimw-vault/src/{vault,layout}.rs` | `set_index_pick`, `remap_index_picks_many` |
-| `crates/nimw-session/src/global_view.rs` | `IndexFrom`, `index_pick_set`, `link_target`; picks follow renames |
+| `crates/liber-markdown/src/frontmatter.rs` | scalar `related:` indexed |
+| `crates/liber-vault/src/{vault,layout}.rs` | `set_index_pick`, `remap_index_picks_many` |
+| `crates/liber-session/src/global_view.rs` | `IndexFrom`, `index_pick_set`, `link_target`; picks follow renames |
 | `apps/desktop/src-tauri/src/{gv_commands,dto,lib}.rs`, `build.rs`, `capabilities/main.json` | `link_target`, `index_pick_set` |
 | `apps/desktop/src/markdown/{frontmatterEdit,related,frontmatter}.ts` | shared guard helpers; `related:` operations; TS reader parity |
 | `apps/desktop/src/stores/{relations,editorStore,uiStore}.ts` | write path; `editPage`; dialog states |
 | `apps/desktop/src/features/global-view/{CardMenu,Card,Canvas,edges,gvStore,GlobalView,RelationsDialog,IndexPickDialog}.tsx/ts` | menu, connect mode, handle, edge hits, dialogs |
 | `apps/desktop/e2e/{ipcMock,m3b.spec,zero-network.spec}.ts`, `playwright.config.ts` | end to end |
 
-**Commands used throughout (repo root):** `export PATH="$HOME/.nvm/versions/node/v24.21.0/bin:$PATH"`; Vitest `pnpm --filter @nimw/desktop exec vitest run --maxWorkers=2 <paths>`; Cargo `cargo test -p <crate> [--test <file>]`; E2E `pnpm --filter @nimw/desktop exec vite build` then `PLAYWRIGHT_BROWSERS_PATH=<browsers> pnpm --filter @nimw/desktop exec playwright test <spec>`.
+**Commands used throughout (repo root):** `export PATH="$HOME/.nvm/versions/node/v24.21.0/bin:$PATH"`; Vitest `pnpm --filter @liber/desktop exec vitest run --maxWorkers=2 <paths>`; Cargo `cargo test -p <crate> [--test <file>]`; E2E `pnpm --filter @liber/desktop exec vite build` then `PLAYWRIGHT_BROWSERS_PATH=<browsers> pnpm --filter @liber/desktop exec playwright test <spec>`.
 
 ---
 
@@ -148,7 +148,7 @@ Modify `apps/desktop/src/theme/palettes.test.ts` (apply this change):
 
 - [ ] **Step 2: Run them to see them fail**
 
-Run: `pnpm --filter @nimw/desktop exec vitest run --maxWorkers=2 src/theme/cssCompat.test.ts src/theme/palettes.test.ts`
+Run: `pnpm --filter @liber/desktop exec vitest run --maxWorkers=2 src/theme/cssCompat.test.ts src/theme/palettes.test.ts`
 Expected: FAIL — `× no color-mix(): Safari before 16.2 drops the whole declaration (M3b §7)` (six offenders listed) and `× lavender light: sidebar shades and backdrops` (and every other palette × mode: the tokens are undefined).
 
 - [ ] **Step 3: Implement**
@@ -311,11 +311,11 @@ Modify `apps/desktop/src/theme/tokens.css` (apply this change):
    --color-warn-text: #f3c79f;
 ```
 
-Note: `tokens.css` gets the lavender values (light `#35333b #3d3a42 #3b3841 rgba(244, 239, 248, 0.6) rgba(244, 239, 248, 0.7)`, dark `#2a282e #322f37 #302d35 rgba(23, 21, 28, 0.6) rgba(23, 21, 28, 0.7)`), computed with `mix(side, sideText, 0.12 / 0.16 / 0.15)` and `alpha(bg, 0.6 / 0.7)`. Never edit `palettes.css` by hand: run `pnpm --filter @nimw/desktop gen:palettes`.
+Note: `tokens.css` gets the lavender values (light `#35333b #3d3a42 #3b3841 rgba(244, 239, 248, 0.6) rgba(244, 239, 248, 0.7)`, dark `#2a282e #322f37 #302d35 rgba(23, 21, 28, 0.6) rgba(23, 21, 28, 0.7)`), computed with `mix(side, sideText, 0.12 / 0.16 / 0.15)` and `alpha(bg, 0.6 / 0.7)`. Never edit `palettes.css` by hand: run `pnpm --filter @liber/desktop gen:palettes`.
 
 - [ ] **Step 4: Run them to see them pass**
 
-Run: `pnpm --filter @nimw/desktop gen:palettes && pnpm --filter @nimw/desktop exec vitest run --maxWorkers=2 src/theme`
+Run: `pnpm --filter @liber/desktop gen:palettes && pnpm --filter @liber/desktop exec vitest run --maxWorkers=2 src/theme`
 Expected: PASS — `Tests  120 passed (120)`; `git status` shows `src/theme/palettes.css` regenerated.
 
 - [ ] **Step 5: Commit**
@@ -350,13 +350,13 @@ Spec §4, §5, §6.
 - Modify: `apps/desktop/src-tauri/tests/commands.rs`
 - Modify: `apps/desktop/src/ipc/globalView.test.ts`
 - Modify: `apps/desktop/src/ipc/index.ts`
-- Modify: `crates/nimw-markdown/src/frontmatter.rs`
-- Modify: `crates/nimw-session/Cargo.toml`
-- Modify: `crates/nimw-session/src/global_view.rs`
-- Modify: `crates/nimw-session/src/lib.rs`
-- Modify: `crates/nimw-session/tests/global_view.rs`
-- Modify: `crates/nimw-vault/src/layout.rs`
-- Modify: `crates/nimw-vault/src/vault.rs`
+- Modify: `crates/liber-markdown/src/frontmatter.rs`
+- Modify: `crates/liber-session/Cargo.toml`
+- Modify: `crates/liber-session/src/global_view.rs`
+- Modify: `crates/liber-session/src/lib.rs`
+- Modify: `crates/liber-session/tests/global_view.rs`
+- Modify: `crates/liber-vault/src/layout.rs`
+- Modify: `crates/liber-vault/src/vault.rs`
 
 **Interfaces:**
 - Consumes: `Vault::update_json_object`, `remap` (layout.rs), `Ctx::folder_card`, `shortest_unique_target`.
@@ -408,7 +408,7 @@ Modify `apps/desktop/src-tauri/tests/commands.rs` (apply this change):
 +        "notFound"
 +    );
 +
-+    assert!(!vault.path().join(".nimw").exists(), "VLT-02");
++    assert!(!vault.path().join(".liber").exists(), "VLT-02");
 +    let card = call(
 +        &h.main,
 +        "index_pick_set",
@@ -419,7 +419,7 @@ Modify `apps/desktop/src-tauri/tests/commands.rs` (apply this change):
 +    assert_eq!(card["indexPage"], "Character Design/My characters.md");
 +    assert_eq!(card["indexFrom"], "picked");
 +    let json: Value = serde_json::from_str(
-+        &std::fs::read_to_string(vault.path().join(".nimw/vault.json")).unwrap(),
++        &std::fs::read_to_string(vault.path().join(".liber/vault.json")).unwrap(),
 +    )
 +    .unwrap();
 +    assert_eq!(
@@ -490,18 +490,18 @@ Modify `apps/desktop/src/ipc/globalView.test.ts` (apply this change):
  });
 ```
 
-Modify `crates/nimw-session/tests/global_view.rs` (apply this change):
+Modify `crates/liber-session/tests/global_view.rs` (apply this change):
 
 ```diff
 @@ -2,7 +2,8 @@
  //! cards (index notes, folder summaries, covers), edges and layouts.
  
- use nimw_session::{
+ use liber_session::{
 -    CardKind, EdgeKind, GvCard, GvEdge, GvLevel, Relation, SessionEvent, VaultSession,
 +    CardKind, EdgeKind, GvCard, GvEdge, GvLevel, IndexFrom, Relation, SessionError, SessionEvent,
 +    VaultSession,
  };
- use nimw_vault::VaultPath;
+ use liber_vault::VaultPath;
  use std::path::Path;
 @@ -527,3 +528,145 @@ fn m3a_an_external_move_of_1000_pinned_notes_writes_the_layout_once() {
      eprintln!("external move of {N} pinned notes, watcher batch: {took:?}");
@@ -533,13 +533,13 @@ Modify `crates/nimw-session/tests/global_view.rs` (apply this change):
 +    );
 +}
 +
-+/// M3b §4, §6: picking a folder's index note writes `.nimw/vault.json`
++/// M3b §4, §6: picking a folder's index note writes `.liber/vault.json`
 +/// (other keys kept) and answers the folder's new card; clearing removes it.
 +#[test]
 +fn m3b_index_pick_set_writes_the_pick_and_answers_the_card() {
 +    let dir = vault();
 +    std::fs::write(
-+        dir.path().join(".nimw/vault.json"),
++        dir.path().join(".liber/vault.json"),
 +        r#"{"version":1,"exclude":["Private/**"],"indexPicks":{"Gamma":"Gamma/b.md"},"future":{"x":1}}"#,
 +    )
 +    .unwrap();
@@ -552,7 +552,7 @@ Modify `crates/nimw-session/tests/global_view.rs` (apply this change):
 +    assert_eq!(card.index_page.as_deref(), Some("Delta/x.md"));
 +    assert_eq!(card.index_from, Some(IndexFrom::Picked));
 +    let json: serde_json::Value = serde_json::from_str(
-+        &std::fs::read_to_string(dir.path().join(".nimw/vault.json")).unwrap(),
++        &std::fs::read_to_string(dir.path().join(".liber/vault.json")).unwrap(),
 +    )
 +    .unwrap();
 +    assert_eq!(json["indexPicks"]["Delta"], "Delta/x.md");
@@ -563,7 +563,7 @@ Modify `crates/nimw-session/tests/global_view.rs` (apply this change):
 +    let cleared = s.index_pick_set(&vp("Delta"), None).unwrap();
 +    assert_eq!(cleared.index_page, None);
 +    let json: serde_json::Value = serde_json::from_str(
-+        &std::fs::read_to_string(dir.path().join(".nimw/vault.json")).unwrap(),
++        &std::fs::read_to_string(dir.path().join(".liber/vault.json")).unwrap(),
 +    )
 +    .unwrap();
 +    assert!(json["indexPicks"].get("Delta").is_none());
@@ -583,20 +583,20 @@ Modify `crates/nimw-session/tests/global_view.rs` (apply this change):
 +    }
 +}
 +
-+/// A vault with no `.nimw/` gets one only when something is picked (VLT-02).
++/// A vault with no `.liber/` gets one only when something is picked (VLT-02).
 +#[test]
 +fn m3b_a_pick_creates_vault_json_lazily() {
 +    let dir = vault();
-+    std::fs::remove_dir_all(dir.path().join(".nimw")).unwrap();
++    std::fs::remove_dir_all(dir.path().join(".liber")).unwrap();
 +    let (_c, s) = open(dir.path());
 +    s.index_pick_set(&vp("Delta"), None).unwrap();
 +    assert!(
-+        !dir.path().join(".nimw").exists(),
++        !dir.path().join(".liber").exists(),
 +        "clearing nothing writes nothing"
 +    );
 +    s.index_pick_set(&vp("Delta"), Some(&vp("Delta/y.md")))
 +        .unwrap();
-+    assert!(dir.path().join(".nimw/vault.json").exists());
++    assert!(dir.path().join(".liber/vault.json").exists());
 +}
 +
 +/// M3b §4: picks follow renames of the folder and of the page.
@@ -653,7 +653,7 @@ Modify `crates/nimw-session/tests/global_view.rs` (apply this change):
 
 - [ ] **Step 2: Run them to see them fail**
 
-Run: `cargo test -p nimw-markdown m3b && cargo test -p nimw-session --test global_view && cargo test -p nimw-desktop --test commands`
+Run: `cargo test -p liber-markdown m3b && cargo test -p liber-session --test global_view && cargo test -p liber-desktop --test commands`
 Expected: FAIL — `frontmatter::tests::m3b_a_scalar_related_counts_as_a_one_item_list` panics (no link for `related: "[[Beta]]"`); `global_view` and `commands` do not compile / fail (`IndexFrom`, `index_pick_set`, `link_target` unknown; the commands list names two unregistered commands).
 
 - [ ] **Step 3: Implement**
@@ -700,14 +700,14 @@ Modify `apps/desktop/src-tauri/src/dto.rs` (apply this change):
      pub child_titles: Vec<String>,
 @@ -199,7 +201,7 @@ pub struct GvCardDto {
  
- impl From<nimw_session::GvCard> for GvCardDto {
-     fn from(c: nimw_session::GvCard) -> GvCardDto {
--        use nimw_session::{CardKind, Relation};
-+        use nimw_session::{CardKind, IndexFrom, Relation};
+ impl From<liber_session::GvCard> for GvCardDto {
+     fn from(c: liber_session::GvCard) -> GvCardDto {
+-        use liber_session::{CardKind, Relation};
++        use liber_session::{CardKind, IndexFrom, Relation};
          GvCardDto {
              path: c.path,
              kind: match c.kind {
-@@ -216,6 +218,12 @@ impl From<nimw_session::GvCard> for GvCardDto {
+@@ -216,6 +218,12 @@ impl From<liber_session::GvCard> for GvCardDto {
              has_image: c.has_image,
              has_audio: c.has_audio,
              index_page: c.index_page,
@@ -727,7 +727,7 @@ Modify `apps/desktop/src-tauri/src/gv_commands.rs` (apply this change):
 ```diff
 @@ -1,7 +1,7 @@
  //! M3a §8: the Global View — levels and their cards, edges between visible
- //! cards, pinned card positions. Thin wrappers over `nimw-session`.
+ //! cards, pinned card positions. Thin wrappers over `liber-session`.
  
 -use crate::dto::{GvEdgeDto, GvLevelDto, GvLevelResultDto};
 +use crate::dto::{GvCardDto, GvEdgeDto, GvLevelDto, GvLevelResultDto};
@@ -830,7 +830,7 @@ Modify `apps/desktop/src/ipc/index.ts` (apply this change):
    call<VaultSettings>('vault_settings_set', { patch });
 ```
 
-Modify `crates/nimw-markdown/src/frontmatter.rs` (apply this change):
+Modify `crates/liber-markdown/src/frontmatter.rs` (apply this change):
 
 ```diff
 @@ -194,11 +194,15 @@ pub(crate) fn parse(src: &str, yaml: Range<usize>) -> Frontmatter {
@@ -877,12 +877,12 @@ Modify `crates/nimw-markdown/src/frontmatter.rs` (apply this change):
          let f = fm("---\ntags: [unclosed\nsubtitle: x\n---\n");
 ```
 
-Modify `crates/nimw-session/Cargo.toml` (apply this change):
+Modify `crates/liber-session/Cargo.toml` (apply this change):
 
 ```diff
 @@ -19,6 +19,7 @@ thiserror.workspace = true
  criterion.workspace = true
- nimw-testkit = { path = "../nimw-testkit" }
+ liber-testkit = { path = "../liber-testkit" }
  proptest.workspace = true
 +serde_json.workspace = true
  tempfile.workspace = true
@@ -890,7 +890,7 @@ Modify `crates/nimw-session/Cargo.toml` (apply this change):
  [[bench]]
 ```
 
-Modify `crates/nimw-session/src/global_view.rs` (apply this change):
+Modify `crates/liber-session/src/global_view.rs` (apply this change):
 
 ```diff
 @@ -28,6 +28,20 @@ pub enum CardKind {
@@ -905,7 +905,7 @@ Modify `crates/nimw-session/src/global_view.rs` (apply this change):
 +    Named,
 +    /// Rule 2: `index.md`.
 +    Index,
-+    /// Rule 3: `.nimw/vault.json` `indexPicks`.
++    /// Rule 3: `.liber/vault.json` `indexPicks`.
 +    Picked,
 +    /// Rule 4: the folder's only page.
 +    Only,
@@ -1015,7 +1015,7 @@ Modify `crates/nimw-session/src/global_view.rs` (apply this change):
 +            return Err(SessionError::NotIndexed(target.to_string()));
 +        }
 +        let files = index.file_set()?;
-+        Ok(nimw_markdown::shortest_unique_target(
++        Ok(liber_markdown::shortest_unique_target(
 +            target.as_str(),
 +            source.as_str(),
 +            &files,
@@ -1049,7 +1049,7 @@ Modify `crates/nimw-session/src/global_view.rs` (apply this change):
                  _ => format!("{} renamed entries", renames.len()),
 ```
 
-Modify `crates/nimw-session/src/lib.rs` (apply this change):
+Modify `crates/liber-session/src/lib.rs` (apply this change):
 
 ```diff
 @@ -14,7 +14,7 @@ pub use attachments::{Attached, LinkSuggestion, cover_reference, sanitize_file_n
@@ -1064,14 +1064,14 @@ Modify `crates/nimw-session/src/lib.rs` (apply this change):
  pub use session::{VaultSession, index_db_path};
 ```
 
-Modify `crates/nimw-vault/src/layout.rs` (apply this change):
+Modify `crates/liber-vault/src/layout.rs` (apply this change):
 
 ```diff
 @@ -169,6 +169,37 @@ impl Vault {
          })
      }
  
-+    /// Index-note picks (`.nimw/vault.json` `indexPicks`) follow a batch of
++    /// Index-note picks (`.liber/vault.json` `indexPicks`) follow a batch of
 +    /// renames, folder keys and page values alike (M3b §4); one write, and
 +    /// none when nothing moved.
 +    pub fn remap_index_picks_many(&self, renames: &[(String, String)]) -> Result<()> {
@@ -1082,7 +1082,7 @@ Modify `crates/nimw-vault/src/layout.rs` (apply this change):
 +            .iter()
 +            .map(|(from, to)| (from.as_str(), to.as_str()))
 +            .collect();
-+        self.update_json_object(crate::vault::NIMW_JSON, false, |map| {
++        self.update_json_object(crate::vault::LIBER_JSON, false, |map| {
 +            let Some(picks) = map
 +                .get_mut("indexPicks")
 +                .and_then(serde_json::Value::as_object_mut)
@@ -1107,19 +1107,19 @@ Modify `crates/nimw-vault/src/layout.rs` (apply this change):
          path.is_empty()
 ```
 
-Modify `crates/nimw-vault/src/vault.rs` (apply this change):
+Modify `crates/liber-vault/src/vault.rs` (apply this change):
 
 ```diff
 @@ -205,6 +205,33 @@ impl Vault {
-         nimw.index_picks
+         liber.index_picks
      }
  
 +    /// Picks (`Some`) or clears (`None`) `folder`'s index note in
-+    /// `.nimw/vault.json` (M3b §4), keeping every other key. Clearing a pick
++    /// `.liber/vault.json` (M3b §4), keeping every other key. Clearing a pick
 +    /// that isn't there writes nothing, and a vault without the file gets one
 +    /// only for a pick (VLT-02).
 +    pub fn set_index_pick(&self, folder: &str, page: Option<&str>) -> Result<()> {
-+        self.update_json_object(NIMW_JSON, page.is_some(), |map| {
++        self.update_json_object(LIBER_JSON, page.is_some(), |map| {
 +            let picks = map
 +                .entry("indexPicks")
 +                .or_insert_with(|| serde_json::Value::Object(Default::default()));
@@ -1146,25 +1146,25 @@ Modify `crates/nimw-vault/src/vault.rs` (apply this change):
          &self.warnings
 ```
 
-Note: `[[note]]` with two `note.md` pages resolves to the first by path order, so `link_target` answers `note` for that one and `Beta/note` for the other (the existing `shortest_unique_target` rule, as `link_suggest` writes it). `nimw-session` gains `serde_json` as a dev-dependency for the tests. `build.rs` regenerates `permissions/autogenerated/{link_target,index_pick_set}.toml` — commit them.
+Note: `[[note]]` with two `note.md` pages resolves to the first by path order, so `link_target` answers `note` for that one and `Beta/note` for the other (the existing `shortest_unique_target` rule, as `link_suggest` writes it). `liber-session` gains `serde_json` as a dev-dependency for the tests. `build.rs` regenerates `permissions/autogenerated/{link_target,index_pick_set}.toml` — commit them.
 
 - [ ] **Step 4: Run them to see them pass**
 
-Run: `cargo test --workspace && cargo clippy --workspace --all-targets -- -D warnings && cargo fmt --all --check && pnpm --filter @nimw/desktop exec vitest run --maxWorkers=2 src/ipc/globalView.test.ts`
+Run: `cargo test --workspace && cargo clippy --workspace --all-targets -- -D warnings && cargo fmt --all --check && pnpm --filter @liber/desktop exec vitest run --maxWorkers=2 src/ipc/globalView.test.ts`
 Expected: PASS — every crate green (`global_view`: 17 passed, 2 ignored; `commands`: 31 passed); clippy and fmt clean; `Tests  2 passed (2)`.
 
 - [ ] **Step 5: Commit**
 
 ```bash
-git add apps/desktop/src-tauri/build.rs apps/desktop/src-tauri/capabilities/main.json apps/desktop/src-tauri/src/dto.rs apps/desktop/src-tauri/src/gv_commands.rs apps/desktop/src-tauri/src/lib.rs apps/desktop/src-tauri/tests/commands.rs apps/desktop/src/ipc/globalView.test.ts apps/desktop/src/ipc/index.ts crates/nimw-markdown/src/frontmatter.rs crates/nimw-session/Cargo.toml crates/nimw-session/src/global_view.rs crates/nimw-session/src/lib.rs crates/nimw-session/tests/global_view.rs crates/nimw-vault/src/layout.rs crates/nimw-vault/src/vault.rs
+git add apps/desktop/src-tauri/build.rs apps/desktop/src-tauri/capabilities/main.json apps/desktop/src-tauri/src/dto.rs apps/desktop/src-tauri/src/gv_commands.rs apps/desktop/src-tauri/src/lib.rs apps/desktop/src-tauri/tests/commands.rs apps/desktop/src/ipc/globalView.test.ts apps/desktop/src/ipc/index.ts crates/liber-markdown/src/frontmatter.rs crates/liber-session/Cargo.toml crates/liber-session/src/global_view.rs crates/liber-session/src/lib.rs crates/liber-session/tests/global_view.rs crates/liber-vault/src/layout.rs crates/liber-vault/src/vault.rs
 git commit -F - <<'MSG'
 feat(global-view): index-note picks and relationship link targets over IPC; scalar related: indexed (M3b §4–§6)
 
-- nimw-markdown: a scalar `related:` (string or map) counts as a
+- liber-markdown: a scalar `related:` (string or map) counts as a
   one-item list, in parity with the TS reader.
-- nimw-vault: set_index_pick (lazy .nimw/vault.json, other keys kept,
+- liber-vault: set_index_pick (lazy .liber/vault.json, other keys kept,
   no write when nothing changes) and remap_index_picks_many.
-- nimw-session: GvCard.index_from (which GV-02 rule chose the index
+- liber-session: GvCard.index_from (which GV-02 rule chose the index
   note), index_pick_set (a visible folder, a page directly inside it;
   answers the folder's card), link_target (shortest unique wiki
   target); picks follow in-app and watcher renames with the layout.
@@ -1242,7 +1242,7 @@ describe('reading related: (M3b §5)', () => {
     expect(readRelated('---\nrelated: [oops\n---\n')).toEqual([]);
   });
 
-  it('the link reader counts a scalar related: too (parity with nimw-markdown)', () => {
+  it('the link reader counts a scalar related: too (parity with liber-markdown)', () => {
     const fm = readFrontmatter(parsePage('---\nrelated: "[[A]]"\n---\n# x\n').tree);
     expect(frontmatterLinks(fm).map((l) => [l.kind, l.target])).toEqual([['related', 'A']]);
   });
@@ -1373,7 +1373,7 @@ describe('sweep: every relationship edit reads back exactly or is refused', () =
 
 - [ ] **Step 2: Run them to see them fail**
 
-Run: `pnpm --filter @nimw/desktop exec vitest run --maxWorkers=2 src/markdown/related.test.ts`
+Run: `pnpm --filter @liber/desktop exec vitest run --maxWorkers=2 src/markdown/related.test.ts`
 Expected: FAIL — `Failed to resolve import "./related"`.
 
 - [ ] **Step 3: Implement**
@@ -1386,7 +1386,7 @@ Modify `apps/desktop/src/markdown/frontmatter.ts` (apply this change):
      });
    }
 -  const related = Array.isArray(data.related) ? data.related : [];
-+  // A list, or one relationship written without it (M3b §5, as nimw-markdown).
++  // A list, or one relationship written without it (M3b §5, as liber-markdown).
 +  const related = Array.isArray(data.related)
 +    ? data.related
 +    : data.related !== undefined && data.related !== null
@@ -1402,7 +1402,7 @@ Modify `apps/desktop/src/markdown/frontmatterEdit.ts` (apply this change):
 ```diff
 @@ -25,7 +25,7 @@ const BLOCK = /^---\n(?:[\s\S]*?\n)?---(?:\n|$)/;
   *  or a `---` line (trailing spaces allowed) with a later `---` / `...` line
-  *  that some reader (remark, nimw-markdown, Obsidian) could take as its end.
+  *  that some reader (remark, liber-markdown, Obsidian) could take as its end.
   *  A new block in front of it would hide it from one reader or another. */
 -function unconfirmedBlock(text: string): boolean {
 +export function unconfirmedBlock(text: string): boolean {
@@ -1442,12 +1442,12 @@ Modify `apps/desktop/src/markdown/frontmatterEdit.ts` (apply this change):
  
 -/** Whether the edited frontmatter `next` reads back as `src` with `patch`
 - *  applied (no other key changes, nothing is added), both as remark reads it
-- *  (without the block's last line break) and as nimw-markdown and Obsidian do. */
+- *  (without the block's last line break) and as liber-markdown and Obsidian do. */
 -function readsBack(src: string, next: string, patch: FrontmatterPatch): boolean {
 +/** Whether the edited frontmatter `next` reads back as `want(before)` — the
 + *  data `src` held with the edit applied: no other key changes, nothing is
 + *  added — both as remark reads it (without the block's last line break) and
-+ *  as nimw-markdown and Obsidian do. `want` answering `null` refuses. */
++ *  as liber-markdown and Obsidian do. `want` answering `null` refuses. */
 +export function readsBackAs(
 +  src: string,
 +  next: string,
@@ -1789,7 +1789,7 @@ Note: The sweep only checks edits that are not refused; a probe over its 14 text
 
 - [ ] **Step 4: Run them to see them pass**
 
-Run: `pnpm --filter @nimw/desktop exec vitest run --maxWorkers=2 src/markdown`
+Run: `pnpm --filter @liber/desktop exec vitest run --maxWorkers=2 src/markdown`
 Expected: PASS — `Tests  103 passed (103)` (the existing 21 frontmatterEdit tests unchanged by the refactor).
 
 - [ ] **Step 5: Commit**
@@ -1942,7 +1942,7 @@ describe('relationships written to pages (M3b §5)', () => {
     expect(await relate('A.md', 'B.md')).toEqual({ status: 'failed' });
     expect(disk.writes()).toEqual([]);
     expect(toasts()).toEqual([
-      'NIMW can’t safely change this note’s frontmatter. Edit it in Source mode.',
+      'Liber Linteum can’t safely change this note’s frontmatter. Edit it in Source mode.',
     ]);
   });
 
@@ -1975,7 +1975,7 @@ describe('relationships written to pages (M3b §5)', () => {
 
 - [ ] **Step 2: Run them to see them fail**
 
-Run: `pnpm --filter @nimw/desktop exec vitest run --maxWorkers=2 src/stores/relations.test.tsx`
+Run: `pnpm --filter @liber/desktop exec vitest run --maxWorkers=2 src/stores/relations.test.tsx`
 Expected: FAIL — `Failed to resolve import "./relations"`.
 
 - [ ] **Step 3: Implement**
@@ -2234,7 +2234,7 @@ export const removeRelation = (r: Relation): Promise<boolean> =>
 
 - [ ] **Step 4: Run them to see them pass**
 
-Run: `pnpm --filter @nimw/desktop exec vitest run --maxWorkers=2 src/stores/relations.test.tsx src/stores/editorStore.test.tsx && pnpm check:i18n`
+Run: `pnpm --filter @liber/desktop exec vitest run --maxWorkers=2 src/stores/relations.test.tsx src/stores/editorStore.test.tsx && pnpm check:i18n`
 Expected: PASS — `Tests  25 passed (25)`; `i18n OK: 2 locales in parity.`
 
 - [ ] **Step 5: Commit**
@@ -2468,7 +2468,7 @@ describe('relationships dialog (M3b §3)', () => {
 
 - [ ] **Step 2: Run them to see them fail**
 
-Run: `pnpm --filter @nimw/desktop exec vitest run --maxWorkers=2 src/features/global-view/RelationsDialog.test.tsx src/features/global-view/Card.test.tsx src/features/global-view/GlobalView.edges.test.tsx`
+Run: `pnpm --filter @liber/desktop exec vitest run --maxWorkers=2 src/features/global-view/RelationsDialog.test.tsx src/features/global-view/Card.test.tsx src/features/global-view/GlobalView.edges.test.tsx`
 Expected: FAIL — `Failed to resolve import "./RelationsDialog"`; `Unable to find an accessible element with the role "button" and name "Connections of Generator Rex"`; `expected  to have a length of 1 but got +0` (no hit path).
 
 - [ ] **Step 3: Implement**
@@ -2772,7 +2772,7 @@ export function CardMenu({
       ref={box}
       role="menu"
       aria-label={label}
-      className="nimw-menu"
+      className="liber-menu"
       style={{ position: 'fixed', left: rect.left, top: rect.bottom + 4 }}
       onKeyDown={onKeyDown}
     >
@@ -3116,7 +3116,7 @@ Note: The menu renders in a portal: React Flow's viewport is transformed, which 
 
 - [ ] **Step 4: Run them to see them pass**
 
-Run: `pnpm --filter @nimw/desktop exec vitest run --maxWorkers=2 && pnpm lint && pnpm check:i18n`
+Run: `pnpm --filter @liber/desktop exec vitest run --maxWorkers=2 && pnpm lint && pnpm check:i18n`
 Expected: PASS — `Test Files  75 passed (75)`, `Tests  702 passed (702)`; lint clean; i18n in parity.
 
 - [ ] **Step 5: Commit**
@@ -3371,7 +3371,7 @@ describe('connecting two cards (M3b §2)', () => {
 
 - [ ] **Step 2: Run them to see them fail**
 
-Run: `pnpm --filter @nimw/desktop exec vitest run --maxWorkers=2 src/features/global-view/Connect.test.tsx`
+Run: `pnpm --filter @liber/desktop exec vitest run --maxWorkers=2 src/features/global-view/Connect.test.tsx`
 Expected: FAIL — 7 tests: `Unable to find an accessible element with the role "menuitem" and name "Connect to…"` (and `connectByDrag is not a function`).
 
 - [ ] **Step 3: Implement**
@@ -3939,7 +3939,7 @@ Note: `nodesConnectable` is on so the handle starts connections; `connectOnClick
 
 - [ ] **Step 4: Run them to see them pass**
 
-Run: `pnpm --filter @nimw/desktop exec vitest run --maxWorkers=2 && pnpm lint && pnpm check:i18n`
+Run: `pnpm --filter @liber/desktop exec vitest run --maxWorkers=2 && pnpm lint && pnpm check:i18n`
 Expected: PASS — `Test Files  76 passed (76)`, `Tests  709 passed (709)`.
 
 - [ ] **Step 5: Commit**
@@ -4124,7 +4124,7 @@ describe('index note pick (M3b §4)', () => {
 
 - [ ] **Step 2: Run them to see them fail**
 
-Run: `pnpm --filter @nimw/desktop exec vitest run --maxWorkers=2 src/features/global-view/IndexPickDialog.test.tsx src/features/global-view/Connect.test.tsx`
+Run: `pnpm --filter @liber/desktop exec vitest run --maxWorkers=2 src/features/global-view/IndexPickDialog.test.tsx src/features/global-view/Connect.test.tsx`
 Expected: FAIL — `Failed to resolve import "./IndexPickDialog"`; `expected [ 'Connect to…' ] to deeply equal [ 'Connect to…', 'Pick index note…' ]`.
 
 - [ ] **Step 3: Implement**
@@ -4206,7 +4206,7 @@ const SEARCH_FROM = 10;
 const stem = (path: string) => nameOf(path).replace(/\.md$/i, '');
 
 /** Picks the page a folder's card previews (M3b §4, GV-02 rule 3): one of
- *  the folder's own pages, or none. Saved in `.nimw/vault.json`. */
+ *  the folder's own pages, or none. Saved in `.liber/vault.json`. */
 export function IndexPickDialog({
   folder,
   current,
@@ -4389,7 +4389,7 @@ Modify `apps/desktop/src/stores/uiStore.ts` (apply this change):
 
 - [ ] **Step 4: Run them to see them pass**
 
-Run: `pnpm --filter @nimw/desktop exec vitest run --maxWorkers=2 && pnpm lint && pnpm check:i18n`
+Run: `pnpm --filter @liber/desktop exec vitest run --maxWorkers=2 && pnpm lint && pnpm check:i18n`
 Expected: PASS — `Test Files  77 passed (77)`, `Tests  715 passed (715)`.
 
 - [ ] **Step 5: Commit**
@@ -4467,7 +4467,7 @@ const writesTo = (page: Page, path: string) =>
   page.evaluate(
     (p) =>
       (
-        (window as unknown as { __nimwWrites?: { path: string; text: string }[] }).__nimwWrites ??
+        (window as unknown as { __liberWrites?: { path: string; text: string }[] }).__liberWrites ??
         []
       )
         .filter((w) => w.path === p)
@@ -4597,7 +4597,7 @@ Modify `apps/desktop/e2e/zero-network.spec.ts` (apply this change):
 +  await page.waitForLoadState('networkidle');
 +  await page.waitForTimeout(300);
 +  const csp = await page.evaluate(
-+    () => (window as unknown as { __nimwCspViolations: string[] }).__nimwCspViolations,
++    () => (window as unknown as { __liberCspViolations: string[] }).__liberCspViolations,
 +  );
 +  expect(problems).toEqual([]);
 +  expect(csp).toEqual([]);
@@ -4607,7 +4607,7 @@ Modify `apps/desktop/e2e/zero-network.spec.ts` (apply this change):
 
 - [ ] **Step 2: Run them to see them fail**
 
-Run: `pnpm --filter @nimw/desktop exec vite build && PLAYWRIGHT_BROWSERS_PATH=<browsers> pnpm --filter @nimw/desktop exec playwright test e2e/m3b.spec.ts`
+Run: `pnpm --filter @liber/desktop exec vite build && PLAYWRIGHT_BROWSERS_PATH=<browsers> pnpm --filter @liber/desktop exec playwright test e2e/m3b.spec.ts`
 Expected: FAIL before the mock change — `not mocked: link_target` (and no manual edge drawn). (While writing it: the keyboard test first started from Welcome, alone on the second row of the 3-column grid at 1280 px — ArrowLeft has nowhere to go; it starts from Notes and goes down.)
 
 - [ ] **Step 3: Implement**
@@ -4731,7 +4731,7 @@ Modify `apps/desktop/e2e/ipcMock.ts` (apply this change):
 +      return gvCard(folder, folder.includes('/') ? 'folder' : 'project', null);
      },
      layout_get: (a) => {
-       const all = JSON.parse(localStorage.getItem('nimw-e2e-layout') ?? '{}');
+       const all = JSON.parse(localStorage.getItem('liber-e2e-layout') ?? '{}');
 ```
 
 Modify `apps/desktop/e2e/remote.md` (apply this change):
@@ -4777,7 +4777,7 @@ Note: Final gate on the clone: `check.sh all` → vitest 715/715 (77 files), car
 
 - [ ] **Step 4: Run them to see them pass**
 
-Run: `PLAYWRIGHT_BROWSERS_PATH=<browsers> pnpm --filter @nimw/desktop exec playwright test e2e/m3b.spec.ts e2e/zero-network.spec.ts --repeat-each=2`
+Run: `PLAYWRIGHT_BROWSERS_PATH=<browsers> pnpm --filter @liber/desktop exec playwright test e2e/m3b.spec.ts e2e/zero-network.spec.ts --repeat-each=2`
 Expected: PASS — `20 passed` for m3b (5 tests × 2 engines × 2 repeats); the zero-network relationships case passes.
 
 - [ ] **Step 5: Commit**

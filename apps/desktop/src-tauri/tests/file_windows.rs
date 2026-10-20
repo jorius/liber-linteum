@@ -2,8 +2,8 @@
 //! `generate_context!()` with the capability files, real command
 //! registration, mock runtime, temp config/cache dirs).
 
-use nimw_desktop::AppDirs;
-use nimw_desktop::file_windows::{FileWindows, open_file_window};
+use liber_desktop::AppDirs;
+use liber_desktop::file_windows::{FileWindows, open_file_window};
 use serde_json::{Value, json};
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
@@ -83,6 +83,7 @@ const VAULT_COMMANDS: &[&str] = &[
     "entry_trash",
     "vaults_recent",
     "vaults_forget",
+    "vaults_reveal",
     "page_read",
     "page_write",
     "page_create_conflict_copy",
@@ -140,7 +141,7 @@ fn harness() -> Harness {
         config: config.path().to_path_buf(),
         cache: cache.path().to_path_buf(),
     };
-    let app = nimw_desktop::configure(mock_builder(), Some(dirs))
+    let app = liber_desktop::configure(mock_builder(), Some(dirs))
         .build(tauri::generate_context!())
         .expect("app builds with the real context");
     let main = WebviewWindowBuilder::new(&app, "main", Default::default())
@@ -555,8 +556,8 @@ fn a_window_without_a_grant_reaches_no_file() {
 
 #[test]
 fn a_file_windows_assets_come_from_its_folder_only() {
-    use nimw_desktop::asset::serve_window;
-    use nimw_desktop::state::AppState;
+    use liber_desktop::asset::serve_window;
+    use liber_desktop::state::AppState;
     let h = harness();
     let outer = folder(&[("secret.png", "s")]);
     let dir = outer.path().join("in");
@@ -636,7 +637,7 @@ fn the_window_hears_when_its_file_changes_and_only_its_file() {
     );
     std::fs::write(dir.path().join("note.md"), "changed outside").unwrap();
     let wait = Duration::from_secs(5);
-    assert!(nimw_testkit::wait_until(wait, || seen
+    assert!(liber_testkit::wait_until(wait, || seen
         .lock()
         .unwrap()
         .contains(&r#"{"removed":false}"#.to_string())));
@@ -645,7 +646,7 @@ fn the_window_hears_when_its_file_changes_and_only_its_file() {
     std::thread::sleep(Duration::from_millis(600));
     seen.lock().unwrap().clear();
     std::fs::remove_file(dir.path().join("Renamed.md")).unwrap();
-    assert!(nimw_testkit::wait_until(wait, || seen
+    assert!(liber_testkit::wait_until(wait, || seen
         .lock()
         .unwrap()
         .contains(&r#"{"removed":true}"#.to_string())));
@@ -687,7 +688,7 @@ fn m4c_review_m2_a_file_grown_too_large_is_not_read() {
         .write(true)
         .open(dir.path().join("note.md"))
         .unwrap()
-        .set_len(nimw_desktop::file_windows::PAGE_MAX_BYTES + 1)
+        .set_len(liber_desktop::file_windows::PAGE_MAX_BYTES + 1)
         .unwrap();
     assert_eq!(
         kind(call(&w, "file_read", json!({})).unwrap_err()),
@@ -700,8 +701,8 @@ fn m4c_review_m2_a_file_grown_too_large_is_not_read() {
 /// a file window is served media and documents only.
 #[test]
 fn m4c_review_i4_assets_never_resolve_into_hidden_files() {
-    use nimw_desktop::asset::serve_window;
-    use nimw_desktop::state::AppState;
+    use liber_desktop::asset::serve_window;
+    use liber_desktop::state::AppState;
     let h = harness();
     let dir = folder(&[(".ssh/id.png", "key"), ("notes.txt", "t"), ("a.png", "a")]);
     #[cfg(unix)]

@@ -19,7 +19,7 @@ Connect ideas by hand on the map, and choose which page represents a folder.
    - in both cases the source page's frontmatter `related:` gains `"[[Target]]"` and a manual edge appears.
 2. **Edit a relationship (GV-23):** give it an optional short label and an optional direction (an arrow from source to target), or delete it.
 3. **Storage (GV-24):** relationships are stored in the **source page's** frontmatter. A plain relationship is the string `"[[Page]]"`; a labelled or directed one is a map `{ link: "[[Page]]", label: "…", directed: true }`. The file reads naturally in Obsidian.
-4. **Index note pick (GV-02):** a folder without an index note under rules 1–2 (named like the folder, or `index.md`) can have one picked. The pick is stored in `.nimw/vault.json` `indexPicks`, follows renames, and can be cleared.
+4. **Index note pick (GV-02):** a folder without an index note under rules 1–2 (named like the folder, or `index.md`) can have one picked. The pick is stored in `.liber/vault.json` `indexPicks`, follows renames, and can be cleared.
 5. **Safari 15 floor:** the six existing `color-mix()` uses (sidebar hovers, dialog and opening backdrops) are replaced by generated tokens, and React Flow's `structuredClone` path stays unreachable.
 
 The non-negotiables are as in M3a.
@@ -66,7 +66,7 @@ The non-negotiables are as in M3a.
 
 - **Who can pick:** a folder card whose index note doesn't come from rules 1–2 shows a **Pick index note…** button in its cover area (folder summary) or footer.
   - It opens a dialog listing the folder's direct pages (radio list, with search when there are more than 10), plus **No index note**.
-  - Saving writes `.nimw/vault.json` `indexPicks[<folder>] = <page>` (or removes it) through Rust. Unknown keys are kept, and the file is created lazily.
+  - Saving writes `.liber/vault.json` `indexPicks[<folder>] = <page>` (or removes it) through Rust. Unknown keys are kept, and the file is created lazily.
 - **When rules 1–2 apply** (a page named like the folder, or `index.md`), the card shows no pick button, because the product spec gives those precedence. A stale pick is ignored and is kept until it's cleared.
 - **Renames:** picks follow renames and moves of the folder or the page, through the same Rust choke points as the M3a layout remap (in-app rename and watcher renames). A pick whose page was deleted is dropped lazily, on the next read.
 
@@ -96,7 +96,7 @@ The non-negotiables are as in M3a.
   - returns the folder's new `GvCard`.
   - `gv_children` already reads `indexPicks` (M3a §3.2 rule 3).
 - **Renames:** `layout_remap`'s rename hook also remaps `indexPicks` keys and values by path prefix.
-- **Indexer:** `crates/nimw-markdown/src/frontmatter.rs` accepts a scalar `related:` (string or map) as a one-item list.
+- **Indexer:** `crates/liber-markdown/src/frontmatter.rs` accepts a scalar `related:` (string or map) as a one-item list.
 
 ## 7. Safari 15 floor cleanup
 
@@ -158,7 +158,7 @@ These override the sections above where they conflict.
 10. **`link_target`** uses the existing `shortest_unique_target` rule (`[[note]]` resolves by path order among equal names, so only the other `note` needs its folder).
 11. **Safari 15 tokens** (§7): one hover shade (12 % of the sidebar text over the sidebar) for both its icon buttons and the explorer rows (rows used 10 %), `--color-sidebar-active` 16 %, `--color-sidebar-divider` 15 %; backdrops as `rgba()` of the background at 60 % / 70 %. A test fails on any `color-mix(` in the app's CSS.
 12. **Index pick dialog:** a radio list of the folder's own pages (search when there are more than 10) plus "No index note"; it re-reads the level after saving.
-13. **Tests:** `nimw-session` gains `serde_json` as a dev-dependency; the e2e IPC mock draws manual edges from frontmatter lines naming `[[X]]` and no longer counts frontmatter links as text links.
+13. **Tests:** `liber-session` gains `serde_json` as a dev-dependency; the e2e IPC mock draws manual edges from frontmatter lines naming `[[X]]` and no longer counts frontmatter links as text links.
 
 ## 11. Rulings from the final review's fix pass: UI, focus and connect mode
 

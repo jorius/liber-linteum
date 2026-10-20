@@ -1,4 +1,4 @@
-# Hand-off: M1b App Integration — Notes In My Way
+# Hand-off: M1b App Integration — Liber Linteum
 
 > **Date:** 2026-10-12 · **Merged into `main`** (branch `feat/m1b-app-integration` from `323740e`, deleted) · not pushed, no remote configured
 > **Audience:** Jose, or anyone continuing by hand.
@@ -71,7 +71,7 @@
 
 Events to `main`: `vault:progress { done, total }`, `vault:changed { created, modified, removed, renamed }` (external only), `vault:warning { message }`.
 
-### 3.2 Settings file (`~/Library/Application Support/app.notesinmyway.desktop/settings.json` on macOS)
+### 3.2 Settings file (`~/Library/Application Support/app.liberlinteum.desktop/settings.json` on macOS)
 ```json
 {
   "version": 1,
@@ -79,7 +79,7 @@ Events to `main`: `vault:progress { done, total }`, `vault:changed { created, mo
   "theme": "system",
   "rewriteLinks": true,
   "confirmDelete": true,
-  "recentVaults": [{ "path": "/Users/you/Documents/NIMW Test Vault", "name": "NIMW Test Vault", "openedAt": "2026-10-12T20:50:00Z" }]
+  "recentVaults": [{ "path": "/Users/you/Documents/Liber Linteum Test Vault", "name": "Liber Linteum Test Vault", "openedAt": "2026-10-12T20:50:00Z" }]
 }
 ```
 `language: null` = follow macOS. Delete the file to reset everything.
@@ -138,10 +138,10 @@ Global (⌘ on macOS, Ctrl elsewhere): ⇧E explorer, O open vault (picker), `,`
 ---
 
 ## 7. Tests inventory
-- **Rust (159):** M1a crates (as before plus `SessionEvent::Warning`, `trash` lock tests in `nimw-session`); desktop: `tests/commands.rs` (every command allowed from `main`, denied elsewhere; fixture open/tree/page; truncated/binary page; traversal → `outsideVault`; `notEmpty`; rename outcome; trash behind `NIMW_TRASH_TESTS`; progress event; **event listen/unlisten permission**; **threading guard**), `tests/settings.rs` (defaults, atomic round trip, corrupt file, newer keys/version, **unknown values reset only that field**, recents), `tests/errors.rs`, `tests/ipc.rs`.
+- **Rust (159):** M1a crates (as before plus `SessionEvent::Warning`, `trash` lock tests in `liber-session`); desktop: `tests/commands.rs` (every command allowed from `main`, denied elsewhere; fixture open/tree/page; truncated/binary page; traversal → `outsideVault`; `notEmpty`; rename outcome; trash behind `LIBER_TRASH_TESTS`; progress event; **event listen/unlisten permission**; **threading guard**), `tests/settings.rs` (defaults, atomic round trip, corrupt file, newer keys/version, **unknown values reset only that field**, recents), `tests/errors.rs`, `tests/ipc.rs`.
 - **Vitest (140):** `ipc/*.test.ts`, `stores/*.test.ts` (coalescing, stale responses, **refused subscriptions never stick**, settings warning toast, page atomic-save reload/recovery), `features/**/*.test.tsx` (welcome, shell, explorer keys/ARIA/rename, page states, dialogs, context menu, **Tab stop never lost**, **stale menus/dialogs close**, axe), `tests/network-ban.test.ts`.
-- Focused runs: `pnpm --filter @nimw/desktop exec vitest run src/features/explorer`; `cargo test -p nimw-desktop --test commands`.
-- OS trash: only with `NIMW_TRASH_TESTS=1` (CI sets it).
+- Focused runs: `pnpm --filter @liber/desktop exec vitest run src/features/explorer`; `cargo test -p liber-desktop --test commands`.
+- OS trash: only with `LIBER_TRASH_TESTS=1` (CI sets it).
 
 ---
 
@@ -186,7 +186,7 @@ Global (⌘ on macOS, Ctrl elsewhere): ⇧E explorer, O open vault (picker), `,`
 | j | Opening fails if recents can't be saved (read-only config dir) | M2 polish |
 | k | ACL test doesn't assert dialog save/message and event emit are denied; test temp dirs not cleaned; no `aria-setsize/posinset` | later |
 | l | Page view is raw Markdown; no breadcrumb | **M2** |
-| m | No undo for renames/moves; single window; `.nimw/vault.json` not written | later |
+| m | No undo for renames/moves; single window; `.liber/vault.json` not written | later |
 | n | M1a deferred minors (M1a hand-off §11 j–m, p–s) | as listed there |
 
 ---
@@ -198,8 +198,8 @@ Global (⌘ on macOS, Ctrl elsewhere): ⇧E explorer, O open vault (picker), `,`
 | Settings reset unexpectedly | Look for `settings.json.bad` next to `settings.json`; a toast names reset fields |
 | A command says "not allowed" | Permission checklist §3.3 |
 | Tree looks stale | It refetches after every own action and 100 ms after external changes; reopen the vault to force a full rescan |
-| `cargo test -p nimw-desktop` fails: `../dist` missing | `pnpm build:ui` first |
-| Test kit fixture path not found after using another checkout | `cargo clean -p nimw-testkit` (it bakes `CARGO_MANIFEST_DIR`) |
+| `cargo test -p liber-desktop` fails: `../dist` missing | `pnpm build:ui` first |
+| Test kit fixture path not found after using another checkout | `cargo clean -p liber-testkit` (it bakes `CARGO_MANIFEST_DIR`) |
 | pnpm refuses a fresh package version | release-age gate; see M0 hand-off §16.4 |
 
 ---

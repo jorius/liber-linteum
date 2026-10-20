@@ -32,7 +32,7 @@ export function StarIcon({ filled, size = 13 }: { filled: boolean; size?: number
   );
 }
 
-const COLLAPSED = 'nimw.favoritesCollapsed:';
+const COLLAPSED = 'liber.favoritesCollapsed:';
 
 function readCollapsed(root: string): boolean {
   try {
@@ -45,10 +45,16 @@ function readCollapsed(root: string): boolean {
 /** Opens a page the way the explorer does (M2b §3: a fresh link trail; the
  *  Trash view gives the editor its place back). Kept beside the explorer's
  *  own copy so the two cherry-pick apart. */
-function openEntry(node: TreeNode) {
+function openEntry(node: TreeNode, clicks = 1) {
   const vault = useVaultStore.getState();
   vault.select(node.path);
   if (node.kind !== 'page' && !isTextPath(node.path)) return;
+  if (clicks >= 2) {
+    // Round 3b §8.1: a double-click opens the page for editing.
+    useUiStore.getState().setScreen('edit');
+    usePageStore.getState().requestEditorFocus();
+    return;
+  }
   useTrailStore.getState().reset();
   const ui = useUiStore.getState();
   if (ui.screen === 'trash') ui.setScreen('edit');
@@ -255,10 +261,10 @@ function FavoriteRow({
           className={styles.name}
           aria-expanded={isFolder ? open : undefined}
           onKeyDown={onKeyDown}
-          onClick={() => {
+          onClick={(e) => {
             if (dragged?.()) return;
             if (isFolder) setOpen(!open);
-            else openEntry(node);
+            else openEntry(node, e.detail);
           }}
         >
           {name}
@@ -281,22 +287,6 @@ function FavoriteRow({
             </button>
           )}
         </span>
-        {onRequestMenu && (
-          <button
-            type="button"
-            tabIndex={-1}
-            className={explorer.more}
-            aria-label={t('menu.label', { name })}
-            aria-haspopup="menu"
-            onPointerDown={(e) => e.stopPropagation()}
-            onClick={(e) => {
-              e.stopPropagation();
-              menuAt(e.currentTarget);
-            }}
-          >
-            …
-          </button>
-        )}
       </div>
       {isFolder && open && kids && kids.length > 0 && (
         <ul className={styles.list}>

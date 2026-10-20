@@ -19,15 +19,15 @@
 | Final review + fix pass (§13) | done |
 | Real-window checks (§9) | **need you** |
 
-Totals: **901 vitest tests (87 files)**, **124 Playwright tests** (Chromium + WebKit) + 8 opt-in perf probes (`NIMW_PERF=1`), **261 cargo tests** (256 + 5 menu checks; Rust unchanged in M4); eslint, prettier, tsc, i18n parity, clippy, rustfmt and `cargo deny` clean.
+Totals: **901 vitest tests (87 files)**, **124 Playwright tests** (Chromium + WebKit) + 8 opt-in perf probes (`LIBER_PERF=1`), **261 cargo tests** (256 + 5 menu checks; Rust unchanged in M4); eslint, prettier, tsc, i18n parity, clippy, rustfmt and `cargo deny` clean.
 
 ## 2. How to run
 
 | What | Command (repo root) |
 |---|---|
 | Everything | `pnpm check` |
-| UI unit tests | `pnpm --filter @nimw/desktop exec vitest run --maxWorkers=2` |
-| E2E | `pnpm test:e2e`; perf probes: `NIMW_PERF=1 pnpm test:e2e` |
+| UI unit tests | `pnpm --filter @liber/desktop exec vitest run --maxWorkers=2` |
+| E2E | `pnpm test:e2e`; perf probes: `LIBER_PERF=1 pnpm test:e2e` |
 | App (dev) | `pnpm dev` |
 
 ## 3. Map (`apps/desktop/src/`)

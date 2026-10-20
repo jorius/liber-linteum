@@ -4,8 +4,8 @@
 //! dialog are replaced through `ScratchpadState`, so no test touches the
 //! user's Documents folder or opens a dialog.
 
-use nimw_desktop::AppDirs;
-use nimw_desktop::scratchpad_commands::ScratchpadState;
+use liber_desktop::AppDirs;
+use liber_desktop::scratchpad_commands::ScratchpadState;
 use serde_json::{Value, json};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -46,7 +46,7 @@ fn harness() -> Harness {
         config: config.path().to_path_buf(),
         cache: cache.path().to_path_buf(),
     };
-    let app = nimw_desktop::configure(mock_builder(), Some(dirs))
+    let app = liber_desktop::configure(mock_builder(), Some(dirs))
         .build(tauri::generate_context!())
         .expect("app builds with the real context");
     app.state::<ScratchpadState>()
@@ -145,7 +145,7 @@ fn m4c_first_use_with_the_default_creates_and_opens_the_scratchpad() {
     let settings = call(&h.main, "settings_get", json!({})).unwrap();
     assert_eq!(settings["settings"]["scratchpadPath"], Value::Null);
     let default = call(&h.main, "scratchpad_default", json!({})).unwrap();
-    let want = h.docs.path().join("Notes In My Way").join("Scratchpad");
+    let want = h.docs.path().join("Liber Linteum").join("Scratchpad");
     assert_eq!(default, json!(want.to_string_lossy()));
     assert!(!want.exists(), "asking for the default creates nothing");
 
@@ -216,7 +216,7 @@ fn m4c_settings_set_cannot_change_the_scratchpad() {
 fn m4c_a_deleted_scratchpad_folder_is_created_again() {
     let h = harness();
     open_scratchpad(&h);
-    let folder = h.docs.path().join("Notes In My Way").join("Scratchpad");
+    let folder = h.docs.path().join("Liber Linteum").join("Scratchpad");
     call(&h.main, "vault_close", json!({})).unwrap();
     std::fs::remove_dir_all(&folder).unwrap();
     let info = call(&h.main, "scratchpad_open", json!({})).unwrap();

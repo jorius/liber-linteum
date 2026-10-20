@@ -18,59 +18,59 @@ use tauri::menu::{AboutMetadata, Menu, MenuEvent, MenuItem, PredefinedMenuItem, 
 use tauri::{AppHandle, Emitter, Manager, Runtime};
 
 /// Id of our Quit item.
-pub const QUIT_ID: &str = "nimw-quit";
+pub const QUIT_ID: &str = "liber-quit";
 /// Ids of View → Back / Forward (M2b §3 link trail).
-pub const BACK_ID: &str = "nimw-back";
-pub const FORWARD_ID: &str = "nimw-forward";
+pub const BACK_ID: &str = "liber-back";
+pub const FORWARD_ID: &str = "liber-forward";
 /// Event telling the page to walk the link trail; payload `"back"` or
 /// `"forward"`.
 pub const NAVIGATE_EVENT: &str = "menu:navigate";
 /// Ids of View → Toggle Formatting Toolbar / Toggle Line Numbers.
-pub const TOOLBAR_ID: &str = "nimw-toggle-toolbar";
-pub const LINE_NUMBERS_ID: &str = "nimw-toggle-line-numbers";
+pub const TOOLBAR_ID: &str = "liber-toggle-toolbar";
+pub const LINE_NUMBERS_ID: &str = "liber-toggle-line-numbers";
 /// Id of View → Toggle Outline (M4b part 2 §5).
-pub const OUTLINE_ID: &str = "nimw-toggle-outline";
+pub const OUTLINE_ID: &str = "liber-toggle-outline";
 /// Event telling the page to flip a setting; payload `"toolbar"`,
 /// `"lineNumbers"` or `"outline"` (the settings key).
 pub const TOGGLE_EVENT: &str = "menu:toggle";
 /// Ids of View → Editor / Global View (M3a §2).
-pub const EDITOR_ID: &str = "nimw-screen-edit";
-pub const GLOBAL_VIEW_ID: &str = "nimw-screen-global";
+pub const EDITOR_ID: &str = "liber-screen-edit";
+pub const GLOBAL_VIEW_ID: &str = "liber-screen-global";
 /// Id of View → See Atoms of This Page (M4b part 3 §6).
-pub const ATOMS_ID: &str = "nimw-see-atoms";
+pub const ATOMS_ID: &str = "liber-see-atoms";
 /// Id of View → Search… (M5 §4); the page answers `menu:search`.
-pub const SEARCH_ID: &str = "nimw-search";
+pub const SEARCH_ID: &str = "liber-search";
 pub const SEARCH_EVENT: &str = "menu:search";
 /// Event telling the page which screen to show; payload `"edit"`,
 /// `"global"`, or `"atoms"` (the open page's atoms in the Global View).
 pub const SCREEN_EVENT: &str = "menu:screen";
-/// Id of File → New Quick Note (M4c §2).
-pub const QUICK_NOTE_ID: &str = "nimw-quick-note";
+/// Id of File → Create New Scratchpad in This Vault (M4c §2; renamed in round 3 §2.4).
+pub const QUICK_NOTE_ID: &str = "liber-quick-note";
 /// Event telling the main window to take a quick note (no payload).
 pub const QUICK_NOTE_EVENT: &str = "menu:quickNote";
 /// Id of File → Open File… (M4c §3).
-pub const OPEN_FILE_ID: &str = "nimw-open-file";
+pub const OPEN_FILE_ID: &str = "liber-open-file";
 /// File → Import from Notion… (M7): the import dialog, in the main window.
-pub const NOTION_IMPORT_ID: &str = "nimw-notion-import";
+pub const NOTION_IMPORT_ID: &str = "liber-notion-import";
 pub const NOTION_IMPORT_EVENT: &str = "menu:notionImport";
 /// Event asking the page to run Open File… (it shows what couldn't open).
 pub const OPEN_FILE_EVENT: &str = "menu:open-file";
 /// ⌘⇧O: ⌘O already opens a folder as a vault (spec §3.5).
 pub const OPEN_FILE_ACCELERATOR: &str = "CmdOrCtrl+Shift+O";
-/// Notes In My Way → Settings… (M5b §2.1): the focused window answers
+/// Liber Linteum → Settings… (M5b §2.1): the focused window answers
 /// `menu:settings` (file windows have Settings too).
-pub const SETTINGS_ID: &str = "nimw-settings";
+pub const SETTINGS_ID: &str = "liber-settings";
 pub const SETTINGS_EVENT: &str = "menu:settings";
 /// Vault → Open Vault… / Close Vault (M5b §2.1): the main window answers
 /// `menu:vault` with `"open"` or `"close"`.
-pub const VAULT_OPEN_ID: &str = "nimw-vault-open";
-pub const VAULT_CLOSE_ID: &str = "nimw-vault-close";
+pub const VAULT_OPEN_ID: &str = "liber-vault-open";
+pub const VAULT_CLOSE_ID: &str = "liber-vault-close";
 pub const VAULT_EVENT: &str = "menu:vault";
 /// File → Save (M5b §6, auto save off): the focused window saves its page.
-pub const SAVE_ID: &str = "nimw-save";
+pub const SAVE_ID: &str = "liber-save";
 pub const SAVE_EVENT: &str = "menu:save";
 /// View → Toggle Sidebar (M5b §2.5): the main window's sidebar.
-pub const SIDEBAR_ID: &str = "nimw-toggle-sidebar";
+pub const SIDEBAR_ID: &str = "liber-toggle-sidebar";
 pub const SIDEBAR_EVENT: &str = "menu:sidebar";
 
 /// The app menu: About, Settings… (M5b §2.1), Services, Hide, Hide Others,
@@ -125,7 +125,7 @@ pub fn app_menu<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
     let quick_note = MenuItem::with_id(
         app,
         QUICK_NOTE_ID,
-        "New Quick Note",
+        "Create New Scratchpad in This Vault",
         true,
         Some("CmdOrCtrl+Shift+N"),
     )?;

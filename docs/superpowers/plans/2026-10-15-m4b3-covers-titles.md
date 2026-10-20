@@ -9,9 +9,9 @@
 
 **Architecture:**
 - **Rust:**
-  - `nimw-markdown::title` takes an H1 only when it is the body's first block;
+  - `liber-markdown::title` takes an H1 only when it is the body's first block;
   - the frontmatter gains `cover-x` (beside `cover-y`), indexed in `pages.cover_x` (index schema v2, so titles re-extract);
-  - `.nimw/vault.json` gains `coverSides` / `coverWidths` (`nimw-vault::cover_side`), remapped and forgotten through the cover-height choke points;
+  - `.liber/vault.json` gains `coverSides` / `coverWidths` (`liber-vault::cover_side`), remapped and forgotten through the cover-height choke points;
   - `cover_side_set` / `cover_width_set` commands;
   - `GvCard` carries `cover_x` and `cover_side`.
 - **Frontend:**
@@ -22,7 +22,7 @@
 
 **Tech Stack:**
 - React 19 + TS, zustand, CodeMirror 6 (`invertedEffects`, `isolateHistory`);
-- Rust (`nimw-markdown`, `nimw-index`, `nimw-vault`, `nimw-session`, Tauri commands);
+- Rust (`liber-markdown`, `liber-index`, `liber-vault`, `liber-session`, Tauri commands);
 - Vitest (jsdom), Playwright (Chromium + WebKit).
 - No new dependencies.
 
@@ -34,7 +34,7 @@
 
 ## Global Constraints
 
-- **Notes are never written** for placement or width: `.nimw/vault.json` only. Notes carry only the focus point (`cover`, `cover-y`, `cover-x`).
+- **Notes are never written** for placement or width: `.liber/vault.json` only. Notes carry only the focus point (`cover`, `cover-y`, `cover-x`).
 - **Every new Tauri command** needs:
   - `build.rs` COMMANDS, `generate_handler!`, `capabilities/main.json` `allow-…` and the `tests/commands.rs` COMMANDS list;
   - a real-ACL test (main window only);
@@ -57,14 +57,14 @@
 - **Switching placement while focus is on a placement radio:** the group moves between the band and the strip, and focus follows. *Vitest.*
 - **A window narrowed below strip + 520 px:** the cover goes on top without saving anything, and the strip comes back on widening. *Vitest with a fake ResizeObserver, plus e2e.*
 - **⌘Z right after choosing a placement:** it puts the previous one back, and redo restores it. The entry never merges with typing (`isolateHistory`). *Vitest.*
-- **The WebView2 asset path (`http://nimw-asset.localhost`):** the band and strip images fill their frames exactly, so `object-position` crops. *e2e with a Windows UA and a routed SVG.*
+- **The WebView2 asset path (`http://liber-asset.localhost`):** the band and strip images fill their frames exactly, so `object-position` crops. *e2e with a Windows UA and a routed SVG.*
 
 ---
 
 ### Task 1: Titles follow a first-line H1 (§1) — `dffd1ed`
 
 **Files:**
-- Modify: `crates/nimw-markdown/src/title.rs`, `crates/nimw-index/src/schema.rs` (v2), `crates/nimw-index/tests/index.rs`.
+- Modify: `crates/liber-markdown/src/title.rs`, `crates/liber-index/src/schema.rs` (v2), `crates/liber-index/tests/index.rs`.
 - Modify (fakes): `apps/desktop/src/test/fakeDisk.ts`, `apps/desktop/e2e/ipcMock.ts`.
 
 - [x] **Step 1: Failing tests** in `title.rs`:
@@ -72,7 +72,7 @@
   - `pg_01_an_h1_after_frontmatter_and_blank_lines_is_the_title`;
   - `pg_01_a_section_heading_halfway_down_is_not_the_title` (the friend's note gives "Tipos de comisiones");
   - `pg_01_a_setext_h1_at_the_top_is_the_title`.
-- [x] **Step 2:** `cargo test -p nimw-markdown --lib title`. Expected and seen: 3 FAIL (`left: "Real Title"`, `left: "WIP (Work In Progress):"`).
+- [x] **Step 2:** `cargo test -p liber-markdown --lib title`. Expected and seen: 3 FAIL (`left: "Real Title"`, `left: "WIP (Work In Progress):"`).
 - [x] **Step 3: Implement.** Skip the metadata block. The first H1 may open; an empty H1 is skipped. Any other block start (`Start(_)`, `Rule`, `Html`) breaks to the stem:
 
 ```rust
@@ -85,7 +85,7 @@ Event::End(TagEnd::Heading(HeadingLevel::H1)) => { /* non-empty → return */ }
 Event::Start(_) | Event::Rule | Event::Html(_) if !in_h1 => break,
 ```
 
-- [x] **Step 4:** `cargo test -p nimw-markdown`. Expected and seen: 41 pass, including the existing `pg_01_empty_h1_is_skipped`.
+- [x] **Step 4:** `cargo test -p liber-markdown`. Expected and seen: 41 pass, including the existing `pg_01_empty_h1_is_skipped`.
 - [x] **Step 5: Migration.** Test `an_index_from_before_the_title_rule_is_rebuilt`: an index whose meta says `schema_version = 1` opens empty. It failed against v1. Then `SCHEMA_VERSION = 2`, and it passes.
 - [x] **Step 6:** The fakes read titles the same way: `/^(?:---\n[\s\S]*?\n---\n)?\s*# ([^\n]+)/`. `cargo test --workspace` and the full vitest run stay green (1174).
 - [x] **Step 7:** Commit.
@@ -93,16 +93,16 @@ Event::Start(_) | Event::Rule | Event::Html(_) if !in_h1 => break,
 ### Task 2: `cover-x`, indexed, on pages and cards (§3) — `7002e2f`
 
 **Files:**
-- `nimw-markdown`:
+- `liber-markdown`:
   - `frontmatter.rs` (`cover_x`, and a shared `percent()` for `cover-y` and `cover-x`);
   - `types.rs`, `page.rs`;
   - test `frontmatter_api.rs`.
-- `nimw-index`:
+- `liber-index`:
   - `schema.rs` (`pages.cover_x`);
   - `rows.rs`;
   - `index.rs`: `CARD_SELECT` and the page query append `cover_x` last, and `upsert_page` writes `?10`.
-- `nimw-vault`: `cover_side.rs` (the `CoverSide` enum).
-- `nimw-session`:
+- `liber-vault`: `cover_side.rs` (the `CoverSide` enum).
+- `liber-session`:
   - `global_view.rs`: `GvCard.cover_x`, and `cover_side: CoverSide` defaulting to `Top`;
   - tests `global_view.rs`, `open.rs`.
 - Tauri:
@@ -129,11 +129,11 @@ Event::Start(_) | Event::Rule | Event::Html(_) if !in_h1 => break,
 ### Task 3: `coverSides` / `coverWidths`, the commands, the cards, the store (§3) — `be9b3ea`
 
 **Files:**
-- `nimw-vault`:
+- `liber-vault`:
   - `cover_side.rs`: `cover_sides`, `cover_widths`, `set_cover_side` (Top clears), `set_cover_width` (clamped 160–2000), `forget_*` and `remap_*_many`;
   - `MIN_COVER_WIDTH` / `MAX_COVER_WIDTH` exported;
   - `tests/cover_side.rs`.
-- `nimw-session`:
+- `liber-session`:
   - `follow_layout` and `forget_page_sizes` call the four new methods;
   - `gv_children` is now `level_cards`, followed by `place_cover` on every card (a folder card takes its index note's placement);
   - `index_pick_set` places its card too;
@@ -147,7 +147,7 @@ Event::Start(_) | Event::Rule | Event::Html(_) if !in_h1 => break,
   - `ipc/index.ts`: `coverSideSet`, `coverWidthSet`; `VaultSettings.coverSides` and `coverWidths`;
   - `stores/coverLayoutStore.ts` with its test;
   - i18n `cover.*`;
-  - the e2e mock gets `cover_side_set` and `cover_width_set`, kept in sessionStorage and logged in `__nimwCoverSides`.
+  - the e2e mock gets `cover_side_set` and `cover_width_set`, kept in sessionStorage and logged in `__liberCoverSides`.
 
 - [x] **Step 1: Vault tests.**
   - Nothing set writes nothing.
@@ -159,7 +159,7 @@ Event::Start(_) | Event::Rule | Event::Html(_) if !in_h1 => break,
   Seen: they failed to compile. After implementing, 6 pass. One fix along the way: the update closure borrows `&value`, since it is `FnMut` and retried once.
 - [x] **Step 2: Session tests.** The in-app rename test failed (`left: [("Game Design/Game 1.md", Right), ("Welcome.md", Left)]`). After wiring the choke points, both it and the watcher test pass.
 - [x] **Step 3: Card test.** `cards_carry_the_cover_side_of_their_page` failed (`left: Top, right: Left`). After `place_cover`, 23 pass.
-- [x] **Step 4: IPC tests.** Implement and register. `cargo test -p nimw-desktop --test commands cover_` passes 7. The full workspace run then showed the M2c exact settings snapshot needed the two new keys; after that, 40 pass.
+- [x] **Step 4: IPC tests.** Implement and register. `cargo test -p liber-desktop --test commands cover_` passes 7. The full workspace run then showed the M2c exact settings snapshot needed the two new keys; after that, 40 pass.
 - [x] **Step 5: Store test** (6 cases):
   - defaults;
   - an optimistic save, then `top` clears;
@@ -240,10 +240,10 @@ invertedEffects.of((tr) => tr.effects.filter((e) => e.is(sideChange))
   - A right strip is outermost (right of the outline).
   - 2-axis reposition: ← ↑ give `45% 55%`, and Save writes `cover-y: 55\ncover-x: 45`.
   - An 860 px window drops the strip; 1280 brings it back.
-  - **The WebView2 crop path:** `test.use({ userAgent: WINDOWS_UA })`. Assets go to `http://nimw-asset.localhost/…`, and the test routes them to a 400 × 1200 SVG. The image box must equal its frame (the band, then the strip), with `object-position: 0% 100%` from `cover-x: 0` / `cover-y: 100`.
+  - **The WebView2 crop path:** `test.use({ userAgent: WINDOWS_UA })`. Assets go to `http://liber-asset.localhost/…`, and the test routes them to a 400 × 1200 SVG. The image box must equal its frame (the band, then the strip), with `object-position: 0% 100%` from `cover-x: 0` / `cover-y: 100`.
   - §1: no "Title in the note" on the friend's note.
   - axe light and dark on the strip and the band.
-- [x] **Step 2: Run** (with `pnpm --filter @nimw/desktop build` first) on a private port copy of the config, so parallel streams don't collide on 4317.
+- [x] **Step 2: Run** (with `pnpm --filter @liber/desktop build` first) on a private port copy of the config, so parallel streams don't collide on 4317.
   - Two fixes:
     - the text's left edge equals the strip's right edge (≥, not >);
     - axe is scoped to the strip and the band, because `.cm-scroller` is the editor's own, pre-existing issue. axe also waits until the strip's controls have finished fading in: WebKit measured mid-fade contrast.

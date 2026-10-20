@@ -105,7 +105,7 @@ describe('relationships written to pages (M3b §5)', () => {
     expect(await relate('A.md', 'B.md')).toEqual({ status: 'failed' });
     expect(disk.writes()).toEqual([]);
     expect(toasts()).toEqual([
-      'NIMW can’t safely change this note’s frontmatter. Edit it in Source mode.',
+      'Liber Linteum can’t safely change this note’s frontmatter. Edit it in Source mode.',
     ]);
   });
 
@@ -166,7 +166,7 @@ describe('relationships written to pages (M3b §5)', () => {
     expect(disk.writes()).toEqual([]);
   });
 
-  it('a page name with double quotes is written single-quoted, as nimw-markdown indexes it (final review m4)', async () => {
+  it('a page name with double quotes is written single-quoted, as liber-markdown indexes it (final review m4)', async () => {
     const disk = fakeDisk({ 'A.md': '# A\n', 'say "hi".md': '# x\n' }, extra);
     expect(await relate('A.md', 'say "hi".md')).toEqual({ status: 'created' });
     expect(disk.files.get('A.md')).toBe('---\nrelated:\n  - \'[[say "hi"]]\'\n---\n# A\n');

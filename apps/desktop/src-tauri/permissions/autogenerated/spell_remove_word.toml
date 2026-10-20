@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-spell-remove-word"
+description = "Enables the spell_remove_word command without any pre-configured scope."
+commands.allow = ["spell_remove_word"]
+
+[[permission]]
+identifier = "deny-spell-remove-word"
+description = "Denies the spell_remove_word command without any pre-configured scope."
+commands.deny = ["spell_remove_word"]

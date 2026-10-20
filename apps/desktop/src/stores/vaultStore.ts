@@ -34,7 +34,16 @@ import { usePageStore } from './pageStore';
 import { useToastStore } from './toastStore';
 import { useTrailStore } from './trailStore';
 import { useUiStore } from './uiStore';
-import { childrenByParent, isArchived, joinPath, nextFreeName, parentOf, remap } from './tree';
+import {
+  childrenByParent,
+  isArchived,
+  joinPath,
+  nameOf,
+  nextFreeName,
+  parentOf,
+  remap,
+} from './tree';
+import { useSpellStore } from './spellStore';
 
 /** External changes arriving within this window trigger one tree refresh. */
 export const COALESCE_MS = 100;
@@ -72,6 +81,8 @@ interface VaultState {
   expand: (path: string) => void;
   startRename: (path: string | null) => void;
   createPage: (dir: string) => Promise<IpcResult<string>>;
+  /** Round 3b §6.4: the folder's own page, `X/X.md`, opened (no rename). */
+  createFolderPage: (folder: string) => Promise<IpcResult<string>>;
   createFolder: (dir: string) => Promise<IpcResult<string>>;
   /** `quiet`: a refused rename isn't toasted (the caller shows it inline,
    *  like the page title — final review m4). */
@@ -146,6 +157,17 @@ export async function resetVaultStore() {
   stopListening();
   treeSeq++;
   useVaultStore.setState({ ...EMPTY, children: new Map(), expanded: new Set() });
+}
+
+/** Open warnings: the settings-folder codes from the rename are translated
+ *  (`metaDir.*`, rename review M6); the rest are shown as Rust wrote them. */
+function warningText(w: string): string {
+  if (w === 'metaDir.both') return i18next.t('toasts.metaDirBoth');
+  const unmoved = 'metaDir.unmoved:';
+  if (w.startsWith(unmoved)) {
+    return i18next.t('toasts.metaDirUnmoved', { error: w.slice(unmoved.length) });
+  }
+  return w;
 }
 
 export const useVaultStore = create<VaultState>((set, get) => {
@@ -238,11 +260,13 @@ export const useVaultStore = create<VaultState>((set, get) => {
     await get().refreshTree();
     await startListening();
     set({ status: 'open', progress: null });
+    // Another vault: its own words and dictionaries (spell checking).
+    useSpellStore.getState().bump();
     const warnings = res.value.report.warnings ?? [];
     if (warnings.length) {
       toast().push({
         message: i18next.t('toasts.openedWithWarnings', { count: warnings.length }),
-        detail: warnings,
+        detail: warnings.map(warningText),
       });
     }
     return res;
@@ -300,6 +324,7 @@ export const useVaultStore = create<VaultState>((set, get) => {
       usePageStore.getState().clear();
       treeSeq++;
       set({ ...EMPTY, children: new Map(), expanded: new Set() });
+      useSpellStore.getState().bump();
     },
     refreshTree: async () => {
       const mine = ++treeSeq;
@@ -359,6 +384,17 @@ export const useVaultStore = create<VaultState>((set, get) => {
       set({ selected: res.value, renaming: res.value });
       return res;
     },
+    createFolderPage: async (folder) => {
+      const res = await entryCreatePage(folder, nameOf(folder));
+      if (!res.ok) {
+        toast().push({ message: errorMessage(res.error), tone: 'error' });
+        return res;
+      }
+      await get().refreshTree();
+      set({ selected: folder });
+      await usePageStore.getState().load(res.value);
+      return res;
+    },
     createFolder: async (dir) => {
       const name = nextFreeName(get().nodes, dir, i18next.t('explorer.untitled'), '');
       const res = await entryCreateFolder(dir, name);
@@ -383,16 +419,24 @@ export const useVaultStore = create<VaultState>((set, get) => {
     },
     applyRename: async (from, to, out, opts) => {
       const { selected, expanded, renaming } = get();
+      // A folder page's rename moves twice (round 3b §6.3); every path follows both.
+      const steps: [string, string][] = out.pair ? [[from, to], out.pair] : [[from, to]];
+      const move = (p: string) => steps.reduce((x, [a, b]) => remap(x, a, b) ?? x, p);
       set({
-        selected: selected ? (remap(selected, from, to) ?? selected) : selected,
-        expanded: new Set([...expanded].map((p) => remap(p, from, to) ?? p)),
+        selected: selected ? move(selected) : selected,
+        expanded: new Set([...expanded].map(move)),
         // Another entry's rename stays open (M4c final review I3).
         renaming: renaming && remap(renaming, from, to) === null ? renaming : null,
       });
-      useTrailStore.getState().renamed(from, to);
-      get().expand(parentOf(to));
+      for (const [a, b] of steps) {
+        useTrailStore.getState().renamed(a, b);
+        useEditorStore.getState().follow(a, b);
+      }
+      get().expand(parentOf(move(to)));
       await get().refreshTree();
-      await usePageStore.getState().follow(from, to);
+      // One reload, straight to the final path: never the in-between one.
+      const open = usePageStore.getState().path;
+      if (open && move(open) !== open) await usePageStore.getState().follow(open, move(open));
       // Our link rewrites aren't reported by the watcher: re-read open pages.
       await useEditorStore.getState().syncPaths(out.updatedFiles);
       if (out.failed.length) {

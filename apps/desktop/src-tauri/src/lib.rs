@@ -14,6 +14,7 @@ pub mod file_windows;
 pub mod fonts;
 pub mod gv_commands;
 pub mod icon_commands;
+pub mod legacy_dirs;
 pub mod menu;
 pub mod navigation;
 pub mod notion_commands;
@@ -24,6 +25,7 @@ pub mod search_commands;
 pub mod settings;
 pub mod settings_commands;
 pub mod sort_commands;
+pub mod spell_commands;
 pub mod state;
 pub mod vault_commands;
 
@@ -33,7 +35,7 @@ use std::path::PathBuf;
 use tauri::Manager;
 
 /// Where settings and the index cache live. `None` in `configure` means the
-/// OS app config/cache dirs for `app.notesinmyway.desktop`; tests pass temp dirs.
+/// OS app config/cache dirs for `app.liberlinteum.desktop`; tests pass temp dirs.
 #[derive(Debug, Clone)]
 pub struct AppDirs {
     pub config: PathBuf,
@@ -47,10 +49,10 @@ pub fn configure<R: tauri::Runtime>(
     dirs: Option<AppDirs>,
 ) -> tauri::Builder<R> {
     // M6 §7: tests (the only callers that pass dirs) never open a microphone.
-    let microphone: std::sync::Arc<dyn nimw_audio::Host> = if dirs.is_some() {
-        std::sync::Arc::new(nimw_audio::SyntheticHost::tone(48_000, 1).realtime())
+    let microphone: std::sync::Arc<dyn liber_audio::Host> = if dirs.is_some() {
+        std::sync::Arc::new(liber_audio::SyntheticHost::tone(48_000, 1).realtime())
     } else {
-        std::sync::Arc::new(nimw_audio::CpalHost)
+        std::sync::Arc::new(liber_audio::CpalHost)
     };
     let builder = builder
         .manage(audio_commands::AudioState::new(microphone))
@@ -88,6 +90,7 @@ pub fn configure<R: tauri::Runtime>(
         .manage(scratchpad_commands::ScratchpadState::default())
         // The Notion import (M7): its dialogs' picks and cancel flag.
         .manage(notion_commands::NotionState::default())
+        .manage(spell_commands::SpellState::default())
         .register_asynchronous_uri_scheme_protocol(asset::SCHEME, |ctx, request, responder| {
             let app = ctx.app_handle().clone();
             // A single-file window is served its file's folder (M4c §4).
@@ -127,6 +130,10 @@ pub fn configure<R: tauri::Runtime>(
         None => builder.setup(|app| {
             let config = app.path().app_config_dir()?;
             let cache = app.path().app_cache_dir()?;
+            // Rename to Liber Linteum: adopt the old app's settings once; never blocks launch.
+            if let Err(e) = legacy_dirs::adopt(&config, &cache) {
+                eprintln!("adopting the old app's settings failed: {e}");
+            }
             app.manage(AppState::new(SettingsStore::load(&config), cache));
             Ok(())
         }),
@@ -155,6 +162,7 @@ pub fn configure<R: tauri::Runtime>(
         settings_commands::settings_set,
         settings_commands::vaults_recent,
         settings_commands::vaults_forget,
+        settings_commands::vaults_reveal,
         editor_commands::page_read,
         editor_commands::page_write,
         editor_commands::page_create_conflict_copy,
@@ -225,6 +233,17 @@ pub fn configure<R: tauri::Runtime>(
         notion_commands::notion_cancel,
         notion_commands::notion_open_partial,
         notion_commands::notion_reveal_partial,
+        spell_commands::spell_dictionaries,
+        spell_commands::spell_import,
+        spell_commands::spell_remove,
+        spell_commands::spell_check,
+        spell_commands::spell_suggest,
+        spell_commands::spell_add_word,
+        spell_commands::spell_ignore,
+        spell_commands::spell_words,
+        spell_commands::spell_remove_word,
+        spell_commands::spell_vault_get,
+        spell_commands::spell_vault_set,
     ])
 }
 
@@ -241,7 +260,7 @@ pub fn run() {
     }));
     menu::with_app_menu(configure(builder, None))
         .build(tauri::generate_context!())
-        .expect("error while building Notes In My Way")
+        .expect("error while building Liber Linteum")
         .run(|app, event| match event {
             // Files named on the command line that started the app.
             tauri::RunEvent::Ready => {

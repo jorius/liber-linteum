@@ -52,7 +52,7 @@ describe('Editor (M2a §3.2–3.3)', () => {
     expect(viewOf()).toBe(view);
     expect(view.state.doc.toString()).toBe('# A!\n\nbody\n');
     expect(view.state.selection.main.head).toBe(4);
-    expect(view.dom).toHaveClass('cm-nimw-source');
+    expect(view.dom).toHaveClass('cm-liber-source');
     rerender(<Editor doc={doc} mode="split" label="A" />);
     expect(screen.getByRole('region', { name: 'Preview' })).toHaveTextContent('A!');
     act(() => void undo(view));
@@ -204,7 +204,7 @@ describe('a jump from the Global View (M4b part 3 §6: See atoms)', () => {
     const a = await load('A.md');
     rerender(<Editor doc={a} mode="livePreview" label="A" />);
     expect(viewOf().state.selection.main.head).toBe(12);
-    expect([...document.querySelectorAll('.cm-nimw-flash')].map((el) => el.textContent)).toEqual([
+    expect([...document.querySelectorAll('.cm-liber-flash')].map((el) => el.textContent)).toEqual([
       'target block',
     ]);
     expect(usePageStore.getState().jump).toBeNull();
@@ -355,7 +355,7 @@ describe('code highlighting in the editor (M4b part 2 §2)', () => {
       const { unmount } = render(<Editor doc={doc} mode={mode} label="C" />);
       await vi.waitFor(
         () => {
-          const kw = [...viewOf().contentDOM.querySelectorAll('.cm-nimw-code-keyword')];
+          const kw = [...viewOf().contentDOM.querySelectorAll('.cm-liber-code-keyword')];
           expect(kw.map((e) => e.textContent)).toContain('const');
         },
         { timeout: 3000 },
@@ -375,12 +375,12 @@ describe('picker ids read back in the editor (final review I1 follow-up)', () =>
     render(<Editor doc={doc} mode="source" label="Q" />);
     await vi.waitFor(
       () => {
-        const kw = [...viewOf().contentDOM.querySelectorAll('.cm-nimw-code-keyword')];
+        const kw = [...viewOf().contentDOM.querySelectorAll('.cm-liber-code-keyword')];
         expect(kw.map((e) => e.textContent?.toUpperCase())).toContain('SELECT');
         const angular = [...viewOf().contentDOM.querySelectorAll('.cm-line')].find((l) =>
           l.textContent?.startsWith('<div'),
         );
-        expect(angular?.querySelector('[class*="cm-nimw-code-"]')).not.toBeNull();
+        expect(angular?.querySelector('[class*="cm-liber-code-"]')).not.toBeNull();
       },
       { timeout: 3000 },
     );
@@ -433,8 +433,8 @@ describe('wide elements (M4b part 3)', () => {
     expect(host()).toHaveAttribute('data-wide-diagrams', '');
     expect(host()).not.toHaveAttribute('data-wide-code');
     // How far they may reach is measured from the editor.
-    expect(host().style.getPropertyValue('--nimw-wide-m')).toMatch(/^\d+px$/);
-    expect(host().style.getPropertyValue('--nimw-wide-r')).toMatch(/^\d+px$/);
+    expect(host().style.getPropertyValue('--liber-wide-m')).toMatch(/^\d+px$/);
+    expect(host().style.getPropertyValue('--liber-wide-r')).toMatch(/^\d+px$/);
     act(() =>
       useSettingsStore.setState({
         settings: {
@@ -451,7 +451,7 @@ describe('wide elements (M4b part 3)', () => {
     for (const kind of ['tables', 'code', 'diagrams', 'images', 'maths']) {
       expect(host()).not.toHaveAttribute(`data-wide-${kind}`);
     }
-    expect(host().style.getPropertyValue('--nimw-wide-m')).toBe('');
-    expect(host().style.getPropertyValue('--nimw-wide-r')).toBe('');
+    expect(host().style.getPropertyValue('--liber-wide-m')).toBe('');
+    expect(host().style.getPropertyValue('--liber-wide-r')).toBe('');
   });
 });

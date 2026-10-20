@@ -5,7 +5,7 @@
        stacked translucent squares: sips (CoreSVG) draws no SVG filters.
        To regenerate (macOS), from the repo root, with <tmp> a new folder (an absolute path):
          sips -s format png apps/desktop/src-tauri/icons/app-icon-macos.svg -o <tmp>/icon.png
-         pnpm -F @nimw/desktop tauri icon <tmp>/icon.png -o <tmp>/out
+         pnpm -F @liber/desktop tauri icon <tmp>/icon.png -o <tmp>/out
          cp <tmp>/out/icon.icns apps/desktop/src-tauri/icons/icon.icns -->
   <g fill="#000" fill-opacity="0.035">
     <rect x="76" y="84" width="872" height="872" rx="208"/>

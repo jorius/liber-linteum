@@ -45,7 +45,7 @@ const LONG = Array.from({ length: 60 }, (_, i) => `Line ${i + 1} of the long sec
 const PAGES: Record<string, string> = {
   'Outline.md': `# One\n\nIntro.\n\n## Two\n\n${LONG}\n\n### Three\n\nThe end.\n`,
   'Words.md': '# Words\n\nOne two three.\n',
-  'conf.json': '{\n  "name": "nimw"\n}\n',
+  'conf.json': '{\n  "name": "liber"\n}\n',
   'Code.md': '# Code\n\nIntro.\n\n```js\nconst answer = 42;\n```\n\nAfter.\n',
   'Maths.md': '# Maths\n\nInline $E = mc^2$ here.\n\n$$\n\\int_0^1 x\\,dx\n$$\n\nAfter.\n',
   'Diagram.md':
@@ -68,11 +68,11 @@ async function watchNetwork(page: Page) {
       (url.protocol === 'http:' && url.hostname === '127.0.0.1') ||
       url.protocol === 'data:' ||
       url.protocol === 'blob:' ||
-      url.protocol === 'nimw-asset:' ||
-      url.hostname === 'nimw-asset.localhost';
+      url.protocol === 'liber-asset:' ||
+      url.hostname === 'liber-asset.localhost';
     if (!local) outside.push(r.url());
   });
-  await page.route(/^https?:\/\/(?!127\.0\.0\.1|nimw-asset\.localhost)/, (route) => route.abort());
+  await page.route(/^https?:\/\/(?!127\.0\.0\.1|liber-asset\.localhost)/, (route) => route.abort());
   return outside;
 }
 
@@ -107,7 +107,8 @@ async function openItem(page: Page, name: string) {
 const writes = (page: Page) =>
   page.evaluate(
     () =>
-      (window as unknown as { __nimwWrites?: { path: string; text: string }[] }).__nimwWrites ?? [],
+      (window as unknown as { __liberWrites?: { path: string; text: string }[] }).__liberWrites ??
+      [],
   );
 
 async function axeViolations(page: Page, selector: string): Promise<string[]> {
@@ -137,7 +138,7 @@ async function stayedLocal(page: Page, outside: string[], errors: string[]) {
   expect(errors).toEqual([]);
   expect(
     await page.evaluate(
-      () => (window as unknown as { __nimwCspViolations: string[] }).__nimwCspViolations,
+      () => (window as unknown as { __liberCspViolations: string[] }).__liberCspViolations,
     ),
   ).toEqual([]);
 }
@@ -246,7 +247,7 @@ test('§2: the language badge picks a language; code takes the palette colours',
   page,
 }) => {
   const { outside, errors } = await open(page, 'Code');
-  const keyword = page.locator('.cm-nimw-code-keyword').first();
+  const keyword = page.locator('.cm-liber-code-keyword').first();
   await expect(keyword).toHaveText('const');
   const colours = await keyword.evaluate((el) => ({
     token: getComputedStyle(el).color,
@@ -264,6 +265,23 @@ test('§2: the language badge picks a language; code takes the palette colours',
   await page.locator('.cm-content').focus();
   await page.keyboard.press('ControlOrMeta+z');
   await expect.poll(async () => (await writes(page)).at(-1)?.text ?? '').toContain('```js\n');
+  await stayedLocal(page, outside, errors);
+});
+
+test('round 3 §1: a code block hides its fences until the cursor enters it', async ({ page }) => {
+  const { outside, errors } = await open(page, 'Code');
+  const content = page.locator('.cm-content');
+  await expect(page.getByRole('button', { name: 'Language: JavaScript' })).toBeVisible();
+  await expect(content).not.toContainText('```');
+  const before = await page.locator('.cm-line', { hasText: 'After.' }).boundingBox();
+  await page.locator('.cm-line', { hasText: 'const answer' }).click();
+  await expect(page.locator('.cm-line', { hasText: '```js' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Language: JavaScript' })).toHaveCount(0);
+  // The source takes the header's and the empty closing line's places.
+  const after = await page.locator('.cm-line', { hasText: 'After.' }).boundingBox();
+  expect(Math.abs((after?.y ?? 0) - (before?.y ?? 0))).toBeLessThan(2);
+  await page.locator('.cm-line', { hasText: 'After.' }).click();
+  await expect(content).not.toContainText('```');
   await stayedLocal(page, outside, errors);
 });
 
@@ -300,16 +318,18 @@ test('§5: the word count follows typing', async ({ page }) => {
 
 test('§6: a .json file opens in the text view and saves', async ({ page }) => {
   const { outside, errors } = await open(page, 'conf.json');
-  await expect(page.getByText('4 lines · 21 characters')).toBeVisible();
+  await expect(page.getByText('4 lines · 22 characters')).toBeVisible();
   await expect(page.locator('.cm-lineNumbers')).toBeVisible();
-  await expect(page.locator('.cm-nimw-code-string, .cm-nimw-code-function').first()).toBeVisible();
+  await expect(
+    page.locator('.cm-liber-code-string, .cm-liber-code-function').first(),
+  ).toBeVisible();
   await expect(page.getByRole('group', { name: 'Editor mode' })).toHaveCount(0);
   await page.locator('.cm-line', { hasText: '"name"' }).click();
   await page.keyboard.press('End');
   await page.keyboard.type(',');
   await expect
     .poll(async () => (await writes(page)).at(-1))
-    .toEqual(expect.objectContaining({ path: 'conf.json', text: '{\n  "name": "nimw",\n}\n' }));
+    .toEqual(expect.objectContaining({ path: 'conf.json', text: '{\n  "name": "liber",\n}\n' }));
   await stayedLocal(page, outside, errors);
 });
 

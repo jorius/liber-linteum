@@ -23,8 +23,8 @@
 - Palettes (spec §10, exact values in Task 2): `lavender` (default), `graphite`, `rosewood`, `saffron`, `persimmon`, `midnight`, `sepia`, `ink`, plus `custom`. Contrast floors per mode: text on bg ≥ 7, body on surface ≥ 7, muted ≥ 4.5, accent on surface ≥ 4.5, text on accent ≥ 4.5, sidebar text ≥ 7; derived custom accent ≥ 4.8 (light, on white) and ≥ 6 (dark, on the dark surface).
 - Settings defaults: `palette: "lavender"`, `accentColor: "#d1477a"`, `fontLivePreview: "atkinson-hyperlegible"`, `fontSource: "jetbrains-mono"`, `fontSize: 15` (13–20), `toolbar: true`.
 - Shortcuts: ⌘B, ⌘I, ⌘⇧X, ⌘⇧H, ⌘E, ⌘K, ⌘⌥0–6, ⌘⇧7/8/9, ⌘⇧.; ⌘[ / ⌘] are back/forward (never indentation); Tab / ⇧Tab indent only inside list items.
-- Every GREEN step leaves clean (repo root): `pnpm lint`, `pnpm typecheck`, `pnpm check:i18n`, `pnpm --filter @nimw/desktop exec vitest run --maxWorkers=2`; for Rust changes also `pnpm build:ui && cargo fmt --all --check && cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace && cargo deny check`. Never mask exit codes (`set -o pipefail`; no `&&` after `grep`). Run prettier **from the repo root** (the root `.prettierignore` excludes the generated `palettes.css`).
-- Never set `NIMW_TRASH_TESTS=1` locally; never touch `~/Library/Application Support/app.notesinmyway.desktop`; agents never send keystrokes or clicks to the user's machine (Playwright only).
+- Every GREEN step leaves clean (repo root): `pnpm lint`, `pnpm typecheck`, `pnpm check:i18n`, `pnpm --filter @liber/desktop exec vitest run --maxWorkers=2`; for Rust changes also `pnpm build:ui && cargo fmt --all --check && cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace && cargo deny check`. Never mask exit codes (`set -o pipefail`; no `&&` after `grep`). Run prettier **from the repo root** (the root `.prettierignore` excludes the generated `palettes.css`).
+- Never set `LIBER_TRASH_TESTS=1` locally; never touch `~/Library/Application Support/app.liberlinteum.desktop`; agents never send keystrokes or clicks to the user's machine (Playwright only).
 - Commits: conventional commits; every message ends with a `Co-Authored-By:` trailer naming the model that wrote the code.
 
 ## Review Focus
@@ -71,7 +71,7 @@ Spec §7. Six new settings, each with a default, persisted by Rust, reset on its
 
 **Interfaces:**
 - Consumes: `SettingsStore`, `parse_lenient`, `SettingsPatch` (M1b); `DEFAULT_SETTINGS` (TS).
-- Produces: Rust `nimw_desktop::settings::{Palette, HexColor, FontChoice, FontSize, BUNDLED_FONTS, SYSTEM_FONT_PREFIX, MIN_FONT_SIZE, MAX_FONT_SIZE}`; `Settings`/`SettingsPatch` fields `palette, accent_color, font_live_preview, font_source, font_size, toolbar` (JSON `palette, accentColor, fontLivePreview, fontSource, fontSize, toolbar`). TS `PALETTE_IDS`, `PaletteId`, `PaletteChoice`, `FontChoice` and the same fields on `Settings`/`SettingsPatch` in `src/ipc/index.ts`; `DEFAULT_SETTINGS` extended.
+- Produces: Rust `liber_desktop::settings::{Palette, HexColor, FontChoice, FontSize, BUNDLED_FONTS, SYSTEM_FONT_PREFIX, MIN_FONT_SIZE, MAX_FONT_SIZE}`; `Settings`/`SettingsPatch` fields `palette, accent_color, font_live_preview, font_source, font_size, toolbar` (JSON `palette, accentColor, fontLivePreview, fontSource, fontSize, toolbar`). TS `PALETTE_IDS`, `PaletteId`, `PaletteChoice`, `FontChoice` and the same fields on `Settings`/`SettingsPatch` in `src/ipc/index.ts`; `DEFAULT_SETTINGS` extended.
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -145,7 +145,7 @@ Modify `apps/desktop/src-tauri/tests/settings.rs`:
 +/// and reset on its own when a value can't be understood.
 +#[test]
 +fn m2b_appearance_and_editor_settings_default_and_persist() {
-+    use nimw_desktop::settings::{FontChoice, FontSize, HexColor, Palette};
++    use liber_desktop::settings::{FontChoice, FontSize, HexColor, Palette};
 +    let dir = tempfile::tempdir().unwrap();
 +    let s = store(dir.path());
 +    let d = s.get().0;
@@ -179,7 +179,7 @@ Modify `apps/desktop/src-tauri/tests/settings.rs`:
 +
 +#[test]
 +fn m2b_each_new_setting_is_reset_on_its_own() {
-+    use nimw_desktop::settings::{FontSize, Palette};
++    use liber_desktop::settings::{FontSize, Palette};
 +    let dir = tempfile::tempdir().unwrap();
 +    std::fs::write(
 +        dir.path().join("settings.json"),
@@ -210,7 +210,7 @@ Modify `apps/desktop/src-tauri/tests/settings.rs`:
 +
 +#[test]
 +fn m2b_font_size_is_clamped_and_font_choices_are_bounded() {
-+    use nimw_desktop::settings::{FontChoice, FontSize, HexColor};
++    use liber_desktop::settings::{FontChoice, FontSize, HexColor};
 +    let dir = tempfile::tempdir().unwrap();
 +    std::fs::write(dir.path().join("settings.json"), r#"{"fontSize":40}"#).unwrap();
 +    assert_eq!(store(dir.path()).get().0.font_size, FontSize::new(20));
@@ -263,8 +263,8 @@ Modify `apps/desktop/src/stores/stores.test.ts`:
 
 - [ ] **Step 2: Run them and watch them fail**
 
-Run: `set -o pipefail; cargo test -p nimw-desktop --test settings; pnpm --filter @nimw/desktop exec vitest run src/stores/stores.test.ts`
-Expected: Rust FAILS to compile — `unresolved imports nimw_desktop::settings::FontChoice, …::FontSize, …::HexColor, …::Palette` and `struct SettingsPatch has no field named accent_color` (and the other new fields). Vitest: `× M2b §7: the defaults match the Rust defaults (settings.rs)`.
+Run: `set -o pipefail; cargo test -p liber-desktop --test settings; pnpm --filter @liber/desktop exec vitest run src/stores/stores.test.ts`
+Expected: Rust FAILS to compile — `unresolved imports liber_desktop::settings::FontChoice, …::FontSize, …::HexColor, …::Palette` and `struct SettingsPatch has no field named accent_color` (and the other new fields). Vitest: `× M2b §7: the defaults match the Rust defaults (settings.rs)`.
 
 - [ ] **Step 3: Implement**
 
@@ -590,12 +590,12 @@ Modify `apps/desktop/src/stores/settingsStore.ts`:
 
 - [ ] **Step 4: Run the task's tests**
 
-Run: `set -o pipefail; cargo test -p nimw-desktop --test settings && cargo test -p nimw-desktop --test commands m2b_ && pnpm --filter @nimw/desktop exec vitest run src/stores/stores.test.ts`
+Run: `set -o pipefail; cargo test -p liber-desktop --test settings && cargo test -p liber-desktop --test commands m2b_ && pnpm --filter @liber/desktop exec vitest run src/stores/stores.test.ts`
 Expected: PASS — settings 11, commands 1 (`m2b_settings_round_trip_over_ipc`), stores 23.
 
 - [ ] **Step 5: Run the gate**
 
-Run (repo root, each must exit 0): `set -o pipefail; pnpm lint && pnpm typecheck && pnpm check:i18n && pnpm --filter @nimw/desktop exec vitest run --maxWorkers=2 && pnpm build:ui && cargo fmt --all --check && cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace && cargo deny check`
+Run (repo root, each must exit 0): `set -o pipefail; pnpm lint && pnpm typecheck && pnpm check:i18n && pnpm --filter @liber/desktop exec vitest run --maxWorkers=2 && pnpm build:ui && cargo fmt --all --check && cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace && cargo deny check`
 Expected: all clean (vitest 301 tests; cargo 188 + menu 2). If `cargo fmt --check` complains, run `cargo fmt --all` (the code blocks here are already formatted).
 
 - [ ] **Step 6: Commit**
@@ -633,7 +633,7 @@ Spec §4 and §10. Palettes are data; `scripts/gen-palettes.ts` compiles them to
 
 **Interfaces:**
 - Consumes: Task 1: `PaletteId`, `PALETTE_IDS`, `Settings.palette`, `Settings.accentColor`, `DEFAULT_SETTINGS`.
-- Produces: `theme/palettes.ts`: `PaletteTokens`, `Palette`, `PALETTES`. `theme/color.ts`: `hexToRgb`, `rgbToHex`, `mix`, `contrast`, `hexToOklch`, `oklchToHex`. `theme/derive.ts`: `derive(hex) → {light, dark}`, `LIGHT_ACCENT_FLOOR`, `DARK_ACCENT_FLOOR`. `theme/paletteCss.ts`: `paletteVars(p, mode)`, `paletteCss(p)`. `theme/appearance.ts`: `applyAppearance(settings, root?)`, `CUSTOM_STYLE_ID`. Script `pnpm --filter @nimw/desktop gen:palettes`.
+- Produces: `theme/palettes.ts`: `PaletteTokens`, `Palette`, `PALETTES`. `theme/color.ts`: `hexToRgb`, `rgbToHex`, `mix`, `contrast`, `hexToOklch`, `oklchToHex`. `theme/derive.ts`: `derive(hex) → {light, dark}`, `LIGHT_ACCENT_FLOOR`, `DARK_ACCENT_FLOOR`. `theme/paletteCss.ts`: `paletteVars(p, mode)`, `paletteCss(p)`. `theme/appearance.ts`: `applyAppearance(settings, root?)`, `CUSTOM_STYLE_ID`. Script `pnpm --filter @liber/desktop gen:palettes`.
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -834,12 +834,12 @@ describe('custom accent → palette (M2b §4, derive.ts)', () => {
 
 - [ ] **Step 2: Run them and watch them fail**
 
-Run: `set -o pipefail; pnpm --filter @nimw/desktop exec vitest run src/theme src/stores/stores.test.ts`
+Run: `set -o pipefail; pnpm --filter @liber/desktop exec vitest run src/theme src/stores/stores.test.ts`
 Expected: FAIL — `Failed to resolve import "./appearance"`, `Cannot find module './color'` (palettes.test.ts), and `× M2b §4: the palette applies on load and on update`.
 
 - [ ] **Step 3: Implement**
 
-After creating the files below, run `node apps/desktop/scripts/gen-palettes.ts` (or `pnpm --filter @nimw/desktop gen:palettes`) to write `src/theme/palettes.css`, and add the generated file to the root `.prettierignore` (diff below). `paletteCss.ts` imports `./color.ts` with its extension because the generator runs it directly in Node.
+After creating the files below, run `node apps/desktop/scripts/gen-palettes.ts` (or `pnpm --filter @liber/desktop gen:palettes`) to write `src/theme/palettes.css`, and add the generated file to the root `.prettierignore` (diff below). `paletteCss.ts` imports `./color.ts` with its extension because the generator runs it directly in Node.
 
 Modify `.prettierignore`:
 
@@ -893,19 +893,19 @@ Modify `apps/desktop/src/features/editor/livePreview.ts`:
 --- a/apps/desktop/src/features/editor/livePreview.ts
 +++ b/apps/desktop/src/features/editor/livePreview.ts
 @@ -361,11 +361,11 @@ const theme = EditorView.baseTheme({
-   '.cm-nimw-em': { fontStyle: 'italic' },
-   '.cm-nimw-strong': { fontWeight: '700' },
-   '.cm-nimw-strike': { textDecoration: 'line-through' },
--  '.cm-nimw-highlight': { background: 'var(--palette-yellow-bg)', borderRadius: '3px' },
-+  '.cm-nimw-highlight': { background: 'var(--color-highlight-bg)', borderRadius: '3px' },
-   '.cm-nimw-code': {
+   '.cm-liber-em': { fontStyle: 'italic' },
+   '.cm-liber-strong': { fontWeight: '700' },
+   '.cm-liber-strike': { textDecoration: 'line-through' },
+-  '.cm-liber-highlight': { background: 'var(--palette-yellow-bg)', borderRadius: '3px' },
++  '.cm-liber-highlight': { background: 'var(--color-highlight-bg)', borderRadius: '3px' },
+   '.cm-liber-code': {
      fontFamily: 'var(--font-mono)',
      fontSize: '0.9em',
 -    background: 'var(--color-surface-subtle)',
 +    background: 'var(--color-code-bg)',
      borderRadius: '4px',
    },
-   '.cm-nimw-link': { color: 'var(--color-accent)', textDecoration: 'underline' },
+   '.cm-liber-link': { color: 'var(--color-accent)', textDecoration: 'underline' },
 ```
 
 Modify `apps/desktop/src/features/explorer/Explorer.module.css`:
@@ -993,7 +993,7 @@ import { derive } from './derive';
 import { paletteCss } from './paletteCss';
 
 /** Id of the `<style>` holding the custom-accent palette. */
-export const CUSTOM_STYLE_ID = 'nimw-custom-palette';
+export const CUSTOM_STYLE_ID = 'liber-custom-palette';
 
 /** Applies the palette (M2b §4): built-in palettes are an attribute on
  *  `<html>` (their CSS ships in palettes.css); a custom accent also gets a
@@ -1230,7 +1230,7 @@ export function paletteCss(p: Palette): string {
 }
 ```
 
-`apps/desktop/src/theme/palettes.css` — generated: run `pnpm --filter @nimw/desktop gen:palettes` (Step 3 creates the generator); never edit or prettier-format it by hand.
+`apps/desktop/src/theme/palettes.css` — generated: run `pnpm --filter @liber/desktop gen:palettes` (Step 3 creates the generator); never edit or prettier-format it by hand.
 
 Create `apps/desktop/src/theme/palettes.ts`:
 
@@ -1615,12 +1615,12 @@ Modify `apps/desktop/src/theme/tokens.css`:
 
 - [ ] **Step 4: Run the task's tests**
 
-Run: `set -o pipefail; pnpm --filter @nimw/desktop exec vitest run src/theme src/stores`
+Run: `set -o pipefail; pnpm --filter @liber/desktop exec vitest run src/theme src/stores`
 Expected: PASS (119 tests: palettes, contrast for 8 palettes × 2 modes, derive sweep, appearance, stores).
 
 - [ ] **Step 5: Run the gate**
 
-Run (repo root, each must exit 0): `set -o pipefail; pnpm lint && pnpm typecheck && pnpm check:i18n && pnpm --filter @nimw/desktop exec vitest run --maxWorkers=2 && pnpm build:ui`
+Run (repo root, each must exit 0): `set -o pipefail; pnpm lint && pnpm typecheck && pnpm check:i18n && pnpm --filter @liber/desktop exec vitest run --maxWorkers=2 && pnpm build:ui`
 Expected: all clean (vitest 373 tests); `vite build` succeeds with `palettes.css` imported.
 
 - [ ] **Step 6: Commit**
@@ -1666,7 +1666,7 @@ Spec §5. Six @fontsource families (Latin + Latin Extended files only) ship with
 
 - [ ] **Step 1: Add the dependencies**
 
-Run `pnpm --filter @nimw/desktop add @fontsource/atkinson-hyperlegible @fontsource/literata @fontsource/source-serif-4 @fontsource/ibm-plex-sans @fontsource/ibm-plex-mono @fontsource/source-code-pro` (expected versions 5.3.0 / 5.3.0 / 5.3.1 / 5.3.0 / 5.3.0 / 5.3.1 through the release-age gate). The Rust dependency `fontdb = "0.24.0"` is added in Step 4 (workspace `Cargo.toml` diff); `cargo build` updates `Cargo.lock`.
+Run `pnpm --filter @liber/desktop add @fontsource/atkinson-hyperlegible @fontsource/literata @fontsource/source-serif-4 @fontsource/ibm-plex-sans @fontsource/ibm-plex-mono @fontsource/source-code-pro` (expected versions 5.3.0 / 5.3.0 / 5.3.1 / 5.3.0 / 5.3.0 / 5.3.1 through the release-age gate). The Rust dependency `fontdb = "0.24.0"` is added in Step 4 (workspace `Cargo.toml` diff); `cargo build` updates `Cargo.lock`.
 
 - [ ] **Step 2: Write the failing tests**
 
@@ -1806,7 +1806,7 @@ describe('fonts (M2b §5)', () => {
 
 - [ ] **Step 3: Run them and watch them fail**
 
-Run: `set -o pipefail; cargo test -p nimw-desktop --test commands; pnpm --filter @nimw/desktop exec vitest run src/theme`
+Run: `set -o pipefail; cargo test -p liber-desktop --test commands; pnpm --filter @liber/desktop exec vitest run src/theme`
 Expected: Rust FAILS to compile — `couldn't read apps/desktop/src-tauri/tests/../src/fonts.rs` (the async guard includes it). Vitest: `Failed to resolve import "./fonts"` and `× M2b §5: fonts and text size become CSS variables on <html>` (`expected '' to be "'Literata', Georgia, serif"`).
 
 - [ ] **Step 4: Implement**
@@ -1996,7 +1996,7 @@ Modify `apps/desktop/src/features/editor/Editor.tsx`:
 +    fontSize: 'var(--font-size-editor)',
 +    lineHeight: '1.7',
 +  },
-   '&.cm-nimw-source .cm-scroller': {
+   '&.cm-liber-source .cm-scroller': {
 -    fontFamily: 'var(--font-mono)',
 -    fontSize: '13.5px',
 +    fontFamily: 'var(--font-source)',
@@ -2012,24 +2012,24 @@ Modify `apps/desktop/src/features/editor/livePreview.ts`:
 --- a/apps/desktop/src/features/editor/livePreview.ts
 +++ b/apps/desktop/src/features/editor/livePreview.ts
 @@ -363,16 +363,16 @@ const theme = EditorView.baseTheme({
-   '.cm-nimw-strike': { textDecoration: 'line-through' },
-   '.cm-nimw-highlight': { background: 'var(--color-highlight-bg)', borderRadius: '3px' },
-   '.cm-nimw-code': {
+   '.cm-liber-strike': { textDecoration: 'line-through' },
+   '.cm-liber-highlight': { background: 'var(--color-highlight-bg)', borderRadius: '3px' },
+   '.cm-liber-code': {
 -    fontFamily: 'var(--font-mono)',
 +    fontFamily: 'var(--font-source)',
      fontSize: '0.9em',
      background: 'var(--color-code-bg)',
      borderRadius: '4px',
    },
-   '.cm-nimw-link': { color: 'var(--color-accent)', textDecoration: 'underline' },
-   '.cm-nimw-tag': { color: 'var(--color-accent)', fontWeight: '600' },
--  '.cm-nimw-codeblock': { fontFamily: 'var(--font-mono)', fontSize: '0.9em' },
-+  '.cm-nimw-codeblock': { fontFamily: 'var(--font-source)', fontSize: '0.9em' },
-   '.cm-nimw-quote': { borderLeft: '3px solid var(--color-border-strong)', paddingLeft: '12px' },
--  '.cm-nimw-frontmatter': { color: 'var(--color-text-muted)', fontFamily: 'var(--font-mono)' },
-+  '.cm-nimw-frontmatter': { color: 'var(--color-text-muted)', fontFamily: 'var(--font-source)' },
-   '.cm-nimw-widget': { padding: '4px 0', cursor: 'default' },
-   '.cm-nimw-checkbox': { margin: '0 4px 0 0', verticalAlign: 'middle', cursor: 'pointer' },
+   '.cm-liber-link': { color: 'var(--color-accent)', textDecoration: 'underline' },
+   '.cm-liber-tag': { color: 'var(--color-accent)', fontWeight: '600' },
+-  '.cm-liber-codeblock': { fontFamily: 'var(--font-mono)', fontSize: '0.9em' },
++  '.cm-liber-codeblock': { fontFamily: 'var(--font-source)', fontSize: '0.9em' },
+   '.cm-liber-quote': { borderLeft: '3px solid var(--color-border-strong)', paddingLeft: '12px' },
+-  '.cm-liber-frontmatter': { color: 'var(--color-text-muted)', fontFamily: 'var(--font-mono)' },
++  '.cm-liber-frontmatter': { color: 'var(--color-text-muted)', fontFamily: 'var(--font-source)' },
+   '.cm-liber-widget': { padding: '4px 0', cursor: 'default' },
+   '.cm-liber-checkbox': { margin: '0 4px 0 0', verticalAlign: 'middle', cursor: 'pointer' },
  });
 ```
 
@@ -2070,7 +2070,7 @@ Modify `apps/desktop/src/ipc/index.ts`:
 +/** Font families installed on this computer (M2b §5). */
 +export const fontsList = () => call<string[]>('fonts_list');
 +
- /** URL of a vault file for <img>/<audio> through the `nimw-asset:` protocol
+ /** URL of a vault file for <img>/<audio> through the `liber-asset:` protocol
   *  (M2a §2.5); WebView2 on Windows reaches custom protocols over http. */
  export function assetUrl(path: string): string {
 ```
@@ -2102,7 +2102,7 @@ Modify `apps/desktop/src/theme/appearance.ts`:
  import { paletteCss } from './paletteCss';
  
  /** Id of the `<style>` holding the custom-accent palette. */
- export const CUSTOM_STYLE_ID = 'nimw-custom-palette';
+ export const CUSTOM_STYLE_ID = 'liber-custom-palette';
  
 -/** Applies the palette (M2b §4): built-in palettes are an attribute on
 - *  `<html>` (their CSS ships in palettes.css); a custom accent also gets a
@@ -2259,12 +2259,12 @@ Modify `apps/desktop/src/theme/tokens.css`:
 
 - [ ] **Step 5: Run the task's tests**
 
-Run: `set -o pipefail; cargo test -p nimw-desktop --test commands && pnpm --filter @nimw/desktop exec vitest run src/theme`
+Run: `set -o pipefail; cargo test -p liber-desktop --test commands && pnpm --filter @liber/desktop exec vitest run src/theme`
 Expected: PASS — commands 20 (incl. `m2b_fonts_list_returns_installed_families` and `fonts_list` in the allowed/denied ACL list), theme 82.
 
 - [ ] **Step 6: Run the gate**
 
-Run (repo root, each must exit 0): `set -o pipefail; pnpm lint && pnpm typecheck && pnpm check:i18n && pnpm --filter @nimw/desktop exec vitest run --maxWorkers=2 && pnpm build:ui && cargo fmt --all --check && cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace && cargo deny check`
+Run (repo root, each must exit 0): `set -o pipefail; pnpm lint && pnpm typecheck && pnpm check:i18n && pnpm --filter @liber/desktop exec vitest run --maxWorkers=2 && pnpm build:ui && cargo fmt --all --check && cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace && cargo deny check`
 Expected: all clean (vitest 378; cargo 189 + menu 2; `advisories ok, bans ok, licenses ok, sources ok`).
 
 - [ ] **Step 7: Commit**
@@ -2406,7 +2406,7 @@ describe('Settings dialog (M2b §4, §5, §7)', () => {
 
 - [ ] **Step 2: Run them and watch them fail**
 
-Run: `set -o pipefail; pnpm --filter @nimw/desktop exec vitest run src/features/dialogs/SettingsDialog.test.tsx`
+Run: `set -o pipefail; pnpm --filter @liber/desktop exec vitest run src/features/dialogs/SettingsDialog.test.tsx`
 Expected: FAIL — all 6 tests (no "Appearance" heading, no "Graphite" radio, no "Accent colour (hex)" field, no font comboboxes).
 
 - [ ] **Step 3: Implement**
@@ -2928,12 +2928,12 @@ Modify `apps/desktop/src/i18n/locales/es.json`:
 
 - [ ] **Step 4: Run the task's tests**
 
-Run: `set -o pipefail; pnpm --filter @nimw/desktop exec vitest run src/features/dialogs src/features/shell`
+Run: `set -o pipefail; pnpm --filter @liber/desktop exec vitest run src/features/dialogs src/features/shell`
 Expected: PASS (SettingsDialog 6, plus the existing shell/settings tests). The `Array.isArray` guard in `useInstalledFonts` matters: other suites' IPC mocks answer unknown commands with `null`.
 
 - [ ] **Step 5: Run the gate**
 
-Run (repo root, each must exit 0): `set -o pipefail; pnpm lint && pnpm typecheck && pnpm check:i18n && pnpm --filter @nimw/desktop exec vitest run --maxWorkers=2`
+Run (repo root, each must exit 0): `set -o pipefail; pnpm lint && pnpm typecheck && pnpm check:i18n && pnpm --filter @liber/desktop exec vitest run --maxWorkers=2`
 Expected: all clean (vitest 384).
 
 - [ ] **Step 6: Commit**
@@ -3166,7 +3166,7 @@ describe('activeFormats (toolbar pressed state)', () => {
 
 - [ ] **Step 2: Run them and watch them fail**
 
-Run: `set -o pipefail; pnpm --filter @nimw/desktop exec vitest run src/features/editor/format.test.ts src/features/editor/Editor.test.tsx`
+Run: `set -o pipefail; pnpm --filter @liber/desktop exec vitest run src/features/editor/format.test.ts src/features/editor/Editor.test.tsx`
 Expected: FAIL — `Failed to resolve import "./format"`; Editor: `× ⌘B bolds the word at the cursor; ⌘[ is not indentation any more` (`expected 'hello world\n' to be 'hello **world**\n'`).
 
 - [ ] **Step 3: Implement**
@@ -3550,12 +3550,12 @@ export const editorKeymap: readonly KeyBinding[] = [
 
 - [ ] **Step 4: Run the task's tests**
 
-Run: `set -o pipefail; pnpm --filter @nimw/desktop exec vitest run src/features/editor`
+Run: `set -o pipefail; pnpm --filter @liber/desktop exec vitest run src/features/editor`
 Expected: PASS (format 12, the whole editor folder 59).
 
 - [ ] **Step 5: Run the gate**
 
-Run (repo root, each must exit 0): `set -o pipefail; pnpm lint && pnpm typecheck && pnpm check:i18n && pnpm --filter @nimw/desktop exec vitest run --maxWorkers=2`
+Run (repo root, each must exit 0): `set -o pipefail; pnpm lint && pnpm typecheck && pnpm check:i18n && pnpm --filter @liber/desktop exec vitest run --maxWorkers=2`
 Expected: all clean (vitest 397).
 
 - [ ] **Step 6: Commit**
@@ -3705,7 +3705,7 @@ Modify `apps/desktop/src/features/page/PageView.test.tsx`:
 
 - [ ] **Step 2: Run them and watch them fail**
 
-Run: `set -o pipefail; pnpm --filter @nimw/desktop exec vitest run src/features/editor/Toolbar.test.tsx src/features/page/PageView.test.tsx`
+Run: `set -o pipefail; pnpm --filter @liber/desktop exec vitest run src/features/editor/Toolbar.test.tsx src/features/page/PageView.test.tsx`
 Expected: FAIL — the 4 toolbar tests (no `toolbar` named "Formatting") and `× M2b §6: the header button shows and hides the formatting toolbar`.
 
 - [ ] **Step 3: Implement**
@@ -4216,12 +4216,12 @@ Modify `apps/desktop/src/i18n/locales/es.json`:
 
 - [ ] **Step 4: Run the task's tests**
 
-Run: `set -o pipefail; pnpm --filter @nimw/desktop exec vitest run src/features/editor src/features/page`
+Run: `set -o pipefail; pnpm --filter @liber/desktop exec vitest run src/features/editor src/features/page`
 Expected: PASS (Toolbar 4, PageView 11, rest unchanged).
 
 - [ ] **Step 5: Run the gate**
 
-Run (repo root, each must exit 0): `set -o pipefail; pnpm lint && pnpm typecheck && pnpm check:i18n && pnpm --filter @nimw/desktop exec vitest run --maxWorkers=2`
+Run (repo root, each must exit 0): `set -o pipefail; pnpm lint && pnpm typecheck && pnpm check:i18n && pnpm --filter @liber/desktop exec vitest run --maxWorkers=2`
 Expected: all clean (vitest 402).
 
 - [ ] **Step 6: Commit**
@@ -4299,8 +4299,8 @@ Modify `apps/desktop/src-tauri/tests/menu.rs`:
 +            handle.listen("menu:navigate", move |e| {
 +                log.lock().unwrap().push(e.payload().to_string());
 +            });
-+            for id in [nimw_desktop::menu::BACK_ID, nimw_desktop::menu::FORWARD_ID] {
-+                nimw_desktop::menu::on_menu_event(
++            for id in [liber_desktop::menu::BACK_ID, liber_desktop::menu::FORWARD_ID] {
++                liber_desktop::menu::on_menu_event(
 +                    handle,
 +                    MenuEvent {
 +                        id: MenuId::new(id),
@@ -4645,8 +4645,8 @@ describe('link trail (M2b §3)', () => {
 
 - [ ] **Step 2: Run them and watch them fail**
 
-Run: `set -o pipefail; pnpm --filter @nimw/desktop exec vitest run src/stores src/features/page src/features/shell/Interactions.test.tsx; cargo test -p nimw-desktop --test menu`
-Expected: FAIL — `Failed to resolve import "./trailStore"`; once the store exists: `× followLink is a link navigation`, `× M2b §3: renames and trashing in the app update the link trail; a new vault clears it`, `× M2b §3: the back arrow appears after following a link and goes back`, `× ⌘[ goes back and ⌘] forward along followed links` (`expected 'Art/rex.md' to be 'Welcome.md'`), `TypeError: installMenuNavigation is not a function`; Rust: `cannot find value BACK_ID in module nimw_desktop::menu`. ("review focus: ⌘[ typed in the editor…" is a guard over Task 5 + this task and passes once both exist.) Note: in `userEvent.keyboard`, `[` must be written `[[`.
+Run: `set -o pipefail; pnpm --filter @liber/desktop exec vitest run src/stores src/features/page src/features/shell/Interactions.test.tsx; cargo test -p liber-desktop --test menu`
+Expected: FAIL — `Failed to resolve import "./trailStore"`; once the store exists: `× followLink is a link navigation`, `× M2b §3: renames and trashing in the app update the link trail; a new vault clears it`, `× M2b §3: the back arrow appears after following a link and goes back`, `× ⌘[ goes back and ⌘] forward along followed links` (`expected 'Art/rex.md' to be 'Welcome.md'`), `TypeError: installMenuNavigation is not a function`; Rust: `cannot find value BACK_ID in module liber_desktop::menu`. ("review focus: ⌘[ typed in the editor…" is a guard over Task 5 + this task and passes once both exist.) Note: in `userEvent.keyboard`, `[` must be written `[[`.
 
 - [ ] **Step 3: Implement**
 
@@ -4663,10 +4663,10 @@ Modify `apps/desktop/src-tauri/src/menu.rs`:
 +use tauri::{AppHandle, Emitter, Manager, Runtime};
  
  /// Id of our Quit item.
- pub const QUIT_ID: &str = "nimw-quit";
+ pub const QUIT_ID: &str = "liber-quit";
 +/// Ids of View → Back / Forward (M2b §3 link trail).
-+pub const BACK_ID: &str = "nimw-back";
-+pub const FORWARD_ID: &str = "nimw-forward";
++pub const BACK_ID: &str = "liber-back";
++pub const FORWARD_ID: &str = "liber-forward";
 +/// Event telling the page to walk the link trail; payload `"back"` or
 +/// `"forward"`.
 +pub const NAVIGATE_EVENT: &str = "menu:navigate";
@@ -5199,12 +5199,12 @@ Modify `apps/desktop/src/stores/vaultStore.ts`:
 
 - [ ] **Step 4: Run the task's tests**
 
-Run: `set -o pipefail; pnpm --filter @nimw/desktop exec vitest run src/stores src/features/page src/features/shell && cargo test -p nimw-desktop --test menu`
+Run: `set -o pipefail; pnpm --filter @liber/desktop exec vitest run src/stores src/features/page src/features/shell && cargo test -p liber-desktop --test menu`
 Expected: PASS — trail 5, navigate 4, the header/shortcut/vault tests; menu: `macos_menu_quit_is_ours_and_the_standard_items_stay ... ok`, `quit_menu_item_requests_the_window_close_like_the_close_button ... ok`, `back_and_forward_items_emit_menu_navigate ... ok`.
 
 - [ ] **Step 5: Run the gate**
 
-Run (repo root, each must exit 0): `set -o pipefail; pnpm lint && pnpm typecheck && pnpm check:i18n && pnpm --filter @nimw/desktop exec vitest run --maxWorkers=2 && pnpm build:ui && cargo fmt --all --check && cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace && cargo deny check`
+Run (repo root, each must exit 0): `set -o pipefail; pnpm lint && pnpm typecheck && pnpm check:i18n && pnpm --filter @liber/desktop exec vitest run --maxWorkers=2 && pnpm build:ui && cargo fmt --all --check && cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace && cargo deny check`
 Expected: all clean (vitest 415; cargo 189 + menu 3).
 
 - [ ] **Step 6: Commit**
@@ -5428,7 +5428,7 @@ Modify `apps/desktop/src/test/fakeDisk.ts`:
 
 - [ ] **Step 2: Run them and watch them fail**
 
-Run: `set -o pipefail; pnpm --filter @nimw/desktop exec vitest run src/features/page/PageTitle.test.tsx`
+Run: `set -o pipefail; pnpm --filter @liber/desktop exec vitest run src/features/page/PageTitle.test.tsx`
 Expected: FAIL — 5 of 6 (no textbox "Page title"); the axe test passes already.
 
 - [ ] **Step 3: Implement**
@@ -5659,12 +5659,12 @@ Modify `apps/desktop/src/i18n/locales/es.json`:
 
 - [ ] **Step 4: Run the task's tests**
 
-Run: `set -o pipefail; pnpm --filter @nimw/desktop exec vitest run src/features/page`
+Run: `set -o pipefail; pnpm --filter @liber/desktop exec vitest run src/features/page`
 Expected: PASS (21: PageTitle 6, PageView 11 with the two updated header tests, Breadcrumb 3, …).
 
 - [ ] **Step 5: Run the gate**
 
-Run (repo root, each must exit 0): `set -o pipefail; pnpm lint && pnpm typecheck && pnpm check:i18n && pnpm --filter @nimw/desktop exec vitest run --maxWorkers=2`
+Run (repo root, each must exit 0): `set -o pipefail; pnpm lint && pnpm typecheck && pnpm check:i18n && pnpm --filter @liber/desktop exec vitest run --maxWorkers=2`
 Expected: all clean (vitest 421).
 
 - [ ] **Step 6: Commit**
@@ -5688,7 +5688,7 @@ Spec §8. The built UI under the production CSP: toolbar, title rename, link tra
 
 **Interfaces:**
 - Consumes: Everything above; `e2e/ipcMock.ts` (M2a).
-- Produces: `e2e/m2b.spec.ts`; `installIpcMock({ pages, editorMode, settings? })` keeps settings state and records renames in `window.__nimwRenames`.
+- Produces: `e2e/m2b.spec.ts`; `installIpcMock({ pages, editorMode, settings? })` keeps settings state and records renames in `window.__liberRenames`.
 
 - [ ] **Step 1: Write the end-to-end tests**
 
@@ -5724,7 +5724,7 @@ Modify `apps/desktop/e2e/ipcMock.ts`:
 +    ...overrides,
 +  };
    const handlers: Record<string, (a: Args) => unknown> = {
-     app_info: () => ({ name: 'Notes In My Way', version: '0.0.0-e2e' }),
+     app_info: () => ({ name: 'Liber Linteum', version: '0.0.0-e2e' }),
 -    settings_get: () => ({
 -      settings: {
 -        version: 1,
@@ -5753,7 +5753,7 @@ Modify `apps/desktop/e2e/ipcMock.ts`:
 +      const to = a.to as string;
 +      pages[to] = pages[from];
 +      delete pages[from];
-+      ((w.__nimwRenames ??= []) as unknown[]).push({ from, to });
++      ((w.__liberRenames ??= []) as unknown[]).push({ from, to });
 +      return { moved: [[from, to]], updatedFiles: [], updatedLinks: 0, failed: [] };
 +    },
      vaults_recent: () => [{ path: '/vault', name: 'vault', openedAt: '', missing: false }],
@@ -5784,7 +5784,7 @@ async function open(page: Page, name: string, editorMode = 'livePreview') {
 
 const writes = (page: Page) =>
   page.evaluate(() =>
-    ((window as unknown as { __nimwWrites?: { text: string }[] }).__nimwWrites ?? []).map(
+    ((window as unknown as { __liberWrites?: { text: string }[] }).__liberWrites ?? []).map(
       (w) => w.text,
     ),
   );
@@ -5808,7 +5808,7 @@ test('renaming from the title renames the file', async ({ page }) => {
   await title.press('Enter');
   await expect
     .poll(() =>
-      page.evaluate(() => (window as unknown as { __nimwRenames?: unknown[] }).__nimwRenames),
+      page.evaluate(() => (window as unknown as { __liberRenames?: unknown[] }).__liberRenames),
     )
     .toEqual([{ from: 'A.md', to: 'Alpha.md' }]);
   await expect(title).toHaveValue('Alpha');
@@ -5895,7 +5895,7 @@ Modify `apps/desktop/e2e/zero-network.spec.ts`:
 +    await page.waitForLoadState('networkidle');
 +    await page.waitForTimeout(300);
 +    const csp = await page.evaluate(
-+      () => (window as unknown as { __nimwCspViolations: string[] }).__nimwCspViolations,
++      () => (window as unknown as { __liberCspViolations: string[] }).__liberCspViolations,
 +    );
 +    expect(problems).toEqual([]);
 +    expect(csp).toEqual([]);
@@ -5906,7 +5906,7 @@ Modify `apps/desktop/e2e/zero-network.spec.ts`:
 
 - [ ] **Step 2: Run them**
 
-Run: `set -o pipefail; export PLAYWRIGHT_BROWSERS_PATH=<browsers dir>; pnpm --filter @nimw/desktop exec playwright install chromium webkit; pnpm test:e2e`
+Run: `set -o pipefail; export PLAYWRIGHT_BROWSERS_PATH=<browsers dir>; pnpm --filter @liber/desktop exec playwright install chromium webkit; pnpm test:e2e`
 Expected: These exercise features built in Tasks 1–8, so they PASS straight away; a failure here is a real integration bug (or the `testMatch` pitfall above).
 
 - [ ] **Step 3: Implement**
@@ -5934,7 +5934,7 @@ Expected: PASS — 27 tests (Chromium: interceptor, 3 modes, 9 palettes, 3 check
 
 - [ ] **Step 5: Run the gate**
 
-Run (repo root, each must exit 0): `set -o pipefail; pnpm lint && pnpm typecheck && pnpm check:i18n && pnpm --filter @nimw/desktop exec vitest run --maxWorkers=2`
+Run (repo root, each must exit 0): `set -o pipefail; pnpm lint && pnpm typecheck && pnpm check:i18n && pnpm --filter @liber/desktop exec vitest run --maxWorkers=2`
 Expected: all clean.
 
 - [ ] **Step 6: Commit**
@@ -5961,7 +5961,7 @@ Run every check with its own exit code, then write the hand-off (same structure 
 
 ```bash
 set -o pipefail
-for c in "pnpm lint" "pnpm typecheck" "pnpm check:i18n" "pnpm --filter @nimw/desktop exec vitest run --maxWorkers=2" "pnpm build:ui" "pnpm test:e2e" \
+for c in "pnpm lint" "pnpm typecheck" "pnpm check:i18n" "pnpm --filter @liber/desktop exec vitest run --maxWorkers=2" "pnpm build:ui" "pnpm test:e2e" \
          "cargo fmt --all --check" "cargo clippy --workspace --all-targets -- -D warnings" \
          "cargo test --workspace" "cargo deny check"; do
   sh -c "$c" > /tmp/m2b-check.log 2>&1; echo "$? $c"; tail -3 /tmp/m2b-check.log
@@ -6004,9 +6004,9 @@ Totals at the end of the replay: **421 vitest tests (50 files)**, **27 Playwrigh
 | What | Command (repo root) |
 |---|---|
 | Everything (CI gate) | `pnpm check` |
-| UI unit tests | `pnpm test` (on a busy machine: `pnpm --filter @nimw/desktop exec vitest run --maxWorkers=2`) |
-| E2E (both engines) | once: `pnpm --filter @nimw/desktop exec playwright install chromium webkit`; then `pnpm test:e2e` |
-| Regenerate palette CSS after editing a palette | `pnpm --filter @nimw/desktop gen:palettes` |
+| UI unit tests | `pnpm test` (on a busy machine: `pnpm --filter @liber/desktop exec vitest run --maxWorkers=2`) |
+| E2E (both engines) | once: `pnpm --filter @liber/desktop exec playwright install chromium webkit`; then `pnpm test:e2e` |
+| Regenerate palette CSS after editing a palette | `pnpm --filter @liber/desktop gen:palettes` |
 | App (dev) | `pnpm dev` |
 
 ## 3. Backend map (`apps/desktop/src-tauri/src/`)
@@ -6015,7 +6015,7 @@ Totals at the end of the replay: **421 vitest tests (50 files)**, **27 Playwrigh
 |---|---|
 | `settings.rs` | New types: `Palette` (lowercase ids + `custom`), `HexColor` (`#rrggbb`, stored lower-case), `FontChoice` (a `BUNDLED_FONTS` id or `system:<Family>`, ≤ 200 chars, no control characters), `FontSize` (13–20, out-of-range numbers are **clamped**, non-numbers reset). New `Settings`/`SettingsPatch` fields with defaults `lavender`, `#d1477a`, `atkinson-hyperlegible`, `jetbrains-mono`, `15`, `true`. `parse_lenient` resets each field on its own (warning names the key). |
 | `fonts.rs` (new) | `system_families()` with `fontdb` (local files only): English family name when a font has several, hidden `.`-families dropped, unique + sorted ignoring case; cached in a `OnceLock` per app session. Command `fonts_list` is async via `blocking()`. |
-| `menu.rs` | View menu gains **Back** (`nimw-back`) and **Forward** (`nimw-forward`) before Full Screen, **without accelerators** (the page handles ⌘[ / ⌘] itself — see §8.3). `on_menu_event` emits `menu:navigate` with `"back"` / `"forward"`. |
+| `menu.rs` | View menu gains **Back** (`liber-back`) and **Forward** (`liber-forward`) before Full Screen, **without accelerators** (the page handles ⌘[ / ⌘] itself — see §8.3). `on_menu_event` emits `menu:navigate` with `"back"` / `"forward"`. |
 | `lib.rs` | Registers `fonts::fonts_list`. |
 | `build.rs`, `capabilities/main.json` | `fonts_list` / `allow-fonts-list`. No other new permission: the menu event reaches the UI through the existing `core:event:allow-listen`. |
 | Workspace `Cargo.toml` | `fontdb = "0.24.0"` (MIT; pulls `ttf-parser`, `memmap2`, `fontconfig-parser`, `roxmltree`, `slotmap`, all MIT/Apache/Zlib — `cargo deny` clean). |
@@ -6031,7 +6031,7 @@ Tests: `tests/settings.rs` (3 new), `tests/commands.rs` (`m2b_settings_round_tri
 | `theme/derive.ts` | `derive(hex)` → `{light, dark}` tokens: accent darkened until ≥ 4.8:1 on white, lightened until ≥ 6:1 on the dark surface, chroma capped 0.17/0.13, neutrals tinted toward the hue (not for greys, chroma < 0.03). |
 | `theme/paletteCss.ts` | `paletteVars(p, mode)` (mock token → app CSS variables, in-between shades mixed as **hex**, no runtime `color-mix`), `paletteCss(p)` (light block + both dark blocks). |
 | `theme/palettes.css` | **Generated** by `scripts/gen-palettes.ts` (ignored by prettier; a test fails if it is stale). |
-| `theme/appearance.ts` | `applyAppearance(settings)`: `data-palette` on `<html>`, a `<style id="nimw-custom-palette">` for the custom accent, and `--font-live`, `--font-source`, `--font-size-editor`. Called from `settingsStore.apply`. |
+| `theme/appearance.ts` | `applyAppearance(settings)`: `data-palette` on `<html>`, a `<style id="liber-custom-palette">` for the custom accent, and `--font-live`, `--font-source`, `--font-size-editor`. Called from `settingsStore.apply`. |
 | `theme/fonts.ts`, `theme/fonts.css` | `LIVE_FONTS`, `SOURCE_FONTS`, `fontStack(choice, kind)` (installed families quoted and escaped before the default stack), `systemChoice`, `systemFamily`; the @fontsource imports. |
 | `theme/tokens.css` | Defaults for the new tokens (`--color-sidebar-selected`, `--color-highlight-bg`, `--color-code-bg`) and the font variables. |
 | `features/dialogs/SettingsDialog.tsx` | Sections Appearance / Editor / Files; `Swatch`, `AccentEditor` (colour input + hex field with inline error + contrast line), `FontSelect` (bundled + installed optgroups). |
@@ -6056,9 +6056,9 @@ Tests: `tests/settings.rs` (3 new), `tests/commands.rs` (`m2b_settings_round_tri
 
 ## 6. Recipes
 
-- **Add a palette:** add its id to `PALETTE_IDS` (`ipc/index.ts`) and to `Palette` in `settings.rs` (lowercase), add the 15 light + 15 dark tokens to `theme/palettes.ts`, add `settings.palettes.<id>` in `en.json` and `es.json`, run `pnpm --filter @nimw/desktop gen:palettes`. `palettes.test.ts` checks the contrast floors and that the CSS is current.
+- **Add a palette:** add its id to `PALETTE_IDS` (`ipc/index.ts`) and to `Palette` in `settings.rs` (lowercase), add the 15 light + 15 dark tokens to `theme/palettes.ts`, add `settings.palettes.<id>` in `en.json` and `es.json`, run `pnpm --filter @liber/desktop gen:palettes`. `palettes.test.ts` checks the contrast floors and that the CSS is current.
 - **Add a toolbar item:** write a `StateCommand` in `format.ts` (test it with the `‹…›`/`¦` helpers in `format.test.ts`), optionally an `ActiveFormat` read in `activeFormats`, add an `Item` to `INLINE` or `BLOCK` in `Toolbar.tsx` (icon + `toolbar.<id>` strings in both locales), and a shortcut in `formatKeymap` if it has one.
-- **Add a bundled font:** `pnpm --filter @nimw/desktop add @fontsource/<name>`, import its `latin-*`/`latin-ext-*` files in `theme/fonts.css`, add it to `LIVE_FONTS` or `SOURCE_FONTS`, and its id to `BUNDLED_FONTS` in `settings.rs` (a test keeps the lists equal).
+- **Add a bundled font:** `pnpm --filter @liber/desktop add @fontsource/<name>`, import its `latin-*`/`latin-ext-*` files in `theme/fonts.css`, add it to `LIVE_FONTS` or `SOURCE_FONTS`, and its id to `BUNDLED_FONTS` in `settings.rs` (a test keeps the lists equal).
 
 ## 7. Tests inventory (new in M2b)
 
@@ -6115,7 +6115,7 @@ Tests: `tests/settings.rs` (3 new), `tests/commands.rs` (`m2b_settings_round_tri
 
 | Symptom | Fix |
 |---|---|
-| `palettes.css is generated from palettes.ts` fails | run `pnpm --filter @nimw/desktop gen:palettes`; never run prettier on that file (it's in `.prettierignore` — run prettier from the repo root) |
+| `palettes.css is generated from palettes.ts` fails | run `pnpm --filter @liber/desktop gen:palettes`; never run prettier on that file (it's in `.prettierignore` — run prettier from the repo root) |
 | Installed fonts missing from the pickers | `fonts_list` must be in `build.rs` + `capabilities/main.json` (`allow-fonts-list`); outside the app the list is empty by design |
 | ⌘[ indents instead of going back | `editorKeymap` must keep filtering `Mod-[` / `Mod-]` |
 | View → Back does nothing | `installMenuNavigationIfTauri()` must run in `main.tsx`; the UI needs `core:event:allow-listen` |

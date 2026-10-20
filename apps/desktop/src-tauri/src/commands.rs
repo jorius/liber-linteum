@@ -9,7 +9,7 @@ pub struct AppInfo {
 
 pub fn build_app_info() -> AppInfo {
     AppInfo {
-        name: "Notes In My Way".to_string(),
+        name: "Liber Linteum".to_string(),
         version: env!("CARGO_PKG_VERSION").to_string(),
     }
 }
@@ -85,7 +85,7 @@ mod tests {
     #[test]
     fn app_info_reports_name_and_crate_version() {
         let info = build_app_info();
-        assert_eq!(info.name, "Notes In My Way");
+        assert_eq!(info.name, "Liber Linteum");
         assert_eq!(info.version, "0.1.0");
     }
 
@@ -94,7 +94,7 @@ mod tests {
         let json = serde_json::to_value(build_app_info()).unwrap();
         assert_eq!(
             json,
-            serde_json::json!({ "name": "Notes In My Way", "version": "0.1.0" })
+            serde_json::json!({ "name": "Liber Linteum", "version": "0.1.0" })
         );
     }
 }

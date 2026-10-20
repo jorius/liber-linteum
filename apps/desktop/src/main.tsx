@@ -3,6 +3,7 @@ import './theme/palettes.css';
 import './theme/base.css';
 import './theme/fonts.css';
 import './theme/buttons.css';
+import './theme/fields.css';
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { App } from './app/App';

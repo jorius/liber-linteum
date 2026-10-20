@@ -9,6 +9,8 @@ import {
 } from 'react';
 import { useTranslation } from 'react-i18next';
 import { linkSuggest, type LinkSuggestion } from '../../ipc';
+import { Icon } from '../explorer/TreeRow';
+import { useIcons } from '../icons/ItemIcon';
 import styles from './Editor.module.css';
 import { placePopup, type Anchor } from './placePopup';
 
@@ -45,6 +47,7 @@ export function PickerPopup({
   onClose,
 }: PickerPopupProps) {
   const { t } = useTranslation();
+  const icons = useIcons();
   const listId = useId();
   const box = useRef<HTMLDivElement>(null);
   const [query, setQuery] = useState('');
@@ -117,7 +120,7 @@ export function PickerPopup({
   return (
     <div ref={box} className={styles.linkPicker} style={place ?? undefined}>
       <input
-        className={styles.linkPickerInput}
+        className={`field-control ${styles.linkPickerInput}`}
         role="combobox"
         aria-label={label}
         aria-expanded={options.length > 0}
@@ -143,7 +146,11 @@ export function PickerPopup({
             id={optionId(i)}
             role="option"
             aria-selected={i === active}
-            className={styles.linkPickerOption}
+            className={
+              o.kind === 'url'
+                ? styles.linkPickerOption
+                : `${styles.linkPickerOption} ${styles.linkPickerPage}`
+            }
             // Keep focus in the input; the click picks.
             onMouseDown={(e) => e.preventDefault()}
             onClick={() => onPick(o)}
@@ -152,6 +159,12 @@ export function PickerPopup({
               t('linkPicker.url', { url: o.url })
             ) : (
               <>
+                {/* Round 3b §8.2: the page's icon in a leading box. */}
+                <span className={styles.linkPickerIcon} aria-hidden="true">
+                  {icons.get(o.page.path) ?? (
+                    <Icon node={{ path: o.page.path, kind: o.page.kind }} expanded={false} />
+                  )}
+                </span>
                 <span>{o.page.title ?? o.page.target}</span>
                 <span className={styles.linkPickerPath}>{o.page.path}</span>
               </>

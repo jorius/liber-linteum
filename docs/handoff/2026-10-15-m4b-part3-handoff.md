@@ -44,7 +44,7 @@
 |---|---|
 | Some Obsidian titles weren't shown ("Tipos de comisiones" showed as "WIP (Work In Progress):") | A title is an H1 **only when it's the first block of the note** (after frontmatter and blank lines); otherwise the **file name**, as Obsidian does. This also holds after an empty or unusual frontmatter block and after a UTF-8 byte-order mark (Windows Notepad). Indexes rebuild once (schema 2). |
 | Windows: Global View cards ignore the repositioned part of the cover | **Cause:** in WebView2 (Chromium), the card's image kept its natural height (1190 px in a 96 px frame), so `object-position` had nothing to crop and the card showed the image's top. **Fix:** the frame has a fixed size and the image fills it, so the stored focus shows. A Chromium e2e reproduced the bug first. |
-| Covers on the left or right | **Placement:** Top / Left / Right per page (radio group in the cover actions; ⌘Z works). A side cover is a **tall strip** beside the text, with these behaviours: drag its inner edge to resize (160 px to 45% of the window, never leaving the text under 520 px); arrow keys, Home/End, Enter and Escape work on the edge; double-click resets it to 280; repositioning works in both axes (new frontmatter `cover-x`); it falls back to a top band in narrow windows. **Storage:** `.nimw/vault.json` `coverSides`/`coverWidths`. **Global View cards** show the strip on the same side. |
+| Covers on the left or right | **Placement:** Top / Left / Right per page (radio group in the cover actions; ⌘Z works). A side cover is a **tall strip** beside the text, with these behaviours: drag its inner edge to resize (160 px to 45% of the window, never leaving the text under 520 px); arrow keys, Home/End, Enter and Escape work on the edge; double-click resets it to 280; repositioning works in both axes (new frontmatter `cover-x`); it falls back to a top band in narrow windows. **Storage:** `.liber/vault.json` `coverSides`/`coverWidths`. **Global View cards** show the strip on the same side. |
 | Pages and folders look alike on cards | **Page cards:** **Edit** with a pencil icon. **Folder and project cards:** keep **See all** with a stack icon, and look like folders (a tab, a second sheet behind, a tinted head). Kind labels get icons. |
 | Parent/child and "links from inside folder" lines hard to tell apart | **Lines:** parent/child lines are now thin solid **elbows**, while folder links are long dashes with a **count chip** ("12 links"). **Focus:** hovering or keyboard-focusing a card lights its lines and dims the rest. **Legend:** the edge toggles show a sample of each line. |
 | "See atoms" | **What it shows:** a page as a map of its **sections and every block**: paragraphs, lists, quotes, code, tables, images, audio, embeds, maths and diagrams. Lines run to linked pages and related pages. **Entry points:** an Atoms button on page cards, "See atoms" in the card menu, and View → See Atoms of This Page. **Clicking an atom** opens the editor at that block and flashes it. The map is read-only. |
@@ -214,14 +214,14 @@ One Critical and three Important findings. Fixed: the Critical, two of the Impor
 
 **Mac:** `pnpm dev` from the repo on `feat/m4b3-feedback`.
 
-**Windows:** cross-compiled on the Mac with `cargo-xwin` and NSIS, in a toolchain kept apart in `~/.nimw-cross`.
-- Output: `target/x86_64-pc-windows-msvc/release/bundle/nsis/Notes In My Way_0.1.0_x64-setup.exe`.
+**Windows:** cross-compiled on the Mac with `cargo-xwin` and NSIS, in a toolchain kept apart in `~/.liber-cross`.
+- Output: `target/x86_64-pc-windows-msvc/release/bundle/nsis/Liber Linteum_0.1.0_x64-setup.exe`.
 - It's unsigned, so SmartScreen asks for More info → Run anyway.
 - Rebuild with:
 
 ```bash
 cd apps/desktop
-export CARGO_HOME=$HOME/.nimw-cross/cargo RUSTUP_HOME=$HOME/.nimw-cross/rustup RUSTUP_TOOLCHAIN=1.99.0 XWIN_ACCEPT_LICENSE=1
+export CARGO_HOME=$HOME/.liber-cross/cargo RUSTUP_HOME=$HOME/.liber-cross/rustup RUSTUP_TOOLCHAIN=1.99.0 XWIN_ACCEPT_LICENSE=1
 export PATH="/opt/homebrew/opt/rustup/bin:$CARGO_HOME/bin:/opt/homebrew/opt/llvm/bin:/opt/homebrew/opt/lld/bin:$PATH"
 pnpm tauri build --runner cargo-xwin --target x86_64-pc-windows-msvc --bundles nsis
 ```

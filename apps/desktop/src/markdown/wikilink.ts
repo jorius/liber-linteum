@@ -1,4 +1,4 @@
-/** Parts of the inside of `[[…]]`, mirroring `nimw_markdown::wikilink::parse_inner`. */
+/** Parts of the inside of `[[…]]`, mirroring `liber_markdown::wikilink::parse_inner`. */
 export interface WikiParts {
   target: string;
   heading: string | null;

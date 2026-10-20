@@ -2,7 +2,7 @@
 // as a tall strip on the left or right of the page; the strip's inner edge
 // resizes it, a side cover repositions in both axes, and a window too narrow
 // for a strip shows the cover on top. Placement and width live in
-// `.nimw/vault.json`; only the focus point (`cover-x`, `cover-y`) is written
+// `.liber/vault.json`; only the focus point (`cover-x`, `cover-y`) is written
 // to the note.
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';

@@ -1,5 +1,5 @@
 // Plain-text and code files the app opens in its text view (M4b part 2 §6).
-// The same names as `nimw_session::is_text_path`; the content (UTF-8, no NUL
+// The same names as `liber_session::is_text_path`; the content (UTF-8, no NUL
 // bytes, at most 2 MB) is checked by `text_read`, which answers `notAText`.
 
 const EXTENSIONS = new Set(

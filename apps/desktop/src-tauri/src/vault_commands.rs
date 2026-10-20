@@ -1,5 +1,5 @@
 //! Vault and explorer commands (M1b spec §2.4). Thin wrappers over
-//! `nimw-session`; every path from the UI goes through `VaultPath::new`.
+//! `liber-session`; every path from the UI goes through `VaultPath::new`.
 
 use crate::dto::{
     ChangedPayload, PageDto, ProgressPayload, RenameOutcomeDto, TreeNodeDto, VaultInfo,
@@ -7,8 +7,8 @@ use crate::dto::{
 };
 use crate::error::{CmdResult, CommandError, ErrorKind};
 use crate::state::AppState;
-use nimw_session::{SessionEvent, VaultSession};
-use nimw_vault::VaultPath;
+use liber_session::{SessionEvent, VaultSession};
+use liber_vault::VaultPath;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use tauri::{AppHandle, Emitter, Manager, Runtime};
@@ -74,7 +74,7 @@ pub(crate) fn open_session<R: Runtime>(app: &AppHandle<R>, root: &Path) -> CmdRe
     let icon = session
         .vault()
         .vault_icon()
-        .filter(|i| nimw_markdown::is_icon(i));
+        .filter(|i| liber_markdown::is_icon(i));
     state.set_session(Some(session));
     let scratchpad = state.settings.is_scratchpad(&root);
     state.set_scratchpad_root(scratchpad.then(|| root.clone()));
@@ -132,7 +132,7 @@ pub(crate) fn vault_close_impl(state: &AppState) {
 pub(crate) fn not_archived(path: &str) -> CmdResult<()> {
     // Any letter case: on a case-insensitive disk `.ARCHIVE/x` is the Archive (round-2 review M3).
     let first = path.split('/').next().unwrap_or_default();
-    if first.eq_ignore_ascii_case(nimw_vault::ARCHIVE_DIR) {
+    if first.eq_ignore_ascii_case(liber_vault::ARCHIVE_DIR) {
         return Err(CommandError::new(
             ErrorKind::NotPermitted,
             format!("{path} is archived; unarchive it to change it"),
@@ -153,7 +153,7 @@ pub(crate) fn vault_tree_impl(state: &AppState) -> CmdResult<Vec<TreeNodeDto>> {
             let icon = if kind == "folder" {
                 folders
                     .remove(&n.path)
-                    .filter(|i| nimw_markdown::is_icon(i))
+                    .filter(|i| liber_markdown::is_icon(i))
             } else {
                 n.icon
             };

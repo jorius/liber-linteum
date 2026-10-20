@@ -1,5 +1,5 @@
 // Cover placement in the editor's undo history (M4b part 3 §3). A placement
-// lives in `.nimw/vault.json`, not in the note, but ⌘Z should put it back
+// lives in `.liber/vault.json`, not in the note, but ⌘Z should put it back
 // like the other cover edits: choosing one adds a history entry holding no
 // text change, only an effect that undo and redo invert and re-save.
 import { invertedEffects, isolateHistory } from '@codemirror/commands';

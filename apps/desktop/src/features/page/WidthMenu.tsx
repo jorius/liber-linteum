@@ -119,7 +119,7 @@ function Menu({
       ref={box}
       role="menu"
       aria-label={label}
-      className={`nimw-menu ${styles.widthMenu}`}
+      className={`liber-menu ${styles.widthMenu}`}
       style={{
         position: 'fixed',
         right: Math.max(8, document.documentElement.clientWidth - rect.right),

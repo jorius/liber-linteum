@@ -33,7 +33,7 @@ body {
 }
 
 /* Explorer context menu (rendered at the pointer / focused row). */
-.nimw-menu {
+.liber-menu {
   z-index: 35;
   min-width: 180px;
   display: flex;
@@ -45,8 +45,8 @@ body {
   box-shadow: var(--shadow-panel);
 }
 
-.nimw-menu [role='menuitem'],
-.nimw-menu [role='menuitemradio'] {
+.liber-menu [role='menuitem'],
+.liber-menu [role='menuitemradio'] {
   text-align: left;
   border: 0;
   background: none;
@@ -59,41 +59,48 @@ body {
 
 /* Separate rules: WebKit before 15.4 drops a whole selector list that holds
    :focus-visible, hover included. */
-.nimw-menu [role='menuitem']:hover,
-.nimw-menu [role='menuitemradio']:hover {
+.liber-menu [role='menuitem']:hover,
+.liber-menu [role='menuitemradio']:hover {
   background: var(--color-accent-soft);
 }
 
-.nimw-menu [role='menuitem']:focus-visible {
+.liber-menu [role='menuitem']:focus-visible {
   background: var(--color-accent-soft);
 }
 
-.nimw-menu [role='menuitemradio']:focus-visible {
+.liber-menu [role='menuitemradio']:focus-visible {
   background: var(--color-accent-soft);
 }
 
 /* An item that can't be chosen now (e.g. Reset with nothing to reset). */
-.nimw-menu [aria-disabled='true'] {
+.liber-menu [aria-disabled='true'] {
   color: var(--color-text-muted);
   cursor: default;
 }
 
-.nimw-menu [aria-disabled='true']:hover {
+.liber-menu [aria-disabled='true']:hover {
   background: none;
 }
 
-.nimw-menu [role='separator'] {
+.liber-menu [role='separator'] {
   height: 1px;
   margin: 4px 2px;
   background: var(--color-border);
 }
 
 /* Text for screen readers only (live regions made outside React). */
-.nimw-sr-only {
+.liber-sr-only {
   position: absolute;
   width: 1px;
   height: 1px;
   overflow: hidden;
   clip-path: inset(50%);
   white-space: nowrap;
+}
+
+/* A line of text in a menu, not a choice (spelling: "No suggestions"). */
+.liber-menu-note {
+  padding: 8px 10px;
+  color: var(--color-text-muted);
+  font: 500 14px var(--font-body);
 }

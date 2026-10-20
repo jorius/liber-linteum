@@ -163,7 +163,7 @@ export function EmojiPicker({ anchor, label, hasIcon, onPick, onClose }: EmojiPi
       <div className={styles.pickerHead}>
         <input
           type="search"
-          className={styles.search}
+          className={`field-control ${styles.search}`}
           aria-label={t('icons.search')}
           placeholder={t('icons.search')}
           autoFocus

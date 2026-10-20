@@ -21,7 +21,7 @@ export function readFrontmatter(tree: Root): Frontmatter | null {
   }
 }
 
-/** `cover:` and `related:` links (same keys `nimw-markdown` reads). */
+/** `cover:` and `related:` links (same keys `liber-markdown` reads). */
 export function frontmatterLinks(fm: Frontmatter | null): LinkRef[] {
   const data = fm?.data;
   if (!fm || !data) return [];
@@ -35,7 +35,7 @@ export function frontmatterLinks(fm: Frontmatter | null): LinkRef[] {
       range: fm.range,
     });
   }
-  // A list, or one relationship written without it (M3b §5, as nimw-markdown).
+  // A list, or one relationship written without it (M3b §5, as liber-markdown).
   const related = Array.isArray(data.related)
     ? data.related
     : data.related !== undefined && data.related !== null

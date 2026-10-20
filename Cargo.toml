@@ -1,6 +1,7 @@
 [workspace]
 resolver = "3"
 members = ["crates/*", "apps/desktop/src-tauri"]
+exclude = ["crates/liber-crypto/fuzz"]
 
 [workspace.package]
 version = "0.1.0"
@@ -43,6 +44,21 @@ fontdb = "0.24.0"
 # M6 audio clips: capture and WAV (MP3 deferred: LAME does not cross-build for Windows)
 cpal = "0.18.2"
 hound = "3.5.1"
+# Spell checking: pure-Rust Hunspell (MPL-2.0)
+spellbook = "=0.4.2"
+# Encryption E1 (liber-crypto)
+aes-gcm = { version = "0.11.1", features = ["zeroize"] }
+aes-siv = { version = "0.8.0", features = ["zeroize"] }
+hkdf = "0.13.0"
+hmac = { version = "0.13.0", features = ["zeroize"] }
+argon2 = { version = "0.6.0", default-features = false, features = ["alloc", "parallel", "zeroize"] }
+x-wing = { version = "=0.1.1", features = ["zeroize"] }
+getrandom = { version = "0.4.3", features = ["sys_rng"] }
+rand_core = "0.10.1"
+zeroize = "1.9.1"
+subtle = "2.6.1"
+region = "4.0.1"
+data-encoding = "2.11.1"
 
 [workspace.lints.rust]
 unsafe_code = "forbid"

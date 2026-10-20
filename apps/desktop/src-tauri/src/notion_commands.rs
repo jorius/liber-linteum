@@ -7,7 +7,7 @@
 use crate::dto::VaultInfo;
 use crate::error::{CmdResult, CommandError, ErrorKind};
 use crate::vault_commands::{blocking, open_session};
-use nimw_import::{Export, ImportError, Limits, PREVIEW_WARNINGS, clean_component};
+use liber_import::{Export, ImportError, Limits, PREVIEW_WARNINGS, clean_component};
 use serde::Serialize;
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -146,7 +146,7 @@ pub(crate) fn notion_pick_zip_impl<R: Runtime>(app: &AppHandle<R>) -> Option<Not
             .file_name()
             .map(|n| n.to_string_lossy().into_owned())
             .unwrap_or_default(),
-        suggested_name: nimw_import::suggested_name(&p),
+        suggested_name: liber_import::suggested_name(&p),
     })
 }
 
@@ -174,7 +174,7 @@ pub(crate) fn notion_preview_impl<R: Runtime>(app: &AppHandle<R>) -> CmdResult<N
     // counts (spec §8).
     state.cancel.store(false, Ordering::Relaxed);
     let export = Export::open(&picked_zip(app)?, &Limits::default())?;
-    let plan = nimw_import::plan(&export, &state.cancel)?;
+    let plan = liber_import::plan(&export, &state.cancel)?;
     let p = plan.preview();
     Ok(NotionPreviewDto {
         pages: p.pages,
@@ -216,7 +216,7 @@ pub(crate) fn notion_import_impl<R: Runtime>(
         return Err(ImportError::Exists(target.display().to_string()).into());
     }
     let export = Export::open(&zip, &Limits::default())?;
-    let plan = nimw_import::plan(&export, &state.cancel)?;
+    let plan = liber_import::plan(&export, &state.cancel)?;
     let source = zip
         .file_name()
         .map(|n| n.to_string_lossy().into_owned())
@@ -228,7 +228,7 @@ pub(crate) fn notion_import_impl<R: Runtime>(
             let _ = app.emit_to("main", PROGRESS_EVENT, Progress { done, total });
         }
     };
-    let report = nimw_import::write(
+    let report = liber_import::write(
         &export,
         &plan,
         &source,

@@ -29,7 +29,7 @@ describe('callouts (M2a §2.1, Tier B toggles)', () => {
   });
 });
 
-describe('callout titles keep inline content (I7, parity with nimw-markdown)', () => {
+describe('callout titles keep inline content (I7, parity with liber-markdown)', () => {
   const callout = (src: string) => findAll<Callout>(parsePage(src).tree, 'callout')[0];
 
   it('a link in the title is a link', () => {

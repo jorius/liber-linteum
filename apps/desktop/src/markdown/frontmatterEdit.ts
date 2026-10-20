@@ -23,7 +23,7 @@ const BLOCK = /^---\n(?:[\s\S]*?\n)?---(?:\n|$)/;
 /** Whether the text opens like a frontmatter block that BLOCK and remark
  *  don't both confirm (final review Minor 2): a byte-order mark before `---`,
  *  or a `---` line (trailing spaces allowed) with a later `---` / `...` line
- *  that some reader (remark, nimw-markdown, Obsidian) could take as its end.
+ *  that some reader (remark, liber-markdown, Obsidian) could take as its end.
  *  A new block in front of it would hide it from one reader or another. */
 export function unconfirmedBlock(text: string): boolean {
   const open = /^\uFEFF?---[ \t]*\r?\n/.exec(text);
@@ -76,7 +76,7 @@ export function data(src: string): Record<string, unknown> | null {
 /** Whether the edited frontmatter `next` reads back as `want(before)` — the
  *  data `src` held with the edit applied: no other key changes, nothing is
  *  added — both as remark reads it (without the block's last line break) and
- *  as nimw-markdown and Obsidian do. `want` answering `null` refuses. */
+ *  as liber-markdown and Obsidian do. `want` answering `null` refuses. */
 export function readsBackAs(
   src: string,
   next: string,

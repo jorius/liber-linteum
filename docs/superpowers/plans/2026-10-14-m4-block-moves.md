@@ -46,7 +46,7 @@
 | `apps/desktop/src/i18n/locales/{en,es}.json` | `editor.blocks.*` |
 | `apps/desktop/e2e/{m4.spec,zero-network.spec}.ts`, `playwright.config.ts` | end to end |
 
-**Commands used throughout (repo root):** `export PATH="$HOME/.nvm/versions/node/v24.21.0/bin:$PATH"`; Vitest `pnpm --filter @nimw/desktop exec vitest run --maxWorkers=2 <paths>`; E2E `pnpm --filter @nimw/desktop exec vite build` then `PLAYWRIGHT_BROWSERS_PATH=<browsers> pnpm --filter @nimw/desktop exec playwright test <spec>`.
+**Commands used throughout (repo root):** `export PATH="$HOME/.nvm/versions/node/v24.21.0/bin:$PATH"`; Vitest `pnpm --filter @liber/desktop exec vitest run --maxWorkers=2 <paths>`; E2E `pnpm --filter @liber/desktop exec vite build` then `PLAYWRIGHT_BROWSERS_PATH=<browsers> pnpm --filter @liber/desktop exec playwright test <spec>`.
 
 ---
 
@@ -247,7 +247,7 @@ describe('keyboard neighbours (M4 §5)', () => {
 
 - [ ] **Step 2: Run them to see them fail**
 
-Run: `pnpm --filter @nimw/desktop exec vitest run --maxWorkers=2 src/markdown/blockModel.test.ts`
+Run: `pnpm --filter @liber/desktop exec vitest run --maxWorkers=2 src/markdown/blockModel.test.ts`
 Expected: FAIL — `Failed to resolve import "./blockModel"`.
 
 - [ ] **Step 3: Implement**
@@ -707,7 +707,7 @@ Note: The tests name units by the line they start on and take the deepest one (a
 
 - [ ] **Step 4: Run them to see them pass**
 
-Run: `pnpm --filter @nimw/desktop exec vitest run --maxWorkers=2 src/markdown/blockModel.test.ts`
+Run: `pnpm --filter @liber/desktop exec vitest run --maxWorkers=2 src/markdown/blockModel.test.ts`
 Expected: PASS — `Tests  10 passed (10)`.
 
 - [ ] **Step 5: Commit**
@@ -851,7 +851,7 @@ describe('a large note (M4 §6)', () => {
 
 - [ ] **Step 2: Run them to see them fail**
 
-Run: `pnpm --filter @nimw/desktop exec vitest run --maxWorkers=2 src/markdown/blockMoves.test.ts`
+Run: `pnpm --filter @liber/desktop exec vitest run --maxWorkers=2 src/markdown/blockMoves.test.ts`
 Expected: FAIL — `Failed to resolve import "./blockMoves"`.
 
 - [ ] **Step 3: Implement**
@@ -1122,7 +1122,7 @@ Note: A full `parsePage` of 200 KB takes ~450 ms in jsdom — far over §6's 100
 
 - [ ] **Step 4: Run them to see them pass**
 
-Run: `pnpm --filter @nimw/desktop exec vitest run --maxWorkers=2 src/markdown`
+Run: `pnpm --filter @liber/desktop exec vitest run --maxWorkers=2 src/markdown`
 Expected: PASS — `blockMoves.test.ts` 11 passed (the 200 KB case: move + guard ~2.5 ms, first run ~12 ms); `Tests  146 passed (146)` in `src/markdown`.
 
 - [ ] **Step 5: Commit**
@@ -1288,7 +1288,7 @@ describe('moving table rows (M4 §3)', () => {
 
 - [ ] **Step 2: Run them to see them fail**
 
-Run: `pnpm --filter @nimw/desktop exec vitest run --maxWorkers=2 src/markdown/blockMoves.lists.test.ts`
+Run: `pnpm --filter @liber/desktop exec vitest run --maxWorkers=2 src/markdown/blockMoves.lists.test.ts`
 Expected: FAIL — `Tests  13 failed (13)` (`moveBlock` gives `null` for items and rows: `expected null to be '- c\n- a\n- b\n'`).
 
 - [ ] **Step 3: Implement**
@@ -1735,7 +1735,7 @@ Note: A one-item list and its item share a range: the tests take the item.
 
 - [ ] **Step 4: Run them to see them pass**
 
-Run: `pnpm --filter @nimw/desktop exec vitest run --maxWorkers=2 src/markdown`
+Run: `pnpm --filter @liber/desktop exec vitest run --maxWorkers=2 src/markdown`
 Expected: PASS — `Tests  159 passed (159)`.
 
 - [ ] **Step 5: Commit**
@@ -1938,7 +1938,7 @@ Modify `apps/desktop/src/markdown/blockMoves.test.ts` (apply this change):
 
 - [ ] **Step 2: Run them to see them fail**
 
-Run: `pnpm --filter @nimw/desktop exec vitest run --maxWorkers=2 src/markdown/blockMoves.test.ts src/markdown/blockMoves.sweep.test.ts`
+Run: `pnpm --filter @liber/desktop exec vitest run --maxWorkers=2 src/markdown/blockMoves.test.ts src/markdown/blockMoves.sweep.test.ts`
 Expected: FAIL — without the leading blank line: `a move next to a horizontal rule is not refused` → `expected 'refused' to be 'P0\n\nP1…'` (and 22 of 380 sweep moves were refused near `---`). With the guard switched off (`holdsTheSameBlocks` → true) the `hazards` note fails: `hazards: unit 0 (list) → {"scope":"top","before":6}` — the sweep catches corrupting moves.
 
 - [ ] **Step 3: Implement**
@@ -1966,7 +1966,7 @@ Note: The CodeMirror change-set check runs on LF notes only: the editor holds LF
 
 - [ ] **Step 4: Run them to see them pass**
 
-Run: `pnpm --filter @nimw/desktop exec vitest run --maxWorkers=2 src/markdown`
+Run: `pnpm --filter @liber/desktop exec vitest run --maxWorkers=2 src/markdown`
 Expected: PASS — `Tests  166 passed (166)`; counts per note: everything 380 moves (0 refused), tight 22, containers 36, lists 528, crlf 380, hazards (some refused, as it must).
 
 - [ ] **Step 5: Commit**
@@ -2130,7 +2130,7 @@ describe('moving blocks from the editor (M4 §5)', () => {
 
 - [ ] **Step 2: Run them to see them fail**
 
-Run: `pnpm --filter @nimw/desktop exec vitest run --maxWorkers=2 src/features/editor/blockCommands.test.ts`
+Run: `pnpm --filter @liber/desktop exec vitest run --maxWorkers=2 src/features/editor/blockCommands.test.ts`
 Expected: FAIL — `Failed to resolve import "./blockCommands"`. (Without `...blockKeymap` in `editorKeymap`, three tests fail: the item tests use a nested item so a line move can't pass for a block move.)
 
 - [ ] **Step 3: Implement**
@@ -2293,7 +2293,7 @@ Modify `apps/desktop/src/i18n/locales/es.json` (apply this change):
 
 - [ ] **Step 4: Run them to see them pass**
 
-Run: `pnpm --filter @nimw/desktop exec vitest run --maxWorkers=2 src/features/editor src/i18n && pnpm check:i18n`
+Run: `pnpm --filter @liber/desktop exec vitest run --maxWorkers=2 src/features/editor src/i18n && pnpm check:i18n`
 Expected: PASS — editor tests all green (`blockCommands.test.ts` 6, `Editor.test.tsx` incl. "Alt+↓ moves a list item in Live Preview too"); `i18n OK: 2 locales in parity.`
 
 - [ ] **Step 5: Commit**
@@ -2331,7 +2331,7 @@ Spec §4, §5 (amendment 5).
 
 **Interfaces:**
 - Consumes: Task 5 (`applyMove`, `modelFor`), Task 1 (`slotsFor`, `neighbourSlot`, `indentSlot`, `slotAt`).
-- Produces: `BlockGutter({ view, pane, shown })`, `Shown { text, page }`, `summaryOf(text, unit, t)`; `Preview` prop `onRendered(text, page)`; NoteEmbed `data-note-embed`; HTML blocks in `div[data-nimw="html"]` with their source range; the pane is `position: relative`; i18n `editor.blocks.{grip,moveUp,moveDown,indent,outdent,help,moved,picked,cancelled,slot.*,kinds.*}`.
+- Produces: `BlockGutter({ view, pane, shown })`, `Shown { text, page }`, `summaryOf(text, unit, t)`; `Preview` prop `onRendered(text, page)`; NoteEmbed `data-note-embed`; HTML blocks in `div[data-liber="html"]` with their source range; the pane is `position: relative`; i18n `editor.blocks.{grip,moveUp,moveDown,indent,outdent,help,moved,picked,cancelled,slot.*,kinds.*}`.
 
 - [ ] **Step 1: Write the failing test(s)**
 
@@ -2467,7 +2467,7 @@ Modify `apps/desktop/src/markdown/sanitize.test.ts` (apply this change):
  
 +  it('M4: an HTML block sits in a wrapper that carries its source range (the drag gutter needs one)', () => {
 +    const src = 'Before\n\n<div class="x">raw <b>html</b></div>\n\n<!-- note -->\n\nAfter\n';
-+    const wrappers = elements(render(src)).filter((e) => e.properties.dataNimw === 'html');
++    const wrappers = elements(render(src)).filter((e) => e.properties.dataLiber === 'html');
 +    expect(
 +      wrappers.map((w) =>
 +        src.slice(Number(w.properties.dataSourceStart), Number(w.properties.dataSourceEnd)),
@@ -2484,7 +2484,7 @@ Modify `apps/desktop/src/markdown/sanitize.test.ts` (apply this change):
 
 - [ ] **Step 2: Run them to see them fail**
 
-Run: `pnpm --filter @nimw/desktop exec vitest run --maxWorkers=2 src/features/editor/BlockGutter.test.tsx src/markdown/sanitize.test.ts`
+Run: `pnpm --filter @liber/desktop exec vitest run --maxWorkers=2 src/features/editor/BlockGutter.test.tsx src/markdown/sanitize.test.ts`
 Expected: FAIL — `BlockGutter.test.tsx`: 5 failed (no gutter; axe passes vacuously); `sanitize.test.ts`: `expected [] to deeply equal [ …(2) ]` (no HTML wrapper).
 
 - [ ] **Step 3: Implement**
@@ -3118,7 +3118,7 @@ Modify `apps/desktop/src/features/editor/livePreview.ts` (apply this change):
 +    }): boolean =>
 +      // The wrapper every HTML block gets (M4: the gutter's anchor) shows
 +      // only what's inside it.
-+      (n.type === 'element' && n.properties?.dataNimw !== 'html') ||
++      (n.type === 'element' && n.properties?.dataLiber !== 'html') ||
        (n.type === 'text' && typeof n.value === 'string' && n.value.trim() !== '') ||
        (n.children ?? []).some((c) => visible(c as never));
      empty = !visible(toSafeHast(parsePage(source), { sourcePath: '' }) as never);
@@ -3268,7 +3268,7 @@ Modify `apps/desktop/src/markdown/sanitize.ts` (apply this change):
 +    return el(
 +      'div',
 +      {
-+        dataNimw: 'html',
++        dataLiber: 'html',
 +        dataSourceStart: c.position.start.offset,
 +        dataSourceEnd: c.position.end.offset,
 +      },
@@ -3290,7 +3290,7 @@ Note: The M2c Live Preview check "an HTML block that renders nothing keeps its s
 
 - [ ] **Step 4: Run them to see them pass**
 
-Run: `pnpm --filter @nimw/desktop exec vitest run --maxWorkers=2 && pnpm lint && pnpm typecheck && pnpm check:i18n`
+Run: `pnpm --filter @liber/desktop exec vitest run --maxWorkers=2 && pnpm lint && pnpm typecheck && pnpm check:i18n`
 Expected: PASS — `Test Files  83 passed (83)`, `Tests  821 passed (821)`; lint, types and i18n clean.
 
 - [ ] **Step 5: Commit**
@@ -3441,7 +3441,7 @@ Modify `apps/desktop/src/features/editor/BlockGutter.test.tsx` (apply this chang
 
 - [ ] **Step 2: Run them to see them fail**
 
-Run: `pnpm --filter @nimw/desktop exec vitest run --maxWorkers=2 src/features/editor/BlockGutter.test.tsx`
+Run: `pnpm --filter @liber/desktop exec vitest run --maxWorkers=2 src/features/editor/BlockGutter.test.tsx`
 Expected: FAIL — the 4 drag tests (no drop line; source unchanged). The auto-scroll test fails with the scroll switched off.
 
 - [ ] **Step 3: Implement**
@@ -3651,7 +3651,7 @@ Note: jsdom has no layout: the tests give each block a 20 px box, 30 px apart.
 
 - [ ] **Step 4: Run them to see them pass**
 
-Run: `pnpm --filter @nimw/desktop exec vitest run --maxWorkers=2 src/features/editor && pnpm lint && pnpm typecheck`
+Run: `pnpm --filter @liber/desktop exec vitest run --maxWorkers=2 src/features/editor && pnpm lint && pnpm typecheck`
 Expected: PASS — `Tests  133 passed (133)` (then 134 with the auto-scroll test).
 
 - [ ] **Step 5: Commit**
@@ -3684,7 +3684,7 @@ Spec §4 (amendment 8).
 
 **Interfaces:**
 - Consumes: `CloseIcon`.
-- Produces: `SplitHint`, `HINT_KEY = "nimw.blockHintDismissed"`; i18n `editor.blocks.{hint,dismissHint}`.
+- Produces: `SplitHint`, `HINT_KEY = "liber.blockHintDismissed"`; i18n `editor.blocks.{hint,dismissHint}`.
 
 - [ ] **Step 1: Write the failing test(s)**
 
@@ -3748,7 +3748,7 @@ describe('the Split hint (M4 §4)', () => {
 
 - [ ] **Step 2: Run them to see them fail**
 
-Run: `pnpm --filter @nimw/desktop exec vitest run --maxWorkers=2 src/features/editor/SplitHint.test.tsx`
+Run: `pnpm --filter @liber/desktop exec vitest run --maxWorkers=2 src/features/editor/SplitHint.test.tsx`
 Expected: FAIL — `Failed to resolve import "./SplitHint"`.
 
 - [ ] **Step 3: Implement**
@@ -3828,7 +3828,7 @@ import { useTranslation } from 'react-i18next';
 import { CloseIcon } from '../../app/icons';
 import styles from './BlockGutter.module.css';
 
-export const HINT_KEY = 'nimw.blockHintDismissed';
+export const HINT_KEY = 'liber.blockHintDismissed';
 
 function dismissed(): boolean {
   try {
@@ -3908,7 +3908,7 @@ Modify `apps/desktop/src/i18n/locales/es.json` (apply this change):
 
 - [ ] **Step 4: Run them to see them pass**
 
-Run: `pnpm --filter @nimw/desktop exec vitest run --maxWorkers=2 && pnpm lint && pnpm typecheck && pnpm check:i18n`
+Run: `pnpm --filter @liber/desktop exec vitest run --maxWorkers=2 && pnpm lint && pnpm typecheck && pnpm check:i18n`
 Expected: PASS — `Test Files  84 passed (84)`, `Tests  829 passed (829)`.
 
 - [ ] **Step 5: Commit**
@@ -3972,7 +3972,7 @@ Modify `apps/desktop/src/features/editor/BlockGutter.test.tsx` (apply this chang
 
 - [ ] **Step 2: Run them to see them fail**
 
-Run: `pnpm --filter @nimw/desktop exec vitest run --maxWorkers=2 src/features/editor/BlockGutter.test.tsx`
+Run: `pnpm --filter @liber/desktop exec vitest run --maxWorkers=2 src/features/editor/BlockGutter.test.tsx`
 Expected: FAIL — without the immediate render: `expected 'P1' to be 'P2'`; without the key guard: `expected 'P2 picked up. Arrow keys choose where…' to be 'Moved P2.'`. (Found by the e2e of Task 10: keys right after a move acted on the old blocks, so a pick-up dropped nothing.)
 
 - [ ] **Step 3: Implement**
@@ -4112,7 +4112,7 @@ Modify `apps/desktop/src/features/preview/Preview.tsx` (apply this change):
 
 - [ ] **Step 4: Run them to see them pass**
 
-Run: `pnpm --filter @nimw/desktop exec vitest run --maxWorkers=2 src/features/editor/BlockGutter.test.tsx`
+Run: `pnpm --filter @liber/desktop exec vitest run --maxWorkers=2 src/features/editor/BlockGutter.test.tsx`
 Expected: PASS — `Tests  12 passed (12)`.
 
 - [ ] **Step 5: Commit**
@@ -4287,7 +4287,7 @@ Modify `apps/desktop/e2e/zero-network.spec.ts` (apply this change):
 +  await page.waitForLoadState('networkidle');
 +  await page.waitForTimeout(300);
 +  const csp = await page.evaluate(
-+    () => (window as unknown as { __nimwCspViolations: string[] }).__nimwCspViolations,
++    () => (window as unknown as { __liberCspViolations: string[] }).__liberCspViolations,
 +  );
 +  expect(problems).toEqual([]);
 +  expect(csp).toEqual([]);
@@ -4297,7 +4297,7 @@ Modify `apps/desktop/e2e/zero-network.spec.ts` (apply this change):
 
 - [ ] **Step 2: Run them to see them fail**
 
-Run: `pnpm --filter @nimw/desktop exec vite build && PLAYWRIGHT_BROWSERS_PATH=<browsers> pnpm --filter @nimw/desktop exec playwright test e2e/m4.spec.ts`
+Run: `pnpm --filter @liber/desktop exec vite build && PLAYWRIGHT_BROWSERS_PATH=<browsers> pnpm --filter @liber/desktop exec playwright test e2e/m4.spec.ts`
 Expected: FAIL before Task 9 — the keyboard test in both engines (the pick-up dropped nothing: the source stayed `P2, P1, P3`).
 
 - [ ] **Step 3: Implement**
@@ -4320,7 +4320,7 @@ Note: The keyboard test waits for the pane to show the move before the next keys
 
 - [ ] **Step 4: Run them to see them pass**
 
-Run: `PLAYWRIGHT_BROWSERS_PATH=<browsers> pnpm --filter @nimw/desktop exec playwright test e2e/m4.spec.ts --repeat-each=3 && PLAYWRIGHT_BROWSERS_PATH=<browsers> pnpm --filter @nimw/desktop exec playwright test e2e/zero-network.spec.ts`
+Run: `PLAYWRIGHT_BROWSERS_PATH=<browsers> pnpm --filter @liber/desktop exec playwright test e2e/m4.spec.ts --repeat-each=3 && PLAYWRIGHT_BROWSERS_PATH=<browsers> pnpm --filter @liber/desktop exec playwright test e2e/zero-network.spec.ts`
 Expected: PASS — `36 passed` (6 tests × 2 engines × 3); the zero-network cases pass. Full gate (`check.sh all`): vitest 830 (84 files), e2e 110, cargo/clippy/fmt/deny clean.
 
 - [ ] **Step 5: Commit**
@@ -4395,7 +4395,7 @@ Modify `apps/desktop/src/markdown/blockMoves.ts` (apply this change):
 
 - [ ] **Step 3: Run them to see them pass**
 
-Run: `pnpm --filter @nimw/desktop exec vitest run --maxWorkers=2 src/markdown src/features/editor`
+Run: `pnpm --filter @liber/desktop exec vitest run --maxWorkers=2 src/markdown src/features/editor`
 Expected: PASS — `Tests  305 passed (305)`; the grep lists only a test file. Bundle scan: no new regex lookbehind, `color-mix(` or `structuredClone`.
 
 - [ ] **Step 4: Commit**
@@ -4452,7 +4452,7 @@ Modify `apps/desktop/src/features/editor/blockCommands.test.ts` (apply this chan
 
 - [ ] **Step 2: Run them to see them fail**
 
-Run: `pnpm --filter @nimw/desktop exec vitest run --maxWorkers=2 src/features/editor/blockCommands.test.ts`
+Run: `pnpm --filter @liber/desktop exec vitest run --maxWorkers=2 src/features/editor/blockCommands.test.ts`
 Expected: FAIL — `after the first, Alt+↑ in a 200 KB note takes well under 100 ms` → `expected 145.9 to be less than 100`.
 
 - [ ] **Step 3: Implement**
@@ -4491,7 +4491,7 @@ Note: The first move in a large note opened in Source still pays a full parse (~
 
 - [ ] **Step 4: Run them to see them pass**
 
-Run: `pnpm --filter @nimw/desktop exec vitest run --maxWorkers=2 src/markdown src/features/editor/blockCommands.test.ts`
+Run: `pnpm --filter @liber/desktop exec vitest run --maxWorkers=2 src/markdown src/features/editor/blockCommands.test.ts`
 Expected: PASS — `Tests  175 passed (175)`.
 
 - [ ] **Step 5: Commit**
@@ -4601,7 +4601,7 @@ Modify `apps/desktop/src/test/fakeDisk.ts` (apply this change):
 
 - [ ] **Step 2: Run them to see them fail**
 
-Run: `pnpm --filter @nimw/desktop exec vitest run --maxWorkers=2 src/features/editor/BlockGutter.test.tsx`
+Run: `pnpm --filter @liber/desktop exec vitest run --maxWorkers=2 src/features/editor/BlockGutter.test.tsx`
 Expected: FAIL — the embed's group was named "! Other" (`Unable to find … group "Other"`); with the `[data-note-embed]` filter removed the embedded-note pin fails (`expect(element).not.toBeInTheDocument()` — the other note's paragraph at offset 12 was taken for this page's P2).
 
 - [ ] **Step 3: Implement**
@@ -4625,7 +4625,7 @@ Note: The pin types once after the embed loads: the gutter maps blocks again on 
 
 - [ ] **Step 4: Run them to see them pass**
 
-Run: `pnpm --filter @nimw/desktop exec vitest run --maxWorkers=2`
+Run: `pnpm --filter @liber/desktop exec vitest run --maxWorkers=2`
 Expected: PASS — `Test Files  84 passed (84)`, `Tests  834 passed (834)`.
 
 - [ ] **Step 5: Commit**
@@ -4670,7 +4670,7 @@ Modify `apps/desktop/e2e/m4.spec.ts` (apply this change):
 + *  long note is read from what was written). */
 +const saved = (page: Page) =>
 +  page.evaluate(() => {
-+    const writes = (window as unknown as { __nimwWrites?: { text: string }[] }).__nimwWrites ?? [];
++    const writes = (window as unknown as { __liberWrites?: { text: string }[] }).__liberWrites ?? [];
 +    return writes.length ? writes[writes.length - 1].text : null;
 +  });
 +
@@ -4726,12 +4726,12 @@ Modify `apps/desktop/src/markdown/blockMoves.sweep.test.ts` (apply this change):
 
 - [ ] **Step 2: Run them to see them fail**
 
-Run: `pnpm --filter @nimw/desktop exec vitest run --maxWorkers=2 src/markdown/blockMoves.sweep.test.ts && PLAYWRIGHT_BROWSERS_PATH=<browsers> pnpm --filter @nimw/desktop exec playwright test e2e/m4.spec.ts -g scrolled`
+Run: `pnpm --filter @liber/desktop exec vitest run --maxWorkers=2 src/markdown/blockMoves.sweep.test.ts && PLAYWRIGHT_BROWSERS_PATH=<browsers> pnpm --filter @liber/desktop exec playwright test e2e/m4.spec.ts -g scrolled`
 Expected: PASS for the sweep (pins of working behaviour). The e2e first failed on its own helper: CodeMirror renders only the lines in view, so a long note is read from the last autosave instead.
 
 - [ ] **Step 3: Run them to see them pass**
 
-Run: `PLAYWRIGHT_BROWSERS_PATH=<browsers> pnpm --filter @nimw/desktop exec playwright test e2e/m4.spec.ts --repeat-each=2`
+Run: `PLAYWRIGHT_BROWSERS_PATH=<browsers> pnpm --filter @liber/desktop exec playwright test e2e/m4.spec.ts --repeat-each=2`
 Expected: PASS — `28 passed`.
 
 - [ ] **Step 4: Commit**

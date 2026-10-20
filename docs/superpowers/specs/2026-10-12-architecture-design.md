@@ -1,4 +1,4 @@
-# Notes In My Way — Architecture Design (plan doc v1)
+# Liber Linteum — Architecture Design (plan doc v1)
 
 > **Status:** Approved in design review · **Date:** 2026-10-12
 > **Roles:** Jose — tech lead (decisions below are DECIDED) · PO — product owner
@@ -12,14 +12,14 @@
 
 | Area | v1 design said | As built |
 |------|----------------|----------|
-| Crates | 5: vault, markdown, index, audio, import | 7: plus **`nimw-session`** (one open vault: indexing, watching and every file operation, composed from the others) and **`nimw-testkit`** (fixtures, generated vaults). `nimw-audio` and `nimw-import` are still stubs (M6, M7). The index depends on `nimw-markdown` only; the session ties vault, markdown and index together. |
+| Crates | 5: vault, markdown, index, audio, import | 7: plus **`liber-session`** (one open vault: indexing, watching and every file operation, composed from the others) and **`liber-testkit`** (fixtures, generated vaults). `liber-audio` and `liber-import` are still stubs (M6, M7). The index depends on `liber-markdown` only; the session ties vault, markdown and index together. |
 | Global View layout | elkjs in a web worker | Own deterministic layouts in `features/global-view/layout.ts`; no elkjs (M3a). Edges are one SVG layer, not React Flow edges. |
 | HTML sanitizing | DOMPurify | `hast-util-sanitize` with an explicit schema, in the remark/rehype pipeline. |
 | File watching | `notify` + a debouncer crate | `notify` with the app's own batching (200 ms quiet, 2 s cap), because the debouncer crates drop macOS deletes or rescan signals. |
-| Trash (EXP-03) | OS trash via the `trash` crate | Delete moves items to the vault's own **`.trash/`** with a record in `.nimw/trash.json` (M5b §5); **Delete from vault** and **Empty Trash** send them on to the OS trash. **Archive** moves items to `.archive/` and keeps them indexed, read-only. |
-| Asset protocol | `asset:` | A custom **`nimw-asset:`** scheme (CSP `img-src`/`media-src`), scoped per window: the vault for the main window, the file's folder for a single-file window; outside files only when a saved note links them (M4b part 3 §15). |
+| Trash (EXP-03) | OS trash via the `trash` crate | Delete moves items to the vault's own **`.trash/`** with a record in `.liber/trash.json` (M5b §5); **Delete from vault** and **Empty Trash** send them on to the OS trash. **Archive** moves items to `.archive/` and keeps them indexed, read-only. |
+| Asset protocol | `asset:` | A custom **`liber-asset:`** scheme (CSP `img-src`/`media-src`), scoped per window: the vault for the main window, the file's folder for a single-file window; outside files only when a saved note links them (M4b part 3 §15). |
 | Index schema (§3.2) | v1 sketch | **Schema 5** (batch 6: text files in `page_text`/`fts`): `files`, `pages` (incl. `cover_x`, `icon`), `tags`, `links` (byte offsets, resolved `target_path`), `page_text` + FTS5 external-content `fts`, `meta`. See `docs/architecture/index-and-database.md`. |
-| `vault.json` (§3.1) | `version`, `viewMode`, `indexPicks`, `exclude`, `attachments` | Also `attachmentLinkFormat`, `pageWidth`, `pageWidths`, `coverHeights`, `coverSides`, `coverWidths`, `autoNamed`, `scratchpadFolder`, `icon`, `folderIcons`, `favorites`, `folderSorts`; unknown keys are kept. Plus `.nimw/trash.json` and `.nimw/archive.json`. |
+| `vault.json` (§3.1) | `version`, `viewMode`, `indexPicks`, `exclude`, `attachments` | Also `attachmentLinkFormat`, `pageWidth`, `pageWidths`, `coverHeights`, `coverSides`, `coverWidths`, `autoNamed`, `scratchpadFolder`, `icon`, `folderIcons`, `favorites`, `folderSorts`; unknown keys are kept. Plus `.liber/trash.json` and `.liber/archive.json`. |
 | Frontmatter keys (§3.3) | `cover`, `cover-y`, `subtitle`, `tags`, `related` | Also `cover-x` (side covers) and `icon` (the page's emoji). |
 | Windows | one window | The vault window (`main`) plus **single-file windows** (`file-<n>`) with their own capability file `capabilities/file.json` and per-window path grants (M4c). |
 | Shell | top bar with view switch, search, settings, close | No top bar (M5b): native menus (Settings, a **Vault** menu), a floating action button (Search ⌘F, Global View ⌘2, Edit ⌘1), a collapsible sidebar, the title in the page's cover band. |
@@ -74,11 +74,11 @@ notes-in-my-way/
 │  │  └─ theme/               tokens (light, dark), bundled fonts
 │  └─ src-tauri/              thin shell: commands, events, CSP, capabilities, app state
 ├─ crates/
-│  ├─ nimw-vault/             FS model, scan, watch, atomic CAS writes, trash, link rewrite
-│  ├─ nimw-markdown/          metadata extraction (title, frontmatter, tags, links, embeds, offsets)
-│  ├─ nimw-index/             SQLite schema, incremental indexing, level/neighborhood/search queries
-│  ├─ nimw-audio/             devices, capture thread, level meter, WAV/MP3 encoders
-│  └─ nimw-import/            Notion export importer
+│  ├─ liber-vault/             FS model, scan, watch, atomic CAS writes, trash, link rewrite
+│  ├─ liber-markdown/          metadata extraction (title, frontmatter, tags, links, embeds, offsets)
+│  ├─ liber-index/             SQLite schema, incremental indexing, level/neighborhood/search queries
+│  ├─ liber-audio/             devices, capture thread, level meter, WAV/MP3 encoders
+│  └─ liber-import/            Notion export importer
 ├─ fixtures/                  shared Markdown fixtures + expected outputs (Rust and TS)
 ├─ design/                    prototype reference (not shipped)
 └─ docs/                      product spec, this doc, ADRs
@@ -87,7 +87,7 @@ notes-in-my-way/
 **Rules**
 1. `crates/*` never depend on Tauri. They are tested with plain `cargo test`. `src-tauri` only adapts them to commands/events.
 2. The UI never touches the filesystem; everything goes through `src/ipc/`. That module *is* the backend capability surface.
-3. Dependency direction: `nimw-index → nimw-markdown`, `nimw-index → nimw-vault` (types only), `nimw-import → nimw-markdown`. No cycles; `nimw-audio` is standalone.
+3. Dependency direction: `liber-index → liber-markdown`, `liber-index → liber-vault` (types only), `liber-import → liber-markdown`. No cycles; `liber-audio` is standalone.
 4. Two parsers exist (Rust extraction, TS rendering). Both are tested against `fixtures/`; a divergence fails CI.
 
 ---
@@ -99,9 +99,9 @@ notes-in-my-way/
 | Data | Location | Notes |
 |------|----------|-------|
 | Notes, attachments | the vault (plain files) | source of truth |
-| Per-vault app data | `<vault>/.nimw/vault.json`, `<vault>/.nimw/layout.json` | Hidden folder (Obsidian ignores it). Created lazily on first need, so opening a vault writes nothing (VLT-02). |
-| Global settings | OS config dir `nimw/settings.json` | language, theme, default recording format, recent vaults |
-| Index cache | OS cache dir `nimw/<sha256(vault-abs-path)[..16]>/index.sqlite` | Disposable, rebuildable; never inside the vault |
+| Per-vault app data | `<vault>/.liber/vault.json`, `<vault>/.liber/layout.json` | Hidden folder (Obsidian ignores it). Created lazily on first need, so opening a vault writes nothing (VLT-02). |
+| Global settings | OS config dir `liber/settings.json` | language, theme, default recording format, recent vaults |
+| Index cache | OS cache dir `liber/<sha256(vault-abs-path)[..16]>/index.sqlite` | Disposable, rebuildable; never inside the vault |
 
 `vault.json`: `{ "version": 1, "viewMode": "drill"|"expand", "indexPicks": { "<folderPath>": "<pagePath>" }, "exclude": ["<glob>"], "attachments": { "mode": "vault"|"same"|"subfolder", "path": "attachments" } }`
 `layout.json`: `{ "version": 1, "levels": { "<levelKey>": { "<nodePath>": { "x": 0, "y": 0 } } } }` where `levelKey` is the drilled path (`""` = level 0) or `expand:<rootPath>`.
@@ -195,7 +195,7 @@ Dot-folders are ignored everywhere. Attachment folders are hidden from the Globa
 
 ## 5. Audio, attachments, import
 
-### 5.1 Recording (`nimw-audio`)
+### 5.1 Recording (`liber-audio`)
 - `audio_devices()` lists inputs (AUD-01). `audio_start(device, format, targetDir)` spawns a capture thread writing to `.clip-<ts>.part`; emits `audio:level` (RMS/peak, ~20 Hz) and elapsed time (AUD-07).
 - `audio_stop()` → rename to `clip-YYYYMMDD-HHMMSS.{wav|mp3}` → UI inserts `![[…]]` at the cursor in one transaction (AUD-04). `audio_cancel()` deletes the part file.
 - WAV: 16-bit PCM at the device rate. MP3: LAME 192 kbps CBR. Default from settings (WAV); switchable per take (AUD-02).
@@ -208,7 +208,7 @@ Dot-folders are ignored everywhere. Attachment folders are hidden from the Globa
 ### 5.3 Images and covers
 `save_attachment(bytes, name, pagePath)` resolves the attachments folder (mode or Obsidian `attachmentFolderPath`), de-duplicates (`name 1.png`), writes atomically, returns the vault path; the UI inserts `![[name.png]]` (ED-05). Covers: pick from vault or upload; vertical drag sets `cover-y` (PG-02).
 
-### 5.4 Notion importer (`nimw-import`, IMP-*)
+### 5.4 Notion importer (`liber-import`, IMP-*)
 1. Input: Notion "Markdown & CSV" export zip, nested zips included. Unzip to a temp dir.
 2. Strip trailing 32-hex IDs from names; resolve collisions with ` 1`, ` 2` suffixes.
 3. Rewrite internal links to `[[Page]]` and asset links to vault-relative embeds.

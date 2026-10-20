@@ -18,11 +18,11 @@ use tauri::{App, Manager, RunEvent, WindowEvent};
 /// The app exactly as `run()` builds it (plus the menu on macOS), on the mock
 /// runtime; its main window comes from tauri.conf.json.
 fn build_app(tag: &str) -> App<MockRuntime> {
-    let dirs = nimw_desktop::AppDirs {
-        config: std::env::temp_dir().join(format!("nimw-menu-{tag}-cfg-{}", std::process::id())),
-        cache: std::env::temp_dir().join(format!("nimw-menu-{tag}-cache-{}", std::process::id())),
+    let dirs = liber_desktop::AppDirs {
+        config: std::env::temp_dir().join(format!("liber-menu-{tag}-cfg-{}", std::process::id())),
+        cache: std::env::temp_dir().join(format!("liber-menu-{tag}-cache-{}", std::process::id())),
     };
-    nimw_desktop::menu::with_app_menu(nimw_desktop::configure(mock_builder(), Some(dirs)))
+    liber_desktop::menu::with_app_menu(liber_desktop::configure(mock_builder(), Some(dirs)))
         .build(tauri::generate_context!())
         .expect("failed to build app with the real context")
 }
@@ -89,8 +89,8 @@ fn macos_menu_quit_is_ours_and_the_standard_items_stay() {
     let (_, app_items) = &outline[0];
     assert!(
         app_items.iter().any(|(kind, id, text)| *kind == "item"
-            && id == nimw_desktop::menu::QUIT_ID
-            && text == "Quit Notes In My Way"),
+            && id == liber_desktop::menu::QUIT_ID
+            && text == "Quit Liber Linteum"),
         "custom Quit missing from the app menu: {outline:?}"
     );
     let app_texts: Vec<&String> = app_items.iter().map(|(_, _, t)| t).collect();
@@ -138,7 +138,9 @@ fn macos_menu_quit_is_ours_and_the_standard_items_stay() {
     // M4c §2: File → New Quick Note, right after the app menu.
     assert_eq!(outline[1].0, "File", "{outline:?}");
     assert!(
-        texts("File").iter().any(|t| t == "New Quick Note"),
+        texts("File")
+            .iter()
+            .any(|t| t == "Create New Scratchpad in This Vault"),
         "{outline:?}"
     );
     // M4c §3: File → Open File… (⌘⇧O; ⌘O opens a folder as a vault).
@@ -183,10 +185,10 @@ fn menu_events_reach_one_window_only() {
                 }
             }
             for id in [
-                nimw_desktop::menu::OPEN_FILE_ID,
-                nimw_desktop::menu::TOOLBAR_ID,
+                liber_desktop::menu::OPEN_FILE_ID,
+                liber_desktop::menu::TOOLBAR_ID,
             ] {
-                nimw_desktop::menu::on_menu_event(
+                liber_desktop::menu::on_menu_event(
                     handle,
                     MenuEvent {
                         id: MenuId::new(id),
@@ -224,10 +226,10 @@ fn quit_menu_item_requests_the_window_close_like_the_close_button() {
                     let _ = window.destroy();
                 }
             });
-            nimw_desktop::menu::on_menu_event(
+            liber_desktop::menu::on_menu_event(
                 handle,
                 MenuEvent {
-                    id: MenuId::new(nimw_desktop::menu::QUIT_ID),
+                    id: MenuId::new(liber_desktop::menu::QUIT_ID),
                 },
             );
         }
@@ -262,8 +264,11 @@ fn back_and_forward_items_emit_menu_navigate() {
             main_window(handle).listen("menu:navigate", move |e| {
                 log.lock().unwrap().push(e.payload().to_string());
             });
-            for id in [nimw_desktop::menu::BACK_ID, nimw_desktop::menu::FORWARD_ID] {
-                nimw_desktop::menu::on_menu_event(
+            for id in [
+                liber_desktop::menu::BACK_ID,
+                liber_desktop::menu::FORWARD_ID,
+            ] {
+                liber_desktop::menu::on_menu_event(
                     handle,
                     MenuEvent {
                         id: MenuId::new(id),
@@ -294,11 +299,11 @@ fn toggle_items_emit_menu_toggle() {
                 log.lock().unwrap().push(e.payload().to_string());
             });
             for id in [
-                nimw_desktop::menu::TOOLBAR_ID,
-                nimw_desktop::menu::LINE_NUMBERS_ID,
-                nimw_desktop::menu::OUTLINE_ID,
+                liber_desktop::menu::TOOLBAR_ID,
+                liber_desktop::menu::LINE_NUMBERS_ID,
+                liber_desktop::menu::OUTLINE_ID,
             ] {
-                nimw_desktop::menu::on_menu_event(
+                liber_desktop::menu::on_menu_event(
                     handle,
                     MenuEvent {
                         id: MenuId::new(id),
@@ -333,11 +338,11 @@ fn screen_items_emit_menu_screen() {
                 log.lock().unwrap().push(e.payload().to_string());
             });
             for id in [
-                nimw_desktop::menu::EDITOR_ID,
-                nimw_desktop::menu::GLOBAL_VIEW_ID,
-                nimw_desktop::menu::ATOMS_ID,
+                liber_desktop::menu::EDITOR_ID,
+                liber_desktop::menu::GLOBAL_VIEW_ID,
+                liber_desktop::menu::ATOMS_ID,
             ] {
-                nimw_desktop::menu::on_menu_event(
+                liber_desktop::menu::on_menu_event(
                     handle,
                     MenuEvent {
                         id: MenuId::new(id),
@@ -375,14 +380,14 @@ fn quick_note_item_emits_menu_quick_note() {
                 .unwrap();
             for (window, name) in [(main, "main"), (file, "file-1")] {
                 let log = log.clone();
-                window.listen(nimw_desktop::menu::QUICK_NOTE_EVENT, move |_| {
+                window.listen(liber_desktop::menu::QUICK_NOTE_EVENT, move |_| {
                     log.lock().unwrap().push(name.to_string());
                 });
             }
-            nimw_desktop::menu::on_menu_event(
+            liber_desktop::menu::on_menu_event(
                 handle,
                 MenuEvent {
-                    id: MenuId::new(nimw_desktop::menu::QUICK_NOTE_ID),
+                    id: MenuId::new(liber_desktop::menu::QUICK_NOTE_ID),
                 },
             );
             for window in handle.webview_windows().into_values() {
@@ -406,14 +411,14 @@ fn notion_import_item_emits_to_main() {
                 .unwrap();
             for (window, name) in [(main_window(handle), "main"), (file, "file-1")] {
                 let log = log.clone();
-                window.listen(nimw_desktop::menu::NOTION_IMPORT_EVENT, move |_| {
+                window.listen(liber_desktop::menu::NOTION_IMPORT_EVENT, move |_| {
                     log.lock().unwrap().push(name.to_string());
                 });
             }
-            nimw_desktop::menu::on_menu_event(
+            liber_desktop::menu::on_menu_event(
                 handle,
                 MenuEvent {
-                    id: MenuId::new(nimw_desktop::menu::NOTION_IMPORT_ID),
+                    id: MenuId::new(liber_desktop::menu::NOTION_IMPORT_ID),
                 },
             );
             for window in handle.webview_windows().into_values() {
@@ -447,13 +452,13 @@ fn m5b_items_emit_their_events() {
                 }
             }
             for id in [
-                nimw_desktop::menu::SETTINGS_ID,
-                nimw_desktop::menu::VAULT_OPEN_ID,
-                nimw_desktop::menu::VAULT_CLOSE_ID,
-                nimw_desktop::menu::SAVE_ID,
-                nimw_desktop::menu::SIDEBAR_ID,
+                liber_desktop::menu::SETTINGS_ID,
+                liber_desktop::menu::VAULT_OPEN_ID,
+                liber_desktop::menu::VAULT_CLOSE_ID,
+                liber_desktop::menu::SAVE_ID,
+                liber_desktop::menu::SIDEBAR_ID,
             ] {
-                nimw_desktop::menu::on_menu_event(
+                liber_desktop::menu::on_menu_event(
                     handle,
                     MenuEvent {
                         id: MenuId::new(id),

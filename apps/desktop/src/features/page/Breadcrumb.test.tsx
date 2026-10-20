@@ -36,6 +36,30 @@ describe('Breadcrumb (M2a §5)', () => {
     expect(screen.getByText('rex')).toHaveAttribute('aria-current', 'page');
   });
 
+  it("round 3b §6.5: a folder page doesn't repeat its folder; its icon falls back to the folder's", () => {
+    const withPage: TreeNode[] = [
+      { path: 'Cyber', kind: 'folder' },
+      { path: 'Cyber/Linux', kind: 'folder', icon: '🐧' },
+      { path: 'Cyber/Linux/Linux.md', kind: 'page' },
+    ];
+    act(() => useVaultStore.setState({ nodes: withPage, children: childrenByParent(withPage) }));
+    const { unmount } = render(<Breadcrumb path="Cyber/Linux/Linux.md" />);
+    const nav = screen.getByRole('navigation', { name: 'Breadcrumb' });
+    expect([...nav.querySelectorAll('li')].map((li) => li.textContent)).toEqual([
+      'My Vault',
+      'Cyber',
+      '🐧Linux',
+    ]);
+    expect(nav.querySelector('[aria-current="page"]')).toHaveTextContent('Linux');
+    unmount();
+    const iconed = withPage.map((n) => (n.kind === 'page' ? { ...n, icon: '🛡️' } : n));
+    act(() => useVaultStore.setState({ nodes: iconed, children: childrenByParent(iconed) }));
+    render(<Breadcrumb path="Cyber/Linux/Linux.md" />);
+    expect(
+      screen.getByRole('navigation', { name: 'Breadcrumb' }).querySelector('[aria-current="page"]'),
+    ).toHaveTextContent('🛡️Linux');
+  });
+
   it('a folder segment expands its chain in the explorer and focuses it', async () => {
     render(
       <>

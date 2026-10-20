@@ -1,6 +1,6 @@
 //! Serializable shapes returned to the UI (M1b spec §2.4), all camelCase.
 
-use nimw_session::{IndexReport, RenameOutcome};
+use liber_session::{IndexReport, RenameOutcome};
 use serde::Serialize;
 
 #[derive(Debug, Clone, Serialize)]
@@ -80,6 +80,8 @@ pub struct RenameOutcomeDto {
     pub updated_files: Vec<String>,
     pub updated_links: usize,
     pub failed: Vec<(String, String)>,
+    /// Round 3b §6.3: the folder page's second rename, `[from, to]` or null.
+    pub pair: Option<(String, String)>,
 }
 
 impl From<RenameOutcome> for RenameOutcomeDto {
@@ -89,6 +91,7 @@ impl From<RenameOutcome> for RenameOutcomeDto {
             updated_files: o.updated_files,
             updated_links: o.updated_links,
             failed: o.failed,
+            pair: o.pair,
         }
     }
 }
@@ -124,8 +127,8 @@ pub struct AttachedDto {
     pub copied: bool,
 }
 
-impl From<nimw_session::Attached> for AttachedDto {
-    fn from(a: nimw_session::Attached) -> AttachedDto {
+impl From<liber_session::Attached> for AttachedDto {
+    fn from(a: liber_session::Attached) -> AttachedDto {
         AttachedDto {
             path: a.path.to_string(),
             link: a.link,
@@ -162,7 +165,7 @@ pub struct LinkSuggestionDto {
     pub target: String,
 }
 
-/// `.nimw/vault.json` attachments: `vault` | `same` | `subfolder` | `folder`.
+/// `.liber/vault.json` attachments: `vault` | `same` | `subfolder` | `folder`.
 #[derive(Debug, Clone, Serialize, serde::Deserialize, PartialEq, Eq)]
 pub struct AttachmentsDto {
     pub mode: String,
@@ -176,22 +179,22 @@ pub struct VaultSettingsDto {
     pub attachments: AttachmentsDto,
     /// Obsidian's `attachmentFolderPath` when set (it wins unless overridden).
     pub obsidian: Option<String>,
-    /// NIMW's place wins over Obsidian's (M4b §5).
+    /// Liber Linteum's place wins over Obsidian's (M4b §5).
     pub override_obsidian: bool,
     /// The vault's default page width (`None`: the app's; M4b part 2 §1).
-    pub page_width: Option<nimw_vault::PageWidth>,
+    pub page_width: Option<liber_vault::PageWidth>,
     /// Pages with their own width.
-    pub page_widths: std::collections::BTreeMap<String, nimw_vault::PageWidth>,
+    pub page_widths: std::collections::BTreeMap<String, liber_vault::PageWidth>,
     /// Pages with their own cover height in px (cover resize).
     pub cover_heights: std::collections::BTreeMap<String, u32>,
     /// Pages whose cover sits beside the text: `"left" | "right"` (M4b part 3 §3).
     pub cover_sides: std::collections::BTreeMap<String, &'static str>,
     /// Side covers' own strip widths in px (§3).
     pub cover_widths: std::collections::BTreeMap<String, u32>,
-    /// NIMW's own link format for new attachments (M4b part 3 §8).
-    pub attachment_link_format: Option<nimw_vault::LinkFormat>,
-    /// Obsidian's `newLinkFormat`, as NIMW reads it (applies while NIMW has none).
-    pub obsidian_link_format: Option<nimw_vault::LinkFormat>,
+    /// Liber Linteum's own link format for new attachments (M4b part 3 §8).
+    pub attachment_link_format: Option<liber_vault::LinkFormat>,
+    /// Obsidian's `newLinkFormat`, as Liber Linteum reads it (applies while Liber Linteum has none).
+    pub obsidian_link_format: Option<liber_vault::LinkFormat>,
 }
 
 #[derive(Debug, Clone, serde::Deserialize)]
@@ -244,9 +247,9 @@ pub struct GvCardDto {
     pub relation: Option<&'static str>,
 }
 
-impl From<nimw_session::GvCard> for GvCardDto {
-    fn from(c: nimw_session::GvCard) -> GvCardDto {
-        use nimw_session::{CardKind, IndexFrom, Relation};
+impl From<liber_session::GvCard> for GvCardDto {
+    fn from(c: liber_session::GvCard) -> GvCardDto {
+        use liber_session::{CardKind, IndexFrom, Relation};
         GvCardDto {
             path: c.path,
             kind: match c.kind {
@@ -307,14 +310,14 @@ pub struct GvEdgeDto {
     pub label: Option<String>,
 }
 
-impl From<nimw_session::GvEdge> for GvEdgeDto {
-    fn from(e: nimw_session::GvEdge) -> GvEdgeDto {
+impl From<liber_session::GvEdge> for GvEdgeDto {
+    fn from(e: liber_session::GvEdge) -> GvEdgeDto {
         GvEdgeDto {
             from: e.from,
             to: e.to,
             kind: match e.kind {
-                nimw_session::EdgeKind::Link => "link",
-                nimw_session::EdgeKind::Manual => "manual",
+                liber_session::EdgeKind::Link => "link",
+                liber_session::EdgeKind::Manual => "manual",
             },
             count: e.count,
             aggregated: e.aggregated,

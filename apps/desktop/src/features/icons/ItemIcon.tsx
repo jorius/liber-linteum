@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useRef, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import type { TreeNode } from '../../ipc';
@@ -63,8 +63,8 @@ export function IconButton({
   className?: string;
   /** The button's own name, when "Add icon" / "Change icon" isn't enough. */
   label?: string;
-  /** Shown instead of the icon (the explorer row's ☺ action). */
-  glyph?: string;
+  /** Shown instead of the icon, at full contrast (the explorer row's action). */
+  glyph?: ReactNode;
   tabIndex?: number;
 }) {
   const { t } = useTranslation();
@@ -86,7 +86,7 @@ export function IconButton({
         ref={button}
         type="button"
         className={className ? `${styles.iconButton} ${className}` : styles.iconButton}
-        data-empty={icon ? undefined : ''}
+        data-empty={icon || glyph ? undefined : ''}
         aria-label={label ?? t(icon ? 'icons.changeFor' : 'icons.addFor', { name })}
         aria-haspopup="dialog"
         aria-expanded={open}

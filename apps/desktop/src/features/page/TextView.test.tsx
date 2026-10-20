@@ -33,7 +33,7 @@ afterEach(async () => {
 
 describe('text and code files (M4b part 2 §6)', () => {
   it('open in a Source-style text view without page features', async () => {
-    const disk = fakeDisk({ 'conf/app.json': '{\n  "name": "nimw"\n}\n' });
+    const disk = fakeDisk({ 'conf/app.json': '{\n  "name": "liber"\n}\n' });
     render(<PageScreen />);
     await open('conf/app.json');
     const name = screen.getByRole('textbox', { name: 'File name' });
@@ -48,20 +48,22 @@ describe('text and code files (M4b part 2 §6)', () => {
     expect(screen.queryByRole('toolbar')).not.toBeInTheDocument();
     expect(screen.queryByRole('tree', { name: 'Outline' })).not.toBeInTheDocument();
     expect(screen.getByRole('status', { name: 'Save status' })).toHaveTextContent('Saved');
-    expect(screen.getByText('4 lines · 21 characters')).toBeInTheDocument();
+    expect(screen.getByText('4 lines · 22 characters')).toBeInTheDocument();
     expect(screen.getByRole('navigation', { name: 'Breadcrumb' })).toHaveTextContent('conf');
     // Monospace Source style, line numbers, highlighting by file type.
-    expect(view().dom).toHaveClass('cm-nimw-source');
+    expect(view().dom).toHaveClass('cm-liber-source');
     expect(document.querySelector('.cm-lineNumbers')).not.toBeNull();
     await waitFor(() =>
-      expect(document.querySelector('.cm-nimw-code-string, .cm-nimw-code-function')).not.toBeNull(),
+      expect(
+        document.querySelector('.cm-liber-code-string, .cm-liber-code-function'),
+      ).not.toBeNull(),
     );
     // Autosaves through text_write.
     vi.useFakeTimers();
     act(() => view().dispatch({ changes: { from: 0, insert: '\n' }, userEvent: 'input.type' }));
     await act(() => vi.advanceTimersByTimeAsync(AUTOSAVE_MS));
     expect(disk.calls.some(([c]) => c === 'text_write')).toBe(true);
-    expect(disk.files.get('conf/app.json')).toBe('\n{\n  "name": "nimw"\n}\n');
+    expect(disk.files.get('conf/app.json')).toBe('\n{\n  "name": "liber"\n}\n');
   });
 
   it('renaming keeps the extension', async () => {
@@ -136,13 +138,13 @@ describe('text and code files (M4b part 2 §6)', () => {
         .onExternalChange({ created: [], modified: ['data.csv'], removed: [], renamed: [] }),
     );
     const notice =
-      'This file changed outside Notes In My Way and is no longer plain text it can edit. ' +
+      'This file changed outside Liber Linteum and is no longer plain text it can edit. ' +
       'Your unsaved changes are kept here: copy them, or save them as a new file.';
     expect(screen.getByText(notice)).toBeInTheDocument();
     expect(view().state.doc.toString()).toBe('José,Bogotá\nmine\n');
     expect(screen.getByRole('status', { name: 'Save status' })).toHaveTextContent('Not saved');
     expect(useToastStore.getState().toasts.map((t) => t.message)).toContain(
-      '“data.csv” changed outside Notes In My Way and is no longer plain text it can edit. ' +
+      '“data.csv” changed outside Liber Linteum and is no longer plain text it can edit. ' +
         'Your unsaved changes are kept in the app.',
     );
     await userEvent.click(screen.getByRole('button', { name: 'Save as new file' }));

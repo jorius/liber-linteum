@@ -5,16 +5,16 @@
 **Goal:** A third page width, **Wide elements**, keeps text at the 760 px measure while the element kinds the user picks (tables, code, diagrams, images, maths) use the editor's width. Table cells keep their words whole in every mode.
 
 **Architecture:**
-- **Width value:** `wide` joins `readable | full` at all three levels (page/vault in `.nimw/vault.json`, app in `settings.json`), validated in Rust.
+- **Width value:** `wide` joins `readable | full` at all three levels (page/vault in `.liber/vault.json`, app in `settings.json`), validated in Rust.
 - **Which kinds go wide:** the app setting `wideElements` (five booleans).
 - **Header control:** the full-width toggle becomes a radio menu button.
-- **Live Preview:** the host carries `data-wide-<kind>` attributes and a measured `--nimw-wide-max`.
+- **Live Preview:** the host carries `data-wide-<kind>` attributes and a measured `--liber-wide-max`.
   - Block widgets carry `data-wide-kind`.
-  - Code and raw-table lines carry `--nimw-ch` (their longest line in characters).
+  - Code and raw-table lines carry `--liber-ch` (their longest line in characters).
   - CSS lets the chosen ones escape the measure, centred on the text column.
 - **Tables:** they render inside a wrapper that scrolls sideways (a labelled, focusable region only while it overflows). Cells use `overflow-wrap: break-word` instead of the pane's `anywhere`, so their min-content counts whole words.
 
-**Tech Stack:** Rust (nimw-vault, Tauri commands, settings), React 19 + TS + zustand, CodeMirror 6, Vitest, Playwright (Chromium + WebKit).
+**Tech Stack:** Rust (liber-vault, Tauri commands, settings), React 19 + TS + zustand, CodeMirror 6, Vitest, Playwright (Chromium + WebKit).
 
 **Spec:** `docs/superpowers/specs/2026-10-15-m4b-part3-wide-elements-design.md`. It extends `docs/superpowers/specs/2026-10-14-m4b-part2-design.md` §1, §10 and §11.
 
@@ -23,7 +23,7 @@
 - **Width values:** page width is `readable | wide | full`. Rust refuses unknown values. `"default"` in the vault patch clears the vault level.
 - **`wideElements` defaults:** `{ tables: true, code: false, diagrams: true, images: false, maths: false }`. Missing keys take their defaults; unknown keys are kept on save.
 - **Measure:** 760 px (Live Preview `.cm-content`), side padding 40 px (Live Preview) and 28 px (Split pane).
-- **Notes are never written.** Widths live in `.nimw/vault.json` and settings.
+- **Notes are never written.** Widths live in `.liber/vault.json` and settings.
 - **Safari 15 floor:** no regex lookbehind, `color-mix`, `structuredClone`, `Array.at`, `Object.hasOwn`, container units or `:has()` (see `jsCompat.test.ts`, `cssCompat.test.ts`).
 - **i18n:** en and es, ICU plurals; axe clean in light and dark.
 - **Commits and tooling:**
@@ -35,7 +35,7 @@
 ## Review Focus
 
 1. **A wide table while the cursor enters it** (raw lines showing). The raw lines use the same wide box, so the caret lands where clicked and nothing jumps sideways. This is checked in e2e by clicking into the table and typing.
-2. **A narrow editor** (outline open, small window) where the wide box would be narrower than the measure. Wide elements must never be narrower than the text or overflow the scroller. `--nimw-wide-max` is clamped to the content box, and unit-tested through `wideMax()`.
+2. **A narrow editor** (outline open, small window) where the wide box would be narrower than the measure. Wide elements must never be narrower than the text or overflow the scroller. `--liber-wide-max` is clamped to the content box, and unit-tested through `wideMax()`.
 3. **Line numbers on** (the gutter beside the measure). The wide box is centred on the text column and stays clear of the gutter. Covered by the `wideMax()` maths (gutter subtracted) and by the e2e geometry check with line numbers on.
 4. **A table with a long URL in a cell.** No mid-word split; the wrapper scrolls and becomes a focusable region. Covered by a component test with mocked overflow, and an e2e in Readable.
 5. **Full and Source unchanged; Split pane with no measure.** Wide must not change Full or Source. Covered by e2e assertions on Full and by an Editor test that no `data-wide-*` is set unless the width is `wide`.
@@ -45,17 +45,17 @@
 ### Task 1: `wide` page width in Rust (vault, commands, app settings)
 
 **Files:**
-- Modify: `crates/nimw-vault/src/page_width.rs`
+- Modify: `crates/liber-vault/src/page_width.rs`
 - Modify: `apps/desktop/src-tauri/src/attachment_commands.rs` (`width_of`)
-- Test: `crates/nimw-vault/tests/page_width.rs`, `apps/desktop/src-tauri/tests/commands.rs` (`m4b2_page_width_over_ipc`), `apps/desktop/src-tauri/tests/settings.rs` (`m4b2_page_width_setting_default_persist_and_reset` used `"wide"` as its unreadable example; it becomes `"huge"`)
+- Test: `crates/liber-vault/tests/page_width.rs`, `apps/desktop/src-tauri/tests/commands.rs` (`m4b2_page_width_over_ipc`), `apps/desktop/src-tauri/tests/settings.rs` (`m4b2_page_width_setting_default_persist_and_reset` used `"wide"` as its unreadable example; it becomes `"huge"`)
 
-**Interfaces:** Produces `nimw_vault::PageWidth::Wide`, serialised `"wide"`. `page_width_set` and `vault_settings_set` accept `"wide"`.
+**Interfaces:** Produces `liber_vault::PageWidth::Wide`, serialised `"wide"`. `page_width_set` and `vault_settings_set` accept `"wide"`.
 
 - [ ] **Step 1: Write the failing tests**
   - In `page_width.rs`: `m4b3_wide_round_trips_at_page_and_vault_level` sets `PageWidth::Wide` for a page and for the vault, then reads it back and checks `json["pageWidths"]["A.md"] == "wide"`.
   - In `commands.rs`: `page_width_set` with `"wide"` gives `pageWidths: { "Welcome.md": "wide" }`; `vault_settings_set` with `{ pageWidth: "wide" }` gives `pageWidth: "wide"`.
   - In `settings.rs`: an update to `PageWidth::Wide` persists as `"wide"`; the unreadable example becomes `"huge"`.
-- [ ] **Step 2: Run them to verify they fail.** Run `cargo test -p nimw-vault --test page_width` and `cargo test -p nimw-desktop --test commands m4b2_page_width --test settings m4b2_page_width`. Expected: they don't compile (no `PageWidth::Wide`).
+- [ ] **Step 2: Run them to verify they fail.** Run `cargo test -p liber-vault --test page_width` and `cargo test -p liber-desktop --test commands m4b2_page_width --test settings m4b2_page_width`. Expected: they don't compile (no `PageWidth::Wide`).
 - [ ] **Step 3: Implement**
   - Add `Wide` to the enum (doc: "Text at the readable measure; chosen elements span the editor") and `"wide"` to `as_str`.
   - Add `Some("wide") => Ok(Some(PageWidth::Wide))` to `width_of`.
@@ -74,7 +74,7 @@
   - the defaults are `tables` and `diagrams` on;
   - a file holding `{"wideElements":{"code":true,"future":1}}` reads as code on, tables and diagrams on (defaults), and keeps `future` after an update;
   - a patch replaces the five booleans.
-- [ ] **Step 2: Run it to verify it fails** (`cargo test -p nimw-desktop --test settings m4b3`). Expected: it doesn't compile.
+- [ ] **Step 2: Run it to verify it fails** (`cargo test -p liber-desktop --test settings m4b3`). Expected: it doesn't compile.
 - [ ] **Step 3: Implement** `WideElements` (Default as above, `extra: serde_json::Map` flattened), the field, the patch and the lenient parse.
 - [ ] **Step 4: Run it to verify it passes.** Expected: PASS.
 - [ ] **Step 5: Commit** with `feat(settings): wideElements, the kinds that go wide (M4b part 3 wide elements §2)`.
@@ -108,7 +108,7 @@
 - Create: `apps/desktop/src/features/page/WidthMenu.tsx`
 - Modify: `apps/desktop/src/features/page/PageHeader.tsx` (replaces the toggle)
 - Modify: `apps/desktop/src/app/icons.tsx` (if the icon needs states)
-- Modify: `apps/desktop/src/theme/base.css` (`.nimw-menu [role='menuitemradio']` styles, separator)
+- Modify: `apps/desktop/src/theme/base.css` (`.liber-menu [role='menuitemradio']` styles, separator)
 - Modify: `apps/desktop/src/i18n/locales/en.json` and `es.json` (`page.width.*`)
 - Test: `apps/desktop/src/features/page/WidthMenu.test.tsx`; the existing `PageView.test.tsx` toggle tests are updated to the menu.
 
@@ -128,7 +128,7 @@ The menu button is `aria-haspopup="menu"`, `aria-expanded`, named "Page width", 
   - Escape refocuses the button;
   - ArrowDown moves the focus.
 - [ ] **Step 2: Run them to verify they fail.**
-- [ ] **Step 3: Implement** (portal into `document.body`, fixed under the button and right-aligned to it, on the `.nimw-menu` styles).
+- [ ] **Step 3: Implement** (portal into `document.body`, fixed under the button and right-aligned to it, on the `.liber-menu` styles).
 - [ ] **Step 4: Run them to verify they pass**, together with the updated `PageView.test.tsx`.
 - [ ] **Step 5: Commit** with `feat(page): the page width menu — Readable, Wide elements, Full width, Reset`.
 
@@ -180,16 +180,16 @@ The menu button is `aria-haspopup="menu"`, `aria-expanded`, named "Page width", 
 - Modify: `apps/desktop/src/features/editor/livePreview.ts`:
   - `blockWidget(node, kind)`;
   - kinds: table → `table`, math → `maths`, a Mermaid code block → `diagrams`, a lone image embed → `images`;
-  - code lines and the raw lines of a table being edited get `--nimw-ch` (their block's longest line, tabs as 4);
-  - raw table lines get the line class `cm-nimw-tablesrc`.
+  - code lines and the raw lines of a table being edited get `--liber-ch` (their block's longest line, tabs as 4);
+  - raw table lines get the line class `cm-liber-tablesrc`.
 - Create: `apps/desktop/src/features/editor/wideBox.ts` (`wideMax(scrollerWidth, gutterWidth, padding)`, `wideAttrs(width, kinds)`)
-- Modify: `apps/desktop/src/features/editor/Editor.tsx` (host attributes; a `ResizeObserver` sets `--nimw-wide-max`)
+- Modify: `apps/desktop/src/features/editor/Editor.tsx` (host attributes; a `ResizeObserver` sets `--liber-wide-max`)
 - Modify: `apps/desktop/src/features/editor/Editor.module.css`
 - Test: `apps/desktop/src/features/editor/wideBox.test.ts`, `livePreview.test.ts`, `Editor.test.tsx`
 
 **CSS** (only under `.live[data-width='wide']`):
-- **Widgets:** `width: max-content; min-width: 100%; max-width: var(--nimw-wide-max); position: relative; left: 50%; transform: translateX(-50%)`.
-- **Lines:** `--nimw-w: clamp(100%, calc(var(--nimw-ch) * 1ch + 16px), var(--nimw-wide-max)); width: var(--nimw-w); margin-left: calc((100% - var(--nimw-w)) / 2)`.
+- **Widgets:** `width: max-content; min-width: 100%; max-width: var(--liber-wide-max); position: relative; left: 50%; transform: translateX(-50%)`.
+- **Lines:** `--liber-w: clamp(100%, calc(var(--liber-ch) * 1ch + 16px), var(--liber-wide-max)); width: var(--liber-w); margin-left: calc((100% - var(--liber-w)) / 2)`.
 
 - [ ] **Step 1: Write the failing tests:**
   - `wideMax(1200, 0, 40)` is 1120;
@@ -197,7 +197,7 @@ The menu button is `aria-haspopup="menu"`, `aria-expanded`, named "Page width", 
   - it is never below the content width;
   - `wideAttrs('wide', { tables: true, code: false… })` gives `{ 'data-wide-tables': '' }`, and is empty for readable and full;
   - Live Preview decorations: a table widget's DOM has `data-wide-kind="table"`, a Mermaid widget `diagrams`, a lone `![[x.png]]` `images`, a `$$` block `maths`, and a callout none;
-  - a code block's lines carry `--nimw-ch: <longest>`;
+  - a code block's lines carry `--liber-ch: <longest>`;
   - the Editor host has `data-wide-tables` only when the width is `wide` and tables are on.
 - [ ] **Step 2: Run them to verify they fail.**
 - [ ] **Step 3: Implement.**
@@ -243,7 +243,7 @@ Run on `feat/m4b3-wide`, with worktree base 9f9651b. Every step's command was ru
 | 3 + 4 (one commit: removing `toggle` breaks the header until the menu exists) | b894da3 | store 4 fail; the menu's 3 fail | page, text-view and store tests 32/32 (axe inside) |
 | 5 | 4819a89 | 2 fail | SettingsDialog 19/19 |
 | 6 | 48e41b0 | 3 fail | preview folder 37/37 |
-| 7 | 3ef21e3 | kinds and `--nimw-ch` all null or empty; host attributes missing | editor folder 242/242, `cssCompat` and `jsCompat` 8/8 |
+| 7 | 3ef21e3 | kinds and `--liber-ch` all null or empty; host attributes missing | editor folder 242/242, `cssCompat` and `jsCompat` 8/8 |
 | 8 | bc3e5fd | first e2e run: line numbers (the table covered the gutter) and an axe scope issue | `m4b3-wide` 18/18 in Chromium and WebKit |
 | 9 | docs commit | — | full gate (below) |
 
@@ -253,13 +253,13 @@ Run on `feat/m4b3-wide`, with worktree base 9f9651b. Every step's command was ru
   - The widget kinds are named after the settings keys (`tables`, `maths`, `diagrams`, `images`), not singular.
   - Code and raw lines carry `data-wide-src` (`code`, `tables`, `diagrams`, `maths`), not only a class.
 - **Task 8 changed Task 7's geometry.** `wideMax(scroller, gutter, padding)` became `wideExtents({ textLeft, textRight, leftBound, rightBound }) → { m, r }`.
-  - The host gets `--nimw-wide-m` and `--nimw-wide-r` in place of `--nimw-wide-max`.
+  - The host gets `--liber-wide-m` and `--liber-wide-r` in place of `--liber-wide-max`.
   - A block widget is a frame (`m` past the text on both sides) whose content is centred by auto margins.
   - Why: with line numbers, the gutter sits beside the measure.
   - See spec §6.6–6.8.
 - **Task 8, other changes:**
   - The axe check is scoped to the menu and its button (spec §6.13).
   - `m4b2.spec.ts` follows the menu.
-  - `playwright.config.ts` reads `NIMW_E2E_PORT`.
+  - `playwright.config.ts` reads `LIBER_E2E_PORT`.
   - An extra e2e checks long code lines with Code blocks on, and that a click and a typed character land at the line's end.
 - **Formatting:** prettier formatted three test files after the first gate run.

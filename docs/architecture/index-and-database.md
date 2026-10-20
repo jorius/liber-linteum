@@ -14,10 +14,10 @@ Who owns what:
 
 | Crate | Role |
 |---|---|
-| `nimw-vault` | The file system: scan, stat, read, atomic CAS writes, watch. Never touches SQLite. |
-| `nimw-markdown` | Parses one page's text into `PageMeta` (title, frontmatter, tags, links, body text, icon). No I/O. |
-| `nimw-index` | The SQLite database: schema, writes inside transactions, reads, search. Never reads vault files (`crates/nimw-index/src/lib.rs:1-2`). |
-| `nimw-session` | One open vault: feeds files from `nimw-vault` through `nimw-markdown` into `nimw-index`; the watcher loop; every write the app makes. |
+| `liber-vault` | The file system: scan, stat, read, atomic CAS writes, watch. Never touches SQLite. |
+| `liber-markdown` | Parses one page's text into `PageMeta` (title, frontmatter, tags, links, body text, icon). No I/O. |
+| `liber-index` | The SQLite database: schema, writes inside transactions, reads, search. Never reads vault files (`crates/liber-index/src/lib.rs:1-2`). |
+| `liber-session` | One open vault: feeds files from `liber-vault` through `liber-markdown` into `liber-index`; the watcher loop; every write the app makes. |
 | `apps/desktop/src-tauri` | Tauri commands that call the session on a blocking thread. |
 
 ---
@@ -25,38 +25,38 @@ Who owns what:
 ## 1. Where the database lives
 
 ```
-<app cache dir>/nimw/<16 hex chars>/index.sqlite   (+ -wal, -shm)
+<app cache dir>/liber/<16 hex chars>/index.sqlite   (+ -wal, -shm)
 ```
 
-- **The app cache dir** is Tauri's `app_cache_dir()` (`apps/desktop/src-tauri/src/lib.rs:102`), which is the OS cache folder plus the bundle identifier `app.notesinmyway.desktop`:
-  - macOS: `~/Library/Caches/app.notesinmyway.desktop/`
-  - Windows: `%LOCALAPPDATA%\app.notesinmyway.desktop\`
-  - Linux: `$XDG_CACHE_HOME/app.notesinmyway.desktop/` (usually `~/.cache/…`)
-- **The folder name** is `cache_dir_name(vault_root)`: the first 8 bytes (16 hex characters) of the SHA-256 of the vault's canonical absolute path (`crates/nimw-index/src/lib.rs:28`). The path is built by `index_db_path` (`crates/nimw-session/src/session.rs:53`).
+- **The app cache dir** is Tauri's `app_cache_dir()` (`apps/desktop/src-tauri/src/lib.rs:102`), which is the OS cache folder plus the bundle identifier `app.liberlinteum.desktop`:
+  - macOS: `~/Library/Caches/app.liberlinteum.desktop/`
+  - Windows: `%LOCALAPPDATA%\app.liberlinteum.desktop\`
+  - Linux: `$XDG_CACHE_HOME/app.liberlinteum.desktop/` (usually `~/.cache/…`)
+- **The folder name** is `cache_dir_name(vault_root)`: the first 8 bytes (16 hex characters) of the SHA-256 of the vault's canonical absolute path (`crates/liber-index/src/lib.rs:28`). The path is built by `index_db_path` (`crates/liber-session/src/session.rs:53`).
 - **One database per vault.** Two vaults with the same folder name in different places get different hashes, so they never share a database. The global Scratchpad is an ordinary vault and gets its own.
 - **Why not inside the vault:** opening a vault writes nothing into it (VLT-02), the index isn't Obsidian's business, and a synced vault (iCloud, Dropbox, git) must not carry a binary database that two machines would fight over.
 - **Moving or renaming a vault folder** changes its canonical path, so it gets a fresh database (a full re-index) and the old one is left behind. **Orphaned databases are never cleaned up** (not handled).
-- **A safe reset:** quit the app and delete the vault's `<hash>` folder, or the whole `nimw/` folder. The next open rebuilds it.
+- **A safe reset:** quit the app and delete the vault's `<hash>` folder, or the whole `liber/` folder. The next open rebuilds it.
 
 ## 2. SQLite setup
 
 - **Library:** `rusqlite 0.40` with the `bundled` feature (`Cargo.toml:23`). SQLite is compiled in, FTS5 included, so the system's SQLite version never matters.
-- **Opening** (`Index::open`, `crates/nimw-index/src/index.rs:107`):
+- **Opening** (`Index::open`, `crates/liber-index/src/index.rs:107`):
   1. Create the folder.
   2. A **new file** gets the schema straight away.
   3. An **existing file** must pass `PRAGMA quick_check` and carry `meta.schema_version` equal to the build's `SCHEMA_VERSION` (`index.rs:130-152`).
   4. Anything else — a corrupt file, a foreign file, an older or newer schema — is **deleted together with its `-wal` and `-shm` files and rebuilt** (`index.rs:111-121`).
 - **Pragmas** (`index.rs:154-163`): `journal_mode = WAL`, `foreign_keys = ON`, `synchronous = NORMAL`, `cache_size = -32000` (32 MB; the 2 MB default made search's page reads hit the disk) and `temp_store = MEMORY` (search's temp tables), both from batch 6. No `busy_timeout` is set; there is only ever one connection per database (below).
-- **Connection ownership:** one `rusqlite::Connection` inside `Index`, inside a `Mutex<Index>` in `VaultSession` (`crates/nimw-session/src/session.rs:21`). The lock helper recovers from a poisoned mutex rather than failing (`session.rs:101-103`).
+- **Connection ownership:** one `rusqlite::Connection` inside `Index`, inside a `Mutex<Index>` in `VaultSession` (`crates/liber-session/src/session.rs:21`). The lock helper recovers from a poisoned mutex rather than failing (`session.rs:101-103`).
 - **Threads that touch it:**
   - **Tauri command threads.** Every command runs its session work through `blocking()`, which is `tauri::async_runtime::spawn_blocking` (`apps/desktop/src-tauri/src/vault_commands.rs:90-97`). So SQLite never runs on the async runtime or the UI thread.
-  - **The watcher's batching thread** (`nimw-watch`, `crates/nimw-vault/src/watch.rs:86`). It calls `VaultSession::apply`, which takes the same mutex.
+  - **The watcher's batching thread** (`liber-watch`, `crates/liber-vault/src/watch.rs:86`). It calls `VaultSession::apply`, which takes the same mutex.
   - **Rayon workers** read and parse files in parallel during a full pass, but they **never touch SQLite**. All writes happen afterwards, on the calling thread, under the mutex (`session.rs:150-206`).
 - **Transactions:** `Index::transaction` wraps a closure; it commits on `Ok`, and rolls back on `Err` by dropping the transaction (`index.rs:172-179`). The full pass writes in chunks of 500 rows per transaction (`BATCH_ROWS`, `session.rs:14`).
 
 ## 3. The schema (version 5)
 
-Defined in one string, `crates/nimw-index/src/schema.rs:9-93`, and created in one batch by `Index::init`.
+Defined in one string, `crates/liber-index/src/schema.rs:9-93`, and created in one batch by `Index::init`.
 
 ```
 meta
@@ -87,20 +87,20 @@ Every child references `files(path)` with `ON DELETE CASCADE ON UPDATE CASCADE`.
 | `kind` | TEXT, CHECK in `page`, `folder`, `attachment` | `page` for `.md` files that are valid UTF-8; `folder`; everything else, `.txt` and code files included, is `attachment` (`session.rs:47-50`, `219-250`) |
 | `mtime_ns` | INTEGER | Modification time in ns since the epoch, clamped to i64 (`session.rs:513`); `0` if the OS doesn't report one |
 | `size` | INTEGER | Bytes (`0` for folders) |
-| `hash` | TEXT, nullable | BLAKE3 of the content, hex (`crates/nimw-vault/src/hash.rs:9`); `NULL` for folders |
+| `hash` | TEXT, nullable | BLAKE3 of the content, hex (`crates/liber-vault/src/hash.rs:9`); `NULL` for folders |
 
 Index: `files_parent(parent)`.
 
 ### `pages` — one row per page
 
-| Column | Type | Filled with (`PageMeta`, `crates/nimw-markdown/src/page.rs:8`) |
+| Column | Type | Filled with (`PageMeta`, `crates/liber-markdown/src/page.rs:8`) |
 |---|---|---|
 | `path` | TEXT PK → `files` | |
-| `title` | TEXT | The visible text of an H1 that is the body's **first block**, else the file stem (`crates/nimw-markdown/src/title.rs:1-10`, PG-01 as revised in M4b part 3) |
+| `title` | TEXT | The visible text of an H1 that is the body's **first block**, else the file stem (`crates/liber-markdown/src/title.rs:1-10`, PG-01 as revised in M4b part 3) |
 | `subtitle` | TEXT | Frontmatter `subtitle:` |
 | `cover` | TEXT | Frontmatter `cover:` as written |
 | `cover_y`, `cover_x` | INTEGER 0–100 | Frontmatter `cover-y`, `cover-x` |
-| `excerpt` | TEXT | First ~200 characters of body text (`crates/nimw-markdown/src/body.rs:7`), shown on cards |
+| `excerpt` | TEXT | First ~200 characters of body text (`crates/liber-markdown/src/body.rs:7`), shown on cards |
 | `has_image`, `has_audio` | INTEGER 0/1 | Any embed, image or Markdown link whose target ends in an image or audio extension (`page.rs:36-56`) |
 | `frontmatter_error` | TEXT | The YAML error, when the frontmatter doesn't parse (the page is still indexed) |
 | `icon` | TEXT | Frontmatter `icon:`, when it is a valid emoji (schema 4, M5b §4) |
@@ -111,7 +111,7 @@ Index: `files_parent(parent)`.
 |---|---|
 | `path` | → `files` |
 | `tag` | The tag as written (frontmatter `tags:` plus body `#tags`, de-duplicated by key) |
-| `tag_key` | NFC-normalised and lowercased (`crates/nimw-markdown/src/types.rs:37-41`) |
+| `tag_key` | NFC-normalised and lowercased (`crates/liber-markdown/src/types.rs:37-41`) |
 
 Indexes: `tags_key(tag_key)`, `tags_path(path)`.
 
@@ -123,7 +123,7 @@ Indexes: `tags_key(tag_key)`, `tags_path(path)`.
 | `src` | The page the link is in (→ `files`) |
 | `kind` | `wiki`, `embed`, `markdown`, `markdown_image`, `related` (frontmatter `related:`) or `cover` (frontmatter `cover:`) (`types.rs:59-64`) |
 | `target_raw` | The target as written |
-| `target_key` | `link_key(target)`: NFC-lowercased base name without a trailing `.md`. It follows `\` too, and a `file:` URL is decoded first (`crates/nimw-markdown/src/resolve.rs:16`). It decides which links a create, remove or rename can affect. |
+| `target_key` | `link_key(target)`: NFC-lowercased base name without a trailing `.md`. It follows `\` too, and a `file:` URL is decoded first (`crates/liber-markdown/src/resolve.rs:16`). It decides which links a create, remove or rename can affect. |
 | `target_path` | The resolved vault path, or `NULL` while unresolved (§5.6) |
 | `heading`, `alias` | `[[Page#heading\|alias]]` parts |
 | `start`, `end` | Byte offsets of the link in the file, used to rewrite links on rename (EXP-04) |
@@ -136,7 +136,7 @@ Indexes: `links_target_path`, `links_target_key`, `links_src`.
 
 `page_text` (`schema.rs:64-73`) holds one row per page, with an explicit `rowid` so FTS5 can point at it.
 
-| Column | Filled with (`crates/nimw-index/src/text.rs`) |
+| Column | Filled with (`crates/liber-index/src/text.rs`) |
 |---|---|
 | `path` | UNIQUE → `files` |
 | `title` | The page title |
@@ -168,14 +168,14 @@ CREATE VIRTUAL TABLE fts USING fts5(
 
 These live in files, not SQLite:
 
-- **`<vault>/.nimw/vault.json`** keys:
+- **`<vault>/.liber/vault.json`** keys:
   - `attachments`, `attachmentLinkFormat`, `exclude`, `indexPicks`;
   - `pageWidth`, `pageWidths`;
   - `coverHeights`, `coverSides`, `coverWidths`;
   - `autoNamed`, `scratchpadFolder`;
   - `icon`, `folderIcons`, `favorites`, `folderSorts`.
-- **`<vault>/.nimw/layout.json`:** Global View positions.
-- **`<vault>/.nimw/trash.json`** and **`archive.json`:** the Trash and Archive records.
+- **`<vault>/.liber/layout.json`:** Global View positions.
+- **`<vault>/.liber/trash.json`** and **`archive.json`:** the Trash and Archive records.
 - **App settings:** in the OS config dir.
 
 ## 4. Schema versions
@@ -205,18 +205,18 @@ A bump costs every user one full re-index on first open (§7: about 1.5 s for 10
 
 `VaultSession::open` (`session.rs:64-93`):
 
-1. **`Vault::open(root)`.** Checks the folder and loads the exclude globs. It writes nothing (VLT-02). `.nimw/vault.json`, and Obsidian's attachment settings, are read when needed.
+1. **`Vault::open(root)`.** Checks the folder and loads the exclude globs. It writes nothing (VLT-02). `.liber/vault.json`, and Obsidian's attachment settings, are read when needed.
 2. **`Index::open`** (§2).
 3. **`reindex_all()`**, the full incremental pass (§5.3).
-4. **Clean up after files removed while the app was closed.** Their `.nimw` entries are forgotten (`forget_page_sizes`, `session.rs:447`): page widths, cover sizes, folder icons and sorts, favourites, auto-name flags, layout positions and index picks. Quick-note auto-name flags are also dropped for every page created or modified since the last session (M4c final review I2).
-5. The desktop shell then calls `start_watching()` (`crates/nimw-session/src/watching.rs:13`).
+4. **Clean up after files removed while the app was closed.** Their `.liber` entries are forgotten (`forget_page_sizes`, `session.rs:447`): page widths, cover sizes, folder icons and sorts, favourites, auto-name flags, layout positions and index picks. Quick-note auto-name flags are also dropped for every page created or modified since the last session (M4c final review I2).
+5. The desktop shell then calls `start_watching()` (`crates/liber-session/src/watching.rs:13`).
 
 ### 5.2 What the scan sees
 
-`Vault::scan` (`crates/nimw-vault/src/scan.rs:42`) walks the whole vault.
+`Vault::scan` (`crates/liber-vault/src/scan.rs:42`) walks the whole vault.
 
 **Skipped:**
-- **Hidden names at any depth:** a name starting with `.` (`crates/nimw-vault/src/lib.rs:42`), so `.obsidian`, `.git`, `.nimw` and **`.trash`**.
+- **Hidden names at any depth:** a name starting with `.` (`crates/liber-vault/src/lib.rs:42`), so `.obsidian`, `.git`, `.liber` and **`.trash`**.
 - **The Archive is the exception.** `.archive/` is scanned and indexed like any folder, but its own hidden children are not (`is_hidden_path`, `lib.rs:60-67`). Archived pages stay findable by links. Search and the tree filter them out unless asked (§6, `session.rs` `tree()`).
 - **User-excluded globs** from `vault.json` `exclude`.
 - **Symlinked folders**, and symlinks that resolve outside the vault.
@@ -233,7 +233,7 @@ A bump costs every user one full re-index on first open (§7: about 1.5 s for 10
    - **Removed:** stored paths not on disk.
    - **Folders:** new, or a file that became a folder.
    - **Files:** unchanged when `mtime_ns` **and** `size` both match the stored row (`unchanged`, `session.rs:507-511`). An unchanged file is not read at all.
-3. **Load changed files in parallel** with rayon (`load`, `session.rs:213-264`). Each file is read whole and BLAKE3-hashed (`crates/nimw-vault/src/fsops.rs:59-63`), then:
+3. **Load changed files in parallel** with rayon (`load`, `session.rs:213-264`). Each file is read whole and BLAKE3-hashed (`crates/liber-vault/src/fsops.rs:59-63`), then:
    - **Same hash as stored:** only the stat is updated (`StatOnly`). This happens when a file is touched without changing.
    - **Not `.md`:** an `attachment`.
    - **`.md` and valid UTF-8:** `parse_page(text, stem)` gives a `PageMeta`.
@@ -258,14 +258,14 @@ When a `.md` file stops being a page (for example, invalid UTF-8), `upsert_file`
 
 ### 5.5 Live changes: the watcher
 
-**In `nimw-vault`** (`crates/nimw-vault/src/watch.rs`):
+**In `liber-vault`** (`crates/liber-vault/src/watch.rs`):
 
 - **Backend:** the `notify` crate's recommended backend (FSEvents, ReadDirectoryChangesW, inotify), watching recursively.
 - **Batching:** the app does its own batching (`watch.rs:43-49`), because the debouncer crates drop macOS deletes or rescan signals. A batch closes after **200 ms** without events (`DEBOUNCE`), or after **2 s** under a continuous stream (`MAX_BATCH_WAIT`).
 - **Events:** a batch carries only "this path changed" (`Changed`) or "this path is gone" (`Removed`). Hidden and excluded paths are dropped.
 - **Overflow:** a backend error, a "rescan needed" flag, or an event on the vault root becomes `Overflow`.
 
-**In the session** (`VaultSession::apply`, `crates/nimw-session/src/watching.rs:42`):
+**In the session** (`VaultSession::apply`, `crates/liber-session/src/watching.rs:42`):
 
 1. **Overflow:** run the full pass (§5.3) and report what changed.
 2. **Otherwise, collect the dirty set:** the reported paths, plus every unindexed file and every vanished indexed file in their **parent folders**. That catches sibling renames that a backend reported badly. A changed folder is re-scanned below it.
@@ -283,7 +283,7 @@ When a `.md` file stops being a page (for example, invalid UTF-8), `upsert_file`
 
 ### 5.6 Link resolution
 
-`resolve(kind, target, source, files)` (`crates/nimw-markdown/src/resolve.rs:147`), against a `FileSet` of every non-folder path (`index.rs:221`):
+`resolve(kind, target, source, files)` (`crates/liber-markdown/src/resolve.rs:147`), against a `FileSet` of every non-folder path (`index.rs:221`):
 
 **Markdown links and images** are relative paths. They are joined with the source's folder and matched exactly, or with `.md` added when the target has no extension.
 
@@ -315,7 +315,7 @@ The watcher's later event for the same file sees an unchanged `mtime_ns` and `si
 
 ### 5.8 The `indexing` flag
 
-`VaultSession.indexing` is an `AtomicBool`. It is set only while `reindex_all` runs (`session.rs:110-115`), which happens on open and on an overflow. `search` copies it into its answer (`crates/nimw-session/src/search.rs:13`), so the search dialog can say results may be incomplete. Incremental watcher batches don't set it.
+`VaultSession.indexing` is an `AtomicBool`. It is set only while `reindex_all` runs (`session.rs:110-115`), which happens on open and on an overflow. `search` copies it into its answer (`crates/liber-session/src/search.rs:13`), so the search dialog can say results may be incomplete. Incremental watcher batches don't set it.
 
 ### 5.9 Pages, attachments, text files
 
@@ -326,25 +326,25 @@ The watcher's later event for the same file sees an unchanged `mtime_ns` and `si
 | images, audio, PDFs, other files | `attachment` | no | link targets; `has_image`/`has_audio` come from links, not from these rows |
 | `.txt`, code and other text files | `attachment` | `page_text`/`fts` only (schema 5) | the text view's rule: UTF-8, no NUL, ≤ 2 MB. Searchable by name and body (a **Text files** filter narrows to them); never in `pages`, tags or links. A file that stops reading as text loses its row |
 | folders | `folder` | no | |
-| `.trash/…`, `.git`, `.obsidian`, `.nimw` | not indexed | | hidden |
+| `.trash/…`, `.git`, `.obsidian`, `.liber` | not indexed | | hidden |
 | `.archive/…` | as above | yes (flagged by path) | excluded from search and the tree unless asked |
 
 ## 6. Search on top of the index
 
-Entry point: `Index::search` (`crates/nimw-index/src/search.rs:241`), called through `VaultSession::search` under the session mutex.
+Entry point: `Index::search` (`crates/liber-index/src/search.rs:241`), called through `VaultSession::search` under the session mutex.
 
 1. **Query text** (`fts_query`, `search.rs:144`):
    - The text is split into words and `"quoted phrases"`. An unclosed quote runs to the end, and control characters act as spaces.
    - Every word becomes a quoted FTS5 string with `*`, so it matches as a prefix. FTS5 syntax typed by the user (`AND`, `NEAR(`, `^`, `:`) is always plain text.
    - A word with no letter or digit is dropped.
    - Two queries are built: `all` (every word must match) and `any` (at least one).
-2. **Scoring** (`fill_hits`, `search.rs:451`). Matches of `all` go into a temp table, `temp.nimw_hits`, with:
+2. **Scoring** (`fill_hits`, `search.rs:451`). Matches of `all` go into a temp table, `temp.liber_hits`, with:
    - `bm25(fts, 10, 8, 5, 6, 4, 1)`, the weights for title, name, folders, tags, links and body (`search.rs:27-28`);
    - a `meta` flag, set when `any` also matches within `{title name folders tags links}`. This is the **metadata bonus**: a metadata match always ranks above a body-only match.
 3. **Filters:**
    - SQL conditions on `files`, `pages`, `tags` and `links`: project, folder, tags (all must be present), links to, links from, has image, has audio.
    - Archived pages are left out unless the Archived chip is on.
-   - All matches are written once into `temp.nimw_match`, which the count, the page of results and most facets read (`search.rs:365-381`).
+   - All matches are written once into `temp.liber_match`, which the count, the page of results and most facets read (`search.rs:365-381`).
 4. **Order:**
    - With text: `meta DESC, score, length(path), mtime DESC, path`.
    - Without text: newest first. An empty query with no filters is **Recent**, the 20 newest pages.
@@ -356,28 +356,28 @@ Entry point: `Index::search` (`crates/nimw-index/src/search.rs:241`), called thr
    - About 12 words of the stored `page_text.body` around the first matching word, cut in Rust (`snippet`, `search.rs:560`).
    - FTS5's own `snippet()` cost 25–40 ms per page of results.
    - They are returned as structured parts, never HTML.
-   - Folding for highlights uses `fold()`: NFD, combining marks dropped, then lowercase (`crates/nimw-index/src/fold.rs`).
-7. **Temp tables** (`nimw_hits`, `nimw_match`, `nimw_except`) are per connection, created `IF NOT EXISTS` and cleared at the start of each search. Searches never overlap, because they run under the session mutex.
+   - Folding for highlights uses `fold()`: NFD, combining marks dropped, then lowercase (`crates/liber-index/src/fold.rs`).
+7. **Temp tables** (`liber_hits`, `liber_match`, `liber_except`) are per connection, created `IF NOT EXISTS` and cleared at the start of each search. Searches never overlap, because they run under the session mutex.
 
 The UI debounces typing by 80 ms (`apps/desktop/src/features/search/searchStore.ts:7`).
 
 ## 7. Performance budgets and their tests
 
-NFR-03, on a generated 10,000-note vault (`nimw_testkit::generate_vault`, `VaultShape::TEN_K`, `crates/nimw-testkit/src/lib.rs:112`, `144`):
+NFR-03, on a generated 10,000-note vault (`liber_testkit::generate_vault`, `VaultShape::TEN_K`, `crates/liber-testkit/src/lib.rs:112`, `144`):
 
 | Budget | Test | Last measured |
 |---|---|---|
-| First full index < 30 s | `nfr_03_search_p95_under_50_ms` (`crates/nimw-session/tests/search.rs:105`) | 1.63 s |
+| First full index < 30 s | `nfr_03_search_p95_under_50_ms` (`crates/liber-session/tests/search.rs:105`) | 1.63 s |
 | Search p95 < 50 ms over 200 queries | same test | p95 41.4 ms, p50 22.6 ms (M5 fix pass, machine under load); 34.8 ms on a quieter run |
 | Re-index one changed page < 100 ms | same test | 20.9 ms |
-| A 200-card Global View level and its edges < 100 ms | `nfr_03_a_200_card_level_and_its_edges_in_under_100_ms` (`crates/nimw-session/tests/global_view.rs:403`) | |
+| A 200-card Global View level and its edges < 100 ms | `nfr_03_a_200_card_level_and_its_edges_in_under_100_ms` (`crates/liber-session/tests/global_view.rs:403`) | |
 | An outside move of 1,000 pinned notes writes the layout once | `m3a_an_external_move_of_1000_pinned_notes_writes_the_layout_once` (`global_view.rs:517`) | |
 
 They are `#[ignore]`d. Run them in release:
 
 ```sh
-cargo test --release -p nimw-session --test search -- --ignored --nocapture
-cargo test --release -p nimw-session --test global_view -- --ignored
+cargo test --release -p liber-session --test search -- --ignored --nocapture
+cargo test --release -p liber-session --test global_view -- --ignored
 ```
 
 There is no nightly benchmark job yet (architecture §9.2 planned one for M8).
@@ -405,7 +405,7 @@ Quit the app first. A second writer is safe with WAL, but the app doesn't expect
 
 ```sh
 # macOS: find the vault's database by its folder's hash
-DB=~/Library/Caches/app.notesinmyway.desktop/nimw/<hash>/index.sqlite
+DB=~/Library/Caches/app.liberlinteum.desktop/liber/<hash>/index.sqlite
 sqlite3 "$DB"
 ```
 

@@ -1,21 +1,26 @@
 {
   "app": {
-    "name": "Notes In My Way",
+    "name": "Liber Linteum",
     "tagline": "Private notes that live on your disk. No cloud, no accounts, no telemetry.",
     "version": "v{version}",
     "credits": "Global View made with React Flow (MIT)."
   },
   "welcome": {
     "language": "Language",
-    "create": "Create a new vault",
-    "open": "Open a folder as vault",
+    "create": "New vault",
+    "open": "Open folder as vault",
     "openObsidian": "Open an Obsidian vault",
-    "importNotion": "Import a Notion export",
-    "recent": "Recent",
+    "importNotion": "Import from Notion…",
+    "recent": "Recent vaults",
     "noRecent": "No recent vaults yet.",
     "forget": "Remove {name} from recent",
-    "missing": "Folder not found",
-    "quickNote": "Take a quick note"
+    "missing": "Can't open",
+    "quickNote": "Quick note",
+    "moreWays": "More ways to start",
+    "openFile": "Open a single file…",
+    "filter": "Filter vaults",
+    "noMatch": "No vaults match “{query}”.",
+    "reveal": "{os, select, mac {Show {name} in Finder} windows {Show {name} in Explorer} other {Show {name} in the file manager}}"
   },
   "languages": {
     "en": "English",
@@ -40,6 +45,7 @@
     "notAFile": "Folders can't be attached.",
     "tooLarge": "That file is too large to paste.",
     "notAText": "This file can't be opened as text: it isn't UTF-8 text, or it's over 2 MB.",
+    "invalidInput": "That value isn't valid here.",
     "io": "Something went wrong: {message}"
   },
   "toasts": {
@@ -47,6 +53,8 @@
     "renameFailed": "{count, plural, one {Renamed. # file couldn't be updated} other {Renamed. # files couldn't be updated}}",
     "trashed": "Moved to Trash",
     "openedWithWarnings": "{count, plural, one {Opened with # warning} other {Opened with # warnings}}",
+    "metaDirBoth": "This vault also has its settings folder from before the rename. The current one is used; the old one is left untouched.",
+    "metaDirUnmoved": "This vault's settings folder from before the rename couldn't be moved ({error}). It's used where it is and moves on the next writable open.",
     "dismiss": "Dismiss",
     "details": "Details",
     "liveUpdatesUnavailable": "Live updates are unavailable: changes made outside the app appear after reopening the vault.",
@@ -88,6 +96,8 @@
     "closeVault": "Close vault",
     "actions": "Actions",
     "hideSidebar": "Hide sidebar",
+    "resizeSidebar": "Resize the sidebar",
+    "resizeSidebarHint": "Drag to resize the sidebar; double-click to reset it",
     "showSidebar": "Show sidebar",
     "settingsItem": "Settings…",
     "openAnother": "Open another vault…"
@@ -111,7 +121,7 @@
     "titleLabel": "Page title",
     "titleTaken": "A page named “{name}” is already in this folder.",
     "titleInNote": "Title in the note: {title}",
-    "frontmatterInvalid": "NIMW can’t safely change this note’s frontmatter. Edit it in Source mode.",
+    "frontmatterInvalid": "Liber Linteum can’t safely change this note’s frontmatter. Edit it in Source mode.",
     "subtitleLabel": "Subtitle",
     "subtitlePlaceholder": "Add a subtitle",
     "width": {
@@ -136,10 +146,10 @@
     "notSaved": "Not saved",
     "orphaned": "This page was deleted outside the app. Your text is still here.",
     "saveAsNew": "Save as new page",
-    "notText": "This file changed outside Notes In My Way and is no longer plain text it can edit. Your unsaved changes are kept here: copy them, or save them as a new file.",
-    "notTextPage": "This page changed outside Notes In My Way and is no longer text it can edit. Your unsaved changes are kept here: copy them, or save them as a new page.",
-    "notTextToast": "“{name}” changed outside Notes In My Way and is no longer plain text it can edit. Your unsaved changes are kept in the app.",
-    "tooLarge": "This text can’t be saved: a text file Notes In My Way edits holds at most 2 MB and no NUL characters. It’s kept here: shorten it to save again, or copy it.",
+    "notText": "This file changed outside Liber Linteum and is no longer plain text it can edit. Your unsaved changes are kept here: copy them, or save them as a new file.",
+    "notTextPage": "This page changed outside Liber Linteum and is no longer text it can edit. Your unsaved changes are kept here: copy them, or save them as a new page.",
+    "notTextToast": "“{name}” changed outside Liber Linteum and is no longer plain text it can edit. Your unsaved changes are kept in the app.",
+    "tooLarge": "This text can’t be saved: a text file Liber Linteum edits holds at most 2 MB and no NUL characters. It’s kept here: shorten it to save again, or copy it.",
     "tooLargeToast": "“{name}” is too large to save as text. Your text is kept in the app.",
     "saveAsNewFile": "Save as new file",
     "largeNote": "Simplified preview for large notes",
@@ -236,7 +246,9 @@
     "archive": "Archive",
     "sortBy": "Sort by",
     "open": "Open",
-    "unarchive": "Unarchive"
+    "unarchive": "Unarchive",
+    "addFolderPage": "Add a page to this folder",
+    "useAsFolderPage": "Use {name}.md as this folder’s page"
   },
   "dialogs": {
     "cancel": "Cancel",
@@ -246,12 +258,16 @@
       "links": "{count, plural, =0 {Nothing links to it.} one {# link points to it and will break.} other {# links point to it and will break.}}",
       "items": "{count, plural, one {It contains # item.} other {It contains # items.}}",
       "dontAsk": "Don't ask again",
+      "folderPage": "Its page, {name}, goes with it.",
       "confirm": "Move to Trash"
     },
     "move": {
       "title": "Move “{name}”",
       "to": "Destination folder",
       "root": "Vault root",
+      "filter": "Filter folders",
+      "current": "current",
+      "none": "No folder matches",
       "confirm": "Move"
     },
     "external": {
@@ -377,6 +393,10 @@
         "title": "Editor",
         "description": "Fonts, page width, covers and saving."
       },
+      "spelling": {
+        "title": "Spelling",
+        "description": "Dictionaries for spell checking, all on this computer."
+      },
       "files": {
         "title": "Files and quick notes",
         "description": "Renaming, deleting and where quick notes live."
@@ -387,7 +407,7 @@
       },
       "vault": {
         "title": "This vault",
-        "description": "Settings kept with this vault, in .nimw/vault.json."
+        "description": "Settings kept with this vault, in .liber/vault.json."
       }
     },
     "shortcuts": {
@@ -405,7 +425,7 @@
         "search": "Search",
         "files": "Go to the files",
         "newPage": "New page",
-        "quickNote": "New quick note",
+        "quickNote": "Create new scratchpad in this vault",
         "save": "Save",
         "link": "Insert a link",
         "bold": "Bold",
@@ -538,7 +558,7 @@
     "folderPath": "Folder in the vault",
     "obsidianSet": "Obsidian puts new attachments in {value} ({place}).",
     "obsidianHint": "Change it in Obsidian (Settings → Files and links), or use a different place here.",
-    "override": "Use a different place in Notes In My Way",
+    "override": "Use a different place in Liber Linteum",
     "obsidianRoot": "the vault root",
     "obsidianSame": "the page’s folder",
     "obsidianSubfolder": "the “{name}” folder next to the page",
@@ -833,6 +853,31 @@
     "emptyHelp": "Pages, folders and attachments you delete wait here, inside the vault, until you delete them for good.",
     "noMatch": "Nothing in the Trash matches “{query}”."
   },
+  "spelling": {
+    "menu": "Spelling: {word}",
+    "noSuggestions": "No suggestions",
+    "add": "Add to dictionary",
+    "ignore": "Ignore",
+    "check": "Check spelling",
+    "dictionaries": "Dictionaries",
+    "import": "Add dictionary from disk…",
+    "remove": "Remove {name}",
+    "removeShort": "Remove",
+    "removeAsk": "Remove {name}?",
+    "noneSelected": "No dictionary selected — spelling is not checked",
+    "unavailable": "Couldn't be loaded",
+    "words": "Words added in this vault",
+    "noWords": "No words yet",
+    "removeWord": "Remove {word}",
+    "vault": "Spelling",
+    "vaultApp": "Use the app's dictionaries",
+    "vaultCustom": "Choose for this vault",
+    "dict": {
+      "en_US": "English (US)",
+      "es": "Spanish",
+      "es_CO": "Spanish (Colombia)"
+    }
+  },
   "sort": {
     "label": "Sort {name} by",
     "vault": "Sort the vault",
@@ -846,7 +891,9 @@
     "title": "Favorites",
     "add": "Add to Favorites",
     "remove": "Remove from Favorites",
+    "addNamed": "Add {name} to Favorites",
     "removeNamed": "Remove {name} from Favorites",
+    "toggleNamed": "{name} in Favorites",
     "moveUp": "Move up in Favorites",
     "moveDown": "Move down in Favorites",
     "movedTo": "{name} moved to {position} of {count} in Favorites",
@@ -862,6 +909,7 @@
     "noLocation": "No folder chosen",
     "chooseLocation": "Choose location…",
     "name": "Vault name",
+    "namePlaceholder": "Named after the export",
     "nameInvalid": "Use a plain folder name: no / \\ : * ? \" < > | # ^ [ ], no dot at the start or end, no Windows device name (CON, NUL…), at most 200 bytes.",
     "previewLabel": "Preview",
     "reading": "Reading the export…",

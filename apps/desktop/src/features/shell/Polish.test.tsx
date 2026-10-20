@@ -1,5 +1,5 @@
 // M1b hand-off §10 items a–f (M2a spec §6).
-import { act, render, screen, waitFor, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it } from 'vitest';
 import { App } from '../../app/App';
@@ -156,14 +156,14 @@ describe('M1b polish (M2a §6)', () => {
     await waitFor(() => expect(calls.map(([c]) => c)).toContain('entry_trash'));
   });
 
-  it('d: a "…" button on each row opens its context menu', async () => {
+  it('d (round 3 §2.3): no "…" on rows; right-click opens the context menu', async () => {
     backend({});
     seed();
     render(<AppShell />);
     const row = screen.getByRole('treeitem', { name: 'Welcome' });
-    await userEvent.click(within(row).getByRole('button', { name: 'Actions for Welcome' }));
+    expect(within(row).queryByRole('button', { name: 'Actions for Welcome' })).toBeNull();
+    fireEvent.contextMenu(row);
     expect(screen.getByRole('menu', { name: 'Actions for Welcome' })).toBeInTheDocument();
-    expect(useVaultStore.getState().selected).not.toBe('Welcome.md'); // the row wasn't activated
   });
 
   it('e: the inline-rename error id is a safe generated id', async () => {
@@ -192,6 +192,6 @@ describe('M1b polish (M2a §6)', () => {
     const open = await screen.findByRole('button', { name: /^gone/ });
     await userEvent.click(open);
     await waitFor(() => expect(screen.getByRole('button', { name: /^gone/ })).toBeDisabled());
-    expect(screen.getByText('Folder not found')).toBeInTheDocument();
+    expect(screen.getByText("Can't open")).toBeInTheDocument();
   });
 });

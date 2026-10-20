@@ -49,7 +49,14 @@ describe('Settings dialog (M2b §4, §5, §7)', () => {
       within(nav)
         .getAllByRole('button')
         .map((b) => b.textContent),
-    ).toEqual(['General', 'Appearance', 'Editor', 'Files and quick notes', 'Keyboard shortcuts']);
+    ).toEqual([
+      'General',
+      'Appearance',
+      'Editor',
+      'Spelling',
+      'Files and quick notes',
+      'Keyboard shortcuts',
+    ]);
     expect(within(nav).getByRole('button', { name: 'General' })).toHaveAttribute(
       'aria-current',
       'page',
@@ -85,7 +92,7 @@ describe('Settings dialog (M2b §4, §5, §7)', () => {
     expect(
       screen.getByRole('heading', { name: 'Keyboard shortcuts', level: 3 }),
     ).toBeInTheDocument();
-    expect(screen.getByText('New quick note')).toBeInTheDocument();
+    expect(screen.getByText('Create new scratchpad in this vault')).toBeInTheDocument();
   });
 
   it('M5b §18: search shows the matching rows of every category, accents ignored', async () => {
@@ -101,6 +108,12 @@ describe('Settings dialog (M2b §4, §5, §7)', () => {
     await userEvent.clear(screen.getByRole('searchbox', { name: 'Search settings' }));
     expect(screen.getByRole('combobox', { name: 'Language' })).toBeVisible();
     expect(screen.queryByText('No settings match.')).not.toBeInTheDocument();
+  });
+
+  it('spelling: the Spelling category is found by search', async () => {
+    open();
+    await userEvent.type(screen.getByRole('searchbox', { name: 'Search settings' }), 'spelling');
+    expect(screen.getByRole('checkbox', { name: 'Check spelling' })).toBeVisible();
   });
 
   it('round-2 review I3: Tab from the last shown control wraps, past a category search hides', async () => {
@@ -397,14 +410,17 @@ describe('Settings → This vault (M2c §5.4)', () => {
     expect(screen.queryByRole('heading', { name: 'This vault' })).not.toBeInTheDocument();
   });
 
-  it("shows NIMW's setting and saves another mode at once", async () => {
+  it("shows Liber Linteum's setting and saves another mode at once", async () => {
     open();
     await show('This vault');
     const where = await screen.findByRole('combobox', { name: 'New attachments go to' });
     await waitFor(() => expect(where).toHaveValue('subfolder'));
     expect(screen.getByRole('textbox', { name: 'Subfolder name' })).toHaveValue('attachments');
     // M5b round 2: as wide as the selects around it, not a 10-character box.
-    expect(screen.getByRole('textbox', { name: 'Subfolder name' })).toHaveClass(styles.textInput);
+    expect(screen.getByRole('textbox', { name: 'Subfolder name' })).toHaveClass(
+      styles.textInput,
+      'field-control',
+    );
     await userEvent.selectOptions(where, 'same');
     await waitFor(() =>
       expect(vaultPatches).toEqual([{ attachments: { mode: 'same', path: '' } }]),
@@ -450,7 +466,7 @@ describe('Settings → This vault (M2c §5.4)', () => {
     expect(screen.getByText('![](file:///…/Assets/x.png)')).toBeInTheDocument();
   });
 
-  it("M4b part 3 §8: Obsidian's newLinkFormat is followed until NIMW has its own", async () => {
+  it("M4b part 3 §8: Obsidian's newLinkFormat is followed until Liber Linteum has its own", async () => {
     obsidianLinkFormat = 'relative';
     open();
     await show('This vault');
@@ -509,7 +525,7 @@ describe('Settings → This vault (M2c §5.4)', () => {
     );
   });
 
-  it('tabbing through the untouched field writes nothing (no .nimw/ for nothing; final review M5)', async () => {
+  it('tabbing through the untouched field writes nothing (no .liber/ for nothing; final review M5)', async () => {
     open();
     await show('This vault');
     const where = await screen.findByRole('combobox', { name: 'New attachments go to' });
@@ -552,7 +568,7 @@ describe('Settings → This vault (M2c §5.4)', () => {
       ),
     ).toBeInTheDocument();
     expect(
-      screen.getByRole('checkbox', { name: 'Use a different place in Notes In My Way' }),
+      screen.getByRole('checkbox', { name: 'Use a different place in Liber Linteum' }),
     ).not.toBeChecked();
     const violations = await axe
       .run(screen.getByRole('dialog'), { rules: { 'color-contrast': { enabled: false } } })
@@ -560,13 +576,13 @@ describe('Settings → This vault (M2c §5.4)', () => {
     expect(violations).toEqual([]);
   });
 
-  it("M4b §5: a switch lets NIMW use its own place; off restores Obsidian's", async () => {
+  it("M4b §5: a switch lets Liber Linteum use its own place; off restores Obsidian's", async () => {
     obsidian = './assets';
     open();
     await show('This vault');
     const where = await screen.findByRole('combobox', { name: 'New attachments go to' });
     await waitFor(() => expect(where).toBeDisabled());
-    const own = screen.getByRole('checkbox', { name: 'Use a different place in Notes In My Way' });
+    const own = screen.getByRole('checkbox', { name: 'Use a different place in Liber Linteum' });
     await userEvent.click(own);
     await waitFor(() =>
       expect(vaultPatches).toEqual([

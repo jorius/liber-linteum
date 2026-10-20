@@ -1,0 +1,18 @@
+[package]
+name = "liber-spell"
+description = "Spell checking with local Hunspell dictionaries (bundled en_US, es, es_CO, plus imported ones)."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+spellbook.workspace = true
+thiserror.workspace = true
+unicode-normalization.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true
+
+[lints]
+workspace = true

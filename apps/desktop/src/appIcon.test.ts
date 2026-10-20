@@ -57,7 +57,7 @@ function decodePng(png: Buffer) {
 
 describe.runIf(process.platform === 'darwin')('the macOS Dock icon (M4b §7)', () => {
   it('icon.icns at 1024 px: a rounded 824 px square, with transparent corners and margin', () => {
-    const dir = mkdtempSync(join(tmpdir(), 'nimw-icon-'));
+    const dir = mkdtempSync(join(tmpdir(), 'liber-icon-'));
     try {
       const png = join(dir, 'icon.png');
       execFileSync('sips', ['-s', 'format', 'png', icns, '--out', png], { stdio: 'ignore' });

@@ -35,8 +35,8 @@ async function open(page: Page, pages: Record<string, string>, files: string[] =
     const local =
       (url.protocol === 'http:' && url.hostname === '127.0.0.1') ||
       url.protocol === 'data:' ||
-      url.protocol === 'nimw-asset:' ||
-      url.hostname === 'nimw-asset.localhost';
+      url.protocol === 'liber-asset:' ||
+      url.hostname === 'liber-asset.localhost';
     if (!local) outside.push(r.url());
   });
   await page.addInitScript(installIpcMock, {
@@ -57,14 +57,15 @@ async function open(page: Page, pages: Record<string, string>, files: string[] =
 /** The page's text as last saved (autosave is on), or null before any save. */
 const editorText = (page: Page) =>
   page.evaluate(() => {
-    const writes = (window as unknown as { __nimwWrites?: { text: string }[] }).__nimwWrites ?? [];
+    const writes =
+      (window as unknown as { __liberWrites?: { text: string }[] }).__liberWrites ?? [];
     return writes.length ? writes[writes.length - 1].text : null;
   });
 
 const level = (page: Page, elapsedMs: number) =>
   page.evaluate(
     (ms) =>
-      (window as unknown as { __nimwEmit: (e: string, p: unknown) => void }).__nimwEmit(
+      (window as unknown as { __liberEmit: (e: string, p: unknown) => void }).__liberEmit(
         'audio:level',
         { recordingId: 7, rms: 0.2, peak: 0.4, elapsedMs: ms, ended: null },
       ),
@@ -134,9 +135,9 @@ test('Upload clip inserts the picked file', async ({ page }) => {
 test('the player plays, pauses and seeks a clip', async ({ page, browserName }) => {
   // Real decoding through a routed request: Chromium only (WebKit loads media
   // outside Playwright's routing); WebKit still checks the controls.
-  // Served with byte ranges, as the nimw-asset protocol does (seeking needs them).
+  // Served with byte ranges, as the liber-asset protocol does (seeking needs them).
   const body = wav();
-  await page.route(/nimw-asset/, (route) => {
+  await page.route(/liber-asset/, (route) => {
     const range = /bytes=(\d+)-(\d*)/.exec(route.request().headers().range ?? '');
     if (!range) {
       return route.fulfill({

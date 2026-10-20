@@ -1,6 +1,6 @@
 import { undo } from '@codemirror/commands';
 import { EditorView } from '@codemirror/view';
-import { act, render, screen, waitFor, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import axe from 'axe-core';
 import { afterEach, beforeAll, describe, expect, it } from 'vitest';
@@ -94,7 +94,7 @@ describe('AppShell', () => {
     render(<AppShell />);
     const side = screen.getByRole('complementary', { name: 'Files · Digital Brain' });
     expect(side).toHaveTextContent('Digital Brain');
-    expect(side).not.toHaveTextContent('Notes In My Way');
+    expect(side).not.toHaveTextContent('Liber Linteum');
     expect(screen.queryByRole('banner')).not.toBeInTheDocument();
     await act(() => openPage('Art/rex.md'));
     const page = screen.getByRole('region', { name: 'Page' });
@@ -127,7 +127,7 @@ describe('AppShell', () => {
       expect(calls.at(-1)).toEqual(['window_title_set', { title: 'Trash — Digital Brain' }]),
     );
     unmount();
-    expect(calls.at(-1)).toEqual(['window_title_set', { title: 'Notes In My Way' }]);
+    expect(calls.at(-1)).toEqual(['window_title_set', { title: 'Liber Linteum' }]);
   });
 
   it('M3a §2: Edit and Global view switch the screen; the editor stays mounted (undo survives)', async () => {
@@ -267,6 +267,108 @@ describe('AppShell', () => {
     expect(
       await screen.findByRole('complementary', { name: 'Files · Digital Brain' }),
     ).toBeInTheDocument();
+  });
+
+  it('round 3 §2.1: the sidebar resizes by drag and keys, clamps to 200–560, and remembers its width', async () => {
+    const calls = backend({
+      settings_set: (a) => ({ ...useSettingsStore.getState().settings, ...(a.patch as object) }),
+    });
+    const patches = () => calls.filter(([c]) => c === 'settings_set').map(([, a]) => a.patch);
+    seed();
+    render(<AppShell />);
+    const side = screen.getByRole('complementary');
+    const edge = screen.getByRole('separator', { name: 'Resize the sidebar' });
+    const width = () => side.style.getPropertyValue('--sidebar-width');
+    expect(edge).toHaveAttribute('aria-valuenow', '270');
+    expect(edge).toHaveAttribute('aria-valuemin', '200');
+    expect(edge).toHaveAttribute('aria-valuemax', '560');
+    expect(width()).toBe('270px');
+    // Keys: → wider, Shift ×4, saved each time.
+    edge.focus();
+    await userEvent.keyboard('{ArrowRight}');
+    await waitFor(() => expect(patches().at(-1)).toEqual({ sidebarWidth: 286 }));
+    expect(width()).toBe('286px');
+    await userEvent.keyboard('{Shift>}{ArrowLeft}{/Shift}');
+    await waitFor(() => expect(patches().at(-1)).toEqual({ sidebarWidth: 222 }));
+    // Dragging follows the pointer, clamps, and saves once on release.
+    const at = (type: string, x: number) =>
+      act(() => {
+        edge.dispatchEvent(
+          new PointerEvent(type, { bubbles: true, clientX: x, clientY: 300, pointerId: 1 }),
+        );
+      });
+    const before = patches().length;
+    await at('pointerdown', 222);
+    await at('pointermove', 400);
+    expect(edge).toHaveAttribute('aria-valuenow', '400');
+    await at('pointermove', 2000);
+    expect(width()).toBe('560px');
+    expect(patches().length).toBe(before);
+    await at('pointerup', 2000);
+    await waitFor(() => expect(patches().at(-1)).toEqual({ sidebarWidth: 560 }));
+    // A double-click puts the default back.
+    fireEvent.doubleClick(edge);
+    await waitFor(() => expect(patches().at(-1)).toEqual({ sidebarWidth: 270 }));
+    expect(width()).toBe('270px');
+  });
+
+  it('round 3b final review: a release that arrives before the last move renders keeps the dragged width', async () => {
+    backend({
+      settings_set: (a) => ({ ...useSettingsStore.getState().settings, ...(a.patch as object) }),
+    });
+    seed();
+    render(<AppShell />);
+    const edge = screen.getByRole('separator', { name: 'Resize the sidebar' });
+    const fire = (type: string, x: number) =>
+      edge.dispatchEvent(
+        new PointerEvent(type, { bubbles: true, clientX: x, clientY: 300, pointerId: 1 }),
+      );
+    act(() => fire('pointerdown', 270));
+    // A loaded machine: the move and the release land before React renders.
+    act(() => {
+      fire('pointermove', 420);
+      fire('pointerup', 420);
+    });
+    await waitFor(() => expect(useSettingsStore.getState().settings.sidebarWidth).toBe(420));
+    expect(edge).toHaveAttribute('aria-valuenow', '420');
+  });
+
+  it('round 3 review I1: held arrow keys never lose a step or go back while saves are in flight', async () => {
+    const pending: (() => void)[] = [];
+    const saved: number[] = [];
+    backend({
+      settings_set: (a) =>
+        new Promise((resolve) => {
+          const patch = a.patch as { sidebarWidth: number };
+          pending.push(() => {
+            saved.push(patch.sidebarWidth);
+            resolve({ ...useSettingsStore.getState().settings, ...patch });
+          });
+        }),
+    });
+    seed();
+    render(<AppShell />);
+    const edge = screen.getByRole('separator', { name: 'Resize the sidebar' });
+    const seen: number[] = [];
+    const watch = () => seen.push(Number(edge.getAttribute('aria-valuenow')));
+    edge.focus();
+    for (let i = 0; i < 3; i++) {
+      await userEvent.keyboard('{ArrowRight}');
+      watch();
+    }
+    // Answer every save, oldest first, as they reach the backend.
+    for (let i = 0; i < 10 && saved.length < 3; i++) {
+      await act(async () => {
+        pending.shift()?.();
+        await new Promise((r) => setTimeout(r, 0));
+      });
+      watch();
+    }
+    await waitFor(() => expect(edge).toHaveAttribute('aria-valuenow', '318'));
+    watch();
+    expect(seen).toEqual([...seen].sort((x, y) => x - y));
+    expect(saved.at(-1)).toBe(318);
+    expect(useSettingsStore.getState().settings.sidebarWidth).toBe(318);
   });
 
   it('final review I5: collapsing from inside the sidebar keeps the keyboard; reopening returns it', async () => {

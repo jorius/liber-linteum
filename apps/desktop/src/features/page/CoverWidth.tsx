@@ -32,7 +32,7 @@ function useWindowWidth(): number {
 
 /** A side cover's strip (M4b part 3 §3): its width and the handle on its
  *  inner edge, the twin of the cover band's height handle (CoverResize). The
- *  page's own width (`.nimw/vault.json`) or 280 px, shown between 160 px and
+ *  page's own width (`.liber/vault.json`) or 280 px, shown between 160 px and
  *  45% of the window; the window caps what is shown, never what is stored.
  *  The arrow keys move the edge the way they point (on a left strip → widens
  *  it, on a right strip ←), Shift ×4, Home/End go to the ends, Enter or

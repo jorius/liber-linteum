@@ -208,7 +208,7 @@ export function BinView() {
           <div className={styles.toolbar}>
             <input
               type="search"
-              className={styles.filter}
+              className={`field-control ${styles.filter}`}
               aria-label={t('bin.filter')}
               placeholder={t('bin.filterPlaceholder')}
               value={filter}
@@ -219,7 +219,7 @@ export function BinView() {
             </label>
             <select
               id={ids.sort}
-              className={styles.sortSelect}
+              className="field-control"
               value={sort}
               onChange={(e) => {
                 sessionSort = e.target.value as Sort;

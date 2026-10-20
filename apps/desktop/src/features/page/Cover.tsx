@@ -116,7 +116,7 @@ export interface CoverSlots {
  *  document the cover is shown read-only. A cover band is as tall as the
  *  page's own cover height or the app's default, a strip as wide as its own
  *  width or 280 px; their inner edges resize them (kept in
- *  `.nimw/vault.json`, so even a read-only page can). */
+ *  `.liber/vault.json`, so even a read-only page can). */
 export function Cover({
   page,
   editable,

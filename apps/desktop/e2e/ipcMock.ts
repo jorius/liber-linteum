@@ -20,7 +20,7 @@ export function installIpcMock({
   remoteCover?: boolean;
   /** Vault files other than pages from the start (e.g. a cover image). */
   files?: string[];
-  /** M4b part 3 §3: pages whose cover is a side strip (`.nimw/vault.json`). */
+  /** M4b part 3 §3: pages whose cover is a side strip (`.liber/vault.json`). */
   coverSides?: Record<string, 'left' | 'right'>;
   /** M4b part 3 §9: what `links_external` says about each target. */
   outside?: Record<
@@ -46,7 +46,7 @@ export function installIpcMock({
   const files = new Set<string>(vaultFiles);
   /** `listen` registrations, so tests can emit events (e.g. tauri://drag-drop). */
   const listeners: { event: string; handler: number; id: number }[] = [];
-  w.__nimwEmit = (event: string, payload: unknown) => {
+  w.__liberEmit = (event: string, payload: unknown) => {
     for (const l of listeners.filter((x) => x.event === event)) {
       (w[`_${l.handler}`] as (e: unknown) => void)?.({ event, id: l.id, payload });
     }
@@ -158,7 +158,10 @@ export function installIpcMock({
   };
   const widths = (): Record<string, string> => {
     try {
-      return JSON.parse(sessionStorage.getItem('nimwMockWidths') ?? '{}') as Record<string, string>;
+      return JSON.parse(sessionStorage.getItem('liberMockWidths') ?? '{}') as Record<
+        string,
+        string
+      >;
     } catch {
       return {};
     }
@@ -166,7 +169,7 @@ export function installIpcMock({
   /** Cover resize: page cover heights, kept like the widths. */
   const heights = (): Record<string, number> => {
     try {
-      return JSON.parse(sessionStorage.getItem('nimwMockHeights') ?? '{}') as Record<
+      return JSON.parse(sessionStorage.getItem('liberMockHeights') ?? '{}') as Record<
         string,
         number
       >;
@@ -182,8 +185,8 @@ export function installIpcMock({
       return {};
     }
   };
-  const sides = () => stored<string>('nimwMockSides');
-  const coverWidths = () => stored<number>('nimwMockCoverWidths');
+  const sides = () => stored<string>('liberMockSides');
+  const coverWidths = () => stored<number>('liberMockCoverWidths');
   /** M4b part 3 §8: the vault's own link format for new attachments. */
   let linkFormat: string | null = null;
   const vaultSettings = () => ({
@@ -198,7 +201,7 @@ export function installIpcMock({
     obsidianLinkFormat: null,
   });
   // ---- M4c: quick notes (the global Scratchpad and the scratch folder) ----
-  const SCRATCH_DEFAULT = '/Users/e2e/Documents/Notes In My Way/Scratchpad';
+  const SCRATCH_DEFAULT = '/Users/e2e/Documents/Liber Linteum/Scratchpad';
   /** The open vault is the global Scratchpad (its root is the scratch place). */
   let inScratchpad = false;
   const autoNamed = new Set<string>();
@@ -223,8 +226,10 @@ export function installIpcMock({
       .trim();
   /** M5b §5: pages moved into the vault's Trash, by their path there. */
   const trashed: Record<string, { text: string; from: string; at: number }> = {};
+  /** Spelling: words ignored this session. */
+  const ignored = new Set<string>();
   const handlers: Record<string, (a: Args, options?: unknown) => unknown> = {
-    app_info: () => ({ name: 'Notes In My Way', version: '0.0.0-e2e' }),
+    app_info: () => ({ name: 'Liber Linteum', version: '0.0.0-e2e' }),
     settings_get: () => ({ settings }),
     settings_set: (a) => {
       settings = { ...settings, ...(a.patch as object) };
@@ -236,7 +241,7 @@ export function installIpcMock({
       const to = a.to as string;
       pages[to] = pages[from];
       delete pages[from];
-      ((w.__nimwRenames ??= []) as unknown[]).push({ from, to });
+      ((w.__liberRenames ??= []) as unknown[]).push({ from, to });
       return { moved: [[from, to]], updatedFiles: [], updatedLinks: 0, failed: [] };
     },
     // ---- M5b §5: the vault's Trash and Archive (pages only) ----
@@ -335,17 +340,50 @@ export function installIpcMock({
     vault_icon_set: () => null,
     // M5b §19: kept in sessionStorage, so a reload still has them.
     favorites_get: () =>
-      JSON.parse(sessionStorage.getItem('nimwMockFavorites') ?? '[]') as string[],
+      JSON.parse(sessionStorage.getItem('liberMockFavorites') ?? '[]') as string[],
     favorites_set: (a) => {
       const next = (a.paths as string[]).filter((p, i, all) => all.indexOf(p) === i);
-      sessionStorage.setItem('nimwMockFavorites', JSON.stringify(next));
+      sessionStorage.setItem('liberMockFavorites', JSON.stringify(next));
       return next;
     },
+    // ---- spell checking: a tiny dictionary that knows one misspelling ----
+    spell_check: (a) => {
+      const known = JSON.parse(sessionStorage.getItem('liberMockWords') ?? '[]') as string[];
+      return (a.words as string[]).map(
+        (w) => w !== 'recieve' || known.includes(w) || ignored.has(w),
+      );
+    },
+    spell_suggest: (a) => (a.word === 'recieve' ? ['receive', 'relieve'] : []),
+    spell_dictionaries: () => [
+      { id: 'en_US', name: 'English (US)', bundled: true, available: true },
+      { id: 'es', name: 'Spanish', bundled: true, available: true },
+      { id: 'es_CO', name: 'Spanish (Colombia)', bundled: true, available: true },
+    ],
+    spell_import: () => null,
+    spell_remove: () => null,
+    // Kept in sessionStorage, like favorites, so a reload still has them.
+    spell_add_word: (a) => {
+      const known = JSON.parse(sessionStorage.getItem('liberMockWords') ?? '[]') as string[];
+      sessionStorage.setItem('liberMockWords', JSON.stringify([...known, a.word as string].sort()));
+      return null;
+    },
+    spell_ignore: (a) => {
+      ignored.add(a.word as string);
+      return null;
+    },
+    spell_words: () => JSON.parse(sessionStorage.getItem('liberMockWords') ?? '[]') as string[],
+    spell_remove_word: (a) => {
+      const known = JSON.parse(sessionStorage.getItem('liberMockWords') ?? '[]') as string[];
+      sessionStorage.setItem('liberMockWords', JSON.stringify(known.filter((w) => w !== a.word)));
+      return null;
+    },
+    spell_vault_get: () => null,
+    spell_vault_set: () => null,
     page_get: (a) => page(a.path as string),
     page_read: (a) => ({ text: pages[a.path as string], hash: 'h' }),
     page_write: (a) => {
       // Recorded so tests can assert what an edit saved; kept for page_get.
-      ((w.__nimwWrites ??= []) as unknown[]).push(a);
+      ((w.__liberWrites ??= []) as unknown[]).push(a);
       pages[a.path as string] = a.text as string;
       // A new hash per write: the header refreshes when the hash changes.
       return { hash: `h${nextId++}` };
@@ -353,7 +391,7 @@ export function installIpcMock({
     // ---- M4b part 2: text files (§6) ----
     text_read: (a) => ({ text: pages[a.path as string], hash: 'h' }),
     text_write: (a) => {
-      ((w.__nimwWrites ??= []) as unknown[]).push(a);
+      ((w.__liberWrites ??= []) as unknown[]).push(a);
       pages[a.path as string] = a.text as string;
       return { hash: `h${nextId++}` };
     },
@@ -384,7 +422,7 @@ export function installIpcMock({
       const next = { ...widths() };
       if (a.width) next[a.path as string] = a.width as string;
       else delete next[a.path as string];
-      sessionStorage.setItem('nimwMockWidths', JSON.stringify(next));
+      sessionStorage.setItem('liberMockWidths', JSON.stringify(next));
       return vaultSettings();
     },
     // Cover resize: clamped like Rust (132–2000), kept across a reload.
@@ -393,8 +431,8 @@ export function installIpcMock({
       const height = a.height as number | null;
       if (height === null) delete next[a.path as string];
       else next[a.path as string] = Math.min(2000, Math.max(132, Math.round(height)));
-      sessionStorage.setItem('nimwMockHeights', JSON.stringify(next));
-      ((w.__nimwCoverHeights ??= []) as unknown[]).push({ path: a.path, height });
+      sessionStorage.setItem('liberMockHeights', JSON.stringify(next));
+      ((w.__liberCoverHeights ??= []) as unknown[]).push({ path: a.path, height });
       return vaultSettings();
     },
     // M4b part 3 §3: placements (`top` clears) and strip widths (clamped
@@ -403,8 +441,8 @@ export function installIpcMock({
       const next = { ...sides() };
       if (a.side === 'top') delete next[a.path as string];
       else next[a.path as string] = a.side as string;
-      sessionStorage.setItem('nimwMockSides', JSON.stringify(next));
-      ((w.__nimwCoverSides ??= []) as unknown[]).push({ path: a.path, side: a.side });
+      sessionStorage.setItem('liberMockSides', JSON.stringify(next));
+      ((w.__liberCoverSides ??= []) as unknown[]).push({ path: a.path, side: a.side });
       return vaultSettings();
     },
     cover_width_set: (a) => {
@@ -412,12 +450,12 @@ export function installIpcMock({
       const width = a.width as number | null;
       if (width === null) delete next[a.path as string];
       else next[a.path as string] = Math.min(2000, Math.max(160, Math.round(width)));
-      sessionStorage.setItem('nimwMockCoverWidths', JSON.stringify(next));
+      sessionStorage.setItem('liberMockCoverWidths', JSON.stringify(next));
       return vaultSettings();
     },
     vault_settings_set: (a) => {
       const patch = a.patch as { attachments?: unknown; attachmentLinkFormat?: string };
-      ((w.__nimwVaultPatches ??= []) as unknown[]).push(patch);
+      ((w.__liberVaultPatches ??= []) as unknown[]).push(patch);
       if (patch.attachmentLinkFormat) {
         linkFormat = patch.attachmentLinkFormat === 'default' ? null : patch.attachmentLinkFormat;
       }
@@ -434,7 +472,7 @@ export function installIpcMock({
       }),
     // Final review C1: the user loads a network file; it is found from then on.
     external_network_allow: (a) => {
-      ((w.__nimwNetworkLoads ??= []) as unknown[]).push(a.path);
+      ((w.__liberNetworkLoads ??= []) as unknown[]).push(a.path);
       for (const [target, f] of Object.entries(outside)) {
         if (f.path === a.path) outside[target] = { ...f, askFirst: false, exists: true };
       }
@@ -443,18 +481,18 @@ export function installIpcMock({
     },
     file_pick: () => filePicks,
     external_open: (a) => {
-      ((w.__nimwExternalOpens ??= []) as unknown[]).push(a.path);
+      ((w.__liberExternalOpens ??= []) as unknown[]).push(a.path);
       return null;
     },
     external_reveal: (a) => {
-      ((w.__nimwReveals ??= []) as unknown[]).push(a.path);
+      ((w.__liberReveals ??= []) as unknown[]).push(a.path);
       return null;
     },
     attachment_paste: (_a, options) => {
       const headers = (options as { headers?: Record<string, string> })?.headers ?? {};
-      const name = decodeURIComponent(headers['x-nimw-name'] ?? 'pasted.png');
+      const name = decodeURIComponent(headers['x-liber-name'] ?? 'pasted.png');
       files.add(`attachments/${name}`);
-      ((w.__nimwPastes ??= []) as unknown[]).push(name);
+      ((w.__liberPastes ??= []) as unknown[]).push(name);
       return { path: `attachments/${name}`, link: name, copied: true };
     },
     attachment_import: (a) =>
@@ -466,20 +504,20 @@ export function installIpcMock({
     // ---- M6: audio clips (a synthetic microphone; levels come from the test) ----
     audio_devices: () => [{ id: 'mic', name: 'Test microphone', isDefault: true }],
     audio_record_start: (a) => {
-      if (w.__nimwTake) throw { kind: 'alreadyExists', message: 'already recording' };
-      w.__nimwTake = { id: 7, name: a.name, page: a.page };
+      if (w.__liberTake) throw { kind: 'alreadyExists', message: 'already recording' };
+      w.__liberTake = { id: 7, name: a.name, page: a.page };
       return { recordingId: 7, recovered: [] };
     },
     audio_record_stop: () => {
-      const take = w.__nimwTake as { name: string } | undefined;
+      const take = w.__liberTake as { name: string } | undefined;
       if (!take) throw { kind: 'notFound', message: 'no recording' };
-      delete w.__nimwTake;
+      delete w.__liberTake;
       const name = `${take.name}.wav`;
       files.add(`attachments/${name}`);
       return { path: `attachments/${name}`, link: name, copied: true };
     },
     audio_record_cancel: () => {
-      delete w.__nimwTake;
+      delete w.__liberTake;
       return null;
     },
     audio_pick: () => {
@@ -604,13 +642,13 @@ export function installIpcMock({
       return gvCard(folder, folder.includes('/') ? 'folder' : 'project', null);
     },
     layout_get: (a) => {
-      const all = JSON.parse(localStorage.getItem('nimw-e2e-layout') ?? '{}');
+      const all = JSON.parse(localStorage.getItem('liber-e2e-layout') ?? '{}');
       return all[a.level as string] ?? {};
     },
     layout_set: (a) => {
-      const all = JSON.parse(localStorage.getItem('nimw-e2e-layout') ?? '{}');
+      const all = JSON.parse(localStorage.getItem('liber-e2e-layout') ?? '{}');
       all[a.level as string] = a.positions;
-      localStorage.setItem('nimw-e2e-layout', JSON.stringify(all));
+      localStorage.setItem('liber-e2e-layout', JSON.stringify(all));
       return null;
     },
     // ---- M5: search over `pages` (folded word prefixes, the filters, a
@@ -762,7 +800,7 @@ export function installIpcMock({
       pages['Home.md'] = '# Home\n\nSee [[Child]].\n';
       pages['Home/Child.md'] = '# Child\n';
       pages['Notion import report.md'] = '# Notion import report\n\nNo warnings.\n';
-      (w.__nimwEmit as (e: string, p: unknown) => void)('notion:progress', { done: 4, total: 4 });
+      (w.__liberEmit as (e: string, p: unknown) => void)('notion:progress', { done: 4, total: 4 });
       return {
         vault: {
           name: a.name,
@@ -842,7 +880,7 @@ export function installIpcMock({
   w.isTauri = true;
   // CSP-blocked loads never become requests; record them as violations.
   const violations: string[] = [];
-  w.__nimwCspViolations = violations;
+  w.__liberCspViolations = violations;
   document.addEventListener('securitypolicyviolation', (e) =>
     violations.push(`${e.violatedDirective} ${e.blockedURI}`),
   );

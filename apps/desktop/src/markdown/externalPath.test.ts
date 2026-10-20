@@ -31,11 +31,11 @@ describe('targets outside the vault (M4b part 3 §9)', () => {
 
   it('outside files are asked for as one encoded segment after /.external/', () => {
     expect(externalAssetUrl('/Users/j/a b#1.png')).toBe(
-      'nimw-asset://localhost/.external/%2FUsers%2Fj%2Fa%20b%231.png',
+      'liber-asset://localhost/.external/%2FUsers%2Fj%2Fa%20b%231.png',
     );
     vi.stubGlobal('navigator', { userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)' });
     expect(externalAssetUrl('D:\\Pics\\a.png')).toBe(
-      'http://nimw-asset.localhost/.external/D%3A%5CPics%5Ca.png',
+      'http://liber-asset.localhost/.external/D%3A%5CPics%5Ca.png',
     );
   });
 });

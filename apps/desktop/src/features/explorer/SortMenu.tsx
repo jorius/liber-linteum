@@ -73,7 +73,7 @@ export function SortMenu({
       ref={box}
       role="menu"
       aria-label={t('sort.label', { name })}
-      className="nimw-menu"
+      className="liber-menu"
       style={{ position: 'fixed', left: anchor.x, top: anchor.y }}
       onKeyDown={onKeyDown}
     >

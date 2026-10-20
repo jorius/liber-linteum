@@ -92,7 +92,7 @@ function Menu({
       ref={box}
       role="menu"
       aria-label={label}
-      className="nimw-menu"
+      className="liber-menu"
       style={{ position: 'fixed', left: rect.left, top: rect.bottom + 4, minWidth: 220 }}
       onKeyDown={onKeyDown}
     >

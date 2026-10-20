@@ -8,8 +8,8 @@ use crate::editor_commands::{LinkTarget, check_openable, parse_targets};
 use crate::error::{CmdResult, CommandError, ErrorKind};
 use crate::state::AppState;
 use crate::vault_commands::blocking;
-use nimw_session::{file_url, opens_from_notes};
-use nimw_vault::VaultPath;
+use liber_session::{file_url, opens_from_notes};
+use liber_vault::VaultPath;
 use serde::Serialize;
 use std::path::PathBuf;
 use tauri::{AppHandle, Manager, Runtime};
@@ -34,8 +34,8 @@ pub struct ExternalFileDto {
     pub openable: bool,
 }
 
-impl From<nimw_session::ExternalFile> for ExternalFileDto {
-    fn from(f: nimw_session::ExternalFile) -> Self {
+impl From<liber_session::ExternalFile> for ExternalFileDto {
+    fn from(f: liber_session::ExternalFile) -> Self {
         ExternalFileDto {
             path: f.path,
             exists: f.exists,

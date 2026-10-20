@@ -36,7 +36,11 @@ export const DEFAULT_SETTINGS: Settings = {
   scratchpadPath: null,
   autoSave: true,
   sidebarCollapsed: false,
+  sidebarWidth: 270,
   actionButton: 'bottomRight',
+  spellcheck: true,
+  spellDictionaries: null,
+  importedDictionaries: [],
   globalViewMode: 'drill',
   globalViewEdges: { links: true, tree: true, manual: true, aggregated: true },
 };

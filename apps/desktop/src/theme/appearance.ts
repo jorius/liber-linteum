@@ -4,7 +4,7 @@ import { fontStack } from './fonts';
 import { paletteCss } from './paletteCss';
 
 /** Id of the `<style>` holding the custom-accent palette. */
-export const CUSTOM_STYLE_ID = 'nimw-custom-palette';
+export const CUSTOM_STYLE_ID = 'liber-custom-palette';
 
 /** Applies the palette and the editor fonts (M2b §4–5): built-in palettes are
  *  an attribute on `<html>` (their CSS ships in palettes.css); a custom accent

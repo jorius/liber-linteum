@@ -25,7 +25,7 @@ function backend(handlers: Record<string, Handler>) {
   return calls;
 }
 
-const DEFAULT = '/Users/me/Documents/Notes In My Way/Scratchpad';
+const DEFAULT = '/Users/me/Documents/Liber Linteum/Scratchpad';
 const report = { pages: 0, warnings: [] };
 
 function setupBackend(extra: Record<string, Handler> = {}) {

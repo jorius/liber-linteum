@@ -15,14 +15,14 @@ export function linkTargets(tree: Root): LinkTarget[] {
   const walk = (n: Root | Element) => {
     for (const c of n.children) {
       if (c.type !== 'element') continue;
-      const { dataNimw, dataTarget } = c.properties;
+      const { dataLiber, dataTarget } = c.properties;
       if (typeof dataTarget === 'string') {
         const t: LinkTarget | null =
-          dataNimw === 'wikilink'
+          dataLiber === 'wikilink'
             ? { kind: 'wiki', target: dataTarget }
-            : dataNimw === 'embed'
+            : dataLiber === 'embed'
               ? { kind: 'embed', target: dataTarget }
-              : dataNimw === 'link'
+              : dataLiber === 'link'
                 ? { kind: 'markdown', target: `/${dataTarget}` }
                 : null;
         if (t) out.set(keyOf(t), t);

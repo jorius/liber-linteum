@@ -29,7 +29,7 @@ All acceptance criteria of product spec §6 pass, except the manual-relationship
 - Safari 15 floor;
 - performance: a level of ≤ 200 cards renders in < 300 ms at 10k notes (NFR-03);
 - only open levels are mounted (NFR-02);
-- opening a vault writes nothing: `.nimw/layout.json` is created on the first card move.
+- opening a vault writes nothing: `.liber/layout.json` is created on the first card move.
 
 ## 2. Screen and switching (`stores/uiStore.ts`, `TopBar.tsx`, `AppShell.tsx`)
 
@@ -174,7 +174,7 @@ Values come from the prototype (`.card`, lines 64-79 and 291-312), expressed as 
   - **Neighbourhood** (page level, Drill-down): backlinks on the left, the page in the centre and outgoing links on the right, each column vertically centred on the page. Related pages go left or right by direction (undirected ones go right), and a page that is both linked and linking goes right.
 - **Pinned positions (GV-31):**
   - dragging a card by its move handle pins it;
-  - pinned positions are saved per **level key** in `.nimw/layout.json` (arch §3.1), with an atomic write that preserves unknown keys, debounced 300 ms after a drag ends;
+  - pinned positions are saved per **level key** in `.liber/layout.json` (arch §3.1), with an atomic write that preserves unknown keys, debounced 300 ms after a drag ends;
   - level keys: `""` (vault), `<folderPath>`, `page:<path>`, and `expand:<rootKey>` for Expand canvases;
   - unpinned cards follow the deterministic layout.
 - **Reset layout (GV-32)** removes the current level key's entries.
@@ -185,7 +185,7 @@ Values come from the prototype (`.card`, lines 64-79 and 291-312), expressed as 
   - each level change fits the view, unless the level has pinned positions, in which case it restores them and fits.
 - **Canvas background:** `--color-canvas` with the `--color-bg-dots` 18 px dot grid already used by Welcome.
 
-## 8. Backend (`apps/desktop/src-tauri/src/gv_commands.rs`, `crates/nimw-session/src/global_view.rs`)
+## 8. Backend (`apps/desktop/src-tauri/src/gv_commands.rs`, `crates/liber-session/src/global_view.rs`)
 
 **Rules for all commands:** async via `blocking()`; registered in `build.rs`, `generate_handler!`, capabilities and the test COMMANDS list; each with a real-ACL test.
 
@@ -202,13 +202,13 @@ Values come from the prototype (`.card`, lines 64-79 and 291-312), expressed as 
   - It scans the resolved links once (an indexed query on `target_path IS NOT NULL`), maps ends with a prefix lookup over the visible folders (sorted, binary search), and aggregates in a `HashMap`.
   - A manual edge's label is the first label found for that pair; `directed` is true when any entry for that pair is directed in that orientation.
 - **`layout_get(level: String) -> HashMap<String, {x, y}>` and `layout_set(level, positions)`**
-  - `.nimw/layout.json` holds `{ "version": 1, "levels": { … } }`. It is created lazily and written atomically.
+  - `.liber/layout.json` holds `{ "version": 1, "levels": { … } }`. It is created lazily and written atomically.
   - An empty map removes the level.
   - It is read per level and per entry: a malformed entry, or one a later version adds, is skipped on its own, and a save keeps the saved level's entries it can't read as positions (final review m8).
   - Updates are serialized in the process (`layout_set` threads and the watcher), a compare-and-swap lost to another program is retried once, and an update that changes nothing is not written (final review I3, m11).
   - Pruning (final review m10): a level save drops that level's positions for paths that no longer exist and doesn't store a level whose own folder or page is gone; a level save, or a remap that moved something, drops the levels of deleted folders and pages (one `lstat` per level key). Reads and no-op remaps never write just to prune.
 - **`VaultSession::rename`** and the watcher's rename path call `layout_remap(from, to)` (prefix remap for keys and entries). They do nothing when no `layout.json` exists. The watcher remaps a whole batch at once (`remap_layout_many`: one read, at most one write), before announcing the change. Keys and entries already at a rename's destination are leftovers of a deleted path and are replaced by the moved ones (final review I3, m10).
-- **`.nimw/vault.json`** is read field by field: a malformed `indexPicks`, `attachments` or `exclude` item is reported and ignored on its own, and never disables `exclude` (final review m9).
+- **`.liber/vault.json`** is read field by field: a malformed `indexPicks`, `attachments` or `exclude` item is reported and ignored on its own, and never disables `exclude` (final review m9).
 - **Settings:** `globalViewMode` (`"drill"` default) and `globalViewEdges` (`{ links, tree, manual, aggregated }`, all `true`), each lenient per field (M1/M2b pattern).
 - **The DTO for `PageDto`** is unchanged. Cards come only from `gv_children`.
 
@@ -332,7 +332,7 @@ These override the sections above where they conflict.
       | the same, toggling "Links from inside folders" | 55–210 · 290–860 ms | 40–50 · 30–75 ms |
       | 200 cards, no edges (floor) | 169 / 72 · 210 / 145 ms | 138 / 102 · 159 / 92 ms |
 
-    - **Pinned by:** `GlobalView.edges.test.tsx` (counts are SVG text, 3,160 edges make one layer and no React Flow edge, the cap and its note), `edges.test.ts` (`strongest`, `dashScale`), and the opt-in timing probe `e2e/m3a-perf.spec.ts` (`NIMW_PERF=1`, both engines, asserts < 300 ms; not in CI, where runner speed varies).
+    - **Pinned by:** `GlobalView.edges.test.tsx` (counts are SVG text, 3,160 edges make one layer and no React Flow edge, the cap and its note), `edges.test.ts` (`strongest`, `dashScale`), and the opt-in timing probe `e2e/m3a-perf.spec.ts` (`LIBER_PERF=1`, both engines, asserts < 300 ms; not in CI, where runner speed varies).
 18. **Final-review fixes (build, rendering, accessibility):**
     - **Dev pre-bundle** (C1): `pnpm dev` / `tauri dev` serve React Flow from Vite's dependency pre-bundle, which Rolldown builds without the app's plugin `transform` hooks; Tauri freezes the prototype in dev too, so the window stayed blank. `vite.config.ts` also runs `freezeSafe()` in `optimizeDeps.rolldownOptions.plugins`; `tests/devPrebundle.test.ts` runs the real optimizer with the app's config and checks the bundle.
     - **Card button** (m5): a text-free layer (`.press`) over the card body is the `role="button"` element, so its name (the title) matches what it shows; the cover, title, subtitle and excerpt sit beside it, and the subtitle, excerpt and connections stay its description. axe's label-content-name-mismatch only runs in a real engine: `e2e/m3a-a11y.spec.ts` runs axe on the Global View in Chromium and WebKit, light and dark.

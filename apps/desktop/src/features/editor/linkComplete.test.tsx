@@ -110,15 +110,13 @@ describe('linkSource (M2c §6, PG-05)', () => {
     expect(v.state.selection.main.head).toBe(v.state.doc.length);
   });
 
-  it('M5b §4: a page’s emoji shows before its name; matching and inserting stay on the name', async () => {
+  it('round 3b §8.2: the label is the name alone; matching and inserting stay on it', async () => {
     useVaultStore.setState({ nodes: [{ path: REX.path, kind: 'page', icon: '🦖' }] });
     mockIPC((cmd) => (cmd === 'link_suggest' ? [REX] : null));
     const v = editor('See [[gen');
     const result = await complete(v);
-    expect(result!.options[0]).toMatchObject({
-      label: 'Generator Rex',
-      displayLabel: '🦖 Generator Rex',
-    });
+    expect(result!.options[0]).toMatchObject({ label: 'Generator Rex' });
+    expect(result!.options[0].displayLabel).toBeUndefined();
     expect(v.state.doc.toString()).toBe('See [[rex-draft|Generator Rex]]');
     useVaultStore.setState({ nodes: [] });
   });
@@ -203,6 +201,22 @@ describe('in the editor (M2c §6)', () => {
     expect(v.state.doc.toString()).toBe('See [[rex-draft|Generator Rex]]');
     expect(acceptCompletion(v)).toBe(false);
   });
+  it("round 3b §8.2: an option shows the page's icon in a leading box", async () => {
+    useVaultStore.setState({ nodes: [{ path: REX.path, kind: 'page', icon: '🦖' }] });
+    mockIPC(() => [REX, COVER]);
+    const v = editor('See [[');
+    act(() => {
+      startCompletion(v);
+    });
+    await vi.waitFor(() =>
+      expect(document.querySelectorAll('.cm-tooltip-autocomplete li')).toHaveLength(2),
+    );
+    const [rex, other] = [...document.querySelectorAll('.cm-tooltip-autocomplete li')];
+    expect(rex.querySelector('.cm-liber-linkIcon')).toHaveTextContent('🦖');
+    expect(rex.querySelector('.cm-completionLabel')!.textContent).toBe('Generator Rex');
+    expect(other.querySelector('.cm-liber-linkIcon svg')).not.toBeNull();
+    useVaultStore.setState({ nodes: [] });
+  });
 });
 
 describe('the search line and debounce (M4b §4)', () => {
@@ -212,7 +226,7 @@ describe('the search line and debounce (M4b §4)', () => {
       startCompletion(v);
     });
     await vi.waitFor(() =>
-      expect(document.querySelector('.cm-tooltip-autocomplete .cm-nimw-search')).not.toBeNull(),
+      expect(document.querySelector('.cm-tooltip-autocomplete .cm-liber-search')).not.toBeNull(),
     );
     return v;
   };
@@ -220,21 +234,23 @@ describe('the search line and debounce (M4b §4)', () => {
   it('the list opens with what was typed and how many pages match', async () => {
     mockIPC(() => [REX, COVER]);
     await open('See [[gen');
-    const line = document.querySelector('.cm-nimw-search')!;
+    const line = document.querySelector('.cm-liber-search')!;
     expect(line).toHaveTextContent('Search: gen');
     expect(line).toHaveTextContent('2 matches');
     expect(line).toHaveAttribute('aria-hidden', 'true');
     // Read out politely instead (the line is part of the list's visuals).
     await vi.waitFor(() =>
-      expect(document.querySelector('[data-nimw-status]')).toHaveTextContent('2 matches for “gen”'),
+      expect(document.querySelector('[data-liber-status]')).toHaveTextContent(
+        '2 matches for “gen”',
+      ),
     );
   });
 
   it('with nothing typed yet it says to type to filter', async () => {
     mockIPC(() => [REX]);
     await open('See [[');
-    expect(document.querySelector('.cm-nimw-search')).toHaveTextContent('Type to filter');
-    expect(document.querySelector('.cm-nimw-search')).toHaveTextContent('1 match');
+    expect(document.querySelector('.cm-liber-search')).toHaveTextContent('Type to filter');
+    expect(document.querySelector('.cm-liber-search')).toHaveTextContent('1 match');
   });
 
   it('typing quickly asks Rust once, for the last text (80 ms debounce)', async () => {
@@ -258,7 +274,7 @@ describe('the search line and debounce (M4b §4)', () => {
       await act(() => new Promise((r) => setTimeout(r, 20)));
     }
     await vi.waitFor(() =>
-      expect(document.querySelector('.cm-nimw-search')).toHaveTextContent('gen'),
+      expect(document.querySelector('.cm-liber-search')).toHaveTextContent('gen'),
     );
     expect(queries).toEqual(['gen']);
   });

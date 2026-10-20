@@ -36,11 +36,11 @@ async function watchNetwork(page: Page) {
     const local =
       (url.protocol === 'http:' && url.hostname === '127.0.0.1') ||
       url.protocol === 'data:' ||
-      url.protocol === 'nimw-asset:' ||
-      url.hostname === 'nimw-asset.localhost';
+      url.protocol === 'liber-asset:' ||
+      url.hostname === 'liber-asset.localhost';
     if (!local) outside.push(r.url());
   });
-  await page.route(/^https?:\/\/(?!127\.0\.0\.1|nimw-asset\.localhost)/, (route) => route.abort());
+  await page.route(/^https?:\/\/(?!127\.0\.0\.1|liber-asset\.localhost)/, (route) => route.abort());
   return outside;
 }
 
@@ -71,14 +71,15 @@ async function stayedLocal(page: Page, outside: string[]) {
   expect(outside).toEqual([]);
   expect(
     await page.evaluate(
-      () => (window as unknown as { __nimwCspViolations: string[] }).__nimwCspViolations,
+      () => (window as unknown as { __liberCspViolations: string[] }).__liberCspViolations,
     ),
   ).toEqual([]);
 }
 
 const lastWrite = (page: Page) =>
   page.evaluate(() => {
-    const writes = (window as unknown as { __nimwWrites?: { text: string }[] }).__nimwWrites ?? [];
+    const writes =
+      (window as unknown as { __liberWrites?: { text: string }[] }).__liberWrites ?? [];
     return writes.at(-1)?.text ?? null;
   });
 
@@ -158,7 +159,7 @@ test('§8 the link format for new attachments, in Settings → This vault', asyn
   await expect(page.getByText('![](file:///…/Assets/x.png)')).toBeVisible();
   expect(
     await page.evaluate(
-      () => (window as unknown as { __nimwVaultPatches: unknown[] }).__nimwVaultPatches,
+      () => (window as unknown as { __liberVaultPatches: unknown[] }).__liberVaultPatches,
     ),
   ).toEqual([{ attachmentLinkFormat: 'absolute' }]);
   for (const scheme of ['light', 'dark'] as const) {
@@ -171,8 +172,8 @@ test('§8 the link format for new attachments, in Settings → This vault', asyn
 test('§9 outside files and §8 where attachments are on disk', async ({ page }) => {
   const outside = await open(page, 'Pics', { showAttachmentPaths: true });
   const pic = page.getByRole('img', { name: '/Users/j/pic.png' }).last();
-  // nimw-asset://localhost/… (macOS), http://nimw-asset.localhost/… (a Windows UA).
-  await expect(pic).toHaveAttribute('src', /nimw-asset.*\/\.external\/%2FUsers%2Fj%2Fpic\.png$/);
+  // liber-asset://localhost/… (macOS), http://liber-asset.localhost/… (a Windows UA).
+  await expect(pic).toHaveAttribute('src', /liber-asset.*\/\.external\/%2FUsers%2Fj%2Fpic\.png$/);
   await expect(page.getByText('Not found: D:\\Docs\\gone.pdf').last()).toBeVisible();
   await expect(page.getByRole('button', { name: 'Create page' })).toHaveCount(0);
   // Captions: the vault file under the vault's folder, the outside one as is.
@@ -200,17 +201,17 @@ test('§9 a network file waits for the user, then loads (final review C1)', asyn
   }
   expect(
     await page.evaluate(
-      () => (window as unknown as { __nimwNetworkLoads?: string[] }).__nimwNetworkLoads,
+      () => (window as unknown as { __liberNetworkLoads?: string[] }).__liberNetworkLoads,
     ),
   ).toBeUndefined();
   await page.getByRole('button', { name: 'Load from network' }).last().click();
   await expect(page.getByRole('img', { name: NAS }).last()).toHaveAttribute(
     'src',
-    /nimw-asset.*\/\.external\/%5C%5Cnas%5Cshare%5Cx\.png$/,
+    /liber-asset.*\/\.external\/%5C%5Cnas%5Cshare%5Cx\.png$/,
   );
   expect(
     await page.evaluate(
-      () => (window as unknown as { __nimwNetworkLoads?: string[] }).__nimwNetworkLoads,
+      () => (window as unknown as { __liberNetworkLoads?: string[] }).__liberNetworkLoads,
     ),
   ).toEqual([NAS]);
   await stayedLocal(page, outside);

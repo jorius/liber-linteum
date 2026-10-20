@@ -71,12 +71,14 @@ const click = (run: () => void) => (e: MouseEvent) => {
 function loneEmbed(e: Element): Element | null {
   const els = e.children.filter((c) => c.type === 'element');
   const rest = e.children.filter((c) => c.type === 'text' && c.value.trim());
-  return els.length === 1 && !rest.length && els[0].properties.dataNimw === 'embed' ? els[0] : null;
+  return els.length === 1 && !rest.length && els[0].properties.dataLiber === 'embed'
+    ? els[0]
+    : null;
 }
 
 function pageLink(e: Element, key: number, ctx: RenderCtx): ReactNode {
   const p = e.properties;
-  const kind = p.dataNimw === 'wikilink' ? 'wiki' : 'markdown';
+  const kind = p.dataLiber === 'wikilink' ? 'wiki' : 'markdown';
   const target = typeof p.dataTarget === 'string' ? p.dataTarget : '';
   const heading = typeof p.dataHeading === 'string' ? p.dataHeading : null;
   let resolved = target ? ctx.resolve(kind, target) : null;
@@ -101,7 +103,7 @@ function pageLink(e: Element, key: number, ctx: RenderCtx): ReactNode {
       key={key}
       href="#"
       className={state === 'unresolved' ? styles.unresolved : styles.link}
-      data-nimw={p.dataNimw}
+      data-liber={p.dataLiber}
       data-state={state}
       title={outside ? outside.path : undefined}
       onClick={click(() => {
@@ -155,7 +157,7 @@ function OutsideImage({
 function renderElement(e: Element, key: number, ctx: RenderCtx): ReactNode {
   const p = e.properties;
   const { t } = ctx;
-  switch (p.dataNimw) {
+  switch (p.dataLiber) {
     case 'math':
       return (
         <MathView key={key} tex={String(p.dataTex ?? '')} display={p.dataDisplay === 'block'} />
@@ -170,7 +172,7 @@ function renderElement(e: Element, key: number, ctx: RenderCtx): ReactNode {
           key={key}
           href="#"
           className={styles.link}
-          data-nimw="external"
+          data-liber="external"
           title={url}
           onClick={click(() => followLink({ type: 'external', url }))}
         >
@@ -188,7 +190,7 @@ function renderElement(e: Element, key: number, ctx: RenderCtx): ReactNode {
           key={key}
           href="#"
           className={styles.link}
-          data-nimw="anchor"
+          data-liber="anchor"
           onClick={click(() => followLink({ type: 'anchor', heading }))}
         >
           {renderChildren(e, ctx)}
@@ -212,7 +214,7 @@ function renderElement(e: Element, key: number, ctx: RenderCtx): ReactNode {
     case 'callout': {
       const head = e.children.find((c) => c.type === 'element');
       const title =
-        head?.type === 'element' && head.properties.dataNimw === 'callout-title' ? head : null;
+        head?.type === 'element' && head.properties.dataLiber === 'callout-title' ? head : null;
       const body = title ? { ...e, children: e.children.filter((c) => c !== title) } : e;
       return (
         <Callout

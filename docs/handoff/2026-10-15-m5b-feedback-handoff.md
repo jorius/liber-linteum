@@ -41,7 +41,7 @@
 | 4 | Search filter rows overlap the list | The dialog no longer scrolls as a whole. The result list takes the remaining space and is the only part that scrolls. Each chip row shows two lines, then a dashed **+N more** chip. The filters scroll on their own past 40% of the window height. |
 | 5 | Wide tables should use the full width | On a **Wide elements** page, a table wider than the text fills the editor from its left padding to its right padding, centred; narrow tables stay with the text. With line numbers on, the whole number column moves to the editor's left edge on wide pages. Code, maths and diagrams grow evenly on both sides up to the full width, without stretching. |
 | 6 | ⌘F doesn't open search | **⌘F** opens Search from everywhere, as ⌘⇧F does. A short one-line selection in the editor becomes the search text. View → Search… shows ⌘F. On macOS, plain Ctrl+F stays "forward one character". |
-| 7 | Settings into the app menu | macOS: **Notes In My Way → Settings… ⌘,**. On every platform, clicking the vault name in the sidebar opens a menu with **Settings…**, **Open another vault…** and **Close vault**. The gear button is gone. |
+| 7 | Settings into the app menu | macOS: **Liber Linteum → Settings… ⌘,**. On every platform, clicking the vault name in the sidebar opens a menu with **Settings…**, **Open another vault…** and **Close vault**. The gear button is gone. |
 | 8 | Close X into a "Vault" menu | macOS has a new native **Vault** menu with **Open Vault…** and **Close Vault ⌥⌘W**. The same items are in the vault-name menu. The X is gone. Encryption isn't listed until it exists. |
 | 9 | One floating button for Edit / Global View / Search; the title back in the page | A round **Actions** button sits at the bottom right. It opens **Search ⌘F**, **Global View ⌘2** and **Edit ⌘1**, and **⌘J** toggles it. Settings → Appearance → **Action button** offers Bottom right (default), Bottom left and Top right. **The top bar is removed.** The page title and subtitle sit at the top of the page, just below the cover band. The native window title shows "Page — Vault". |
 | 10 | Drop the app icon by the vault name; vault emoji | The app mark is gone. The vault's ☺ button (**Add an icon to …**) sits before the vault name. |
@@ -57,8 +57,8 @@
   - `bin_list`, `trash_restore`, `trash_delete`, `trash_empty`, `entry_archive`, `archive_restore`;
   - `window_title_set`.
 - **Records:**
-  - `.nimw/trash.json` and `.nimw/archive.json` hold each item's original path and time. The record is written before the move.
-  - `.nimw/vault.json` gains `folderIcons` and `icon`.
+  - `.liber/trash.json` and `.liber/archive.json` hold each item's original path and time. The record is written before the move.
+  - `.liber/vault.json` gains `folderIcons` and `icon`.
   - Page icons are the frontmatter key `icon:`.
 - **New settings:** `autoSave`, `sidebarCollapsed`, `actionButton`.
 - **macOS quit guard** (`quit_guard.rs`): adds `applicationShouldTerminate:` to tao's app delegate, so Dock Quit, logout and shutdown reach the Save prompt when Auto save is off.
@@ -85,7 +85,7 @@ The Dock Quit and native-menu checks only mean something in the bundle.
 
 1. **First open:** the index rebuilds once (schema 4). The sidebar has no top bar above the page, and the vault name has no app mark.
 2. **Menus:**
-   - Notes In My Way → **Settings… ⌘,** opens Settings.
+   - Liber Linteum → **Settings… ⌘,** opens Settings.
    - The **Vault** menu: Open Vault… opens the folder dialog; **Close Vault ⌥⌘W** returns to Welcome.
    - Clicking the vault name in the sidebar shows the same three items.
    - File → **Save ⌘S**.
@@ -150,7 +150,7 @@ The Dock Quit and native-menu checks only mean something in the bundle.
 
 No Critical issues. Fixed, each with a test that failed first:
 
-- **I1:** a Trash or Archive record (`.nimw/*.json`, which a cloned or synced vault could carry) can no longer restore into a hidden folder such as `.git/hooks` or `.obsidian`. A rename can't move anything into a hidden folder either, which also closes an older `entry_rename` gap.
+- **I1:** a Trash or Archive record (`.liber/*.json`, which a cloned or synced vault could carry) can no longer restore into a hidden folder such as `.git/hooks` or `.obsidian`. A rename can't move anything into a hidden folder either, which also closes an older `entry_rename` gap.
 - **I2:** a `.trash` or `.archive` that is a symlink is refused. Before, a link back to the vault would have made Empty Trash send the whole vault to the system Trash.
 - **M1 (re-graded Important):** an archived page no longer wins `[[links]]` meant for a live page with the same name.
 - **M2:** restoring under a folder that's now a file goes to the vault root, with no endless Keep both loop.
@@ -222,7 +222,7 @@ No Critical issues. Fixed, each with a test that failed first:
 13. **Wide pages move the whole line-number column to the left edge,** not only the wide rows' numbers. **Only tables stretch to the full width;** code, maths and diagrams grow to their own width.
 
 **Icons:**
-14. **Page icons live in frontmatter `icon:`;** folder and vault icons live in `.nimw/vault.json`.
+14. **Page icons live in frontmatter `icon:`;** folder and vault icons live in `.liber/vault.json`.
 15. **Emoji only:** no custom images and no skin tones. The list stops at Emoji 13.1, which Windows 10 can draw.
 16. **"Is it an emoji"** uses hand-kept Unicode ranges (a marked shortcut), so a rare real emoji may be refused.
 
@@ -238,8 +238,8 @@ No Critical issues. Fixed, each with a test that failed first:
 
 ## 5. Builds
 
-- **Mac:** `target/release/bundle/macos/Notes In My Way.app`. Ad-hoc signed only. Finder's Open With and the Dock need the bundle.
-- **Windows:** `target/x86_64-pc-windows-msvc/release/bundle/nsis/Notes In My Way_0.1.0_x64-setup.exe`. Unsigned, so SmartScreen asks: More info → Run anyway.
+- **Mac:** `target/release/bundle/macos/Liber Linteum.app`. Ad-hoc signed only. Finder's Open With and the Dock need the bundle.
+- **Windows:** `target/x86_64-pc-windows-msvc/release/bundle/nsis/Liber Linteum_0.1.0_x64-setup.exe`. Unsigned, so SmartScreen asks: More info → Run anyway.
 - **Index:** schema 4. Every vault's index rebuilds once on first open.
 - **Rebuild:**
   - **Mac:** in `apps/desktop`, `CARGO_TARGET_DIR=<repo>/target pnpm tauri build --bundles app`.
@@ -247,7 +247,7 @@ No Critical issues. Fixed, each with a test that failed first:
 
     ```bash
     cd apps/desktop
-    export CARGO_HOME=$HOME/.nimw-cross/cargo RUSTUP_HOME=$HOME/.nimw-cross/rustup RUSTUP_TOOLCHAIN=1.99.0 XWIN_ACCEPT_LICENSE=1
+    export CARGO_HOME=$HOME/.liber-cross/cargo RUSTUP_HOME=$HOME/.liber-cross/rustup RUSTUP_TOOLCHAIN=1.99.0 XWIN_ACCEPT_LICENSE=1
     export PATH="/opt/homebrew/opt/rustup/bin:$CARGO_HOME/bin:/opt/homebrew/opt/llvm/bin:/opt/homebrew/opt/lld/bin:$PATH"
     CARGO_TARGET_DIR=<repo>/target pnpm tauri build --runner cargo-xwin --target x86_64-pc-windows-msvc --bundles nsis
     ```
@@ -264,7 +264,7 @@ No Critical issues. Fixed, each with a test that failed first:
 | Dock Quit with Auto save off quits without asking | `quit_guard::install` must run at `RunEvent::Ready` (macOS only). Check the console for the class `TaoAppDelegateParent`. |
 | The emoji picker is empty | Its data chunk (`emoji.json`) is lazy-loaded; check the console for a failed chunk load. Regenerate with `pnpm gen:emoji <folder>` only if the data must change. |
 | Ctrl+F shows WebView2's find bar | The page must `preventDefault` Ctrl+F everywhere on Windows and Linux (spec §16 M12). |
-| `read fixture dir: NotFound` in cargo tests | A seeded target dir from a removed worktree. Run `cargo clean -p nimw-testkit -p nimw-desktop -p nimw-session -p nimw-vault -p nimw-index -p nimw-markdown`. |
+| `read fixture dir: NotFound` in cargo tests | A seeded target dir from a removed worktree. Run `cargo clean -p liber-testkit -p liber-desktop -p liber-session -p liber-vault -p liber-index -p liber-markdown`. |
 | An e2e spec can't find the Search, Settings or Edit buttons | The top bar is gone. Use `e2e/shell.ts` (`openSearch`, `openSettings`, `showGlobalView`, `showEditor`). |
 
 ---
@@ -282,7 +282,7 @@ Jose tested the M5b build and sent a second batch of feedback. Everything below 
 - **Settings → This vault fields:** Subfolder name and Quick notes folder are as wide as the selects.
 - **Toasts go away:** after 8 s with a button (Undo), 5 s without. They wait while the pointer is on them or focus is in them. At most 3 show; the oldest timed one makes room, and a toast listing details is never pushed out.
 - **Sort by:** in every folder's … / context menu, plus a sort button beside New page / New folder for the vault root. The orders are Name A→Z (default), Name Z→A, Modified newest or oldest first, and Created newest first. Folders stay first.
-  - Stored per folder in `.nimw/vault.json` `folderSorts`. It follows renames and the Trash, and is forgotten on delete.
+  - Stored per folder in `.liber/vault.json` `folderSorts`. It follows renames and the Trash, and is forgotten on delete.
 - **Archived is a read-only folder.** It's a tree node above Trash at the bottom of the sidebar.
   - Its pages open in the editor read-only: no typing; title, subtitle, cover, icon and relationships locked; toolbar and width menu hidden; task boxes disabled; paste, drop and Attach ignored.
   - A banner offers Unarchive.
@@ -306,7 +306,7 @@ Jose tested the M5b build and sent a second batch of feedback. Everything below 
   - add or remove from the … menu, the header star, or ⌘⇧D (Ctrl+Shift+D);
   - reorder by dragging (Escape cancels) or Move up / Move down, which says the new position aloud;
   - folders open in place;
-  - stored in `.nimw/vault.json` `favorites`; entries follow renames and moves, into and back from the Trash and the Archive.
+  - stored in `.liber/vault.json` `favorites`; entries follow renames and moves, into and back from the Trash and the Archive.
   - Obsidian's bookmarks are neither read nor written.
 
 ### 7.2 Totals
@@ -366,5 +366,5 @@ A fresh Opus review of `4aae8f3..7c69026` found 4 Important issues and 14 Minor 
 ### 7.7 Builds
 
 See §5 for the commands. Both were rebuilt from the tip after this section was written:
-- Mac: `target/release/bundle/macos/Notes In My Way.app` (ad hoc signed).
-- Windows: `target/x86_64-pc-windows-msvc/release/bundle/nsis/Notes In My Way_0.1.0_x64-setup.exe` (unsigned).
+- Mac: `target/release/bundle/macos/Liber Linteum.app` (ad hoc signed).
+- Windows: `target/x86_64-pc-windows-msvc/release/bundle/nsis/Liber Linteum_0.1.0_x64-setup.exe` (unsigned).

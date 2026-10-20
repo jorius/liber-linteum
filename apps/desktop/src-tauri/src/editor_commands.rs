@@ -5,9 +5,9 @@
 use crate::error::{CmdResult, CommandError, ConflictInfo, ErrorKind};
 use crate::state::AppState;
 use crate::vault_commands::blocking;
-use nimw_markdown::LinkKind;
-use nimw_session::{SessionError, is_text_content};
-use nimw_vault::{Hash, VaultError, VaultPath};
+use liber_markdown::LinkKind;
+use liber_session::{SessionError, is_text_content};
+use liber_vault::{Hash, VaultError, VaultPath};
 use serde::{Deserialize, Serialize};
 use std::path::Path;
 use tauri::{AppHandle, Manager, Runtime};

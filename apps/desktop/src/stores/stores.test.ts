@@ -267,6 +267,26 @@ describe('vaultStore', () => {
     expect(t.detail).toEqual(['bad.md: x', 'locked: y']);
   });
 
+  it('rename review M6: the settings-folder warnings arrive as codes and are translated', async () => {
+    backend({
+      vault_open: () => ({
+        ...info,
+        report: {
+          pages: 1,
+          warnings: ['metaDir.both', 'metaDir.unmoved:Permission denied', 'bad.md: x'],
+        },
+      }),
+      vault_tree: () => tree,
+    });
+    await useVaultStore.getState().open('/v');
+    const t = useToastStore.getState().toasts[0];
+    expect(t.detail).toEqual([
+      'This vault also has its settings folder from before the rename. The current one is used; the old one is left untouched.',
+      "This vault's settings folder from before the rename couldn't be moved (Permission denied). It's used where it is and moves on the next writable open.",
+      'bad.md: x',
+    ]);
+  });
+
   /** Review Focus: a slow, older tree response must not overwrite a newer one. */
   it('review_focus stale tree responses are ignored', async () => {
     const first = deferred<TreeNode[]>();
@@ -562,5 +582,32 @@ describe('applyRename (M4c final review)', () => {
     useVaultStore.setState({ renaming: 'Q.md' });
     await useVaultStore.getState().applyRename('Q.md', 'Idea.md', outcome([]), { quiet: true });
     expect(useVaultStore.getState().renaming).toBeNull();
+  });
+  it('round 3b: a paired rename follows the open page to its final path, once', async () => {
+    const after: TreeNode[] = [
+      { path: 'Myths', kind: 'folder' },
+      { path: 'Myths/Myths.md', kind: 'page' },
+      { path: 'Myths/Sub', kind: 'folder' },
+    ];
+    mockIPC((cmd) => (cmd === 'vault_tree' ? after : []));
+    const load = vi.fn(async () => {});
+    const realLoad = usePageStore.getState().load;
+    usePageStore.setState({ path: 'Lore/Lore.md', load });
+    useVaultStore.setState({ selected: 'Lore/Lore.md', expanded: new Set(['Lore', 'Lore/Sub']) });
+    await useVaultStore
+      .getState()
+      .applyRename(
+        'Lore/Lore.md',
+        'Lore/Myths.md',
+        { ...outcome([]), pair: ['Lore', 'Myths'] },
+        { quiet: true },
+      );
+    expect(load).toHaveBeenCalledWith('Myths/Myths.md');
+    expect(load).not.toHaveBeenCalledWith('Lore/Myths.md');
+    expect(useVaultStore.getState().selected).toBe('Myths/Myths.md');
+    expect([...useVaultStore.getState().expanded]).toEqual(
+      expect.arrayContaining(['Myths', 'Myths/Sub']),
+    );
+    usePageStore.setState({ path: null, load: realLoad });
   });
 });

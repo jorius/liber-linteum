@@ -91,8 +91,8 @@ describe('the Archive (M5b round 2)', () => {
         .getAllByRole('treeitem')
         .map((r) => r.getAttribute('data-path')),
     ).toEqual(['.archive/Camp', '.archive/Old.md']);
-    // Read-only: no new page inside, no icon; 🗑 and … stay.
-    expect(within(archived).queryByRole('button', { name: /New page in|icon/i })).toBeNull();
+    // Read-only: no favourite, no icon; 🗑 stays.
+    expect(within(archived).queryByRole('button', { name: /Favorites|icon/i })).toBeNull();
     expect(within(archived).getByRole('button', { name: 'Move Old to Trash' })).toBeInTheDocument();
     // F2 renames nothing here.
     within(archived).getByRole('treeitem', { name: 'Old' }).focus();
@@ -316,13 +316,20 @@ describe('move (EXP-02)', () => {
     render(<AppShell />);
     act(() => useUiStore.getState().openDialog({ type: 'move', path: 'Art/DMC' }));
     const dialog = screen.getByRole('dialog', { name: 'Move “DMC”' });
-    const select = within(dialog).getByRole('listbox', { name: 'Destination folder' });
-    const options = within(select)
-      .getAllByRole('option')
+    // Round 3 §3.2: a folder tree. Its own folder is shown but can't be
+    // picked; itself and its descendants aren't there.
+    const tree = within(dialog).getByRole('tree', { name: 'Destination folder' });
+    const enabled = within(tree)
+      .getAllByRole('treeitem')
+      .filter((o) => o.getAttribute('aria-disabled') !== 'true')
       .map((o) => o.textContent);
-    expect(options).toEqual(['Vault root', 'Games']); // not itself, its folder or descendants
+    expect(enabled).toEqual(['Vault root', 'Games']);
+    expect(within(tree).getByRole('treeitem', { name: /^Art/ })).toHaveAttribute(
+      'aria-disabled',
+      'true',
+    );
     expect(await axeRun(dialog)).toEqual([]);
-    await userEvent.selectOptions(select, 'Games');
+    await userEvent.click(within(tree).getByRole('treeitem', { name: 'Games' }));
     await userEvent.click(within(dialog).getByRole('button', { name: 'Move' }));
     await waitFor(() =>
       expect(calls.find(([c]) => c === 'entry_rename')?.[1]).toEqual({

@@ -17,7 +17,7 @@ async function open(page: Page, options: Options) {
 }
 
 const calls = (page: Page) =>
-  page.evaluate(() => (window as unknown as { __nimwCalls: [string, unknown][] }).__nimwCalls);
+  page.evaluate(() => (window as unknown as { __liberCalls: [string, unknown][] }).__liberCalls);
 
 test('a Markdown file: its name, subtitle and band; typing saves to it', async ({ page }) => {
   const errors = await open(page, {
@@ -37,7 +37,7 @@ test('a Markdown file: its name, subtitle and band; typing saves to it', async (
   await page.keyboard.type(' More.');
   await expect
     .poll(() =>
-      page.evaluate(() => (window as unknown as { __nimwDisk: () => string }).__nimwDisk()),
+      page.evaluate(() => (window as unknown as { __liberDisk: () => string }).__liberDisk()),
     )
     .toContain('More.');
   const commands = (await calls(page)).map(([c]) => c);

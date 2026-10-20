@@ -34,7 +34,7 @@ describe('initI18n', () => {
     const i18n = await initI18n('en');
     expect(i18n.t('app.version', { version: '0.1.0' })).toBe('v0.1.0');
     await i18n.changeLanguage('es');
-    expect(i18n.t('welcome.create')).toBe('Crear una bóveda nueva');
+    expect(i18n.t('welcome.create')).toBe('Bóveda nueva');
   });
 
   // M5b round 2: `{{save}}` showed as is in Settings. Messages are ICU, whose
