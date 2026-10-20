@@ -76,8 +76,9 @@ pub fn passphrase_kek(passphrase: &str, salt: &[u8; 32], p: &Argon2Params) -> Re
     p.check()?;
     let params = Params::new(p.m_kib, p.t, p.p, Some(32))
         .map_err(|_| CryptoError::Params("argon2 parameters rejected"))?;
-    // Pre-sized so the buffer never reallocates (which would leave unzeroized copies); wiped on drop.
-    let mut pw = String::with_capacity(passphrase.len() + 16);
+    // Pre-sized so the buffer never reallocates (which would leave unzeroized copies); wiped on
+    // drop. NFC output is at most 3× its input (UAX #15 stability bound).
+    let mut pw = String::with_capacity(3 * passphrase.len() + 16);
     pw.extend(passphrase.nfc());
     let pw = zeroize::Zeroizing::new(pw);
     let mut b = Box::new([0u8; 32]);

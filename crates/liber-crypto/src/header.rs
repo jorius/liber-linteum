@@ -1069,6 +1069,23 @@ mod tests {
     }
 
     #[test]
+    fn deep_nesting_is_an_error_not_a_stack_overflow() {
+        // serde_json's recursion limit (128) must stay on: no `unbounded_depth`.
+        let n = 10_000;
+        let arrays = format!(r#"{{"slots":{}{}}}"#, "[".repeat(n), "]".repeat(n));
+        let objects = format!("{}1{}", r#"{"a":"#.repeat(n), "}".repeat(n));
+        let slot = format!(
+            r#"{{"slots":[{{"type":"x","f":{}{}}}]}}"#,
+            "[".repeat(n),
+            "]".repeat(n)
+        );
+        for doc in [arrays, objects, slot] {
+            assert!(VaultHeader::parse(doc.as_bytes()).is_err());
+            assert!(crate::keyring::KeyringFile::parse(doc.as_bytes()).is_err());
+        }
+    }
+
+    #[test]
     fn unknown_slot_survives_to_bytes_in_place() {
         let (h, u, _) = new_vault("pw");
         let mut v: Value = serde_json::from_slice(&h.to_bytes(&u).unwrap()).unwrap();

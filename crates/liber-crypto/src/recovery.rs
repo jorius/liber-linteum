@@ -4,6 +4,7 @@ use std::sync::OnceLock;
 
 use data_encoding::{Encoding, Specification};
 use sha2::{Digest, Sha256};
+use zeroize::Zeroizing;
 
 use crate::error::{CryptoError, Result};
 use crate::keys::Secret;
@@ -39,9 +40,14 @@ impl RecoveryCode {
         &self.0
     }
 
-    pub fn to_display(&self) -> String {
-        let body = crockford().encode(self.0.expose()) + &checksum(self.0.expose());
-        let mut out = String::from("LIBER");
+    /// The 75-character display form, wiped on drop. Buffers are pre-sized so they never
+    /// reallocate and leave a copy behind.
+    pub fn to_display(&self) -> Zeroizing<String> {
+        let mut body = Zeroizing::new(String::with_capacity(56));
+        crockford().encode_append(self.0.expose(), &mut body);
+        body.push_str(&checksum(self.0.expose()));
+        let mut out = Zeroizing::new(String::with_capacity(5 + 14 * 5));
+        out.push_str("LIBER");
         for g in body.as_bytes().chunks(4) {
             out.push('-');
             out.push_str(std::str::from_utf8(g).expect("ascii"));
@@ -112,7 +118,7 @@ mod tests {
 
     #[test]
     fn recovery_display_shape() {
-        let d = RecoveryCode::generate().to_display();
+        let d: Zeroizing<String> = RecoveryCode::generate().to_display();
         assert_eq!(d.len(), 5 + 14 * 5);
         assert!(d.starts_with("LIBER"));
         for g in d[5..].split('-').skip(1) {
@@ -137,7 +143,7 @@ mod tests {
         assert!(same(&d.replace('1', "l")));
         assert!(same(d.strip_prefix("LIBER-").unwrap()));
         // Corrupt one data character.
-        let mut bad = d.clone().into_bytes();
+        let mut bad = d.as_bytes().to_vec();
         bad[6] = if bad[6] == b'A' { b'B' } else { b'A' };
         assert!(matches!(
             RecoveryCode::parse(&String::from_utf8(bad).unwrap()),

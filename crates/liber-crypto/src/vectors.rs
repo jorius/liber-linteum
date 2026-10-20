@@ -79,8 +79,8 @@ fn generate() -> Vec<(String, Vec<u8>)> {
             .iter()
             .map(|(parent, name, folder)| {
                 let (kind, on_disk) = match folder {
-                    Some(id) => ("folder", codec.encrypt_folder(parent, id, name)),
-                    None => ("file", codec.encrypt_file(parent, name)),
+                    Some(id) => ("folder", codec.encrypt_folder(parent, id, name).unwrap()),
+                    None => ("file", codec.encrypt_file(parent, name).unwrap()),
                 };
                 let mut v = json!({
                     "parent": hex(&parent.0),
@@ -132,16 +132,16 @@ fn generate() -> Vec<(String, Vec<u8>)> {
             },
             "passphrase": PASSPHRASE,
             "params": { "m_kib": PARAMS.m_kib, "t": PARAMS.t, "p": PARAMS.p },
-            "recovery_code": rc.to_display(),
+            "recovery_code": rc.to_display().as_str(),
             "device": { "device_id": DEVICE_ID, "secret": hex(device.expose()) },
             "names": names,
             "files": files,
             "rotated": {
                 "vk": hex(u2.vk.expose()),
                 "epoch": u2.epoch(),
-                "recovery_code": rc2.to_display(),
+                "recovery_code": rc2.to_display().as_str(),
             },
-            "keyring": { "recovery_code": krc.to_display() },
+            "keyring": { "recovery_code": krc.to_display().as_str() },
         });
         let mut vj = serde_json::to_vec_pretty(&v).unwrap();
         vj.push(b'\n');

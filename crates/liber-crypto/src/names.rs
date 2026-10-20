@@ -45,10 +45,14 @@ impl<'a> NameCodec<'a> {
         }
     }
 
-    /// `name` must be one valid path component; decryption rejects anything else.
-    pub fn encrypt_file(&self, parent: &FolderId, name: &str) -> String {
-        let name: String = name.nfc().collect();
-        format!("{}{FILE_EXT}", self.seal(parent, FILE, name.as_bytes()))
+    /// `name` must be one valid path component of at most 255 bytes once NFC-normalised,
+    /// else `BadFormat`; decryption rejects the same components.
+    pub fn encrypt_file(&self, parent: &FolderId, name: &str) -> Result<String> {
+        let name = checked_name(name)?;
+        Ok(format!(
+            "{}{FILE_EXT}",
+            self.seal(parent, FILE, name.as_bytes())
+        ))
     }
 
     pub fn decrypt_file(&self, parent: &FolderId, on_disk: &str) -> Result<String> {
@@ -58,10 +62,11 @@ impl<'a> NameCodec<'a> {
         valid_name(self.open(parent, FILE, stem)?)
     }
 
-    pub fn encrypt_folder(&self, parent: &FolderId, id: &FolderId, name: &str) -> String {
+    /// As `encrypt_file`.
+    pub fn encrypt_folder(&self, parent: &FolderId, id: &FolderId, name: &str) -> Result<String> {
         let mut pt = id.0.to_vec();
-        pt.extend(name.nfc().collect::<String>().bytes());
-        self.seal(parent, FOLDER, &pt)
+        pt.extend(checked_name(name)?.bytes());
+        Ok(self.seal(parent, FOLDER, &pt))
     }
 
     pub fn decrypt_folder(&self, parent: &FolderId, on_disk: &str) -> Result<(FolderId, String)> {
@@ -121,6 +126,18 @@ const FILE_EXT: &str = ".libere";
 /// Entry kinds bound into the AD.
 const FILE: &[u8] = b"f";
 const FOLDER: &[u8] = b"d";
+
+/// Longest plaintext name, in bytes of its NFC form (the usual file-system component limit).
+const MAX_NAME_BYTES: usize = 255;
+
+/// The NFC name a writer encrypts: one valid component, at most `MAX_NAME_BYTES`.
+fn checked_name(name: &str) -> Result<String> {
+    let name = valid_name(name.nfc().collect::<String>().into_bytes())?;
+    if name.len() > MAX_NAME_BYTES {
+        return Err(CryptoError::BadFormat("name longer than 255 bytes"));
+    }
+    Ok(name)
+}
 
 /// Guards against path traversal once vaults can be shared.
 fn valid_name(pt: Vec<u8>) -> Result<String> {
@@ -214,17 +231,47 @@ mod tests {
     }
 
     #[test]
+    fn names_are_checked_before_encryption() {
+        let (k, v) = (key(), VaultId::random());
+        let c = NameCodec::new(&k, &v, 1);
+        let p = FolderId::ROOT;
+        let long = "a".repeat(256);
+        for bad in ["", ".", "..", "a/b", "a\\b", "a\0b", long.as_str()] {
+            assert!(
+                matches!(c.encrypt_file(&p, bad), Err(CryptoError::BadFormat(_))),
+                "{bad:?}"
+            );
+            let r = c.encrypt_folder(&p, &FolderId::random(), bad);
+            assert!(matches!(r, Err(CryptoError::BadFormat(_))), "{bad:?}");
+        }
+        let max = "a".repeat(255);
+        assert_eq!(
+            c.decrypt_file(&p, &c.encrypt_file(&p, &max).unwrap())
+                .unwrap(),
+            max
+        );
+        // The cap counts the NFC form: 100 decomposed "é" are 300 bytes, 200 once composed.
+        let nfd = "e\u{301}".repeat(100);
+        let f = c.encrypt_file(&p, &nfd).unwrap();
+        assert_eq!(c.decrypt_file(&p, &f).unwrap(), "\u{e9}".repeat(100));
+    }
+
+    #[test]
     fn file_and_folder_round_trip() {
         let (k, v) = (key(), VaultId::random());
         let c = NameCodec::new(&k, &v, 1);
         let parent = FolderId::random();
-        let f = c.encrypt_file(&parent, "Notes.md");
+        let f = c.encrypt_file(&parent, "Notes.md").unwrap();
         assert!(f.ends_with(".libere"), "{f}");
-        assert_eq!(c.encrypt_file(&parent, "Notes.md"), f, "deterministic");
+        assert_eq!(
+            c.encrypt_file(&parent, "Notes.md").unwrap(),
+            f,
+            "deterministic"
+        );
         assert_eq!(c.decrypt_file(&parent, &f).unwrap(), "Notes.md");
 
         let id = FolderId::random();
-        let d = c.encrypt_folder(&FolderId::ROOT, &id, "Projects");
+        let d = c.encrypt_folder(&FolderId::ROOT, &id, "Projects").unwrap();
         assert!(!d.contains('.'), "{d}");
         assert_eq!(
             c.decrypt_folder(&FolderId::ROOT, &d).unwrap(),
@@ -233,7 +280,7 @@ mod tests {
         // One-byte names and names of exactly one SIV block both work.
         for n in ["a", "abcdefghijklmnop", "ünïcødé 名前.md"] {
             assert_eq!(
-                c.decrypt_file(&parent, &c.encrypt_file(&parent, n))
+                c.decrypt_file(&parent, &c.encrypt_file(&parent, n).unwrap())
                     .unwrap(),
                 n
             );
@@ -246,13 +293,13 @@ mod tests {
         let c = NameCodec::new(&k, &v, 1);
         let (a, b) = (FolderId::random(), FolderId::random());
         assert_ne!(
-            c.encrypt_file(&a, "Notes.md"),
-            c.encrypt_file(&b, "Notes.md")
+            c.encrypt_file(&a, "Notes.md").unwrap(),
+            c.encrypt_file(&b, "Notes.md").unwrap()
         );
         let id = FolderId::random();
         assert_ne!(
-            c.encrypt_folder(&a, &id, "x"),
-            c.encrypt_folder(&b, &id, "x")
+            c.encrypt_folder(&a, &id, "x").unwrap(),
+            c.encrypt_folder(&b, &id, "x").unwrap()
         );
     }
 
@@ -261,8 +308,8 @@ mod tests {
         let (k, v) = (key(), VaultId::random());
         let c = NameCodec::new(&k, &v, 1);
         let id = FolderId::random();
-        let old = c.encrypt_folder(&FolderId::ROOT, &id, "Drafts");
-        let new = c.encrypt_folder(&FolderId::ROOT, &id, "Archive");
+        let old = c.encrypt_folder(&FolderId::ROOT, &id, "Drafts").unwrap();
+        let new = c.encrypt_folder(&FolderId::ROOT, &id, "Archive").unwrap();
         assert_ne!(old, new);
         assert_eq!(c.decrypt_folder(&FolderId::ROOT, &new).unwrap().0, id);
         assert_eq!(c.decrypt_folder(&FolderId::ROOT, &old).unwrap().0, id);
@@ -273,8 +320,10 @@ mod tests {
         let (k, v) = (key(), VaultId::random());
         let c = NameCodec::new(&k, &v, 1);
         let parent = FolderId::random();
-        let f = c.encrypt_file(&parent, "Notes.md");
-        let d = c.encrypt_folder(&parent, &FolderId::random(), "Sub");
+        let f = c.encrypt_file(&parent, "Notes.md").unwrap();
+        let d = c
+            .encrypt_folder(&parent, &FolderId::random(), "Sub")
+            .unwrap();
         let other = FolderId::random();
         assert!(matches!(
             c.decrypt_file(&other, &f),
@@ -312,13 +361,13 @@ mod tests {
         let (k, v) = (key(), VaultId::random());
         let c = NameCodec::new(&k, &v, 1);
         let p = FolderId::ROOT;
-        let nfc = c.encrypt_file(&p, "Canci\u{f3}n.md");
-        assert_eq!(nfc, c.encrypt_file(&p, "Cancio\u{301}n.md"));
+        let nfc = c.encrypt_file(&p, "Canci\u{f3}n.md").unwrap();
+        assert_eq!(nfc, c.encrypt_file(&p, "Cancio\u{301}n.md").unwrap());
         assert_eq!(c.decrypt_file(&p, &nfc).unwrap(), "Canci\u{f3}n.md");
         let id = FolderId::random();
         assert_eq!(
-            c.encrypt_folder(&p, &id, "Canci\u{f3}n"),
-            c.encrypt_folder(&p, &id, "Cancio\u{301}n")
+            c.encrypt_folder(&p, &id, "Canci\u{f3}n").unwrap(),
+            c.encrypt_folder(&p, &id, "Cancio\u{301}n").unwrap()
         );
     }
 
@@ -326,7 +375,7 @@ mod tests {
     fn long_names_shorten() {
         let (k, v) = (key(), VaultId::random());
         let c = NameCodec::new(&k, &v, 1);
-        let enc = c.encrypt_file(&FolderId::ROOT, &"x".repeat(180));
+        let enc = c.encrypt_file(&FolderId::ROOT, &"x".repeat(180)).unwrap();
         assert!(enc.len() > LONG_NAME_LIMIT, "{}", enc.len());
         let s = shorten(&enc).unwrap();
         assert_eq!(s.on_disk.len(), 32 + 7);
@@ -346,7 +395,7 @@ mod tests {
         assert_eq!(shorten(&enc).unwrap(), s, "deterministic");
         assert!(shorten(&"a".repeat(LONG_NAME_LIMIT + 1)).is_some());
         assert!(shorten(&"a".repeat(LONG_NAME_LIMIT)).is_none());
-        assert!(shorten(&c.encrypt_file(&FolderId::ROOT, "Notes.md")).is_none());
+        assert!(shorten(&c.encrypt_file(&FolderId::ROOT, "Notes.md").unwrap()).is_none());
     }
 
     #[test]
@@ -441,9 +490,15 @@ mod tests {
         let c = NameCodec::new(&k, &v, 1);
         for i in 0..200 {
             let n = format!("n{i}");
-            assert_eq!(strip_conflict(&c.encrypt_file(&FolderId::ROOT, &n)), None);
             assert_eq!(
-                strip_conflict(&c.encrypt_folder(&FolderId::ROOT, &FolderId::random(), &n)),
+                strip_conflict(&c.encrypt_file(&FolderId::ROOT, &n).unwrap()),
+                None
+            );
+            assert_eq!(
+                strip_conflict(
+                    &c.encrypt_folder(&FolderId::ROOT, &FolderId::random(), &n)
+                        .unwrap()
+                ),
                 None
             );
         }
@@ -454,13 +509,15 @@ mod tests {
         let (k, v) = (key(), VaultId::random());
         let c = NameCodec::new(&k, &v, 1);
         let p = FolderId::random();
-        let f = c.encrypt_file(&p, "A long enough note.md");
+        let f = c.encrypt_file(&p, "A long enough note.md").unwrap();
         let stem = f.strip_suffix(".libere").unwrap();
         assert!(matches!(
             c.decrypt_folder(&p, stem),
             Err(CryptoError::Authentication)
         ));
-        let d = c.encrypt_folder(&p, &FolderId::random(), "Projects");
+        let d = c
+            .encrypt_folder(&p, &FolderId::random(), "Projects")
+            .unwrap();
         let as_file = format!("{d}.libere");
         assert!(matches!(
             c.decrypt_file(&p, &as_file),
@@ -511,7 +568,7 @@ mod tests {
         pt.extend_from_slice(&[0xc3]);
         assert!(bad_folder(c.decrypt_folder(&p, &c.seal(&p, FOLDER, &pt))));
         // Not Base64url, padded, non-canonical trailing bits, too short for a tag, too long.
-        let file = c.encrypt_file(&p, "Notes.md");
+        let file = c.encrypt_file(&p, "Notes.md").unwrap();
         let stem = file.strip_suffix(".libere").unwrap();
         for s in [
             "",

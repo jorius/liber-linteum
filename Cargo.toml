@@ -50,7 +50,7 @@ aes-siv = { version = "0.8.0", features = ["zeroize"] }
 hkdf = "0.13.0"
 hmac = { version = "0.13.0", features = ["zeroize"] }
 argon2 = { version = "0.6.0", default-features = false, features = ["alloc", "parallel", "zeroize"] }
-x-wing = { version = "0.1.1", features = ["zeroize"] }
+x-wing = { version = "=0.1.1", features = ["zeroize"] }
 getrandom = { version = "0.4.3", features = ["sys_rng"] }
 rand_core = "0.10.1"
 zeroize = "1.9.1"
