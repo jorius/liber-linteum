@@ -71,12 +71,14 @@ test('the keyboard drag can drop a page onto a page (Space, arrows, Space)', asy
   await row(page, 'Welcome').focus();
   await page.keyboard.press('Space');
   // dnd-kit's keyboard sensor moves the item 25 px a press; rows are taller.
-  for (
-    let i = 0;
-    i < 4 && !/drop/.test((await row(page, 'Projects').getAttribute('class')) ?? '');
-    i++
-  ) {
+  // Each press re-renders the drop target a frame later: wait for it before deciding to press again.
+  for (let i = 0; i < 4; i++) {
     await page.keyboard.press('ArrowUp');
+    const reached = await expect(row(page, 'Projects'))
+      .toHaveClass(/drop/, { timeout: 600 })
+      .then(() => true)
+      .catch(() => false);
+    if (reached) break;
   }
   await expect(row(page, 'Projects')).toHaveClass(/drop/);
   await page.keyboard.press('Space');
