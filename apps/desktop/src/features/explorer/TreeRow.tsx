@@ -40,6 +40,12 @@ interface TreeRowProps {
   pinnedCount?: number;
   /** The first root row under the pinned scratch folder. */
   divider?: boolean;
+  /** A folder's own page, `X/X.md` (round 3b §6.2): the row stands for it. */
+  page?: TreeNode | null;
+  /** That page is the one open in the editor. */
+  current?: boolean;
+  /** Expands or collapses the folder (a folder page's chevron). */
+  onToggle?: (node: TreeNode) => void;
 }
 
 /** The row's ★ (round 3 §2.3): adds the item to Favorites or takes it out. */
@@ -220,6 +226,9 @@ export const TreeRow = forwardRef<HTMLLIElement, TreeRowProps>(function TreeRow(
     onCancelRename,
     pinnedCount,
     divider,
+    page = null,
+    current = false,
+    onToggle,
   },
   ref,
 ) {
@@ -227,6 +236,8 @@ export const TreeRow = forwardRef<HTMLLIElement, TreeRowProps>(function TreeRow(
   const name = displayName(node);
   // The Archive is read-only (M5b round 2): no new page inside, no icon.
   const archived = isArchived(node.path);
+  // A folder page's ★ and ☺ act on its page (round 3b §6.2).
+  const target = page ?? node;
   // Drag source (any item) and drop target (folders). Only the listeners are
   // spread: dnd-kit's attributes would replace the treeitem role and tabindex.
   const drag = useDraggable({ id: node.path, disabled: renaming });
@@ -257,6 +268,7 @@ export const TreeRow = forwardRef<HTMLLIElement, TreeRowProps>(function TreeRow(
       aria-level={level}
       aria-selected={selected}
       aria-expanded={node.kind === 'folder' ? expanded : undefined}
+      aria-current={current ? 'page' : undefined}
       tabIndex={focused ? 0 : -1}
       data-path={node.path}
       data-name={name}
@@ -270,10 +282,22 @@ export const TreeRow = forwardRef<HTMLLIElement, TreeRowProps>(function TreeRow(
           follows a folder's chevron. */}
       {node.kind === 'page' && node.icon ? (
         <ItemIcon icon={node.icon} />
+      ) : page ? (
+        // Only the chevron expands a folder page; the rest of the row opens it.
+        <span
+          data-twisty
+          className={styles.twisty}
+          onClick={(e) => {
+            e.stopPropagation();
+            onToggle?.(node);
+          }}
+        >
+          <Icon node={node} expanded={expanded} />
+        </span>
       ) : (
         <Icon node={node} expanded={expanded} />
       )}
-      {node.kind === 'folder' && <ItemIcon icon={node.icon} />}
+      {node.kind === 'folder' && <ItemIcon icon={page?.icon ?? node.icon} />}
       {pinnedCount !== undefined && (
         <span className={styles.pinIcon} data-quick-note-icon>
           <QuickNoteIcon size={14} />
@@ -308,12 +332,14 @@ export const TreeRow = forwardRef<HTMLLIElement, TreeRowProps>(function TreeRow(
           onKeyDown={(e) => e.stopPropagation()}
         >
           {node.kind !== 'attachment' && !archived && (
-            <FavoriteAction path={node.path} name={name} />
+            <FavoriteAction path={target.path} name={name} />
           )}
           {node.kind !== 'attachment' && !archived && (
             <IconButton
-              target={{ kind: node.kind, path: node.path }}
-              icon={node.icon}
+              target={
+                page ? { kind: 'page', path: page.path } : { kind: node.kind, path: node.path }
+              }
+              icon={target.icon}
               name={name}
               glyph={<EmojiAddGlyph />}
               label={t('icons.pickFor', { name })}

@@ -202,3 +202,10 @@
 .action:hover {
   background: var(--color-sidebar-active);
 }
+
+/* A folder page's chevron (round 3b §6.2): the only part that expands it. */
+.twisty {
+  display: inline-flex;
+  flex: none;
+  cursor: pointer;
+}

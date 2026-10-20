@@ -291,6 +291,110 @@ describe('folder pages (round 3b §6.2)', () => {
       'Lore.md',
     ]);
   });
+
+  const lore: TreeNode[] = [
+    { path: 'Lore', kind: 'folder', icon: '📁' },
+    { path: 'Lore/Lore.md', kind: 'page', icon: '🛡️' },
+    { path: 'Lore/Other.md', kind: 'page' },
+    { path: 'Welcome.md', kind: 'page' },
+  ];
+  const realLoad = usePageStore.getState().load;
+  const spyLoad = () => {
+    const load = vi.fn(async () => {});
+    usePageStore.setState({ load });
+    return load;
+  };
+  afterEach(() => usePageStore.setState({ load: realLoad, path: null }));
+  const loreRow = () => screen.getByRole('treeitem', { name: 'Lore' });
+
+  it('clicking the name opens the page, selects the folder and leaves it closed', async () => {
+    const load = spyLoad();
+    seed(lore);
+    render(<ExplorerTree />);
+    await userEvent.click(within(loreRow()).getByText('Lore'));
+    expect(load).toHaveBeenCalledWith('Lore/Lore.md');
+    expect(useVaultStore.getState().selected).toBe('Lore');
+    expect(useVaultStore.getState().expanded.has('Lore')).toBe(false);
+  });
+
+  it('the chevron alone expands and collapses, and opens nothing', async () => {
+    const load = spyLoad();
+    seed(lore);
+    render(<ExplorerTree />);
+    const twisty = loreRow().querySelector('[data-twisty]')!;
+    await userEvent.click(twisty);
+    expect(useVaultStore.getState().expanded.has('Lore')).toBe(true);
+    await userEvent.click(loreRow().querySelector('[data-twisty]')!);
+    expect(useVaultStore.getState().expanded.has('Lore')).toBe(false);
+    expect(load).not.toHaveBeenCalled();
+  });
+
+  it('Enter opens the page; → and ← still expand and collapse', async () => {
+    const load = spyLoad();
+    seed(lore);
+    render(<ExplorerTree />);
+    loreRow().focus();
+    await userEvent.keyboard('{ArrowRight}');
+    expect(useVaultStore.getState().expanded.has('Lore')).toBe(true);
+    await userEvent.keyboard('{ArrowLeft}');
+    expect(useVaultStore.getState().expanded.has('Lore')).toBe(false);
+    await userEvent.keyboard('{Enter}');
+    expect(load).toHaveBeenCalledWith('Lore/Lore.md');
+  });
+
+  it("shows the page's icon, else the folder's; marked current while its page is open", () => {
+    seed(lore);
+    usePageStore.setState({ path: 'Lore/Lore.md' });
+    const { unmount } = render(<ExplorerTree />);
+    expect(loreRow()).toHaveTextContent('🛡️');
+    expect(loreRow()).not.toHaveTextContent('📁');
+    expect(loreRow()).toHaveAttribute('aria-current', 'page');
+    unmount();
+    usePageStore.setState({ path: 'Welcome.md' });
+    seed(lore.map((n) => (n.path === 'Lore/Lore.md' ? { ...n, icon: undefined } : n)));
+    render(<ExplorerTree />);
+    expect(loreRow()).toHaveTextContent('📁');
+    expect(loreRow()).not.toHaveAttribute('aria-current');
+  });
+
+  it("★ on the row stars the folder's page", async () => {
+    const calls = backend({ favorites_set: () => null, favorites_get: () => [] });
+    useFavoritesStore.setState({ paths: [] });
+    seed(lore);
+    render(<ExplorerTree />);
+    await userEvent.click(within(loreRow()).getByRole('button', { name: 'Lore in Favorites' }));
+    expect(useFavoritesStore.getState().paths).toContain('Lore/Lore.md');
+    expect(calls.some(([c]) => c === 'favorites_set')).toBe(true);
+  });
+
+  it('the pinned Scratchpad with its own page still pins first and opens it', async () => {
+    const load = spyLoad();
+    useScratchpadStore.setState({ folder: 'Scratchpad' });
+    seed([
+      { path: 'Art', kind: 'folder' },
+      { path: 'Scratchpad', kind: 'folder' },
+      { path: 'Scratchpad/Scratchpad.md', kind: 'page' },
+    ]);
+    render(<ExplorerTree />);
+    expect(items()[0]).toHaveAttribute('data-path', 'Scratchpad');
+    await userEvent.click(within(items()[0]).getByText('Scratchpad'));
+    expect(load).toHaveBeenCalledWith('Scratchpad/Scratchpad.md');
+    useScratchpadStore.getState().reset();
+  });
+
+  it('in the Archive a folder page opens its page (read-only there) and offers no ★ or ☺', async () => {
+    const load = spyLoad();
+    seed([
+      { path: '.archive', kind: 'folder' },
+      { path: '.archive/Old', kind: 'folder' },
+      { path: '.archive/Old/Old.md', kind: 'page' },
+    ]);
+    render(<ExplorerTree root=".archive" />);
+    const row = screen.getByRole('treeitem', { name: 'Old' });
+    await userEvent.click(within(row).getByText('Old'));
+    expect(load).toHaveBeenCalledWith('.archive/Old/Old.md');
+    expect(within(row).queryByRole('button', { name: 'Old in Favorites' })).toBeNull();
+  });
 });
 
 describe('row quick actions (M5b §3)', () => {

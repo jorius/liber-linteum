@@ -81,6 +81,12 @@ export function ExplorerTree({
   const focusRequest = useVaultStore((s) => s.focusRequest);
   const scratch = useScratchpadStore((s) => s.folder);
   const nodes = useVaultStore((s) => s.nodes);
+  const openPath = usePageStore((s) => s.path);
+  // A folder's own page (round 3b §6.2), as a node.
+  const pageOf = (node: TreeNode) => {
+    const path = node.kind === 'folder' ? folderPageOf(node.path, children) : null;
+    return path ? (children.get(node.path)?.find((n) => n.path === path) ?? null) : null;
+  };
   const rows = useMemo(
     () => visibleRows(children, expanded, archive ? null : scratch, root),
     [children, expanded, scratch, archive, root],
@@ -148,15 +154,16 @@ export function ExplorerTree({
     const vault = useVaultStore.getState();
     vault.select(node.path);
     setFocused(node.path);
-    if (node.kind === 'folder') vault.toggle(node.path);
-    else if (node.kind === 'page' || isTextPath(node.path)) {
+    const open = node.kind === 'folder' ? pageOf(node)?.path : node.path;
+    if (node.kind === 'folder' && !open) vault.toggle(node.path);
+    else if (open && (node.kind !== 'attachment' || isTextPath(open))) {
       // Pages, and text and code files in the text view (M4b part 2 §6).
       // Opening from the explorer starts a fresh link trail (M2b §3).
       useTrailStore.getState().reset();
       // The Trash view takes the editor's place (M5b §5).
       const ui = useUiStore.getState();
       if (ui.screen === 'trash') ui.setScreen('edit');
-      void usePageStore.getState().load(node.path);
+      void usePageStore.getState().load(open);
     }
   };
 
@@ -281,6 +288,9 @@ export function ExplorerTree({
       focused={focusPath === node.path}
       renaming={renaming === node.path}
       dropTarget={dropTarget === node.path}
+      page={pageOf(node)}
+      current={pageOf(node)?.path === openPath}
+      onToggle={(n) => useVaultStore.getState().toggle(n.path)}
       onActivate={activate}
       onFocusRow={setFocused}
       onCommitRename={commitRename}
