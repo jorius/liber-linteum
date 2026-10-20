@@ -8,6 +8,7 @@ import { usePageStore } from '../../stores/pageStore';
 import { useUiStore } from '../../stores/uiStore';
 import { childrenByParent } from '../../stores/tree';
 import { resetVaultStore, useVaultStore } from '../../stores/vaultStore';
+import { useFavoritesStore } from '../favorites/favoritesStore';
 import { useScratchpadStore } from '../scratchpad/scratchpadStore';
 import { ContextMenu } from './ContextMenu';
 import { ExplorerTree, visibleRows } from './ExplorerTree';
@@ -282,38 +283,48 @@ describe('row quick actions (M5b §3)', () => {
       .getAllByRole('button')
       .map((b) => b.getAttribute('aria-label'));
 
-  it('folders get + ☺ 🗑 …, pages ☺ 🗑 …, attachments 🗑 …; none is a Tab stop', () => {
+  it('round 3 §2.3: folders and pages get ★ ☺ 🗑, attachments 🗑; no "+" or "…"; none is a Tab stop', () => {
     seed(nodes, { expanded: new Set(['Art']) });
     render(<ExplorerTree onRequestMenu={() => undefined} />);
     expect(actions('Games')).toEqual([
-      'New page in Games',
+      'Add Games to Favorites',
       'Icon for Games',
       'Move Games to Trash',
-      'Actions for Games',
     ]);
     expect(actions('Welcome')).toEqual([
+      'Add Welcome to Favorites',
       'Icon for Welcome',
       'Move Welcome to Trash',
-      'Actions for Welcome',
     ]);
-    expect(actions('cover.png')).toEqual(['Move cover.png to Trash', 'Actions for cover.png']);
+    expect(actions('cover.png')).toEqual(['Move cover.png to Trash']);
     for (const b of within(screen.getByRole('tree')).getAllByRole('button')) {
       expect(b).toHaveAttribute('tabindex', '-1');
     }
   });
 
-  it('+ makes a page inside the folder without opening the row', async () => {
-    const calls = backend({
-      entry_create_page: (a) => `${a.dir}/Untitled.md`,
-      vault_tree: () => nodes,
-    });
+  it('round 3 §2.3: ★ adds the item to Favorites and fills; again takes it out', async () => {
+    backend({ favorites_set: () => null, favorites_get: () => [] });
+    useFavoritesStore.setState({ paths: [] });
     seed();
     render(<ExplorerTree />);
-    await userEvent.click(screen.getByRole('button', { name: 'New page in Games' }));
-    await waitFor(() =>
-      expect(calls.find(([c]) => c === 'entry_create_page')?.[1]).toMatchObject({ dir: 'Games' }),
-    );
-    expect(useVaultStore.getState().expanded.has('Games')).toBe(true);
+    await userEvent.click(screen.getByRole('button', { name: 'Add Welcome to Favorites' }));
+    await waitFor(() => expect(useFavoritesStore.getState().paths).toEqual(['Welcome.md']));
+    const star = within(screen.getByRole('treeitem', { name: 'Welcome' })).getByRole('button', {
+      name: 'Remove Welcome from Favorites',
+    });
+    expect(star).toHaveAttribute('aria-pressed', 'true');
+    expect(useVaultStore.getState().selected).toBeNull(); // the row wasn't activated
+    await userEvent.click(star);
+    await waitFor(() => expect(useFavoritesStore.getState().paths).toEqual([]));
+  });
+
+  it('round 3 §2.3: the icon action is a full-contrast glyph, not the faded smiley', () => {
+    seed();
+    render(<ExplorerTree />);
+    const pick = screen.getByRole('button', { name: 'Icon for Games' });
+    expect(pick).not.toHaveAttribute('data-empty');
+    expect(pick.querySelector('svg')).not.toBeNull();
+    expect(pick.textContent).not.toContain('☺');
   });
 
   it('🗑 asks for confirmation through the trash action', async () => {

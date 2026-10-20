@@ -848,6 +848,7 @@
     "title": "Favoritos",
     "add": "Añadir a Favoritos",
     "remove": "Quitar de Favoritos",
+    "addNamed": "Añadir {name} a Favoritos",
     "removeNamed": "Quitar {name} de Favoritos",
     "moveUp": "Subir en Favoritos",
     "moveDown": "Bajar en Favoritos",

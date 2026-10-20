@@ -281,22 +281,6 @@ function FavoriteRow({
             </button>
           )}
         </span>
-        {onRequestMenu && (
-          <button
-            type="button"
-            tabIndex={-1}
-            className={explorer.more}
-            aria-label={t('menu.label', { name })}
-            aria-haspopup="menu"
-            onPointerDown={(e) => e.stopPropagation()}
-            onClick={(e) => {
-              e.stopPropagation();
-              menuAt(e.currentTarget);
-            }}
-          >
-            …
-          </button>
-        )}
       </div>
       {isFolder && open && kids && kids.length > 0 && (
         <ul className={styles.list}>

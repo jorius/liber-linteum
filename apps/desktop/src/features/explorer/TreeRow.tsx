@@ -3,7 +3,8 @@ import { forwardRef, useEffect, useId, useRef, useState, type KeyboardEvent } fr
 import { useTranslation } from 'react-i18next';
 import type { TreeNode } from '../../ipc';
 import { isArchived } from '../../stores/tree';
-import { useVaultStore } from '../../stores/vaultStore';
+import { StarIcon } from '../favorites/FavoritesSection';
+import { useFavoritesStore } from '../favorites/favoritesStore';
 import { IconButton, ItemIcon } from '../icons/ItemIcon';
 import { QuickNoteIcon } from '../scratchpad/QuickNoteIcon';
 import styles from './Explorer.module.css';
@@ -35,12 +36,50 @@ interface TreeRowProps {
   onFocusRow: (path: string) => void;
   onCommitRename: (node: TreeNode, name: string) => void;
   onCancelRename: () => void;
-  /** Opens the row's context menu (the "…" button). */
-  onMenu?: (path: string, anchor: { x: number; y: number }) => void;
   /** The vault's scratch folder, pinned first (M4c §7.2): its note count. */
   pinnedCount?: number;
   /** The first root row under the pinned scratch folder. */
   divider?: boolean;
+}
+
+/** The row's ★ (round 3 §2.3): adds the item to Favorites or takes it out. */
+function FavoriteAction({ path, name }: { path: string; name: string }) {
+  const { t } = useTranslation();
+  const on = useFavoritesStore((s) => s.paths.includes(path));
+  const label = t(on ? 'favorites.removeNamed' : 'favorites.addNamed', { name });
+  return (
+    <button
+      type="button"
+      tabIndex={-1}
+      className={styles.action}
+      aria-pressed={on}
+      aria-label={label}
+      title={label}
+      onClick={() => void useFavoritesStore.getState().toggle(path)}
+    >
+      <StarIcon filled={on} size={13} />
+    </button>
+  );
+}
+
+/** "Add an icon": a face with a plus, at full contrast (round 3 §2.3). */
+function EmojiAddGlyph() {
+  return (
+    <svg
+      width="14"
+      height="14"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M21 11.5V12a9 9 0 1 1-9-9h.5" />
+      <path d="M8 14s1.5 2 4 2 4-2 4-2M9 9h.01M15 9h.01M16 5h6M19 2v6" />
+    </svg>
+  );
 }
 
 function TrashGlyph() {
@@ -179,7 +218,6 @@ export const TreeRow = forwardRef<HTMLLIElement, TreeRowProps>(function TreeRow(
     onFocusRow,
     onCommitRename,
     onCancelRename,
-    onMenu,
     pinnedCount,
     divider,
   },
@@ -260,33 +298,24 @@ export const TreeRow = forwardRef<HTMLLIElement, TreeRowProps>(function TreeRow(
         </span>
       )}
       {!renaming && (
-        // Quick actions (M5b §3), for the pointer: shown on hover, focus and
-        // selection; the keyboard has Delete, the menu and its keys. Their
-        // clicks and keys (the picker's too) stay out of the row and tree.
+        // Quick actions (round 3 §2.3: ★ ☺ 🗑), for the pointer: shown on
+        // hover, focus and selection; right-click, Delete and Shift+F10 do the
+        // rest. Their clicks and keys (the picker's too) stay out of the row.
         <span
           className={styles.actions}
           onClick={(e) => e.stopPropagation()}
           onPointerDown={(e) => e.stopPropagation()}
           onKeyDown={(e) => e.stopPropagation()}
         >
-          {node.kind === 'folder' && !archived && (
-            <button
-              type="button"
-              tabIndex={-1}
-              className={styles.action}
-              aria-label={t('explorer.newPageIn', { name })}
-              title={t('explorer.newPageIn', { name })}
-              onClick={() => void useVaultStore.getState().createPage(node.path)}
-            >
-              +
-            </button>
+          {node.kind !== 'attachment' && !archived && (
+            <FavoriteAction path={node.path} name={name} />
           )}
           {node.kind !== 'attachment' && !archived && (
             <IconButton
               target={{ kind: node.kind, path: node.path }}
               icon={node.icon}
               name={name}
-              glyph="☺"
+              glyph={<EmojiAddGlyph />}
               label={t('icons.pickFor', { name })}
               tabIndex={-1}
               className={styles.action}
@@ -303,24 +332,6 @@ export const TreeRow = forwardRef<HTMLLIElement, TreeRowProps>(function TreeRow(
             <TrashGlyph />
           </button>
         </span>
-      )}
-      {onMenu && !renaming && (
-        <button
-          type="button"
-          tabIndex={-1}
-          className={styles.more}
-          aria-label={t('menu.label', { name })}
-          aria-haspopup="menu"
-          // Pointer users' way to the menu (keyboard: Shift+F10 / ContextMenu key).
-          onPointerDown={(e) => e.stopPropagation()}
-          onClick={(e) => {
-            e.stopPropagation();
-            const rect = e.currentTarget.getBoundingClientRect();
-            onMenu(node.path, { x: rect.left, y: rect.bottom });
-          }}
-        >
-          …
-        </button>
       )}
     </li>
   );

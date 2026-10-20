@@ -91,8 +91,8 @@ describe('the Archive (M5b round 2)', () => {
         .getAllByRole('treeitem')
         .map((r) => r.getAttribute('data-path')),
     ).toEqual(['.archive/Camp', '.archive/Old.md']);
-    // Read-only: no new page inside, no icon; 🗑 and … stay.
-    expect(within(archived).queryByRole('button', { name: /New page in|icon/i })).toBeNull();
+    // Read-only: no favourite, no icon; 🗑 stays.
+    expect(within(archived).queryByRole('button', { name: /Favorites|icon/i })).toBeNull();
     expect(within(archived).getByRole('button', { name: 'Move Old to Trash' })).toBeInTheDocument();
     // F2 renames nothing here.
     within(archived).getByRole('treeitem', { name: 'Old' }).focus();

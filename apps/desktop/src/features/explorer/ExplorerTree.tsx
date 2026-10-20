@@ -284,14 +284,6 @@ export function ExplorerTree({
       onFocusRow={setFocused}
       onCommitRename={commitRename}
       onCancelRename={cancelRename}
-      onMenu={
-        onRequestMenu
-          ? (path, anchor) => {
-              setFocused(path);
-              onRequestMenu(path, anchor);
-            }
-          : undefined
-      }
     />
   );
 

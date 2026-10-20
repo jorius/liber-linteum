@@ -129,7 +129,9 @@ describe('Favorites (M5b §19)', () => {
   it('the star takes one out; the heading collapses, remembered per vault', async () => {
     const sets = await open(['Zed.md', 'Welcome.md']);
     const { unmount } = render(<ExplorerTree />);
-    await userEvent.click(screen.getByRole('button', { name: 'Remove Zed from Favorites' }));
+    await userEvent.click(
+      within(section()).getByRole('button', { name: 'Remove Zed from Favorites' }),
+    );
     expect(sets.at(-1)).toEqual(['Welcome.md']);
     const heading = within(section()).getByRole('button', { name: 'Favorites' });
     await userEvent.click(heading);
