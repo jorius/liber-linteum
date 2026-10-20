@@ -97,3 +97,10 @@ body {
   clip-path: inset(50%);
   white-space: nowrap;
 }
+
+/* A line of text in a menu, not a choice (spelling: "No suggestions"). */
+.nimw-menu-note {
+  padding: 8px 10px;
+  color: var(--color-text-muted);
+  font: 500 14px var(--font-body);
+}

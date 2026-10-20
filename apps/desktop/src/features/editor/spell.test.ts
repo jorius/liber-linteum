@@ -8,6 +8,8 @@ import { useSpellStore } from '../../stores/spellStore';
 import {
   clearSpellCache,
   misspelledAt,
+  openSpellMenuAt,
+  setSpellMenuOpener,
   SPELL_DEBOUNCE_MS,
   spellcheck,
   wordsToCheck,
@@ -109,5 +111,17 @@ describe('the spellcheck extension', () => {
     await settle();
     expect(calls).toHaveLength(3);
     expect(calls[2]).toEqual(['uno', 'recieve', 'dos']);
+  });
+
+  it('the menu opens on a misspelled word only', async () => {
+    const v = editor('I recieve mail');
+    await settle();
+    const opened: string[] = [];
+    setSpellMenuOpener(v, (target) => opened.push(target.word));
+    expect(openSpellMenuAt(v, 0, { x: 1, y: 1 })).toBe(false);
+    expect(openSpellMenuAt(v, 5, { x: 1, y: 1 })).toBe(true);
+    expect(opened).toEqual(['recieve']);
+    setSpellMenuOpener(v, null);
+    expect(openSpellMenuAt(v, 5, { x: 1, y: 1 })).toBe(false);
   });
 });

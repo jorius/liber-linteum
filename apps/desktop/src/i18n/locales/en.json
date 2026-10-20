@@ -847,6 +847,12 @@
     "emptyHelp": "Pages, folders and attachments you delete wait here, inside the vault, until you delete them for good.",
     "noMatch": "Nothing in the Trash matches “{query}”."
   },
+  "spelling": {
+    "menu": "Spelling: {word}",
+    "noSuggestions": "No suggestions",
+    "add": "Add to dictionary",
+    "ignore": "Ignore"
+  },
   "sort": {
     "label": "Sort {name} by",
     "vault": "Sort the vault",

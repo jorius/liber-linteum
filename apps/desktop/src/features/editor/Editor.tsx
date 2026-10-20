@@ -44,7 +44,8 @@ import { notifyViewReset, notifyViewUpdate, setCurrentView } from './viewUpdates
 import { Toolbar } from './Toolbar';
 import { hideView, pageDocOf, showView, storedState, storeState } from './views';
 import { LIVE_PADDING, wideAttrs, wideExtents } from './wideBox';
-import { spellcheck } from './spell';
+import { setSpellMenuOpener, spellcheck, type WordRange } from './spell';
+import { SpellMenu } from './SpellMenu';
 import { toggleTaskIn } from './widgets';
 
 /** The Split pane of the component currently showing each view. */
@@ -378,6 +379,10 @@ export function Editor({ doc, mode, label }: EditorProps) {
   const [picker, setPicker] = useState(false);
   const [attach, setAttach] = useState<PickedFile[] | null>(null);
   const [langPicker, setLangPicker] = useState<{ at: number; anchor: HTMLElement } | null>(null);
+  const [spellMenu, setSpellMenu] = useState<{
+    target: WordRange;
+    anchor: { x: number; y: number };
+  } | null>(null);
   const [active, setActive] = useState<Set<ActiveFormat>>(() => new Set());
   const showFormats = useCallback((state: EditorState) => {
     const next = activeFormats(state);
@@ -398,6 +403,7 @@ export function Editor({ doc, mode, label }: EditorProps) {
     setLinkPickerOpener(v, () => setPicker(true));
     setAttachChooser(v, setAttach);
     setLanguagePickerOpener(v, (at, anchor) => setLangPicker({ at, anchor }));
+    setSpellMenuOpener(v, (target, anchor) => setSpellMenu({ target, anchor }));
     showFormats(v.state);
     setCurrentView(v);
     showLanguage(v, current.current);
@@ -411,6 +417,7 @@ export function Editor({ doc, mode, label }: EditorProps) {
       setLinkPickerOpener(v, null);
       setAttachChooser(v, null);
       setLanguagePickerOpener(v, null);
+      setSpellMenuOpener(v, null);
       v.destroy();
       view.current = null;
     };
@@ -583,6 +590,17 @@ export function Editor({ doc, mode, label }: EditorProps) {
         <Toolbar view={toolbarView} active={active} />
       )}
       {picker && toolbarView && <LinkPicker view={toolbarView} onClose={() => setPicker(false)} />}
+      {spellMenu && toolbarView && (
+        <SpellMenu
+          view={toolbarView}
+          target={spellMenu.target}
+          anchor={spellMenu.anchor}
+          onClose={(refocus) => {
+            setSpellMenu(null);
+            if (refocus) toolbarView.focus();
+          }}
+        />
+      )}
       {attach && toolbarView && (
         <AttachChoice view={toolbarView} files={attach} onClose={() => setAttach(null)} />
       )}

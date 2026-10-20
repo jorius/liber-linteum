@@ -3,7 +3,7 @@
 // Only `text` nodes of the parsed page (and a wikilink's shown text) are
 // words: code, math, HTML, frontmatter, tags, URLs and comments never are.
 import { type EditorState, StateEffect, StateField, type Extension } from '@codemirror/state';
-import { Decoration, type DecorationSet, EditorView, ViewPlugin } from '@codemirror/view';
+import { Decoration, type DecorationSet, EditorView, keymap, ViewPlugin } from '@codemirror/view';
 import i18n from 'i18next';
 import type { Node, Parent } from 'mdast';
 import { spellCheck } from '../../ipc';
@@ -145,7 +145,53 @@ const checker = ViewPlugin.fromClass(
   },
 );
 
+type SpellMenuOpener = (target: WordRange, anchor: { x: number; y: number }) => void;
+const openers = new WeakMap<EditorView, SpellMenuOpener>();
+
+/** The editor component shows the spelling menu for its view. */
+export function setSpellMenuOpener(view: EditorView, open: SpellMenuOpener | null): void {
+  if (open) openers.set(view, open);
+  else openers.delete(view);
+}
+
+/** Opens the menu for a misspelled word at `pos`; false leaves the event to
+ *  the default menu (a correct word, or no menu here). */
+export function openSpellMenuAt(
+  view: EditorView,
+  pos: number,
+  anchor: { x: number; y: number },
+): boolean {
+  const target = misspelledAt(view.state, pos);
+  const open = openers.get(view);
+  if (!target || !open) return false;
+  open(target, anchor);
+  return true;
+}
+
+/** The context-menu key or Shift+F10 on the word at the cursor. */
+const fromKeyboard = (view: EditorView) => {
+  const pos = view.state.selection.main.head;
+  const at = view.coordsAtPos(pos);
+  return openSpellMenuAt(view, pos, { x: at?.left ?? 0, y: at?.bottom ?? 0 });
+};
+
 /** Spell checking for a page editor; leave it out to turn it off. */
 export function spellcheck(): Extension {
-  return [misspelled, checker];
+  return [
+    misspelled,
+    checker,
+    EditorView.domEventHandlers({
+      contextmenu(e, view) {
+        const pos = view.posAtCoords({ x: e.clientX, y: e.clientY });
+        if (pos == null || !openSpellMenuAt(view, pos, { x: e.clientX, y: e.clientY }))
+          return false;
+        e.preventDefault();
+        return true;
+      },
+    }),
+    keymap.of([
+      { key: 'Shift-F10', run: fromKeyboard },
+      { key: 'ContextMenu', run: fromKeyboard },
+    ]),
+  ];
 }

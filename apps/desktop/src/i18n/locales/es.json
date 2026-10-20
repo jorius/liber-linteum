@@ -847,6 +847,12 @@
     "emptyHelp": "Las páginas, carpetas y adjuntos que eliminas esperan aquí, dentro de la bóveda, hasta que los eliminas definitivamente.",
     "noMatch": "Nada en la Papelera coincide con «{query}»."
   },
+  "spelling": {
+    "menu": "Ortografía: {word}",
+    "noSuggestions": "Sin sugerencias",
+    "add": "Agregar al diccionario",
+    "ignore": "Ignorar"
+  },
   "sort": {
     "label": "Ordenar {name} por",
     "vault": "Ordenar la bóveda",
