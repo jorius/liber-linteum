@@ -55,16 +55,20 @@ export function useSidebarResize() {
     setDragging(true);
     e.currentTarget.setPointerCapture?.(e.pointerId);
   };
+  const dragged = (e: PointerEvent<HTMLDivElement>, d: { startX: number; start: number }) =>
+    clamp(d.start + e.clientX - d.startX);
   const onPointerMove = (e: PointerEvent<HTMLDivElement>) => {
     const d = drag.current;
-    if (d) setDraft(clamp(d.start + e.clientX - d.startX));
+    if (d) setDraft(dragged(e, d));
   };
-  const end = (keep: boolean) => {
+  // The width comes from the release itself: on a busy machine it can arrive
+  // before the last move has rendered (round 3b final review, flaky drag).
+  const end = (e: PointerEvent<HTMLDivElement>, keep: boolean) => {
     const d = drag.current;
     if (!d) return;
     drag.current = null;
     setDragging(false);
-    if (keep) save(width);
+    if (keep) save(dragged(e, d));
     else setDraft(null);
   };
 
@@ -83,8 +87,8 @@ export function useSidebarResize() {
       onKeyDown={onKeyDown}
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
-      onPointerUp={() => end(true)}
-      onPointerCancel={() => end(false)}
+      onPointerUp={(e) => end(e, true)}
+      onPointerCancel={(e) => end(e, false)}
       onDoubleClick={() => save(DEFAULT_SIDEBAR_WIDTH)}
     />
   );

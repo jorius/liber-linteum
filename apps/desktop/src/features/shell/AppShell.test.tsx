@@ -312,6 +312,27 @@ describe('AppShell', () => {
     expect(width()).toBe('270px');
   });
 
+  it('round 3b final review: a release that arrives before the last move renders keeps the dragged width', async () => {
+    backend({
+      settings_set: (a) => ({ ...useSettingsStore.getState().settings, ...(a.patch as object) }),
+    });
+    seed();
+    render(<AppShell />);
+    const edge = screen.getByRole('separator', { name: 'Resize the sidebar' });
+    const fire = (type: string, x: number) =>
+      edge.dispatchEvent(
+        new PointerEvent(type, { bubbles: true, clientX: x, clientY: 300, pointerId: 1 }),
+      );
+    act(() => fire('pointerdown', 270));
+    // A loaded machine: the move and the release land before React renders.
+    act(() => {
+      fire('pointermove', 420);
+      fire('pointerup', 420);
+    });
+    await waitFor(() => expect(useSettingsStore.getState().settings.sidebarWidth).toBe(420));
+    expect(edge).toHaveAttribute('aria-valuenow', '420');
+  });
+
   it('round 3 review I1: held arrow keys never lose a step or go back while saves are in flight', async () => {
     const pending: (() => void)[] = [];
     const saved: number[] = [];

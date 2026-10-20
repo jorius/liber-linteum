@@ -29,13 +29,18 @@ test('dragging the edge resizes the sidebar and the width is saved', async ({ pa
   const errors = await open(page);
   expect(Math.round(await sideWidth(page))).toBe(270);
   const edge = page.getByRole('separator', { name: 'Resize the sidebar' });
+  await expect(edge).toBeVisible();
   const box = (await edge.boundingBox())!;
+  const x = box.x + box.width / 2;
   const y = box.y + box.height / 2;
-  await page.mouse.move(box.x + box.width / 2, y);
+  await page.mouse.move(x, y);
   await page.mouse.down();
-  await page.mouse.move(box.x + 120, y, { steps: 4 });
+  // The edge follows the pointer before it's released.
+  await page.mouse.move(x + 120, y, { steps: 4 });
+  await expect(edge).toHaveAttribute('aria-valuenow', '390');
   await page.mouse.up();
   await expect.poll(async () => Math.round(await sideWidth(page))).toBeGreaterThan(370);
+  await expect(edge).toHaveAttribute('aria-valuenow', '390');
   const saved = await page.evaluate(() =>
     (
       window as unknown as { __TAURI_INTERNALS__: { invoke: (c: string) => Promise<unknown> } }
