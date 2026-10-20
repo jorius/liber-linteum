@@ -5,8 +5,16 @@ use super::{
 };
 use crate::error::{Result, VaultError, io_err};
 use crate::path::VaultPath;
+use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::UNIX_EPOCH;
+
+static TMP_COUNTER: AtomicU64 = AtomicU64::new(0);
+
+/// Suffix marker of in-flight atomic writes. Temp names start with `.` so scans
+/// and watchers ignore them (VLT-05).
+pub const TMP_MARKER: &str = ".liber-tmp-";
 
 #[derive(Debug)]
 pub struct PlainStorage {
@@ -27,6 +35,17 @@ impl PlainStorage {
 
     fn resolve_visible(&self, path: &VaultPath) -> Result<PathBuf> {
         resolve_visible(&self.root, path)
+    }
+
+    /// [`Storage::replace_atomic`] that fails just before the rename (NFR-08 test).
+    #[cfg(test)]
+    pub(crate) fn replace_atomic_failing(
+        &self,
+        path: &VaultPath,
+        from: &mut dyn Read,
+        mode: Replace,
+    ) -> Result<()> {
+        replace_atomic(&self.root, path, from, mode, true)
     }
 }
 
@@ -90,6 +109,149 @@ pub(crate) fn resolve_visible(root: &Path, path: &VaultPath) -> Result<PathBuf> 
     }
     Ok(full)
 }
+
+/// Streams `from` into a hidden temp file next to `path`, then renames it into
+/// place (NFR-08). An overwritten file keeps its permissions. `CreateOnly`:
+/// `AlreadyExists` if `path` exists before or after the copy. `NotFound` if
+/// its folder doesn't exist. The temp file is removed on any error.
+pub(crate) fn replace_atomic(
+    root: &Path,
+    path: &VaultPath,
+    from: &mut dyn Read,
+    mode: Replace,
+    fail_before_rename: bool,
+) -> Result<()> {
+    if path.is_root() {
+        return Err(VaultError::OutsideVault(
+            "cannot write the vault root".into(),
+        ));
+    }
+    let target = resolve(root, path)?;
+    let create_only = mode == Replace::CreateOnly;
+    if create_only && target.symlink_metadata().is_ok() {
+        return Err(VaultError::AlreadyExists(path.to_string()));
+    }
+    let parent = target.parent().expect("non-root path has a parent");
+    if !parent.is_dir() {
+        return Err(VaultError::NotFound(
+            path.parent().map(|p| p.to_string()).unwrap_or_default(),
+        ));
+    }
+    let existing = std::fs::metadata(&target).ok();
+    let tmp = parent.join(format!(
+        ".{}{}{}-{}",
+        path.file_name(),
+        TMP_MARKER,
+        std::process::id(),
+        TMP_COUNTER.fetch_add(1, Ordering::Relaxed)
+    ));
+    let result = (|| -> std::io::Result<()> {
+        let mut out = std::fs::OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(&tmp)?;
+        let mut buf = vec![0u8; 64 * 1024];
+        loop {
+            let n = from.read(&mut buf)?;
+            if n == 0 {
+                break;
+            }
+            out.write_all(&buf[..n])?;
+        }
+        out.sync_all()?;
+        drop(out);
+        if let Some(meta) = &existing {
+            std::fs::set_permissions(&tmp, meta.permissions())?;
+        }
+        if fail_before_rename {
+            return Err(std::io::Error::other("injected failure before rename"));
+        }
+        if create_only && target.symlink_metadata().is_ok() {
+            return Err(std::io::ErrorKind::AlreadyExists.into());
+        }
+        std::fs::rename(&tmp, &target)?;
+        sync_dir(parent);
+        Ok(())
+    })();
+    result.map_err(|e| {
+        let _ = std::fs::remove_file(&tmp);
+        io_err(path.as_str(), e)
+    })
+}
+
+/// Creates one folder; the parent must exist.
+pub(crate) fn create_dir(root: &Path, path: &VaultPath) -> Result<()> {
+    std::fs::create_dir(resolve(root, path)?).map_err(|e| io_err(path.as_str(), e))
+}
+
+/// Renames/moves a file or folder. Fails with `AlreadyExists` if `to` exists,
+/// except case-only renames of the same entry on case-insensitive filesystems.
+pub(crate) fn rename(root: &Path, from: &VaultPath, to: &VaultPath) -> Result<()> {
+    if from.is_root() || to.is_root() {
+        return Err(VaultError::OutsideVault(
+            "cannot rename the vault root".into(),
+        ));
+    }
+    let src = resolve(root, from)?;
+    let dst = resolve(root, to)?;
+    if src.symlink_metadata().is_err() {
+        return Err(VaultError::NotFound(from.to_string()));
+    }
+    if !dst.parent().is_some_and(Path::is_dir) {
+        return Err(VaultError::NotFound(
+            to.parent().map(|p| p.to_string()).unwrap_or_default(),
+        ));
+    }
+    if dst.symlink_metadata().is_ok() {
+        if same_entry(&src, &dst) && from != to {
+            // Case-only rename on a case-insensitive FS: go through a temp name.
+            let tmp = src.with_file_name(format!(
+                ".{}{}{}",
+                from.file_name(),
+                TMP_MARKER,
+                TMP_COUNTER.fetch_add(1, Ordering::Relaxed)
+            ));
+            std::fs::rename(&src, &tmp).map_err(|e| io_err(from.as_str(), e))?;
+            return std::fs::rename(&tmp, &dst).map_err(|e| io_err(to.as_str(), e));
+        }
+        return Err(VaultError::AlreadyExists(to.to_string()));
+    }
+    std::fs::rename(&src, &dst).map_err(|e| io_err(from.as_str(), e))
+}
+
+/// Moves a file or folder to the OS trash (EXP-03).
+pub(crate) fn trash(root: &Path, path: &VaultPath) -> Result<()> {
+    if path.is_root() {
+        return Err(VaultError::OutsideVault(
+            "cannot trash the vault root".into(),
+        ));
+    }
+    let full = resolve(root, path)?;
+    if full.symlink_metadata().is_err() {
+        return Err(VaultError::NotFound(path.to_string()));
+    }
+    trash::delete(&full).map_err(|e| VaultError::Io {
+        path: path.to_string(),
+        source: std::io::Error::other(e.to_string()),
+    })
+}
+
+pub(crate) fn same_entry(a: &Path, b: &Path) -> bool {
+    match (dunce::canonicalize(a), dunce::canonicalize(b)) {
+        (Ok(x), Ok(y)) => x == y,
+        _ => false,
+    }
+}
+
+#[cfg(unix)]
+fn sync_dir(dir: &Path) {
+    if let Ok(d) = std::fs::File::open(dir) {
+        let _ = d.sync_all();
+    }
+}
+
+#[cfg(not(unix))]
+fn sync_dir(_dir: &Path) {}
 
 pub(crate) fn mtime_ns(meta: &std::fs::Metadata) -> i128 {
     meta.modified()
@@ -198,48 +360,74 @@ impl Storage for PlainStorage {
         })
     }
 
-    fn replace_atomic(
-        &self,
-        _path: &VaultPath,
-        _from: &mut dyn std::io::Read,
-        _mode: Replace,
-    ) -> Result<()> {
-        unimplemented!("E2 Task 2")
+    fn replace_atomic(&self, path: &VaultPath, from: &mut dyn Read, mode: Replace) -> Result<()> {
+        replace_atomic(&self.root, path, from, mode, false)
     }
 
-    fn create_new(&self, _path: &VaultPath) -> Result<Box<dyn std::io::Write + Send>> {
-        unimplemented!("E2 Task 2")
+    fn create_new(&self, path: &VaultPath) -> Result<Box<dyn Write + Send>> {
+        let file = std::fs::OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(self.resolve(path)?)
+            .map_err(|e| io_err(path.as_str(), e))?;
+        Ok(Box::new(file))
     }
 
-    fn create_dir(&self, _path: &VaultPath) -> Result<()> {
-        unimplemented!("E2 Task 2")
+    fn create_dir(&self, path: &VaultPath) -> Result<()> {
+        create_dir(&self.root, path)
     }
 
-    fn remove_file(&self, _path: &VaultPath) -> Result<()> {
-        unimplemented!("E2 Task 2")
+    fn remove_file(&self, path: &VaultPath) -> Result<()> {
+        std::fs::remove_file(self.resolve(path)?).map_err(|e| io_err(path.as_str(), e))
     }
 
-    fn remove_empty_dir(&self, _path: &VaultPath) -> Result<()> {
-        unimplemented!("E2 Task 2")
+    fn remove_empty_dir(&self, path: &VaultPath) -> Result<()> {
+        std::fs::remove_dir(self.resolve(path)?).map_err(|e| io_err(path.as_str(), e))
     }
 
-    fn rename(&self, _from: &VaultPath, _to: &VaultPath) -> Result<()> {
-        unimplemented!("E2 Task 2")
+    fn rename(&self, from: &VaultPath, to: &VaultPath) -> Result<()> {
+        rename(&self.root, from, to)
     }
 
-    fn trash_os(&self, _path: &VaultPath) -> Result<()> {
-        unimplemented!("E2 Task 2")
+    fn trash_os(&self, path: &VaultPath) -> Result<()> {
+        trash(&self.root, path)
     }
 
-    fn os_path(&self, _path: &VaultPath, _use_: OsUse) -> Result<PathBuf> {
-        unimplemented!("E2 Task 2")
+    /// Plain files are their own OS path, whatever the use.
+    fn os_path(&self, path: &VaultPath, _use_: OsUse) -> Result<PathBuf> {
+        self.resolve(path)
     }
 
-    fn vault_path_of(&self, _os: &Path) -> Option<VaultPath> {
-        unimplemented!("E2 Task 2")
+    fn vault_path_of(&self, os: &Path) -> Option<VaultPath> {
+        VaultPath::from_fs_path(&self.root, os).ok()
     }
 
     fn watch(&self, _recursive: bool, _sink: Box<dyn Fn(RawEvent) + Send>) -> Result<WatchGuard> {
         unimplemented!("E2 Task 3")
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn nfr_08_injected_failure_leaves_target_untouched_and_no_temp_file() {
+        let dir = tempfile::tempdir().unwrap();
+        let storage = PlainStorage::open(dir.path()).unwrap();
+        let p = VaultPath::new("a.md").unwrap();
+        storage
+            .replace_atomic(&p, &mut &b"original"[..], Replace::CreateOnly)
+            .unwrap();
+        let err = storage
+            .replace_atomic_failing(&p, &mut &b"new content"[..], Replace::Overwrite)
+            .unwrap_err();
+        assert!(matches!(err, VaultError::Io { .. }));
+        assert_eq!(std::fs::read(dir.path().join("a.md")).unwrap(), b"original");
+        let names: Vec<_> = std::fs::read_dir(dir.path())
+            .unwrap()
+            .map(|e| e.unwrap().file_name().into_string().unwrap())
+            .collect();
+        assert_eq!(names, vec!["a.md".to_string()]);
     }
 }

@@ -1,22 +1,17 @@
 use crate::error::{Result, VaultError, io_err};
 use crate::hash::Hash;
 use crate::path::VaultPath;
+use crate::storage::Replace;
+use crate::storage::plain;
 use crate::vault::Vault;
-use std::io::{Read, Write};
+use std::io::Read;
 use std::path::{Path, PathBuf};
-use std::sync::atomic::{AtomicU64, Ordering};
-
-static TMP_COUNTER: AtomicU64 = AtomicU64::new(0);
-
-/// Suffix marker of in-flight atomic writes. Temp names start with `.` so scans
-/// and watchers ignore them (VLT-05).
-pub const TMP_MARKER: &str = ".liber-tmp-";
 
 impl Vault {
     /// Absolute path for `path`, refusing anything whose deepest existing
     /// ancestor resolves (through symlinks) outside the vault.
     pub fn fs_path(&self, path: &VaultPath) -> Result<PathBuf> {
-        crate::storage::plain::resolve(&self.root, path)
+        plain::resolve(&self.root, path)
     }
 
     /// [`Vault::fs_path`] for a path the webview names, also refusing one
@@ -24,7 +19,7 @@ impl Vault {
     /// hidden folder through a symlink or, on Windows, an 8.3 short name
     /// (`SSH~1`). A missing file is left to the read that follows.
     pub fn visible_fs_path(&self, path: &VaultPath) -> Result<PathBuf> {
-        crate::storage::plain::resolve_visible(&self.root, path)
+        plain::resolve_visible(&self.root, path)
     }
 
     pub fn read(&self, path: &VaultPath) -> Result<(Vec<u8>, Hash)> {
@@ -48,76 +43,29 @@ impl Vault {
         content: &[u8],
         expected: Option<Hash>,
     ) -> Result<Hash> {
-        self.write_cas_inner(path, content, expected, false)
-    }
-
-    pub(crate) fn write_cas_inner(
-        &self,
-        path: &VaultPath,
-        content: &[u8],
-        expected: Option<Hash>,
-        fail_before_rename: bool,
-    ) -> Result<Hash> {
         if path.is_root() {
             return Err(VaultError::OutsideVault(
                 "cannot write the vault root".into(),
             ));
         }
-        let target = self.fs_path(path)?;
-        let existing = match std::fs::read(&target) {
-            Ok(bytes) => Some((Hash::of(&bytes), std::fs::metadata(&target).ok())),
+        let current = match std::fs::read(self.fs_path(path)?) {
+            Ok(bytes) => Some(Hash::of(&bytes)),
             Err(e) if e.kind() == std::io::ErrorKind::NotFound => None,
             Err(e) => return Err(io_err(path.as_str(), e)),
         };
-        match (&expected, &existing) {
+        let mode = match (&expected, &current) {
             (None, Some(_)) => return Err(VaultError::AlreadyExists(path.to_string())),
             (Some(_), None) => return Err(VaultError::NotFound(path.to_string())),
-            (Some(want), Some((current, _))) if want != current => {
+            (Some(want), Some(current)) if want != current => {
                 return Err(VaultError::Conflict {
                     path: path.to_string(),
                     current: *current,
                 });
             }
-            _ => {}
-        }
-        let parent = target.parent().expect("non-root path has a parent");
-        if !parent.is_dir() {
-            return Err(VaultError::NotFound(
-                path.parent().map(|p| p.to_string()).unwrap_or_default(),
-            ));
-        }
-        let tmp = parent.join(format!(
-            ".{}{}{}-{}",
-            path.file_name(),
-            TMP_MARKER,
-            std::process::id(),
-            TMP_COUNTER.fetch_add(1, Ordering::Relaxed)
-        ));
-        let result = (|| -> std::io::Result<()> {
-            let mut file = std::fs::OpenOptions::new()
-                .write(true)
-                .create_new(true)
-                .open(&tmp)?;
-            file.write_all(content)?;
-            file.sync_all()?;
-            drop(file);
-            if let Some((_, Some(meta))) = &existing {
-                std::fs::set_permissions(&tmp, meta.permissions())?;
-            }
-            if fail_before_rename {
-                return Err(std::io::Error::other("injected failure before rename"));
-            }
-            std::fs::rename(&tmp, &target)?;
-            sync_dir(parent);
-            Ok(())
-        })();
-        if let Err(e) = result {
-            let _ = std::fs::remove_file(&tmp);
-            return Err(VaultError::Io {
-                path: path.to_string(),
-                source: e,
-            });
-        }
+            (None, None) => Replace::CreateOnly,
+            (Some(_), Some(_)) => Replace::Overwrite,
+        };
+        plain::replace_atomic(&self.root, path, &mut &content[..], mode, false)?;
         Ok(Hash::of(content))
     }
 
@@ -148,97 +96,24 @@ impl Vault {
     /// file and renamed into place (M2c §7.1). Create-only: `AlreadyExists` if
     /// `dest` exists, `NotFound` if its folder doesn't.
     pub fn import_file(&self, src: &Path, dest: &VaultPath) -> Result<Hash> {
-        if dest.is_root() {
-            return Err(VaultError::OutsideVault(
-                "cannot write the vault root".into(),
-            ));
-        }
-        let target = self.fs_path(dest)?;
-        if target.symlink_metadata().is_ok() {
-            return Err(VaultError::AlreadyExists(dest.to_string()));
-        }
-        let parent = target.parent().expect("non-root path has a parent");
-        if !parent.is_dir() {
-            return Err(VaultError::NotFound(
-                dest.parent().map(|p| p.to_string()).unwrap_or_default(),
-            ));
-        }
-        let tmp = parent.join(format!(
-            ".{}{}{}-{}",
-            dest.file_name(),
-            TMP_MARKER,
-            std::process::id(),
-            TMP_COUNTER.fetch_add(1, Ordering::Relaxed)
-        ));
-        let result = (|| -> std::io::Result<Hash> {
-            let mut input = std::fs::File::open(src)?;
-            let mut out = std::fs::OpenOptions::new()
-                .write(true)
-                .create_new(true)
-                .open(&tmp)?;
-            let mut hasher = blake3::Hasher::new();
-            let mut buf = vec![0u8; 64 * 1024];
-            loop {
-                let n = input.read(&mut buf)?;
-                if n == 0 {
-                    break;
-                }
-                hasher.update(&buf[..n]);
-                out.write_all(&buf[..n])?;
-            }
-            out.sync_all()?;
-            drop(out);
-            if target.symlink_metadata().is_ok() {
-                return Err(std::io::ErrorKind::AlreadyExists.into());
-            }
-            std::fs::rename(&tmp, &target)?;
-            sync_dir(parent);
-            Ok(Hash::from_bytes(*hasher.finalize().as_bytes()))
-        })();
-        result.map_err(|e| {
-            let _ = std::fs::remove_file(&tmp);
-            io_err(dest.as_str(), e)
-        })
+        let mut input = HashingReader {
+            src,
+            file: None,
+            hasher: blake3::Hasher::new(),
+        };
+        plain::replace_atomic(&self.root, dest, &mut input, Replace::CreateOnly, false)?;
+        Ok(Hash::from_bytes(*input.hasher.finalize().as_bytes()))
     }
 
     /// Creates one folder; the parent must exist.
     pub fn create_dir(&self, path: &VaultPath) -> Result<()> {
-        std::fs::create_dir(self.fs_path(path)?).map_err(|e| io_err(path.as_str(), e))
+        plain::create_dir(&self.root, path)
     }
 
     /// Renames/moves a file or folder. Fails with `AlreadyExists` if `to` exists,
     /// except case-only renames of the same entry on case-insensitive filesystems.
     pub fn rename(&self, from: &VaultPath, to: &VaultPath) -> Result<()> {
-        if from.is_root() || to.is_root() {
-            return Err(VaultError::OutsideVault(
-                "cannot rename the vault root".into(),
-            ));
-        }
-        let src = self.fs_path(from)?;
-        let dst = self.fs_path(to)?;
-        if src.symlink_metadata().is_err() {
-            return Err(VaultError::NotFound(from.to_string()));
-        }
-        if !dst.parent().is_some_and(Path::is_dir) {
-            return Err(VaultError::NotFound(
-                to.parent().map(|p| p.to_string()).unwrap_or_default(),
-            ));
-        }
-        if dst.symlink_metadata().is_ok() {
-            if same_entry(&src, &dst) && from != to {
-                // Case-only rename on a case-insensitive FS: go through a temp name.
-                let tmp = src.with_file_name(format!(
-                    ".{}{}{}",
-                    from.file_name(),
-                    TMP_MARKER,
-                    TMP_COUNTER.fetch_add(1, Ordering::Relaxed)
-                ));
-                std::fs::rename(&src, &tmp).map_err(|e| io_err(from.as_str(), e))?;
-                return std::fs::rename(&tmp, &dst).map_err(|e| io_err(to.as_str(), e));
-            }
-            return Err(VaultError::AlreadyExists(to.to_string()));
-        }
-        std::fs::rename(&src, &dst).map_err(|e| io_err(from.as_str(), e))
+        plain::rename(&self.root, from, to)
     }
 
     /// The child of `dir` named `name`, or failing that one whose name only
@@ -272,45 +147,36 @@ impl Vault {
     /// `notes` (or `á`/`Á`) on a case-insensitive file system.
     pub fn same_entry(&self, a: &VaultPath, b: &VaultPath) -> bool {
         match (self.fs_path(a), self.fs_path(b)) {
-            (Ok(x), Ok(y)) => same_entry(&x, &y),
+            (Ok(x), Ok(y)) => plain::same_entry(&x, &y),
             _ => false,
         }
     }
 
     /// Moves a file or folder to the OS trash (EXP-03).
     pub fn trash(&self, path: &VaultPath) -> Result<()> {
-        if path.is_root() {
-            return Err(VaultError::OutsideVault(
-                "cannot trash the vault root".into(),
-            ));
-        }
-        let full = self.fs_path(path)?;
-        if full.symlink_metadata().is_err() {
-            return Err(VaultError::NotFound(path.to_string()));
-        }
-        trash::delete(&full).map_err(|e| VaultError::Io {
-            path: path.to_string(),
-            source: std::io::Error::other(e.to_string()),
-        })
+        plain::trash(&self.root, path)
     }
 }
 
-fn same_entry(a: &Path, b: &Path) -> bool {
-    match (dunce::canonicalize(a), dunce::canonicalize(b)) {
-        (Ok(x), Ok(y)) => x == y,
-        _ => false,
-    }
+/// `src`, opened on the first read (so `dest`'s checks come first, as before)
+/// and hashed as it streams.
+struct HashingReader<'a> {
+    src: &'a Path,
+    file: Option<std::fs::File>,
+    hasher: blake3::Hasher,
 }
 
-#[cfg(unix)]
-fn sync_dir(dir: &Path) {
-    if let Ok(d) = std::fs::File::open(dir) {
-        let _ = d.sync_all();
+impl Read for HashingReader<'_> {
+    fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
+        let file = match &mut self.file {
+            Some(file) => file,
+            None => self.file.insert(std::fs::File::open(self.src)?),
+        };
+        let n = file.read(buf)?;
+        self.hasher.update(&buf[..n]);
+        Ok(n)
     }
 }
-
-#[cfg(not(unix))]
-fn sync_dir(_dir: &Path) {}
 
 /// `name` among `names`: the exact one if present, else any case variant.
 fn pick_child<'a>(names: &'a [String], name: &str) -> Option<&'a String> {
@@ -339,23 +205,5 @@ mod tests {
         assert_eq!(pick_child(&both("X.md", "x.md"), "X.md").unwrap(), "X.md");
         assert_eq!(pick_child(&both("x.md", "y.md"), "X.md").unwrap(), "x.md");
         assert_eq!(pick_child(&both("a.md", "b.md"), "X.md"), None);
-    }
-
-    #[test]
-    fn nfr_08_injected_failure_leaves_target_untouched_and_no_temp_file() {
-        let dir = tempfile::tempdir().unwrap();
-        let vault = Vault::open(dir.path()).unwrap();
-        let p = VaultPath::new("a.md").unwrap();
-        let h = vault.write_cas(&p, b"original", None).unwrap();
-        let err = vault
-            .write_cas_inner(&p, b"new content", Some(h), true)
-            .unwrap_err();
-        assert!(matches!(err, VaultError::Io { .. }));
-        assert_eq!(std::fs::read(dir.path().join("a.md")).unwrap(), b"original");
-        let names: Vec<_> = std::fs::read_dir(dir.path())
-            .unwrap()
-            .map(|e| e.unwrap().file_name().into_string().unwrap())
-            .collect();
-        assert_eq!(names, vec!["a.md".to_string()]);
     }
 }
