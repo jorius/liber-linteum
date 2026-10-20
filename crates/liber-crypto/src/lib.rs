@@ -1,6 +1,8 @@
 //! Vault encryption core (encryption phase E1).
 
 mod error;
+#[doc(hidden)]
+pub mod fuzzing;
 mod header;
 mod kdf;
 mod keyring;
