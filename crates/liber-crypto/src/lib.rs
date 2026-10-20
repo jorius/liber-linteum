@@ -15,7 +15,7 @@ mod stream;
 mod vectors;
 
 pub use error::{CryptoError, Result};
-pub use header::{Unlocked, VaultHeader};
+pub use header::{MergeOutcome, Unlocked, VaultHeader};
 pub use kdf::{Argon2Params, passphrase_kek};
 pub use keyring::{KeyringFile, KeyringPublic, KeyringSecret};
 pub use keys::{Secret, Subkeys, VaultId, VaultKey};

@@ -71,6 +71,17 @@ impl Unlocked {
     }
 }
 
+/// What `merge_from` did.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct MergeOutcome {
+    /// Slots taken from the other copy.
+    pub added: usize,
+    /// This copy's recovery slot is gone (the other copy replaced it, or won the smallest-id
+    /// rule): the code this device showed no longer works, so the app says so and offers
+    /// `new_recovery` (E4).
+    pub local_recovery_dropped: bool,
+}
+
 #[derive(Clone, Debug)]
 pub struct VaultHeader {
     pub vault_id: VaultId,
@@ -81,7 +92,7 @@ pub struct VaultHeader {
     unknown_slots: Vec<(usize, Value)>,
     /// Ids of slots removed this epoch, sorted: a merge never brings them back (spec §4.3).
     removed: Vec<[u8; 16]>,
-    /// Kept valid by every method that takes an `Unlocked`; `remove_slot` leaves it stale until `to_bytes`.
+    /// Valid for the current contents: every write verifies it first and re-seals after.
     mac: [u8; 32],
 }
 
@@ -220,7 +231,7 @@ impl VaultHeader {
                 continue;
             };
             let mut u = Unlocked::new(vk, id, self.epoch, None);
-            self.verify(&u.subkeys.header)?;
+            self.verify_mac(&u.subkeys.header)?;
             if let Some(r) = &self.retiring {
                 let old = unwrap(
                     &retiring_kek(&u.vk, id),
@@ -238,14 +249,14 @@ impl VaultHeader {
     /// The file bytes, with the MAC recomputed under `u`'s header key. Refuses an `Unlocked`
     /// from another vault or epoch, whose MAC would lock everyone out.
     pub fn to_bytes(&self, u: &Unlocked) -> Result<Vec<u8>> {
-        self.check_unlocked(u)?;
+        self.verify(u)?;
         let mut v = self.to_json();
         v["mac"] = b64(&mac_over(&v, &u.subkeys.header));
         Ok(serde_json::to_vec(&v).expect("a Value always serialises"))
     }
 
     pub fn add_slot(&mut self, u: &Unlocked, s: NewSlot) -> Result<[u8; 16]> {
-        self.check_unlocked(u)?;
+        self.verify(u)?;
         let id = match s {
             NewSlot::Passphrase(pw, params) => {
                 params.check_floor()?;
@@ -280,7 +291,8 @@ impl VaultHeader {
     }
 
     /// Refuses to remove the recovery slot or the last passphrase slot.
-    pub fn remove_slot(&mut self, id: &[u8; 16]) -> Result<()> {
+    pub fn remove_slot(&mut self, u: &Unlocked, id: &[u8; 16]) -> Result<()> {
+        self.verify(u)?;
         let i = self
             .slots
             .iter()
@@ -295,6 +307,7 @@ impl VaultHeader {
             _ => {
                 self.bury(&[*id])?;
                 self.slots.remove(i);
+                self.seal(u);
                 Ok(())
             }
         }
@@ -302,7 +315,7 @@ impl VaultHeader {
 
     /// Replaces the recovery slot; the returned code is shown once.
     pub fn new_recovery(&mut self, u: &Unlocked) -> Result<RecoveryCode> {
-        self.check_unlocked(u)?;
+        self.verify(u)?;
         let old: Vec<[u8; 16]> = recovery_slot_ids(&self.slots).collect();
         self.bury(&old)?;
         self.slots.retain(|s| !matches!(s.kind, SlotKind::Recovery));
@@ -311,16 +324,16 @@ impl VaultHeader {
         Ok(rc)
     }
 
-    /// Merges a sync-conflict copy (spec §4.3) and returns how many of its slots were added.
-    /// A slot can't be checked without its secret, so `other` must carry a valid MAC under this
-    /// vault's header key at the same epoch; anything else is refused whole. Tombstones are
-    /// unioned: no removed slot is added, and local slots the other copy removed are dropped.
-    pub fn merge_from(&mut self, other: &VaultHeader, u: &Unlocked) -> Result<usize> {
-        self.check_unlocked(u)?;
+    /// Merges a sync-conflict copy (spec §4.3). A slot can't be checked without its secret, so
+    /// both copies must carry a valid MAC under this vault's header key at the same epoch;
+    /// anything else is refused whole. Tombstones are unioned: no removed slot is added, and
+    /// local slots the other copy removed are dropped.
+    pub fn merge_from(&mut self, other: &VaultHeader, u: &Unlocked) -> Result<MergeOutcome> {
+        self.verify(u)?;
         if other.vault_id != self.vault_id || other.epoch != self.epoch {
             return Err(CryptoError::Authentication);
         }
-        other.verify(&u.subkeys.header)?;
+        other.verify_mac(&u.subkeys.header)?;
         let mut removed = [&self.removed[..], &other.removed[..]].concat();
         removed.sort_unstable();
         removed.dedup();
@@ -352,14 +365,18 @@ impl VaultHeader {
                 "merge would leave no passphrase or recovery slot",
             ));
         }
-        let n = added
-            .iter()
-            .filter(|id| slots.iter().any(|s| s.id == **id))
-            .count();
+        let outcome = MergeOutcome {
+            added: added
+                .iter()
+                .filter(|id| slots.iter().any(|s| s.id == **id))
+                .count(),
+            local_recovery_dropped: recovery_slot_ids(&self.slots)
+                .any(|id| !slots.iter().any(|s| s.id == id)),
+        };
         self.slots = slots;
         self.removed = removed;
         self.seal(u);
-        Ok(n)
+        Ok(outcome)
     }
 
     /// Starts a key rotation (spec §3.2): new VK at the next epoch, the old one kept as retiring.
@@ -381,7 +398,7 @@ impl VaultHeader {
         passphrase: &str,
         params: Argon2Params,
     ) -> Result<(Unlocked, RecoveryCode)> {
-        self.check_unlocked(u)?;
+        self.verify(u)?;
         if self.retiring.is_some() {
             return Err(CryptoError::Params("a rotation is already in progress"));
         }
@@ -425,19 +442,22 @@ impl VaultHeader {
 
     /// Drops the retiring key once every file is at the current epoch.
     pub fn finish_rotation(&mut self, u: &Unlocked) -> Result<()> {
-        self.check_unlocked(u)?;
+        self.verify(u)?;
         self.retiring = None;
         self.seal(u);
         Ok(())
     }
 
-    fn check_unlocked(&self, u: &Unlocked) -> Result<()> {
+    /// Checks that `u` is this vault's key at this epoch (`Params` if not) and that the header's
+    /// MAC verifies under it (`Authentication` if not). Every method that writes or re-MACs calls
+    /// this first, so a header edited on disk since `u` was unlocked is never signed.
+    pub fn verify(&self, u: &Unlocked) -> Result<()> {
         if u.vault_id != self.vault_id || u.epoch != self.epoch {
             return Err(CryptoError::Params(
                 "unlocked key is for another vault or epoch",
             ));
         }
-        Ok(())
+        self.verify_mac(&u.subkeys.header)
     }
 
     /// Records removed slot ids (sorted) so a merge can't bring them back.
@@ -531,7 +551,7 @@ impl VaultHeader {
         self.mac = mac_over(&self.to_json(), &u.subkeys.header);
     }
 
-    fn verify(&self, k_header: &Secret<32>) -> Result<()> {
+    fn verify_mac(&self, k_header: &Secret<32>) -> Result<()> {
         check_mac(&self.to_json(), k_header, &self.mac)
     }
 }
@@ -657,6 +677,49 @@ mod tests {
         assert_eq!(h.to_bytes(&u).unwrap(), before);
     }
 
+    /// The header re-read from disk after a sync, as an app holding an open `Unlocked` would.
+    fn edited_on_disk(h: &VaultHeader, u: &Unlocked, edit: impl Fn(&mut Value)) -> VaultHeader {
+        let mut v: Value = serde_json::from_slice(&h.to_bytes(u).unwrap()).unwrap();
+        edit(&mut v);
+        VaultHeader::parse(&serde_json::to_vec(&v).unwrap()).unwrap()
+    }
+
+    #[test]
+    fn edited_header_is_never_re_maced() {
+        let (h, u, _) = new_vault("pw");
+        let dev = Secret::random();
+        let edits: [fn(&mut Value); 3] = [
+            // A garbage retiring key: once MACed, every unlock fails at the retiring unwrap.
+            |v| {
+                v["retiring"] =
+                    json!({"epoch": 9, "nonce": "A".repeat(16), "wrapped": "A".repeat(64)})
+            },
+            |v| v["removed"] = json!(["AAAAAAAAAAAAAAAAAAAAAA"]),
+            |v| v["slots"][1]["wrapped"] = json!("A".repeat(64)),
+        ];
+        for edit in edits {
+            let mut p = edited_on_disk(&h, &u, edit);
+            let before = (p.to_json(), p.mac);
+            let pass = id_of(&p, |k| matches!(k, SlotKind::Passphrase { .. }));
+            assert!(is_auth(p.verify(&u)));
+            assert!(is_auth(p.to_bytes(&u)));
+            let new_dev = NewSlot::Device {
+                device_id: "d".into(),
+                secret: &dev,
+            };
+            assert!(is_auth(p.add_slot(&u, new_dev)));
+            assert!(is_auth(p.remove_slot(&u, &pass)));
+            assert!(is_auth(p.new_recovery(&u)));
+            assert!(is_auth(p.finish_rotation(&u)));
+            assert!(is_auth(p.begin_rotation_unchecked(&u, "x", TINY)));
+            assert!(is_auth(p.merge_from(&h, &u)));
+            // Merging the edited copy into a genuine one is refused too.
+            assert!(is_auth(h.clone().merge_from(&p, &u)));
+            assert_eq!((p.to_json(), p.mac), before, "refused calls change nothing");
+        }
+        h.verify(&u).unwrap();
+    }
+
     #[test]
     fn add_and_remove_device_slot() {
         let (mut h, u, rc) = new_vault("pw");
@@ -664,16 +727,22 @@ mod tests {
         let id = device(&mut h, &u, "mac-1", &dev);
         let d = h.unlock(Unlock::Device(&dev)).unwrap();
         assert_eq!(d.vk.expose(), u.vk.expose());
-        h.remove_slot(&id).unwrap();
-        assert!(h.remove_slot(&id).is_err());
+        h.remove_slot(&u, &id).unwrap();
+        assert!(h.remove_slot(&u, &id).is_err());
         let p = VaultHeader::parse(&h.to_bytes(&u).unwrap()).unwrap();
         assert!(is_auth(p.unlock(Unlock::Device(&dev))));
         p.unlock(Unlock::Passphrase("pw")).unwrap();
         p.unlock(Unlock::Recovery(&rc)).unwrap();
         let pass = id_of(&h, |k| matches!(k, SlotKind::Passphrase { .. }));
         let rec = id_of(&h, |k| matches!(k, SlotKind::Recovery));
-        assert!(matches!(h.remove_slot(&pass), Err(CryptoError::Params(_))));
-        assert!(matches!(h.remove_slot(&rec), Err(CryptoError::Params(_))));
+        assert!(matches!(
+            h.remove_slot(&u, &pass),
+            Err(CryptoError::Params(_))
+        ));
+        assert!(matches!(
+            h.remove_slot(&u, &rec),
+            Err(CryptoError::Params(_))
+        ));
         assert_eq!(h.slots.len(), 2);
         // A new recovery key replaces the old one.
         let rc2 = h.new_recovery(&u).unwrap();
@@ -958,9 +1027,11 @@ mod tests {
             .as_array_mut()
             .unwrap()
             .insert(1, unknown.clone());
+        // A writer that knows the type MACs it; this reader keeps it where it was.
+        v.as_object_mut().unwrap().remove("mac");
+        v["mac"] = b64(&mac_over(&v, &u.subkeys.header));
         let p = VaultHeader::parse(&serde_json::to_vec(&v).unwrap()).unwrap();
         assert_eq!(p.slots.len(), 2);
-        // A writer that knows the type MACs it; this reader keeps it where it was.
         let written = p.to_bytes(&u).unwrap();
         let w: Value = serde_json::from_slice(&written).unwrap();
         assert_eq!(w["slots"][1], unknown);
@@ -978,8 +1049,20 @@ mod tests {
         let (da, db) = (Secret::random(), Secret::random());
         device(&mut a, &u, "a", &da);
         device(&mut b, &u, "b", &db);
-        assert_eq!(a.merge_from(&b, &u).unwrap(), 1);
-        assert_eq!(a.merge_from(&b, &u).unwrap(), 0);
+        assert_eq!(
+            a.merge_from(&b, &u).unwrap(),
+            MergeOutcome {
+                added: 1,
+                local_recovery_dropped: false
+            }
+        );
+        assert_eq!(
+            a.merge_from(&b, &u).unwrap(),
+            MergeOutcome {
+                added: 0,
+                local_recovery_dropped: false
+            }
+        );
         let a = VaultHeader::parse(&a.to_bytes(&u).unwrap()).unwrap();
         for s in [&da, &db] {
             assert_eq!(
@@ -993,6 +1076,7 @@ mod tests {
         let (mut c, mut cu, _) = new_vault("pw");
         c.vault_id = h.vault_id;
         cu.vault_id = h.vault_id;
+        c.seal(&cu);
         let dc = Secret::random();
         device(&mut c, &cu, "c", &dc);
         assert!(is_auth(a.merge_from(&c, &u)));
@@ -1021,8 +1105,14 @@ mod tests {
         // A removed a device slot; B is a stale copy that still has it.
         let mut a = VaultHeader::parse(&base).unwrap();
         let mut b = VaultHeader::parse(&base).unwrap();
-        a.remove_slot(&dev_id).unwrap();
-        assert_eq!(a.merge_from(&b, &u).unwrap(), 0);
+        a.remove_slot(&u, &dev_id).unwrap();
+        assert_eq!(
+            a.merge_from(&b, &u).unwrap(),
+            MergeOutcome {
+                added: 0,
+                local_recovery_dropped: false
+            }
+        );
         assert!(is_auth(a.unlock(Unlock::Device(&dev))));
         let a_bytes = a.to_bytes(&u).unwrap();
         let v: Value = serde_json::from_slice(&a_bytes).unwrap();
@@ -1034,15 +1124,27 @@ mod tests {
         assert_eq!(
             b.merge_from(&VaultHeader::parse(&a_bytes).unwrap(), &u)
                 .unwrap(),
-            0
+            MergeOutcome {
+                added: 0,
+                local_recovery_dropped: false
+            }
         );
         assert!(is_auth(b.unlock(Unlock::Device(&dev))));
         assert_eq!(b.to_bytes(&u).unwrap(), a_bytes);
         // A replaced recovery code stays replaced.
         let mut a = VaultHeader::parse(&base).unwrap();
         let b = VaultHeader::parse(&base).unwrap();
+        let mut b = b;
         let rc_a = a.new_recovery(&u).unwrap();
-        assert_eq!(a.merge_from(&b, &u).unwrap(), 0);
+        assert_eq!(
+            a.merge_from(&b, &u).unwrap(),
+            MergeOutcome {
+                added: 0,
+                local_recovery_dropped: false
+            }
+        );
+        // The stale copy's code is void now; it is told so.
+        assert!(b.merge_from(&a, &u).unwrap().local_recovery_dropped);
         assert!(is_auth(a.unlock(Unlock::Recovery(&rc))));
         a.unlock(Unlock::Recovery(&rc_a)).unwrap();
         // Tombstones are MACed.
@@ -1062,8 +1164,8 @@ mod tests {
         let base = h.to_bytes(&u).unwrap();
         let mut a = VaultHeader::parse(&base).unwrap();
         let mut b = VaultHeader::parse(&base).unwrap();
-        a.remove_slot(&p1).unwrap();
-        b.remove_slot(&p2).unwrap();
+        a.remove_slot(&u, &p1).unwrap();
+        b.remove_slot(&u, &p2).unwrap();
         let b = VaultHeader::parse(&b.to_bytes(&u).unwrap()).unwrap();
         let before = a.to_bytes(&u).unwrap();
         assert!(matches!(a.merge_from(&b, &u), Err(CryptoError::Params(_))));
@@ -1083,10 +1185,24 @@ mod tests {
         let rc_a = a.new_recovery(&u).unwrap();
         let rc_b = b.new_recovery(&u).unwrap();
         let (a0, b0) = (a.clone(), b.clone());
-        a.merge_from(&b0, &u).unwrap();
-        b.merge_from(&a0, &u).unwrap();
+        let a_lost = a.merge_from(&b0, &u).unwrap().local_recovery_dropped;
+        let b_lost = b.merge_from(&a0, &u).unwrap().local_recovery_dropped;
         // The smaller slot id wins, so both devices pick the same one.
         let winner = recovery_ids(&a0)[0].min(recovery_ids(&b0)[0]);
+        // Exactly the device whose code lost is told, so it can offer `new_recovery`.
+        assert_eq!(
+            (a_lost, b_lost),
+            (
+                winner != recovery_ids(&a0)[0],
+                winner != recovery_ids(&b0)[0]
+            )
+        );
+        assert!(a_lost ^ b_lost);
+        // The loser also learns it when it merges a copy that already settled.
+        let (mut a1, mut b1) = (a0.clone(), b0.clone());
+        let settled = if a_lost { &b } else { &a };
+        let lost = if a_lost { &mut a1 } else { &mut b1 };
+        assert!(lost.merge_from(settled, &u).unwrap().local_recovery_dropped);
         assert_eq!(recovery_ids(&a), vec![winner]);
         assert_eq!(recovery_ids(&b), vec![winner]);
         assert_eq!(a.to_bytes(&u).unwrap(), b.to_bytes(&u).unwrap());

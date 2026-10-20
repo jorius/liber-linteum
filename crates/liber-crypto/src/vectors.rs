@@ -55,7 +55,7 @@ fn generate() -> Vec<(String, Vec<u8>)> {
         h.add_slot(&u, NewSlot::Keyring(&kf.public())).unwrap();
         // A removed slot leaves a tombstone in `removed`, which the MAC covers.
         let gone = add_device(&mut h, "old phone", &Secret::random());
-        h.remove_slot(&gone).unwrap();
+        h.remove_slot(&u, &gone).unwrap();
         let header = h.to_bytes(&u).unwrap();
         // Python has no X-Wing, so the keyring slot is checked here.
         let k = VaultHeader::parse(&header).unwrap();
