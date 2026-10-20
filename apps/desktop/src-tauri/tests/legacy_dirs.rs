@@ -128,20 +128,44 @@ fn corrupt_legacy_settings_are_copied_and_load_falls_back() {
     let _ = SettingsStore::load(&d.config);
 }
 
+/// Rename review I2: takes are folders (`audio/<name>-<id>/{take.json,
+/// <name>.wav}`, see `audio_commands`), copied once: after the new app
+/// recovers (and deletes) them, a later launch copies nothing again.
 #[test]
-fn copies_leftover_takes() {
+fn copies_leftover_take_folders_once() {
     let d = dirs();
-    write(&d.old_cache.join("audio/take-1.wav"), b"RIFF1");
-    write(&d.old_cache.join("audio/take-2.wav"), b"RIFF2");
+    write(&d.old_config.join("settings.json"), OLD);
+    write(&d.old_cache.join("audio/clip-3/take.json"), b"{}");
+    write(&d.old_cache.join("audio/clip-3/clip.wav"), b"RIFF1");
     let a = adopt(&d.config, &d.cache).unwrap();
-    assert_eq!(a.audio_takes, 2);
+    assert_eq!(a.audio_takes, 1);
     assert_eq!(
-        fs::read(d.cache.join("audio/take-1.wav")).unwrap(),
+        fs::read(d.cache.join("audio/clip-3/clip.wav")).unwrap(),
         b"RIFF1"
     );
-    assert!(d.old_cache.join("audio/take-1.wav").is_file());
-    // A cache that already has takes is left alone.
-    write(&d.old_cache.join("audio/take-3.wav"), b"RIFF3");
-    assert_eq!(adopt(&d.config, &d.cache).unwrap().audio_takes, 0);
-    assert!(!d.cache.join("audio/take-3.wav").exists());
+    assert!(d.cache.join("audio/clip-3/take.json").is_file());
+    assert!(d.old_cache.join("audio/clip-3/clip.wav").is_file());
+    // Recovery imports and deletes the take; the next launch adopts nothing.
+    fs::remove_dir_all(d.cache.join("audio/clip-3")).unwrap();
+    assert_eq!(adopt(&d.config, &d.cache).unwrap(), Default::default());
+    assert!(!d.cache.join("audio/clip-3").exists());
+}
+
+/// Rename review M1: imported dictionaries listed in the adopted settings
+/// come along, where `spell_commands` looks for them.
+#[test]
+fn copies_imported_dictionaries_with_the_settings() {
+    let d = dirs();
+    write(&d.old_config.join("settings.json"), OLD);
+    write(
+        &d.old_config.join("dictionaries/user-x/x.aff"),
+        b"SET UTF-8\n",
+    );
+    write(&d.old_config.join("dictionaries/user-x/x.dic"), b"1\nx\n");
+    adopt(&d.config, &d.cache).unwrap();
+    assert_eq!(
+        fs::read(d.config.join("dictionaries/user-x/x.dic")).unwrap(),
+        b"1\nx\n"
+    );
+    assert!(d.config.join("dictionaries/user-x/x.aff").is_file());
 }
