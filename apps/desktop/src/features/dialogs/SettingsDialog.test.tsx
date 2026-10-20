@@ -49,7 +49,14 @@ describe('Settings dialog (M2b §4, §5, §7)', () => {
       within(nav)
         .getAllByRole('button')
         .map((b) => b.textContent),
-    ).toEqual(['General', 'Appearance', 'Editor', 'Files and quick notes', 'Keyboard shortcuts']);
+    ).toEqual([
+      'General',
+      'Appearance',
+      'Editor',
+      'Spelling',
+      'Files and quick notes',
+      'Keyboard shortcuts',
+    ]);
     expect(within(nav).getByRole('button', { name: 'General' })).toHaveAttribute(
       'aria-current',
       'page',
@@ -101,6 +108,12 @@ describe('Settings dialog (M2b §4, §5, §7)', () => {
     await userEvent.clear(screen.getByRole('searchbox', { name: 'Search settings' }));
     expect(screen.getByRole('combobox', { name: 'Language' })).toBeVisible();
     expect(screen.queryByText('No settings match.')).not.toBeInTheDocument();
+  });
+
+  it('spelling: the Spelling category is found by search', async () => {
+    open();
+    await userEvent.type(screen.getByRole('searchbox', { name: 'Search settings' }), 'spelling');
+    expect(screen.getByRole('checkbox', { name: 'Check spelling' })).toBeVisible();
   });
 
   it('round-2 review I3: Tab from the last shown control wraps, past a category search hides', async () => {

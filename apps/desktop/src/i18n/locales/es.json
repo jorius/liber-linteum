@@ -391,6 +391,10 @@
         "title": "Editor",
         "description": "Fuentes, ancho de página, portadas y guardado."
       },
+      "spelling": {
+        "title": "Ortografía",
+        "description": "Diccionarios para revisar la ortografía, todos en este equipo."
+      },
       "files": {
         "title": "Archivos y notas rápidas",
         "description": "Renombrar, borrar y dónde viven las notas rápidas."
@@ -851,7 +855,25 @@
     "menu": "Ortografía: {word}",
     "noSuggestions": "Sin sugerencias",
     "add": "Agregar al diccionario",
-    "ignore": "Ignorar"
+    "ignore": "Ignorar",
+    "check": "Revisar la ortografía",
+    "dictionaries": "Diccionarios",
+    "import": "Agregar diccionario desde el disco…",
+    "remove": "Quitar {name}",
+    "removeShort": "Quitar",
+    "removeAsk": "¿Quitar {name}?",
+    "unavailable": "No se pudo cargar",
+    "words": "Palabras agregadas en esta bóveda",
+    "noWords": "Aún no hay palabras",
+    "removeWord": "Quitar {word}",
+    "vault": "Ortografía",
+    "vaultApp": "Usar los diccionarios de la app",
+    "vaultCustom": "Elegir para esta bóveda",
+    "dict": {
+      "en_US": "Inglés (EE. UU.)",
+      "es": "Español",
+      "es_CO": "Español (Colombia)"
+    }
   },
   "sort": {
     "label": "Ordenar {name} por",

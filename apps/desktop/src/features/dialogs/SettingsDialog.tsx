@@ -41,6 +41,7 @@ import { keyLabel, SHORTCUT_GROUPS } from './shortcuts';
 import { useLatestSave } from './useLatestSave';
 import { ScratchpadLocation } from '../scratchpad/ScratchpadLocation';
 import { VaultSettingsSection } from './VaultSettingsSection';
+import { SpellingSettings } from './SpellingSettings';
 
 const THEMES: Theme[] = ['system', 'light', 'dark'];
 const themeKey = { system: 'themeSystem', light: 'themeLight', dark: 'themeDark' } as const;
@@ -59,7 +60,14 @@ const WIDE_KINDS: (keyof WideElements)[] = ['tables', 'code', 'diagrams', 'image
 
 /** The categories of the left menu (M5b §18), in order; `vault` only with a
  *  vault open. */
-const APP_CATEGORIES = ['general', 'appearance', 'editor', 'files', 'shortcuts'] as const;
+const APP_CATEGORIES = [
+  'general',
+  'appearance',
+  'editor',
+  'spelling',
+  'files',
+  'shortcuts',
+] as const;
 type Category = (typeof APP_CATEGORIES)[number] | 'vault';
 /** The category shown last, for the session (M5b §18). */
 let lastCategory: Category = 'general';
@@ -478,6 +486,7 @@ export function SettingsDialog({ onClose }: { onClose: () => void }) {
               <ScratchpadLocation />
             </>,
           )}
+          {panel('spelling', <SpellingSettings vaultOpen={vaultOpen} />)}
           {panel('shortcuts', <ShortcutList />)}
           {vaultOpen && panel('vault', <VaultSettingsSection />)}
         </div>
@@ -519,6 +528,8 @@ function CategoryIcon({ category }: { category: Category }) {
       return <WidthIcon />;
     case 'editor':
       return <PencilIcon />;
+    case 'spelling':
+      return <FormatIcon />;
     case 'files':
       return <NewPageIcon />;
     case 'shortcuts':

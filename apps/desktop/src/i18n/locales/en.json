@@ -391,6 +391,10 @@
         "title": "Editor",
         "description": "Fonts, page width, covers and saving."
       },
+      "spelling": {
+        "title": "Spelling",
+        "description": "Dictionaries for spell checking, all on this computer."
+      },
       "files": {
         "title": "Files and quick notes",
         "description": "Renaming, deleting and where quick notes live."
@@ -851,7 +855,25 @@
     "menu": "Spelling: {word}",
     "noSuggestions": "No suggestions",
     "add": "Add to dictionary",
-    "ignore": "Ignore"
+    "ignore": "Ignore",
+    "check": "Check spelling",
+    "dictionaries": "Dictionaries",
+    "import": "Add dictionary from disk…",
+    "remove": "Remove {name}",
+    "removeShort": "Remove",
+    "removeAsk": "Remove {name}?",
+    "unavailable": "Couldn't be loaded",
+    "words": "Words added in this vault",
+    "noWords": "No words yet",
+    "removeWord": "Remove {word}",
+    "vault": "Spelling",
+    "vaultApp": "Use the app's dictionaries",
+    "vaultCustom": "Choose for this vault",
+    "dict": {
+      "en_US": "English (US)",
+      "es": "Spanish",
+      "es_CO": "Spanish (Colombia)"
+    }
   },
   "sort": {
     "label": "Sort {name} by",

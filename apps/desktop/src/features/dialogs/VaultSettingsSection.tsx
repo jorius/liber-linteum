@@ -12,6 +12,7 @@ import { usePageWidthStore } from '../../stores/pageWidthStore';
 import { validateName } from '../explorer/nameRules';
 import { ScratchFolderSetting } from '../scratchpad/ScratchFolderSetting';
 import styles from './Dialogs.module.css';
+import { VaultSpelling } from './SpellingSettings';
 
 const MODES: AttachmentMode[] = ['subfolder', 'same', 'vault', 'folder'];
 
@@ -264,6 +265,7 @@ export function VaultSettingsSection() {
         </select>
       </label>
       <ScratchFolderSetting />
+      <VaultSpelling />
     </section>
   );
 }
