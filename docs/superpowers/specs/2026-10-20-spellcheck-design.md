@@ -5,6 +5,7 @@ Status: written from Jose's answers (2026-10-20); plan to follow.
 ## 0. Intent
 
 Spell checking in the editor, with **full privacy**:
+
 - dictionaries live on the machine;
 - nothing is sent anywhere;
 - the operating system's spelling service never sees the text either.
@@ -12,6 +13,7 @@ Spell checking in the editor, with **full privacy**:
 The user picks one or more dictionaries.
 
 **Jose decided:**
+
 - Ship three dictionaries: **Spanish (Colombia)**, **Spanish (generic)** and **English (US)**.
 - Other dictionaries can be added from disk.
 - Several dictionaries can be active at once.
@@ -19,6 +21,7 @@ The user picks one or more dictionaries.
 ## 1. Goals / non-goals / anti-goals
 
 **Goals**
+
 - Misspelled words get a wavy underline in Live Preview and Source modes.
 - Right-click on a misspelled word offers:
   - suggestions;
@@ -29,11 +32,13 @@ The user picks one or more dictionaries.
 - Add any Hunspell dictionary (`.dic` + `.aff`) from disk, and remove dictionaries added this way.
 
 **Non-goals**
+
 - Grammar or style checking.
 - Automatic language detection.
 - Spell checking in the title, subtitle, search, rename or settings fields. Those stay `spellCheck={false}`.
 
 **Anti-goals**
+
 - Any network request, including downloading dictionaries. P1 still holds.
 - Using the WebView's or the OS's spell checker. CodeMirror already sets `spellcheck="false"`, and that stays.
 - Typing lag on large notes.
@@ -74,7 +79,7 @@ The user picks one or more dictionaries.
   - **Check spelling:** on by default.
   - **Dictionaries:** a list of checkboxes. The three bundled dictionaries come first, then imported ones, each with Remove.
   - **Add dictionary from disk…**
-  - **Default selection:** the dictionary matching the app language. English selects `en_US`; Spanish selects `es`, the generic Spanish (*my call*: `es` covers every region, and Jose can switch to `es_CO`).
+  - **Default selection:** the dictionary matching the app language. English selects `en_US`; Spanish selects `es`, the generic Spanish (_my call_: `es` covers every region, and Jose can switch to `es_CO`).
 - **"This vault"** gains a "Spelling" control with two choices: "Use the app's dictionaries", or a custom set (the same checkbox list). The choice is stored in `.nimw/vault.json` as `spelling: { dictionaries: [ids] } | absent`.
 
 ## 5. What gets checked
@@ -82,6 +87,7 @@ The user picks one or more dictionaries.
 **Tokenising.** Words are split with `Intl.Segmenter` (word granularity, `isWordLike`). Apostrophes and hyphens inside a word follow the segmenter.
 
 **Skipped, decided from the Markdown syntax tree:**
+
 - fenced and indented code, and inline code;
 - URLs, link destinations, autolinks, and wikilink targets (the display text after `|` is checked);
 - HTML;
@@ -91,6 +97,7 @@ The user picks one or more dictionaries.
 - footnote labels.
 
 **Skipped by shape:**
+
 - words containing digits;
 - words in ALL CAPS of 2 or more letters (acronyms);
 - words with inner capitals, like `camelCase` or `iPhone`.
@@ -134,27 +141,31 @@ The user picks one or more dictionaries.
 Each ruling ends with what it costs if it turns out wrong.
 
 **Storage and packaging**
-1. **Added words live in `.nimw/vault.json`** under `spellingWords`, not in a separate `.nimw/spelling.txt`. This reuses the existing atomic, compare-and-swap JSON update, and the words still live inside the vault, so encryption §5 holds. The words are NFC-normalised, sorted and unique. *Cost if wrong:* moving one key into its own file.
-2. **The dictionaries are compiled into the binary** with `include_str!`; they are not Tauri resources. They are `dictionary-en@4.0.0`, `dictionary-es@4.0.0` and `dictionary-es-co@2.0.0` from wooorm/dictionaries, with their licence and source in `crates/nimw-spell/dictionaries/*/`. The Spanish sets are used under GPL-3.0. *Cost:* the binary grows by about 2.3 MB.
+
+1. **Added words live in `.nimw/vault.json`** under `spellingWords`, not in a separate `.nimw/spelling.txt`. This reuses the existing atomic, compare-and-swap JSON update, and the words still live inside the vault, so encryption §5 holds. The words are NFC-normalised, sorted and unique. _Cost if wrong:_ moving one key into its own file.
+2. **The dictionaries are compiled into the binary** with `include_str!`; they are not Tauri resources. They are `dictionary-en@4.0.0`, `dictionary-es@4.0.0` and `dictionary-es-co@2.0.0` from wooorm/dictionaries, with their licence and source in `crates/nimw-spell/dictionaries/*/`. The Spanish sets are used under GPL-3.0. _Cost:_ the binary grows by about 2.3 MB.
 3. **The engine is `spellbook` 0.4.2** (MPL-2.0, pure Rust). Suggestions work, so no fallback suggester was needed.
-4. **Imported dictionaries get the id `user:<slug>`** and live in `<config>/dictionaries/user-<slug>/`, because `:` isn't valid in Windows folder names. The import picker runs in Rust through the cover-picker test hook, so no path ever comes from the webview. *Cost if wrong:* a rename.
-5. **A deleted dictionary reports `available: false`.** If an imported dictionary's files are deleted by hand, it says so even while it is still loaded in memory. *Cost:* none.
+4. **Imported dictionaries get the id `user:<slug>`** and live in `<config>/dictionaries/user-<slug>/`, because `:` isn't valid in Windows folder names. The import picker runs in Rust through the cover-picker test hook, so no path ever comes from the webview. _Cost if wrong:_ a rename.
+5. **A deleted dictionary reports `available: false`.** If an imported dictionary's files are deleted by hand, it says so even while it is still loaded in memory. _Cost:_ none.
 
-**Commands**
-6. **`spell_check` and `spell_suggest` take the UI's resolved language (`lang`).** Rust can't detect the OS locale, and `language` is unset when the app follows the OS. The language picks the default dictionary only when none is chosen: Spanish gives `es`, anything else gives `en_US`. *Cost if wrong:* one parameter to drop later.
-7. **There is a new error kind, `invalidInput`,** covering a bad word or an unknown dictionary id. *Cost:* one enum variant.
-8. **Ignored words last for the session of one open vault.** Reopening the same vault starts a new session, so they clear without needing hooks into open and close. *Cost:* none.
-9. **The settings patch can set `spellDictionaries` but can't clear it back to `null`,** because the UI always writes an explicit list. *Cost if wrong:* a "reset to default" button would need a double option.
+**Commands** 6. **`spell_check` and `spell_suggest` take the UI's resolved language (`lang`).** Rust can't detect the OS locale, and `language` is unset when the app follows the OS. The language picks the default dictionary only when none is chosen: Spanish gives `es`, anything else gives `en_US`. _Cost if wrong:_ one parameter to drop later. 7. **There is a new error kind, `invalidInput`,** covering a bad word or an unknown dictionary id. _Cost:_ one enum variant. 8. **Ignored words last for the session of one open vault.** Reopening the same vault starts a new session, so they clear without needing hooks into open and close. _Cost:_ none. 9. **The settings patch can set `spellDictionaries` but can't clear it back to `null`,** because the UI always writes an explicit list. _Cost if wrong:_ a "reset to default" button would need a double option.
 
-**Editor**
-10. **What counts as a word follows the parsed page model.** Only `text` nodes and a wikilink's shown text are checked, so code, math, HTML, frontmatter, tags, URLs (autolinks included) and comments are skipped. *Cost:* none.
-11. **Single-file windows don't check spelling.** They have no vault to keep added words in, and their capability has no spell commands. *Cost if wrong:* add the commands to the file-window capability and decide where added words go.
-12. **The 4 ms keystroke budget is met by design.** A keystroke only resets the 300 ms timer. The check after a pause adds at most about 9 ms to the worst frame, once, on a 200 KB note. The probe in `e2e/m4-perf.spec.ts` measured the worst frame at 18–22 ms with spelling off and 19–30 ms with it on. *Cost if wrong:* rework the visible-range scan.
+**Editor** 10. **What counts as a word follows the parsed page model.** Only `text` nodes and a wikilink's shown text are checked, so code, math, HTML, frontmatter, tags, URLs (autolinks included) and comments are skipped. _Cost:_ none. 11. **Single-file windows don't check spelling.** They have no vault to keep added words in, and their capability has no spell commands. _Cost if wrong:_ add the commands to the file-window capability and decide where added words go. 12. **The 4 ms keystroke budget is met by design.** A keystroke only resets the 300 ms timer. The check after a pause adds at most about 9 ms to the worst frame, once, on a 200 KB note. The probe in `e2e/m4-perf.spec.ts` measured the worst frame at 18–22 ms with spelling off and 19–30 ms with it on. _Cost if wrong:_ rework the visible-range scan.
 
-**Settings UI**
-13. **Removing an imported dictionary asks inside its row,** "Remove X? [Remove] [Cancel]", not in a dialog. A dialog would sit inside the Settings dialog. *Cost if wrong:* swap in a dialog.
-14. **Quick checkbox clicks build on each other.** A local draft holds the newest set, so a second click doesn't undo the first before it has saved. *Cost:* none.
+**Settings UI** 13. **Removing an imported dictionary asks inside its row,** "Remove X? [Remove] [Cancel]", not in a dialog. A dialog would sit inside the Settings dialog. _Cost if wrong:_ swap in a dialog. 14. **Quick checkbox clicks build on each other.** A local draft holds the newest set, so a second click doesn't undo the first before it has saved. _Cost:_ none.
 
 **Deferred**
+
 - A line that starts with a `%%` comment parses as an indented code block. The parser replaces comments with spaces, so the rest of that line ends up indented. This is pre-existing behaviour, not caused by spelling.
 
+## 9. Final review fixes (2026-10-20)
+
+From the fresh-context review of round 3b plus spell checking, fixed test-first on `fix/r3-final`:
+
+- **No dictionary (#2).** With no usable dictionary active (none ticked, or only imported ones whose files are gone), nothing is flagged. Settings → Spelling says "No dictionary selected — spelling is not checked" ("Ningún diccionario seleccionado: no se revisa la ortografía").
+- **Stale answers (#3).** A check answered after the dictionaries changed is dropped; the bump already scheduled a fresh one.
+- **Licences (#4).** `THIRD-PARTY-NOTICES.md` credits spellbook (MPL-2.0) and the three dictionaries with their sources, versions and licences. The licence texts ship in the app's resources under `licenses/`. A test fails if a bundled dictionary's `LICENSE` isn't both named and bundled.
+- **Case forms (#7).** An added word also matches its Title and ALL-CAPS forms, as Hunspell does for its own words: `nimw` accepts `Nimw` and `NIMW`. Mixed case such as `nImw` still matches only itself.
+- **Language change (#8).** Changing the UI language bumps the spell key, so answers are re-checked against the new language's default dictionary.
+- **Menu placement (#11).** The spelling menu is placed with `placePopup`, so it stays inside the window, and Tab closes it and gives focus back to the editor.
+- **Caching (#12).** A vault's spelling settings are cached until `.nimw/vault.json` changes (keyed on its mtime and size), and also dropped after this app writes them. An imported dictionary that fails to load isn't read again until its files' modification times change, or it is removed and re-imported.
