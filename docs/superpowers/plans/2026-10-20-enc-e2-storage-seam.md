@@ -21,7 +21,8 @@
 - **Dependencies.** None added. `cargo deny check` and the cargo-xwin Windows build still pass.
 - **P1.** Zero network requests, as before.
 - **Commits.** Signed, with the trailer `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`. Never bypass signing.
-- **Gate.** The gate after every task is `$SP/check.sh all <worktree>`. Tasks 1–3 may run `cargo test -p liber-vault` while iterating.
+- **Gate.** The gate after every task is `LIBER_E2E_PORT=<free port> $SP/check.sh all <worktree>`. Use your own `CARGO_TARGET_DIR`; never share one across worktrees. Tasks 1–3 may run `cargo test -p liber-vault` while iterating.
+- **Base.** `main` at de5c8ba: round 3b, spell checking, the Liber Linteum rename (`.liber/` with the `meta_dir` resolver for an unmoved legacy folder, `LEGACY_META_DIR`), and `liber-crypto` (E1) are all in.
 
 ## Review Focus
 
@@ -33,49 +34,56 @@
 
 ---
 
-## Inventory (`git grep` of production code, `#[cfg(test)]` modules excluded, 2026-10-20)
+## Inventory (`grep` of production code, lines before a file's first `#[cfg(test)]`, refreshed 2026-10-20 against main de5c8ba)
 
-There are 151 hits in 25 files for `std::fs | fs:: | File:: | OpenOptions | read_dir | symlink_metadata | .metadata() | canonicalize | .is_dir() | .is_file() | .exists() | notify:: | trash:: | tempfile`. A further 30 lines turn a vault path into an OS path (`fs_path(`, `visible_fs_path(`, `to_fs_path(`, `.root()`).
+There are 198 hits in 31 files for `std::fs | fs:: | File:: | OpenOptions | read_dir | symlink_metadata | .metadata() | canonicalize | .is_dir() | .is_file() | .exists() | notify:: | trash:: | tempfile`. A further 68 lines turn a vault path into an OS path (`fs_path(`, `visible_fs_path(`, `to_fs_path(`, `from_fs_path(`, `.root()`), most of them `read_json(self.root(), …)` inside liber-vault.
 
-**Routed through the seam: 86 hits in 14 files**
+**Routed through the seam: 89 hits in 14 files, plus the path-only lines listed**
 
 | File (hits) | Today | After E2 |
 |---|---|---|
 | `liber-vault/src/fsops.rs` (32) | `fs_path`, `visible_fs_path`, `read`, `write_cas`, `create_dir_all`, `import_file`, `create_dir`, `rename`, `trash`, `sync_dir` | Bodies move to `PlainStorage` (`resolve`, `replace_atomic`, `create_dir`, `rename`, `trash_os`). `Vault::read/write_cas/import_file/create_dir_all/create_dir/rename/trash` keep their signatures and call `self.storage` |
-| `liber-vault/src/scan.rs` (9) | `read_dir`, `symlink_metadata`, follow-a-symlink | `Vault::walk` uses `storage.children()`, and `storage.meta(_, Follow::InsideVault)` for symlinks; `mtime_ns()` moves into plain |
-| `liber-vault/src/watch.rs` (7) | `notify` setup, OS→vault path translation, `exists()` | The OS side becomes `storage.watch()`. Batching, hidden and excluded filtering, sorting and dedup stay in `Vault` |
-| `liber-vault/src/vault.rs` (5) | `canonicalize` + `is_dir` at open; `.liber` `create_dir`; `read_json` via `std::fs::read` | `PlainStorage::open(root)`; `storage.create_dir`; `read_json(&dyn Storage, rel, …)` |
+| `liber-vault/src/scan.rs` (9, plus `to_fs_path` 62, 70) | `read_dir`, `symlink_metadata`, follow-a-symlink | `Vault::walk` uses `storage.children()`, and `storage.meta(_, Follow::InsideVault)` for symlinks; `mtime_ns()` moves into plain |
+| `liber-vault/src/watch.rs` (7, plus `from_fs_path` 167) | `notify` setup, OS→vault path translation, `exists()` | The OS side becomes `storage.watch()`. Batching, hidden and excluded filtering, sorting and dedup stay in `Vault` |
+| `liber-vault/src/vault.rs` (5, plus `fs_path` 209) | `canonicalize` + `is_dir` at open; the meta-dir `create_dir` in `try_update_json_object`; `read_json(root, …)` via `std::fs::read` | `PlainStorage::open(root)`; `storage.create_dir`; `read_json(&dyn Storage, rel, …)` |
+| `liber-vault/src/meta_dir.rs` (6) | `resolve(root, rel)` checks `META_DIR`/`LEGACY_META_DIR` with `exists`/`is_dir`; `migrate(root, …)` renames `LEGACY_META_DIR` → `META_DIR` with `std::fs::rename` | `resolve(&dyn Storage, rel)` and `migrate(&dyn Storage, …)`: `storage.meta(_, Follow::No)` and `storage.rename`. The migration is a vault operation, so it goes through the seam like any other rename |
+| `liber-vault/src/spelling.rs` (1) | `spelling_stamp` stats the resolved `vault.json` | `storage.meta(_, Follow::No)` → `(mtime_ns, len)` (signature change, see Task 3) |
 | `liber-vault/src/layout.rs` (1) | `to_fs_path(root).symlink_metadata()` | `storage.meta(_, Follow::No).is_some()` |
-| `liber-vault/src/icon.rs` (via `read_json(root)`) | `vault_icon_at(root)` | `vault_icon_at(root)` keeps its signature and reads through `PlainStorage::open(root)`. It serves the recent list, which never opens a session |
-| `liber-session/src/bin.rs` (15) | `measure`, `page_icon`, `free_path`, `is_dir`, `bin_dir`, `parents_are_folders`, `trash_list`, `trash_delete_via` gone check, `prune_archive` `remove_dir` | `vault.meta(_, Follow::No)`, `vault.children()`, `vault.read()`, `vault.remove_empty_dir()` |
+| `liber-vault/src/{bin,cover_height,cover_side,favorite,icon,layout,link_format,page_width,scratch,spelling}.rs` (path lines only) | `read_json(self.root(), …)` | `read_json(self.storage(), …)`. `vault_icon_at(root)` keeps its signature and reads through `PlainStorage::open(root)`: it serves the recent list, which never opens a session |
+| `liber-session/src/bin.rs` (15, plus `fs_path`/`to_fs_path` 102, 110, 118, 149, 202, 237, 302, 338, 480) | `measure`, `page_icon`, `free_path`, `is_dir`, `bin_dir`, `parents_are_folders`, `trash_list`, `trash_delete_via` gone check, `prune_archive` `remove_dir` | `vault.meta(_, Follow::No)`, `vault.children()`, `vault.read()`, `vault.remove_empty_dir()` |
 | `liber-session/src/quick_notes.rs` (1) | `read_dir(root)` for an exact-case name | `vault.children(&VaultPath::root())` |
-| `liber-session/src/rename.rs` (1) | `symlink_metadata(fs_path)` (is it a symlink?) | `vault.meta(path, Follow::No)?.kind == Kind::Symlink` |
-| `liber-session/src/session.rs` (1) | `metadata(fs_path).created()` for folder sort | `vault.meta(_, Follow::InsideVault)?.created` |
-| `liber-session/src/attachments.rs` (2 of 5) | `from_fs_path(root, real)` (is the dropped file already inside?); `fs_path` for an absolute `file://` link | `vault.vault_path_of(&real)`; `vault.os_path(path, OsUse::FileUrl)` |
-| `liber-session/src/external.rs` (path line 302) | `from_fs_path(root, real)` | `vault.vault_path_of(&real)` |
-| `liber-import/src/import.rs` (3 of 4: lines 566, 567, 586) | `fs_path` + `OpenOptions::create_new` + `remove_file` on failure | `vault.create_new(path)` and `vault.remove_file(path)` |
-| `src-tauri/src/asset.rs` (5) | `.trash` image: `root.join` + `symlink_metadata`; `respond_file(&Path)` opens and seeks a file | `vault.meta(".trash/<n>", Follow::No)`; `vault.open_read(path, Reach::Visible / Any)` → `respond(reader, mime, range)` |
+| `liber-session/src/rename.rs` (3: 161, 164, 357) | round 3b's pair pre-check (`exists` via `symlink_metadata`, `is_folder` via `is_dir`) and the symlink guard in link rewriting | `vault.meta(p, Follow::No).is_some()`, `…kind == Kind::Dir`, `…kind == Kind::Symlink` |
+| `liber-session/src/session.rs` (1, plus `fs_path` 356) | `metadata(fs_path).created()` for folder sort | `vault.meta(_, Follow::InsideVault)?.created` |
+| `liber-session/src/attachments.rs` (path lines 121, 339) | `from_fs_path(root, real)` (is the dropped file already inside?); `fs_path` for an absolute `file://` link | `vault.vault_path_of(&real)`; `vault.os_path(path, OsUse::FileUrl)` |
+| `liber-session/src/external.rs` (path line 304) | `from_fs_path(root, real)` | `vault.vault_path_of(&real)` |
+| `liber-import/src/import.rs` (2: 614, 633, plus `fs_path` 613) | `fs_path` + `OpenOptions::create_new` + `remove_file` on failure | `vault.create_new(path)` and `vault.remove_file(path)` |
+| `src-tauri/src/asset.rs` (5, plus 162, 207) | `.trash` image: `root.join` + `symlink_metadata`; `visible_fs_path`; `respond_file(&Path)` opens and seeks a file | `vault.meta(".trash/<n>", Follow::No)`; `vault.open_read(path, Reach::Visible / Any)` → `respond(reader, mime, range)` |
 | `src-tauri/src/editor_commands.rs` (path line 318) | `fs_path` → open with the default app | `vault.os_path(vp, OsUse::Open)` |
-| `src-tauri/src/file_commands.rs` (2: lines 125, 291) | `metadata(fs_path).len()`; `fs_path` for opening | `vault.meta(..).len`; `vault.os_path(vp, OsUse::Open)` |
+| `src-tauri/src/file_commands.rs` (1: 125, plus path lines 103, 291) | `metadata(fs_path).len()`; `visible_fs_path(&vp).is_err()` as a "may this be shown" check; `fs_path` for opening | `vault.meta(..).len`; `vault.open_read(&vp, Reach::Visible).is_err()`; `vault.os_path(vp, OsUse::Open)` |
 
-**Stays outside the seam.** Each kept line gets a trailing `// seam: outside (<reason>)` comment, which the guard test (Task 6) requires.
+**Stays outside the seam: 109 hits.** Each kept line gets a trailing `// seam: outside (<reason>)` comment, which the guard test (Task 6) requires, unless the whole file is allow-listed.
 
 | File (hits) | Reason |
 |---|---|
-| `src-tauri/src/settings.rs` (8) | The app's own settings file in the app data dir, not vault content (whole file allow-listed) |
+| `src-tauri/src/settings.rs` (8) | The app's own settings file in the app config dir, not vault content (whole file allow-listed) |
+| `src-tauri/src/legacy_dirs.rs` (19) | First-launch adoption of the old app's config and cache dirs: settings, take folders, imported dictionaries. App dirs only, never a vault (whole file allow-listed) |
+| `src-tauri/src/spell_commands.rs` (10) | Imported dictionaries live in the app config dir (`dictionaries/user-<slug>/`); picking, copying, statting and removing them is app data. Vault spelling settings already go through `Vault` (`spelling_words`, `spelling_stamp`) |
+| `liber-spell/src/lib.rs` (3) | Reads a dictionary pair from the path it is given: compiled-in or app config, never vault content |
 | `src-tauri/src/vault_commands.rs` (3) | Checks and creates the folder that is about to *become* a vault; no vault exists yet |
 | `src-tauri/src/scratchpad_commands.rs` (3) | Creates the global Scratchpad folder in app data, which is then opened as a vault through `Vault::open` |
-| `src-tauri/src/file_windows.rs` (3, plus `to_fs_path` line 127) | Single-file windows: one plain file outside any vault (M4c §3) |
-| `src-tauri/src/file_commands.rs` (lines 65, 307) | Matching a single file against recent vaults by canonical path, and the real target of a followed link (M4c review I3) |
+| `src-tauri/src/file_windows.rs` (3, plus `to_fs_path` 127) | Single-file windows: one plain file outside any vault (M4c §3) |
+| `src-tauri/src/file_commands.rs` (2: 65–66, 307) | Matching a single file against recent vaults by canonical path, and the real target of a followed link (M4c review I3) |
 | `src-tauri/src/editor_commands.rs` (`check_openable`, 4) | Inspects the OS path that `os_path(Open)` returned, which is today the file itself (E3: a decrypted temp copy) |
 | `src-tauri/src/audio_commands.rs` (17) | Takes live in the app cache dir and reach the vault only through `session.import_attachment` → `Vault::import_file`. E3 redesigns this (spec §4.2) |
 | `src-tauri/src/notion_commands.rs` (1) | Checks the import target folder that doesn't exist yet |
 | `liber-audio/src/record.rs` (2) | Writes a take to the cache path it is given |
 | `liber-import/src/archive.rs` (5) | Reads the user's export zip, plus an OS temp file for a nested zip. It is input outside any vault |
-| `liber-import/src/import.rs` (lines 555, 558) | Creates the new vault's own folder before `Vault::open` |
+| `liber-import/src/import.rs` (2: 601, 604) | Checks and creates the new vault's own folder before `Vault::open` |
 | `liber-index/src/index.rs` (3) | The index DB in the app cache (E3: `:memory:` for encrypted vaults, spec §5.1) |
-| `liber-session/src/attachments.rs` (lines 103–118) | `metadata`/`canonicalize` of the *outside* source file being imported |
+| `liber-session/src/attachments.rs` (3: 103–115) | `metadata`/`canonicalize` of the *outside* source file being imported |
 | `liber-testkit/src/lib.rs` (15) | Test-only crate that writes fixtures (whole file allow-listed; E3 converts fixtures into encrypted vaults through `Storage`) |
+| `liber-crypto/src/vectors.rs` (5) | A `#[cfg(test)]`-only module (declared `#[cfg(test)] mod vectors;` in `lib.rs`) that reads and writes the frozen vector files (whole file allow-listed) |
+| `liber-crypto/src/fuzzing.rs` (1) | A false positive: `KeyringFile::` matched `File::`. The guard's pattern uses `\bFile::` (Task 6) |
 
 ---
 
@@ -84,7 +92,7 @@ There are 151 hits in 25 files for `std::fs | fs:: | File:: | OpenOptions | read
 - `crates/liber-vault/src/storage/mod.rs`: the `Storage` trait, value types, `open_storage()` (with the test switch), and `PassThrough` (test-only).
 - `crates/liber-vault/src/storage/plain.rs`: `PlainStorage`. All OS calls of the vault crate live here.
 - `crates/liber-vault/src/storage/plain_watch.rs`: `PlainStorage::watch`, holding `notify` and the OS→`VaultPath` translation moved from `watch.rs`.
-- Modified: `fsops.rs`, `scan.rs`, `watch.rs`, `vault.rs`, `layout.rs`, `icon.rs`, `lib.rs`; the session, import and src-tauri files in the table above.
+- Modified: `fsops.rs`, `scan.rs`, `watch.rs`, `vault.rs`, `meta_dir.rs`, `spelling.rs`, `layout.rs`, `icon.rs`, `lib.rs`, and every liber-vault module calling `read_json` (`bin.rs`, `cover_height.rs`, `cover_side.rs`, `favorite.rs`, `link_format.rs`, `page_width.rs`, `scratch.rs`); the session, import and src-tauri files in the table above.
 - `crates/liber-vault/tests/seam_guard.rs`: the guard.
 - `docs/architecture/storage-seam.md`: a short reference, linked from `docs/README.md`.
 
@@ -165,6 +173,12 @@ impl PlainStorage { pub fn open(root: &std::path::Path) -> Result<PlainStorage>;
 - `watch`: E3 translates ciphertext events into logical ones (§8).
 - `name`: the test switch and diagnostics.
 
+**E3 needs from the E1 hand-off §5, checked against this trait (no method added):**
+- *Highest epoch seen per `vault_id`* is app state, not vault content: E3 keeps it in the app settings (`settings.rs`, outside the seam), keyed by `vault_id`.
+- *Exactly one `Normal` component per decrypted name before a join* is `EncryptedStorage`'s own validation when it maps ciphertext names to `VaultPath`s. Every path crossing the trait is already a validated `VaultPath`.
+- *A size cap on the `.libern` side file* is internal to `EncryptedStorage`'s name lookup.
+- *Recordings written append-only into the vault:* `create_new` gives the append-only writer. The final take with corrected WAV sizes is one `replace_atomic` from a reader, then `remove_file` of the in-progress take. Recovery lists `.liber/recording/` with `children`. `Write::flush` matches today's durability (hound's flush reaches the OS, not the disk).
+
 - [ ] **Step 1: Write the failing tests** in `tests/storage_plain.rs`, each with its own `tempfile::tempdir()`:
   - `meta_reports_logical_len_and_physical_mtime`: write 5 bytes with `std::fs`. Then `meta(p, Follow::No)` is `Some(Meta { kind: File, len: 5, .. })` with `mtime_ns > 0`, and a missing path is `Ok(None)`.
   - `meta_follow_inside_vault` (unix): with `link.md → a.md` inside the vault, `Follow::No` gives `Kind::Symlink` and `Follow::InsideVault` gives `Kind::File, len` of `a.md`. With `out.md → /etc/hosts`, `Follow::InsideVault` is `Err(VaultError::OutsideVault(_))`. A dangling `gone.md → missing.md` is also `Err(OutsideVault(_))`. That is today's `symlink_target_meta` → `None` → "symlink points outside the vault" message, which `scan` keeps.
@@ -231,9 +245,12 @@ impl PlainStorage { pub fn open(root: &std::path::Path) -> Result<PlainStorage>;
 **Files:**
 - Create: `crates/liber-vault/src/storage/plain_watch.rs`
 - Modify:
-  - `vault.rs` (struct field, `open`, `open_with`, `read_json`, `.liber` creation);
+  - `vault.rs` (struct field, `open`, `open_with`, `read_json`, the meta-dir creation in `try_update_json_object`);
+  - `meta_dir.rs` (`resolve` and `migrate` over `&dyn Storage`);
+  - `spelling.rs` (`spelling_stamp` over `storage.meta`), and its caller `apps/desktop/src-tauri/src/spell_commands.rs:44,76` (the cached stamp's type);
   - `fsops.rs` (thin wrappers);
-  - `scan.rs`, `watch.rs`, `layout.rs`, `icon.rs`, `lib.rs`.
+  - `scan.rs`, `watch.rs`, `layout.rs`, `icon.rs`, `lib.rs`;
+  - the `read_json(self.root(), …)` callers: `bin.rs`, `cover_height.rs`, `cover_side.rs`, `favorite.rs`, `link_format.rs`, `page_width.rs`, `scratch.rs`, `spelling.rs`.
 - Modify tests: `crates/liber-vault/tests/write_ops.rs:182-185`, `crates/liber-vault/tests/open_scan.rs:185,290-291`. Move the `watch.rs` unit tests on `PathFilter` into `plain_watch.rs`.
 
 **Interfaces:**
@@ -254,11 +271,17 @@ impl Vault {
     pub fn remove_empty_dir(&self, path: &VaultPath) -> Result<()>;
     pub fn os_path(&self, path: &VaultPath, use_: OsUse) -> Result<PathBuf>;
     pub fn vault_path_of(&self, os: &Path) -> Option<VaultPath>;
+    pub(crate) fn storage(&self) -> &dyn Storage;
+    pub fn spelling_stamp(&self) -> Option<(i128, u64)>;              // was (SystemTime, u64): (mtime_ns, len)
     // unchanged signatures, now over storage: read, read_to_string, write_cas,
     // create_dir_all, create_dir, import_file, rename, trash, scan, scan_from,
     // list_dir, stat, watch, watch_folder
 }
 // REMOVED: pub fn fs_path, pub fn visible_fs_path
+pub(crate) fn read_json<T: DeserializeOwned + Default>(storage: &dyn Storage, rel: &str, warnings: &mut Vec<String>) -> T;
+// meta_dir.rs
+pub(crate) fn resolve(storage: &dyn Storage, rel: &str) -> String;              // was (root: &Path, rel)
+pub(crate) fn migrate(storage: &dyn Storage, warnings: &mut Vec<String>) -> bool; // was (root: &Path, …)
 ```
 
 - `PlainStorage::watch(recursive, sink)` owns `notify::recommended_watcher` and calls `sink` once per OS path:
@@ -270,10 +293,15 @@ impl Vault {
   - inject `Changed(".a.md.liber-tmp-1-0")`, `Changed(".liber/vault.json")`, `Changed("build/x.md")` with the exclude `build/**` in `.liber/vault.json`, and `Changed("ok.md")`;
   - expect exactly one batch, `[WatchEvent::Changed("ok.md")]`;
   - then inject `Overflow` and `Changed("ok.md")` and expect `[WatchEvent::Overflow]`.
-- [ ] **Step 2: Run** `cargo test -p liber-vault --test watch`. Expected: FAIL to compile (`open_with` not found).
+
+  And `legacy_folder_moves_through_storage` in `crates/liber-vault/tests/meta_dir.rs`, with the same delegating test `Storage` (it records `rename` calls): a vault with only `LEGACY_META_DIR/vault.json` opened through `Vault::open_with` records exactly one rename from `LEGACY_META_DIR` to `META_DIR`, and `favorites()` reads the moved file. The existing `meta_dir.rs` tests, the chmod read-only resolver case included, are the guard and stay unchanged.
+- [ ] **Step 2: Run** `cargo test -p liber-vault --test watch --test meta_dir`. Expected: FAIL to compile (`open_with` not found).
 - [ ] **Step 3: Implement the rewiring:**
   - `Vault { storage: Box<dyn Storage>, … }`. `Vault::open(root)` = `open_with(open_storage(root)?)`, where `open_storage` is Task 6's switch; for now it is `Box::new(PlainStorage::open(root)?)`.
-  - `read_json(storage: &dyn Storage, rel, warnings)` reads with `storage.read`, mapping `NotFound` → default as today.
+  - `read_json(storage: &dyn Storage, rel, warnings)` reads `meta_dir::resolve(storage, rel)` with `storage.read`, mapping `NotFound` → default as today. Every `read_json(self.root(), …)` caller becomes `read_json(self.storage(), …)`.
+  - `meta_dir::resolve` checks `storage.meta(".liber", No)` is `None` and `storage.meta(LEGACY_META_DIR, No)` is a `Dir`. `meta_dir::migrate` uses the same checks and `storage.rename(LEGACY_META_DIR, META_DIR)`; on failure the warning stays `WARN_UNMOVED` followed by the error's text.
+  - `try_update_json_object` creates the resolved meta dir with `storage.meta`/`storage.create_dir` instead of `fs_path` + `std::fs::create_dir`.
+  - `spelling_stamp` returns `storage.meta(resolve(…LIBER_JSON), No)` as `(mtime_ns, len)`; `spell_commands.rs` stores that type in its cache.
   - `fsops.rs` methods become wrappers:
     - `write_cas` reads the current bytes and hash via `storage.read`, keeps the conflict logic, then calls `storage.replace_atomic(path, &mut &content[..], mode)`;
     - `import_file` wraps `File::open(src)` in a reader that feeds `blake3` as it reads, and calls `replace_atomic(.., Replace::CreateOnly)`.
@@ -284,7 +312,7 @@ impl Vault {
     - `write_ops.rs:182-185` → `vault.open_read(&p(x), Reach::Visible)`: refused cases `Err(OutsideVault)`; `ok.png` `Ok`; `missing.png` `Err(NotFound)`. This is the same decision with a different signal for a missing file; record it as a ruling.
     - `open_scan.rs:185` → `vault.os_path(.., OsUse::Open)`.
     - `open_scan.rs:290-291` → `open_read(.., Reach::Visible)`, `is_ok` / `is_err` on files that exist.
-- [ ] **Step 4: Run** `cargo test -p liber-vault`. Expected: all pass, the moved tests included.
+- [ ] **Step 4: Run** `cargo test -p liber-vault`, then `cargo test --workspace` (spell_commands' stamp type). Expected: all pass, the moved tests and `tests/meta_dir.rs` included.
 - [ ] **Step 5: Commit**: `refactor(vault): Vault runs on Storage; fs_path/visible_fs_path removed (E2)`.
 
 ### Task 4: liber-session and liber-import on the Vault API
@@ -313,10 +341,11 @@ impl Vault {
     - `bin_dir` refuses `Some(Meta{kind != Dir})`;
     - `trash_list` uses `children(".trash")`;
     - `prune_archive` uses `remove_empty_dir`.
-  - `quick_notes.rs` uses `children(root)`. `rename.rs` checks `Kind::Symlink`. `session.rs` uses `meta(.., Follow::InsideVault)?.created`.
-  - `attachments.rs`: `vault_path_of` and `os_path(.., OsUse::FileUrl)`.
+  - `quick_notes.rs` uses `children(root)`. `session.rs:356` uses `meta(.., Follow::InsideVault)?.created`.
+  - `rename.rs`: the round 3b pair pre-check (161, 164) uses `vault.meta(p, Follow::No).is_some()` and `…kind == Kind::Dir`; the link-rewrite symlink guard (357) checks `Kind::Symlink`. The round 3b tests in `crates/liber-session/tests/rename.rs` (the `r3b_review_*` cases) must stay green unchanged.
+  - `attachments.rs`: `vault_path_of` (121) and `os_path(.., OsUse::FileUrl)` (339).
   - `external.rs:302` uses `vault_path_of`.
-  - `import.rs` `step` uses `vault.create_new(&p)` and, on error, `vault.remove_file(&p)`.
+  - `import.rs` `step` (613–633) uses `vault.create_new(&p)` and, on error, `vault.remove_file(&p)`. Lines 601 and 604 stay outside.
   - Mark the kept outside lines with `// seam: outside (<reason>)`.
 - [ ] **Step 4: Run** `cargo test --workspace`. Expected: all pass.
 - [ ] **Step 5: Commit**: `refactor(session, import): vault content only through the Vault API (E2)`.
@@ -324,7 +353,7 @@ impl Vault {
 ### Task 5: src-tauri on the Vault API
 
 **Files:**
-- Modify: `apps/desktop/src-tauri/src/{asset.rs,editor_commands.rs,file_commands.rs}`; mark the kept lines in `audio_commands.rs`, `file_windows.rs`, `vault_commands.rs`, `scratchpad_commands.rs` and `notion_commands.rs`
+- Modify: `apps/desktop/src-tauri/src/{asset.rs,editor_commands.rs,file_commands.rs}`; mark the kept lines in `audio_commands.rs`, `file_windows.rs`, `vault_commands.rs`, `scratchpad_commands.rs`, `notion_commands.rs` and `spell_commands.rs`, and in `crates/liber-spell/src/lib.rs`
 - Test: `apps/desktop/src-tauri/tests/asset.rs`
 
 **Interfaces:**
@@ -335,11 +364,11 @@ impl Vault {
   - `asset_range_on_empty_file_is_416`: on a 0-byte `e.wav`, `bytes=0-` gives status 416 with `Content-Range: bytes */0`, and no range gives 200 with an empty body.
   - `asset_range_reads_from_reader_offset`: a 100-byte file, `bytes=10-19`, gives 206 with body `[10..20]` and `Content-Range: bytes 10-19/100`.
   - `asset_trashed_image_symlink_is_404` (unix): `.trash/x.png` as a symlink gives 404, as today.
-- [ ] **Step 2: Run** `cargo test -p liber-desktop --test asset`. Use the crate's actual package name from `apps/desktop/src-tauri/Cargo.toml`. Expected: the new tests fail to compile, because the `respond` shape isn't reachable yet, or they fail.
+- [ ] **Step 2: Run** `cargo test -p liber-desktop --test asset`. Expected: the new tests fail to compile, because the `respond` shape isn't reachable yet, or they fail.
 - [ ] **Step 3: Implement.**
   - `serve_from` uses `vault.open_read(&path, Reach::Visible)`, mapping `Err` → 404 as today, then `respond(reader, mime, range)`.
   - `serve_trashed_image` checks `vault.meta(".trash", No)` is `Dir` and `vault.meta(".trash/<n>", No)` is `File`, then `open_read(.., Reach::Any)`.
-  - `editor_commands.rs:318` and `file_commands.rs:291` use `os_path(.., OsUse::Open)`; `file_commands.rs:125` uses `meta(.., Follow::InsideVault)?.len`.
+  - `editor_commands.rs:318` and `file_commands.rs:291` use `os_path(.., OsUse::Open)`; `file_commands.rs:125` uses `meta(.., Follow::InsideVault)?.len`; `file_commands.rs:103` uses `vault.open_read(&vp, Reach::Visible).is_err()` for its "may this be shown" check.
 - [ ] **Step 4: Run** `cargo test --workspace`, then `$SP/check.sh all <worktree>`. Expected: ALL-OK, e2e included (asset ranges for audio, covers, attachments).
 - [ ] **Step 5: Commit**: `refactor(desktop): asset protocol and open-with through the Vault API (E2)`.
 
@@ -368,8 +397,8 @@ pub struct PassThrough(PlainStorage);   // name() == "pass-through"; every metho
 - The test switch values in E2 are `plain` (the default) and `pass-through`. E3 adds `encrypted`, and then must make fixtures go through `Storage`: `liber-testkit` writes plaintext with `std::fs` today.
 
 - [ ] **Step 1: Write the failing tests:**
-  - `seam_guard` in `tests/seam_guard.rs`. It walks `crates/*/src/**/*.rs` and `apps/desktop/src-tauri/src/**/*.rs` from `CARGO_MANIFEST_DIR/../..`, and considers only lines before a file's first `#[cfg(test)]`. It matches `std::fs|\bfs::|File::|OpenOptions|read_dir|symlink_metadata|canonicalize|notify::|trash::|to_fs_path\(`.
-    - **Allowed:** files under `crates/liber-vault/src/storage/`, `crates/liber-testkit/`, `apps/desktop/src-tauri/src/settings.rs`, and any line carrying `// seam: outside (`.
+  - `seam_guard` in `tests/seam_guard.rs`. It walks `crates/*/src/**/*.rs` and `apps/desktop/src-tauri/src/**/*.rs` from `CARGO_MANIFEST_DIR/../..`, and considers only lines before a file's first `#[cfg(test)]`. It matches `std::fs|\bfs::|\bFile::|OpenOptions|read_dir|symlink_metadata|canonicalize|notify::|trash::|to_fs_path\(`. The `\b` before `File::` keeps `KeyringFile::` from matching.
+    - **Allowed:** files under `crates/liber-vault/src/storage/`, `crates/liber-testkit/`, `apps/desktop/src-tauri/src/settings.rs`, `apps/desktop/src-tauri/src/legacy_dirs.rs`, `crates/liber-crypto/src/vectors.rs` (a `#[cfg(test)]`-only module), and any line carrying `// seam: outside (`.
     - **Assertion:** the list of offending `path:line` is empty.
     - **Self-test:** a second test, `seam_guard_catches_an_offender`, feeds the matcher one in-memory line `let x = std::fs::read(p);` with the path `crates/liber-session/src/x.rs` and expects one offender.
   - `test_switch_selects_pass_through` in `storage/mod.rs` `#[cfg(test)]`. With `LIBER_TEST_STORAGE=pass-through` set via a scoped env guard, `Vault::open(tmp).storage_name() == "pass-through"`; unset, it is `"plain"`.
@@ -393,3 +422,12 @@ pub struct PassThrough(PlainStorage);   // name() == "pass-through"; every metho
 3. **`write_cas` with `None` now re-checks absence right before the rename,** as `import_file` already did. This closes a tiny create-vs-create race and is the only behavioural difference. *Cost if wrong:* nil; it can only refuse a write that would have silently overwritten.
 4. **`visible_fs_path` on a missing file returned `Ok(path)`; `open_read(.., Visible)` returns `NotFound`.** Every production caller then read the file and turned the error into a 404 anyway. Two tests change their assertion.
 5. **The audio cache, index DB, app settings, global scratchpad creation and single-file windows stay outside the seam** (inventory table). E3 handles the audio and index cases per spec §4.2 and §5.1.
+
+**Added when the plan was refreshed against main de5c8ba (round 3b, spelling, rename, E1):**
+
+6. **The legacy-folder → `.liber` migration and the resolver go through `Storage`.** They read and rename vault content. *Cost if wrong:* none; E3 vaults have no legacy folder, so `resolve` always answers `.liber/…` there.
+7. **`spelling_stamp` changes from `(SystemTime, u64)` to `(i128, u64)`,** the `Meta` mtime and length. Its only caller compares stamps for equality. *Cost if wrong:* one type in `spell_commands.rs`.
+8. **`WARN_UNMOVED`'s parameter becomes the `VaultError`'s text** instead of the raw OS error's. The UI shows the code's translation and passes the text through. *Cost if wrong:* a slightly longer detail line in the warning.
+9. **`file_commands.rs:103`'s visibility check opens the file** (`open_read(.., Visible)`) instead of resolving a path. Same decision, one extra open per check. *Cost if wrong:* negligible I/O on a rare command.
+10. **Imported dictionaries, `legacy_dirs.rs` and `liber-spell` stay outside:** they touch app dirs or given paths, never vault content.
+11. **No trait method for E3's hand-off requirements** (epoch persistence, single-component joins, side-file cap, recordings). Each is app state or internal to `EncryptedStorage`, or is covered by `create_new` + `replace_atomic` (Task 1). *Cost if wrong:* E3 adds one method and implements it in `PlainStorage`.
