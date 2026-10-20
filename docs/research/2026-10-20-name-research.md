@@ -154,7 +154,7 @@ LSJ is cited unless the row says otherwise. Sensitivity is none for every Greek 
   - *fihizca*, soul or spirit;
   - *Sua* and *Chie*, the Sun and Moon;
   - *Bochica*, *Bachué* and *Chiminigagua*.
-- Other Chibchan languages: Kogi's *Aluna* stays rejected, because it is a living sacred concept and is tied up in the UNESCO-listed knowledge system of the Sierra Nevada.
+- Other Chibchan languages: Kogi's *Aluna* stays rejected. See the Aluna subsection below.
 
 ### Candidates
 
@@ -167,6 +167,45 @@ LSJ is cited unless the row says otherwise. Sensitivity is none for every Greek 
 | **bchihisqua** | "to write" **and** "to paint", the same verb ([IDS 18.510](https://ids.clld.org/valuesets/18-510-243), [9.890](https://ids.clld.org/valuesets/9-890-243)) | "bchee-HEES-kwa" | Unusable as a name | Low | — | — |
 | **muysua** | "dream" ([IDS 4.620](https://ids.clld.org/valuesets/4-620-243)) | MUY-swa | Weak fit | Low to medium (contains *sua*?) | None | T·**F**·**F** |
 | Others | *ybunsuca* "think", *zemucansuca* "know", *boi* "blanket / manta", *ynybgu* "knot" (IDS) | — | Verbs carry *-suca/-squa* endings | — | — | — |
+
+### Aluna (asked again: free, open source, donations)
+
+**What it is.** In Kogi thought, *aluna* is the world of thought, mind and spirit that comes before the material world and sustains it. A film press kit glosses it as "idea, consciousness, thought and essence" ([Wikipedia: Kogi](https://en.wikipedia.org/wiki/Kogi_people), [*Aluna* press kit](https://www.thefilmcollaborative.org/films/img/epk/Press_Kit_Aluna_040813.pdf)). The concept is shared across the four peoples of the Sierra Nevada de Santa Marta: the Kogi (Kággaba), Arhuaco (Iku), Wiwa and Kankuamo. Patrícia Lora León places *Alúna* and *Sewá* at the centre of their own thought, around the principle of communication *Yuluka*, in their duty of care for all that exists ([Espaço Ameríndio, 2013](https://seer.ufrgs.br/index.php/EspacoAmerindio/article/download/38279/25963/162309)). It sits inside their *Ley de Origen* ("Law of Origin"), the highest ancestral authority that governs them ([Ministerio de Cultura](https://mng.mincultura.gov.co/prensa/noticias/Documents/Poblaciones/PUEBLO%20WIWA.pdf)).
+
+**UNESCO.** In **2022**, UNESCO inscribed the "Ancestral system of knowledge of the four indigenous peoples, Arhuaco, Kankuamo, Kogui and Wiwa of the Sierra Nevada de Santa Marta" on the **Representative List of the Intangible Cultural Heritage of Humanity** ([decision 17.COM 7.b.3](https://ich.unesco.org/en/Decisions/17.COM/7.b.3)).
+
+**Who speaks for them.**
+- The **Consejo Territorial de Cabildos (CTC)** is their joint body. Colombia's Ministry of Environment recognised it in Resolution 0621 of 2002 as the main channel of dialogue between the four peoples and the state.
+- It is made up of four organisations, one per people:
+  - **Organización Gonawindúa Tayrona** (Kogi);
+  - Confederación Indígena Tayrona (Arhuaco);
+  - Organización Wiwa Yugumaiun Bunkuanarrua Tayrona (Wiwa);
+  - Organización Indígena Kankuama (Kankuamo).
+- Source: [Parques Nacionales management plan, 2020](https://www.parquesnacionales.gov.co/wp-content/uploads/2020/10/plan-de-manejo-del-pnn-sierra-nevada-de-santa-marta-y-tayrona-1.pdf).
+
+**The law: Andean Community Decision 486, Art. 136(g).** This is the Andean Community's industrial-property law, and Colombia's trademark office (SIC) applies it directly. It bars registering signs that:
+
+> "consist of the name of indigenous, African American, or local communities, or of such denominations, words, letters, characters, or signs as are used to distinguish their products, services or methods of processing, or that constitute an expression of their culture or practice, **unless the application is filed by the community itself or with its express consent**"
+>
+> ([official English text, OAS SICE](http://www.sice.oas.org/trade/junac/decisiones/DEC486ce.asp))
+
+What that means for us:
+- The test is the sign itself, not whether we make money. A free, open-source, donation-funded app filing "Aluna" in Colombia would still fall under 136(g), and the office could refuse it or a later challenge could cancel it.
+- We could use the name without registering it. But then we could not protect it, and the cultural problem remains.
+- This is my reading, not legal advice.
+
+**Existing uses.** The name is already crowded:
+- Alan Ereira's 2012 documentary *Aluna*, made with the Kogi.
+- [Aluna.Social](https://www.kucoin.com/price/ALN), a crypto trading platform with its ALN token.
+- The singer **Aluna** (Aluna Francis, of [AlunaGeorge](https://en.wikipedia.org/wiki/AlunaGeorge)).
+- aluna.app, .com and .dev are all registered.
+
+**Recommendation: don't use it.** It is a sacred concept belonging to living peoples who guard their knowledge closely. It is UNESCO-listed. Colombian trademark law bars it without their consent. And it is already crowded.
+
+**If the lead still wants it,** the respectful path is to ask before building anything:
+1. Write to the CTC, or to the Organización Gonawindúa Tayrona for the Kogi. Explain the project, that it is free and non-commercial, and why the name matters to us.
+2. Accept that the answer may be no, or may never come.
+3. Only proceed with **explicit written consent**. Treat a yes as a relationship: credit them, link to them, and agree in advance how any donations are handled.
 
 ---
 
@@ -191,7 +230,58 @@ LSJ is cited unless the row says otherwise. Sensitivity is none for every Greek 
 
 ---
 
-## 6. Comparison
+## 6. Create / creation (Tolkien, Chibcha, Inca)
+
+### Sacred names to avoid
+
+These are proper names of creator figures. The Andean and Muisca names are sacred to living peoples, and Tolkien's carries the most IP and religious weight of any of his words.
+- **Chiminigagua**: the Muisca supreme creator, who sent birds to bring light ([Wikipedia](https://en.wikipedia.org/wiki/Chiminigagua)).
+- **Bachué**: the Muisca mother of humanity ([Wikipedia](https://en.wikipedia.org/wiki/Bachu%C3%A9)).
+- **Wiraqucha / Viracocha**: the Andean supreme creator ([Wikipedia](https://en.wikipedia.org/wiki/Viracocha)).
+- **Pachakamaq**: "creator and animator of the universe"; still a living pilgrimage site and shrine name ([Wikipedia](https://en.wikipedia.org/wiki/Pacha_Kamaq)).
+- **Ilúvatar / Eru**: Tolkien's God.
+
+Muisca communities and Andean ritual practice still hold these names, so using them for a product reads as appropriation. **Use the ordinary verbs, not the deity names.**
+
+### Candidates
+
+| Word | Meaning (source) | Say it (EN / ES) | Pitfalls | Sensitivity | Collisions | com·app·dev |
+|---|---|---|---|---|---|---|
+| **Eä** (Q.) | "Creation, the (Material) Universe … it is, let it be" ([Eldamo](https://eldamo.org/content/words/word-1062987751.html)). It is the word Ilúvatar speaks to make the world real. | EH-ah / É-a | **"EA" = Electronic Arts**, which owns ea.com; unsearchable | Medium (creation-myth weight) | EA Games | T·T·T (ea.*) |
+| **carmë** (Q.) | "production, making; structure; art" ([Eldamo](https://eldamo.org/content/words/word-1553763551.html)), from *car-* "to do, make" ([Eldamo](https://eldamo.org/content/words/word-452504165.html)) | KAR-meh / CAR-me | Close to Carme (Barcelona) and Carmen | Low | carme.app is a Bulgarian services map | T·T·T |
+| **tanwë** (MQ, 1930s) | "craft, thing made, device, construction" ([Eldamo](https://eldamo.org/content/words/word-3219926051.html)). Also *tano* "craftsman", later *tamo* | TAN-weh | 1930s layer | Low | None found | T·**F**·**F** |
+| **onta-** (MQ/Q.) | "beget, create" (MQ); later "to beget" ([Eldamo](https://eldamo.org/content/words/word-289139655.html)) | ON-ta | Verb stem | Low | — | — |
+| **echad-** (S.) | "to form, make, shape, cut out" ([Eldamo](https://eldamo.org/content/words/word-630017767.html)) | EH-khad | Verb; the *ch* is a throat sound | Low | echad.app is a game studio | T·T·**F** |
+| **tân** (S.) | "builder, smith, wright, artificer" ([Eldamo](https://eldamo.org/content/words/word-240709727.html)). Sindarin also has *car-* "do, make" ([Eldamo](https://eldamo.org/content/words/word-3736354243.html)) and *carth* "deed" ([Eldamo](https://eldamo.org/content/words/word-4005253249.html)) | "tahn" | Circumflex; "tan" | Low | Generic | — |
+| **kamay** (Q.) | "to create, form, found; to govern, rule" ([Wiktionary](https://en.wiktionary.org/wiki/kamay)). Its root *kama-* means "to animate", a vitalising force (Taylor, cited in [Revista Alpha](https://revistaalpha.ulagos.cl/index.php/alpha/article/download/1723/2662)) | KA-mai | — | **Medium to high**: a religious concept; root of *Pachakamaq* | **kamay.app is an Andean anime** ("AYAHUASCA") | T·T·T |
+| **kamaq** (Q.) | "creator, animator" (agent form of *kamay*) | KA-mak | — | **High**: half of the deity name *Pachakamaq* | None found | T·**F**·**F** |
+| **ruray / ruway** (Q.) | "to do, make, work, create, form" ([Wiktionary](https://en.wiktionary.org/wiki/ruray)) | RU-rai | Two spellings | Low; an everyday verb | None found | T·T·**F** |
+| **paqariy** (Q.) | Noun "dawn, origin, birth"; verb "to dawn, rise, appear, be born" ([Wiktionary](https://en.wiktionary.org/wiki/paqariy); [Living Dictionaries](https://livingdictionaries.app/quechua-chanka/entry/heTmgahGdmqYW5R7xn0R): "nacer, dar origen") | pa-ka-RIY | Hard to spell | Low to medium. *Paqarina* (place of origin) is a sacred ancestral site; *paqarina* itself is unverified | None found | **F·F·F** (paqarina T·**F**·**F**) |
+| **luraña** (Ay.) | "do, make" ([IDS 9.110](https://ids.clld.org/valuesets/9-110-269)). Also *pirqaña* "build" and *qalltaña* "begin" (IDS) | lu-RA-ña | The *ñ*; ASCII "lurana" | Low | None found | lurana T·**F**·**F** |
+| **bquysqua** (Muisca) | "do, make" ([IDS 9.110](https://ids.clld.org/valuesets/9-110-243)). Also *ichosqua* "work" and *bxisqua* "sow, plant", and *bxisque* "beget" (IDS) | "bkwis-kwa" (approximate) | Unpronounceable | Low | — | **F·F·F** |
+
+I could not find a separate Muisca "create" verb, or any entry by Diego F. Gómez online. IDS has only "do, make", "work" and "beget".
+
+### Top 3 (creation theme)
+
+1. **Ruray**
+   - Quechua "to do, make, create": the everyday verb.
+   - Low sensitivity, no collisions, and ruray.dev is free.
+   - Sounds friendly in both languages.
+2. **Carmë**
+   - Quenya "making; art".
+   - Short and pretty, but all its domains are taken; "Carme" is crowded.
+3. **Paqariy**
+   - Quechua "dawn, origin; to be born".
+   - All three domains are free, and it has a lovely "first light of a page" story.
+   - Costs: hard to spell, and it sits near the sacred *paqarina*.
+
+**Not picked:**
+- **Eä**: unsearchable, and it collides with EA.
+- **Kamay / Kamaq**: too close to Pachakamaq.
+- **Tanwë**: 1930s layer.
+
+## 7. Comparison
 
 Scores run from 1 (poor) to 5 (good).
 - **Fit** is how well the meaning suits a notes app.
@@ -221,7 +311,7 @@ Scores run from 1 (poor) to 5 (good).
 | Tengwar | Quenya | letters | 4 | 4 | 3 | 3 |
 | Codex / Mneme / Pinax / Scriptorium | — | — | 5 | 5 | 5 | **1** |
 
-## 7. Shortlists
+## 8. Shortlists
 
 ### Top 3 per source
 
