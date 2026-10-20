@@ -17,3 +17,6 @@ Thumbs.db
 # Playwright (zero-network test)
 test-results/
 playwright-report/
+
+# Brainstorm companion mocks and plan workspaces (local only)
+.superpowers/
