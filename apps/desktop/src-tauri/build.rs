@@ -101,6 +101,8 @@ const COMMANDS: &[&str] = &[
     // Spell checking: local dictionaries (main window only).
     "spell_dictionaries",
     "spell_import",
+    "theme_export",
+    "theme_import",
     "spell_remove",
     "spell_check",
     "spell_suggest",

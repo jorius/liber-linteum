@@ -27,6 +27,7 @@ pub mod settings_commands;
 pub mod sort_commands;
 pub mod spell_commands;
 pub mod state;
+pub mod theme_commands;
 pub mod vault_commands;
 
 use settings::SettingsStore;
@@ -244,6 +245,8 @@ pub fn configure<R: tauri::Runtime>(
         spell_commands::spell_remove_word,
         spell_commands::spell_vault_get,
         spell_commands::spell_vault_set,
+        theme_commands::theme_export,
+        theme_commands::theme_import,
     ])
 }
 

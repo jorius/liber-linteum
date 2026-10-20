@@ -629,3 +629,100 @@ fn sidebar_width_setting_default_persist_clamp_and_reset() {
     assert_eq!(s.sidebar_width.get(), 270);
     assert!(warning.unwrap().contains("sidebarWidth"));
 }
+
+/** Custom themes spec §2: a theme's 16 colours. */
+fn theme_json(id: &str, accent: &str) -> serde_json::Value {
+    let mode = serde_json::json!({
+        "accent": accent, "secondary": "#a2540d", "bg": "#f4eff8", "surface": "#ffffff",
+        "border": "#e6ddef", "side": "#1f1d24", "sideText": "#d9d4e2",
+        "sideSel": "rgba(185,162,230,.22)", "strong": "#2c1f4a", "body": "#4a4058",
+        "text": "#1d1a22", "muted": "#6b5f80", "contrast": "#ffffff", "soft": "#e9e1f4",
+        "mark": "#fbf1c7", "code": "#efe9f6"
+    });
+    serde_json::json!({ "id": id, "name": format!("Theme {id}"), "light": mode, "dark": mode,
+        "derived": { "light": ["soft", "notAKey"], "dark": [] } })
+}
+
+#[test]
+fn custom_themes_round_trip() {
+    let dir = tempfile::tempdir().unwrap();
+    let text = serde_json::json!({
+        "palette": "custom", "customTheme": "t1",
+        "customThemes": [theme_json("t1", "#0e7c7b")]
+    });
+    std::fs::write(dir.path().join("settings.json"), text.to_string()).unwrap();
+    let (s, warning) = store(dir.path()).get();
+    assert!(warning.is_none(), "{warning:?}");
+    assert_eq!(s.custom_theme.as_deref(), Some("t1"));
+    assert_eq!(s.custom_themes.len(), 1);
+    let v = serde_json::to_value(&s).unwrap();
+    assert_eq!(v["customThemes"][0]["light"]["accent"], "#0e7c7b");
+    assert_eq!(
+        v["customThemes"][0]["light"]["sideSel"],
+        "rgba(185,162,230,.22)"
+    );
+    // Unknown derived keys are dropped, known ones kept.
+    assert_eq!(
+        v["customThemes"][0]["derived"]["light"],
+        serde_json::json!(["soft"])
+    );
+}
+
+#[test]
+fn one_bad_theme_is_dropped_not_all() {
+    let dir = tempfile::tempdir().unwrap();
+    let mut bad = theme_json("t2", "#0e7c7b");
+    bad["light"]["accent"] = "#fff".into();
+    let text = serde_json::json!({ "customThemes": [theme_json("t1", "#0e7c7b"), bad] });
+    std::fs::write(dir.path().join("settings.json"), text.to_string()).unwrap();
+    let (s, warning) = store(dir.path()).get();
+    assert_eq!(s.custom_themes.len(), 1);
+    assert_eq!(s.custom_themes[0].id, "t1");
+    assert!(warning.unwrap().contains("customThemes"));
+}
+
+#[test]
+fn theme_color_accepts_hex_and_rgba_only() {
+    use liber_desktop::settings::ThemeColor;
+    for ok in [
+        "#0E7C7B",
+        "rgba(185,162,230,.22)",
+        "rgba(255, 255, 255, 0.18)",
+        "rgba(0,0,0,1)",
+    ] {
+        assert!(ThemeColor::parse(ok).is_some(), "{ok}");
+    }
+    for bad in [
+        "#fff",
+        "red",
+        "rgba(256,0,0,.5)",
+        "rgba(1,2,3,1.5)",
+        "rgb(1,2,3)",
+        "#0e7c7bff",
+        "",
+    ] {
+        assert!(ThemeColor::parse(bad).is_none(), "{bad}");
+    }
+    assert_eq!(ThemeColor::parse("#0E7C7B").unwrap().as_str(), "#0e7c7b");
+}
+
+#[test]
+fn patch_sets_custom_theme() {
+    let dir = tempfile::tempdir().unwrap();
+    let s = store(dir.path());
+    let patch: SettingsPatch = serde_json::from_value(serde_json::json!({
+        "palette": "custom", "customTheme": "t1", "customThemes": [theme_json("t1", "#0e7c7b")]
+    }))
+    .unwrap();
+    let saved = s.update(patch).unwrap();
+    assert_eq!(saved.custom_theme.as_deref(), Some("t1"));
+    assert_eq!(saved.custom_themes.len(), 1);
+    // "" clears the selection; the themes stay.
+    let patch: SettingsPatch =
+        serde_json::from_value(serde_json::json!({ "customTheme": "" })).unwrap();
+    let saved = s.update(patch).unwrap();
+    assert_eq!(saved.custom_theme, None);
+    assert_eq!(saved.custom_themes.len(), 1);
+    let reread = SettingsStore::load(dir.path()).get().0;
+    assert_eq!(reread, saved);
+}

@@ -97,6 +97,9 @@ const COMMANDS: &[&str] = &[
     "spell_remove_word",
     "spell_vault_get",
     "spell_vault_set",
+    // Custom themes: export/import through the native dialogs.
+    "theme_export",
+    "theme_import",
 ];
 
 struct Harness {
@@ -3016,4 +3019,62 @@ fn spell_review_caches_vault_settings_and_failed_dictionaries() {
     )
     .unwrap();
     assert_eq!(check(&h, &["Ioque", "zzqx"], "en"), [true, false]);
+}
+
+#[test]
+fn theme_export_writes_the_json() {
+    let h = harness();
+    let state = h.app.state::<liber_desktop::state::AppState>();
+    let out = tempfile::tempdir().unwrap();
+    let target = out.path().join("Selva.liber-theme.json");
+    let picked = target.clone();
+    state.set_cover_picker(Some(Arc::new(move || Some(picked.clone()))));
+    let json = "{\"format\":\"liber-theme\"}";
+    assert_eq!(
+        call(
+            &h.main,
+            "theme_export",
+            json!({ "name": "Selva", "json": json })
+        )
+        .unwrap(),
+        json!(true)
+    );
+    assert_eq!(std::fs::read_to_string(&target).unwrap(), json);
+    // Cancelled: nothing written, false.
+    state.set_cover_picker(Some(Arc::new(|| None)));
+    assert_eq!(
+        call(
+            &h.main,
+            "theme_export",
+            json!({ "name": "Selva", "json": json })
+        )
+        .unwrap(),
+        json!(false)
+    );
+}
+
+#[test]
+fn theme_import_refuses_over_64k() {
+    let h = harness();
+    let state = h.app.state::<liber_desktop::state::AppState>();
+    let dir = tempfile::tempdir().unwrap();
+    let small = dir.path().join("t.liber-theme.json");
+    std::fs::write(&small, "{}").unwrap();
+    let picked = small.clone();
+    state.set_cover_picker(Some(Arc::new(move || Some(picked.clone()))));
+    assert_eq!(
+        call(&h.main, "theme_import", json!({})).unwrap(),
+        json!("{}")
+    );
+    let big = dir.path().join("big.liber-theme.json");
+    std::fs::write(&big, vec![b' '; 64 * 1024 + 1]).unwrap();
+    let picked = big.clone();
+    state.set_cover_picker(Some(Arc::new(move || Some(picked.clone()))));
+    let err = call(&h.main, "theme_import", json!({})).unwrap_err();
+    assert_eq!(kind(err), "invalidInput");
+    state.set_cover_picker(Some(Arc::new(|| None)));
+    assert_eq!(
+        call(&h.main, "theme_import", json!({})).unwrap(),
+        json!(null)
+    );
 }

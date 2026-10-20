@@ -220,6 +220,148 @@ impl Default for WideElements {
     }
 }
 
+/// A theme colour (custom themes §4): `#rrggbb`, or `rgba(r,g,b,a)` (used by
+/// the sidebar selection); stored lower-case.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(try_from = "String", into = "String")]
+pub struct ThemeColor(String);
+
+impl ThemeColor {
+    pub fn parse(s: &str) -> Option<ThemeColor> {
+        if let Some(h) = HexColor::parse(s) {
+            return Some(ThemeColor(h.0));
+        }
+        let inner = s.strip_prefix("rgba(")?.strip_suffix(')')?;
+        let parts: Vec<&str> = inner.split(',').map(str::trim).collect();
+        let [r, g, b, a] = parts.as_slice() else {
+            return None;
+        };
+        let channel = |c: &str| c.len() <= 3 && c.parse::<u8>().is_ok();
+        let alpha = a.parse::<f64>().is_ok_and(|v| (0.0..=1.0).contains(&v))
+            && a.chars().all(|c| c.is_ascii_digit() || c == '.');
+        (channel(r) && channel(g) && channel(b) && alpha)
+            .then(|| ThemeColor(s.to_ascii_lowercase()))
+    }
+
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+}
+
+impl TryFrom<String> for ThemeColor {
+    type Error = String;
+    fn try_from(s: String) -> Result<ThemeColor, String> {
+        ThemeColor::parse(&s).ok_or_else(|| format!("not a theme colour: {s}"))
+    }
+}
+
+impl From<ThemeColor> for String {
+    fn from(c: ThemeColor) -> String {
+        c.0
+    }
+}
+
+/// A custom theme's 16 colours for one mode (custom themes §2).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ThemeTokens {
+    pub accent: ThemeColor,
+    pub secondary: ThemeColor,
+    pub bg: ThemeColor,
+    pub surface: ThemeColor,
+    pub border: ThemeColor,
+    pub side: ThemeColor,
+    pub side_text: ThemeColor,
+    pub side_sel: ThemeColor,
+    pub strong: ThemeColor,
+    pub body: ThemeColor,
+    pub text: ThemeColor,
+    pub muted: ThemeColor,
+    pub contrast: ThemeColor,
+    pub soft: ThemeColor,
+    pub mark: ThemeColor,
+    pub code: ThemeColor,
+}
+
+const THEME_TOKEN_KEYS: [&str; 16] = [
+    "accent",
+    "secondary",
+    "bg",
+    "surface",
+    "border",
+    "side",
+    "sideText",
+    "sideSel",
+    "strong",
+    "body",
+    "text",
+    "muted",
+    "contrast",
+    "soft",
+    "mark",
+    "code",
+];
+
+fn known_token_keys<'de, D: serde::Deserializer<'de>>(d: D) -> Result<Vec<String>, D::Error> {
+    let keys = Vec::<String>::deserialize(d)?;
+    Ok(keys
+        .into_iter()
+        .filter(|k| THEME_TOKEN_KEYS.contains(&k.as_str()))
+        .collect())
+}
+
+/// The colours not set by hand, per mode; unknown names are dropped.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ThemeDerived {
+    #[serde(deserialize_with = "known_token_keys", default)]
+    pub light: Vec<String>,
+    #[serde(deserialize_with = "known_token_keys", default)]
+    pub dark: Vec<String>,
+}
+
+/// A theme the user built (custom themes §2).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(try_from = "CustomThemeRaw")]
+pub struct CustomTheme {
+    pub id: String,
+    pub name: String,
+    pub light: ThemeTokens,
+    pub dark: ThemeTokens,
+    #[serde(default)]
+    pub derived: ThemeDerived,
+}
+
+#[derive(Deserialize)]
+struct CustomThemeRaw {
+    id: String,
+    name: String,
+    light: ThemeTokens,
+    dark: ThemeTokens,
+    #[serde(default)]
+    derived: ThemeDerived,
+}
+
+impl TryFrom<CustomThemeRaw> for CustomTheme {
+    type Error = String;
+    fn try_from(r: CustomThemeRaw) -> Result<CustomTheme, String> {
+        let id_ok = (1..=64).contains(&r.id.len());
+        let name_ok = !r.name.trim().is_empty() && r.name.chars().count() <= 80;
+        if !(id_ok && name_ok) {
+            return Err("theme id or name out of range".into());
+        }
+        Ok(CustomTheme {
+            id: r.id,
+            name: r.name,
+            light: r.light,
+            dark: r.dark,
+            derived: r.derived,
+        })
+    }
+}
+
+/// At most this many custom themes are kept.
+pub const MAX_CUSTOM_THEMES: usize = 100;
+
 pub const MIN_FONT_SIZE: u8 = 13;
 pub const MAX_FONT_SIZE: u8 = 20;
 
@@ -390,6 +532,10 @@ pub struct Settings {
     pub spellcheck: bool,
     /// The dictionaries checked, in order; `None` = the app language's.
     pub spell_dictionaries: Option<Vec<String>>,
+    /// Themes the user built (custom themes §2).
+    pub custom_themes: Vec<CustomTheme>,
+    /// With `palette: custom`, the id of the theme in use.
+    pub custom_theme: Option<String>,
     /// Dictionaries imported from disk; changed only by the spell commands.
     pub imported_dictionaries: Vec<ImportedDictionary>,
     pub recent_vaults: Vec<RecentVault>,
@@ -428,6 +574,8 @@ impl Default for Settings {
             action_button: ActionButton::BottomRight,
             spellcheck: true,
             spell_dictionaries: None,
+            custom_themes: Vec::new(),
+            custom_theme: None,
             imported_dictionaries: Vec::new(),
             recent_vaults: Vec::new(),
             extra: serde_json::Map::new(),
@@ -464,6 +612,9 @@ pub struct SettingsPatch {
     pub action_button: Option<ActionButton>,
     pub spellcheck: Option<bool>,
     pub spell_dictionaries: Option<Vec<String>>,
+    pub custom_themes: Option<Vec<CustomTheme>>,
+    /// The theme in use; `""` clears it.
+    pub custom_theme: Option<String>,
 }
 
 /// A dictionary imported from disk; its files live in
@@ -547,6 +698,23 @@ fn parse_lenient(text: &str) -> Result<(Settings, Vec<String>), serde_json::Erro
     field!("spellcheck", spellcheck);
     field!("spellDictionaries", spell_dictionaries);
     field!("importedDictionaries", imported_dictionaries);
+    field!("customTheme", custom_theme);
+    // One bad theme is dropped, not all of them (custom themes plan, focus 3).
+    match map.remove("customThemes") {
+        None => {}
+        Some(Value::Array(items)) => {
+            let total = items.len();
+            settings.custom_themes = items
+                .into_iter()
+                .filter_map(|v| serde_json::from_value::<CustomTheme>(v).ok())
+                .take(MAX_CUSTOM_THEMES)
+                .collect();
+            if settings.custom_themes.len() < total.min(MAX_CUSTOM_THEMES) {
+                reset.push("customThemes (some entries)".to_string());
+            }
+        }
+        Some(_) => reset.push("customThemes".to_string()),
+    }
     match map.remove("recentVaults") {
         None => {}
         Some(Value::Array(items)) => {
@@ -711,6 +879,13 @@ impl SettingsStore {
         }
         if let Some(v) = patch.spell_dictionaries {
             next.spell_dictionaries = Some(v);
+        }
+        if let Some(mut v) = patch.custom_themes {
+            v.truncate(MAX_CUSTOM_THEMES);
+            next.custom_themes = v;
+        }
+        if let Some(id) = patch.custom_theme {
+            next.custom_theme = (!id.is_empty()).then_some(id);
         }
         self.save(&next)?;
         *s = next.clone();
