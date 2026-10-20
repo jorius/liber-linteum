@@ -35,7 +35,7 @@ test('Escape closes Settings even when nothing in it has focus', async ({ page }
   expect(errors).toEqual([]);
 });
 
-test('a click outside closes Settings and saves the accent typed but not confirmed', async ({
+test('a click outside closes Settings and saves a theme colour typed but not confirmed', async ({
   page,
 }) => {
   const errors = await open(page);
@@ -49,13 +49,16 @@ test('a click outside closes Settings and saves the accent typed but not confirm
   await page.mouse.up();
   await expect(dialog).toBeVisible();
 
-  await dialog.getByRole('radio', { name: 'Custom accent' }).check();
-  const hex = dialog.getByRole('textbox', { name: 'Accent colour (hex)' });
+  // Custom themes §3: the accent lives in a theme of your own now.
+  await dialog.getByRole('button', { name: 'New theme' }).click();
+  const hex = dialog.getByRole('textbox', { name: 'Primary colour (hex)', exact: true });
   await hex.fill('#123456');
   await page.mouse.click(4, 4);
   await expect(dialog).toBeHidden();
 
   await openSettings(page, 'Appearance');
-  await expect(dialog.getByRole('textbox', { name: 'Accent colour (hex)' })).toHaveValue('#123456');
+  await expect(
+    dialog.getByRole('textbox', { name: 'Primary colour (hex)', exact: true }),
+  ).toHaveValue('#123456');
   expect(errors).toEqual([]);
 });

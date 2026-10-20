@@ -360,6 +360,12 @@ export function installIpcMock({
       { id: 'es_CO', name: 'Spanish (Colombia)', bundled: true, available: true },
     ],
     spell_import: () => null,
+    // Custom themes §4: the save and open dialogs.
+    theme_export: (a) => {
+      ((w.__liberThemeExports ??= []) as unknown[]).push({ name: a.name, json: a.json });
+      return true;
+    },
+    theme_import: () => (w.__liberThemeImport as string | undefined) ?? null,
     spell_remove: () => null,
     // Kept in sessionStorage, like favorites, so a reload still has them.
     spell_add_word: (a) => {
