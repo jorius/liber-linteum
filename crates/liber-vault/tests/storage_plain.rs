@@ -269,3 +269,50 @@ fn vault_path_of_maps_inside_and_rejects_outside() {
     assert_eq!(s.vault_path_of(&inside), Some(p("x/y.md")));
     assert_eq!(s.vault_path_of(std::path::Path::new("/tmp/z")), None);
 }
+
+/// Task 3's walk relies on it: a link to a folder inside the vault, followed,
+/// is a folder (`scan` skips it as "symlinked folder not followed").
+#[cfg(unix)]
+#[test]
+fn meta_follow_inside_vault_link_to_folder_is_dir() {
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::create_dir(dir.path().join("B")).unwrap();
+    std::os::unix::fs::symlink(dir.path().join("B"), dir.path().join("d")).unwrap();
+    let s = PlainStorage::open(dir.path()).unwrap();
+    let meta = s.meta(&p("d"), Follow::InsideVault).unwrap().unwrap();
+    assert_eq!(meta.kind, Kind::Dir);
+}
+
+#[test]
+fn children_of_missing_folder_is_not_found() {
+    let dir = tempfile::tempdir().unwrap();
+    let s = PlainStorage::open(dir.path()).unwrap();
+    let err = s.children(&p("missing")).unwrap_err();
+    assert!(matches!(err, VaultError::NotFound(_)), "{err:?}");
+}
+
+/// `CreateOnly` re-checks just before the rename: something created at the
+/// path while the copy ran is kept, and the temp file is removed.
+#[test]
+fn replace_atomic_create_only_rechecks_after_the_copy() {
+    struct CreatesTarget(std::path::PathBuf, bool);
+    impl Read for CreatesTarget {
+        fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
+            if std::mem::replace(&mut self.1, true) {
+                return Ok(0);
+            }
+            std::fs::write(&self.0, "other").unwrap();
+            buf[..3].copy_from_slice(b"new");
+            Ok(3)
+        }
+    }
+    let dir = tempfile::tempdir().unwrap();
+    let s = PlainStorage::open(dir.path()).unwrap();
+    let mut from = CreatesTarget(dir.path().join("a.md"), false);
+    let err = s
+        .replace_atomic(&p("a.md"), &mut from, Replace::CreateOnly)
+        .unwrap_err();
+    assert!(matches!(err, VaultError::AlreadyExists(_)), "{err:?}");
+    assert_eq!(std::fs::read(dir.path().join("a.md")).unwrap(), b"other");
+    assert_eq!(names(dir.path()), ["a.md"]);
+}
