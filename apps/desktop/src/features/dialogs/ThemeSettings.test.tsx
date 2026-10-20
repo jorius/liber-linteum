@@ -170,8 +170,11 @@ describe('Appearance: theme gallery and editor (custom themes §3)', () => {
         "That change couldn't be saved, so the theme is back to how it was.",
       ),
     );
-    expect(screen.getByRole('textbox', { name: 'Primary colour (hex)' })).toHaveValue(
-      PALETTES[0].light.accent,
+    // The reset can render a tick after the toast, so wait for it too.
+    await waitFor(() =>
+      expect(screen.getByRole('textbox', { name: 'Primary colour (hex)' })).toHaveValue(
+        PALETTES[0].light.accent,
+      ),
     );
     // The next edit saves normally.
     saveError = null;
