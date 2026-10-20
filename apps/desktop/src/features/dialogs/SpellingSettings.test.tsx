@@ -132,9 +132,30 @@ describe('SpellingSettings', () => {
   it('lists the vault words and removes one', async () => {
     render(<SpellingSettings vaultOpen />);
     await waitFor(() => expect(screen.getByText('Ioque')).toBeTruthy());
-    fireEvent.click(screen.getByRole('button', { name: 'Quitar Ioque' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Quitar «Ioque»' }));
     await waitFor(() => expect(screen.queryByText('Ioque')).toBeNull());
     expect(calls).toContainEqual({ cmd: 'spell_remove_word', args: { word: 'Ioque' } });
+  });
+
+  it('words are chips: a list whose remove buttons are the close icon, not a "×" button', async () => {
+    render(<SpellingSettings vaultOpen />);
+    const list = await screen.findByRole('list', { name: 'Palabras agregadas en esta bóveda' });
+    const remove = within(list).getByRole('button', { name: 'Quitar «parcero»' });
+    expect(remove.querySelector('svg')).toBeTruthy();
+    expect(remove.textContent).toBe('');
+    expect(remove.className).not.toMatch(/\bbtn\b/);
+  });
+
+  it('after a removal the keyboard goes to the next word, or the previous one at the end', async () => {
+    words = ['alfa', 'beta', 'gama'];
+    render(<SpellingSettings vaultOpen />);
+    const button = (w: string) => screen.getByRole('button', { name: `Quitar «${w}»` });
+    await waitFor(() => expect(screen.getByText('beta')).toBeTruthy());
+    button('beta').focus();
+    fireEvent.click(button('beta'));
+    await waitFor(() => expect(document.activeElement).toBe(button('gama')));
+    fireEvent.click(button('gama'));
+    await waitFor(() => expect(document.activeElement).toBe(button('alfa')));
   });
 
   it('shows no word list without a vault', async () => {

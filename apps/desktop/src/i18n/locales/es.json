@@ -868,7 +868,7 @@
     "unavailable": "No se pudo cargar",
     "words": "Palabras agregadas en esta bóveda",
     "noWords": "Aún no hay palabras",
-    "removeWord": "Quitar {word}",
+    "removeWord": "Quitar «{word}»",
     "vault": "Ortografía",
     "vaultApp": "Usar los diccionarios de la app",
     "vaultCustom": "Elegir para esta bóveda",

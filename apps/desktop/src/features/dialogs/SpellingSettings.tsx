@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useId, useState } from 'react';
+import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   spellDictionaries,
@@ -11,6 +11,7 @@ import {
   type CommandError,
   type SpellDictionary,
 } from '../../ipc';
+import { SmallCloseIcon } from '../../app/icons';
 import { errorMessage } from '../../stores/messages';
 import { useSettingsStore } from '../../stores/settingsStore';
 import { useSpellStore } from '../../stores/spellStore';
@@ -156,10 +157,21 @@ export function SpellingSettings({ vaultOpen }: { vaultOpen: boolean }) {
     await useSettingsStore.getState().load();
     bump();
   };
-  const removeWord = async (word: string) => {
+  // Removing a chip unmounts the focused button: the keyboard goes to the
+  // chip now in its place, else the one before (as related-page chips do).
+  const chips = useRef<HTMLUListElement>(null);
+  const [refocus, setRefocus] = useState<number | null>(null);
+  useEffect(() => {
+    if (refocus === null) return;
+    setRefocus(null);
+    const buttons = chips.current?.querySelectorAll('button') ?? [];
+    (buttons[refocus] ?? buttons[refocus - 1])?.focus();
+  }, [refocus, words]);
+  const removeWord = async (word: string, at: number) => {
     const res = await spellRemoveWord(word);
     if (!res.ok) return failed(res.error);
     setWords((w) => w?.filter((x) => x !== word) ?? null);
+    setRefocus(at);
     bump();
   };
 
@@ -193,19 +205,24 @@ export function SpellingSettings({ vaultOpen }: { vaultOpen: boolean }) {
         <fieldset className={styles.fieldset}>
           <legend>{t('spelling.words')}</legend>
           {words && words.length === 0 && <p className={styles.hint}>{t('spelling.noWords')}</p>}
-          {words?.map((w) => (
-            <div key={w} className={styles.check}>
-              <span>{w}</span>
-              <button
-                type="button"
-                className="btn btn-secondary btn-sm"
-                aria-label={t('spelling.removeWord', { word: w })}
-                onClick={() => void removeWord(w)}
-              >
-                ×
-              </button>
-            </div>
-          ))}
+          {words && words.length > 0 && (
+            <ul ref={chips} className={styles.chips} aria-label={t('spelling.words')}>
+              {words.map((w, at) => (
+                <li key={w} className={styles.chip}>
+                  {w}
+                  <button
+                    type="button"
+                    className={styles.chipRemove}
+                    aria-label={t('spelling.removeWord', { word: w })}
+                    title={t('spelling.removeWord', { word: w })}
+                    onClick={() => void removeWord(w, at)}
+                  >
+                    <SmallCloseIcon />
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
         </fieldset>
       )}
     </>
