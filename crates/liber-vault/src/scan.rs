@@ -1,9 +1,9 @@
 use crate::error::{Result, io_err};
 use crate::path::VaultPath;
+use crate::storage::plain::mtime_ns;
 use crate::vault::Vault;
 use crate::{ARCHIVE_DIR, is_hidden_name, is_hidden_path};
 use std::path::Path;
-use std::time::UNIX_EPOCH;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum EntryKind {
@@ -25,14 +25,6 @@ pub struct Entry {
 pub struct Scan {
     pub entries: Vec<Entry>,
     pub skipped: Vec<String>,
-}
-
-pub(crate) fn mtime_ns(meta: &std::fs::Metadata) -> i128 {
-    meta.modified()
-        .ok()
-        .and_then(|t| t.duration_since(UNIX_EPOCH).ok())
-        .map(|d| d.as_nanos() as i128)
-        .unwrap_or(0)
 }
 
 impl Vault {

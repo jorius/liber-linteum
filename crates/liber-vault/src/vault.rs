@@ -24,19 +24,7 @@ pub struct Vault {
 
 impl Vault {
     pub fn open(root: &Path) -> Result<Vault> {
-        let root = dunce::canonicalize(root).map_err(|e| match e.kind() {
-            std::io::ErrorKind::NotFound => VaultError::NotFound(root.display().to_string()),
-            _ => VaultError::Io {
-                path: root.display().to_string(),
-                source: e,
-            },
-        })?;
-        if !root.is_dir() {
-            return Err(VaultError::NotFound(format!(
-                "{} is not a folder",
-                root.display()
-            )));
-        }
+        let root = crate::storage::plain::canonical_root(root)?;
         let mut warnings = Vec::new();
         let legacy_settings = crate::meta_dir::migrate(&root, &mut warnings);
 

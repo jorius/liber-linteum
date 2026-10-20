@@ -16,21 +16,7 @@ impl Vault {
     /// Absolute path for `path`, refusing anything whose deepest existing
     /// ancestor resolves (through symlinks) outside the vault.
     pub fn fs_path(&self, path: &VaultPath) -> Result<PathBuf> {
-        let full = path.to_fs_path(&self.root);
-        let mut probe = full.as_path();
-        loop {
-            if probe.symlink_metadata().is_ok() {
-                let real = dunce::canonicalize(probe).map_err(|e| io_err(path.as_str(), e))?;
-                if !real.starts_with(&self.root) {
-                    return Err(VaultError::OutsideVault(path.to_string()));
-                }
-                return Ok(full);
-            }
-            match probe.parent() {
-                Some(parent) => probe = parent,
-                None => return Ok(full),
-            }
-        }
+        crate::storage::plain::resolve(&self.root, path)
     }
 
     /// [`Vault::fs_path`] for a path the webview names, also refusing one
@@ -38,22 +24,7 @@ impl Vault {
     /// hidden folder through a symlink or, on Windows, an 8.3 short name
     /// (`SSH~1`). A missing file is left to the read that follows.
     pub fn visible_fs_path(&self, path: &VaultPath) -> Result<PathBuf> {
-        let full = self.fs_path(path)?;
-        if full.symlink_metadata().is_err() {
-            return Ok(full);
-        }
-        let real = dunce::canonicalize(&full).map_err(|e| io_err(path.as_str(), e))?;
-        let inside = real
-            .strip_prefix(&self.root)
-            .map_err(|_| VaultError::OutsideVault(path.to_string()))?;
-        let parts: Option<Vec<&str>> = inside
-            .components()
-            .map(|c| c.as_os_str().to_str())
-            .collect();
-        if parts.is_none_or(|parts| crate::is_hidden_path(&parts.join("/"))) {
-            return Err(VaultError::OutsideVault(path.to_string()));
-        }
-        Ok(full)
+        crate::storage::plain::resolve_visible(&self.root, path)
     }
 
     pub fn read(&self, path: &VaultPath) -> Result<(Vec<u8>, Hash)> {

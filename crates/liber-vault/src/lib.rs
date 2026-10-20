@@ -19,6 +19,7 @@ mod path;
 mod scan;
 mod scratch;
 mod spelling;
+mod storage;
 mod vault;
 mod watch;
 
@@ -38,6 +39,10 @@ pub use page_width::{PageWidth, PageWidths};
 pub use path::VaultPath;
 pub use scan::{Entry, EntryKind, Scan};
 pub use scratch::DEFAULT_SCRATCH_FOLDER;
+pub use storage::{
+    Child, Follow, Kind, Meta, OsUse, PlainStorage, RawEvent, Reach, ReadSeek, Reader, Replace,
+    Storage, WatchGuard,
+};
 pub use vault::Vault;
 pub use watch::{DEBOUNCE, WatchEvent, Watcher};
 
