@@ -243,7 +243,9 @@
     "archive": "Archive",
     "sortBy": "Sort by",
     "open": "Open",
-    "unarchive": "Unarchive"
+    "unarchive": "Unarchive",
+    "addFolderPage": "Add a page to this folder",
+    "useAsFolderPage": "Use {name}.md as this folder’s page"
   },
   "dialogs": {
     "cancel": "Cancel",
@@ -253,6 +255,7 @@
       "links": "{count, plural, =0 {Nothing links to it.} one {# link points to it and will break.} other {# links point to it and will break.}}",
       "items": "{count, plural, one {It contains # item.} other {It contains # items.}}",
       "dontAsk": "Don't ask again",
+      "folderPage": "Its page, {name}, goes with it.",
       "confirm": "Move to Trash"
     },
     "move": {

@@ -536,3 +536,74 @@ describe('the row menu (M5b §3, §4)', () => {
     act(() => useUiStore.getState().closeDialog());
   });
 });
+
+describe('the folder-page menu actions (round 3b §6.4)', () => {
+  const labels = () => screen.getAllByRole('menuitem').map((i) => i.textContent);
+  const realLoad = usePageStore.getState().load;
+  afterEach(() => usePageStore.setState({ load: realLoad }));
+
+  it('"Add a page to this folder" creates X/X.md and opens it', async () => {
+    const calls = backend({
+      entry_create_page: () => 'Lore/Lore.md',
+      vault_tree: () => [
+        { path: 'Lore', kind: 'folder' },
+        { path: 'Lore/Lore.md', kind: 'page' },
+      ],
+    });
+    const load = vi.fn(async () => {});
+    usePageStore.setState({ load });
+    seed([{ path: 'Lore', kind: 'folder' }]);
+    render(<ContextMenu menu={{ path: 'Lore', anchor: { x: 0, y: 0 } }} onClose={() => {}} />);
+    expect(labels()).toContain('Add a page to this folder');
+    expect(labels()).not.toContain('Use Lore.md as this folder’s page');
+    await userEvent.click(screen.getByRole('menuitem', { name: 'Add a page to this folder' }));
+    await waitFor(() => expect(load).toHaveBeenCalledWith('Lore/Lore.md'));
+    expect(calls).toContainEqual(['entry_create_page', { dir: 'Lore', name: 'Lore' }]);
+    expect(useVaultStore.getState().renaming).toBeNull();
+  });
+
+  it('"Use Lore.md as this folder’s page" moves the namesake page inside', async () => {
+    const calls = backend({
+      entry_rename: () => ({
+        moved: [],
+        updatedFiles: [],
+        updatedLinks: 0,
+        failed: [],
+        pair: null,
+      }),
+    });
+    seed([
+      { path: 'Lore', kind: 'folder' },
+      { path: 'Lore.md', kind: 'page' },
+    ]);
+    render(<ContextMenu menu={{ path: 'Lore', anchor: { x: 0, y: 0 } }} onClose={() => {}} />);
+    await userEvent.click(
+      screen.getByRole('menuitem', { name: 'Use Lore.md as this folder’s page' }),
+    );
+    expect(calls).toContainEqual(['entry_rename', { from: 'Lore.md', to: 'Lore/Lore.md' }]);
+  });
+
+  it('a folder with a page offers neither, and its Favorites action stars the page', async () => {
+    backend({ favorites_set: () => null });
+    useFavoritesStore.setState({ paths: [] });
+    seed([
+      { path: 'Lore', kind: 'folder' },
+      { path: 'Lore/Lore.md', kind: 'page' },
+    ]);
+    render(<ContextMenu menu={{ path: 'Lore', anchor: { x: 0, y: 0 } }} onClose={() => {}} />);
+    expect(labels()).not.toContain('Add a page to this folder');
+    await userEvent.click(screen.getByRole('menuitem', { name: 'Add to Favorites' }));
+    expect(useFavoritesStore.getState().paths).toEqual(['Lore/Lore.md']);
+  });
+
+  it('an archived folder offers neither', () => {
+    seed([
+      { path: '.archive', kind: 'folder' },
+      { path: '.archive/Lore', kind: 'folder' },
+    ]);
+    render(
+      <ContextMenu menu={{ path: '.archive/Lore', anchor: { x: 0, y: 0 } }} onClose={() => {}} />,
+    );
+    expect(labels()).not.toContain('Add a page to this folder');
+  });
+});

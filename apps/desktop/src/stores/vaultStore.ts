@@ -34,7 +34,15 @@ import { usePageStore } from './pageStore';
 import { useToastStore } from './toastStore';
 import { useTrailStore } from './trailStore';
 import { useUiStore } from './uiStore';
-import { childrenByParent, isArchived, joinPath, nextFreeName, parentOf, remap } from './tree';
+import {
+  childrenByParent,
+  isArchived,
+  joinPath,
+  nameOf,
+  nextFreeName,
+  parentOf,
+  remap,
+} from './tree';
 
 /** External changes arriving within this window trigger one tree refresh. */
 export const COALESCE_MS = 100;
@@ -72,6 +80,8 @@ interface VaultState {
   expand: (path: string) => void;
   startRename: (path: string | null) => void;
   createPage: (dir: string) => Promise<IpcResult<string>>;
+  /** Round 3b §6.4: the folder's own page, `X/X.md`, opened (no rename). */
+  createFolderPage: (folder: string) => Promise<IpcResult<string>>;
   createFolder: (dir: string) => Promise<IpcResult<string>>;
   /** `quiet`: a refused rename isn't toasted (the caller shows it inline,
    *  like the page title — final review m4). */
@@ -357,6 +367,17 @@ export const useVaultStore = create<VaultState>((set, get) => {
       await get().refreshTree();
       get().expand(dir);
       set({ selected: res.value, renaming: res.value });
+      return res;
+    },
+    createFolderPage: async (folder) => {
+      const res = await entryCreatePage(folder, nameOf(folder));
+      if (!res.ok) {
+        toast().push({ message: errorMessage(res.error), tone: 'error' });
+        return res;
+      }
+      await get().refreshTree();
+      set({ selected: folder });
+      await usePageStore.getState().load(res.value);
       return res;
     },
     createFolder: async (dir) => {

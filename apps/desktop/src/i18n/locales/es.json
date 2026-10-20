@@ -243,7 +243,9 @@
     "archive": "Archivar",
     "sortBy": "Ordenar por",
     "open": "Abrir",
-    "unarchive": "Desarchivar"
+    "unarchive": "Desarchivar",
+    "addFolderPage": "Añadir una página a esta carpeta",
+    "useAsFolderPage": "Usar {name}.md como página de esta carpeta"
   },
   "dialogs": {
     "cancel": "Cancelar",
@@ -253,6 +255,7 @@
       "links": "{count, plural, =0 {Nada enlaza a este elemento.} one {# enlace apunta aquí y se romperá.} other {# enlaces apuntan aquí y se romperán.}}",
       "items": "{count, plural, one {Contiene # elemento.} other {Contiene # elementos.}}",
       "dontAsk": "No volver a preguntar",
+      "folderPage": "Su página, {name}, se va con ella.",
       "confirm": "Mover a la papelera"
     },
     "move": {
