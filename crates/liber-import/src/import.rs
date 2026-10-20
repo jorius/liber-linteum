@@ -5,7 +5,7 @@ use crate::database::Table;
 use crate::markdown::{Resolver, Target, convert, strip_properties};
 use crate::names::{NameMap, clean_component};
 use crate::{Entry, Export, ImportError, strip_notion_id};
-use liber_vault::{Vault, VaultPath};
+use liber_vault::{Vault, VaultError, VaultPath};
 use std::collections::{BTreeSet, HashMap, HashSet, VecDeque};
 use std::io::Write;
 use std::path::{Path, PathBuf};
@@ -598,10 +598,11 @@ pub fn write(
     progress: &mut dyn FnMut(usize, usize),
     cancel: &AtomicBool,
 ) -> Result<Report, ImportError> {
-    if target.symlink_metadata().is_ok() {
+    let taken = target.symlink_metadata().is_ok(); // seam: outside (the new vault's own folder, before Vault::open)
+    if taken {
         return Err(ImportError::Exists(target.display().to_string()));
     }
-    std::fs::create_dir(target)?;
+    std::fs::create_dir(target)?; // seam: outside (the new vault's own folder, before Vault::open)
     // A folder made just now: no legacy settings folder to move or warn about.
     let vault = Vault::open(target)?;
     let total = plan.total();
@@ -610,11 +611,8 @@ pub fn write(
     // Plain create-only writes: the folder is new and nothing else reads it
     // yet, so no temp file or fsync per file (spec §10: 5k pages in seconds).
     let step = |out: &Out| -> Result<(), ImportError> {
-        let full = vault.fs_path(&VaultPath::new(&out.path)?)?;
-        let mut file = std::fs::OpenOptions::new()
-            .write(true)
-            .create_new(true)
-            .open(&full)?;
+        let path = VaultPath::new(&out.path)?;
+        let mut file = vault.create_new(&path)?;
         let written = match &out.body {
             Body::Text(text) => file.write_all(text.as_bytes()).map_err(ImportError::from),
             Body::Page { entry, row } => page_text(
@@ -630,14 +628,19 @@ pub fn write(
         };
         if written.is_err() {
             drop(file);
-            let _ = std::fs::remove_file(&full); // never leave half a file
+            let _ = vault.remove_file(&path); // never leave half a file
         }
         written
     };
     let mut failure = None;
     // One file that can't be written is a warning; a full disk stops it all.
     let mut skipped: Vec<String> = Vec::new();
-    let full = |e: &ImportError| matches!(e, ImportError::Io(io) if io.kind() == std::io::ErrorKind::StorageFull);
+    let full = |e: &ImportError| match e {
+        ImportError::Io(io) | ImportError::Vault(VaultError::Io { source: io, .. }) => {
+            io.kind() == std::io::ErrorKind::StorageFull
+        }
+        _ => false,
+    };
     for folder in &plan.folders {
         let made = VaultPath::new(folder)
             .and_then(|p| vault.create_dir_all(&p))
@@ -718,6 +721,16 @@ mod tests {
 
     /// A small export with every shape the importer handles.
     fn sample() -> tempfile::NamedTempFile {
+        let files = sample_files();
+        let refs: Vec<(&str, &[u8])> = files
+            .iter()
+            .map(|(n, b)| (n.as_str(), b.as_slice()))
+            .collect();
+        zip_file(&refs)
+    }
+
+    /// [`sample`]'s files: (name in the zip, bytes).
+    fn sample_files() -> Vec<(String, Vec<u8>)> {
         let home = format!(
             "# Home\n\nSee [Child](Home%20{A}/Child%20{B}.md) and [Tasks](Home%20{A}/Tasks%20{C}.csv).\n\n![pic.png](Home%20{A}/pic.png)\n\n<aside>\n💡 Tip\n</aside>\n\n[gone](Nope.md)\n"
         );
@@ -727,7 +740,7 @@ mod tests {
             "Name,Status,Due,Related\nWrite intro,Done,\"October 1, 2026\",Child (Child%20{B}.md)\nShip it,,,\n"
         );
         let row = "# Write intro\n\nStatus: Done\nDue: October 1, 2026\nRelated: Child (../Child%20ffffffffffffffffffffffffffffffff.md)\n\nThe body.\n".to_string();
-        let files: Vec<(String, Vec<u8>)> = vec![
+        vec![
             (format!("Home {A}.md"), home.into_bytes()),
             (format!("Home {A}/Child {B}.md"), child.into_bytes()),
             (format!("Home {A}/pic.png"), b"PNG".to_vec()),
@@ -746,12 +759,7 @@ mod tests {
             ),
             (format!("Notes {A}.md"), b"# Notes\n".to_vec()),
             (format!("Notes {B}.md"), b"# Notes too\n".to_vec()),
-        ];
-        let refs: Vec<(&str, &[u8])> = files
-            .iter()
-            .map(|(n, b)| (n.as_str(), b.as_slice()))
-            .collect();
-        zip_file(&refs)
+        ]
     }
 
     fn import(
@@ -1226,5 +1234,64 @@ mod tests {
         let total = started.elapsed();
         eprintln!("m7 perf: preview {preview:?}, preview + import {total:?}");
         assert!(preview.as_secs() < 10 && total.as_secs() < 60);
+    }
+
+    /// Review Focus 4: an entry whose data fails mid-copy leaves no partial
+    /// file ("never leave half a file"); the rest of the export is written.
+    #[test]
+    fn import_failed_entry_leaves_no_partial_file() {
+        use std::io::{Cursor, Write as _};
+        use zip::write::SimpleFileOptions;
+        let big_name = format!("Home {A}/Big.bin");
+        let mut seed = 0x2545_f491_4f6c_dd1d_u64;
+        let big: Vec<u8> = (0..256 * 1024)
+            .map(|_| {
+                seed ^= seed << 13;
+                seed ^= seed >> 7;
+                seed ^= seed << 17;
+                seed as u8
+            })
+            .collect();
+        let mut w = zip::ZipWriter::new(Cursor::new(Vec::new()));
+        let deflated =
+            SimpleFileOptions::default().compression_method(zip::CompressionMethod::Deflated);
+        for (name, bytes) in sample_files().iter().chain([&(big_name.clone(), big)]) {
+            w.start_file(name.as_str(), deflated).unwrap();
+            w.write_all(bytes).unwrap();
+        }
+        let mut bytes = w.finish().unwrap().into_inner();
+        let mid = {
+            let mut zip = zip::ZipArchive::new(Cursor::new(&bytes)).unwrap();
+            let f = zip.by_name(&big_name).unwrap();
+            assert_eq!(f.compression(), zip::CompressionMethod::Deflated);
+            (f.data_start().unwrap() + f.compressed_size() / 2) as usize
+        };
+        for b in &mut bytes[mid..mid + 16] {
+            *b = !*b;
+        }
+        let zip = tempfile::NamedTempFile::new().unwrap();
+        std::fs::write(zip.path(), &bytes).unwrap();
+
+        let (dir, report, plan) = import(zip.path(), None);
+        let report = report.unwrap();
+        let (big, rest): (Vec<&Out>, Vec<&Out>) =
+            plan.files.iter().partition(|o| o.path.ends_with("Big.bin"));
+        assert_eq!(big.len(), 1, "Big.bin is planned");
+        let vault = dir.path().join("Vault");
+        assert!(
+            vault.join(&big[0].path).symlink_metadata().is_err(),
+            "no partial {}",
+            big[0].path
+        );
+        assert!(
+            read(&dir, REPORT).contains("Big.bin"),
+            "{}",
+            read(&dir, REPORT)
+        );
+        for o in rest {
+            assert!(vault.join(&o.path).is_file(), "{} written", o.path);
+        }
+        assert_eq!(report.written, plan.total() - 1);
+        assert!(report.failed.is_none(), "{:?}", report.failed);
     }
 }

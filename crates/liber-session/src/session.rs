@@ -2,7 +2,7 @@ use crate::error::{Result, SessionError};
 use crate::events::{IndexReport, SessionEvent};
 use liber_index::{FileKind, FileRow, Index, Stat, cache_dir_name};
 use liber_markdown::{PageMeta, link_key, parse_page};
-use liber_vault::{Entry, EntryKind, Hash, Vault, VaultPath, Watcher, is_hidden_name};
+use liber_vault::{Entry, EntryKind, Follow, Hash, Vault, VaultPath, Watcher, is_hidden_name};
 use rayon::prelude::*;
 use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
@@ -351,10 +351,8 @@ impl VaultSession {
             return;
         }
         let created = |path: &str| {
-            let full = VaultPath::new(path)
-                .ok()
-                .and_then(|p| self.vault.fs_path(&p).ok());
-            full.and_then(|f| std::fs::metadata(f).ok()?.created().ok())
+            let p = VaultPath::new(path).ok()?;
+            self.vault.meta(&p, Follow::InsideVault).ok()??.created
         };
         for run in nodes.chunk_by_mut(|a, b| a.parent == b.parent) {
             let Some(&sort) = sorts.get(&run[0].parent) else {

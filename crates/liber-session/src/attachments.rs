@@ -8,7 +8,7 @@ use crate::session::{
 };
 use liber_index::{FileKind, FileRow, LinkCandidate};
 use liber_markdown::{LinkKind, link_key, name_key, resolve, shortest_unique_target};
-use liber_vault::{AttachmentConfig, Hash, LinkFormat, VaultError, VaultPath};
+use liber_vault::{AttachmentConfig, Hash, LinkFormat, OsUse, VaultError, VaultPath};
 use std::path::Path;
 
 /// A file saved into (or found in) the vault for a page.
@@ -100,7 +100,8 @@ impl VaultSession {
     /// already inside the vault is only linked. Folders are refused.
     pub fn import_attachment(&self, page: &VaultPath, src: &Path) -> Result<Attached> {
         let shown = src.display().to_string();
-        let meta = std::fs::metadata(src).map_err(|e| match e.kind() {
+        let meta = std::fs::metadata(src); // seam: outside (the source file being imported)
+        let meta = meta.map_err(|e| match e.kind() {
             std::io::ErrorKind::NotFound => {
                 SessionError::Vault(VaultError::NotFound(shown.clone()))
             }
@@ -112,13 +113,14 @@ impl VaultSession {
         if !meta.is_file() {
             return Err(SessionError::NotAFile(shown));
         }
-        let real = dunce::canonicalize(src).map_err(|e| {
+        let real = dunce::canonicalize(src); // seam: outside (the source file being imported)
+        let real = real.map_err(|e| {
             SessionError::Vault(VaultError::Io {
                 path: shown.clone(),
                 source: e,
             })
         })?;
-        if let Ok(inside) = VaultPath::from_fs_path(self.vault.root(), &real)
+        if let Some(inside) = self.vault.vault_path_of(&real)
             && self.vault.stat(&inside)?.is_some()
         {
             let (link, url) = self.link_to(page, &inside)?;
@@ -336,7 +338,7 @@ impl VaultSession {
                     .unwrap_or(shortest)
             }
             LinkFormat::Absolute => {
-                let full = self.vault.fs_path(path)?;
+                let full = self.vault.os_path(path, OsUse::FileUrl)?;
                 let url = full.to_str().map(file_url);
                 return Ok((shortest, url));
             }

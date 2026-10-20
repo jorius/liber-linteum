@@ -9,8 +9,8 @@ use crate::events::RenameOutcome;
 use crate::session::{VaultSession, validate_name};
 use liber_markdown::link_key;
 use liber_vault::{
-    ARCHIVE_DIR, Bin, BinRecord, TRASH_DIR, VaultError, VaultPath, WatchEvent, is_hidden_name,
-    is_hidden_path,
+    ARCHIVE_DIR, Bin, BinRecord, Child, Follow, Kind, TRASH_DIR, Vault, VaultError, VaultPath,
+    WatchEvent, is_hidden_name, is_hidden_path,
 };
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -33,36 +33,38 @@ pub struct BinItem {
     pub icon: Option<String>,
 }
 
-/// Bytes of every file under `full` (itself, for a file) and how many of
+fn is_md(path: &VaultPath) -> bool {
+    path.extension()
+        .is_some_and(|e| e.eq_ignore_ascii_case("md"))
+}
+
+/// Bytes of every file under `path` (itself, for a file) and how many of
 /// them are pages; links are never followed.
-fn measure(full: &std::path::Path) -> (u64, u32) {
-    let Ok(meta) = std::fs::symlink_metadata(full) else {
-        return (0, 0);
-    };
-    if !meta.is_dir() {
-        let page = full
-            .extension()
-            .is_some_and(|e| e.eq_ignore_ascii_case("md"));
-        return (meta.len(), u32::from(page));
+fn measure(vault: &Vault, path: &VaultPath) -> (u64, u32) {
+    match vault.meta(path, Follow::No) {
+        Ok(Some(meta)) if meta.kind == Kind::Dir => {}
+        Ok(Some(meta)) => return (meta.len, u32::from(is_md(path))),
+        _ => return (0, 0),
     }
     let mut total = (0, 0);
-    for entry in std::fs::read_dir(full).into_iter().flatten().flatten() {
-        let (size, pages) = measure(&entry.path());
-        total = (total.0 + size, total.1 + pages);
+    for child in vault.children(path).into_iter().flatten() {
+        if let Child::Entry { name, .. } = child
+            && let Ok(p) = path.join(&name)
+        {
+            let (size, pages) = measure(vault, &p);
+            total = (total.0 + size, total.1 + pages);
+        }
     }
     total
 }
 
 /// A trashed page's frontmatter emoji (the Trash isn't indexed); big files
 /// aren't read for it.
-fn page_icon(full: &std::path::Path, size: u64) -> Option<String> {
-    let page = full
-        .extension()
-        .is_some_and(|e| e.eq_ignore_ascii_case("md"));
-    if !page || size > 1 << 20 {
+fn page_icon(vault: &Vault, path: &VaultPath, size: u64) -> Option<String> {
+    if !is_md(path) || size > 1 << 20 {
         return None;
     }
-    let text = std::fs::read_to_string(full).ok()?;
+    let text = String::from_utf8(vault.read(path).ok()?.0).ok()?;
     liber_markdown::parse_page(&text, "")
         .icon
         .filter(|i| liber_markdown::is_icon(i))
@@ -99,25 +101,33 @@ impl VaultSession {
     fn free_path(&self, parent: &VaultPath, name: &str, folder: bool) -> Result<VaultPath> {
         for i in 0.. {
             let p = parent.join(&numbered_entry(name, i, folder))?;
-            if self.vault.fs_path(&p)?.symlink_metadata().is_err() {
+            if !self.exists(&p) {
                 return Ok(p);
             }
         }
         unreachable!("a free name")
     }
 
-    fn is_dir(&self, path: &VaultPath) -> bool {
-        self.vault.fs_path(path).is_ok_and(|p| p.is_dir())
+    /// Anything at `path`, a dangling link included.
+    pub(crate) fn exists(&self, path: &VaultPath) -> bool {
+        self.vault.meta(path, Follow::No).is_ok_and(|m| m.is_some())
+    }
+
+    /// A folder, or a link to one inside the vault.
+    pub(crate) fn is_dir(&self, path: &VaultPath) -> bool {
+        self.vault
+            .meta(path, Follow::InsideVault)
+            .is_ok_and(|m| m.is_some_and(|m| m.kind == Kind::Dir))
     }
 
     /// A bin folder, refused when it is a symlink: a `.trash` linked back
     /// into the vault would make Empty Trash take the vault with it.
     fn bin_dir(&self, dir: &str) -> Result<VaultPath> {
         let bin = VaultPath::new(dir)?;
-        if bin
-            .to_fs_path(self.vault.root())
-            .symlink_metadata()
-            .is_ok_and(|m| !m.is_dir())
+        if self
+            .vault
+            .meta(&bin, Follow::No)
+            .is_ok_and(|m| m.is_some_and(|m| m.kind != Kind::Dir))
         {
             return Err(SessionError::NotPermitted(format!("{dir} isn't a folder")));
         }
@@ -144,11 +154,7 @@ impl VaultSession {
     fn parents_are_folders(&self, path: &VaultPath) -> bool {
         let mut dir = path.parent();
         while let Some(d) = dir.filter(|d| !d.is_root()) {
-            if self
-                .vault
-                .fs_path(&d)
-                .is_ok_and(|p| p.symlink_metadata().is_ok() && !p.is_dir())
-            {
+            if self.exists(&d) && !self.is_dir(&d) {
                 return false;
             }
             dir = d.parent();
@@ -199,7 +205,7 @@ impl VaultSession {
     /// its widths and cover sizes go with it.
     pub fn trash(&self, path: &VaultPath) -> Result<VaultPath> {
         self.check_binnable(path)?;
-        if self.vault.fs_path(path)?.symlink_metadata().is_err() {
+        if !self.exists(path) {
             return Err(VaultError::NotFound(path.to_string()).into());
         }
         let bin = self.bin_dir(TRASH_DIR)?;
@@ -234,26 +240,29 @@ impl VaultSession {
     pub fn trash_list(&self) -> Result<Vec<BinItem>> {
         let records = self.vault.bin_records(Bin::Trash);
         let folder_icons = self.vault.folder_icons();
-        let dir = self.vault.fs_path(&self.bin_dir(TRASH_DIR)?)?;
+        let dir = self.bin_dir(TRASH_DIR)?;
         let mut items = Vec::new();
-        let Ok(read) = std::fs::read_dir(&dir) else {
+        let Ok(children) = self.vault.children(&dir) else {
             return Ok(items);
         };
-        for entry in read.flatten() {
-            let Some(name) = entry.file_name().to_str().map(str::to_string) else {
+        for child in children {
+            let Child::Entry { name, meta } = child else {
                 continue;
             };
             if is_hidden_name(&name) {
                 continue;
             }
-            let path = format!("{TRASH_DIR}/{name}");
+            let Ok(vp) = dir.join(&name) else {
+                continue;
+            };
+            let path = vp.to_string();
             let r = records.get(&path);
-            let folder = entry.file_type().is_ok_and(|t| t.is_dir());
-            let (size, pages) = measure(&entry.path());
+            let folder = meta.kind == Kind::Dir;
+            let (size, pages) = measure(&self.vault, &vp);
             let icon = if folder {
                 folder_icons.get(&path).cloned()
             } else {
-                page_icon(&entry.path(), size)
+                page_icon(&self.vault, &vp, size)
             };
             items.push(BinItem {
                 folder,
@@ -299,7 +308,7 @@ impl VaultSession {
 
     /// `target` when free; else `AlreadyExists`, or its next free name.
     fn bin_place(&self, target: &VaultPath, keep_both: bool, folder: bool) -> Result<VaultPath> {
-        if self.vault.fs_path(target)?.symlink_metadata().is_err() {
+        if !self.exists(target) {
             return Ok(target.clone());
         }
         if !keep_both {
@@ -335,7 +344,7 @@ impl VaultSession {
         for p in items {
             // Already gone (removed outside the app): nothing to delete; its
             // record goes too, and the rest carry on (round-2 review M13).
-            let gone = std::fs::symlink_metadata(p.to_fs_path(self.vault.root())).is_err();
+            let gone = !self.exists(p);
             if !gone && let Err(e) = self.trash_via(p, &|| {}, os_trash) {
                 result = Err(e);
                 break;
@@ -477,10 +486,7 @@ impl VaultSession {
     /// Removes empty Archive folders from `dir` up (never `.archive` itself).
     fn prune_archive(&self, mut dir: Option<VaultPath>) {
         while let Some(d) = dir.filter(|d| in_bin(d, ARCHIVE_DIR)) {
-            let Ok(full) = self.vault.fs_path(&d) else {
-                return;
-            };
-            if std::fs::remove_dir(&full).is_err() {
+            if self.vault.remove_empty_dir(&d).is_err() {
                 return;
             }
             let _ = self.index().transaction(|tx| tx.remove(d.as_str()));

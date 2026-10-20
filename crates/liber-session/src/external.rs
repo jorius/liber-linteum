@@ -158,11 +158,11 @@ fn checked_file(path: &str) -> Result<PathBuf> {
     if hidden(&host) {
         return Err(SessionError::NotPermitted(format!("{path}: hidden")));
     }
-    let real = dunce::canonicalize(&host).map_err(|_| not_found())?;
+    let real = dunce::canonicalize(&host).map_err(|_| not_found())?; // seam: outside (a file outside the vault)
     if hidden(&real) {
         return Err(SessionError::NotPermitted(format!("{path}: hidden")));
     }
-    let meta = std::fs::metadata(&real).map_err(|_| not_found())?;
+    let meta = std::fs::metadata(&real).map_err(|_| not_found())?; // seam: outside (a file outside the vault)
     if !meta.is_file() {
         return Err(SessionError::NotAFile(path.to_string()));
     }
@@ -300,8 +300,8 @@ impl VaultSession {
     /// the vault knows (§7: a picked file already in the vault is linked, not
     /// copied).
     pub fn vault_path_of(&self, path: &Path) -> Option<VaultPath> {
-        let real = dunce::canonicalize(path).ok()?;
-        let inside = VaultPath::from_fs_path(self.vault.root(), &real).ok()?;
+        let real = dunce::canonicalize(path).ok()?; // seam: outside (an OS path the user picked)
+        let inside = self.vault.vault_path_of(&real)?;
         (!inside.is_root() && self.vault.stat(&inside).ok()?.is_some()).then_some(inside)
     }
 
