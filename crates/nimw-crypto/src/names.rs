@@ -1,4 +1,9 @@
 //! Encrypted file and folder names (spec §4.3).
+//!
+//! Each name is AES-SIV-256 under K_name with four associated-data components, in this
+//! order: `vault_id` (16 bytes), `epoch` (u32 big-endian), parent folder id (16 bytes), and
+//! the entry kind (`b"f"` for a file, `b"d"` for a folder, so neither passes for the other).
+//! A file's plaintext is its NFC name; a folder's is `folder id ‖ NFC name`.
 
 use aes_siv::KeyInit;
 use aes_siv::siv::{Aes256Siv, IV_SIZE};
@@ -43,24 +48,24 @@ impl<'a> NameCodec<'a> {
     /// `name` must be one valid path component; decryption rejects anything else.
     pub fn encrypt_file(&self, parent: &FolderId, name: &str) -> String {
         let name: String = name.nfc().collect();
-        format!("{}{FILE_EXT}", self.seal(parent, name.as_bytes()))
+        format!("{}{FILE_EXT}", self.seal(parent, FILE, name.as_bytes()))
     }
 
     pub fn decrypt_file(&self, parent: &FolderId, on_disk: &str) -> Result<String> {
         let stem = on_disk
             .strip_suffix(FILE_EXT)
             .ok_or(CryptoError::BadFormat("file name lacks .nimwe"))?;
-        valid_name(self.open(parent, stem)?)
+        valid_name(self.open(parent, FILE, stem)?)
     }
 
     pub fn encrypt_folder(&self, parent: &FolderId, id: &FolderId, name: &str) -> String {
         let mut pt = id.0.to_vec();
         pt.extend(name.nfc().collect::<String>().bytes());
-        self.seal(parent, &pt)
+        self.seal(parent, FOLDER, &pt)
     }
 
     pub fn decrypt_folder(&self, parent: &FolderId, on_disk: &str) -> Result<(FolderId, String)> {
-        let mut pt = self.open(parent, on_disk)?;
+        let mut pt = self.open(parent, FOLDER, on_disk)?;
         if pt.len() < 16 {
             return Err(CryptoError::BadFormat("folder name shorter than its id"));
         }
@@ -69,15 +74,15 @@ impl<'a> NameCodec<'a> {
         Ok((id, valid_name(name)?))
     }
 
-    fn seal(&self, parent: &FolderId, plaintext: &[u8]) -> String {
+    fn seal(&self, parent: &FolderId, kind: &[u8], plaintext: &[u8]) -> String {
         let ct = self
             .siv()
-            .encrypt(self.ad(parent), plaintext)
-            .expect("3 headers, any plaintext length");
+            .encrypt(self.ad(parent, kind), plaintext)
+            .expect("4 headers, any plaintext length");
         BASE64URL_NOPAD.encode(&ct)
     }
 
-    fn open(&self, parent: &FolderId, encoded: &str) -> Result<Vec<u8>> {
+    fn open(&self, parent: &FolderId, kind: &[u8], encoded: &str) -> Result<Vec<u8>> {
         if encoded.len() > MAX_ENCODED_LEN {
             return Err(CryptoError::BadFormat("encrypted name too long"));
         }
@@ -90,7 +95,7 @@ impl<'a> NameCodec<'a> {
             ));
         }
         self.siv()
-            .decrypt(self.ad(parent), &ct)
+            .decrypt(self.ad(parent, kind), &ct)
             .map_err(|_| CryptoError::Authentication)
     }
 
@@ -99,12 +104,13 @@ impl<'a> NameCodec<'a> {
         Aes256Siv::new_from_slice(self.key.expose()).expect("64-byte AES-SIV-256 key")
     }
 
-    /// AD components: vault id, epoch (u32 BE), parent folder id (spec §4.3).
-    fn ad(&self, parent: &FolderId) -> [Vec<u8>; 3] {
+    /// AD components, in order: vault id, epoch (u32 BE), parent folder id, entry kind.
+    fn ad(&self, parent: &FolderId, kind: &[u8]) -> [Vec<u8>; 4] {
         [
             self.vault_id.0.to_vec(),
             self.epoch.to_be_bytes().to_vec(),
             parent.0.to_vec(),
+            kind.to_vec(),
         ]
     }
 }
@@ -112,6 +118,9 @@ impl<'a> NameCodec<'a> {
 /// Room for a 255-byte name plus a folder id and tag, Base64url-encoded, with margin.
 const MAX_ENCODED_LEN: usize = 1024;
 const FILE_EXT: &str = ".nimwe";
+/// Entry kinds bound into the AD.
+const FILE: &[u8] = b"f";
+const FOLDER: &[u8] = b"d";
 
 /// Guards against path traversal once vaults can be shared.
 fn valid_name(pt: Vec<u8>) -> Result<String> {
@@ -441,19 +450,38 @@ mod tests {
     }
 
     #[test]
+    fn file_and_folder_names_are_not_interchangeable() {
+        let (k, v) = (key(), VaultId::random());
+        let c = NameCodec::new(&k, &v, 1);
+        let p = FolderId::random();
+        let f = c.encrypt_file(&p, "A long enough note.md");
+        let stem = f.strip_suffix(".nimwe").unwrap();
+        assert!(matches!(
+            c.decrypt_folder(&p, stem),
+            Err(CryptoError::Authentication)
+        ));
+        let d = c.encrypt_folder(&p, &FolderId::random(), "Projects");
+        let as_file = format!("{d}.nimwe");
+        assert!(matches!(
+            c.decrypt_file(&p, &as_file),
+            Err(CryptoError::Authentication)
+        ));
+    }
+
+    #[test]
     fn rejects_traversal_names() {
         let (k, v) = (key(), VaultId::random());
         let c = NameCodec::new(&k, &v, 1);
         let p = FolderId::random();
         for bad in ["..", ".", "", "a/b", "a\\b", "a\0b", "/"] {
-            let f = format!("{}.nimwe", c.seal(&p, bad.as_bytes()));
+            let f = format!("{}.nimwe", c.seal(&p, FILE, bad.as_bytes()));
             assert!(
                 matches!(c.decrypt_file(&p, &f), Err(CryptoError::BadFormat(_))),
                 "{bad:?}"
             );
             let mut pt = FolderId::random().0.to_vec();
             pt.extend_from_slice(bad.as_bytes());
-            let d = c.seal(&p, &pt);
+            let d = c.seal(&p, FOLDER, &pt);
             assert!(
                 matches!(c.decrypt_folder(&p, &d), Err(CryptoError::BadFormat(_))),
                 "{bad:?}"
@@ -472,14 +500,16 @@ mod tests {
         // Invalid UTF-8 after decryption.
         assert!(bad_format(c.decrypt_file(
             &p,
-            &format!("{}.nimwe", c.seal(&p, &[0xff, 0xfe]))
+            &format!("{}.nimwe", c.seal(&p, FILE, &[0xff, 0xfe]))
         )));
         // Folder plaintext shorter than a folder id.
-        assert!(bad_folder(c.decrypt_folder(&p, &c.seal(&p, &[1; 15]))));
-        assert!(bad_folder(c.decrypt_folder(&p, &c.seal(&p, &[]))));
+        assert!(bad_folder(
+            c.decrypt_folder(&p, &c.seal(&p, FOLDER, &[1; 15]))
+        ));
+        assert!(bad_folder(c.decrypt_folder(&p, &c.seal(&p, FOLDER, &[]))));
         let mut pt = FolderId::random().0.to_vec();
         pt.extend_from_slice(&[0xc3]);
-        assert!(bad_folder(c.decrypt_folder(&p, &c.seal(&p, &pt))));
+        assert!(bad_folder(c.decrypt_folder(&p, &c.seal(&p, FOLDER, &pt))));
         // Not Base64url, padded, non-canonical trailing bits, too short for a tag, too long.
         let file = c.encrypt_file(&p, "Notes.md");
         let stem = file.strip_suffix(".nimwe").unwrap();
