@@ -47,7 +47,7 @@ impl Vault {
     /// keep the spelling settings until it does; `None` when it's absent.
     pub fn spelling_stamp(&self) -> Option<(i128, u64)> {
         let path = VaultPath::new(&crate::meta_dir::resolve(self.storage(), LIBER_JSON)).ok()?;
-        // Followed, as `std::fs::metadata` did: a linked file's own changes count.
+        // Followed, as the old `metadata` call did: a linked file's own changes count.
         let meta = self.storage().meta(&path, Follow::InsideVault).ok()??;
         Some((meta.mtime_ns, meta.len))
     }

@@ -24,7 +24,7 @@ use std::path::Path;
 
 /// Folder name for a vault's index cache inside the OS cache dir
 /// (`liber/<name>/index.sqlite`): first 16 hex chars of SHA-256 of the
-/// canonical absolute vault path. Callers must pass a canonicalized path.
+/// canonical absolute vault path. Callers must pass the canonical path.
 pub fn cache_dir_name(vault_abs_path: &Path) -> String {
     let digest = Sha256::digest(vault_abs_path.as_os_str().as_encoded_bytes());
     digest.iter().take(8).map(|b| format!("{b:02x}")).collect()

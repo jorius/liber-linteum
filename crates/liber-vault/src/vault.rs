@@ -4,7 +4,7 @@ use crate::config::{
 use crate::error::{Result, VaultError};
 use crate::is_hidden_name;
 use crate::path::VaultPath;
-use crate::storage::{Follow, Kind, PlainStorage, Storage};
+use crate::storage::{Follow, Kind, Storage, open_storage};
 use globset::{Glob, GlobSet, GlobSetBuilder};
 use std::path::Path;
 use std::sync::Mutex;
@@ -25,7 +25,7 @@ pub struct Vault {
 
 impl Vault {
     pub fn open(root: &Path) -> Result<Vault> {
-        Vault::open_with(Box::new(PlainStorage::open(root)?))
+        Vault::open_with(open_storage(root)?)
     }
 
     /// Opens the vault that `storage` holds.

@@ -16,5 +16,8 @@ thiserror.workspace = true
 unicode-normalization.workspace = true
 zip.workspace = true
 
+[dev-dependencies]
+liber-vault = { path = "../liber-vault", features = ["test-storage"] }
+
 [lints]
 workspace = true

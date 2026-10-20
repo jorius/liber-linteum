@@ -9,6 +9,7 @@ Where to start, depending on what you need.
 | **What** the app does and why | [`product-spec.md`](product-spec.md): requirements with IDs (`GV-04`, `SR-02`…), personas, decision log |
 | **How** it is built | [`superpowers/specs/2026-10-12-architecture-design.md`](superpowers/specs/2026-10-12-architecture-design.md): start at §0 "As built" for where the code differs from the v1 design |
 | The index, its SQLite database and how indexing works | [`architecture/index-and-database.md`](architecture/index-and-database.md) |
+| The storage seam: the `Storage` trait, what stays outside it, the guard test, running the suite on another storage | [`architecture/storage-seam.md`](architecture/storage-seam.md) |
 | The encrypted-vault format, byte by byte (for implementers) | [`security/vault-format-v1.md`](security/vault-format-v1.md): headers, slots, keyring, STREAM files, names, vectors |
 | One milestone in detail | its spec in [`superpowers/specs/`](superpowers/specs/) (`YYYY-MM-DD-<milestone>-design.md`); later sections hold the amendments, review findings and rulings |
 | How a milestone was planned task by task | [`superpowers/plans/`](superpowers/plans/) |
@@ -30,6 +31,7 @@ Where to start, depending on what you need.
 | M6 audio | `2026-10-14-m6-audio-design.md` (§10–§11: batch-6 amendments and review) | `2026-10-18-batch6-handoff.md` |
 | M7 Notion import | `2026-10-18-m7-notion-import-design.md` | `2026-10-18-batch6-handoff.md` |
 | Batch 6 (main merge, text-file search, docs review, M6, M7) | M5 spec §12, M6 and M7 specs | `2026-10-18-batch6-handoff.md` |
+| E2 storage seam | `2026-10-20-encryption-design.md` §8, §13; plan `2026-10-20-enc-e2-storage-seam.md` | `2026-10-20-e2-handoff.md` |
 | M8 packaging | — | — |
 
 All of M0–M5b is merged on `main` (2026-10-18).

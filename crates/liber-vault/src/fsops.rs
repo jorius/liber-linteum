@@ -199,7 +199,7 @@ impl Vault {
 /// and hashed as it streams.
 struct HashingReader<'a> {
     src: &'a Path,
-    file: Option<std::fs::File>,
+    file: Option<std::fs::File>, // seam: outside (the import source, a file outside the vault)
     hasher: blake3::Hasher,
 }
 
@@ -207,7 +207,7 @@ impl Read for HashingReader<'_> {
     fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
         let file = match &mut self.file {
             Some(file) => file,
-            None => self.file.insert(std::fs::File::open(self.src)?),
+            None => self.file.insert(std::fs::File::open(self.src)?), // seam: outside (the import source, a file outside the vault)
         };
         let n = file.read(buf)?;
         self.hasher.update(&buf[..n]);

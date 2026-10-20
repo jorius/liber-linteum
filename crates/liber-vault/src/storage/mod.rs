@@ -125,3 +125,116 @@ pub trait Storage: Send + Sync + std::fmt::Debug {
     /// which must drop `sink` too (see [`WatchGuard`]).
     fn watch(&self, recursive: bool, sink: Box<dyn Fn(RawEvent) + Send>) -> Result<WatchGuard>;
 }
+
+/// The storage `Vault::open` uses: `PlainStorage`, unless built with
+/// `test-storage` (or `cfg(test)`) and `LIBER_TEST_STORAGE` names another.
+/// Unknown names panic, so a typo can't silently test plain storage.
+pub(crate) fn open_storage(root: &Path) -> Result<Box<dyn Storage>> {
+    #[cfg(any(test, feature = "test-storage"))]
+    if let Ok(name) = std::env::var("LIBER_TEST_STORAGE") {
+        return storage_named(&name, root);
+    }
+    Ok(Box::new(PlainStorage::open(root)?))
+}
+
+#[cfg(any(test, feature = "test-storage"))]
+fn storage_named(name: &str, root: &Path) -> Result<Box<dyn Storage>> {
+    let plain = PlainStorage::open(root)?;
+    Ok(match name {
+        "plain" => Box::new(plain),
+        "pass-through" => Box::new(PassThrough(plain)),
+        other => panic!("LIBER_TEST_STORAGE={other:?}: expected \"plain\" or \"pass-through\""),
+    })
+}
+
+/// A second `Storage` for the test switch: every method delegates to
+/// `PlainStorage`, so a suite that passes on it doesn't depend on the
+/// concrete type behind `Vault`.
+#[cfg(any(test, feature = "test-storage"))]
+#[derive(Debug)]
+pub struct PassThrough(PlainStorage);
+
+#[cfg(any(test, feature = "test-storage"))]
+impl Storage for PassThrough {
+    fn name(&self) -> &'static str {
+        "pass-through"
+    }
+    fn location(&self) -> &Path {
+        self.0.location()
+    }
+    fn meta(&self, path: &VaultPath, follow: Follow) -> Result<Option<Meta>> {
+        self.0.meta(path, follow)
+    }
+    fn children(&self, dir: &VaultPath) -> Result<Vec<Child>> {
+        self.0.children(dir)
+    }
+    fn read(&self, path: &VaultPath) -> Result<Vec<u8>> {
+        self.0.read(path)
+    }
+    fn open_read(&self, path: &VaultPath, reach: Reach) -> Result<Reader> {
+        self.0.open_read(path, reach)
+    }
+    fn replace_atomic(
+        &self,
+        path: &VaultPath,
+        from: &mut dyn std::io::Read,
+        mode: Replace,
+    ) -> Result<()> {
+        self.0.replace_atomic(path, from, mode)
+    }
+    fn create_new(&self, path: &VaultPath) -> Result<Box<dyn std::io::Write + Send>> {
+        self.0.create_new(path)
+    }
+    fn create_dir(&self, path: &VaultPath) -> Result<()> {
+        self.0.create_dir(path)
+    }
+    fn remove_file(&self, path: &VaultPath) -> Result<()> {
+        self.0.remove_file(path)
+    }
+    fn remove_empty_dir(&self, path: &VaultPath) -> Result<()> {
+        self.0.remove_empty_dir(path)
+    }
+    fn rename(&self, from: &VaultPath, to: &VaultPath) -> Result<()> {
+        self.0.rename(from, to)
+    }
+    fn trash_os(&self, path: &VaultPath) -> Result<()> {
+        self.0.trash_os(path)
+    }
+    fn os_path(&self, path: &VaultPath, use_: OsUse) -> Result<PathBuf> {
+        self.0.os_path(path, use_)
+    }
+    fn vault_path_of(&self, os: &Path) -> Option<VaultPath> {
+        self.0.vault_path_of(os)
+    }
+    fn watch(&self, recursive: bool, sink: Box<dyn Fn(RawEvent) + Send>) -> Result<WatchGuard> {
+        self.0.watch(recursive, sink)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::Vault;
+
+    // `unsafe_code` is forbidden, so no test sets the variable in-process:
+    // the named switch is tested directly, and `Vault::open` against
+    // whatever this run's `LIBER_TEST_STORAGE` says (unset: plain).
+    #[test]
+    fn test_switch_selects_pass_through() {
+        let dir = tempfile::tempdir().unwrap();
+        assert_eq!(
+            storage_named("pass-through", dir.path()).unwrap().name(),
+            "pass-through"
+        );
+        assert_eq!(storage_named("plain", dir.path()).unwrap().name(), "plain");
+        let want = std::env::var("LIBER_TEST_STORAGE").unwrap_or_else(|_| "plain".into());
+        assert_eq!(Vault::open(dir.path()).unwrap().storage_name(), want);
+    }
+
+    #[test]
+    #[should_panic(expected = "LIBER_TEST_STORAGE")]
+    fn test_switch_refuses_unknown_names() {
+        let dir = tempfile::tempdir().unwrap();
+        let _ = storage_named("passthrough", dir.path());
+    }
+}

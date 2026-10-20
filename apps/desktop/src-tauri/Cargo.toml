@@ -42,6 +42,7 @@ tauri-plugin-single-instance.workspace = true
 
 [dev-dependencies]
 tauri = { workspace = true, features = ["test"] }
+liber-vault = { path = "../../../crates/liber-vault", features = ["test-storage"] }
 tempfile.workspace = true
 liber-testkit = { path = "../../../crates/liber-testkit" }
 zip.workspace = true

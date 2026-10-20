@@ -106,7 +106,7 @@ impl Index {
     /// corrupt or foreign file is deleted and rebuilt: the index is only a cache.
     pub fn open(db_path: &Path) -> Result<Index> {
         if let Some(dir) = db_path.parent() {
-            std::fs::create_dir_all(dir)?;
+            std::fs::create_dir_all(dir)?; // seam: outside (the index DB in the app cache; E3: :memory: for encrypted vaults, spec §5.1)
         }
         match Self::try_open(db_path) {
             Ok(Some(index)) => Ok(index),
@@ -114,7 +114,7 @@ impl Index {
                 for suffix in ["", "-wal", "-shm"] {
                     let mut p = db_path.as_os_str().to_owned();
                     p.push(suffix);
-                    let _ = std::fs::remove_file(p);
+                    let _ = std::fs::remove_file(p); // seam: outside (the index DB in the app cache; E3: :memory: for encrypted vaults, spec §5.1)
                 }
                 let conn = Connection::open(db_path)?;
                 Self::init(conn)
