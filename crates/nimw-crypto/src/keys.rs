@@ -11,7 +11,7 @@ pub struct Secret<const N: usize> {
 }
 
 impl<const N: usize> Secret<N> {
-    fn from_box(bytes: Box<[u8; N]>) -> Self {
+    pub(crate) fn from_box(bytes: Box<[u8; N]>) -> Self {
         // shortcut: page-granular mlock, guards are leaked so shared pages stay locked; upgrade to a dedicated locked arena if many secrets are created
         // Best effort: locking can fail (rlimit), and that must not stop the vault opening.
         if let Ok(guard) = region::lock(bytes.as_ptr(), N) {
