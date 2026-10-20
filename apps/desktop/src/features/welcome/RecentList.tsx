@@ -88,6 +88,7 @@ export function RecentList() {
             <SearchIcon />
             <input
               type="search"
+              className="field-control"
               aria-label={t('welcome.filter')}
               placeholder={t('welcome.filter')}
               value={query}

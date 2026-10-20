@@ -231,31 +231,27 @@
   min-height: 36px;
 }
 
+/* The shared field (theme/fields.css), with the search glyph laid over its
+   left padding. */
 .filter {
+  position: relative;
   margin-left: auto;
   width: min(240px, 50%);
   display: flex;
   align-items: center;
-  gap: 8px;
-  height: 36px;
-  padding: 0 11px;
-  border: 1px solid var(--color-border-strong);
-  border-radius: var(--radius-md);
-  background: var(--color-surface);
   color: var(--color-text-muted);
 }
 
-.filter:focus-within {
-  border-color: var(--color-accent);
+.filter svg {
+  position: absolute;
+  left: 11px;
+  pointer-events: none;
 }
 
 .filter input {
   flex: 1;
   min-width: 0;
-  border: 0;
-  background: none;
-  font: 400 13px var(--font-body);
-  color: var(--color-text);
+  padding-left: 32px;
 }
 
 .recentList {
