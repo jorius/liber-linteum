@@ -8,14 +8,16 @@ use zeroize::Zeroize;
 /// Heap-allocated secret bytes: zeroized on drop, pages locked best-effort.
 pub struct Secret<const N: usize> {
     bytes: Box<[u8; N]>,
-    // Best effort: locking can fail (rlimit), and that must not stop the vault opening.
-    _lock: Option<region::LockGuard>,
 }
 
 impl<const N: usize> Secret<N> {
     fn from_box(bytes: Box<[u8; N]>) -> Self {
-        let _lock = region::lock(bytes.as_ptr(), N).ok();
-        Self { bytes, _lock }
+        // shortcut: page-granular mlock, guards are leaked so shared pages stay locked; upgrade to a dedicated locked arena if many secrets are created
+        // Best effort: locking can fail (rlimit), and that must not stop the vault opening.
+        if let Ok(guard) = region::lock(bytes.as_ptr(), N) {
+            std::mem::forget(guard);
+        }
+        Self { bytes }
     }
 
     pub fn random() -> Self {
@@ -70,9 +72,9 @@ impl Subkeys {
     pub fn derive(vk: &VaultKey, id: &VaultId) -> Subkeys {
         let hk = Hkdf::<Sha512>::new(Some(&id.0), vk.expose());
         fn expand<const N: usize>(hk: &Hkdf<Sha512>, info: &[u8]) -> Secret<N> {
-            let mut out = [0u8; N];
-            hk.expand(info, &mut out).expect("N <= 255 * 64");
-            Secret::from_bytes(out)
+            let mut b = Box::new([0u8; N]);
+            hk.expand(info, &mut b[..]).expect("N <= 255 * 64");
+            Secret::from_box(b)
         }
         Subkeys {
             content: expand(&hk, b"nimw/v1/content"),
@@ -161,6 +163,18 @@ mod tests {
         }
         let c = Subkeys::derive(&vk, &VaultId::random());
         assert_ne!(a.content.expose(), c.content.expose());
+    }
+
+    #[test]
+    fn many_secrets_create_and_drop_without_panic() {
+        for _ in 0..1000 {
+            drop(Secret::<32>::random());
+        }
+        let vk = VaultKey::random();
+        let id = VaultId::random();
+        for _ in 0..200 {
+            drop(Subkeys::derive(&vk, &id));
+        }
     }
 
     #[test]
