@@ -4,13 +4,15 @@
 //! only: a file's content is moved, never rewritten, and a folder keeps its id,
 //! so its children are untouched.
 
-use super::names::{Cache, Entry, one_component, side_file};
+use super::names::{Cache, Entry, one_component, serves, side_file, side_owner};
 use super::{EncryptedStorage, load, lock};
 use crate::error::{Result, VaultError, io_err};
 use crate::path::VaultPath;
 use crate::storage::plain::sync_dir;
 use crate::storage::{NewFile, Replace};
-use liber_crypto::{FolderId, NameCodec, ShortName, StreamWriter, Unlocked, shorten};
+use liber_crypto::{
+    FolderId, NameCodec, ShortName, StreamWriter, Unlocked, shorten, strip_conflict,
+};
 use std::fs::File;
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
@@ -107,7 +109,11 @@ impl Pending {
             if let Some(side) = &self.side {
                 write_side(parent, side)?;
             }
-            std::fs::rename(&self.tmp, &self.target)?;
+            std::fs::rename(&self.tmp, &self.target).inspect_err(|_| {
+                if self.side.is_some() {
+                    remove_side(&self.target);
+                }
+            })?;
             sync_dir(parent);
             Ok(())
         })()
@@ -384,14 +390,15 @@ impl EncryptedStorage {
             }
             let (name, side) = encode(u, &t.id, &t.name, e.folder, to)?;
             let dst = t.parent.join(name);
-            // `rename` would silently replace a file there (a duplicate name).
-            if dst.symlink_metadata().is_ok() {
-                return Err(VaultError::AlreadyExists(to.to_string()));
-            }
+            // `place` refuses a taken name: `rename` would silently replace a
+            // file there (a duplicate name).
             place(&t.parent, &dst, side.as_ref(), || {
                 std::fs::rename(&e.physical, &dst)
             })
-            .map_err(|err| io_err(from.as_str(), err))?;
+            .map_err(|err| match err.kind() {
+                std::io::ErrorKind::AlreadyExists => VaultError::AlreadyExists(to.to_string()),
+                _ => io_err(from.as_str(), err),
+            })?;
             remove_side(&e.physical);
             sync_dir(&t.parent);
             forget(cache, &canon);
@@ -414,7 +421,7 @@ impl EncryptedStorage {
             // The entry is gone: forget it whatever happens to the side file, which
             // is harmless if left (as in `remove_side`).
             forget(cache, &canon);
-            if let Some(side) = side_file(&e.physical).filter(|s| s.exists()) {
+            for side in unused_sides(&e.physical) {
                 let _ = trash::delete(side);
             }
             Ok(())
@@ -437,13 +444,46 @@ fn place(
     if let Some(side) = side {
         write_side(parent, side)?;
     }
-    make()
+    make().inspect_err(|_| {
+        if side.is_some() {
+            remove_side(dst);
+        }
+    })
 }
 
-/// A removed or moved long-named entry's side file goes with it; a leftover one
-/// is harmless, so failure is ignored.
+/// The side files the gone long-named entry `physical` read (its own, or for a
+/// sync copy its original's too) that nothing left in its folder still reads.
+fn unused_sides(physical: &Path) -> Vec<PathBuf> {
+    let (Some(dir), Some(name)) = (
+        physical.parent(),
+        physical.file_name().and_then(|n| n.to_str()),
+    ) else {
+        return Vec::new();
+    };
+    // Unlistable: keep everything.
+    let Ok(names) = std::fs::read_dir(dir).and_then(|d| {
+        d.map(|e| Ok(e?.file_name().to_string_lossy().into_owned()))
+            .collect::<std::io::Result<Vec<String>>>()
+    }) else {
+        return Vec::new();
+    };
+    let original = strip_conflict(name).map(|c| c.original);
+    [Some(name), original.as_deref()]
+        .into_iter()
+        .flatten()
+        .filter_map(|n| side_file(&dir.join(n)))
+        .filter(|side| {
+            let owner = side.file_name().and_then(|n| side_owner(n.to_str()?));
+            side.symlink_metadata().is_ok()
+                && owner.is_some_and(|o| !names.iter().any(|x| serves(x, &o)))
+        })
+        .collect()
+}
+
+/// A removed or moved long-named entry's side files go with it ([`unused_sides`]);
+/// a leftover one is harmless, so failure is ignored.
 fn remove_side(physical: &Path) {
-    if let Some(side) = side_file(physical) {
+    for side in unused_sides(physical) {
         let _ = std::fs::remove_file(side);
     }
 }

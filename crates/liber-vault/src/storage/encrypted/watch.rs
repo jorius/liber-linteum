@@ -2,7 +2,7 @@
 //! path translated to its logical one through the name cache. A path the cache
 //! can't map becomes [`RawEvent::Overflow`], so the session rescans.
 
-use super::names::{self, Cache, is_side};
+use super::names::{self, Cache, side_owner};
 use super::write::forget;
 use super::{DATA_DIR, EncryptedStorage, Keys, load, lock};
 use crate::error::{Result, VaultError};
@@ -97,7 +97,7 @@ impl Translate {
         let Some(last) = parts.pop() else {
             return Some(RawEvent::Overflow);
         };
-        if last.starts_with('.') || is_side(last) {
+        if last.starts_with('.') || side_owner(last).is_some() {
             return None;
         }
         let Some(canon) = self.logical(u, cache, &parts, last) else {

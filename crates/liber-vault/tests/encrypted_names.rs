@@ -247,14 +247,165 @@ fn watcher_translates_and_overflows_unknown() {
         "{:?}",
         seen.lock().unwrap()
     );
+    // Nothing else follows our own write: no Overflow, no temp or side file.
+    std::thread::sleep(Duration::from_millis(500));
+    let got = seen.lock().unwrap().clone();
     assert!(
-        !seen.lock().unwrap().contains(&RawEvent::Overflow),
-        "{:?}",
-        seen.lock().unwrap()
+        got.iter().all(|e| *e == RawEvent::Changed(vp("w.md"))),
+        "{got:?}"
     );
 
     std::fs::write(dir.path().join("d").join("stray.libere"), b"random").unwrap();
     assert!(saw(RawEvent::Overflow), "{:?}", seen.lock().unwrap());
+
+    // A dropped guard drops the watch: nothing more reaches the sink.
+    drop(_guard);
+    std::thread::sleep(Duration::from_millis(100));
+    seen.lock().unwrap().clear();
+    write(&storage, "w2.md", b"w");
+    std::fs::write(dir.path().join("d").join("stray2.libere"), b"random").unwrap();
+    std::thread::sleep(Duration::from_millis(500));
+    assert!(
+        seen.lock().unwrap().is_empty(),
+        "{:?}",
+        seen.lock().unwrap()
+    );
+}
+
+#[test]
+fn dropping_the_storage_clears_the_keys_a_watcher_shares() {
+    let (dir, storage) = new_vault();
+    let seen = Arc::new(Mutex::new(Vec::<RawEvent>::new()));
+    let sink = Arc::clone(&seen);
+    let _guard = storage
+        .watch(true, Box::new(move |ev| sink.lock().unwrap().push(ev)))
+        .unwrap();
+    std::thread::sleep(Duration::from_millis(300));
+    drop(storage);
+    // A name the keys would decrypt: with them cleared it can only overflow.
+    let d = dunce::canonicalize(dir.path()).unwrap().join("d");
+    let on_disk = with_codec(dir.path(), |c, _| {
+        c.encrypt_file(&FolderId::ROOT, "x.md").unwrap()
+    });
+    std::fs::write(d.join(on_disk), b"x").unwrap();
+    assert!(
+        wait_until(Duration::from_secs(2), || {
+            seen.lock().unwrap().contains(&RawEvent::Overflow)
+        }),
+        "{:?}",
+        seen.lock().unwrap()
+    );
+    assert!(
+        !seen
+            .lock()
+            .unwrap()
+            .contains(&RawEvent::Changed(vp("x.md"))),
+        "{:?}",
+        seen.lock().unwrap()
+    );
+}
+
+/// A Dropbox-style copy of the long-named physical entry in `d`.
+fn plant_long_copy(d: &Path) -> PathBuf {
+    let liberl = on_disk(d)
+        .into_iter()
+        .find(|n| n.ends_with(".liberl"))
+        .unwrap();
+    let h = liberl.strip_suffix(".liberl").unwrap();
+    let copy = d.join(format!("{h} (conflicted copy 2026-10-20).liberl"));
+    std::fs::copy(d.join(&liberl), &copy).unwrap();
+    copy
+}
+
+#[test]
+fn a_long_names_conflict_copy_survives_its_original() {
+    let long = format!("{}.md", "l".repeat(177));
+    let copy_name = format!(
+        "{} (conflict conflicted copy 2026-10-20).md",
+        "l".repeat(177)
+    );
+
+    // (a) The original is removed.
+    let (_dir, storage) = new_vault();
+    let d = storage.location().join("d");
+    write(&storage, &long, b"body");
+    plant_long_copy(&d);
+    assert_eq!(names(&storage, ""), [copy_name.clone(), long.clone()]);
+    storage.remove_file(&vp(&long)).unwrap();
+    assert_eq!(names(&storage, ""), std::slice::from_ref(&copy_name));
+    assert_eq!(storage.read(&vp(&copy_name)).unwrap(), b"body");
+    assert!(
+        storage.unreadable().is_empty(),
+        "{:?}",
+        storage.unreadable()
+    );
+
+    // (b) The original is renamed to a short name.
+    let (_dir, storage) = new_vault();
+    let d = storage.location().join("d");
+    write(&storage, &long, b"body");
+    plant_long_copy(&d);
+    storage.rename(&vp(&long), &vp("short.md")).unwrap();
+    assert_eq!(names(&storage, ""), [copy_name.clone(), "short.md".into()]);
+    assert_eq!(storage.read(&vp(&copy_name)).unwrap(), b"body");
+    assert!(
+        storage.unreadable().is_empty(),
+        "{:?}",
+        storage.unreadable()
+    );
+
+    // Renaming the copy itself away leaves no side file behind.
+    storage.rename(&vp(&copy_name), &vp("kept.md")).unwrap();
+    assert!(
+        on_disk(&d).iter().all(|n| n.ends_with(".libere")),
+        "{:?}",
+        on_disk(&d)
+    );
+
+    if real_trash_tests_enabled() {
+        let (_dir, storage) = new_vault();
+        let d = storage.location().join("d");
+        write(&storage, &long, b"body");
+        plant_long_copy(&d);
+        storage.trash_os(&vp(&long)).unwrap();
+        assert_eq!(storage.read(&vp(&copy_name)).unwrap(), b"body");
+    }
+}
+
+#[test]
+fn orphan_side_files_are_listed_and_failed_moves_leave_none() {
+    let (_dir, storage) = new_vault();
+    let d = storage.location().join("d");
+    storage.create_dir(&vp("F")).unwrap();
+    let long = format!("{}.md", "l".repeat(177));
+    write(&storage, &format!("F/{long}"), b"x");
+    let folder = d.join(on_disk(&d).remove(0));
+    let liberl = on_disk(&folder)
+        .into_iter()
+        .find(|n| n.ends_with(".liberl"))
+        .unwrap();
+    std::fs::remove_file(folder.join(&liberl)).unwrap();
+
+    assert!(names(&storage, "F").is_empty());
+    let side = folder.join(liberl.replace(".liberl", ".libern"));
+    let found = storage.unreadable();
+    assert_eq!(found.len(), 1, "{found:?}");
+    assert_eq!(found[0].0, side);
+    assert!(
+        found[0].1.contains("side file without its entry"),
+        "{found:?}"
+    );
+    assert!(matches!(
+        storage.remove_empty_dir(&vp("F")),
+        Err(VaultError::NotEmpty(_))
+    ));
+    std::fs::remove_file(&side).unwrap();
+
+    // A move the OS refuses (a folder into itself) takes its new side file back.
+    let long_dir = "f".repeat(180);
+    let err = storage.rename(&vp("F"), &vp(&format!("F/{long_dir}")));
+    assert!(err.is_err());
+    assert!(on_disk(&folder).is_empty(), "{:?}", on_disk(&folder));
 }
 
 #[test]
@@ -279,9 +430,13 @@ fn decrypted_names_are_single_components() {
             .all(|(_, why)| why.contains("not a single name"))
     );
     // Writing such a name is refused: it would list as unreadable.
+    let err = storage
+        .replace_atomic(&vp("at 10:30.md"), &mut &b"x"[..], Replace::CreateOnly)
+        .unwrap_err();
     assert!(
-        storage
-            .replace_atomic(&vp("at 10:30.md"), &mut &b"x"[..], Replace::CreateOnly)
-            .is_err()
+        matches!(&err, VaultError::Io { source, .. }
+            if source.kind() == std::io::ErrorKind::InvalidInput
+                && source.to_string().contains("bad name")),
+        "{err:?}"
     );
 }

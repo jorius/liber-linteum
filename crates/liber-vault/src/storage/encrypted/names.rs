@@ -86,10 +86,17 @@ pub(super) fn one_component(name: &str) -> bool {
     matches!((c.next(), c.next()), (Some(Component::Normal(_)), None)) && !name.contains(':')
 }
 
-/// A long name's side file (or a sync copy of one): never an entry itself.
-pub(super) fn is_side(on_disk: &str) -> bool {
-    on_disk.ends_with(".libern")
-        || strip_conflict(on_disk).is_some_and(|c| c.original.ends_with(".libern"))
+/// For a long name's side file (or a sync copy of one), which is never an entry
+/// itself: the long-named entry it belongs to (`h.libern` → `h.liberl`).
+pub(super) fn side_owner(on_disk: &str) -> Option<String> {
+    let base = strip_conflict(on_disk).map_or_else(|| on_disk.to_string(), |c| c.original);
+    Some(format!("{}.liberl", base.strip_suffix(".libern")?))
+}
+
+/// Whether the physical name `x` is the long-named entry `owner` or a sync copy
+/// of it: either reads `owner`'s side file.
+pub(super) fn serves(x: &str, owner: &str) -> bool {
+    x == owner || strip_conflict(x).is_some_and(|c| c.original == owner)
 }
 
 /// Side files longer than this are unreadable (format §14.5: bounded before reading).
@@ -175,15 +182,28 @@ pub(super) fn list(u: &Unlocked, physical: &Path, id: FolderId) -> std::io::Resu
         unreadable: Vec::new(),
     };
     let mut named: HashMap<String, Vec<Entry>> = HashMap::new();
-    for item in std::fs::read_dir(physical)? {
-        let item = item?;
+    let items = std::fs::read_dir(physical)?.collect::<std::io::Result<Vec<_>>>()?;
+    let all: Vec<String> = items
+        .iter()
+        .filter_map(|i| i.file_name().into_string().ok())
+        .collect();
+    for item in items {
         let path = item.path();
         let Some(on_disk) = item.file_name().to_str().map(str::to_owned) else {
             listing.unreadable.push((path, "name is not UTF-8".into()));
             continue;
         };
         // Encoded names never start with `.`: these are OS files and in-flight temp files.
-        if on_disk.starts_with('.') || is_side(&on_disk) {
+        if on_disk.starts_with('.') {
+            continue;
+        }
+        if let Some(owner) = side_owner(&on_disk) {
+            // Listed so a folder that won't go away (`NotEmpty`) explains itself.
+            if !all.iter().any(|x| serves(x, &owner)) {
+                listing
+                    .unreadable
+                    .push((path, "side file without its entry".into()));
+            }
             continue;
         }
         let Ok(ft) = item.file_type() else { continue };

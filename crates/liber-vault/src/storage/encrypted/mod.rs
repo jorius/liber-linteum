@@ -58,6 +58,13 @@ pub struct EncryptedStorage {
     cache: Arc<Mutex<Cache>>,
 }
 
+/// A watcher can outlive the storage holding the shared keys: clear them now.
+impl Drop for EncryptedStorage {
+    fn drop(&mut self) {
+        self.lock();
+    }
+}
+
 impl std::fmt::Debug for EncryptedStorage {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         // `try_lock`: formatting while a call holds the keys must not deadlock.
