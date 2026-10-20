@@ -270,6 +270,15 @@ impl Vault {
         std::fs::rename(&src, &dst).map_err(|e| io_err(from.as_str(), e))
     }
 
+    /// Whether two vault paths name the same entry on disk, e.g. `Notes` and
+    /// `notes` (or `á`/`Á`) on a case-insensitive file system.
+    pub fn same_entry(&self, a: &VaultPath, b: &VaultPath) -> bool {
+        match (self.fs_path(a), self.fs_path(b)) {
+            (Ok(x), Ok(y)) => same_entry(&x, &y),
+            _ => false,
+        }
+    }
+
     /// Moves a file or folder to the OS trash (EXP-03).
     pub fn trash(&self, path: &VaultPath) -> Result<()> {
         if path.is_root() {

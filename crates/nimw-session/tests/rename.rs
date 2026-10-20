@@ -584,3 +584,77 @@ fn r3b_plain_renames_have_no_pair() {
     assert_eq!(out.pair, None);
     assert!(dir.path().join("Lore/Lore.md").exists());
 }
+
+// Round 3b final review #1: the pair's second step is checked in post-move
+// coordinates before anything moves.
+#[test]
+fn r3b_review_folder_renamed_onto_a_sibling_page_name_refuses_before_moving() {
+    let (dir, _c, s) = lore_session(&[]);
+    // `Lore/Other.md` is where the paired page would land as `Other/Other.md`.
+    let err = s.rename(&vp("Lore"), &vp("Other"), true).unwrap_err();
+    assert!(
+        matches!(
+            err,
+            SessionError::Vault(nimw_vault::VaultError::AlreadyExists(_))
+        ),
+        "{err:?}"
+    );
+    assert!(dir.path().join("Lore/Lore.md").exists());
+    assert!(dir.path().join("Lore/Other.md").exists());
+    assert!(!dir.path().join("Other").exists());
+    assert!(read(&dir, "Index.md").contains("[[Lore]]"));
+}
+
+#[test]
+fn r3b_review_a_folder_name_the_vault_refuses_stops_the_page_rename_too() {
+    let (dir, _c, s) = lore_session(&[]);
+    let err = s.rename(&vp("Lore/Lore.md"), &vp("Lore/Myths .md"), true);
+    assert!(err.is_err(), "{err:?}");
+    assert!(dir.path().join("Lore/Lore.md").exists());
+    assert!(!dir.path().join("Lore/Myths .md").exists());
+}
+
+// Round 3b final review #5: files rewritten by the first step are reported
+// at the paths they have after the second.
+#[test]
+fn r3b_review_updated_files_are_reported_where_they_end_up() {
+    let (dir, _c, s) = vault_with(&[
+        ("Lore/Lore.md", b"# Lore\n"),
+        ("Lore/Other.md", b"# Other\n\nUp: [[Lore]]\n"),
+    ]);
+    let out = s
+        .rename(&vp("Lore/Lore.md"), &vp("Lore/Myths.md"), true)
+        .unwrap();
+    assert!(!out.updated_files.is_empty());
+    for f in &out.updated_files {
+        assert!(dir.path().join(f).exists(), "{f} is not on disk: {out:?}");
+    }
+    assert!(
+        out.updated_files.contains(&"Myths/Other.md".to_string()),
+        "{out:?}"
+    );
+    assert!(read(&dir, "Myths/Other.md").contains("[[Myths]]"));
+}
+
+// Round 3b final review #6: a case-only pair rename is the same entry,
+// whatever the letters (Unicode, not ASCII, case).
+#[test]
+fn r3b_review_case_only_pair_rename_with_an_accented_letter() {
+    let vault = copy_fixture("obsidian-basic");
+    std::fs::create_dir_all(vault.path().join("árbol")).unwrap();
+    std::fs::write(vault.path().join("árbol/árbol.md"), "# árbol\n").unwrap();
+    let cache = tempfile::tempdir().unwrap();
+    let (s, _) = VaultSession::open(vault.path(), cache.path(), |_: SessionEvent| {}).unwrap();
+    s.rename(&vp("árbol/árbol.md"), &vp("árbol/Árbol.md"), true)
+        .unwrap();
+    let names: Vec<String> = std::fs::read_dir(vault.path())
+        .unwrap()
+        .map(|e| e.unwrap().file_name().to_string_lossy().into_owned())
+        .collect();
+    assert!(names.iter().any(|n| n == "Árbol"), "{names:?}");
+    let inner: Vec<String> = std::fs::read_dir(vault.path().join("Árbol"))
+        .unwrap()
+        .map(|e| e.unwrap().file_name().to_string_lossy().into_owned())
+        .collect();
+    assert_eq!(inner, vec!["Árbol.md".to_string()]);
+}

@@ -163,17 +163,50 @@ impl VaultSession {
         };
         let is_folder = self.vault.fs_path(from).is_ok_and(|f| f.is_dir());
         let pair = paired_rename(from, to, is_folder, |p| exists(p));
-        // A taken pair name refuses the whole rename before anything moves;
-        // a case-only pair is the same entry and the vault handles it.
-        if let Some((a, b)) = &pair
-            && exists(b)
-            && !a.as_str().eq_ignore_ascii_case(b.as_str())
-        {
-            return Err(VaultError::AlreadyExists(b.to_string()).into());
+        // The pair's second step is checked before anything moves (round 3b
+        // final review #1): its name, and a clash in the coordinates it has
+        // now. For a folder, `to/<x>.md` is still `from/<x>.md`. A case-only
+        // pair is the same entry and the vault handles it.
+        if let Some((a, b)) = &pair {
+            check_target(a, b)?;
+            let now = |p: &VaultPath| match p.rebase(to, from) {
+                Some(q) if is_folder => q,
+                _ => p.clone(),
+            };
+            let (a_now, b_now) = (now(a), now(b));
+            if exists(&b_now) && !self.vault.same_entry(&a_now, &b_now) {
+                return Err(VaultError::AlreadyExists(b.to_string()).into());
+            }
         }
         let mut outcome = self.rename_with_hook(from, to, rewrite_links, &|_| {})?;
         if let Some((a, b)) = pair {
-            let second = self.rename_with_hook(&a, &b, rewrite_links, &|_| {})?;
+            let second = match self.rename_with_hook(&a, &b, rewrite_links, &|_| {}) {
+                Ok(second) => second,
+                Err(e) => {
+                    // Backstop for an I/O failure after the checks above: put
+                    // the first move back so the pair never ends up split.
+                    if let Err(back) = self.rename_with_hook(to, from, rewrite_links, &|_| {}) {
+                        self.emit(SessionEvent::Warning(format!(
+                            "{to}: could not undo the rename after {b} failed: {back}"
+                        )));
+                    }
+                    return Err(e);
+                }
+            };
+            // Files the first step touched are reported where they are now.
+            let after = |p: String| {
+                second
+                    .moved
+                    .iter()
+                    .find(|(o, _)| *o == p)
+                    .map_or(p, |(_, n)| n.clone())
+            };
+            outcome.updated_files = outcome.updated_files.into_iter().map(after).collect();
+            outcome.failed = outcome
+                .failed
+                .into_iter()
+                .map(|(p, e)| (after(p), e))
+                .collect();
             outcome.moved.extend(second.moved);
             outcome.moved.sort();
             outcome.updated_files.extend(second.updated_files);
@@ -193,24 +226,7 @@ impl VaultSession {
         rewrite_links: bool,
         before_write: &dyn Fn(&VaultPath),
     ) -> Result<RenameOutcome> {
-        if from.is_root() || to.is_root() || from == to {
-            return Err(SessionError::InvalidName(format!(
-                "cannot rename {from:?} to {to:?}"
-            )));
-        }
-        if to.starts_with(from) {
-            return Err(SessionError::InvalidName(format!(
-                "cannot move {from} into itself"
-            )));
-        }
-        if validate_name(to.file_name())? != to.file_name() {
-            return Err(SessionError::InvalidName(to.to_string()));
-        }
-        // Nothing moves into `.git`, `.obsidian` or another hidden folder
-        // (M5b final review I1); `.archive` is the Archive's own.
-        if nimw_vault::is_hidden_path(to.as_str()) {
-            return Err(SessionError::InvalidName(to.to_string()));
-        }
+        check_target(from, to)?;
         let (plan, sources) = {
             let index = self.index();
             let stats = index.stats()?;
@@ -453,6 +469,29 @@ mod tests {
             "the move itself succeeded"
         );
     }
+}
+
+/// What every rename refuses before it touches the disk.
+fn check_target(from: &VaultPath, to: &VaultPath) -> Result<()> {
+    if from.is_root() || to.is_root() || from == to {
+        return Err(SessionError::InvalidName(format!(
+            "cannot rename {from:?} to {to:?}"
+        )));
+    }
+    if to.starts_with(from) {
+        return Err(SessionError::InvalidName(format!(
+            "cannot move {from} into itself"
+        )));
+    }
+    if validate_name(to.file_name())? != to.file_name() {
+        return Err(SessionError::InvalidName(to.to_string()));
+    }
+    // Nothing moves into `.git`, `.obsidian` or another hidden folder
+    // (M5b final review I1); `.archive` is the Archive's own.
+    if nimw_vault::is_hidden_path(to.as_str()) {
+        return Err(SessionError::InvalidName(to.to_string()));
+    }
+    Ok(())
 }
 
 /// The second rename that keeps a folder page and its folder together
