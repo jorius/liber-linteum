@@ -1,6 +1,6 @@
 use std::io::{Cursor, Read, Seek, SeekFrom, Write};
 
-use nimw_crypto::{Secret, StreamReader, StreamWriter};
+use liber_crypto::{Secret, StreamReader, StreamWriter};
 use proptest::prelude::*;
 
 proptest! {

@@ -1,4 +1,4 @@
-//! The vault header `nimw-vault.json`: key slots plus an HMAC over canonical JSON (spec §3.2).
+//! The vault header `liber-vault.json`: key slots plus an HMAC over canonical JSON (spec §3.2).
 //!
 //! Canonical JSON is the header as a `serde_json::Value` without `"mac"`, serialised compactly with
 //! sorted keys (serde_json's default `Map`; the workspace must not enable `preserve_order`).
@@ -19,7 +19,7 @@ use crate::slots::{
     unwrap, wrap,
 };
 
-const FORMAT: &str = "nimw-vault";
+const FORMAT: &str = "liber-vault";
 const VERSION: u64 = 1;
 const MAX_HEADER_BYTES: usize = 1 << 20;
 /// Known plus unknown slots; also bounds how many KDF runs a hostile header can cause.
@@ -28,7 +28,7 @@ pub(crate) const MAX_SLOTS: usize = 64;
 pub(crate) const MAX_PASSPHRASE_SLOTS: usize = 4;
 /// Tombstones reset at each key rotation, so this is never reached in practice.
 const MAX_REMOVED: usize = 1024;
-const RETIRING: &[u8] = b"nimw/v1/retiring";
+const RETIRING: &[u8] = b"liber/v1/retiring";
 
 /// The previous vault key during a rotation, wrapped under the new one.
 #[derive(Clone, Debug)]
@@ -695,7 +695,7 @@ mod tests {
         let p = VaultHeader::parse(&bytes).unwrap();
         assert_eq!(p.to_bytes(&u).unwrap(), bytes);
         let v: Value = serde_json::from_slice(&bytes).unwrap();
-        assert_eq!(v["format"], "nimw-vault");
+        assert_eq!(v["format"], "liber-vault");
         assert_eq!(v["version"], 1);
         assert_eq!(v["epoch"], 1);
         assert_eq!(v["retiring"], Value::Null);
@@ -941,7 +941,7 @@ mod tests {
             b"[]",
             b"{",
             b"\xff\xfe",
-            b"{\"format\":\"nimw-vault\"}",
+            b"{\"format\":\"liber-vault\"}",
         ] {
             assert!(VaultHeader::parse(junk).is_err());
         }

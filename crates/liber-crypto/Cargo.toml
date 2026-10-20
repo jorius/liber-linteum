@@ -1,5 +1,5 @@
 [package]
-name = "nimw-crypto"
+name = "liber-crypto"
 description = "Vault encryption core: secrets, key derivation, key slots, STREAM file format, names."
 version.workspace = true
 edition.workspace = true

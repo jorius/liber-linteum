@@ -3,7 +3,7 @@
 //! wrapping is unauthenticated, so the keyring also keeps commitments to the vaults the user
 //! enrolled, and the app opens a vault silently only if it is enrolled (§15 flaw 5).
 //!
-//! The file `keyring.nimwk` uses the vault header's canonical-JSON MAC, under a key derived from
+//! The file `keyring.liberk` uses the vault header's canonical-JSON MAC, under a key derived from
 //! the keyring seed. Unknown slot types are refused: a new keyring slot type needs a new version.
 
 use serde_json::{Value, json};
@@ -23,7 +23,7 @@ use crate::slots::{
     wrap,
 };
 
-const FORMAT: &str = "nimw-keyring";
+const FORMAT: &str = "liber-keyring";
 const VERSION: u64 = 1;
 const MAX_FILE_BYTES: usize = 1 << 20;
 /// About 90 bytes of JSON each, so the cap keeps the file well under `MAX_FILE_BYTES`.
@@ -47,8 +47,8 @@ pub struct KeyringSecret {
 impl KeyringSecret {
     fn new(keyring_id: [u8; 16], seed: Secret<32>) -> Self {
         Self {
-            mac_key: hkdf_sha256(seed.expose(), &keyring_id, b"nimw/v1/keyring/mac"),
-            commit_key: hkdf_sha256(seed.expose(), &keyring_id, b"nimw/v1/keyring/commit"),
+            mac_key: hkdf_sha256(seed.expose(), &keyring_id, b"liber/v1/keyring/mac"),
+            commit_key: hkdf_sha256(seed.expose(), &keyring_id, b"liber/v1/keyring/commit"),
             keyring_id,
             seed,
         }
@@ -190,7 +190,7 @@ impl KeyringFile {
                 }
                 (SlotKind::Recovery, Unlock::Recovery(rc)) => recovery_kek(rc, kid),
                 (SlotKind::Device { .. }, Unlock::Device(d)) => {
-                    hkdf_sha256(d.expose(), kid, b"nimw/v1/keyring-slot/device")
+                    hkdf_sha256(d.expose(), kid, b"liber/v1/keyring-slot/device")
                 }
                 _ => continue,
             };
@@ -296,14 +296,14 @@ fn recovery_kek(rc: &RecoveryCode, keyring_id: &[u8; 16]) -> Secret<32> {
     hkdf_sha256(
         rc.secret().expose(),
         keyring_id,
-        b"nimw/v1/keyring-slot/recovery",
+        b"liber/v1/keyring-slot/recovery",
     )
 }
 
-/// `"nimw/v1/keyring-slot" ‖ keyring_id ‖ slot id ‖ type`
+/// `"liber/v1/keyring-slot" ‖ keyring_id ‖ slot id ‖ type`
 fn slot_aad(keyring_id: &[u8; 16], slot_id: &[u8; 16], kind: &SlotKind) -> Vec<u8> {
     [
-        &b"nimw/v1/keyring-slot"[..],
+        &b"liber/v1/keyring-slot"[..],
         keyring_id,
         slot_id,
         kind.type_name().as_bytes(),
@@ -402,7 +402,7 @@ mod tests {
         let back = KeyringFile::parse(&bytes).unwrap();
         assert_eq!(back.to_bytes(&ks).unwrap(), bytes);
         let v: Value = serde_json::from_slice(&bytes).unwrap();
-        assert_eq!(v["format"], "nimw-keyring");
+        assert_eq!(v["format"], "liber-keyring");
         assert_eq!(v["version"], 1);
         assert_eq!(serde_json::to_vec(&v).unwrap(), bytes, "canonical");
         let types: Vec<&str> = v["slots"]
@@ -491,7 +491,7 @@ mod tests {
             edit(&|v| v["version"] = json!(2)),
             Err(CryptoError::UnsupportedVersion(2))
         ));
-        assert!(is_format(edit(&|v| v["format"] = json!("nimw-vault"))));
+        assert!(is_format(edit(&|v| v["format"] = json!("liber-vault"))));
         assert!(is_format(edit(&|v| v["public"] = b64(1215))));
         assert!(is_format(edit(&|v| v["public"] = b64(1217))));
         assert!(is_format(edit(&|v| v["keyring_id"] = b64(15))));

@@ -77,10 +77,10 @@ impl Subkeys {
             Secret::from_box(b)
         }
         Subkeys {
-            content: expand(&hk, b"nimw/v1/content"),
-            name: expand(&hk, b"nimw/v1/name"),
-            header: expand(&hk, b"nimw/v1/header"),
-            index: expand(&hk, b"nimw/v1/index"),
+            content: expand(&hk, b"liber/v1/content"),
+            name: expand(&hk, b"liber/v1/name"),
+            header: expand(&hk, b"liber/v1/header"),
+            index: expand(&hk, b"liber/v1/index"),
         }
     }
 }

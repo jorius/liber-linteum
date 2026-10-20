@@ -26,7 +26,7 @@ impl FolderId {
     }
 }
 
-/// Encoded names longer than this many bytes are stored as `<hash>.nimwl` plus a side file.
+/// Encoded names longer than this many bytes are stored as `<hash>.liberl` plus a side file.
 pub const LONG_NAME_LIMIT: usize = 200;
 
 /// AES-SIV-256 names bound to the vault, the key epoch and the parent folder's id.
@@ -54,7 +54,7 @@ impl<'a> NameCodec<'a> {
     pub fn decrypt_file(&self, parent: &FolderId, on_disk: &str) -> Result<String> {
         let stem = on_disk
             .strip_suffix(FILE_EXT)
-            .ok_or(CryptoError::BadFormat("file name lacks .nimwe"))?;
+            .ok_or(CryptoError::BadFormat("file name lacks .libere"))?;
         valid_name(self.open(parent, FILE, stem)?)
     }
 
@@ -117,7 +117,7 @@ impl<'a> NameCodec<'a> {
 
 /// Room for a 255-byte name plus a folder id and tag, Base64url-encoded, with margin.
 const MAX_ENCODED_LEN: usize = 1024;
-const FILE_EXT: &str = ".nimwe";
+const FILE_EXT: &str = ".libere";
 /// Entry kinds bound into the AD.
 const FILE: &[u8] = b"f";
 const FOLDER: &[u8] = b"d";
@@ -151,8 +151,8 @@ pub fn shorten(encoded: &str) -> Option<ShortName> {
     h.truncate(32);
     h.make_ascii_lowercase();
     Some(ShortName {
-        on_disk: format!("{h}.nimwl"),
-        side_file: format!("{h}.nimwn"),
+        on_disk: format!("{h}.liberl"),
+        side_file: format!("{h}.libern"),
         side_contents: encoded.to_string(),
     })
 }
@@ -172,7 +172,7 @@ pub fn strip_conflict(on_disk: &str) -> Option<ConflictName> {
         .find(|c: char| !(c.is_ascii_alphanumeric() || c == '-' || c == '_'))
         .filter(|&n| n > 0)?;
     let (core, rest) = on_disk.split_at(core_len);
-    let (suffix, ext) = [".nimwe", ".nimwl", ".nimwn"]
+    let (suffix, ext) = [".libere", ".liberl", ".libern"]
         .into_iter()
         .find_map(|e| {
             rest.strip_suffix(e)
@@ -219,7 +219,7 @@ mod tests {
         let c = NameCodec::new(&k, &v, 1);
         let parent = FolderId::random();
         let f = c.encrypt_file(&parent, "Notes.md");
-        assert!(f.ends_with(".nimwe"), "{f}");
+        assert!(f.ends_with(".libere"), "{f}");
         assert_eq!(c.encrypt_file(&parent, "Notes.md"), f, "deterministic");
         assert_eq!(c.decrypt_file(&parent, &f).unwrap(), "Notes.md");
 
@@ -329,15 +329,15 @@ mod tests {
         let enc = c.encrypt_file(&FolderId::ROOT, &"x".repeat(180));
         assert!(enc.len() > LONG_NAME_LIMIT, "{}", enc.len());
         let s = shorten(&enc).unwrap();
-        assert_eq!(s.on_disk.len(), 32 + 6);
-        assert!(s.on_disk.ends_with(".nimwl"));
+        assert_eq!(s.on_disk.len(), 32 + 7);
+        assert!(s.on_disk.ends_with(".liberl"));
         let h = &s.on_disk[..32];
         assert!(
             h.bytes()
                 .all(|b| b.is_ascii_lowercase() || (b'2'..=b'7').contains(&b)),
             "{h}"
         );
-        assert_eq!(s.side_file, format!("{h}.nimwn"));
+        assert_eq!(s.side_file, format!("{h}.libern"));
         assert_eq!(s.side_contents, enc);
         assert_eq!(
             c.decrypt_file(&FolderId::ROOT, &s.side_contents).unwrap(),
@@ -353,7 +353,7 @@ mod tests {
     fn shorten_hash_known_answer() {
         // SHA-256 of 201 × 'a', base32 (RFC 4648) lower case, cut to 32 characters (Python oracle).
         let s = shorten(&"a".repeat(201)).unwrap();
-        assert_eq!(s.on_disk, "vexp3aqqsnz6ld42ebln5ya6qb7cc3hg.nimwl");
+        assert_eq!(s.on_disk, "vexp3aqqsnz6ld42ebln5ya6qb7cc3hg.liberl");
     }
 
     #[test]
@@ -362,13 +362,13 @@ mod tests {
         let table: &[(&str, &str, &str)] = &[
             // Dropbox
             (
-                "Zm9vYmFy-_Q (Jose's conflicted copy 2026-10-20).nimwe",
-                "Zm9vYmFy-_Q.nimwe",
+                "Zm9vYmFy-_Q (Jose's conflicted copy 2026-10-20).libere",
+                "Zm9vYmFy-_Q.libere",
                 "Jose's conflicted copy 2026-10-20",
             ),
             (
-                "Zm9vYmFy-_Q.nimwe (Jose's conflicted copy 2026-10-20)",
-                "Zm9vYmFy-_Q.nimwe",
+                "Zm9vYmFy-_Q.libere (Jose's conflicted copy 2026-10-20)",
+                "Zm9vYmFy-_Q.libere",
                 "Jose's conflicted copy 2026-10-20",
             ),
             (
@@ -377,22 +377,22 @@ mod tests {
                 "Jose's conflicted copy 2026-10-20",
             ),
             // iCloud
-            ("Zm9vYmFy-_Q 2.nimwe", "Zm9vYmFy-_Q.nimwe", "2"),
-            ("Zm9vYmFy-_Q.nimwe 3", "Zm9vYmFy-_Q.nimwe", "3"),
+            ("Zm9vYmFy-_Q 2.libere", "Zm9vYmFy-_Q.libere", "2"),
+            ("Zm9vYmFy-_Q.libere 3", "Zm9vYmFy-_Q.libere", "3"),
             ("Zm9vYmFy-_Q 12", "Zm9vYmFy-_Q", "12"),
             // Google Drive
-            ("Zm9vYmFy-_Q (1).nimwe", "Zm9vYmFy-_Q.nimwe", "1"),
-            ("Zm9vYmFy-_Q.nimwe (2)", "Zm9vYmFy-_Q.nimwe", "2"),
+            ("Zm9vYmFy-_Q (1).libere", "Zm9vYmFy-_Q.libere", "1"),
+            ("Zm9vYmFy-_Q.libere (2)", "Zm9vYmFy-_Q.libere", "2"),
             ("Zm9vYmFy-_Q (1)", "Zm9vYmFy-_Q", "1"),
             // Syncthing
             (
-                "Zm9vYmFy-_Q.sync-conflict-20261020-101530-ABCDEFG.nimwe",
-                "Zm9vYmFy-_Q.nimwe",
+                "Zm9vYmFy-_Q.sync-conflict-20261020-101530-ABCDEFG.libere",
+                "Zm9vYmFy-_Q.libere",
                 "sync-conflict-20261020-101530-ABCDEFG",
             ),
             (
-                "Zm9vYmFy-_Q.nimwe.sync-conflict-20261020-101530-ABCDEFG",
-                "Zm9vYmFy-_Q.nimwe",
+                "Zm9vYmFy-_Q.libere.sync-conflict-20261020-101530-ABCDEFG",
+                "Zm9vYmFy-_Q.libere",
                 "sync-conflict-20261020-101530-ABCDEFG",
             ),
             (
@@ -402,8 +402,8 @@ mod tests {
             ),
             // A shortened long name
             (
-                "abcdefghijklmnopqrstuvwxyz234567 2.nimwl",
-                "abcdefghijklmnopqrstuvwxyz234567.nimwl",
+                "abcdefghijklmnopqrstuvwxyz234567 2.liberl",
+                "abcdefghijklmnopqrstuvwxyz234567.liberl",
                 "2",
             ),
         ];
@@ -419,16 +419,16 @@ mod tests {
         }
         let none = [
             enc.to_string(),
-            format!("{enc}.nimwe"),
-            "abcdefghijklmnopqrstuvwxyz234567.nimwl".to_string(),
+            format!("{enc}.libere"),
+            "abcdefghijklmnopqrstuvwxyz234567.liberl".to_string(),
             "Notes.md".to_string(),
-            format!("{enc} (copy).nimwe"),
-            format!("{enc} 2a.nimwe"),
-            format!("{enc} ().nimwe"),
-            format!("{enc} .nimwe"),
-            format!("{enc}.sync-conflict-2026102-101530-ABCDEFG.nimwe"),
-            format!("{enc}.sync-conflict-20261020-101530-ABCDEF.nimwe"),
-            " 2.nimwe".to_string(),
+            format!("{enc} (copy).libere"),
+            format!("{enc} 2a.libere"),
+            format!("{enc} ().libere"),
+            format!("{enc} .libere"),
+            format!("{enc}.sync-conflict-2026102-101530-ABCDEFG.libere"),
+            format!("{enc}.sync-conflict-20261020-101530-ABCDEF.libere"),
+            " 2.libere".to_string(),
             " (1)".to_string(),
             String::new(),
             "ü 2".to_string(),
@@ -455,13 +455,13 @@ mod tests {
         let c = NameCodec::new(&k, &v, 1);
         let p = FolderId::random();
         let f = c.encrypt_file(&p, "A long enough note.md");
-        let stem = f.strip_suffix(".nimwe").unwrap();
+        let stem = f.strip_suffix(".libere").unwrap();
         assert!(matches!(
             c.decrypt_folder(&p, stem),
             Err(CryptoError::Authentication)
         ));
         let d = c.encrypt_folder(&p, &FolderId::random(), "Projects");
-        let as_file = format!("{d}.nimwe");
+        let as_file = format!("{d}.libere");
         assert!(matches!(
             c.decrypt_file(&p, &as_file),
             Err(CryptoError::Authentication)
@@ -474,7 +474,7 @@ mod tests {
         let c = NameCodec::new(&k, &v, 1);
         let p = FolderId::random();
         for bad in ["..", ".", "", "a/b", "a\\b", "a\0b", "/"] {
-            let f = format!("{}.nimwe", c.seal(&p, FILE, bad.as_bytes()));
+            let f = format!("{}.libere", c.seal(&p, FILE, bad.as_bytes()));
             assert!(
                 matches!(c.decrypt_file(&p, &f), Err(CryptoError::BadFormat(_))),
                 "{bad:?}"
@@ -500,7 +500,7 @@ mod tests {
         // Invalid UTF-8 after decryption.
         assert!(bad_format(c.decrypt_file(
             &p,
-            &format!("{}.nimwe", c.seal(&p, FILE, &[0xff, 0xfe]))
+            &format!("{}.libere", c.seal(&p, FILE, &[0xff, 0xfe]))
         )));
         // Folder plaintext shorter than a folder id.
         assert!(bad_folder(
@@ -512,7 +512,7 @@ mod tests {
         assert!(bad_folder(c.decrypt_folder(&p, &c.seal(&p, FOLDER, &pt))));
         // Not Base64url, padded, non-canonical trailing bits, too short for a tag, too long.
         let file = c.encrypt_file(&p, "Notes.md");
-        let stem = file.strip_suffix(".nimwe").unwrap();
+        let stem = file.strip_suffix(".libere").unwrap();
         for s in [
             "",
             "!!!!",
@@ -523,21 +523,21 @@ mod tests {
             &"A".repeat(100_000),
         ] {
             assert!(
-                bad_format(c.decrypt_file(&p, &format!("{s}.nimwe"))),
+                bad_format(c.decrypt_file(&p, &format!("{s}.libere"))),
                 "{s:.20}"
             );
             assert!(bad_folder(c.decrypt_folder(&p, s)), "{s:.20}");
         }
         // Missing or wrong suffix; a folder name with the file suffix.
         assert!(bad_format(c.decrypt_file(&p, stem)));
-        assert!(bad_format(c.decrypt_file(&p, &format!("{stem}.nimwl"))));
+        assert!(bad_format(c.decrypt_file(&p, &format!("{stem}.liberl"))));
         assert!(bad_folder(c.decrypt_folder(&p, &file)));
         // A flipped tag bit is an authentication failure, not a format error.
         let mut ct = data_encoding::BASE64URL_NOPAD
             .decode(stem.as_bytes())
             .unwrap();
         ct[0] ^= 1;
-        let flipped = format!("{}.nimwe", data_encoding::BASE64URL_NOPAD.encode(&ct));
+        let flipped = format!("{}.libere", data_encoding::BASE64URL_NOPAD.encode(&ct));
         assert!(matches!(
             c.decrypt_file(&p, &flipped),
             Err(CryptoError::Authentication)

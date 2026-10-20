@@ -13,7 +13,7 @@ pub const HEADER_LEN: usize = 48;
 pub const CHUNK_LEN: usize = 65_536;
 pub const TAG_LEN: usize = 16;
 
-const MAGIC: &[u8; 5] = b"NIMWE";
+const MAGIC: &[u8; 5] = b"LIBER";
 const VERSION: u8 = 1;
 const SUITE_AES_256_GCM: u8 = 1;
 const LOG2_CHUNK: u8 = 16;
@@ -54,9 +54,9 @@ fn parse_header(head: &[u8]) -> Result<Header> {
     })
 }
 
-/// K_f = HKDF-SHA-256(K_content, salt = file salt, info = `nimw/v1/file`); the key stays on the heap.
+/// K_f = HKDF-SHA-256(K_content, salt = file salt, info = `liber/v1/file`); the key stays on the heap.
 fn file_cipher(content: &Secret<32>, salt: &[u8; 32]) -> Aes256Gcm {
-    let kf = hkdf_sha256(content.expose(), salt, b"nimw/v1/file");
+    let kf = hkdf_sha256(content.expose(), salt, b"liber/v1/file");
     Aes256Gcm::new_from_slice(kf.expose()).expect("32-byte key")
 }
 
@@ -401,6 +401,11 @@ fn append(out: &mut Zeroizing<Vec<u8>>, data: &[u8]) {
 mod tests {
     use super::*;
 
+    #[test]
+    fn magic_is_liber() {
+        assert_eq!(MAGIC, b"LIBER");
+    }
+
     const SEG: usize = CHUNK_LEN + TAG_LEN;
 
     fn plaintext(n: usize) -> Vec<u8> {
@@ -598,7 +603,7 @@ mod tests {
             header_epoch(&ct[..47]),
             Err(CryptoError::Truncated)
         ));
-        assert_eq!(&ct[..8], b"NIMWE\x01\x01\x10");
+        assert_eq!(&ct[..8], b"LIBER\x01\x01\x10");
         assert_eq!(&ct[40..48], &[0, 0, 0, 9, 0, 0, 0, 0]);
     }
 

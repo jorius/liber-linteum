@@ -1,7 +1,7 @@
 [workspace]
 resolver = "3"
 members = ["crates/*", "apps/desktop/src-tauri"]
-exclude = ["crates/nimw-crypto/fuzz"]
+exclude = ["crates/liber-crypto/fuzz"]
 
 [workspace.package]
 version = "0.1.0"
@@ -44,7 +44,7 @@ fontdb = "0.24.0"
 # M6 audio clips: capture and WAV (MP3 deferred: LAME does not cross-build for Windows)
 cpal = "0.18.2"
 hound = "3.5.1"
-# Encryption E1 (nimw-crypto)
+# Encryption E1 (liber-crypto)
 aes-gcm = { version = "0.11.1", features = ["zeroize"] }
 aes-siv = { version = "0.8.0", features = ["zeroize"] }
 hkdf = "0.13.0"

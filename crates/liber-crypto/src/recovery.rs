@@ -1,4 +1,4 @@
-//! Recovery code: 32 random bytes shown as `NIMW-` + 13 Crockford groups + a checksum group.
+//! Recovery code: 32 random bytes shown as `LIBER-` + 13 Crockford groups + a checksum group.
 
 use std::sync::OnceLock;
 
@@ -22,7 +22,7 @@ fn crockford() -> &'static Encoding {
 /// First 4 Crockford characters of SHA-256(domain || secret).
 fn checksum(secret: &[u8; 32]) -> String {
     let h = Sha256::new()
-        .chain_update(b"nimw/v1/recovery-check")
+        .chain_update(b"liber/v1/recovery-check")
         .chain_update(secret)
         .finalize();
     crockford().encode(&h[..3])[..4].to_string()
@@ -41,7 +41,7 @@ impl RecoveryCode {
 
     pub fn to_display(&self) -> String {
         let body = crockford().encode(self.0.expose()) + &checksum(self.0.expose());
-        let mut out = String::from("NIMW");
+        let mut out = String::from("LIBER");
         for g in body.as_bytes().chunks(4) {
             out.push('-');
             out.push_str(std::str::from_utf8(g).expect("ascii"));
@@ -54,12 +54,12 @@ impl RecoveryCode {
             .chars()
             .filter(|c| !c.is_whitespace() && *c != '-')
             .collect();
-        // The prefix letters N, I, M, W are all valid symbols or translated ones, so strip it before decoding.
+        // The prefix letters L, I, B, E, R are all valid symbols or translated ones, so strip it before decoding.
         if !chars.is_ascii() {
             return Err(CryptoError::RecoveryCode);
         }
-        if chars.len() == 60 && chars[..4].eq_ignore_ascii_case("NIMW") {
-            chars.drain(..4);
+        if chars.len() == 61 && chars[..5].eq_ignore_ascii_case("LIBER") {
+            chars.drain(..5);
         }
         if chars.len() != 56 {
             return Err(CryptoError::RecoveryCode);
@@ -99,9 +99,9 @@ mod tests {
     fn recovery_parse_rejects_non_ascii_without_panic() {
         let tail = "0".repeat(56);
         for bad in [
-            format!("NIM\u{e9}{tail}"),
-            format!("N\u{1f600}{tail}"),
-            "\u{e9}".repeat(60),
+            format!("LIB\u{e9}{tail}"),
+            format!("L\u{1f600}{tail}"),
+            "\u{e9}".repeat(61),
         ] {
             assert!(matches!(
                 RecoveryCode::parse(&bad),
@@ -113,9 +113,9 @@ mod tests {
     #[test]
     fn recovery_display_shape() {
         let d = RecoveryCode::generate().to_display();
-        assert_eq!(d.len(), 4 + 14 * 5);
-        assert!(d.starts_with("NIMW"));
-        for g in d[4..].split('-').skip(1) {
+        assert_eq!(d.len(), 5 + 14 * 5);
+        assert!(d.starts_with("LIBER"));
+        for g in d[5..].split('-').skip(1) {
             assert_eq!(g.len(), 4);
             assert!(
                 g.chars()
@@ -135,7 +135,7 @@ mod tests {
         assert!(same(&d.replace('-', " ")));
         assert!(same(&d.replace('0', "o").replace('1', "i")));
         assert!(same(&d.replace('1', "l")));
-        assert!(same(d.strip_prefix("NIMW-").unwrap()));
+        assert!(same(d.strip_prefix("LIBER-").unwrap()));
         // Corrupt one data character.
         let mut bad = d.clone().into_bytes();
         bad[6] = if bad[6] == b'A' { b'B' } else { b'A' };

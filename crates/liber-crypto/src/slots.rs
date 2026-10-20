@@ -72,11 +72,11 @@ pub enum NewSlot<'a> {
 }
 
 pub(crate) fn recovery_kek(rc: &RecoveryCode, id: &VaultId) -> Secret<32> {
-    hkdf_sha256(rc.secret().expose(), &id.0, b"nimw/v1/slot/recovery")
+    hkdf_sha256(rc.secret().expose(), &id.0, b"liber/v1/slot/recovery")
 }
 
 pub(crate) fn device_kek(secret: &Secret<32>, id: &VaultId) -> Secret<32> {
-    hkdf_sha256(secret.expose(), &id.0, b"nimw/v1/slot/device")
+    hkdf_sha256(secret.expose(), &id.0, b"liber/v1/slot/device")
 }
 
 /// X-Wing encapsulation to the keyring: returns the slot's `enc` (the ciphertext) and its KEK.
@@ -106,7 +106,11 @@ pub(crate) fn keyring_kek_open(
 }
 
 fn keyring_kek(ss: &[u8], id: &VaultId, slot_id: &[u8; 16]) -> Secret<32> {
-    hkdf_sha256(ss, &id.0, &[&b"nimw/v1/slot/keyring"[..], slot_id].concat())
+    hkdf_sha256(
+        ss,
+        &id.0,
+        &[&b"liber/v1/slot/keyring"[..], slot_id].concat(),
+    )
 }
 
 /// `label ‖ vault_id ‖ epoch (u32 BE) ‖ tail…`
@@ -118,7 +122,7 @@ pub(crate) fn aad(label: &[u8], id: &VaultId, epoch: u32, tail: &[&[u8]]) -> Vec
 
 pub(crate) fn slot_aad(id: &VaultId, epoch: u32, slot_id: &[u8; 16], kind: &SlotKind) -> Vec<u8> {
     aad(
-        b"nimw/v1/slot",
+        b"liber/v1/slot",
         id,
         epoch,
         &[slot_id, kind.type_name().as_bytes()],
@@ -279,7 +283,7 @@ mod tests {
         let id = VaultId([1; 16]);
         let a = slot_aad(&id, 0x0102_0304, &[9; 16], &SlotKind::Recovery);
         let want = [
-            &b"nimw/v1/slot"[..],
+            &b"liber/v1/slot"[..],
             &[1; 16],
             &[1, 2, 3, 4],
             &[9; 16],
@@ -287,10 +291,10 @@ mod tests {
         ]
         .concat();
         assert_eq!(a, want);
-        let r = aad(b"nimw/v1/retiring", &id, 7, &[]);
+        let r = aad(b"liber/v1/retiring", &id, 7, &[]);
         assert_eq!(
             r,
-            [&b"nimw/v1/retiring"[..], &[1; 16], &[0, 0, 0, 7]].concat()
+            [&b"liber/v1/retiring"[..], &[1; 16], &[0, 0, 0, 7]].concat()
         );
     }
 
