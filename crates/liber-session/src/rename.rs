@@ -221,44 +221,153 @@ impl VaultSession {
 
     /// Add sub-page (round 3 §9): `P.md` becomes its folder's page,
     /// `P/P.md`, through the ordinary rename so links follow. An existing
-    /// folder `P/` (any letter case) without its own page takes it. Refused,
-    /// with nothing moved, when a file holds the name, the folder already has
-    /// a page, or `page` already is one. Returns (folder, page, outcome).
+    /// folder `P/` takes it when the disk treats its name as `P` (exact, or a
+    /// case variant on a case-insensitive file system). Refused, with nothing
+    /// moved, when a file holds the name, the folder already has a page,
+    /// `page` already is one, or it sits in a hidden folder. Returns
+    /// (folder, page, outcome).
     pub fn make_folder_page(
         &self,
         page: &VaultPath,
         rewrite_links: bool,
     ) -> Result<(VaultPath, VaultPath, RenameOutcome)> {
+        let (folder, create) = self.folder_plan(page)?;
+        self.convert(page, &folder, create, rewrite_links)
+    }
+
+    /// Moves `item` under the page `page` (round 3 §9.3), turning `page`
+    /// into its folder's page first if it isn't one. Every refusal (self,
+    /// ancestor, a name clash, already there, hidden) comes before anything
+    /// moves; if the move still fails, the conversion is undone.
+    pub fn move_under_page(
+        &self,
+        item: &VaultPath,
+        page: &VaultPath,
+        rewrite_links: bool,
+    ) -> Result<MoveUnderOutcome> {
+        if liber_vault::is_hidden_path(item.as_str()) {
+            return Err(VaultError::OutsideVault(item.to_string()).into());
+        }
+        let into_itself = || SessionError::InvalidName(format!("cannot move {item} into itself"));
+        if item == page || page.starts_with(item) {
+            return Err(into_itself());
+        }
         let parent = page
             .parent()
             .ok_or_else(|| VaultError::NotFound(page.to_string()))?;
-        if page.extension() != Some("md")
-            || self.vault.folder_page_of(&parent).as_ref() == Some(page)
-        {
-            return Err(VaultError::AlreadyExists(page.to_string()).into());
-        }
-        let stem = page.stem();
-        let (folder, created) = match self.vault.child_named(&parent, stem)? {
-            Some(f) if self.vault.fs_path(&f)?.is_dir() => {
-                if let Some(own) = self.vault.folder_page_of(&f) {
-                    return Err(VaultError::AlreadyExists(own.to_string()).into());
-                }
-                (f, false)
-            }
-            Some(taken) => return Err(VaultError::AlreadyExists(taken.to_string()).into()),
-            None => (self.create_folder(&parent, stem)?, true),
+        let already =
+            !parent.is_root() && self.vault.folder_page_of(&parent).as_ref() == Some(page);
+        let (folder, create) = if already {
+            (parent, false)
+        } else {
+            self.folder_plan(page)?
         };
-        let target = folder.join(&format!("{}.md", folder.file_name()))?;
-        match self.rename(page, &target, rewrite_links) {
-            Ok(out) => Ok((folder, target, out)),
+        if item == &folder || folder.starts_with(item) || self.vault.same_entry(item, &folder) {
+            return Err(into_itself());
+        }
+        let name = item.file_name();
+        let target = folder.join(name)?;
+        if item
+            .parent()
+            .is_some_and(|p| p == folder || self.vault.same_entry(&p, &folder))
+        {
+            return Err(VaultError::AlreadyExists(target.to_string()).into());
+        }
+        if let Some(taken) = self.vault.child_named(&folder, name)?
+            && (taken.file_name() == name || self.vault.same_entry(&taken, &target))
+            && !self.vault.same_entry(&taken, item)
+        {
+            return Err(VaultError::AlreadyExists(taken.to_string()).into());
+        }
+        let converted = if already {
+            None
+        } else {
+            Some(self.convert(page, &folder, create, rewrite_links)?)
+        };
+        match self.rename(item, &target, rewrite_links) {
+            Ok(moved) => Ok(MoveUnderOutcome {
+                page: converted
+                    .as_ref()
+                    .map_or_else(|| page.clone(), |(_, p, _)| p.clone()),
+                converted: converted.map(|(_, _, out)| out),
+                folder,
+                moved,
+            }),
             Err(e) => {
-                if created {
-                    // Nothing moved: take the empty folder away again.
-                    let _ = std::fs::remove_dir(self.vault.fs_path(&folder)?);
+                if let Some((_, new_page, _)) = &converted {
+                    // Undo the conversion: the page goes back, a new folder goes.
+                    let _ = self.rename(new_page, page, rewrite_links);
+                    if create {
+                        self.drop_created_folder(&folder);
+                    }
                 }
                 Err(e)
             }
         }
+    }
+
+    /// The folder `page` becomes the page of, and whether it must be made.
+    fn folder_plan(&self, page: &VaultPath) -> Result<(VaultPath, bool)> {
+        let parent = page
+            .parent()
+            .ok_or_else(|| VaultError::NotFound(page.to_string()))?;
+        if liber_vault::is_hidden_path(page.as_str()) {
+            return Err(VaultError::OutsideVault(page.to_string()).into());
+        }
+        if !is_page_path(page.as_str()) || self.vault.folder_page_of(&parent).as_ref() == Some(page)
+        {
+            return Err(VaultError::AlreadyExists(page.to_string()).into());
+        }
+        let stem = page.stem();
+        let exact = parent.join(stem)?;
+        match self.vault.child_named(&parent, stem)? {
+            Some(f) if reuse_folder(f.file_name() == stem, self.vault.same_entry(&f, &exact)) => {
+                if !self.vault.fs_path(&f)?.is_dir() {
+                    return Err(VaultError::AlreadyExists(f.to_string()).into());
+                }
+                if let Some(own) = self.vault.folder_page_of(&f) {
+                    return Err(VaultError::AlreadyExists(own.to_string()).into());
+                }
+                Ok((f, false))
+            }
+            _ => Ok((exact, true)),
+        }
+    }
+
+    /// `page` → `folder/<folder>.<page's own extension>`, making `folder` first
+    /// when `create`; a folder made here goes again if the page can't move.
+    fn convert(
+        &self,
+        page: &VaultPath,
+        folder: &VaultPath,
+        create: bool,
+        rewrite_links: bool,
+    ) -> Result<(VaultPath, VaultPath, RenameOutcome)> {
+        if create {
+            let parent = folder
+                .parent()
+                .ok_or_else(|| VaultError::NotFound(folder.to_string()))?;
+            self.create_folder(&parent, folder.file_name())?;
+        }
+        let ext = page.extension().unwrap_or("md");
+        let target = folder.join(&format!("{}.{ext}", folder.file_name()))?;
+        match self.rename(page, &target, rewrite_links) {
+            Ok(out) => Ok((folder.clone(), target, out)),
+            Err(e) => {
+                if create {
+                    self.drop_created_folder(folder);
+                }
+                Err(e)
+            }
+        }
+    }
+
+    /// Takes a folder this module just made away again, from disk and index.
+    fn drop_created_folder(&self, folder: &VaultPath) {
+        if let Ok(full) = self.vault.fs_path(folder) {
+            let _ = std::fs::remove_dir(full); // only ever an empty folder
+        }
+        let _ = self.index().transaction(|tx| tx.remove(folder.as_str()));
     }
 
     pub(crate) fn rename_with_hook(
@@ -514,6 +623,24 @@ mod tests {
 }
 
 /// What every rename refuses before it touches the disk.
+/// Result of [`VaultSession::move_under_page`].
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct MoveUnderOutcome {
+    pub folder: VaultPath,
+    /// The page after the move (`P/P.md` when it was converted).
+    pub page: VaultPath,
+    /// The page's own move, when it wasn't a folder page yet.
+    pub converted: Option<RenameOutcome>,
+    pub moved: RenameOutcome,
+}
+
+/// Whether a sibling folder found by name (any case) is the page's folder:
+/// the exact name, or a case variant the disk treats as the same entry. On a
+/// case-sensitive disk `notes/` stays a different folder from `Notes.md`'s.
+fn reuse_folder(exact_name: bool, same_entry: bool) -> bool {
+    exact_name || same_entry
+}
+
 fn check_target(from: &VaultPath, to: &VaultPath) -> Result<()> {
     if from.is_root() || to.is_root() || from == to {
         return Err(SessionError::InvalidName(format!(
@@ -609,5 +736,17 @@ mod pair_tests {
             ),
             None
         );
+    }
+}
+
+#[cfg(test)]
+mod review_tests {
+    use super::reuse_folder;
+
+    #[test]
+    fn a_case_variant_folder_is_reused_only_when_the_disk_says_it_is_the_same() {
+        assert!(reuse_folder(true, false)); // exact name
+        assert!(reuse_folder(false, true)); // `notes/` on APFS or NTFS
+        assert!(!reuse_folder(false, false)); // `notes/` on a case-sensitive disk
     }
 }

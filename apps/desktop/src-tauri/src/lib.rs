@@ -158,6 +158,7 @@ pub fn configure<R: tauri::Runtime>(
         vault_commands::entry_create_folder,
         vault_commands::entry_rename,
         vault_commands::entry_make_folder_page,
+        vault_commands::entry_move_under_page,
         vault_commands::entry_trash,
         settings_commands::settings_get,
         settings_commands::settings_set,

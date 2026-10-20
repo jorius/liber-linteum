@@ -17,6 +17,7 @@
     "allow-entry-create-folder",
     "allow-entry-rename",
     "allow-entry-make-folder-page",
+    "allow-entry-move-under-page",
     "allow-entry-reveal",
     "allow-entry-trash",
     "allow-settings-get",

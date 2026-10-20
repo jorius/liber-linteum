@@ -64,7 +64,7 @@ describe('dropping onto a page (round 3 §9.3)', () => {
     expect(planDrop('.archive/Old.md', 'Notes/P.md')).toBeNull();
   });
 
-  it('dropEntry makes the page a folder page, then moves the item in', async () => {
+  it('dropEntry moves under a page in one command (review #1)', async () => {
     seed([
       ['P.md', 'page'],
       ['a.md', 'page'],
@@ -73,16 +73,34 @@ describe('dropping onto a page (round 3 §9.3)', () => {
     const outcome = { moved: [], updatedFiles: [], updatedLinks: 0, failed: [], pair: null };
     mockIPC((cmd, args) => {
       calls.push([cmd, args]);
-      if (cmd === 'entry_make_folder_page') return { folder: 'P', page: 'P/P.md', outcome };
-      if (cmd === 'entry_rename') return outcome;
+      if (cmd === 'entry_move_under_page')
+        return { folder: 'P', page: 'P/P.md', converted: outcome, moved: outcome };
       if (cmd === 'vault_tree') return [];
       return null;
     });
     expect(await dropEntry('a.md', 'P.md')).toBe(true);
     expect(calls.filter(([c]) => c.startsWith('entry_'))).toEqual([
-      ['entry_make_folder_page', { page: 'P.md' }],
-      ['entry_rename', { from: 'a.md', to: 'P/a.md' }],
+      ['entry_move_under_page', { item: 'a.md', page: 'P.md' }],
     ]);
+    clearMocks();
+  });
+
+  it('a refused move under a page leaves the page where it was (review #1)', async () => {
+    seed([
+      ['Projects.md', 'page'],
+      ['projects', 'folder'],
+      ['projects/a.md', 'page'],
+    ]);
+    const calls: string[] = [];
+    mockIPC((cmd) => {
+      calls.push(cmd);
+      if (cmd === 'entry_move_under_page')
+        throw { kind: 'alreadyExists', message: 'projects/a.md' };
+      return null;
+    });
+    expect(await dropEntry('projects/a.md', 'Projects.md')).toBe(false);
+    expect(calls).not.toContain('entry_rename');
+    expect(calls).not.toContain('entry_make_folder_page');
     clearMocks();
   });
 });

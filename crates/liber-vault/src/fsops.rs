@@ -282,11 +282,7 @@ impl Vault {
         let names: Vec<String> = entries
             .filter_map(|e| e.ok()?.file_name().into_string().ok())
             .collect();
-        let found = names
-            .iter()
-            .find(|n| *n == name)
-            .or_else(|| names.iter().find(|n| fold(n) == fold(name)));
-        found.map(|n| dir.join(n)).transpose()
+        pick_child(&names, name).map(|n| dir.join(n)).transpose()
     }
 
     /// A folder's own page: `X/X.md`, or a file whose name differs from it
@@ -345,6 +341,14 @@ fn sync_dir(dir: &Path) {
 #[cfg(not(unix))]
 fn sync_dir(_dir: &Path) {}
 
+/// `name` among `names`: the exact one if present, else any case variant.
+fn pick_child<'a>(names: &'a [String], name: &str) -> Option<&'a String> {
+    names
+        .iter()
+        .find(|n| *n == name)
+        .or_else(|| names.iter().find(|n| fold(n) == fold(name)))
+}
+
 /// Names compared without letter case or Unicode form.
 fn fold(name: &str) -> String {
     use unicode_normalization::UnicodeNormalization;
@@ -354,6 +358,17 @@ fn fold(name: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Review #8: the exact name wins over a case variant whatever the listing
+    /// order (runs everywhere; the on-disk twin of this needs Linux).
+    #[test]
+    fn subpages_review_exact_name_wins_in_any_order() {
+        let both = |a: &str, b: &str| vec![a.to_string(), b.to_string()];
+        assert_eq!(pick_child(&both("x.md", "X.md"), "X.md").unwrap(), "X.md");
+        assert_eq!(pick_child(&both("X.md", "x.md"), "X.md").unwrap(), "X.md");
+        assert_eq!(pick_child(&both("x.md", "y.md"), "X.md").unwrap(), "x.md");
+        assert_eq!(pick_child(&both("a.md", "b.md"), "X.md"), None);
+    }
 
     #[test]
     fn nfr_08_injected_failure_leaves_target_untouched_and_no_temp_file() {

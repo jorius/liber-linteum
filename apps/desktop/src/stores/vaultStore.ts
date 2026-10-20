@@ -5,6 +5,7 @@ import {
   entryCreateFolder,
   entryCreatePage,
   entryMakeFolderPage,
+  entryMoveUnderPage,
   entryRename,
   entryTrash,
   binList,
@@ -408,9 +409,18 @@ export const useVaultStore = create<VaultState>((set, get) => {
       const folder = await get().folderFor(page);
       return folder.ok ? get().createPage(folder.value) : folder;
     },
+    // One Rust step (review #1): a refusal moves nothing, the page included.
     moveUnder: async (item, page) => {
-      const folder = await get().folderFor(page);
-      return folder.ok ? get().rename(item, joinPath(folder.value, nameOf(item))) : folder;
+      await useEditorStore.getState().flushBefore(); // the move takes the latest text
+      const res = await entryMoveUnderPage(item, page);
+      if (!res.ok) {
+        toast().push({ message: errorMessage(res.error), tone: 'error' });
+        return res;
+      }
+      const { folder, page: after, converted, moved } = res.value;
+      if (converted) await get().applyRename(page, after, converted, { quiet: true });
+      await get().applyRename(item, joinPath(folder, nameOf(item)), moved);
+      return res;
     },
     folderFor: async (page) => {
       const dir = parentOf(page);

@@ -37,15 +37,12 @@ test('dragging a page onto a page makes it a folder page with the dragged page i
   await page.mouse.move(to.x + 40, to.y + to.height / 2, { steps: 8 });
   await expect(row(page, 'Projects')).toHaveClass(/drop/);
   await page.mouse.up();
-  // Projects is now one row (folder + its page) holding Ideas.
-  await expect(row(page, 'Projects')).toHaveAttribute('aria-expanded', /true|false/);
+  // Projects is now one row (folder + its page), opened to show Ideas inside.
+  await expect(row(page, 'Projects')).toHaveAttribute('aria-expanded', 'true');
   const renames = await page.evaluate(
     () => (window as unknown as { __liberRenames?: unknown[] }).__liberRenames ?? [],
   );
   expect(renames).toContainEqual({ from: 'Ideas.md', to: 'Projects/Ideas.md' });
-  if ((await row(page, 'Projects').getAttribute('aria-expanded')) === 'false') {
-    await row(page, 'Projects').locator('[data-twisty]').click();
-  }
   await expect(row(page, 'Ideas')).toBeVisible();
   expect(errors).toEqual([]);
 });
@@ -66,5 +63,27 @@ test('Move to… can choose a page; "Add sub-page" adds one under a page', async
   await page.getByRole('menuitem', { name: 'Add sub-page' }).click();
   await expect(page.getByRole('textbox', { name: 'Rename' })).toBeVisible();
   await expect(row(page, 'Ideas')).toHaveAttribute('aria-expanded', 'true');
+  expect(errors).toEqual([]);
+});
+
+test('the keyboard drag can drop a page onto a page (Space, arrows, Space)', async ({ page }) => {
+  const errors = await open(page);
+  await row(page, 'Welcome').focus();
+  await page.keyboard.press('Space');
+  // dnd-kit's keyboard sensor moves the item 25 px a press; rows are taller.
+  for (
+    let i = 0;
+    i < 4 && !/drop/.test((await row(page, 'Projects').getAttribute('class')) ?? '');
+    i++
+  ) {
+    await page.keyboard.press('ArrowUp');
+  }
+  await expect(row(page, 'Projects')).toHaveClass(/drop/);
+  await page.keyboard.press('Space');
+  await expect(row(page, 'Projects')).toHaveAttribute('aria-expanded', 'true');
+  const renames = await page.evaluate(
+    () => (window as unknown as { __liberRenames?: unknown[] }).__liberRenames ?? [],
+  );
+  expect(renames).toContainEqual({ from: 'Welcome.md', to: 'Projects/Welcome.md' });
   expect(errors).toEqual([]);
 });
