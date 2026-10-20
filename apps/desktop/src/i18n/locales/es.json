@@ -318,13 +318,8 @@
       "persimmon": "Caqui",
       "midnight": "Medianoche",
       "sepia": "Sepia",
-      "ink": "Tinta",
-      "custom": "Color de acento propio"
+      "ink": "Tinta"
     },
-    "accentColor": "Color de acento",
-    "accentHex": "Color de acento (hex)",
-    "accentInvalid": "Usa un color como #rrggbb (seis dígitos hexadecimales).",
-    "accentContrast": "Contraste del acento: {light}:1 en modo claro, {dark}:1 en modo oscuro",
     "fontLive": "Fuente de Vista en vivo",
     "fontSource": "Fuente de Código",
     "fontBundled": "Incluidas con la app",
@@ -448,7 +443,124 @@
       }
     },
     "themes": {
-      "legacyName": "Personalizado"
+      "legacyName": "Personalizado",
+      "builtIn": "Incluidos",
+      "mine": "Mis temas",
+      "new": "Nuevo tema",
+      "newName": "Mi tema",
+      "copyName": "Copia de {name}",
+      "import": "Importar…",
+      "export": "Exportar…",
+      "duplicate": "Duplicar",
+      "duplicateToEdit": "Duplicar para editar",
+      "delete": "Eliminar",
+      "deleteNamed": "Eliminar «{name}»",
+      "editing": "Editando «{name}»",
+      "name": "Nombre del tema",
+      "mode": "Modo que se edita",
+      "light": "Claro",
+      "dark": "Oscuro",
+      "fill": "Completar el resto desde el principal",
+      "more": "{count, plural, one {Mostrar # color más} other {Mostrar # colores más}}",
+      "fewer": "Mostrar menos colores",
+      "colour": "Color: {name}",
+      "colourHex": "Color: {name} (hex)",
+      "fix": "Corregir",
+      "fixNamed": "Corregir {name}",
+      "reset": "Volver al color derivado",
+      "resetNamed": "Restablecer {name}",
+      "preview": "Vista previa",
+      "sample": {
+        "title": "Notas de campo",
+        "before": "Un párrafo con un",
+        "link": "enlace",
+        "tag": "etiqueta",
+        "highlight": "resaltado",
+        "meta": "Editado hace 2 min",
+        "primary": "Principal",
+        "secondary": "Secundario"
+      },
+      "importFailed": "Ese archivo no es un tema que esta app pueda usar.",
+      "importReason": {
+        "size": "Es demasiado grande para un archivo de tema.",
+        "json": "No es JSON válido.",
+        "format": "No es un tema de Liber Linteum.",
+        "version": "Lo hizo una versión más reciente.",
+        "keys": "Sus colores no coinciden con los 16 de un tema.",
+        "value": "Uno de sus colores no es un valor #rrggbb."
+      },
+      "groups": {
+        "brand": "Marca",
+        "surfaces": "Superficies",
+        "text": "Texto",
+        "accents": "Acentos"
+      },
+      "tokens": {
+        "accent": {
+          "name": "Principal",
+          "use": "Enlaces, botones, foco"
+        },
+        "secondary": {
+          "name": "Secundario",
+          "use": "Etiquetas, relaciones, la estrella de favoritos"
+        },
+        "bg": {
+          "name": "Fondo",
+          "use": "Detrás de todo"
+        },
+        "surface": {
+          "name": "Páginas y tarjetas",
+          "use": "Editor, tarjetas, diálogos"
+        },
+        "border": {
+          "name": "Bordes",
+          "use": "Líneas entre elementos"
+        },
+        "side": {
+          "name": "Barra lateral",
+          "use": "La lista de archivos"
+        },
+        "sideText": {
+          "name": "Texto de la barra lateral",
+          "use": "Nombres en la lista de archivos"
+        },
+        "sideSel": {
+          "name": "Selección de la barra lateral",
+          "use": "La fila seleccionada"
+        },
+        "strong": {
+          "name": "Encabezados",
+          "use": "Títulos y encabezados"
+        },
+        "body": {
+          "name": "Texto del cuerpo",
+          "use": "Texto corrido"
+        },
+        "text": {
+          "name": "Texto por defecto",
+          "use": "Etiquetas y controles"
+        },
+        "muted": {
+          "name": "Texto secundario",
+          "use": "Pistas y fechas"
+        },
+        "contrast": {
+          "name": "Texto sobre el principal",
+          "use": "Dentro de los botones principales"
+        },
+        "soft": {
+          "name": "Tono de selección",
+          "use": "Texto seleccionado, llamadas"
+        },
+        "mark": {
+          "name": "Resaltado",
+          "use": "Texto ==resaltado=="
+        },
+        "code": {
+          "name": "Fondo del código",
+          "use": "Código en línea y bloques"
+        }
+      }
     }
   },
   "toolbar": {

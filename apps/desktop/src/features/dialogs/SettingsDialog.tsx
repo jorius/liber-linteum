@@ -22,8 +22,6 @@ import {
 import { SUPPORTED_LANGUAGES } from '../../i18n';
 import {
   fontsList,
-  PALETTE_IDS,
-  type PaletteChoice,
   type Theme,
   type PageWidth,
   type WideElements,
@@ -31,21 +29,17 @@ import {
 } from '../../ipc';
 import { useSettingsStore } from '../../stores/settingsStore';
 import { useVaultStore } from '../../stores/vaultStore';
-import { contrast } from '../../theme/color';
-import { derive } from '../../theme/derive';
 import { LIVE_FONTS, SOURCE_FONTS, systemChoice, type FontOption } from '../../theme/fonts';
-import { PALETTES } from '../../theme/palettes';
 import { Dialog } from './Dialog';
 import styles from './Dialogs.module.css';
 import { keyLabel, SHORTCUT_GROUPS } from './shortcuts';
-import { useLatestSave } from './useLatestSave';
 import { ScratchpadLocation } from '../scratchpad/ScratchpadLocation';
 import { VaultSettingsSection } from './VaultSettingsSection';
 import { SpellingSettings } from './SpellingSettings';
+import { ThemeSettings } from './ThemeSettings';
 
 const THEMES: Theme[] = ['system', 'light', 'dark'];
 const themeKey = { system: 'themeSystem', light: 'themeLight', dark: 'themeDark' } as const;
-const PALETTE_CHOICES: PaletteChoice[] = [...PALETTE_IDS, 'custom'];
 const SIZES = [13, 14, 15, 16, 17, 18, 19, 20];
 /** Default cover heights (cover resize); a page can be dragged to its own. */
 const COVER_HEIGHTS = [
@@ -54,7 +48,6 @@ const COVER_HEIGHTS = [
   { px: 280, key: 'coverHeightLarge' },
   { px: 360, key: 'coverHeightExtraLarge' },
 ] as const;
-const HEX = /^#[0-9a-f]{6}$/i;
 /** The kinds a `wide` page lets span the editor (M4b part 3). */
 const WIDE_KINDS: (keyof WideElements)[] = ['tables', 'code', 'diagrams', 'images', 'maths'];
 
@@ -303,28 +296,7 @@ export function SettingsDialog({ onClose }: { onClose: () => void }) {
                   </label>
                 ))}
               </fieldset>
-              <fieldset className={`${styles.fieldset} ${styles.palettes}`}>
-                <legend>{t('settings.palette')}</legend>
-                {PALETTE_CHOICES.map((id) => (
-                  <label key={id} className={styles.palette}>
-                    <input
-                      type="radio"
-                      name="palette"
-                      value={id}
-                      checked={settings.palette === id}
-                      onChange={() => void update({ palette: id })}
-                    />
-                    <Swatch id={id} accent={settings.accentColor} />
-                    <span>{t(`settings.palettes.${id}`)}</span>
-                  </label>
-                ))}
-              </fieldset>
-              {settings.palette === 'custom' && (
-                <AccentEditor
-                  value={settings.accentColor}
-                  onSave={(accentColor) => update({ accentColor })}
-                />
-              )}
+              <ThemeSettings />
               <label className={styles.field}>
                 <span>{t('settings.actionButton')}</span>
                 <select
@@ -552,103 +524,6 @@ function useInstalledFonts(): string[] {
     };
   }, []);
   return families;
-}
-
-/** Light and dark background + accent of a palette, as four chips. */
-function Swatch({ id, accent }: { id: PaletteChoice; accent: string }) {
-  const p = id === 'custom' ? derive(accent) : PALETTES.find((x) => x.id === id)!;
-  return (
-    <span className={styles.chips} aria-hidden="true">
-      {[p.light.bg, p.light.accent, p.dark.bg, p.dark.accent].map((c, i) => (
-        <span key={i} className={styles.chip} style={{ background: c }} />
-      ))}
-    </span>
-  );
-}
-
-/** Colour picker + hex field for the custom accent, with the contrast the
- *  derived palette reaches in each mode. The picker previews locally while
- *  dragging and saves the settled colour; the last colour always wins. */
-function AccentEditor({
-  value,
-  onSave,
-}: {
-  value: string;
-  onSave: (hex: string) => Promise<unknown>;
-}) {
-  const { t } = useTranslation();
-  const [draft, setDraft] = useState(value);
-  const [invalid, setInvalid] = useState(false);
-  const errorId = useId();
-  const saver = useLatestSave(onSave);
-  // Follow the saved value, but not while a newer colour is on its way.
-  useEffect(() => {
-    if (!saver.pending()) setDraft(value);
-  }, [value, saver]);
-  const shown = HEX.test(draft) ? draft.toLowerCase() : value;
-  const p = derive(shown);
-
-  const commit = () => {
-    if (!HEX.test(draft)) {
-      setInvalid(true);
-      return;
-    }
-    setInvalid(false);
-    const hex = draft.toLowerCase();
-    if (hex !== value || saver.pending()) saver.now(hex);
-  };
-  const onKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter') {
-      e.preventDefault();
-      commit();
-    }
-  };
-
-  return (
-    <div className={styles.accent}>
-      <div className={styles.accentRow}>
-        <input
-          type="color"
-          className={styles.colorInput}
-          aria-label={t('settings.accentColor')}
-          value={shown}
-          onChange={(e) => {
-            const hex = e.target.value.toLowerCase();
-            setDraft(hex);
-            setInvalid(false);
-            saver.schedule(hex);
-          }}
-        />
-        <input
-          type="text"
-          className={`field-control ${styles.hexInput}`}
-          aria-label={t('settings.accentHex')}
-          aria-invalid={invalid}
-          aria-describedby={invalid ? errorId : undefined}
-          spellCheck={false}
-          value={draft}
-          onChange={(e) => {
-            const next = e.target.value.trim();
-            setDraft(next);
-            if (HEX.test(next)) setInvalid(false);
-          }}
-          onKeyDown={onKeyDown}
-          onBlur={commit}
-        />
-      </div>
-      {invalid && (
-        <p id={errorId} role="alert" className={styles.error}>
-          {t('settings.accentInvalid')}
-        </p>
-      )}
-      <p className={styles.hint}>
-        {t('settings.accentContrast', {
-          light: contrast(p.light.accent, p.light.surface).toFixed(1),
-          dark: contrast(p.dark.accent, p.dark.surface).toFixed(1),
-        })}
-      </p>
-    </div>
-  );
 }
 
 /** Bundled fonts, then the fonts installed on this computer. */

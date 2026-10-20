@@ -124,61 +124,6 @@
   color: var(--color-text-strong);
 }
 
-.palettes {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
-}
-
-.palette {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 13px;
-  color: var(--color-text-body);
-  cursor: pointer;
-}
-
-.chips {
-  display: inline-grid;
-  grid-template-columns: repeat(4, 10px);
-  border-radius: var(--radius-sm);
-  overflow: hidden;
-  border: 1px solid var(--color-border-strong);
-  flex: none;
-}
-
-.chip {
-  width: 10px;
-  height: 18px;
-}
-
-.accent {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.accentRow {
-  display: flex;
-  gap: 8px;
-  align-items: center;
-}
-
-.colorInput {
-  width: 44px;
-  height: 36px;
-  padding: 2px;
-  border: 1px solid var(--color-border-strong);
-  border-radius: var(--radius-sm);
-  background: var(--color-surface-subtle);
-}
-
-/* A field (fields.css) in the mono font, as wide as a hex colour. */
-.hexInput {
-  font-family: var(--font-mono);
-  width: 12ch;
-}
-
 /* A field in a fieldset takes its own row (a relationship's label). */
 .fieldset > .field {
   flex: 1 1 100%;
@@ -404,10 +349,6 @@
 
 .panel > .section > .sectionTitle {
   display: none;
-}
-
-.panel .palettes {
-  grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
 .themes {
