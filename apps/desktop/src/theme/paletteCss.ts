@@ -24,10 +24,10 @@ export function paletteVars(p: Palette, mode: 'light' | 'dark'): Record<string, 
     '--color-accent-contrast': t.contrast,
     '--color-accent-soft': t.soft,
     // Custom themes §2, §6: tags (text on its own tint) and the filled star;
-    // on the always-dark sidebar the star takes the dark secondary.
+    // the sidebar's star and drop ring read on the sidebar itself.
     '--color-secondary': t.secondary,
     '--color-secondary-soft': mix(t.surface, t.secondary, 0.12),
-    '--color-sidebar-secondary': p.dark.secondary,
+    '--color-sidebar-secondary': sidebarMarks(p, mode).star,
     '--color-focus': t.accent,
     '--color-sidebar-bg': t.side,
     '--color-sidebar-text': t.sideText,
@@ -40,9 +40,8 @@ export function paletteVars(p: Palette, mode: 'light' | 'dark'): Record<string, 
     '--color-sidebar-divider': mix(t.side, t.sideText, 0.15),
     '--color-backdrop': alpha(t.bg, 0.6),
     '--color-overlay': alpha(t.bg, 0.7),
-    // The sidebar is dark in both modes: its drop feedback uses the dark accent.
     '--color-drop-bg': t.sideSel,
-    '--color-drop-ring': p.dark.accent,
+    '--color-drop-ring': sidebarMarks(p, mode).ring,
     '--color-highlight-bg': t.mark,
     '--color-code-bg': t.code,
     // Global View (M3a §4, §6): the canvas sits between page and card;
@@ -70,6 +69,20 @@ export function paletteVars(p: Palette, mode: 'light' | 'dark'): Record<string, 
     ),
     // M4b part 2 §2: syntax colours, readable on this palette's code background.
     ...codeTokens(t.code, t.text, t.muted, mode),
+  };
+}
+
+/** The sidebar's filled star and drop ring (custom themes review M13): the
+ *  dark-mode secondary and accent, which suit the usual dark sidebar, unless
+ *  they read below 3:1 on this mode's sidebar (a custom light one); then the
+ *  variant that reads best. */
+export function sidebarMarks(p: Palette, mode: 'light' | 'dark'): { star: string; ring: string } {
+  const side = p[mode].side;
+  const pick = (dark: string, light: string) =>
+    contrast(dark, side) >= 3 || contrast(dark, side) >= contrast(light, side) ? dark : light;
+  return {
+    star: pick(p.dark.secondary, p.light.secondary),
+    ring: pick(p.dark.accent, p.light.accent),
   };
 }
 

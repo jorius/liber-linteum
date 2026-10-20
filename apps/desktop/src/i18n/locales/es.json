@@ -487,7 +487,8 @@
         "format": "No es un tema de Liber Linteum.",
         "version": "Lo hizo una versión más reciente.",
         "keys": "Sus colores no coinciden con los 16 de un tema.",
-        "value": "Uno de sus colores no es un valor #rrggbb."
+        "value": "Uno de sus colores no es un valor #rrggbb.",
+        "unreadable": "No se pudo leer."
       },
       "groups": {
         "brand": "Marca",
@@ -518,7 +519,7 @@
         },
         "side": {
           "name": "Barra lateral",
-          "use": "La lista de archivos"
+          "use": "La lista de archivos; su estrella y el anillo al soltar deben leerse sobre ella"
         },
         "sideText": {
           "name": "Texto de la barra lateral",
@@ -560,7 +561,11 @@
           "name": "Fondo del código",
           "use": "Código en línea y bloques"
         }
-      }
+      },
+      "migrateFailed": "Tu color personalizado no se pudo guardar como tema. Se intentará de nuevo la próxima vez.",
+      "exportFailed": "No se pudo guardar el tema.",
+      "saveFailed": "Ese cambio no se pudo guardar, así que el tema vuelve a como estaba.",
+      "limit": "Puedes tener hasta {max} temas. Borra uno para añadir otro."
     }
   },
   "toolbar": {

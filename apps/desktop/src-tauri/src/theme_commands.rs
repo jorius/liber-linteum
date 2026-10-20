@@ -57,14 +57,21 @@ pub async fn theme_import<R: Runtime>(app: AppHandle<R>) -> CmdResult<Option<Str
         let Some(path) = picked else {
             return Ok(None);
         };
-        let len = std::fs::metadata(&path)?.len(); // seam: outside (app-chosen import path)
-        if len > MAX_THEME_FILE {
+        // Capped by what is read, not by metadata (review M14: a FIFO says 0).
+        use std::io::Read;
+        let mut bytes = Vec::new();
+        std::fs::File::open(&path)? // seam: outside (app-chosen import path)
+            .take(MAX_THEME_FILE + 1)
+            .read_to_end(&mut bytes)?;
+        if bytes.len() as u64 > MAX_THEME_FILE {
             return Err(CommandError::new(
                 ErrorKind::InvalidInput,
                 "this file is too big to be a theme",
             ));
         }
-        Ok(Some(std::fs::read_to_string(&path)?)) // seam: outside (app-chosen import path)
+        String::from_utf8(bytes)
+            .map(Some)
+            .map_err(|_| CommandError::new(ErrorKind::Binary, "not a text file"))
     })
     .await
 }

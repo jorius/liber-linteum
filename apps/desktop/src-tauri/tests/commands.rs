@@ -3078,3 +3078,34 @@ fn theme_import_refuses_over_64k() {
         json!(null)
     );
 }
+
+/// Custom themes review M14: a special file whose size metadata says 0 (a
+/// FIFO) is still capped at 64 KB.
+#[cfg(unix)]
+#[test]
+fn theme_import_caps_what_it_reads_not_what_metadata_says() {
+    let h = harness();
+    let state = h.app.state::<liber_desktop::state::AppState>();
+    let dir = tempfile::tempdir().unwrap();
+    let fifo = dir.path().join("pipe.liber-theme.json");
+    assert!(
+        std::process::Command::new("mkfifo")
+            .arg(&fifo)
+            .status()
+            .unwrap()
+            .success()
+    );
+    let writer = {
+        let fifo = fifo.clone();
+        std::thread::spawn(move || {
+            use std::io::Write;
+            let mut f = std::fs::OpenOptions::new().write(true).open(&fifo).unwrap();
+            let _ = f.write_all(&vec![b' '; 200 * 1024]);
+        })
+    };
+    let picked = fifo.clone();
+    state.set_cover_picker(Some(Arc::new(move || Some(picked.clone()))));
+    let err = call(&h.main, "theme_import", json!({})).unwrap_err();
+    assert_eq!(kind(err), "invalidInput");
+    writer.join().unwrap();
+}

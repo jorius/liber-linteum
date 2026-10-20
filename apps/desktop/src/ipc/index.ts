@@ -177,8 +177,8 @@ export interface Settings {
   editorMode: EditorMode;
   palette: PaletteChoice;
   /** `#rrggbb`: the custom accent from before custom themes, migrated into
-   *  a theme on load (custom themes §2). */
-  accentColor: string;
+   *  a theme on load and then dropped (custom themes §2). */
+  accentColor?: string;
   /** Themes the user built (custom themes §2). */
   customThemes: CustomTheme[];
   /** With `palette: 'custom'`, the id of the theme in use. */
@@ -261,6 +261,7 @@ export interface SettingsPatch {
   confirmDelete?: boolean;
   editorMode?: EditorMode;
   palette?: PaletteChoice;
+  /** `''` drops the legacy accent. */
   accentColor?: string;
   fontLivePreview?: FontChoice;
   fontSource?: FontChoice;

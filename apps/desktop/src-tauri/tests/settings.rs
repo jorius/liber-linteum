@@ -215,12 +215,12 @@ fn ed_01_editor_mode_defaults_to_live_preview_and_persists() {
 /// and reset on its own when a value can't be understood.
 #[test]
 fn m2b_appearance_and_editor_settings_default_and_persist() {
-    use liber_desktop::settings::{FontChoice, FontSize, HexColor, Palette};
+    use liber_desktop::settings::{FontChoice, FontSize, Palette};
     let dir = tempfile::tempdir().unwrap();
     let s = store(dir.path());
     let d = s.get().0;
     assert_eq!(d.palette, Palette::Lavender);
-    assert_eq!(d.accent_color, HexColor::parse("#d1477a").unwrap());
+    assert_eq!(d.accent_color, None);
     assert_eq!(d.font_live_preview.as_str(), "atkinson-hyperlegible");
     assert_eq!(d.font_source.as_str(), "jetbrains-mono");
     assert_eq!(d.font_size, FontSize::new(15));
@@ -228,7 +228,7 @@ fn m2b_appearance_and_editor_settings_default_and_persist() {
     assert!(!d.line_numbers, "line numbers are off by default");
     s.update(SettingsPatch {
         palette: Some(Palette::Custom),
-        accent_color: Some(HexColor::parse("#2AA198").unwrap()),
+        accent_color: Some("#2AA198".into()),
         font_live_preview: Some(FontChoice::parse("system:Avenir Next").unwrap()),
         font_source: Some(FontChoice::parse("ibm-plex-mono").unwrap()),
         font_size: Some(FontSize::new(18)),
@@ -262,7 +262,7 @@ fn m2b_each_new_setting_is_reset_on_its_own() {
     .unwrap();
     let (s, warning) = store(dir.path()).get();
     assert_eq!(s.palette, Palette::Lavender);
-    assert_eq!(s.accent_color.as_str(), "#d1477a");
+    assert_eq!(s.accent_color, None);
     assert_eq!(s.font_live_preview.as_str(), "atkinson-hyperlegible");
     assert_eq!(s.font_source.as_str(), "jetbrains-mono");
     assert_eq!(s.font_size, FontSize::new(15));
@@ -725,4 +725,82 @@ fn patch_sets_custom_theme() {
     assert_eq!(saved.custom_themes.len(), 1);
     let reread = SettingsStore::load(dir.path()).get().0;
     assert_eq!(reread, saved);
+}
+
+/// Custom themes review I3, M11: `rgba()` is allowed for the sidebar
+/// selection only, channels are plain digits, and a bad patch is refused.
+#[test]
+fn review_rgba_only_for_side_sel() {
+    use liber_desktop::settings::ThemeColor;
+    assert!(ThemeColor::parse("rgba(+1,2,3,.5)").is_none());
+    let dir = tempfile::tempdir().unwrap();
+    let mut bad = theme_json("t2", "#0e7c7b");
+    bad["light"]["surface"] = "rgba(255,255,255,1)".into();
+    let text = serde_json::json!({ "customThemes": [theme_json("t1", "#0e7c7b"), bad.clone()] });
+    std::fs::write(dir.path().join("settings.json"), text.to_string()).unwrap();
+    let s = store(dir.path());
+    assert_eq!(
+        s.get().0.custom_themes.len(),
+        1,
+        "rgba on surface drops that theme"
+    );
+    let patch: Result<SettingsPatch, _> =
+        serde_json::from_value(serde_json::json!({ "customThemes": [bad] }));
+    assert!(patch.is_err(), "a patch with rgba on surface is refused");
+}
+
+/// Review M12: a token this build doesn't know (a newer build's 17th) is
+/// ignored, not a reason to drop the theme.
+#[test]
+fn review_unknown_token_keeps_the_theme() {
+    let dir = tempfile::tempdir().unwrap();
+    let mut t = theme_json("t1", "#0e7c7b");
+    t["light"]["future"] = "#123456".into();
+    t["seed"] = "#2AA198".into();
+    let text = serde_json::json!({ "customThemes": [t] });
+    std::fs::write(dir.path().join("settings.json"), text.to_string()).unwrap();
+    let (s, warning) = store(dir.path()).get();
+    assert!(warning.is_none(), "{warning:?}");
+    assert_eq!(s.custom_themes.len(), 1);
+    // Review M6: the seed of a migrated theme round-trips.
+    let v = serde_json::to_value(&s).unwrap();
+    assert_eq!(v["customThemes"][0]["seed"], "#2aa198");
+}
+
+/// Review M7: a 101st theme is refused, never silently dropped.
+#[test]
+fn review_101st_theme_is_refused() {
+    let dir = tempfile::tempdir().unwrap();
+    let s = store(dir.path());
+    let themes: Vec<_> = (0..101)
+        .map(|i| theme_json(&format!("t{i}"), "#0e7c7b"))
+        .collect();
+    let patch: SettingsPatch =
+        serde_json::from_value(serde_json::json!({ "customThemes": themes })).unwrap();
+    let err = s.update(patch).unwrap_err();
+    assert_eq!(err.kind(), std::io::ErrorKind::InvalidInput);
+    assert!(s.get().0.custom_themes.is_empty(), "nothing saved");
+}
+
+/// Custom themes spec §2: the legacy accent is dropped once migrated
+/// (`accentColor: ""` clears it), and a new install has none.
+#[test]
+fn review_legacy_accent_is_dropped() {
+    use liber_desktop::settings::HexColor;
+    let dir = tempfile::tempdir().unwrap();
+    let s = store(dir.path());
+    assert_eq!(s.get().0.accent_color, None);
+    std::fs::write(
+        dir.path().join("settings.json"),
+        r##"{"palette":"custom","accentColor":"#2AA198"}"##,
+    )
+    .unwrap();
+    let s = store(dir.path());
+    assert_eq!(s.get().0.accent_color, HexColor::parse("#2aa198"));
+    let patch: SettingsPatch =
+        serde_json::from_value(serde_json::json!({ "accentColor": "" })).unwrap();
+    let saved = s.update(patch).unwrap();
+    assert_eq!(saved.accent_color, None);
+    let raw = std::fs::read_to_string(dir.path().join("settings.json")).unwrap();
+    assert!(!raw.contains("accentColor"), "{raw}");
 }

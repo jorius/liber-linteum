@@ -487,7 +487,8 @@
         "format": "It isn't a Liber Linteum theme.",
         "version": "It was made by a newer version.",
         "keys": "Its colours don't match the 16 a theme has.",
-        "value": "One of its colours isn't a #rrggbb value."
+        "value": "One of its colours isn't a #rrggbb value.",
+        "unreadable": "It couldn't be read."
       },
       "groups": {
         "brand": "Brand",
@@ -518,7 +519,7 @@
         },
         "side": {
           "name": "Sidebar",
-          "use": "The file list"
+          "use": "The file list; its star and drop ring must read on it"
         },
         "sideText": {
           "name": "Sidebar text",
@@ -560,7 +561,11 @@
           "name": "Code background",
           "use": "Inline code and blocks"
         }
-      }
+      },
+      "migrateFailed": "Your custom colour couldn't be saved as a theme. It will be tried again next time.",
+      "exportFailed": "The theme couldn't be saved.",
+      "saveFailed": "That change couldn't be saved, so the theme is back to how it was.",
+      "limit": "You can keep up to {max} themes. Delete one to add another."
     }
   },
   "toolbar": {

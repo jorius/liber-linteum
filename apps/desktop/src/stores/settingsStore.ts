@@ -23,7 +23,6 @@ export const DEFAULT_SETTINGS: Settings = {
   confirmDelete: true,
   editorMode: 'livePreview',
   palette: 'lavender',
-  accentColor: '#d1477a',
   fontLivePreview: 'atkinson-hyperlegible',
   fontSource: 'jetbrains-mono',
   fontSize: 15,
@@ -77,12 +76,25 @@ export const useSettingsStore = create<SettingsState>((set) => ({
     await apply(settings);
     // Custom themes §2: a custom accent from before custom themes becomes a
     // theme, once (after `apply`, so its name is in the user's language).
-    if (settings.palette === 'custom' && settings.customThemes.length === 0) {
+    if (
+      settings.palette === 'custom' &&
+      settings.customThemes.length === 0 &&
+      settings.accentColor
+    ) {
       const theme = migrateLegacy(settings.accentColor, i18next.t('settings.themes.legacyName'));
       const patch = { customThemes: [theme], customTheme: theme.id };
       settings = { ...settings, ...patch };
       await apply(settings);
-      void settingsSet(patch);
+      // The legacy accent goes in the same save; if that fails it stays, and
+      // the next load tries again (this session already looks right).
+      const saved = await settingsSet({ ...patch, accentColor: '' });
+      if (saved.ok) settings = { ...DEFAULT_SETTINGS, ...saved.value };
+      else
+        useToastStore.getState().push({
+          message: i18next.t('settings.themes.migrateFailed'),
+          detail: [saved.error.message],
+          tone: 'error',
+        });
     }
     const warning = res.ok ? (res.value.warning ?? null) : null;
     set({ settings, warning, loaded: true });

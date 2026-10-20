@@ -1,10 +1,13 @@
 // @vitest-environment node
 import { describe, expect, it } from 'vitest';
-import { contrast, hexToOklch } from './color';
+import { contrast, hexToOklch, oklchToHex } from './color';
 import {
   badge,
+  CHECKS,
   fillDerived,
-  fix,
+  fixColor,
+  isThemeColor,
+  MAX_NAME,
   migrateLegacy,
   newTheme,
   parseImport,
@@ -13,8 +16,12 @@ import {
   TOKEN_KEYS,
   toExport,
   uniqueName,
+  type CustomTheme,
+  type Mode,
+  type TokenKey,
 } from './customThemes';
 import { derive } from './derive';
+import { sidebarMarks } from './paletteCss';
 import { PALETTES } from './palettes';
 
 const lavender = PALETTES[0];
@@ -79,26 +86,129 @@ describe('custom theme model (custom themes §2–§4)', () => {
   });
 
   it('fix_reaches_target_keeps_hue', () => {
-    for (const [hex, bg] of [
-      ['#e0a33a', '#ffffff'],
-      ['#4b2f86', '#17151c'],
-      ['#2aa198', '#f6f3f0'],
+    for (const [key, hex] of [
+      ['secondary', '#e0a33a'],
+      ['muted', '#cccccc'],
+      ['accent', '#9bb7ff'],
     ] as const) {
-      const fixed = fix(hex, [bg]);
-      expect(contrast(fixed, bg), `${hex} on ${bg}`).toBeGreaterThanOrEqual(4.5);
+      const t = setColor(newTheme(lavender, 'L'), 'light', key, hex);
+      const fixed = fixColor(t, 'light', key);
+      expect(badge(setColor(t, 'light', key, fixed), 'light', key)!.ratio).toBeGreaterThanOrEqual(
+        4.5,
+      );
       const [, c0, h0] = hexToOklch(hex);
       const [, c1, h1] = hexToOklch(fixed);
-      expect(Math.abs(((h1 - h0 + 540) % 360) - 180), 'hue').toBeLessThan(3);
+      if (c0 > 0.02) expect(Math.abs(((h1 - h0 + 540) % 360) - 180), 'hue').toBeLessThan(3);
       expect(Math.abs(c1 - c0), 'chroma').toBeLessThan(0.03);
     }
-    // Unreachable (mid grey on mid grey at 21:1): the best found, never a throw.
-    expect(fix('#808080', ['#808080'], 30)).toMatch(/^#[0-9a-f]{6}$/);
+  });
+
+  // Review I1, I2: Fix reaches 4.5 against every background its badge checks,
+  // the tag tint included (recomputed from the new colour), searching both
+  // ways; when no lightness passes it returns the best and stays honest.
+  it('fix_reaches_45_wherever_some_lightness_does', () => {
+    const passes = (t: CustomTheme, mode: Mode, key: TokenKey, x: string) =>
+      badge(setColor(t, mode, key, x), mode, key)!.ratio >= 4.5;
+    const somePasses = (t: CustomTheme, mode: Mode, key: TokenKey) => {
+      const [, C, H] = hexToOklch(t[mode][key]);
+      for (let L = 0; L <= 1.0001; L += 0.0025)
+        if (passes(t, mode, key, oklchToHex(L, C, H))) return true;
+      return false;
+    };
+    let checked = 0;
+    for (const seed of ['#2aa198', '#d1477a', '#3a7bd5', '#808080', '#e0a33a']) {
+      const base = migrateLegacy(seed, 'S');
+      for (const mode of ['light', 'dark'] as const)
+        for (const key of ['secondary', 'contrast', 'muted', 'accent'] as const)
+          for (let h = 0; h < 360; h += 45)
+            for (const L of [0.3, 0.5, 0.62, 0.7, 0.78]) {
+              const t = setColor(base, mode, key, oklchToHex(L, 0.1, h));
+              if (badge(t, mode, key)!.level !== 'Low') continue;
+              checked++;
+              const fixed = fixColor(t, mode, key);
+              if (somePasses(t, mode, key))
+                expect(passes(t, mode, key, fixed), `${seed} ${mode} ${key} L${L} h${h}`).toBe(
+                  true,
+                );
+              else expect(badge(setColor(t, mode, key, fixed), mode, key)!.level).toBe('Low');
+            }
+    }
+    expect(checked).toBeGreaterThan(50);
+    // White text on a mid-tone primary: darkening is the way out.
+    const blue = setColor(newTheme(lavender, 'B'), 'light', 'accent', '#3a7bd5');
+    const onBlue = setColor(blue, 'light', 'contrast', '#ffffff');
+    expect(badge(onBlue, 'light', 'contrast')!.level).toBe('Low');
+    expect(
+      badge(
+        setColor(onBlue, 'light', 'contrast', fixColor(onBlue, 'light', 'contrast')),
+        'light',
+        'contrast',
+      )!.ratio,
+    ).toBeGreaterThanOrEqual(4.5);
   });
 
   it('unique_name_appends_number', () => {
     expect(uniqueName('My theme', [])).toBe('My theme');
     expect(uniqueName('My theme', ['My theme'])).toBe('My theme 2');
     expect(uniqueName('My theme', ['My theme', 'My theme 2'])).toBe('My theme 3');
+    // Review M5: never over the 80-character cap, the number kept.
+    const long = 'a'.repeat(MAX_NAME);
+    const next = uniqueName(long, [long]);
+    expect([...next].length).toBeLessThanOrEqual(MAX_NAME);
+    expect(next.endsWith(' 2')).toBe(true);
+    expect([...uniqueName('é'.repeat(90), [])].length).toBe(MAX_NAME);
+  });
+
+  // Review M6: Fill on an untouched migrated theme changes nothing.
+  it('fill_on_untouched_migrated_theme_is_stable', () => {
+    for (const x of ['#fb5c99', '#2aa198', '#d1477a', '#e0a33a', '#3a7bd5']) {
+      const t = migrateLegacy(x, 'Custom');
+      expect(fillDerived(t), x).toEqual(t);
+    }
+  });
+
+  // Review I3, M11: one colour rule, the same as Rust's.
+  it('colour_validity_matches_rust', () => {
+    expect(isThemeColor('accent', '#0e7c7b')).toBe(true);
+    expect(isThemeColor('accent', '#0E7C7B')).toBe(true);
+    expect(isThemeColor('accent', 'rgba(1,2,3,.5)')).toBe(false);
+    expect(isThemeColor('surface', 'rgba(255,255,255,1)')).toBe(false);
+    expect(isThemeColor('sideSel', 'rgba(255, 255, 255, .12)')).toBe(true);
+    expect(isThemeColor('sideSel', 'rgba(255,255,255,1)')).toBe(true);
+    expect(isThemeColor('sideSel', 'rgba(300,0,0,.5)')).toBe(false);
+    expect(isThemeColor('sideSel', 'rgba(0,0,0,1.5)')).toBe(false);
+    expect(isThemeColor('sideSel', 'rgba(0,0,0,.)')).toBe(false);
+    expect(isThemeColor('sideSel', '#ffffff')).toBe(true);
+  });
+
+  // Review M13: the sidebar's star and drop ring are checked on the theme's
+  // own sidebar, in both modes; built-in and derived palettes meet 3:1.
+  it('sidebar_marks_read_on_the_sidebar', () => {
+    const palettes = [
+      ...PALETTES,
+      ...['#2aa198', '#d1477a', '#3a7bd5', '#e0a33a'].map((x) => ({
+        id: 'custom' as const,
+        ...derive(x),
+      })),
+    ];
+    for (const p of palettes)
+      for (const mode of ['light', 'dark'] as const) {
+        const { star, ring } = sidebarMarks(p, mode);
+        expect(contrast(star, p[mode].side), `${p.id} ${mode} star`).toBeGreaterThanOrEqual(3);
+        expect(contrast(ring, p[mode].side), `${p.id} ${mode} ring`).toBeGreaterThanOrEqual(3);
+      }
+    // A light sidebar gets marks that read on it, and the Sidebar row says so.
+    const t = setColor(
+      setColor(newTheme(lavender, 'L'), 'light', 'side', '#f4f1ea'),
+      'light',
+      'sideText',
+      '#222222',
+    );
+    const { star, ring } = sidebarMarks({ id: 'custom', light: t.light, dark: t.dark }, 'light');
+    expect(contrast(star, '#f4f1ea')).toBeGreaterThanOrEqual(3);
+    expect(contrast(ring, '#f4f1ea')).toBeGreaterThanOrEqual(3);
+    expect(badge(t, 'light', 'side')!.level).not.toBe('Low');
+    expect(CHECKS.side).toBeUndefined();
   });
 
   it('migrate_matches_old_derive', () => {
@@ -135,6 +245,11 @@ describe('custom theme model (custom themes §2–§4)', () => {
       expect(parseImport(JSON.stringify(value)), reason).toEqual({ ok: false, reason });
     expect(parseImport('{ not json')).toEqual({ ok: false, reason: 'json' });
     expect(parseImport(' '.repeat(65 * 1024))).toEqual({ ok: false, reason: 'size' });
+    expect(
+      parseImport(
+        JSON.stringify({ ...good, light: { ...good.light, sideSel: 'rgba(300,0,0,.5)' } }),
+      ),
+    ).toEqual({ ok: false, reason: 'value' });
     // sideSel may be rgba.
     expect(parseImport(JSON.stringify(good)).ok).toBe(true);
     expect(good.light.sideSel).toMatch(/^rgba\(/);

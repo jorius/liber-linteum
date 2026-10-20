@@ -57,12 +57,13 @@ describe('settingsStore', () => {
   it('M2b §7: the defaults match the Rust defaults (settings.rs)', () => {
     expect(DEFAULT_SETTINGS).toMatchObject({
       palette: 'lavender',
-      accentColor: '#d1477a',
       fontLivePreview: 'atkinson-hyperlegible',
       fontSource: 'jetbrains-mono',
       fontSize: 15,
       toolbar: true,
     });
+    // Like Rust's `accent_color: None`: no legacy accent unless a file has one.
+    expect(DEFAULT_SETTINGS.accentColor).toBeUndefined();
   });
 
   it('review focus: a settings warning (reset values, unreadable file) is shown as a toast', async () => {
@@ -152,9 +153,58 @@ describe('settingsStore', () => {
     expect(s.customTheme).toBe(s.customThemes[0].id);
     expect(s.customThemes[0].light.accent).toBe(derive('#2aa198').light.accent);
     expect(document.documentElement.dataset.palette).toBe('custom');
+    // The legacy accent is dropped in the same save (custom themes §2).
+    expect(patches[0].accentColor).toBe('');
     // The next load finds the theme and patches nothing.
     await useSettingsStore.getState().load();
     expect(patches).toHaveLength(1);
+  });
+
+  it('a failed migration save keeps the legacy accent, says so, and retries on the next load', async () => {
+    let fail = true;
+    let saved: Record<string, unknown> = {
+      ...DEFAULT_SETTINGS,
+      palette: 'custom',
+      accentColor: '#2aa198',
+    };
+    let tries = 0;
+    backend({
+      settings_get: () => ({ settings: saved }),
+      settings_set: (a) => {
+        tries++;
+        if (fail) throw { kind: 'io', message: 'disk is read-only' };
+        saved = { ...saved, ...(a.patch as object) };
+        return saved;
+      },
+    });
+    useToastStore.getState().clear();
+    await useSettingsStore.getState().load();
+    // This session still looks right, and the user is told.
+    const s = useSettingsStore.getState().settings;
+    expect(s.customThemes).toHaveLength(1);
+    expect(document.documentElement.dataset.palette).toBe('custom');
+    expect(useToastStore.getState().toasts.map((t) => t.tone)).toContain('error');
+    expect(saved.accentColor).toBe('#2aa198');
+    // Next launch tries again, and this time it sticks.
+    fail = false;
+    await useSettingsStore.getState().load();
+    expect(tries).toBe(2);
+    expect(saved.accentColor).toBe('');
+    expect((saved.customThemes as unknown[]).length).toBe(1);
+  });
+
+  it('no legacy accent: a stale custom palette does not invent a theme', async () => {
+    const patches: unknown[] = [];
+    backend({
+      settings_get: () => ({ settings: { ...DEFAULT_SETTINGS, palette: 'custom' } }),
+      settings_set: (a) => {
+        patches.push(a.patch);
+        return {};
+      },
+    });
+    await useSettingsStore.getState().load();
+    expect(patches).toEqual([]);
+    expect(document.documentElement.dataset.palette).toBe('lavender');
   });
 });
 
