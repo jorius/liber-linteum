@@ -5,28 +5,66 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { clearMocks, mockIPC } from '../../ipc/testing';
 import { DEFAULT_SETTINGS, useSettingsStore } from '../../stores/settingsStore';
 import { useToastStore } from '../../stores/toastStore';
-import { newTheme, setColor, toExport, type CustomTheme } from '../../theme/customThemes';
+import {
+  isThemeColor,
+  MAX_NAME,
+  MAX_THEMES,
+  newTheme,
+  setColor,
+  TOKEN_KEYS,
+  toExport,
+  type CustomTheme,
+} from '../../theme/customThemes';
 import { PALETTES } from '../../theme/palettes';
 import { ThemeSettings } from './ThemeSettings';
 
 let patches: Record<string, unknown>[];
 let importText: string | null;
+let importError: { kind: string; message: string } | null;
+let exportError: { kind: string; message: string } | null;
+let saveError: { kind: string; message: string } | null;
 let exported: { name: string; json: string }[];
+
+/** Refuses what Rust's `settings_set` refuses (review I3): a bad colour, a
+ *  name over the cap, more than the theme limit. */
+function rustRefuses(patch: Record<string, unknown>): string | null {
+  const themes = patch.customThemes as CustomTheme[] | undefined;
+  if (!themes) return null;
+  if (themes.length > MAX_THEMES) return 'at most 100 themes';
+  for (const t of themes) {
+    if (!t.name.trim() || [...t.name].length > MAX_NAME) return 'theme id or name out of range';
+    for (const mode of ['light', 'dark'] as const)
+      for (const k of TOKEN_KEYS)
+        if (!isThemeColor(k, t[mode][k])) return `not a theme colour: ${t[mode][k]}`;
+  }
+  return null;
+}
 
 beforeEach(() => {
   patches = [];
   importText = null;
+  importError = null;
+  exportError = null;
+  saveError = null;
   exported = [];
   useToastStore.getState().clear();
   useSettingsStore.setState({ settings: DEFAULT_SETTINGS });
   mockIPC((cmd, raw) => {
     const args = (raw ?? {}) as Record<string, unknown>;
     if (cmd === 'settings_set') {
-      patches.push(args.patch as Record<string, unknown>);
-      return { ...useSettingsStore.getState().settings, ...(args.patch as object) };
+      const patch = args.patch as Record<string, unknown>;
+      const refused = rustRefuses(patch);
+      if (refused) throw { kind: 'io', message: refused };
+      if (saveError) throw saveError;
+      patches.push(patch);
+      return { ...useSettingsStore.getState().settings, ...patch };
     }
-    if (cmd === 'theme_import') return importText;
+    if (cmd === 'theme_import') {
+      if (importError) throw importError;
+      return importText;
+    }
     if (cmd === 'theme_export') {
+      if (exportError) throw exportError;
       exported.push({ name: args.name as string, json: args.json as string });
       return true;
     }
@@ -90,19 +128,116 @@ describe('Appearance: theme gallery and editor (custom themes §3)', () => {
     };
     withThemes([t], 'selva');
     render(<ThemeSettings />);
+    expect(t.light.soft).toBe(PALETTES[0].light.soft);
     await userEvent.click(screen.getByRole('button', { name: 'Fill the rest from Primary' }));
     await waitFor(() => expect(patches.length).toBeGreaterThan(0));
     expect(saved().customThemes[0].light.bg).toBe('#123456');
+    // Review M15: Fill did fill — the derived colour follows the primary.
+    expect(saved().customThemes[0].light.soft).not.toBe(PALETTES[0].light.soft);
   });
 
-  it('a Low badge offers Fix; after Fix it reads AA', async () => {
-    withThemes([setColor(selva(), 'light', 'muted', '#cccccc')], 'selva');
+  it('a Low badge offers Fix; after Fix it reads AA and focus stays on the row', async () => {
+    withThemes(
+      [setColor(setColor(selva(), 'light', 'muted', '#cccccc'), 'light', 'secondary', '#ee79a1')],
+      'selva',
+    );
     render(<ThemeSettings />);
-    await userEvent.click(screen.getByRole('button', { name: 'Show 3 more colours' }));
-    const row = screen.getByRole('group', { name: 'Secondary text' });
-    expect(within(row).getByText(/^Low/)).toBeInTheDocument();
-    await userEvent.click(within(row).getByRole('button', { name: 'Fix Secondary text' }));
-    await waitFor(() => expect(within(row).getByText(/^AA/)).toBeInTheDocument());
+    for (const name of ['Secondary text', 'Secondary']) {
+      const row = screen.getByRole('group', { name });
+      expect(within(row).getByText(/^Low/)).toBeInTheDocument();
+      // Review M10: the badge describes the hex field.
+      const hex = within(row).getByRole('textbox', { name: `${name} colour (hex)` });
+      expect(hex).toHaveAccessibleDescription(/^Low/);
+      await userEvent.click(within(row).getByRole('button', { name: `Fix ${name}` }));
+      // Review I1: the secondary reaches AA on its tag tint too.
+      await waitFor(() => expect(within(row).getByText(/^AA/)).toBeInTheDocument());
+      expect(hex).toHaveFocus();
+    }
+  });
+
+  it('review I3: an invalid colour never saves; a refused save says so and resets the draft', async () => {
+    withThemes([selva()], 'selva');
+    render(<ThemeSettings />);
+    const sel = screen.getByRole('textbox', { name: 'Sidebar selection colour (hex)' });
+    await userEvent.clear(sel);
+    await userEvent.type(sel, 'rgba(300,0,0,.5)');
+    expect(patches).toHaveLength(0);
+    // A save Rust refuses (a full disk, here): a toast, and the draft is back.
+    saveError = { kind: 'io', message: 'disk full' };
+    fireEvent.change(screen.getByLabelText('Primary colour'), { target: { value: '#0e7c7b' } });
+    await waitFor(() =>
+      expect(useToastStore.getState().toasts.map((t) => t.message)).toContain(
+        "That change couldn't be saved, so the theme is back to how it was.",
+      ),
+    );
+    expect(screen.getByRole('textbox', { name: 'Primary colour (hex)' })).toHaveValue(
+      PALETTES[0].light.accent,
+    );
+    // The next edit saves normally.
+    saveError = null;
+    fireEvent.change(screen.getByLabelText('Primary colour'), { target: { value: '#123456' } });
+    await waitFor(() => expect(saved().customThemes[0].light.accent).toBe('#123456'));
+  });
+
+  it('review I4: import and export failures are explained', async () => {
+    withThemes([selva()], 'selva');
+    render(<ThemeSettings />);
+    const messages = () =>
+      useToastStore.getState().toasts.map((t) => [t.message, ...(t.detail ?? [])]);
+    importError = { kind: 'invalidInput', message: 'this file is too big to be a theme' };
+    await userEvent.click(screen.getByRole('button', { name: 'Import…' }));
+    await waitFor(() => expect(messages().flat()).toContain("It's too big for a theme file."));
+    importError = { kind: 'io', message: 'permission denied' };
+    await userEvent.click(screen.getByRole('button', { name: 'Import…' }));
+    await waitFor(() => expect(messages().flat()).toContain("It couldn't be read."));
+    exportError = { kind: 'io', message: 'read-only volume' };
+    await userEvent.click(screen.getByRole('button', { name: 'Export…' }));
+    await waitFor(() => expect(messages().flat()).toContain("The theme couldn't be saved."));
+  });
+
+  it('review M5, M7: long names stay under the cap; a 101st theme is refused with a message', async () => {
+    const long = { ...selva(), name: 'a'.repeat(MAX_NAME) };
+    withThemes([long], 'selva');
+    render(<ThemeSettings />);
+    await userEvent.click(screen.getByRole('button', { name: 'Duplicate' }));
+    await waitFor(() => expect(saved().customThemes).toHaveLength(2));
+    expect([...saved().customThemes[1].name].length).toBeLessThanOrEqual(MAX_NAME);
+    useToastStore.getState().clear();
+    const many = Array.from({ length: MAX_THEMES }, (_, i) =>
+      newTheme(PALETTES[0], `T${i}`, `t${i}`),
+    );
+    withThemes(many, 't0');
+    await userEvent.click(screen.getByRole('button', { name: 'New theme' }));
+    await waitFor(() =>
+      expect(useToastStore.getState().toasts.map((t) => t.message)).toContain(
+        'You can keep up to 100 themes. Delete one to add another.',
+      ),
+    );
+    expect(saved().customThemes).toHaveLength(MAX_THEMES);
+  });
+
+  it('review M8: a stale selection shows Lavender, and its copy is named for it', async () => {
+    useSettingsStore.setState({
+      settings: {
+        ...DEFAULT_SETTINGS,
+        palette: 'custom',
+        customThemes: [selva()],
+        customTheme: 'gone',
+      },
+    });
+    render(<ThemeSettings />);
+    const builtIn = screen.getByRole('radiogroup', { name: 'Built-in' });
+    expect(within(builtIn).getByRole('radio', { name: 'Lavender' })).toBeChecked();
+    await userEvent.click(screen.getByRole('button', { name: 'Duplicate to edit' }));
+    await waitFor(() => expect(saved().customThemes.map((t) => t.name)).toContain('Lavender copy'));
+  });
+
+  it('review M9: the editor opens on the mode the app is in', () => {
+    document.documentElement.dataset.theme = 'dark';
+    withThemes([selva()], 'selva');
+    render(<ThemeSettings />);
+    expect(screen.getByRole('button', { name: 'Dark' })).toHaveAttribute('aria-pressed', 'true');
+    document.documentElement.removeAttribute('data-theme');
   });
 
   it('a built-in shows "Duplicate to edit", which makes an editable copy', async () => {
@@ -119,9 +254,16 @@ describe('Appearance: theme gallery and editor (custom themes §3)', () => {
     render(<ThemeSettings />);
     await userEvent.click(screen.getByRole('button', { name: 'Delete' }));
     expect(saved().customThemes).toHaveLength(1);
+    // Review M10: focus moves to the confirm, back on Cancel, and to the
+    // selected card after deleting.
+    expect(screen.getByRole('button', { name: 'Delete “Selva”' })).toHaveFocus();
+    await userEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+    expect(screen.getByRole('button', { name: 'Delete' })).toHaveFocus();
+    await userEvent.click(screen.getByRole('button', { name: 'Delete' }));
     await userEvent.click(screen.getByRole('button', { name: 'Delete “Selva”' }));
     await waitFor(() => expect(saved().customThemes).toHaveLength(0));
     expect(saved().palette).toBe('lavender');
+    await waitFor(() => expect(screen.getByRole('radio', { name: 'Lavender' })).toHaveFocus());
   });
 
   it('export writes the file; import adds and selects a valid one, and explains a bad one', async () => {

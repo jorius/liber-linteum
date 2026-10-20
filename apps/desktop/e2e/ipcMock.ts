@@ -232,7 +232,37 @@ export function installIpcMock({
     app_info: () => ({ name: 'Liber Linteum', version: '0.0.0-e2e' }),
     settings_get: () => ({ settings }),
     settings_set: (a) => {
-      settings = { ...settings, ...(a.patch as object) };
+      const patch = a.patch as Record<string, unknown>;
+      // Refuses what Rust refuses (custom themes review I3): a bad colour
+      // (rgba only for sideSel), a name over 80 characters, over 100 themes.
+      const themes = patch.customThemes as
+        { name: string; light: Record<string, string>; dark: Record<string, string> }[] | undefined;
+      if (themes) {
+        const hex = (v: string) => /^#[0-9a-f]{6}$/i.test(v);
+        const rgba = (v: string) => {
+          const m = /^rgba\(([^)]*)\)$/i.exec(v);
+          const p = m ? m[1].split(',').map((x) => x.trim()) : [];
+          return (
+            p.length === 4 &&
+            p.slice(0, 3).every((c) => /^\d{1,3}$/.test(c) && Number(c) <= 255) &&
+            /^[\d.]+$/.test(p[3]) &&
+            Number(p[3]) >= 0 &&
+            Number(p[3]) <= 1
+          );
+        };
+        const bad =
+          themes.length > 100 ||
+          themes.some(
+            (t) =>
+              !t.name.trim() ||
+              [...t.name].length > 80 ||
+              [t.light, t.dark].some((m) =>
+                Object.entries(m).some(([k, v]) => !(hex(v) || (k === 'sideSel' && rgba(v)))),
+              ),
+          );
+        if (bad) throw { kind: 'io', message: 'refused theme patch' };
+      }
+      settings = { ...settings, ...patch };
       return settings;
     },
     fonts_list: () => ['Courier New', 'Menlo'],

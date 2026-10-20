@@ -42,6 +42,12 @@ test('create a theme, edit Primary, and the app follows; Light/Dark edits each m
     'true',
   );
   await expect(hex).not.toHaveValue('#0e7c7b');
+  // Review M15: edit the dark primary; each mode keeps its own.
+  await hex.fill('#ffaa00');
+  await page.evaluate(() => (document.documentElement.dataset.theme = 'dark'));
+  await expect.poll(() => rootVar(page, '--color-accent')).toBe('#ffaa00');
+  await page.evaluate(() => (document.documentElement.dataset.theme = 'light'));
+  await expect.poll(() => rootVar(page, '--color-accent')).toBe('#0e7c7b');
   expect(errors).toEqual([]);
 });
 

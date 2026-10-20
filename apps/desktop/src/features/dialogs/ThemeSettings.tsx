@@ -1,6 +1,7 @@
 import {
   useEffect,
   useId,
+  useRef,
   useState,
   type CSSProperties,
   type KeyboardEvent,
@@ -13,7 +14,9 @@ import { useToastStore } from '../../stores/toastStore';
 import {
   badge,
   fillDerived,
-  fix,
+  fixColor,
+  isThemeColor,
+  MAX_THEMES,
   newTheme,
   parseImport,
   resetColor,
@@ -36,7 +39,14 @@ const GROUPS: { key: string; tokens: TokenKey[]; folded?: boolean }[] = [
   { key: 'accents', tokens: ['soft', 'mark', 'code'], folded: true },
 ];
 const HEX = /^#[0-9a-f]{6}$/i;
-const RGBA = /^rgba\(\s*\d{1,3}\s*,\s*\d{1,3}\s*,\s*\d{1,3}\s*,\s*(0|1|0?\.\d+)\s*\)$/i;
+
+const toastError = (message: string, detail?: string) =>
+  useToastStore.getState().push({ message, detail: detail ? [detail] : [], tone: 'error' });
+
+/** The mode the app shows now: the user's choice, else the OS's (review M9). */
+const appMode = (): Mode =>
+  (document.documentElement.dataset.theme as Mode | undefined) ??
+  (window.matchMedia?.('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
 
 /** Settings → Appearance: built-in palettes and the user's own themes as
  *  cards, and the full editor for the selected own theme (custom themes §3). */
@@ -47,17 +57,49 @@ export function ThemeSettings() {
   const themes = settings.customThemes;
   const selected =
     settings.palette === 'custom' ? themes.find((x) => x.id === settings.customTheme) : undefined;
-  const builtIn = settings.palette === 'custom' && selected ? undefined : settings.palette;
+  // A stale custom selection shows (and is) Lavender (review M8).
+  const builtIn = selected
+    ? undefined
+    : settings.palette === 'custom'
+      ? 'lavender'
+      : settings.palette;
   const current: Palette = selected
     ? { id: 'custom', light: selected.light, dark: selected.dark }
     : (PALETTES.find((p) => p.id === builtIn) ?? PALETTES[0]);
   const names = themes.map((x) => x.name);
+  const root = useRef<HTMLDivElement>(null);
+  const [focusChosen, setFocusChosen] = useState(false);
+  useEffect(() => {
+    if (!focusChosen) return;
+    root.current?.querySelector<HTMLInputElement>('input[type="radio"]:checked')?.focus();
+    setFocusChosen(false);
+  }, [focusChosen, settings]);
 
-  const add = (theme: CustomTheme) =>
-    update({ customThemes: [...themes, theme], palette: 'custom', customTheme: theme.id });
+  // Refused before Rust would refuse it (review M7).
+  const roomFor = (count: number) => {
+    if (count < MAX_THEMES) return true;
+    toastError(t('settings.themes.limit', { max: MAX_THEMES }));
+    return false;
+  };
+  const add = async (theme: CustomTheme) => {
+    const list = useSettingsStore.getState().settings.customThemes;
+    if (!roomFor(list.length)) return;
+    const res = await update({
+      customThemes: [...list, theme],
+      palette: 'custom',
+      customTheme: theme.id,
+    });
+    if (!res.ok) toastError(t('settings.themes.saveFailed'), res.error.message);
+  };
   const importFile = async () => {
     const res = await themeImport();
-    if (!res.ok || res.value === null) return;
+    if (!res.ok) {
+      // Rust says "too big" as invalidInput; anything else is a read failure.
+      const reason = res.error.kind === 'invalidInput' ? 'size' : 'unreadable';
+      toastError(t('settings.themes.importFailed'), t(`settings.themes.importReason.${reason}`));
+      return;
+    }
+    if (res.value === null) return;
     const parsed = parseImport(res.value);
     if (!parsed.ok) {
       useToastStore.getState().push({
@@ -73,7 +115,7 @@ export function ThemeSettings() {
   };
 
   return (
-    <div className={styles.root}>
+    <div className={styles.root} ref={root}>
       <Gallery
         label={t('settings.themes.builtIn')}
         items={PALETTE_IDS.map((id) => ({
@@ -108,7 +150,12 @@ export function ThemeSettings() {
         </button>
       </Gallery>
       {selected ? (
-        <Editor key={selected.id} theme={selected} />
+        <Editor
+          key={selected.id}
+          theme={selected}
+          add={add}
+          onDeleted={() => setFocusChosen(true)}
+        />
       ) : (
         <div className={styles.builtInNote}>
           <button
@@ -119,7 +166,7 @@ export function ThemeSettings() {
                 newTheme(
                   current,
                   uniqueName(
-                    t('settings.themes.copyName', { name: t(`settings.palettes.${builtIn}`) }),
+                    t('settings.themes.copyName', { name: t(`settings.palettes.${current.id}`) }),
                     names,
                   ),
                 ),
@@ -196,21 +243,42 @@ function Mini({ tokens }: { tokens: PaletteTokens }) {
 }
 
 /** The full editor for one of the user's themes. */
-function Editor({ theme }: { theme: CustomTheme }) {
+function Editor({
+  theme,
+  add,
+  onDeleted,
+}: {
+  theme: CustomTheme;
+  add: (theme: CustomTheme) => Promise<void>;
+  onDeleted: () => void;
+}) {
   const { t } = useTranslation();
   const update = useSettingsStore((s) => s.update);
   const [draft, setDraft] = useState(theme);
-  const [mode, setMode] = useState<Mode>('light');
+  const [mode, setMode] = useState<Mode>(appMode);
   const [name, setName] = useState(theme.name);
   const [more, setMore] = useState(false);
   const [confirming, setConfirming] = useState(false);
-  const saver = useLatestSave((next: CustomTheme) =>
-    update({
+  const deleteButton = useRef<HTMLButtonElement>(null);
+  const cancelled = useRef(false);
+  useEffect(() => {
+    if (!confirming && cancelled.current) deleteButton.current?.focus();
+    cancelled.current = false;
+  }, [confirming]);
+  // A refused save (review I3) is said, and the draft goes back to what is
+  // saved, so later edits don't build on a value that will never land.
+  const saver = useLatestSave(async (next: CustomTheme) => {
+    const res = await update({
       customThemes: useSettingsStore
         .getState()
         .settings.customThemes.map((x) => (x.id === next.id ? next : x)),
-    }),
-  );
+    });
+    if (res.ok) return;
+    saver.cancel();
+    const saved = useSettingsStore.getState().settings.customThemes.find((x) => x.id === next.id);
+    if (saved) setDraft(saved);
+    toastError(t('settings.themes.saveFailed'), res.error.message);
+  });
   // Follow the saved theme, but not while a newer edit is on its way.
   useEffect(() => {
     if (!saver.pending()) setDraft(theme);
@@ -227,21 +295,28 @@ function Editor({ theme }: { theme: CustomTheme }) {
     else if (trimmed !== draft.name) edit({ ...draft, name: trimmed }, true);
   };
   const list = () => useSettingsStore.getState().settings.customThemes;
-  const remove = () =>
-    update({
+  const remove = async () => {
+    const res = await update({
       customThemes: list().filter((x) => x.id !== draft.id),
       palette: 'lavender',
       customTheme: '',
     });
-  const duplicate = () => {
-    const copy = newTheme(
-      { id: 'custom', light: draft.light, dark: draft.dark },
-      uniqueName(
-        t('settings.themes.copyName', { name: draft.name }),
-        list().map((x) => x.name),
+    if (res.ok) onDeleted();
+    else toastError(t('settings.themes.saveFailed'), res.error.message);
+  };
+  const duplicate = () =>
+    void add(
+      newTheme(
+        { id: 'custom', light: draft.light, dark: draft.dark },
+        uniqueName(
+          t('settings.themes.copyName', { name: draft.name }),
+          list().map((x) => x.name),
+        ),
       ),
     );
-    void update({ customThemes: [...list(), copy], palette: 'custom', customTheme: copy.id });
+  const exportTheme = async () => {
+    const res = await themeExport(draft.name, toExport(draft));
+    if (!res.ok) toastError(t('settings.themes.exportFailed'), res.error.message);
   };
 
   return (
@@ -312,28 +387,34 @@ function Editor({ theme }: { theme: CustomTheme }) {
             <button type="button" className="btn btn-secondary" onClick={duplicate}>
               {t('settings.themes.duplicate')}
             </button>
-            <button
-              type="button"
-              className="btn btn-secondary"
-              onClick={() => void themeExport(draft.name, toExport(draft))}
-            >
+            <button type="button" className="btn btn-secondary" onClick={() => void exportTheme()}>
               {t('settings.themes.export')}
             </button>
             {confirming ? (
               <span className={styles.confirm}>
-                <button type="button" className="btn btn-danger" onClick={() => void remove()}>
+                <button
+                  type="button"
+                  className="btn btn-danger"
+                  // Focus follows the swap (review M10).
+                  autoFocus
+                  onClick={() => void remove()}
+                >
                   {t('settings.themes.deleteNamed', { name: draft.name })}
                 </button>
                 <button
                   type="button"
                   className="btn btn-secondary"
-                  onClick={() => setConfirming(false)}
+                  onClick={() => {
+                    cancelled.current = true;
+                    setConfirming(false);
+                  }}
                 >
                   {t('dialogs.cancel')}
                 </button>
               </span>
             ) : (
               <button
+                ref={deleteButton}
                 type="button"
                 className="btn btn-secondary"
                 onClick={() => setConfirming(true)}
@@ -367,8 +448,10 @@ function TokenRow({
   useEffect(() => setText(value), [value]);
   const name = t(`settings.themes.tokens.${token}.name`);
   const b = badge(theme, mode, token);
+  const badgeId = useId();
+  const hexField = useRef<HTMLInputElement>(null);
   const handSet = !theme.derived[mode].includes(token);
-  const valid = (v: string) => HEX.test(v) || (token === 'sideSel' && RGBA.test(v));
+  const valid = (v: string) => isThemeColor(token, v);
   // A valid value saves as it is typed (so closing the dialog keeps it); an
   // invalid one reverts on blur.
   const type = (next: string) => {
@@ -399,7 +482,9 @@ function TokenRow({
       <input
         type="text"
         className={`field-control ${styles.hex}`}
+        ref={hexField}
         aria-label={t('settings.themes.colourHex', { name })}
+        aria-describedby={b ? badgeId : undefined}
         spellCheck={false}
         value={text}
         onChange={(e) => type(e.target.value)}
@@ -412,7 +497,7 @@ function TokenRow({
         }}
       />
       {b && (
-        <span className={styles.badge} data-level={b.level}>
+        <span className={styles.badge} data-level={b.level} id={badgeId}>
           {b.level} {b.ratio.toFixed(1)}
         </span>
       )}
@@ -421,7 +506,10 @@ function TokenRow({
           type="button"
           className={styles.small}
           aria-label={t('settings.themes.fixNamed', { name })}
-          onClick={() => onChange(setColor(theme, mode, token, fix(value, b.bgs)))}
+          onClick={() => {
+            onChange(setColor(theme, mode, token, fixColor(theme, mode, token)));
+            hexField.current?.focus(); // the Fix button goes away (review M10)
+          }}
         >
           {t('settings.themes.fix')}
         </button>
