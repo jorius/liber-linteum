@@ -316,3 +316,34 @@ fn replace_atomic_create_only_rechecks_after_the_copy() {
     assert_eq!(std::fs::read(dir.path().join("a.md")).unwrap(), b"other");
     assert_eq!(names(dir.path()), ["a.md"]);
 }
+
+/// E2 Task 5: a `Reader` is a file's; a folder is `NotFound`, as the asset
+/// protocol's old `is_file` check answered 404.
+#[test]
+fn open_read_refuses_a_folder() {
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::create_dir(dir.path().join("d")).unwrap();
+    let s = PlainStorage::open(dir.path()).unwrap();
+    for reach in [Reach::Any, Reach::Visible] {
+        let err = s.open_read(&p("d"), reach).err().unwrap();
+        assert!(matches!(err, VaultError::NotFound(_)), "{err:?}");
+    }
+}
+
+/// E2 Task 5: the file manager never shows a hidden item, even through a
+/// link with a visible name (round 3 §9.4 review #6); `Open` still resolves it.
+#[cfg(unix)]
+#[test]
+fn os_path_reveal_refuses_hidden_real_target() {
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::create_dir(dir.path().join(".git")).unwrap();
+    std::os::unix::fs::symlink(dir.path().join(".git"), dir.path().join("g")).unwrap();
+    let s = PlainStorage::open(dir.path()).unwrap();
+    let err = s.os_path(&p("g"), OsUse::Reveal).unwrap_err();
+    assert!(matches!(err, VaultError::OutsideVault(_)), "{err:?}");
+    assert!(s.os_path(&p("g"), OsUse::Open).is_ok());
+    assert_eq!(
+        s.os_path(&p("missing"), OsUse::Reveal).unwrap(),
+        s.location().join("missing")
+    );
+}

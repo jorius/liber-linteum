@@ -3,7 +3,7 @@
 //! touches the network; dictionaries load lazily and stay in memory.
 
 use std::collections::{HashMap, HashSet};
-use std::fs;
+use std::fs; // seam: outside (a dictionary pair from the path it is given, never vault content)
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, RwLock};
 
@@ -82,13 +82,13 @@ fn case_forms(word: &str) -> Vec<String> {
 }
 
 fn read(path: &Path) -> Result<String, SpellError> {
-    let len = fs::metadata(path)
+    let len = fs::metadata(path) // seam: outside (a dictionary pair from the path it is given, never vault content)
         .map_err(|_| SpellError::Unreadable(path.to_path_buf()))?
         .len();
     if len > MAX_FILE_BYTES {
         return Err(SpellError::TooLarge(path.to_path_buf()));
     }
-    fs::read_to_string(path).map_err(|_| SpellError::Unreadable(path.to_path_buf()))
+    fs::read_to_string(path).map_err(|_| SpellError::Unreadable(path.to_path_buf())) // seam: outside (a dictionary pair from the path it is given, never vault content)
 }
 
 fn parse(aff: &str, dic: &str) -> Result<Dictionary, SpellError> {

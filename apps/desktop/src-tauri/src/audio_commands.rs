@@ -132,9 +132,9 @@ pub(crate) fn audio_devices_impl(audio: &AudioState) -> CmdResult<Vec<Device>> {
 /// `false` when there's no sound at all.
 fn repair_wav(path: &Path) -> std::io::Result<bool> {
     use std::io::{Seek, SeekFrom, Write};
-    let len = std::fs::metadata(path)?.len();
+    let len = std::fs::metadata(path)?.len(); // seam: outside (audio takes live in the app cache, E3 spec §4.2)
     let mut head = vec![0u8; 256.min(len as usize)];
-    std::io::Read::read_exact(&mut std::fs::File::open(path)?, &mut head)?;
+    std::io::Read::read_exact(&mut std::fs::File::open(path)?, &mut head)?; // seam: outside (audio takes live in the app cache, E3 spec §4.2)
     let Some(at) = head.windows(4).position(|w| w == b"data") else {
         return Ok(false);
     };
@@ -144,7 +144,7 @@ fn repair_wav(path: &Path) -> std::io::Result<bool> {
     if data == 0 || &head[..4] != b"RIFF" {
         return Ok(false);
     }
-    let mut f = std::fs::OpenOptions::new().write(true).open(path)?;
+    let mut f = std::fs::OpenOptions::new().write(true).open(path)?; // seam: outside (audio takes live in the app cache, E3 spec §4.2)
     f.seek(SeekFrom::Start(4))?;
     f.write_all(&((start + data - 8) as u32).to_le_bytes())?;
     f.seek(SeekFrom::Start(at as u64 + 4))?;
@@ -162,7 +162,8 @@ fn recover(
     fallback: &VaultPath,
     busy: &HashSet<PathBuf>,
 ) -> Vec<AttachedDto> {
-    let Ok(entries) = std::fs::read_dir(cache) else {
+    let entries = std::fs::read_dir(cache); // seam: outside (audio takes live in the app cache, E3 spec §4.2)
+    let Ok(entries) = entries else {
         return Vec::new();
     };
     let mut out = Vec::new();
@@ -170,18 +171,19 @@ fn recover(
         if !dir.is_dir() || busy.contains(&dir) {
             continue;
         }
-        let page = std::fs::read(dir.join("take.json"))
+        let page = std::fs::read(dir.join("take.json")) // seam: outside (audio takes live in the app cache, E3 spec §4.2)
             .ok()
             .and_then(|b| serde_json::from_slice::<TakeRecord>(&b).ok())
             .filter(|r| {
-                dunce::canonicalize(&r.root).is_ok_and(|root| root == session.vault().root())
+                dunce::canonicalize(&r.root).is_ok_and(|root| root == session.vault().root()) // seam: outside (matching a take to a recent vault by canonical path)
             })
             .and_then(|r| {
                 not_archived(&r.page).ok()?;
                 visible_page(session, &r.page).ok()
             })
             .unwrap_or_else(|| fallback.clone());
-        let Ok(files) = std::fs::read_dir(&dir) else {
+        let files = std::fs::read_dir(&dir); // seam: outside (audio takes live in the app cache, E3 spec §4.2)
+        let Ok(files) = files else {
             continue;
         };
         let mut kept = false;
@@ -201,7 +203,7 @@ fn recover(
             } else {
                 dir.join(format!("{stem}-recovered.wav"))
             };
-            match std::fs::rename(&wav, &named)
+            match std::fs::rename(&wav, &named) // seam: outside (audio takes live in the app cache, E3 spec §4.2)
                 .map_err(CommandError::from)
                 .and_then(|()| Ok(session.import_attachment(&page, &named)?))
             {
@@ -210,7 +212,7 @@ fn recover(
             }
         }
         if !kept {
-            let _ = std::fs::remove_dir_all(&dir);
+            let _ = std::fs::remove_dir_all(&dir); // seam: outside (audio takes live in the app cache, E3 spec §4.2)
         }
     }
     out
@@ -244,16 +246,15 @@ pub(crate) fn audio_record_start_impl<R: Runtime>(
     let recovered = recover(&cache, &session, &page, &audio.finishing());
     let id = audio.next.fetch_add(1, Ordering::SeqCst);
     let dir = cache.join(format!("{name}-{id}"));
-    let _ = std::fs::remove_dir_all(&dir);
-    std::fs::create_dir_all(&dir)?;
+    let _ = std::fs::remove_dir_all(&dir); // seam: outside (audio takes live in the app cache, E3 spec §4.2)
+    std::fs::create_dir_all(&dir)?; // seam: outside (audio takes live in the app cache, E3 spec §4.2)
     let record = TakeRecord {
         root: session.vault().root().to_path_buf(),
         page: page.to_string(),
     };
-    std::fs::write(
-        dir.join("take.json"),
-        serde_json::to_vec(&record).map_err(|e| CommandError::new(ErrorKind::Io, e.to_string()))?,
-    )?;
+    let json =
+        serde_json::to_vec(&record).map_err(|e| CommandError::new(ErrorKind::Io, e.to_string()))?;
+    std::fs::write(dir.join("take.json"), json)?; // seam: outside (audio takes live in the app cache, E3 spec §4.2)
     let file = dir.join(format!("{name}.wav"));
     let stop = Arc::new(AtomicBool::new(false));
     let (started, first) = mpsc::channel::<()>();
@@ -293,7 +294,7 @@ pub(crate) fn audio_record_start_impl<R: Runtime>(
     // The first reading means the microphone opened; an error ends the thread
     // first. A silent stream still reads (zero), so this never waits long.
     if first.recv_timeout(Duration::from_secs(3)).is_err() && thread.is_finished() {
-        let _ = std::fs::remove_dir_all(&dir);
+        let _ = std::fs::remove_dir_all(&dir); // seam: outside (audio takes live in the app cache, E3 spec §4.2)
         return match thread.join() {
             Ok(Err(e)) => Err(e.into()),
             _ => Err(CommandError::new(
@@ -336,7 +337,7 @@ impl Done<'_> {
         let out = match &self.take {
             Ok(_) => match self.session.import_attachment(page, &self.file) {
                 Ok(attached) => {
-                    let _ = std::fs::remove_dir_all(&self.dir);
+                    let _ = std::fs::remove_dir_all(&self.dir); // seam: outside (audio takes live in the app cache, E3 spec §4.2)
                     Ok(attached.into())
                 }
                 Err(e) => Err(CommandError::new(
@@ -347,7 +348,7 @@ impl Done<'_> {
                 )),
             },
             Err(e) => {
-                let _ = std::fs::remove_dir_all(&self.dir);
+                let _ = std::fs::remove_dir_all(&self.dir); // seam: outside (audio takes live in the app cache, E3 spec §4.2)
                 Err(CommandError::new(ErrorKind::Io, e.to_string()))
             }
         };
@@ -356,7 +357,7 @@ impl Done<'_> {
     }
 
     fn discard(self) {
-        let _ = std::fs::remove_dir_all(&self.dir);
+        let _ = std::fs::remove_dir_all(&self.dir); // seam: outside (audio takes live in the app cache, E3 spec §4.2)
         self.audio.finishing().remove(&self.dir);
     }
 }

@@ -8,20 +8,6 @@ use std::path::{Path, PathBuf};
 
 /// Thin wrappers over the vault's [`Storage`](crate::Storage).
 impl Vault {
-    /// Transitional, until liber-session, liber-import (E2 Task 4) and the
-    /// desktop app (Task 5) use the narrow methods below; then removed.
-    #[doc(hidden)]
-    pub fn fs_path(&self, path: &VaultPath) -> Result<PathBuf> {
-        self.os_path(path, OsUse::Open)
-    }
-
-    /// Transitional, as [`Vault::fs_path`]; `open_read(.., Reach::Visible)`
-    /// replaces it.
-    #[doc(hidden)]
-    pub fn visible_fs_path(&self, path: &VaultPath) -> Result<PathBuf> {
-        plain::resolve_visible(self.root(), path)
-    }
-
     /// `"plain"` unless the vault was opened on another storage.
     pub fn storage_name(&self) -> &'static str {
         self.storage().name()
@@ -57,7 +43,7 @@ impl Vault {
     }
 
     /// An OS path for `use_`: opening with the default app, revealing in the
-    /// file manager, or a `file://` link.
+    /// file manager (never a hidden item), or a `file://` link.
     pub fn os_path(&self, path: &VaultPath, use_: OsUse) -> Result<PathBuf> {
         self.storage().os_path(path, use_)
     }
@@ -129,7 +115,7 @@ impl Vault {
                 Ok(Some(meta)) if meta.kind == Kind::Dir => continue,
                 Ok(Some(_)) => return Err(VaultError::AlreadyExists(current.to_string())),
                 // Nothing there, or a link out of the vault: `create_dir`
-                // refuses the latter as `fs_path` used to.
+                // refuses the latter, as before E2.
                 _ => {
                     self.storage().create_dir(&current)?;
                     created.push(current.clone());

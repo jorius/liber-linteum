@@ -212,7 +212,8 @@ pub(crate) fn notion_import_impl<R: Runtime>(
     let target = parent.join(vault_name(&name)?);
     // Before the export is read and planned again: a taken name is said at
     // once (the page then lets the user pick another without re-reading).
-    if target.symlink_metadata().is_ok() {
+    let taken = target.symlink_metadata().is_ok(); // seam: outside (the import target folder, which does not exist yet)
+    if taken {
         return Err(ImportError::Exists(target.display().to_string()).into());
     }
     let export = Export::open(&zip, &Limits::default())?;

@@ -142,14 +142,17 @@ pub(crate) fn entry_reveal_impl<R: Runtime>(app: &AppHandle<R>, path: String) ->
     let full = {
         let state = app.state::<AppState>();
         let session = state.session()?;
+        let vp = liber_vault::VaultPath::new(&path)?;
         // Hidden folders (`.git`, `.obsidian`, `.liber`…) stay hidden here too.
-        session
-            .vault()
-            .visible_fs_path(&liber_vault::VaultPath::new(&path)?)?
+        let full = session.vault().os_path(&vp, liber_vault::OsUse::Reveal)?;
+        if !matches!(
+            session.vault().meta(&vp, liber_vault::Follow::No),
+            Ok(Some(_))
+        ) {
+            return Err(liber_vault::VaultError::NotFound(path).into());
+        }
+        full
     };
-    if full.symlink_metadata().is_err() {
-        return Err(liber_vault::VaultError::NotFound(path).into());
-    }
     app.opener()
         .reveal_item_in_dir(full)
         .map_err(|e| CommandError::new(ErrorKind::Io, e.to_string()))

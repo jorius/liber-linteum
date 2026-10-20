@@ -353,9 +353,12 @@ impl Storage for PlainStorage {
             Reach::Visible => self.resolve_visible(path)?,
         };
         let file = std::fs::File::open(full).map_err(|e| io_err(path.as_str(), e))?;
-        let len = file.metadata().map_err(|e| io_err(path.as_str(), e))?.len();
+        let meta = file.metadata().map_err(|e| io_err(path.as_str(), e))?;
+        if !meta.is_file() {
+            return Err(VaultError::NotFound(format!("{path} is not a file")));
+        }
         Ok(Reader {
-            len,
+            len: meta.len(),
             inner: Box::new(file),
         })
     }
@@ -394,8 +397,11 @@ impl Storage for PlainStorage {
     }
 
     /// Plain files are their own OS path, whatever the use.
-    fn os_path(&self, path: &VaultPath, _use_: OsUse) -> Result<PathBuf> {
-        self.resolve(path)
+    fn os_path(&self, path: &VaultPath, use_: OsUse) -> Result<PathBuf> {
+        match use_ {
+            OsUse::Reveal => self.resolve_visible(path),
+            OsUse::Open | OsUse::FileUrl => self.resolve(path),
+        }
     }
 
     fn vault_path_of(&self, os: &Path) -> Option<VaultPath> {

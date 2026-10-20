@@ -108,7 +108,7 @@ pub async fn vault_open<R: Runtime>(app: AppHandle<R>, path: PathBuf) -> CmdResu
 pub async fn vault_create<R: Runtime>(app: AppHandle<R>, path: PathBuf) -> CmdResult<VaultInfo> {
     blocking(app, move |app| {
         if path.exists() {
-            let occupied = std::fs::read_dir(&path)?
+            let occupied = std::fs::read_dir(&path)? // seam: outside (the folder about to become a vault)
                 .filter_map(|e| e.ok())
                 .any(|e| !OS_METADATA.contains(&e.file_name().to_string_lossy().as_ref()));
             if occupied {
@@ -118,7 +118,7 @@ pub async fn vault_create<R: Runtime>(app: AppHandle<R>, path: PathBuf) -> CmdRe
                 ));
             }
         } else {
-            std::fs::create_dir_all(&path)?;
+            std::fs::create_dir_all(&path)?; // seam: outside (the folder about to become a vault)
         }
         open_session(&app, &path)
     })

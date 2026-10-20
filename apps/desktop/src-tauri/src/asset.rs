@@ -8,7 +8,7 @@
 
 use crate::file_windows::{FileWindows, is_file_window};
 use crate::state::AppState;
-use liber_vault::{Vault, VaultPath, is_hidden_path};
+use liber_vault::{Follow, Kind, Reach, Reader, Vault, VaultPath, is_hidden_path};
 use percent_encoding::percent_decode_str;
 
 pub const SCHEME: &str = "liber-asset";
@@ -125,7 +125,21 @@ fn serve_external(
         }
         Err(_) => return AssetResponse::status(404),
     };
-    respond_file(&real, mime_for(&path), range)
+    let Some(reader) = open_outside(&real) else {
+        return AssetResponse::status(404);
+    };
+    respond(reader, mime_for(&path), range)
+}
+
+/// An outside file the session allowed, as a [`Reader`]; `None` unless it
+/// opens as a file.
+fn open_outside(real: &std::path::Path) -> Option<Reader> {
+    let file = std::fs::File::open(real).ok()?; // seam: outside (an outside file the page links, M4b part 3 §9)
+    let meta = file.metadata().ok()?;
+    meta.is_file().then(|| Reader {
+        len: meta.len(),
+        inner: Box::new(file),
+    })
 }
 
 /// Serves `uri_path` (the request path, percent-encoded, starting with `/`).
@@ -159,14 +173,22 @@ fn serve_trashed_image(vault: &Vault, encoded: &str, range: Option<&str>) -> Ass
     {
         return AssetResponse::status(403);
     }
-    let dir = vault.root().join(".trash");
-    let file = dir.join(name.as_ref());
-    let real_dir = std::fs::symlink_metadata(&dir).is_ok_and(|m| m.is_dir());
-    let real_file = std::fs::symlink_metadata(&file).is_ok_and(|m| m.is_file());
-    if !real_dir || !real_file {
+    let dir = VaultPath::new(".trash").expect("valid");
+    let Ok(file) = dir.join(&name) else {
+        return AssetResponse::status(404);
+    };
+    let is = |p: &VaultPath, kind| {
+        vault
+            .meta(p, Follow::No)
+            .is_ok_and(|m| m.is_some_and(|m| m.kind == kind))
+    };
+    if !is(&dir, Kind::Dir) || !is(&file, Kind::File) {
         return AssetResponse::status(404);
     }
-    respond_file(&file, mime, range)
+    let Ok(reader) = vault.open_read(&file, Reach::Any) else {
+        return AssetResponse::status(404);
+    };
+    respond(reader, mime, range)
 }
 
 /// Serves a request from the webview labelled `label`: a single-file window
@@ -204,10 +226,10 @@ fn serve_from(vault: &Vault, uri_path: &str, range: Option<&str>) -> AssetRespon
     // A symlink resolving outside the vault, or into a hidden file (or an 8.3
     // name doing so, M4c review I4) is, for the webview, a file that doesn't
     // exist (403 stays for requests that are malformed on their face).
-    let Ok(full) = vault.visible_fs_path(&path) else {
+    let Ok(reader) = vault.open_read(&path, Reach::Visible) else {
         return AssetResponse::status(404);
     };
-    respond_file(&full, mime_for(path.as_str()), range)
+    respond(reader, mime_for(path.as_str()), range)
 }
 
 /// The most one ranged response carries: a long clip is played and seeked
@@ -217,18 +239,10 @@ const MAX_PIECE: usize = 8 * 1024 * 1024;
 /// A file as a full (200) or partial (206/416) response. A range is read
 /// from its offset only, and at most [`MAX_PIECE`] of it is sent (a
 /// server may answer a range with less; the player asks for the rest).
-fn respond_file(file: &std::path::Path, mime: &'static str, range: Option<&str>) -> AssetResponse {
+fn respond(reader: Reader, mime: &'static str, range: Option<&str>) -> AssetResponse {
     use std::io::{Read, Seek, SeekFrom};
-    let Ok(mut f) = std::fs::File::open(file) else {
-        return AssetResponse::status(404);
-    };
-    let Ok(meta) = f.metadata() else {
-        return AssetResponse::status(404);
-    };
-    if !meta.is_file() {
-        return AssetResponse::status(404);
-    }
-    let len = meta.len() as usize;
+    let mut f = reader.inner;
+    let len = reader.len as usize;
     match range.and_then(|r| parse_range(r, len)) {
         Some(Ok((start, end))) => {
             let end = end.min(start + MAX_PIECE - 1);

@@ -44,6 +44,8 @@ pub enum Reach {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum OsUse {
     Open,
+    /// Showing in the file manager: also refuses a hidden real location,
+    /// as [`Reach::Visible`] (round 3 §9.4 review #6).
     Reveal,
     FileUrl,
 }
@@ -103,6 +105,7 @@ pub trait Storage: Send + Sync + std::fmt::Debug {
     fn meta(&self, path: &VaultPath, follow: Follow) -> Result<Option<Meta>>;
     fn children(&self, dir: &VaultPath) -> Result<Vec<Child>>;
     fn read(&self, path: &VaultPath) -> Result<Vec<u8>>;
+    /// A file only: anything else is `NotFound`.
     fn open_read(&self, path: &VaultPath, reach: Reach) -> Result<Reader>;
     fn replace_atomic(
         &self,
