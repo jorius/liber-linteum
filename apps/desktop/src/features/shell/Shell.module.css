@@ -6,7 +6,9 @@
 }
 
 .side {
-  flex: 0 0 270px;
+  /* Its width is the user's (round 3 §2.1), dragged on the right edge. */
+  flex: 0 0 var(--sidebar-width, 270px);
+  position: relative;
   /* A long page or folder name is cut short in its row; it never widens the
      sidebar (M4b review focus). */
   min-width: 0;
@@ -308,4 +310,25 @@
 .vaultIcon {
   font-size: 20px;
   color: inherit;
+}
+
+/* The sidebar's right edge (round 3 §2.1): a thin grip that shows on hover,
+   focus and while dragging. */
+.sideResize {
+  position: absolute;
+  top: 0;
+  right: -3px;
+  bottom: 0;
+  width: 6px;
+  cursor: col-resize;
+  z-index: 2;
+  touch-action: none;
+}
+
+.sideResize:hover,
+.sideResize:focus-visible,
+.sideResize[data-dragging] {
+  background: var(--color-accent);
+  opacity: 0.6;
+  outline: none;
 }

@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useRef, useState, type CSSProperties } from 'react';
 import { useTranslation } from 'react-i18next';
 import { NewFolderIcon, NewPageIcon, SidebarIcon, SortIcon } from '../../app/icons';
 import { dirFor } from '../../stores/tree';
@@ -9,6 +9,7 @@ import { SortMenu } from '../explorer/SortMenu';
 import type { ExplorerTreeProps } from '../explorer/ExplorerTree';
 import { IconButton } from '../icons/ItemIcon';
 import { toggleSidebar } from './shellMenu';
+import { useSidebarResize } from './SidebarResize';
 import { VaultMenu } from './VaultMenu';
 import styles from './Shell.module.css';
 
@@ -21,13 +22,18 @@ export function Sidebar(treeProps: ExplorerTreeProps) {
   // The vault root's order (M5b round 2), opened under its button.
   const [sortAt, setSortAt] = useState<{ x: number; y: number } | null>(null);
   const sortButton = useRef<HTMLButtonElement>(null);
+  const resize = useSidebarResize();
   const create = (kind: 'page' | 'folder') => {
     const { nodes, selected, createPage, createFolder } = useVaultStore.getState();
     const dir = dirFor(nodes, selected);
     void (kind === 'page' ? createPage(dir) : createFolder(dir));
   };
   return (
-    <aside className={styles.side} aria-label={t('shell.files', { name })}>
+    <aside
+      className={styles.side}
+      aria-label={t('shell.files', { name })}
+      style={{ '--sidebar-width': `${resize.width}px` } as CSSProperties}
+    >
       {/* The vault, not the app (M4b §1): no app mark beside it (M5b §2.4). Its
           optional emoji is its own button, so it never opens the vault menu. */}
       <div className={styles.brandRow}>
@@ -106,6 +112,7 @@ export function Sidebar(treeProps: ExplorerTreeProps) {
         onRequestDelete={treeProps.onRequestDelete}
         onRequestMenu={treeProps.onRequestMenu}
       />
+      {resize.handle}
     </aside>
   );
 }

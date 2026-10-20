@@ -204,6 +204,8 @@ export interface Settings {
   autoSave: boolean;
   /** The sidebar is collapsed (M5b §2.5). */
   sidebarCollapsed: boolean;
+  /** The sidebar's width in px (round 3 §2.1), 200–560; 270 by default. */
+  sidebarWidth: number;
   /** Where the floating Edit / Global View / Search button sits (M5b §2.2). */
   actionButton: ActionButtonPlace;
 }
@@ -259,6 +261,7 @@ export interface SettingsPatch {
   showAttachmentPaths?: boolean;
   autoSave?: boolean;
   sidebarCollapsed?: boolean;
+  sidebarWidth?: number;
   actionButton?: ActionButtonPlace;
 }
 

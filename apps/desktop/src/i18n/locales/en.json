@@ -88,6 +88,8 @@
     "closeVault": "Close vault",
     "actions": "Actions",
     "hideSidebar": "Hide sidebar",
+    "resizeSidebar": "Resize the sidebar",
+    "resizeSidebarHint": "Drag to resize the sidebar; double-click to reset it",
     "showSidebar": "Show sidebar",
     "settingsItem": "Settings…",
     "openAnother": "Open another vault…"

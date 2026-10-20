@@ -295,6 +295,43 @@ impl From<CoverHeight> for u16 {
     }
 }
 
+pub const MIN_SIDEBAR_WIDTH: u16 = 200;
+pub const MAX_SIDEBAR_WIDTH: u16 = 560;
+
+/// The sidebar's width in px (round 3 §2.1), app-wide, clamped to 200–560
+/// (an out-of-range number is clamped, not reset).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(from = "u32", into = "u16")]
+pub struct SidebarWidth(u16);
+
+impl SidebarWidth {
+    pub fn new(px: u32) -> SidebarWidth {
+        SidebarWidth(px.clamp(u32::from(MIN_SIDEBAR_WIDTH), u32::from(MAX_SIDEBAR_WIDTH)) as u16)
+    }
+
+    pub fn get(self) -> u16 {
+        self.0
+    }
+}
+
+impl Default for SidebarWidth {
+    fn default() -> SidebarWidth {
+        SidebarWidth(270)
+    }
+}
+
+impl From<u32> for SidebarWidth {
+    fn from(px: u32) -> SidebarWidth {
+        SidebarWidth::new(px)
+    }
+}
+
+impl From<SidebarWidth> for u16 {
+    fn from(w: SidebarWidth) -> u16 {
+        w.0
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct RecentVault {
@@ -345,6 +382,8 @@ pub struct Settings {
     pub auto_save: bool,
     /// The sidebar is collapsed (M5b §2.5), app-wide.
     pub sidebar_collapsed: bool,
+    /// The sidebar's width (round 3 §2.1), app-wide.
+    pub sidebar_width: SidebarWidth,
     /// Where the floating Edit / Global View / Search button sits (M5b §2.2).
     pub action_button: ActionButton,
     pub recent_vaults: Vec<RecentVault>,
@@ -379,6 +418,7 @@ impl Default for Settings {
             scratchpad_path: None,
             auto_save: true,
             sidebar_collapsed: false,
+            sidebar_width: SidebarWidth::default(),
             action_button: ActionButton::BottomRight,
             recent_vaults: Vec::new(),
             extra: serde_json::Map::new(),
@@ -411,6 +451,7 @@ pub struct SettingsPatch {
     pub show_attachment_paths: Option<bool>,
     pub auto_save: Option<bool>,
     pub sidebar_collapsed: Option<bool>,
+    pub sidebar_width: Option<SidebarWidth>,
     pub action_button: Option<ActionButton>,
 }
 
@@ -482,6 +523,7 @@ fn parse_lenient(text: &str) -> Result<(Settings, Vec<String>), serde_json::Erro
     field!("scratchpadPath", scratchpad_path);
     field!("autoSave", auto_save);
     field!("sidebarCollapsed", sidebar_collapsed);
+    field!("sidebarWidth", sidebar_width);
     field!("actionButton", action_button);
     match map.remove("recentVaults") {
         None => {}
@@ -635,6 +677,9 @@ impl SettingsStore {
         }
         if let Some(v) = patch.sidebar_collapsed {
             next.sidebar_collapsed = v;
+        }
+        if let Some(v) = patch.sidebar_width {
+            next.sidebar_width = v;
         }
         if let Some(v) = patch.action_button {
             next.action_button = v;

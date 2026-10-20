@@ -594,3 +594,38 @@ fn cover_height_setting_default_persist_clamp_and_reset() {
     assert_eq!(s.theme, Theme::Dark);
     assert!(warning.unwrap().contains("coverHeight"));
 }
+
+/// Round 3 §2.1: the sidebar's width, 270 px by default, persisted, clamped
+/// to 200–560 and reset on its own when it isn't a number.
+#[test]
+fn sidebar_width_setting_default_persist_clamp_and_reset() {
+    use nimw_desktop::settings::SidebarWidth;
+    let dir = tempfile::tempdir().unwrap();
+    let s = store(dir.path());
+    assert_eq!(s.get().0.sidebar_width.get(), 270);
+    s.update(SettingsPatch {
+        sidebar_width: Some(SidebarWidth::new(380)),
+        ..Default::default()
+    })
+    .unwrap();
+    let saved: serde_json::Value =
+        serde_json::from_str(&std::fs::read_to_string(dir.path().join("settings.json")).unwrap())
+            .unwrap();
+    assert_eq!(saved["sidebarWidth"], 380);
+    assert_eq!(store(dir.path()).get().0.sidebar_width.get(), 380);
+    for (text, px) in [
+        (r#"{"sidebarWidth":20}"#, 200),
+        (r#"{"sidebarWidth":5000}"#, 560),
+    ] {
+        std::fs::write(dir.path().join("settings.json"), text).unwrap();
+        assert_eq!(store(dir.path()).get().0.sidebar_width.get(), px, "{text}");
+    }
+    std::fs::write(
+        dir.path().join("settings.json"),
+        r#"{"sidebarWidth":"wide"}"#,
+    )
+    .unwrap();
+    let (s, warning) = store(dir.path()).get();
+    assert_eq!(s.sidebar_width.get(), 270);
+    assert!(warning.unwrap().contains("sidebarWidth"));
+}

@@ -88,6 +88,8 @@
     "closeVault": "Cerrar bóveda",
     "actions": "Acciones",
     "hideSidebar": "Ocultar la barra lateral",
+    "resizeSidebar": "Cambiar el ancho de la barra lateral",
+    "resizeSidebarHint": "Arrastra para cambiar el ancho de la barra lateral; doble clic para restablecerlo",
     "showSidebar": "Mostrar la barra lateral",
     "settingsItem": "Ajustes…",
     "openAnother": "Abrir otra bóveda…"

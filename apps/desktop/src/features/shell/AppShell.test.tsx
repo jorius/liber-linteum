@@ -1,6 +1,6 @@
 import { undo } from '@codemirror/commands';
 import { EditorView } from '@codemirror/view';
-import { act, render, screen, waitFor, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import axe from 'axe-core';
 import { afterEach, beforeAll, describe, expect, it } from 'vitest';
@@ -267,6 +267,49 @@ describe('AppShell', () => {
     expect(
       await screen.findByRole('complementary', { name: 'Files · Digital Brain' }),
     ).toBeInTheDocument();
+  });
+
+  it('round 3 §2.1: the sidebar resizes by drag and keys, clamps to 200–560, and remembers its width', async () => {
+    const calls = backend({
+      settings_set: (a) => ({ ...useSettingsStore.getState().settings, ...(a.patch as object) }),
+    });
+    const patches = () => calls.filter(([c]) => c === 'settings_set').map(([, a]) => a.patch);
+    seed();
+    render(<AppShell />);
+    const side = screen.getByRole('complementary');
+    const edge = screen.getByRole('separator', { name: 'Resize the sidebar' });
+    const width = () => side.style.getPropertyValue('--sidebar-width');
+    expect(edge).toHaveAttribute('aria-valuenow', '270');
+    expect(edge).toHaveAttribute('aria-valuemin', '200');
+    expect(edge).toHaveAttribute('aria-valuemax', '560');
+    expect(width()).toBe('270px');
+    // Keys: → wider, Shift ×4, saved each time.
+    edge.focus();
+    await userEvent.keyboard('{ArrowRight}');
+    await waitFor(() => expect(patches().at(-1)).toEqual({ sidebarWidth: 286 }));
+    expect(width()).toBe('286px');
+    await userEvent.keyboard('{Shift>}{ArrowLeft}{/Shift}');
+    await waitFor(() => expect(patches().at(-1)).toEqual({ sidebarWidth: 222 }));
+    // Dragging follows the pointer, clamps, and saves once on release.
+    const at = (type: string, x: number) =>
+      act(() => {
+        edge.dispatchEvent(
+          new PointerEvent(type, { bubbles: true, clientX: x, clientY: 300, pointerId: 1 }),
+        );
+      });
+    const before = patches().length;
+    await at('pointerdown', 222);
+    await at('pointermove', 400);
+    expect(edge).toHaveAttribute('aria-valuenow', '400');
+    await at('pointermove', 2000);
+    expect(width()).toBe('560px');
+    expect(patches().length).toBe(before);
+    await at('pointerup', 2000);
+    await waitFor(() => expect(patches().at(-1)).toEqual({ sidebarWidth: 560 }));
+    // A double-click puts the default back.
+    fireEvent.doubleClick(edge);
+    await waitFor(() => expect(patches().at(-1)).toEqual({ sidebarWidth: 270 }));
+    expect(width()).toBe('270px');
   });
 
   it('final review I5: collapsing from inside the sidebar keeps the keyboard; reopening returns it', async () => {

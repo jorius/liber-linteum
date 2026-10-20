@@ -36,6 +36,7 @@ export const DEFAULT_SETTINGS: Settings = {
   scratchpadPath: null,
   autoSave: true,
   sidebarCollapsed: false,
+  sidebarWidth: 270,
   actionButton: 'bottomRight',
   globalViewMode: 'drill',
   globalViewEdges: { links: true, tree: true, manual: true, aggregated: true },
