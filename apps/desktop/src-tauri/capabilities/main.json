@@ -21,6 +21,7 @@
     "allow-settings-set",
     "allow-vaults-recent",
     "allow-vaults-forget",
+    "allow-vaults-reveal",
     "allow-page-read",
     "allow-page-write",
     "allow-page-create-conflict-copy",

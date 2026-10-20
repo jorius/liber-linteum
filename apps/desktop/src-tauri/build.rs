@@ -18,6 +18,7 @@ const COMMANDS: &[&str] = &[
     "settings_set",
     "vaults_recent",
     "vaults_forget",
+    "vaults_reveal",
     "page_read",
     "page_write",
     "page_create_conflict_copy",

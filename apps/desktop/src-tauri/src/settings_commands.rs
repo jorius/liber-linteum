@@ -1,10 +1,11 @@
 //! Settings and recent-vault commands (M1b spec §2.3–2.4).
 
-use crate::error::CmdResult;
+use crate::error::{CmdResult, CommandError, ErrorKind};
 use crate::settings::{RecentVaultDto, Settings, SettingsDto, SettingsPatch};
 use crate::state::AppState;
 use crate::vault_commands::blocking;
 use tauri::{AppHandle, Emitter, Manager, Runtime, State};
+use tauri_plugin_opener::OpenerExt;
 
 #[tauri::command]
 pub fn settings_get(state: State<'_, AppState>) -> SettingsDto {
@@ -21,6 +22,20 @@ pub(crate) fn vaults_recent_impl(state: &AppState) -> Vec<RecentVaultDto> {
 
 pub(crate) fn vaults_forget_impl(state: &AppState, path: String) -> CmdResult<()> {
     Ok(state.settings.forget(&path)?)
+}
+
+/// R3 §7: shows a recent vault's folder in Finder or Explorer. Only a path on
+/// the recent list: the webview can't ask to reveal anything else.
+pub(crate) fn vaults_reveal_impl<R: Runtime>(app: &AppHandle<R>, path: String) -> CmdResult<()> {
+    if !app.state::<AppState>().settings.is_recent(&path) {
+        return Err(CommandError::new(
+            ErrorKind::NotPermitted,
+            "only a recent vault can be revealed",
+        ));
+    }
+    app.opener()
+        .reveal_item_in_dir(&path)
+        .map_err(|e| CommandError::new(ErrorKind::Io, e.to_string()))
 }
 
 // ---- command wrappers: run off the UI thread (final review I2) ----
@@ -56,4 +71,9 @@ pub async fn vaults_forget<R: Runtime>(app: AppHandle<R>, path: String) -> CmdRe
         vaults_forget_impl(&app.state::<AppState>(), path)
     })
     .await
+}
+
+#[tauri::command]
+pub async fn vaults_reveal<R: Runtime>(app: AppHandle<R>, path: String) -> CmdResult<()> {
+    blocking(app, move |app| vaults_reveal_impl(&app, path)).await
 }

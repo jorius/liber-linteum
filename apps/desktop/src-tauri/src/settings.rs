@@ -741,6 +741,11 @@ impl SettingsStore {
         self.lock().scratchpad_path.as_deref() == Some(root.to_string_lossy().as_ref())
     }
 
+    /// Whether `path` is on the recent list, exactly as stored.
+    pub fn is_recent(&self, path: &str) -> bool {
+        self.lock().recent_vaults.iter().any(|r| r.path == path)
+    }
+
     pub fn forget(&self, path: &str) -> std::io::Result<()> {
         let mut s = self.lock();
         let mut next = s.clone();

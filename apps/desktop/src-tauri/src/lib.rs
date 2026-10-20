@@ -155,6 +155,7 @@ pub fn configure<R: tauri::Runtime>(
         settings_commands::settings_set,
         settings_commands::vaults_recent,
         settings_commands::vaults_forget,
+        settings_commands::vaults_reveal,
         editor_commands::page_read,
         editor_commands::page_write,
         editor_commands::page_create_conflict_copy,

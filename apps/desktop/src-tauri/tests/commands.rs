@@ -31,6 +31,7 @@ const COMMANDS: &[&str] = &[
     "settings_set",
     "vaults_recent",
     "vaults_forget",
+    "vaults_reveal",
     "page_read",
     "page_write",
     "page_create_conflict_copy",
@@ -380,6 +381,21 @@ fn settings_round_trip_and_recent_vaults_through_ipc() {
         call(&h.main, "vaults_recent", json!({})).unwrap(),
         json!([])
     );
+}
+
+/// R3 §7: the Welcome screen can show a recent vault in Finder or Explorer,
+/// but only a vault on the recent list (the webview can't reveal any path).
+#[test]
+fn r3_vaults_reveal_refuses_a_path_not_on_the_recent_list() {
+    let h = harness();
+    let elsewhere = tempfile::tempdir().unwrap();
+    let err = call(
+        &h.main,
+        "vaults_reveal",
+        json!({ "path": elsewhere.path() }),
+    )
+    .unwrap_err();
+    assert_eq!(kind(err), "notPermitted");
 }
 
 #[test]
