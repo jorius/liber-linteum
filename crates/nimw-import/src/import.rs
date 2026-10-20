@@ -209,11 +209,31 @@ pub fn plan(export: &Export, cancel: &AtomicBool) -> Result<Plan, ImportError> {
         }
     }
 
-    // Names: real files first (sorted), then what the import makes up.
+    // Names: real files first (sorted), then what the import makes up. A
+    // page with sub-pages is its folder's page, `X/X.md` (round 3b §6.6),
+    // named before the folder's children so the name is its own.
     let mut names = NameMap::default();
     let mut paths: HashMap<usize, String> = HashMap::new();
+    let own_folder = |i: usize| -> Option<Vec<String>> {
+        let e = &entries[i];
+        let (name, parent) = e.path.split_last()?;
+        let mut folder = parent.to_vec();
+        folder.push(name.strip_suffix(".md")?.to_string());
+        folders_in_export
+            .contains(folder.as_slice())
+            .then_some(folder)
+    };
     for &i in &order {
-        if !db_csvs.contains(&i) {
+        if ext(&entries[i]) == "md"
+            && let Some(folder) = own_folder(i)
+        {
+            let f = names.assign(&folder, false);
+            let name = f.rsplit('/').next().unwrap_or(&f).to_string();
+            paths.insert(i, names.claim(&f, &format!("{name}.md"), true));
+        }
+    }
+    for &i in &order {
+        if !db_csvs.contains(&i) && !paths.contains_key(&i) {
             paths.insert(i, names.assign(&entries[i].path, true));
         }
     }
@@ -253,16 +273,22 @@ pub fn plan(export: &Export, cancel: &AtomicBool) -> Result<Plan, ImportError> {
             names.assign(&db.parent, false)
         };
         let title = strip_notion_id(&db.base);
-        let index = names.claim(
-            &parent_vault,
-            &clean_component(&format!("{}.md", db.base), true),
-            true,
-        );
         let mut folder_orig = db.parent.clone();
         folder_orig.push(db.base.clone());
         let folder = match names.get(&folder_orig) {
             Some(f) => f.to_string(),
             None => names.claim(&parent_vault, &clean_component(&db.base, false), false),
+        };
+        // The index is its rows folder's page (round 3b §6.6) when it has rows.
+        let index = if table.rows.is_empty() {
+            names.claim(
+                &parent_vault,
+                &clean_component(&format!("{}.md", db.base), true),
+                true,
+            )
+        } else {
+            let name = folder.rsplit('/').next().unwrap_or(&folder).to_string();
+            names.claim(&folder, &format!("{name}.md"), true)
         };
         // Row pages in the export, by their cleaned name.
         let mut waiting: HashMap<String, VecDeque<usize>> = HashMap::new();
@@ -772,8 +798,10 @@ mod tests {
         let report = report.unwrap();
         assert!(!report.cancelled);
         assert_eq!(report.report, REPORT);
+        // Round 3b §6.6: a page with sub-pages is its folder's page.
+        assert!(!dir.path().join("Home.md").exists());
         assert_eq!(
-            read(&dir, "Home.md"),
+            read(&dir, "Home/Home.md"),
             "# Home\n\nSee [[Child]] and [[Tasks]].\n\n![[Home/pic.png]]\n\n> [!note]\n> 💡 Tip\n\n[gone](Nope.md)\n"
         );
         assert_eq!(
@@ -788,8 +816,9 @@ mod tests {
         );
         // A row with no page gets one; the index page links both.
         assert_eq!(read(&dir, "Home/Tasks/Ship it.md"), "# Ship it\n");
+        assert!(!dir.path().join("Home/Tasks.md").exists());
         assert_eq!(
-            read(&dir, "Home/Tasks.md"),
+            read(&dir, "Home/Tasks/Tasks.md"),
             "# Tasks\n\n| Name | Status | Due | Related |\n| --- | --- | --- | --- |\n| [[Home/Tasks/Write intro\\|Write intro]] | Done | October 1, 2026 | Child (Child%20ffffffffffffffffffffffffffffffff.md) |\n| [[Home/Tasks/Ship it\\|Ship it]] |  |  |  |\n"
         );
         // Duplicate names numbered; the plain CSV not written.
@@ -801,6 +830,40 @@ mod tests {
             text.contains("| Database rows | 2 |") && text.contains("Nope.md"),
             "{text}"
         );
+    }
+
+    #[test]
+    fn r3b_folder_pages_follow_a_numbered_folder() {
+        let first = format!("# Home\n\nSee [the other](Home%20{B}.md).\n");
+        let zip = zip_file(&[
+            (&format!("Home {A}.md"), first.as_bytes()),
+            (&format!("Home {A}/Kid {B}.md"), b"# Kid\n"),
+            (&format!("Home {B}.md"), b"# Home again\n"),
+            (&format!("Home {B}/Kid two {C}.md"), b"# Kid two\n"),
+        ]);
+        let (dir, report, _) = import(zip.path(), None);
+        report.unwrap();
+        assert_eq!(read(&dir, "Home 1/Home 1.md"), "# Home again\n");
+        assert!(!dir.path().join("Home 1/Home.md").exists());
+        assert!(
+            read(&dir, "Home/Home.md").contains("[[Home 1|the other]]"),
+            "{}",
+            read(&dir, "Home/Home.md")
+        );
+    }
+
+    #[test]
+    fn r3b_a_page_without_children_stays_beside() {
+        let zip = zip_file(&[
+            (&format!("Solo {A}.md"), b"# Solo\n"),
+            (&format!("Home {B}.md"), b"# Home\n"),
+            (&format!("Home {B}/Kid {C}.md"), b"# Kid\n"),
+        ]);
+        let (dir, report, _) = import(zip.path(), None);
+        report.unwrap();
+        assert_eq!(read(&dir, "Solo.md"), "# Solo\n");
+        assert!(!dir.path().join("Solo").exists());
+        assert_eq!(read(&dir, "Home/Home.md"), "# Home\n");
     }
 
     #[test]
@@ -849,7 +912,7 @@ mod tests {
         );
         assert!(!dir.path().join("Vault/Home/sales.md").exists());
         assert!(!dir.path().join("Vault/Home/sales").exists());
-        assert_eq!(read(&dir, "Home.md"), "# Home\n\n[[Home/sales.csv]]\n");
+        assert_eq!(read(&dir, "Home/Home.md"), "# Home\n\n[[Home/sales.csv]]\n");
         assert_eq!(plan.preview().databases, 0);
         assert_eq!(plan.preview().attachments, 1);
     }
@@ -863,7 +926,7 @@ mod tests {
         let (dir, report, plan) = import(zip.path(), None);
         report.unwrap();
         assert_eq!(plan.preview().databases, 1);
-        assert!(read(&dir, "Tasks.md").starts_with("# Tasks\n"));
+        assert!(read(&dir, "Tasks/Tasks.md").starts_with("# Tasks\n"));
     }
 
     #[test]
@@ -944,7 +1007,7 @@ mod tests {
             .filter(|f| matches!(f.body, Body::Text(_)))
             .map(|f| f.path.as_str())
             .collect();
-        assert_eq!(held, ["Home/Tasks/Ship it.md", "Home/Tasks.md"]);
+        assert_eq!(held, ["Home/Tasks/Ship it.md", "Home/Tasks/Tasks.md"]);
         assert!(
             plan.files
                 .iter()
@@ -1001,7 +1064,7 @@ mod tests {
                 .is_some_and(|f| f.contains("report")),
             "{report:?}"
         );
-        assert_eq!(read(&dir, "Home.md").lines().next(), Some("# Home"));
+        assert_eq!(read(&dir, "Home/Home.md").lines().next(), Some("# Home"));
     }
 
     #[test]

@@ -186,7 +186,7 @@ fn m7_preview_then_import_opens_the_new_vault_at_its_report() {
     assert_eq!(done["report"], "Notion import report.md");
     assert_eq!(done["cancelled"], false);
     assert_eq!(
-        std::fs::read_to_string(root.join("Home.md")).unwrap(),
+        std::fs::read_to_string(root.join("Home/Home.md")).unwrap(),
         "# Home\n\n[[Child]]\n"
     );
     // The new vault is the open one.
