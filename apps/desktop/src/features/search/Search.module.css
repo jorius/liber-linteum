@@ -221,6 +221,12 @@
   object-fit: cover;
 }
 
+/* A page's emoji in place of a thumbnail (round 3b §8.2). */
+.thumbIcon {
+  font-size: 18px;
+  line-height: 1;
+}
+
 /* A text file's extension in place of a thumbnail (batch 6). */
 .ext {
   font-size: 10.5px;

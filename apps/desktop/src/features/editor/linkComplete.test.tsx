@@ -110,15 +110,13 @@ describe('linkSource (M2c §6, PG-05)', () => {
     expect(v.state.selection.main.head).toBe(v.state.doc.length);
   });
 
-  it('M5b §4: a page’s emoji shows before its name; matching and inserting stay on the name', async () => {
+  it('round 3b §8.2: the label is the name alone; matching and inserting stay on it', async () => {
     useVaultStore.setState({ nodes: [{ path: REX.path, kind: 'page', icon: '🦖' }] });
     mockIPC((cmd) => (cmd === 'link_suggest' ? [REX] : null));
     const v = editor('See [[gen');
     const result = await complete(v);
-    expect(result!.options[0]).toMatchObject({
-      label: 'Generator Rex',
-      displayLabel: '🦖 Generator Rex',
-    });
+    expect(result!.options[0]).toMatchObject({ label: 'Generator Rex' });
+    expect(result!.options[0].displayLabel).toBeUndefined();
     expect(v.state.doc.toString()).toBe('See [[rex-draft|Generator Rex]]');
     useVaultStore.setState({ nodes: [] });
   });
@@ -202,6 +200,22 @@ describe('in the editor (M2c §6)', () => {
     });
     expect(v.state.doc.toString()).toBe('See [[rex-draft|Generator Rex]]');
     expect(acceptCompletion(v)).toBe(false);
+  });
+  it("round 3b §8.2: an option shows the page's icon in a leading box", async () => {
+    useVaultStore.setState({ nodes: [{ path: REX.path, kind: 'page', icon: '🦖' }] });
+    mockIPC(() => [REX, COVER]);
+    const v = editor('See [[');
+    act(() => {
+      startCompletion(v);
+    });
+    await vi.waitFor(() =>
+      expect(document.querySelectorAll('.cm-tooltip-autocomplete li')).toHaveLength(2),
+    );
+    const [rex, other] = [...document.querySelectorAll('.cm-tooltip-autocomplete li')];
+    expect(rex.querySelector('.cm-nimw-linkIcon')).toHaveTextContent('🦖');
+    expect(rex.querySelector('.cm-completionLabel')!.textContent).toBe('Generator Rex');
+    expect(other.querySelector('.cm-nimw-linkIcon svg')).not.toBeNull();
+    useVaultStore.setState({ nodes: [] });
   });
 });
 

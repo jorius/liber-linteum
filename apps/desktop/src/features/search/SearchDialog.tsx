@@ -25,7 +25,7 @@ import { isTextPath } from '../../stores/textFiles';
 import { useUiStore } from '../../stores/uiStore';
 import { Dialog } from '../dialogs/Dialog';
 import { useGvStore } from '../global-view/gvStore';
-import { ItemIcon, useIcons } from '../icons/ItemIcon';
+import { useIcons } from '../icons/ItemIcon';
 import {
   highlightParts,
   pathTrail,
@@ -492,7 +492,12 @@ export function SearchDialog({ onClose }: { onClose: () => void }) {
             onClick={(e) => open(hit, e.shiftKey)}
           >
             <span className={styles.thumb}>
-              {hit.cover ? (
+              {/* Round 3b §8.2: the page's icon is its identity, ahead of its cover. */}
+              {icons.get(hit.path) ? (
+                <span className={styles.thumbIcon} aria-hidden="true">
+                  {icons.get(hit.path)}
+                </span>
+              ) : hit.cover ? (
                 <img src={assetUrl(hit.cover)} alt="" loading="lazy" />
               ) : isTextPath(hit.path) ? (
                 <TextFileBadge path={hit.path} />
@@ -510,7 +515,6 @@ export function SearchDialog({ onClose }: { onClose: () => void }) {
             </span>
             <span className={styles.body}>
               <span className={styles.title}>
-                <ItemIcon icon={icons.get(hit.path)} />
                 <Marked parts={highlightParts(hit.title, words)} />
               </span>
               <span className={styles.path}>{pathTrail(hit.path)}</span>

@@ -252,6 +252,30 @@
   cursor: pointer;
 }
 
+/* A page option (round 3b §8.2): its icon box beside the title and path. */
+.linkPickerPage {
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr);
+  column-gap: 8px;
+  align-items: center;
+}
+
+.linkPickerPage > :not(.linkPickerIcon) {
+  grid-column: 2;
+}
+
+.linkPickerIcon {
+  grid-row: 1 / span 2;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  font-size: 15px;
+  line-height: 1;
+  color: var(--color-text-muted);
+}
+
 .linkPickerOption[aria-selected='true'] {
   background: var(--color-accent-soft);
   color: var(--color-text-strong);

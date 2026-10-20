@@ -103,10 +103,30 @@ function openDialog() {
 const lastQuery = () => queries[queries.length - 1];
 
 describe('Search dialog (M5 §4)', () => {
-  it('shows a hit’s emoji before its title (M5b §4)', async () => {
+  // Round 3b §8.2: the icon box shows the page's icon; the title doesn't repeat it.
+  const box = (option: HTMLElement) => option.firstElementChild as HTMLElement;
+  const titleOf = (option: HTMLElement) =>
+    (option.children[1] as HTMLElement).firstElementChild as HTMLElement;
+
+  it('shows a hit’s emoji in its icon box, not before its title (round 3b §8.2)', async () => {
     useVaultStore.setState({ nodes: [{ path: 'Recent.md', kind: 'page', icon: '🚀' }] });
     openDialog();
-    expect(await screen.findByRole('option', { name: /Recent/ })).toHaveTextContent(/🚀Recent/);
+    const option = await screen.findByRole('option', { name: /Recent/ });
+    expect(box(option)).toHaveTextContent('🚀');
+    expect(titleOf(option).textContent).toBe('Recent');
+  });
+
+  it('the icon wins over the cover; a cover alone still shows; neither shows the page glyph', async () => {
+    useVaultStore.setState({ nodes: [{ path: 'Game/Dragon run.md', kind: 'page', icon: '🐉' }] });
+    const field = openDialog();
+    await userEvent.type(field, 'drag');
+    const iconed = await screen.findByRole('option', { name: /Dragon run/ });
+    expect(box(iconed)).toHaveTextContent('🐉');
+    expect(box(iconed).querySelector('img')).toBeNull();
+    act(() => useVaultStore.setState({ nodes: [] }));
+    await waitFor(() => expect(box(iconed).querySelector('img')).not.toBeNull());
+    const plain = screen.getByRole('option', { name: /Canción/ });
+    expect(box(plain).querySelector('svg')).not.toBeNull();
   });
 
   it('opens with the keyboard in the field and shows Recent', async () => {

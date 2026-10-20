@@ -134,6 +134,23 @@ describe('Related chips in the header band (M4b §6)', () => {
     );
   });
 
+  it("round 3b §8.2: + Related page shows a page's icon before its title", async () => {
+    fakeDisk({ 'A.md': '# A\n', 'Beta.md': '# Beta\n' }, backend(['A.md', 'Beta.md']));
+    useVaultStore.setState({
+      nodes: [
+        { path: 'A.md', kind: 'page' },
+        { path: 'Beta.md', kind: 'page', icon: '🐝' },
+      ],
+    });
+    render(<PageScreen />);
+    await open('A.md');
+    await userEvent.click(await screen.findByRole('button', { name: 'Add a related page' }));
+    await userEvent.type(screen.getByRole('combobox', { name: 'Related page' }), 'bet');
+    const option = await screen.findByRole('option', { name: /Beta/ });
+    expect(option.firstElementChild).toHaveTextContent('🐝');
+    expect(option.children[1].textContent).toBe('Beta');
+  });
+
   it('an unresolved target shows muted, not clickable; no axe violations', async () => {
     fakeDisk({ 'A.md': '---\nrelated:\n  - "[[Gone]]"\n---\n# A\n' }, backend(['A.md']));
     render(<PageScreen />);
