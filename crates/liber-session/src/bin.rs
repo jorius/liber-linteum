@@ -154,7 +154,10 @@ impl VaultSession {
     fn parents_are_folders(&self, path: &VaultPath) -> bool {
         let mut dir = path.parent();
         while let Some(d) = dir.filter(|d| !d.is_root()) {
-            if self.exists(&d) && !self.is_dir(&d) {
+            // A link out of the vault (or dangling) doesn't block: the restore
+            // then fails with OutsideVault, as before.
+            if matches!(self.vault.meta(&d, Follow::InsideVault), Ok(Some(m)) if m.kind != Kind::Dir)
+            {
                 return false;
             }
             dir = d.parent();
@@ -963,5 +966,26 @@ mod tests {
     fn m5b_review_m8_a_folder_name_keeps_its_dots() {
         assert_eq!(super::numbered_entry("v1.2", 1, true), "v1.2 1");
         assert_eq!(super::numbered_entry("a.tar.gz", 1, false), "a.tar 1.gz");
+    }
+
+    /// A recorded parent that is now a link out of the vault: the restore is
+    /// refused (OutsideVault), never sent to the vault root instead.
+    #[cfg(unix)]
+    #[test]
+    fn a_restore_through_a_parent_linked_outside_is_refused() {
+        let f = fx(&[("sub/a.md", "a")]);
+        let inner = f.s.trash(&vp("sub/a.md")).unwrap();
+        let outside = tempfile::tempdir().unwrap();
+        std::fs::remove_dir(f.root.join("sub")).unwrap();
+        std::os::unix::fs::symlink(outside.path(), f.root.join("sub")).unwrap();
+        let out = f.s.trash_restore(&inner, false);
+        assert!(
+            matches!(
+                out,
+                Err(crate::SessionError::Vault(VaultError::OutsideVault(_)))
+            ),
+            "{out:?}"
+        );
+        assert!(!exists(&f.root, "a.md") && exists(&f.root, inner.as_str()));
     }
 }
