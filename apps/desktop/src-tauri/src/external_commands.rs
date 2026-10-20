@@ -136,6 +136,24 @@ pub(crate) fn external_reveal_impl<R: Runtime>(app: &AppHandle<R>, path: String)
         .map_err(|e| CommandError::new(ErrorKind::Io, e.to_string()))
 }
 
+/// Shows a vault item in the OS file manager (round 3 §9.4): a vault path,
+/// resolved inside the open vault; anything outside it or missing is refused.
+pub(crate) fn entry_reveal_impl<R: Runtime>(app: &AppHandle<R>, path: String) -> CmdResult<()> {
+    let full = {
+        let state = app.state::<AppState>();
+        let session = state.session()?;
+        session
+            .vault()
+            .fs_path(&liber_vault::VaultPath::new(&path)?)?
+    };
+    if full.symlink_metadata().is_err() {
+        return Err(liber_vault::VaultError::NotFound(path).into());
+    }
+    app.opener()
+        .reveal_item_in_dir(full)
+        .map_err(|e| CommandError::new(ErrorKind::Io, e.to_string()))
+}
+
 /// Opens the file dialog for `page` (a page must be open: the files are for
 /// it). The picked paths are granted for `attachment_import`.
 pub(crate) fn file_pick_impl<R: Runtime>(
@@ -227,6 +245,11 @@ pub async fn links_external<R: Runtime>(
 #[tauri::command]
 pub async fn external_open<R: Runtime>(app: AppHandle<R>, path: String) -> CmdResult<()> {
     blocking(app, move |app| external_open_impl(&app, path)).await
+}
+
+#[tauri::command]
+pub async fn entry_reveal<R: Runtime>(app: AppHandle<R>, path: String) -> CmdResult<()> {
+    blocking(app, move |app| entry_reveal_impl(&app, path)).await
 }
 
 #[tauri::command]

@@ -78,6 +78,8 @@ pub(crate) fn open_session<R: Runtime>(app: &AppHandle<R>, root: &Path) -> CmdRe
     state.set_session(Some(session));
     let scratchpad = state.settings.is_scratchpad(&root);
     state.set_scratchpad_root(scratchpad.then(|| root.clone()));
+    // File → Create New Scratchpad names the vault (round 3 §9.4).
+    crate::menu::show_vault_in_menu(app, Some(if scratchpad { "Quick notes" } else { &name }));
     Ok(VaultInfo {
         name,
         scratchpad,
@@ -305,6 +307,7 @@ pub(crate) fn entry_trash_impl(state: &AppState, path: String) -> CmdResult<Stri
 pub async fn vault_close<R: Runtime>(app: AppHandle<R>) -> CmdResult<()> {
     blocking(app, move |app| {
         vault_close_impl(&app.state::<AppState>());
+        crate::menu::show_vault_in_menu(&app, None);
         Ok(())
     })
     .await

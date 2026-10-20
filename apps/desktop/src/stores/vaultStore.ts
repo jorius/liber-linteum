@@ -4,6 +4,7 @@ import { create } from 'zustand';
 import {
   entryCreateFolder,
   entryCreatePage,
+  entryMakeFolderPage,
   entryRename,
   entryTrash,
   binList,
@@ -36,6 +37,7 @@ import { useTrailStore } from './trailStore';
 import { useUiStore } from './uiStore';
 import {
   childrenByParent,
+  folderPageOf,
   isArchived,
   joinPath,
   nameOf,
@@ -83,6 +85,13 @@ interface VaultState {
   createPage: (dir: string) => Promise<IpcResult<string>>;
   /** Round 3b §6.4: the folder's own page, `X/X.md`, opened (no rename). */
   createFolderPage: (folder: string) => Promise<IpcResult<string>>;
+  /** Add sub-page (round 3 §9): a new page under `page`, which becomes its
+   *  folder's page first if it isn't one. */
+  addSubPage: (page: string) => Promise<IpcResult<string>>;
+  /** Moves `item` under `page` (round 3 §9.3), making `page` a folder page first. */
+  moveUnder: (item: string, page: string) => Promise<IpcResult<unknown>>;
+  /** The folder `page` heads, making it a folder page if needed. */
+  folderFor: (page: string) => Promise<IpcResult<string>>;
   createFolder: (dir: string) => Promise<IpcResult<string>>;
   /** `quiet`: a refused rename isn't toasted (the caller shows it inline,
    *  like the page title — final review m4). */
@@ -394,6 +403,26 @@ export const useVaultStore = create<VaultState>((set, get) => {
       set({ selected: folder });
       await usePageStore.getState().load(res.value);
       return res;
+    },
+    addSubPage: async (page) => {
+      const folder = await get().folderFor(page);
+      return folder.ok ? get().createPage(folder.value) : folder;
+    },
+    moveUnder: async (item, page) => {
+      const folder = await get().folderFor(page);
+      return folder.ok ? get().rename(item, joinPath(folder.value, nameOf(item))) : folder;
+    },
+    folderFor: async (page) => {
+      const dir = parentOf(page);
+      if (folderPageOf(dir, get().children) === page) return { ok: true, value: dir };
+      await useEditorStore.getState().flushBefore(); // the move takes the latest text
+      const res = await entryMakeFolderPage(page);
+      if (!res.ok) {
+        toast().push({ message: errorMessage(res.error), tone: 'error' });
+        return res;
+      }
+      await get().applyRename(page, res.value.page, res.value.outcome);
+      return { ok: true, value: res.value.folder };
     },
     createFolder: async (dir) => {
       const name = nextFreeName(get().nodes, dir, i18next.t('explorer.untitled'), '');

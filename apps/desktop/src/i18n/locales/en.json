@@ -248,7 +248,12 @@
     "open": "Open",
     "unarchive": "Unarchive",
     "addFolderPage": "Add a page to this folder",
-    "useAsFolderPage": "Use {name}.md as this folder’s page"
+    "useAsFolderPage": "Use {name}.md as this folder’s page",
+    "addSubPage": "Add sub-page",
+    "matchFolderPageName": "Match the page name to the folder",
+    "revealMac": "Reveal in Finder",
+    "revealWindows": "Show in File Explorer",
+    "revealOther": "Show in file manager"
   },
   "dialogs": {
     "cancel": "Cancel",
@@ -425,7 +430,7 @@
         "search": "Search",
         "files": "Go to the files",
         "newPage": "New page",
-        "quickNote": "Create new scratchpad in this vault",
+        "quickNote": "Create new scratchpad for this vault",
         "save": "Save",
         "link": "Insert a link",
         "bold": "Bold",

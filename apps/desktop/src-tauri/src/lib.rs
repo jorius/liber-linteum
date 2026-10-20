@@ -193,6 +193,7 @@ pub fn configure<R: tauri::Runtime>(
         external_commands::links_external,
         external_commands::external_open,
         external_commands::external_reveal,
+        external_commands::entry_reveal,
         external_commands::external_network_allow,
         external_commands::file_pick,
         scratchpad_commands::scratchpad_default,

@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-entry-reveal"
+description = "Enables the entry_reveal command without any pre-configured scope."
+commands.allow = ["entry_reveal"]
+
+[[permission]]
+identifier = "deny-entry-reveal"
+description = "Denies the entry_reveal command without any pre-configured scope."
+commands.deny = ["entry_reveal"]

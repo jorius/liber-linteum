@@ -27,6 +27,7 @@ const COMMANDS: &[&str] = &[
     "entry_create_folder",
     "entry_rename",
     "entry_make_folder_page",
+    "entry_reveal",
     "entry_trash",
     "settings_get",
     "settings_set",
@@ -3053,5 +3054,33 @@ fn subpages_make_folder_page_command() {
             .unwrap_err()
         ),
         "notPermitted"
+    );
+}
+
+/// Round 3 §9.4: Reveal in Finder only shows items inside the open vault.
+/// (Only refusals are exercised: a success would open the real file manager.)
+#[test]
+fn subpages_entry_reveal_refuses_outside_and_missing() {
+    let h = harness();
+    assert_eq!(
+        kind(call(&h.main, "entry_reveal", json!({ "path": "a.md" })).unwrap_err()),
+        "noVault"
+    );
+    let vault = tempfile::tempdir().unwrap();
+    let outside = tempfile::tempdir().unwrap();
+    std::fs::write(outside.path().join("secret.md"), "").unwrap();
+    #[cfg(unix)]
+    std::os::unix::fs::symlink(outside.path(), vault.path().join("link")).unwrap();
+    call(&h.main, "vault_open", json!({ "path": vault.path() })).unwrap();
+    assert!(call(&h.main, "entry_reveal", json!({ "path": "../secret.md" })).is_err());
+    assert!(call(&h.main, "entry_reveal", json!({ "path": "/etc/hosts" })).is_err());
+    assert_eq!(
+        kind(call(&h.main, "entry_reveal", json!({ "path": "missing.md" })).unwrap_err()),
+        "notFound"
+    );
+    #[cfg(unix)]
+    assert_eq!(
+        kind(call(&h.main, "entry_reveal", json!({ "path": "link/secret.md" })).unwrap_err()),
+        "outsideVault"
     );
 }

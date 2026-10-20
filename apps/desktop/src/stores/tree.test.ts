@@ -3,7 +3,6 @@ import type { TreeNode } from '../ipc';
 import {
   childrenByParent,
   folderPageOf,
-  isFolderPage,
   joinPath,
   nameOf,
   nextFreeName,
@@ -53,22 +52,24 @@ describe('folder pages (round 3b §6.1)', () => {
   const list = (paths: string[]): TreeNode[] =>
     paths.map((path) => ({ path, kind: path.endsWith('.md') ? 'page' : 'folder' }));
 
-  it('folderPageOf finds X/X.md only, with the exact name', () => {
+  it('folderPageOf finds X/X.md, or a page whose name differs only in case (round 3 §9)', () => {
     const children = childrenByParent(
-      list(['X', 'X/X.md', 'Y', 'Y/y.md', 'Z', 'Z.md', 'A/B', 'A/B/B.md']),
+      list(['X', 'X/X.md', 'Y', 'Y/y.md', 'Z', 'Z.md', 'A/B', 'A/B/B.md', 'Á', 'Á/á.md']),
     );
     expect(folderPageOf('X', children)).toBe('X/X.md');
-    expect(folderPageOf('Y', children)).toBeNull();
+    expect(folderPageOf('Y', children)).toBe('Y/y.md');
+    expect(folderPageOf('Á', children)).toBe('Á/á.md');
     expect(folderPageOf('Z', children)).toBeNull();
     expect(folderPageOf('A/B', children)).toBe('A/B/B.md');
     expect(folderPageOf('', children)).toBeNull();
   });
 
-  it('isFolderPage needs a parent of the same name', () => {
-    expect(isFolderPage('X/X.md')).toBe(true);
-    expect(isFolderPage('A/B/B.md')).toBe(true);
-    expect(isFolderPage('X/x.md')).toBe(false);
-    expect(isFolderPage('X.md')).toBe(false);
-    expect(isFolderPage('X/X.txt')).toBe(false);
+  it('an exact name wins over a case variant; folders never count', () => {
+    const children = childrenByParent([
+      ...list(['X', 'X/x.md', 'X/X.md', 'W']),
+      { path: 'W/W.md', kind: 'folder' },
+    ]);
+    expect(folderPageOf('X', children)).toBe('X/X.md');
+    expect(folderPageOf('W', children)).toBeNull();
   });
 });

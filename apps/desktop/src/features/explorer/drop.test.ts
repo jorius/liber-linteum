@@ -1,5 +1,8 @@
-import { describe, expect, it } from 'vitest';
-import { planDrop } from './drop';
+import { afterEach, describe, expect, it } from 'vitest';
+import { clearMocks, mockIPC } from '../../ipc/testing';
+import { childrenByParent } from '../../stores/tree';
+import { resetVaultStore, useVaultStore } from '../../stores/vaultStore';
+import { dropEntry, planDrop } from './drop';
 
 describe('planDrop (EXP-02 drag-and-drop rules)', () => {
   it('moves into another folder or the root, keeping the name', () => {
@@ -18,5 +21,68 @@ describe('planDrop (EXP-02 drag-and-drop rules)', () => {
 
   it('does not confuse sibling prefixes with descendants', () => {
     expect(planDrop('Art', 'Artwork')).toBe('Artwork/Art');
+  });
+});
+
+describe('dropping onto a page (round 3 §9.3)', () => {
+  const seed = (paths: [string, 'page' | 'folder'][]) => {
+    const list = paths.map(([path, kind]) => ({ path, kind }));
+    useVaultStore.setState({ nodes: list, children: childrenByParent(list) });
+  };
+  afterEach(() => resetVaultStore());
+
+  it('goes into the folder the page heads, made or not yet made', () => {
+    seed([
+      ['Notes', 'folder'],
+      ['Notes/P.md', 'page'],
+      ['Lore', 'folder'],
+      ['Lore/Lore.md', 'page'],
+      ['Art', 'folder'],
+      ['Art/rex.md', 'page'],
+    ]);
+    expect(planDrop('Art/rex.md', 'Notes/P.md')).toBe('Notes/P/rex.md');
+    expect(planDrop('Art/rex.md', 'Lore/Lore.md')).toBe('Lore/rex.md');
+    expect(planDrop('Art', 'Notes/P.md')).toBe('Notes/P/Art');
+  });
+
+  it('refuses itself, its own folder page, where it already is, and the Archive', () => {
+    seed([
+      ['Notes', 'folder'],
+      ['Notes/P.md', 'page'],
+      ['Notes/P', 'folder'],
+      ['Notes/P/a.md', 'page'],
+      ['X', 'folder'],
+      ['X/X.md', 'page'],
+      ['.archive', 'folder'],
+      ['.archive/Old.md', 'page'],
+      ['b.md', 'page'],
+    ]);
+    expect(planDrop('Notes/P.md', 'Notes/P.md')).toBeNull();
+    expect(planDrop('X', 'X/X.md')).toBeNull();
+    expect(planDrop('Notes/P/a.md', 'Notes/P.md')).toBeNull();
+    expect(planDrop('b.md', '.archive/Old.md')).toBeNull();
+    expect(planDrop('.archive/Old.md', 'Notes/P.md')).toBeNull();
+  });
+
+  it('dropEntry makes the page a folder page, then moves the item in', async () => {
+    seed([
+      ['P.md', 'page'],
+      ['a.md', 'page'],
+    ]);
+    const calls: [string, unknown][] = [];
+    const outcome = { moved: [], updatedFiles: [], updatedLinks: 0, failed: [], pair: null };
+    mockIPC((cmd, args) => {
+      calls.push([cmd, args]);
+      if (cmd === 'entry_make_folder_page') return { folder: 'P', page: 'P/P.md', outcome };
+      if (cmd === 'entry_rename') return outcome;
+      if (cmd === 'vault_tree') return [];
+      return null;
+    });
+    expect(await dropEntry('a.md', 'P.md')).toBe(true);
+    expect(calls.filter(([c]) => c.startsWith('entry_'))).toEqual([
+      ['entry_make_folder_page', { page: 'P.md' }],
+      ['entry_rename', { from: 'a.md', to: 'P/a.md' }],
+    ]);
+    clearMocks();
   });
 });

@@ -12,6 +12,10 @@ import { SortMenu } from './SortMenu';
 import { requestTrash } from './trashAction';
 import { nudgeFavorite, shownFavorites, useFavoritesStore } from '../favorites/favoritesStore';
 import { displayName } from './TreeRow';
+import { entryReveal } from '../../ipc';
+import { errorMessage } from '../../stores/messages';
+import { useToastStore } from '../../stores/toastStore';
+import { revealKey } from './reveal';
 
 export interface MenuState {
   path: string;
@@ -62,10 +66,16 @@ export function ContextMenu({ menu, onClose }: { menu: MenuState; onClose: () =>
   const namesake = joinPath(parentOf(node.path), `${nameOf(node.path)}.md`);
   const hasNamesake =
     node.kind === 'folder' && !!children.get(parentOf(node.path))?.some((n) => n.path === namesake);
+  const own = `${node.path}/${nameOf(node.path)}.md`;
   const folderPage: [string, () => void][] =
-    node.kind !== 'folder' || page
+    node.kind !== 'folder'
       ? []
-      : hasNamesake
+      : page
+        ? // Its page only differs in case (round 3 §9): offer to match the names.
+          page === own
+          ? []
+          : [[t('menu.matchFolderPageName'), () => void vault().rename(page, own)]]
+        : hasNamesake
         ? [
             [
               t('menu.useAsFolderPage', { name: nameOf(node.path) }),
@@ -74,6 +84,15 @@ export function ContextMenu({ menu, onClose }: { menu: MenuState; onClose: () =>
           ]
         : [[t('menu.addFolderPage'), () => void vault().createFolderPage(node.path)]];
   const vault = useVaultStore.getState;
+  // TODO(E4): hide in encrypted vaults, it would show ciphertext names
+  // (docs/superpowers/plans/2026-10-20-enc-e4-encrypted-vault-ui.md).
+  const reveal: [string, () => void] = [
+    t(revealKey()),
+    () =>
+      void entryReveal(node.path).then((r) => {
+        if (!r.ok) useToastStore.getState().push({ message: errorMessage(r.error), tone: 'error' });
+      }),
+  ];
   // The Archive is read-only (M5b round 2): open, unarchive, sort or trash.
   const archived = isArchived(node.path);
   const actions: [string, () => void][] = archived
@@ -82,15 +101,20 @@ export function ContextMenu({ menu, onClose }: { menu: MenuState; onClose: () =>
           ? []
           : [[t('menu.open'), () => void openPage(node.path)] as [string, () => void]]),
         [t('menu.unarchive'), () => void restoreItem('archive', node.path)],
+        reveal,
         [t('menu.sortBy'), () => setSorting(true)],
         [t('menu.delete'), () => requestTrash(node.path)],
       ]
     : [
         [t('menu.newPage'), () => void vault().createPage(dir)],
         [t('menu.newFolder'), () => void vault().createFolder(dir)],
+        ...(node.kind === 'page'
+          ? [[t('menu.addSubPage'), () => void vault().addSubPage(node.path)] as [string, () => void]]
+          : []),
         ...folderPage,
         [t('menu.rename'), () => vault().startRename(node.path)],
         [t('menu.move'), () => useUiStore.getState().openDialog({ type: 'move', path: node.path })],
+        reveal,
         ...(node.kind === 'attachment'
           ? []
           : [[t('menu.icon'), () => setPicking(true)] as [string, () => void]]),

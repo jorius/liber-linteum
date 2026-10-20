@@ -609,6 +609,13 @@ export const entryCreateFolder = (parent: string, name: string) =>
   call<string>('entry_create_folder', { parent, name });
 export const entryRename = (from: string, to: string) =>
   call<RenameOutcome>('entry_rename', { from, to });
+/** Add sub-page (round 3 §9): `P.md` becomes `P/P.md`, links rewritten. */
+export const entryMakeFolderPage = (page: string) =>
+  call<{ folder: string; page: string; outcome: RenameOutcome }>('entry_make_folder_page', {
+    page,
+  });
+/** Shows a vault item in the OS file manager (round 3 §9.4). */
+export const entryReveal = (path: string) => call<null>('entry_reveal', { path });
 /** Moves an item into the vault's Trash (M5b §5.1); its path there. */
 export const entryTrash = (path: string) => call<string>('entry_trash', { path });
 export const settingsGet = () => call<SettingsResponse>('settings_get');

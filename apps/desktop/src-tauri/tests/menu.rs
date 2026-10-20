@@ -399,6 +399,40 @@ fn quick_note_item_emits_menu_quick_note() {
     assert_eq!(*got.lock().unwrap(), ["main".to_string()]);
 }
 
+/// Round 3 §9.4: File → Create New Scratchpad names the open vault, and goes
+/// back to the generic label when none is open.
+#[cfg(target_os = "macos")]
+fn quick_note_item_names_the_open_vault() {
+    let texts: Arc<std::sync::Mutex<Vec<String>>> = Arc::default();
+    let log = texts.clone();
+    build_app("quicknote-label").run_return(move |handle, event| {
+        if let RunEvent::Ready = event {
+            let text = |h: &tauri::AppHandle<MockRuntime>| {
+                outline(&h.menu().unwrap())
+                    .into_iter()
+                    .flat_map(|(_, items)| items)
+                    .find(|(_, id, _)| id == liber_desktop::menu::QUICK_NOTE_ID)
+                    .map(|(_, _, t)| t)
+                    .unwrap()
+            };
+            liber_desktop::menu::show_vault_in_menu(handle, Some("Smartjob"));
+            log.lock().unwrap().push(text(handle));
+            liber_desktop::menu::show_vault_in_menu(handle, None);
+            log.lock().unwrap().push(text(handle));
+            for window in handle.webview_windows().into_values() {
+                window.close().unwrap();
+            }
+        }
+    });
+    assert_eq!(
+        *texts.lock().unwrap(),
+        [
+            "Create New Scratchpad for Smartjob".to_string(),
+            "Create New Scratchpad in This Vault".to_string()
+        ]
+    );
+}
+
 /// M7: File → Import from Notion… opens the import in the main window only.
 fn notion_import_item_emits_to_main() {
     use tauri::Listener;
@@ -504,4 +538,9 @@ fn main() {
     println!("test m5b_items_emit_their_events ... ok");
     notion_import_item_emits_to_main();
     println!("test notion_import_item_emits_to_main ... ok");
+    #[cfg(target_os = "macos")]
+    {
+        quick_note_item_names_the_open_vault();
+        println!("test quick_note_item_names_the_open_vault ... ok");
+    }
 }
