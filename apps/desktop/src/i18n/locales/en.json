@@ -868,7 +868,7 @@
     "unavailable": "Couldn't be loaded",
     "words": "Words added in this vault",
     "noWords": "No words yet",
-    "removeWord": "Remove {word}",
+    "removeWord": "Remove “{word}”",
     "vault": "Spelling",
     "vaultApp": "Use the app's dictionaries",
     "vaultCustom": "Choose for this vault",

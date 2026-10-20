@@ -94,6 +94,52 @@
   color: var(--color-text-body);
 }
 
+.chips {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+/* An added word: a pill with a small icon button inside (not a bordered
+   button beside it). */
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  height: 28px;
+  padding: 0 3px 0 11px;
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-pill);
+  background: var(--color-surface);
+  font: 500 13px var(--font-body);
+  color: var(--color-text-body);
+}
+
+.chipRemove {
+  display: inline-grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: none;
+  color: var(--color-text-muted);
+  cursor: pointer;
+}
+
+.chipRemove:hover {
+  background: var(--color-surface-subtle);
+  color: var(--color-text);
+}
+
+.chipRemove:active {
+  background: var(--color-accent-soft);
+}
+
 .buttons {
   display: flex;
   justify-content: flex-end;
