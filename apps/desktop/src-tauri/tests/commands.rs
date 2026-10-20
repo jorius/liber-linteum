@@ -3111,6 +3111,7 @@ fn theme_import_caps_what_it_reads_not_what_metadata_says() {
     let err = call(&h.main, "theme_import", json!({})).unwrap_err();
     assert_eq!(kind(err), "invalidInput");
     writer.join().unwrap();
+}
 
 /// Round 3 §9: Add sub-page turns a page into its folder's page.
 #[test]
