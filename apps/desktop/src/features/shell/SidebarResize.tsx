@@ -33,11 +33,13 @@ export function useSidebarResize() {
     const value = clamp(px);
     setDraft(value === stored ? null : value);
     if (value === stored) return;
-    queue.current = queue.current.then(async () => {
-      const res = await useSettingsStore.getState().update({ sidebarWidth: value });
-      // A refused save shows the stored width again rather than a stale edge.
-      if (!res.ok) setDraft((d) => (d === value ? null : d));
-    }).catch(() => setDraft(null)); // a broken save must not stall the queue
+    queue.current = queue.current
+      .then(async () => {
+        const res = await useSettingsStore.getState().update({ sidebarWidth: value });
+        // A refused save shows the stored width again rather than a stale edge.
+        if (!res.ok) setDraft((d) => (d === value ? null : d));
+      })
+      .catch(() => setDraft(null)); // a broken save must not stall the queue
   };
   const onKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
     const step = { ArrowLeft: -STEP, ArrowRight: STEP }[e.key];
