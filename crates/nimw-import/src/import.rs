@@ -6,7 +6,7 @@ use crate::markdown::{Resolver, Target, convert, strip_properties};
 use crate::names::{NameMap, clean_component};
 use crate::{Entry, Export, ImportError, strip_notion_id};
 use nimw_vault::{Vault, VaultPath};
-use std::collections::{BTreeSet, HashMap, VecDeque};
+use std::collections::{BTreeSet, HashMap, HashSet, VecDeque};
 use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -211,17 +211,23 @@ pub fn plan(export: &Export, cancel: &AtomicBool) -> Result<Plan, ImportError> {
 
     // Names: real files first (sorted), then what the import makes up. A
     // page with sub-pages is its folder's page, `X/X.md` (round 3b §6.6),
-    // named before the folder's children so the name is its own.
+    // named before the folder's children so the name is its own. A folder of
+    // only attachments isn't a page's children (final review #10).
     let mut names = NameMap::default();
     let mut paths: HashMap<usize, String> = HashMap::new();
+    let mut with_pages: HashSet<&[String]> = HashSet::new();
+    for (j, e) in entries.iter().enumerate() {
+        if ext(e) == "md" || db_csvs.contains(&j) {
+            with_pages.extend((1..e.path.len()).map(|n| &e.path[..n]));
+        }
+    }
+    let has_sub_pages = |folder: &[String]| with_pages.contains(folder);
     let own_folder = |i: usize| -> Option<Vec<String>> {
         let e = &entries[i];
         let (name, parent) = e.path.split_last()?;
         let mut folder = parent.to_vec();
         folder.push(name.strip_suffix(".md")?.to_string());
-        folders_in_export
-            .contains(folder.as_slice())
-            .then_some(folder)
+        (folders_in_export.contains(folder.as_slice()) && has_sub_pages(&folder)).then_some(folder)
     };
     for &i in &order {
         if ext(&entries[i]) == "md"
@@ -230,6 +236,18 @@ pub fn plan(export: &Export, cancel: &AtomicBool) -> Result<Plan, ImportError> {
             let f = names.assign(&folder, false);
             let name = f.rsplit('/').next().unwrap_or(&f).to_string();
             paths.insert(i, names.claim(&f, &format!("{name}.md"), true));
+        }
+    }
+    // A database's index is its rows folder's page: claimed before the row
+    // pages, so a row titled like the database can't take it (final review #9).
+    let mut early_index: HashMap<usize, String> = HashMap::new();
+    for (d, db) in databases.iter().enumerate() {
+        let mut rows_folder = db.parent.clone();
+        rows_folder.push(db.base.clone());
+        if folders_in_export.contains(rows_folder.as_slice()) {
+            let f = names.assign(&rows_folder, false);
+            let name = f.rsplit('/').next().unwrap_or(&f).to_string();
+            early_index.insert(d, names.claim(&f, &format!("{name}.md"), true));
         }
     }
     for &i in &order {
@@ -250,7 +268,7 @@ pub fn plan(export: &Export, cancel: &AtomicBool) -> Result<Plan, ImportError> {
     let mut dbs: Vec<Db> = Vec::new();
     let mut tables: Vec<Rows> = Vec::new();
     let mut row_of: HashMap<usize, (usize, usize)> = HashMap::new();
-    for db in &databases {
+    for (di, db) in databases.iter().enumerate() {
         stop()?;
         let csv = &entries[db.csv];
         let table = match export.read_text(csv).map(|(text, _)| Table::parse(&text)) {
@@ -280,7 +298,9 @@ pub fn plan(export: &Export, cancel: &AtomicBool) -> Result<Plan, ImportError> {
             None => names.claim(&parent_vault, &clean_component(&db.base, false), false),
         };
         // The index is its rows folder's page (round 3b §6.6) when it has rows.
-        let index = if table.rows.is_empty() {
+        let index = if let Some(index) = early_index.get(&di) {
+            index.clone()
+        } else if table.rows.is_empty() {
             names.claim(
                 &parent_vault,
                 &clean_component(&format!("{}.md", db.base), true),
@@ -866,6 +886,42 @@ mod tests {
         assert_eq!(read(&dir, "Home/Home.md"), "# Home\n");
     }
 
+    // Round 3b final review #9: a row titled like its database doesn't take
+    // the folder's page from the index.
+    #[test]
+    fn r3b_review_the_index_keeps_its_folder_page_over_a_namesake_row() {
+        let zip = zip_file(&[
+            (
+                &format!("Tasks {A}.csv"),
+                b"Name\nTasks\nOther\n".as_slice(),
+            ),
+            (&format!("Tasks {A}/Tasks {B}.md"), b"# Tasks\n\nrow body\n"),
+            (&format!("Tasks {A}/Other {C}.md"), b"# Other\n"),
+        ]);
+        let (dir, report, _) = import(zip.path(), None);
+        report.unwrap();
+        let index = read(&dir, "Tasks/Tasks.md");
+        assert!(!index.contains("row body"), "{index}");
+        assert!(read(&dir, "Tasks/Tasks 1.md").contains("row body"));
+    }
+
+    // Round 3b final review #10: a folder of only attachments doesn't make
+    // its page a folder page; the attachments stay where Notion put them.
+    #[test]
+    fn r3b_review_a_page_with_only_images_stays_beside_its_folder() {
+        let page = format!("# Recipe A\n\n![photo](Recipe%20A%20{A}/img.png)\n");
+        let zip = zip_file(&[
+            (&format!("Recipe A {A}.md"), page.as_bytes()),
+            (&format!("Recipe A {A}/img.png"), b"\x89PNG".as_slice()),
+        ]);
+        let (dir, report, _) = import(zip.path(), None);
+        report.unwrap();
+        let text = read(&dir, "Recipe A.md");
+        assert!(text.contains("Recipe A/img.png"), "{text}");
+        assert!(dir.path().join("Vault/Recipe A/img.png").exists());
+        assert!(!dir.path().join("Vault/Recipe A/Recipe A.md").exists());
+    }
+
     #[test]
     fn m7_never_writes_into_an_existing_folder() {
         let zip = sample();
@@ -912,7 +968,9 @@ mod tests {
         );
         assert!(!dir.path().join("Vault/Home/sales.md").exists());
         assert!(!dir.path().join("Vault/Home/sales").exists());
-        assert_eq!(read(&dir, "Home/Home.md"), "# Home\n\n[[Home/sales.csv]]\n");
+        // Only attachments in its folder: the page stays beside it (round 3b
+        // final review #10).
+        assert_eq!(read(&dir, "Home.md"), "# Home\n\n[[Home/sales.csv]]\n");
         assert_eq!(plan.preview().databases, 0);
         assert_eq!(plan.preview().attachments, 1);
     }
