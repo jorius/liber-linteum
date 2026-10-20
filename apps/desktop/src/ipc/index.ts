@@ -5,6 +5,7 @@ import { listen, TauriEvent, type UnlistenFn } from '@tauri-apps/api/event';
 import { open } from '@tauri-apps/plugin-dialog';
 import { getCurrentWebview } from '@tauri-apps/api/webview';
 import { getCurrentWindow } from '@tauri-apps/api/window';
+import type { CustomTheme } from '../theme/customThemes';
 
 export interface AppInfo {
   name: string;
@@ -149,7 +150,7 @@ export interface RecentVault {
 
 export type EditorMode = 'livePreview' | 'source' | 'split';
 
-/** Built-in palettes (M2b §4); `custom` derives one from `accentColor`. */
+/** Built-in palettes (M2b §4); `custom` is the theme in `customTheme`. */
 export const PALETTE_IDS = [
   'lavender',
   'graphite',
@@ -175,8 +176,13 @@ export interface Settings {
   confirmDelete: boolean;
   editorMode: EditorMode;
   palette: PaletteChoice;
-  /** `#rrggbb`, used when `palette` is `custom`. */
-  accentColor: string;
+  /** `#rrggbb`: the custom accent from before custom themes, migrated into
+   *  a theme on load and then dropped (custom themes §2). */
+  accentColor?: string;
+  /** Themes the user built (custom themes §2). */
+  customThemes: CustomTheme[];
+  /** With `palette: 'custom'`, the id of the theme in use. */
+  customTheme: string | null;
   fontLivePreview: FontChoice;
   fontSource: FontChoice;
   /** Editor text size in px (13–20). */
@@ -255,6 +261,7 @@ export interface SettingsPatch {
   confirmDelete?: boolean;
   editorMode?: EditorMode;
   palette?: PaletteChoice;
+  /** `''` drops the legacy accent. */
   accentColor?: string;
   fontLivePreview?: FontChoice;
   fontSource?: FontChoice;
@@ -274,6 +281,9 @@ export interface SettingsPatch {
   actionButton?: ActionButtonPlace;
   spellcheck?: boolean;
   spellDictionaries?: string[];
+  customThemes?: CustomTheme[];
+  /** `''` clears it. */
+  customTheme?: string;
 }
 
 export interface SettingsResponse {
@@ -775,6 +785,11 @@ export const spellSuggest = (word: string, lang: string) =>
 export const spellDictionaries = () => call<SpellDictionary[]>('spell_dictionaries');
 /** Picks a .aff/.dic pair on disk; `null` when cancelled. */
 export const spellImport = () => call<SpellDictionary | null>('spell_import');
+
+/** Custom themes §4: save a theme file (`false` = cancelled) / pick one. */
+export const themeExport = (name: string, json: string) =>
+  call<boolean>('theme_export', { name, json });
+export const themeImport = () => call<string | null>('theme_import');
 export const spellRemove = (id: string) => call<void>('spell_remove', { id });
 /** Adds a word to the open vault's dictionary. */
 export const spellAddWord = (word: string) => call<void>('spell_add_word', { word });

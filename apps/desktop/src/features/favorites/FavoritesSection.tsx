@@ -14,12 +14,26 @@ import styles from './Favorites.module.css';
 
 type MenuOpener = (path: string, anchor: { x: number; y: number }) => void;
 
-/** A filled or outlined star. */
-export function StarIcon({ filled, size = 13 }: { filled: boolean; size?: number }) {
+/** A filled or outlined star; filled, it takes the theme's secondary colour
+ *  (custom themes §6), the dark one on the always-dark sidebar (`side`). */
+export function StarIcon({
+  filled,
+  size = 13,
+  side = false,
+}: {
+  filled: boolean;
+  size?: number;
+  side?: boolean;
+}) {
   return (
     <svg
       width={size}
       height={size}
+      style={
+        filled
+          ? { color: side ? 'var(--color-sidebar-secondary)' : 'var(--color-secondary)' }
+          : undefined
+      }
       viewBox="0 0 24 24"
       fill={filled ? 'currentColor' : 'none'}
       stroke="currentColor"
@@ -159,7 +173,7 @@ export function FavoritesSection({ onRequestMenu }: { onRequestMenu?: MenuOpener
           >
             <path d="M9 6l6 6-6 6" />
           </svg>
-          <StarIcon filled size={12} />
+          <StarIcon filled size={12} side />
           {t('favorites.title')}
         </button>
       </h2>
@@ -283,7 +297,7 @@ function FavoriteRow({
               title={t('favorites.remove')}
               onClick={() => void useFavoritesStore.getState().toggle(node.path)}
             >
-              <StarIcon filled />
+              <StarIcon filled side />
             </button>
           )}
         </span>

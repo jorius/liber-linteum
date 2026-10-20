@@ -318,13 +318,8 @@
       "persimmon": "Persimmon",
       "midnight": "Midnight",
       "sepia": "Sepia",
-      "ink": "Ink",
-      "custom": "Custom accent"
+      "ink": "Ink"
     },
-    "accentColor": "Accent colour",
-    "accentHex": "Accent colour (hex)",
-    "accentInvalid": "Use a colour like #rrggbb (six hex digits).",
-    "accentContrast": "Accent contrast: {light}:1 in light mode, {dark}:1 in dark mode",
     "fontLive": "Live Preview font",
     "fontSource": "Source font",
     "fontBundled": "Included with the app",
@@ -446,6 +441,131 @@
         "settings": "Settings",
         "quit": "Quit"
       }
+    },
+    "themes": {
+      "legacyName": "Custom",
+      "builtIn": "Built-in",
+      "mine": "My themes",
+      "new": "New theme",
+      "newName": "My theme",
+      "copyName": "{name} copy",
+      "import": "Import…",
+      "export": "Export…",
+      "duplicate": "Duplicate",
+      "duplicateToEdit": "Duplicate to edit",
+      "delete": "Delete",
+      "deleteNamed": "Delete “{name}”",
+      "editing": "Editing “{name}”",
+      "name": "Theme name",
+      "mode": "Mode being edited",
+      "light": "Light",
+      "dark": "Dark",
+      "fill": "Fill the rest from Primary",
+      "more": "{count, plural, one {Show # more colour} other {Show # more colours}}",
+      "fewer": "Show fewer colours",
+      "colour": "{name} colour",
+      "colourHex": "{name} colour (hex)",
+      "fix": "Fix",
+      "fixNamed": "Fix {name}",
+      "reset": "Back to the derived colour",
+      "resetNamed": "Reset {name}",
+      "preview": "Preview",
+      "sample": {
+        "title": "Field notes",
+        "before": "A paragraph with a",
+        "link": "link",
+        "tag": "tag",
+        "highlight": "highlight",
+        "meta": "Edited 2 min ago",
+        "primary": "Primary",
+        "secondary": "Secondary"
+      },
+      "importFailed": "That file isn't a theme this app can use.",
+      "importReason": {
+        "size": "It's too big for a theme file.",
+        "json": "It isn't valid JSON.",
+        "format": "It isn't a Liber Linteum theme.",
+        "version": "It was made by a newer version.",
+        "keys": "Its colours don't match the 16 a theme has.",
+        "value": "One of its colours isn't a #rrggbb value.",
+        "unreadable": "It couldn't be read."
+      },
+      "groups": {
+        "brand": "Brand",
+        "surfaces": "Surfaces",
+        "text": "Text",
+        "accents": "Accents"
+      },
+      "tokens": {
+        "accent": {
+          "name": "Primary",
+          "use": "Links, buttons, focus"
+        },
+        "secondary": {
+          "name": "Secondary",
+          "use": "Tags, relationships, the favourite star"
+        },
+        "bg": {
+          "name": "Background",
+          "use": "Behind everything"
+        },
+        "surface": {
+          "name": "Pages and cards",
+          "use": "Editor, cards, dialogs"
+        },
+        "border": {
+          "name": "Borders",
+          "use": "Lines between things"
+        },
+        "side": {
+          "name": "Sidebar",
+          "use": "The file list; its star and drop ring must read on it"
+        },
+        "sideText": {
+          "name": "Sidebar text",
+          "use": "Names in the file list"
+        },
+        "sideSel": {
+          "name": "Sidebar selection",
+          "use": "The selected row"
+        },
+        "strong": {
+          "name": "Headings",
+          "use": "Titles and headings"
+        },
+        "body": {
+          "name": "Body text",
+          "use": "Running text"
+        },
+        "text": {
+          "name": "Default text",
+          "use": "Labels and controls"
+        },
+        "muted": {
+          "name": "Secondary text",
+          "use": "Hints and dates"
+        },
+        "contrast": {
+          "name": "Text on primary",
+          "use": "Inside primary buttons"
+        },
+        "soft": {
+          "name": "Selection tint",
+          "use": "Selected text, callouts"
+        },
+        "mark": {
+          "name": "Highlight",
+          "use": "==Highlighted== text"
+        },
+        "code": {
+          "name": "Code background",
+          "use": "Inline code and blocks"
+        }
+      },
+      "migrateFailed": "Your custom colour couldn't be saved as a theme. It will be tried again next time.",
+      "exportFailed": "The theme couldn't be saved.",
+      "saveFailed": "That change couldn't be saved, so the theme is back to how it was.",
+      "limit": "You can keep up to {max} themes. Delete one to add another."
     }
   },
   "toolbar": {

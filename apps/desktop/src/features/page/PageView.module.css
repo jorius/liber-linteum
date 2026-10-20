@@ -624,8 +624,8 @@
 
 .tag {
   font: 600 12px var(--font-body);
-  color: var(--color-accent);
-  background: var(--color-accent-soft);
+  color: var(--color-secondary);
+  background: var(--color-secondary-soft);
   border-radius: var(--radius-pill);
   padding: 3px 10px;
 }

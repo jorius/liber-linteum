@@ -89,6 +89,8 @@
     "allow-notion-reveal-partial",
     "allow-spell-dictionaries",
     "allow-spell-import",
+    "allow-theme-export",
+    "allow-theme-import",
     "allow-spell-remove",
     "allow-spell-check",
     "allow-spell-suggest",

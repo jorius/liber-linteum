@@ -97,6 +97,9 @@ const COMMANDS: &[&str] = &[
     "spell_remove_word",
     "spell_vault_get",
     "spell_vault_set",
+    // Custom themes: export/import through the native dialogs.
+    "theme_export",
+    "theme_import",
 ];
 
 struct Harness {
@@ -3016,4 +3019,93 @@ fn spell_review_caches_vault_settings_and_failed_dictionaries() {
     )
     .unwrap();
     assert_eq!(check(&h, &["Ioque", "zzqx"], "en"), [true, false]);
+}
+
+#[test]
+fn theme_export_writes_the_json() {
+    let h = harness();
+    let state = h.app.state::<liber_desktop::state::AppState>();
+    let out = tempfile::tempdir().unwrap();
+    let target = out.path().join("Selva.liber-theme.json");
+    let picked = target.clone();
+    state.set_cover_picker(Some(Arc::new(move || Some(picked.clone()))));
+    let json = "{\"format\":\"liber-theme\"}";
+    assert_eq!(
+        call(
+            &h.main,
+            "theme_export",
+            json!({ "name": "Selva", "json": json })
+        )
+        .unwrap(),
+        json!(true)
+    );
+    assert_eq!(std::fs::read_to_string(&target).unwrap(), json);
+    // Cancelled: nothing written, false.
+    state.set_cover_picker(Some(Arc::new(|| None)));
+    assert_eq!(
+        call(
+            &h.main,
+            "theme_export",
+            json!({ "name": "Selva", "json": json })
+        )
+        .unwrap(),
+        json!(false)
+    );
+}
+
+#[test]
+fn theme_import_refuses_over_64k() {
+    let h = harness();
+    let state = h.app.state::<liber_desktop::state::AppState>();
+    let dir = tempfile::tempdir().unwrap();
+    let small = dir.path().join("t.liber-theme.json");
+    std::fs::write(&small, "{}").unwrap();
+    let picked = small.clone();
+    state.set_cover_picker(Some(Arc::new(move || Some(picked.clone()))));
+    assert_eq!(
+        call(&h.main, "theme_import", json!({})).unwrap(),
+        json!("{}")
+    );
+    let big = dir.path().join("big.liber-theme.json");
+    std::fs::write(&big, vec![b' '; 64 * 1024 + 1]).unwrap();
+    let picked = big.clone();
+    state.set_cover_picker(Some(Arc::new(move || Some(picked.clone()))));
+    let err = call(&h.main, "theme_import", json!({})).unwrap_err();
+    assert_eq!(kind(err), "invalidInput");
+    state.set_cover_picker(Some(Arc::new(|| None)));
+    assert_eq!(
+        call(&h.main, "theme_import", json!({})).unwrap(),
+        json!(null)
+    );
+}
+
+/// Custom themes review M14: a special file whose size metadata says 0 (a
+/// FIFO) is still capped at 64 KB.
+#[cfg(unix)]
+#[test]
+fn theme_import_caps_what_it_reads_not_what_metadata_says() {
+    let h = harness();
+    let state = h.app.state::<liber_desktop::state::AppState>();
+    let dir = tempfile::tempdir().unwrap();
+    let fifo = dir.path().join("pipe.liber-theme.json");
+    assert!(
+        std::process::Command::new("mkfifo")
+            .arg(&fifo)
+            .status()
+            .unwrap()
+            .success()
+    );
+    let writer = {
+        let fifo = fifo.clone();
+        std::thread::spawn(move || {
+            use std::io::Write;
+            let mut f = std::fs::OpenOptions::new().write(true).open(&fifo).unwrap();
+            let _ = f.write_all(&vec![b' '; 200 * 1024]);
+        })
+    };
+    let picked = fifo.clone();
+    state.set_cover_picker(Some(Arc::new(move || Some(picked.clone()))));
+    let err = call(&h.main, "theme_import", json!({})).unwrap_err();
+    assert_eq!(kind(err), "invalidInput");
+    writer.join().unwrap();
 }

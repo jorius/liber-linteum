@@ -5,6 +5,8 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { clearMocks, mockIPC } from '../../ipc/testing';
 import { DEFAULT_SETTINGS, useSettingsStore } from '../../stores/settingsStore';
 import { resetVaultStore, useVaultStore } from '../../stores/vaultStore';
+import { newTheme } from '../../theme/customThemes';
+import { PALETTES } from '../../theme/palettes';
 import styles from './Dialogs.module.css';
 import { resetSettingsCategory, SettingsDialog } from './SettingsDialog';
 
@@ -142,86 +144,6 @@ describe('Settings dialog (M2b §4, §5, §7)', () => {
     await userEvent.click(screen.getByRole('radio', { name: 'Graphite' }));
     await waitFor(() => expect(patches).toEqual([{ palette: 'graphite' }]));
     expect(document.documentElement.dataset.palette).toBe('graphite');
-  });
-
-  it('a custom accent from the hex field: invalid input is explained and not saved', async () => {
-    open();
-    await show('Appearance');
-    await userEvent.click(screen.getByRole('radio', { name: 'Custom accent' }));
-    const hex = screen.getByRole('textbox', { name: 'Accent colour (hex)' });
-    await userEvent.clear(hex);
-    await userEvent.type(hex, 'pink{Enter}');
-    expect(screen.getByRole('alert')).toHaveTextContent('#rrggbb');
-    await userEvent.clear(hex);
-    await userEvent.type(hex, '#2AA198{Enter}');
-    await waitFor(() =>
-      expect(patches).toEqual([{ palette: 'custom' }, { accentColor: '#2aa198' }]),
-    );
-    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
-    expect(screen.getByText(/Accent contrast/)).toHaveTextContent(/\d+\.\d:1/);
-  });
-
-  it('the colour picker saves the accent too', async () => {
-    useSettingsStore.setState({ settings: { ...DEFAULT_SETTINGS, palette: 'custom' } });
-    open();
-    await show('Appearance');
-    fireEvent.change(screen.getByLabelText('Accent colour'), { target: { value: '#6d28d9' } });
-    await waitFor(() => expect(patches).toEqual([{ accentColor: '#6d28d9' }]));
-  });
-
-  it('the hex error clears once the value is valid again, typed or picked', async () => {
-    useSettingsStore.setState({ settings: { ...DEFAULT_SETTINGS, palette: 'custom' } });
-    open();
-    await show('Appearance');
-    const hex = screen.getByRole('textbox', { name: 'Accent colour (hex)' });
-    await userEvent.clear(hex);
-    await userEvent.type(hex, 'pink{Enter}');
-    expect(screen.getByRole('alert')).toBeInTheDocument();
-    await userEvent.clear(hex);
-    await userEvent.type(hex, '#2aa198');
-    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
-    expect(hex).not.toHaveAttribute('aria-invalid', 'true');
-
-    await userEvent.clear(hex);
-    await userEvent.type(hex, 'nope{Enter}');
-    expect(screen.getByRole('alert')).toBeInTheDocument();
-    fireEvent.input(screen.getByLabelText('Accent colour'), { target: { value: '#6d28d9' } });
-    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
-    expect(hex).toHaveValue('#6d28d9');
-  });
-
-  it('dragging the colour picker saves a bounded number of times, and the last colour wins', async () => {
-    useSettingsStore.setState({ settings: { ...DEFAULT_SETTINGS, palette: 'custom' } });
-    // Earlier saves answer later, as a busy blocking pool might.
-    let calls = 0;
-    mockIPC(async (cmd, raw) => {
-      if (cmd !== 'settings_set') return cmd === 'fonts_list' ? [] : null;
-      const patch = (raw as { patch: Record<string, unknown> }).patch;
-      patches.push(patch);
-      await new Promise((r) => setTimeout(r, Math.max(10, 80 - 20 * calls++)));
-      return { ...useSettingsStore.getState().settings, ...patch };
-    });
-    open();
-    await show('Appearance');
-    const picker = screen.getByLabelText('Accent colour');
-    const colours = Array.from(
-      { length: 20 },
-      (_, i) => `#${(0x203040 + i * 0x050301).toString(16).padStart(6, '0')}`,
-    );
-    // Mostly quick moves, with a pause now and then long enough to save.
-    for (const [i, value] of colours.entries()) {
-      fireEvent.input(picker, { target: { value } });
-      await new Promise((r) => setTimeout(r, i % 5 === 4 ? 200 : 15));
-    }
-    const last = colours[colours.length - 1];
-    expect(screen.getByRole('textbox', { name: 'Accent colour (hex)' })).toHaveValue(last);
-    await waitFor(() => expect(useSettingsStore.getState().settings.accentColor).toBe(last), {
-      timeout: 2000,
-    });
-    await new Promise((r) => setTimeout(r, 300));
-    expect(useSettingsStore.getState().settings.accentColor).toBe(last);
-    expect(patches.at(-1)).toEqual({ accentColor: last });
-    expect(patches.length).toBeLessThanOrEqual(6);
   });
 
   it('fonts: bundled and installed families per mode, text size, toolbar and line numbers', async () => {
@@ -635,17 +557,25 @@ describe('M4b part 3: Escape and a click outside save and close Settings', () =>
     expect(closed).toEqual(['closed']);
   });
 
-  it('a hex accent typed but not confirmed is saved by Escape before closing', async () => {
+  it('a theme colour typed but not confirmed is saved by Escape before closing', async () => {
+    const theme = newTheme(PALETTES[0], 'Selva', 'selva');
+    useSettingsStore.setState({
+      settings: {
+        ...DEFAULT_SETTINGS,
+        palette: 'custom',
+        customThemes: [theme],
+        customTheme: 'selva',
+      },
+    });
     const closed = openWith();
     await show('Appearance');
-    await userEvent.click(screen.getByRole('radio', { name: 'Custom accent' }));
-    const hex = screen.getByRole('textbox', { name: 'Accent colour (hex)' });
+    const hex = screen.getByRole('textbox', { name: 'Primary colour (hex)' });
     await userEvent.clear(hex);
     await userEvent.type(hex, '#123456');
     fireEvent.keyDown(hex, { key: 'Escape' });
     expect(closed).toEqual(['closed']);
     await waitFor(() =>
-      expect(patches).toContainEqual(expect.objectContaining({ accentColor: '#123456' })),
+      expect(useSettingsStore.getState().settings.customThemes[0].light.accent).toBe('#123456'),
     );
   });
 });

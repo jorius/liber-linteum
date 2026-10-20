@@ -1,0 +1,400 @@
+/* Settings → Appearance: theme gallery and editor (custom themes §3, mock A). */
+.root {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.galleryBlock {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.label {
+  font: 700 10.5px var(--font-body);
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+}
+
+.gallery {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: stretch;
+  gap: 10px;
+}
+
+.cards {
+  display: contents;
+}
+
+.card,
+.newCard {
+  position: relative;
+  width: 112px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+  font: 600 12px var(--font-body);
+  color: var(--color-text-body);
+  cursor: pointer;
+}
+
+.card:hover,
+.newCard:hover {
+  border-color: var(--color-border-strong);
+}
+
+.chosen {
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 1px var(--color-accent);
+  color: var(--color-text-strong);
+}
+
+.card:focus-within {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 2px;
+}
+
+/* The radio stays in the accessibility tree; the card shows its state. */
+.radio {
+  position: absolute;
+  opacity: 0;
+  width: 1px;
+  height: 1px;
+  margin: 0;
+}
+
+.cardName {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.newCard {
+  align-items: center;
+  justify-content: center;
+  min-height: 84px;
+  border-style: dashed;
+  color: var(--color-accent);
+}
+
+.newCard:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 2px;
+}
+
+.mini {
+  display: grid;
+  grid-template-columns: 22% 1fr;
+  height: 48px;
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  border: 1px solid var(--color-border);
+}
+
+.miniPage {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 6px;
+}
+
+.miniPage i {
+  display: block;
+  height: 5px;
+  border-radius: 3px;
+}
+
+.builtInNote {
+  display: flex;
+}
+
+.editor {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding-top: 14px;
+  border-top: 1px solid var(--color-border);
+}
+
+.editorHead {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.nameField {
+  flex: 1;
+  min-width: 0;
+  font-weight: 600;
+}
+
+.segmented {
+  display: inline-flex;
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
+
+.segmented button {
+  border: 0;
+  background: var(--color-surface);
+  padding: 0 14px;
+  height: 34px;
+  font: 600 13px var(--font-body);
+  color: var(--color-text-body);
+  cursor: pointer;
+}
+
+.segmented button + button {
+  border-left: 1px solid var(--color-border);
+}
+
+.segmented button[aria-pressed='true'] {
+  background: var(--color-accent);
+  color: var(--color-accent-contrast);
+}
+
+.segmented button:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: -3px;
+}
+
+.editorBody {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 240px;
+  gap: 16px;
+  align-items: start;
+}
+
+.groups {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.group {
+  margin: 0;
+  padding: 4px 12px 6px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+}
+
+.group legend {
+  padding: 0 4px;
+  font: 700 12px var(--font-body);
+  color: var(--color-text-strong);
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.row:last-child {
+  border-bottom: 0;
+}
+
+.swatch {
+  flex: none;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-sm);
+  background: none;
+  cursor: pointer;
+}
+
+.rowText {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  flex: 1;
+}
+
+.rowName {
+  font: 600 13px var(--font-body);
+  color: var(--color-text-strong);
+}
+
+.rowUse {
+  font-size: 11.5px;
+  color: var(--color-text-muted);
+}
+
+.hex {
+  width: 11ch;
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+
+.badge {
+  flex: none;
+  font: 700 10.5px var(--font-body);
+  padding: 2px 7px;
+  border-radius: var(--radius-pill);
+  background: var(--color-surface-subtle);
+  color: var(--color-success);
+  border: 1px solid var(--color-border);
+  white-space: nowrap;
+}
+
+.badge[data-level='Low'] {
+  background: var(--color-warn-bg);
+  border-color: var(--color-warn-border);
+  color: var(--color-warn-text);
+}
+
+.small {
+  flex: none;
+  height: 26px;
+  padding: 0 8px;
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  font: 600 12px var(--font-body);
+  color: var(--color-text-body);
+  cursor: pointer;
+}
+
+.small:hover {
+  border-color: var(--color-accent);
+}
+
+.small:focus-visible,
+.more:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 2px;
+}
+
+.more {
+  align-self: flex-start;
+  border: 0;
+  background: none;
+  padding: 2px 0;
+  font: 600 12.5px var(--font-body);
+  color: var(--color-accent);
+  cursor: pointer;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.confirm {
+  display: inline-flex;
+  gap: 8px;
+}
+
+.preview {
+  margin: 0;
+  position: sticky;
+  top: 0;
+  display: grid;
+  grid-template-columns: 54px 1fr;
+  height: 220px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+}
+
+.pvSide {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 6px;
+  background: var(--p-side);
+}
+
+.pvSide i {
+  display: block;
+  height: 8px;
+  border-radius: 3px;
+  background: var(--p-side-text);
+  opacity: 0.5;
+}
+
+.pvSide i[data-sel] {
+  opacity: 1;
+  background: var(--p-side-sel);
+  outline: 1px solid var(--p-side-text);
+}
+
+.pvMain {
+  padding: 10px;
+  background: var(--p-bg);
+}
+
+.pvCard {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding: 9px;
+  border: 1px solid var(--p-border);
+  border-radius: var(--radius-md);
+  background: var(--p-surface);
+  font-size: 11px;
+  color: var(--p-body);
+}
+
+.pvCard strong {
+  font: 700 13px var(--font-display);
+  color: var(--p-strong);
+}
+
+.pvCard small {
+  color: var(--p-muted);
+}
+
+.pvLink {
+  color: var(--p-accent);
+}
+
+.pvTag {
+  color: var(--p-secondary);
+  font-weight: 600;
+}
+
+.pvMark {
+  background: var(--p-mark);
+  color: inherit;
+}
+
+.pvButtons {
+  display: flex;
+  gap: 6px;
+}
+
+.pvPrimary,
+.pvSecondary {
+  padding: 3px 8px;
+  border-radius: var(--radius-sm);
+  font-weight: 600;
+}
+
+.pvPrimary {
+  background: var(--p-accent);
+  color: var(--p-contrast);
+}
+
+.pvSecondary {
+  border: 1px solid var(--p-border);
+}
+
+@media (max-width: 760px) {
+  .editorBody {
+    grid-template-columns: 1fr;
+  }
+}

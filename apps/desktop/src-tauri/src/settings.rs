@@ -31,7 +31,7 @@ pub enum EditorMode {
     Split,
 }
 
-/// Colour palette (M2b §4); `Custom` derives one from `accent_color`.
+/// Colour palette (M2b §4); `Custom` is the theme in `custom_theme`.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum Palette {
@@ -220,6 +220,160 @@ impl Default for WideElements {
     }
 }
 
+/// A theme colour (custom themes §4): `#rrggbb`, or `rgba(r,g,b,a)` (used by
+/// the sidebar selection); stored lower-case.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(try_from = "String", into = "String")]
+pub struct ThemeColor(String);
+
+impl ThemeColor {
+    pub fn parse(s: &str) -> Option<ThemeColor> {
+        if let Some(h) = HexColor::parse(s) {
+            return Some(ThemeColor(h.0));
+        }
+        let inner = s.strip_prefix("rgba(")?.strip_suffix(')')?;
+        let parts: Vec<&str> = inner.split(',').map(str::trim).collect();
+        let [r, g, b, a] = parts.as_slice() else {
+            return None;
+        };
+        let channel = |c: &str| {
+            (1..=3).contains(&c.len())
+                && c.bytes().all(|b| b.is_ascii_digit())
+                && c.parse::<u8>().is_ok()
+        };
+        let alpha = a.parse::<f64>().is_ok_and(|v| (0.0..=1.0).contains(&v))
+            && a.chars().all(|c| c.is_ascii_digit() || c == '.');
+        (channel(r) && channel(g) && channel(b) && alpha)
+            .then(|| ThemeColor(s.to_ascii_lowercase()))
+    }
+
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+}
+
+impl TryFrom<String> for ThemeColor {
+    type Error = String;
+    fn try_from(s: String) -> Result<ThemeColor, String> {
+        ThemeColor::parse(&s).ok_or_else(|| format!("not a theme colour: {s}"))
+    }
+}
+
+impl From<ThemeColor> for String {
+    fn from(c: ThemeColor) -> String {
+        c.0
+    }
+}
+
+/// A custom theme's 16 colours for one mode (custom themes §2): `#rrggbb`,
+/// and `rgba()` only for the sidebar selection (review I3, M11). A token this
+/// build doesn't know (a newer build's) is ignored, not fatal (review M12).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ThemeTokens {
+    pub accent: HexColor,
+    pub secondary: HexColor,
+    pub bg: HexColor,
+    pub surface: HexColor,
+    pub border: HexColor,
+    pub side: HexColor,
+    pub side_text: HexColor,
+    pub side_sel: ThemeColor,
+    pub strong: HexColor,
+    pub body: HexColor,
+    pub text: HexColor,
+    pub muted: HexColor,
+    pub contrast: HexColor,
+    pub soft: HexColor,
+    pub mark: HexColor,
+    pub code: HexColor,
+}
+
+const THEME_TOKEN_KEYS: [&str; 16] = [
+    "accent",
+    "secondary",
+    "bg",
+    "surface",
+    "border",
+    "side",
+    "sideText",
+    "sideSel",
+    "strong",
+    "body",
+    "text",
+    "muted",
+    "contrast",
+    "soft",
+    "mark",
+    "code",
+];
+
+fn known_token_keys<'de, D: serde::Deserializer<'de>>(d: D) -> Result<Vec<String>, D::Error> {
+    let keys = Vec::<String>::deserialize(d)?;
+    Ok(keys
+        .into_iter()
+        .filter(|k| THEME_TOKEN_KEYS.contains(&k.as_str()))
+        .collect())
+}
+
+/// The colours not set by hand, per mode; unknown names are dropped.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ThemeDerived {
+    #[serde(deserialize_with = "known_token_keys", default)]
+    pub light: Vec<String>,
+    #[serde(deserialize_with = "known_token_keys", default)]
+    pub dark: Vec<String>,
+}
+
+/// A theme the user built (custom themes §2).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(try_from = "CustomThemeRaw")]
+pub struct CustomTheme {
+    pub id: String,
+    pub name: String,
+    pub light: ThemeTokens,
+    pub dark: ThemeTokens,
+    #[serde(default)]
+    pub derived: ThemeDerived,
+    /// The accent a migrated theme was derived from (review M6).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub seed: Option<HexColor>,
+}
+
+#[derive(Deserialize)]
+struct CustomThemeRaw {
+    id: String,
+    name: String,
+    light: ThemeTokens,
+    dark: ThemeTokens,
+    #[serde(default)]
+    derived: ThemeDerived,
+    #[serde(default)]
+    seed: Option<HexColor>,
+}
+
+impl TryFrom<CustomThemeRaw> for CustomTheme {
+    type Error = String;
+    fn try_from(r: CustomThemeRaw) -> Result<CustomTheme, String> {
+        let id_ok = (1..=64).contains(&r.id.len());
+        let name_ok = !r.name.trim().is_empty() && r.name.chars().count() <= 80;
+        if !(id_ok && name_ok) {
+            return Err("theme id or name out of range".into());
+        }
+        Ok(CustomTheme {
+            id: r.id,
+            name: r.name,
+            light: r.light,
+            dark: r.dark,
+            derived: r.derived,
+            seed: r.seed,
+        })
+    }
+}
+
+/// At most this many custom themes are kept.
+pub const MAX_CUSTOM_THEMES: usize = 100;
+
 pub const MIN_FONT_SIZE: u8 = 13;
 pub const MAX_FONT_SIZE: u8 = 20;
 
@@ -351,7 +505,10 @@ pub struct Settings {
     pub confirm_delete: bool,
     pub editor_mode: EditorMode,
     pub palette: Palette,
-    pub accent_color: HexColor,
+    /// The custom accent from before custom themes; dropped once it has
+    /// become a theme (custom themes §2).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub accent_color: Option<HexColor>,
     pub font_live_preview: FontChoice,
     pub font_source: FontChoice,
     pub font_size: FontSize,
@@ -390,6 +547,10 @@ pub struct Settings {
     pub spellcheck: bool,
     /// The dictionaries checked, in order; `None` = the app language's.
     pub spell_dictionaries: Option<Vec<String>>,
+    /// Themes the user built (custom themes §2).
+    pub custom_themes: Vec<CustomTheme>,
+    /// With `palette: custom`, the id of the theme in use.
+    pub custom_theme: Option<String>,
     /// Dictionaries imported from disk; changed only by the spell commands.
     pub imported_dictionaries: Vec<ImportedDictionary>,
     pub recent_vaults: Vec<RecentVault>,
@@ -408,7 +569,7 @@ impl Default for Settings {
             confirm_delete: true,
             editor_mode: EditorMode::LivePreview,
             palette: Palette::Lavender,
-            accent_color: HexColor::default(),
+            accent_color: None,
             font_live_preview: FontChoice::bundled("atkinson-hyperlegible"),
             font_source: FontChoice::bundled("jetbrains-mono"),
             font_size: FontSize::default(),
@@ -428,6 +589,8 @@ impl Default for Settings {
             action_button: ActionButton::BottomRight,
             spellcheck: true,
             spell_dictionaries: None,
+            custom_themes: Vec::new(),
+            custom_theme: None,
             imported_dictionaries: Vec::new(),
             recent_vaults: Vec::new(),
             extra: serde_json::Map::new(),
@@ -445,7 +608,8 @@ pub struct SettingsPatch {
     pub confirm_delete: Option<bool>,
     pub editor_mode: Option<EditorMode>,
     pub palette: Option<Palette>,
-    pub accent_color: Option<HexColor>,
+    /// `""` drops the legacy accent.
+    pub accent_color: Option<String>,
     pub font_live_preview: Option<FontChoice>,
     pub font_source: Option<FontChoice>,
     pub font_size: Option<FontSize>,
@@ -464,6 +628,9 @@ pub struct SettingsPatch {
     pub action_button: Option<ActionButton>,
     pub spellcheck: Option<bool>,
     pub spell_dictionaries: Option<Vec<String>>,
+    pub custom_themes: Option<Vec<CustomTheme>>,
+    /// The theme in use; `""` clears it.
+    pub custom_theme: Option<String>,
 }
 
 /// A dictionary imported from disk; its files live in
@@ -547,6 +714,23 @@ fn parse_lenient(text: &str) -> Result<(Settings, Vec<String>), serde_json::Erro
     field!("spellcheck", spellcheck);
     field!("spellDictionaries", spell_dictionaries);
     field!("importedDictionaries", imported_dictionaries);
+    field!("customTheme", custom_theme);
+    // One bad theme is dropped, not all of them (custom themes plan, focus 3).
+    match map.remove("customThemes") {
+        None => {}
+        Some(Value::Array(items)) => {
+            let total = items.len();
+            settings.custom_themes = items
+                .into_iter()
+                .filter_map(|v| serde_json::from_value::<CustomTheme>(v).ok())
+                .take(MAX_CUSTOM_THEMES)
+                .collect();
+            if settings.custom_themes.len() < total.min(MAX_CUSTOM_THEMES) {
+                reset.push("customThemes (some entries)".to_string());
+            }
+        }
+        Some(_) => reset.push("customThemes".to_string()),
+    }
     match map.remove("recentVaults") {
         None => {}
         Some(Value::Array(items)) => {
@@ -652,7 +836,13 @@ impl SettingsStore {
             next.palette = v;
         }
         if let Some(v) = patch.accent_color {
-            next.accent_color = v;
+            next.accent_color = if v.is_empty() {
+                None
+            } else {
+                Some(HexColor::parse(&v).ok_or_else(|| {
+                    std::io::Error::new(std::io::ErrorKind::InvalidInput, "not a #rrggbb colour")
+                })?)
+            };
         }
         if let Some(v) = patch.font_live_preview {
             next.font_live_preview = v;
@@ -711,6 +901,19 @@ impl SettingsStore {
         }
         if let Some(v) = patch.spell_dictionaries {
             next.spell_dictionaries = Some(v);
+        }
+        if let Some(v) = patch.custom_themes {
+            // Refused, never silently cut (review M7): the UI says why.
+            if v.len() > MAX_CUSTOM_THEMES {
+                return Err(std::io::Error::new(
+                    std::io::ErrorKind::InvalidInput,
+                    format!("at most {MAX_CUSTOM_THEMES} themes"),
+                ));
+            }
+            next.custom_themes = v;
+        }
+        if let Some(id) = patch.custom_theme {
+            next.custom_theme = (!id.is_empty()).then_some(id);
         }
         self.save(&next)?;
         *s = next.clone();

@@ -11,6 +11,7 @@ import {
   type SettingsPatch,
 } from '../ipc';
 import { applyAppearance } from '../theme/appearance';
+import { migrateLegacy } from '../theme/customThemes';
 import { applyTheme } from '../theme/theme';
 import { useToastStore } from './toastStore';
 
@@ -22,7 +23,6 @@ export const DEFAULT_SETTINGS: Settings = {
   confirmDelete: true,
   editorMode: 'livePreview',
   palette: 'lavender',
-  accentColor: '#d1477a',
   fontLivePreview: 'atkinson-hyperlegible',
   fontSource: 'jetbrains-mono',
   fontSize: 15,
@@ -39,6 +39,8 @@ export const DEFAULT_SETTINGS: Settings = {
   sidebarWidth: 270,
   actionButton: 'bottomRight',
   spellcheck: true,
+  customThemes: [],
+  customTheme: null,
   spellDictionaries: null,
   importedDictionaries: [],
   globalViewMode: 'drill',
@@ -70,8 +72,30 @@ export const useSettingsStore = create<SettingsState>((set) => ({
   load: async () => {
     const res = await settingsGet();
     // Outside Tauri (plain browser) or on error: defaults.
-    const settings = res.ok ? { ...DEFAULT_SETTINGS, ...res.value.settings } : DEFAULT_SETTINGS;
+    let settings = res.ok ? { ...DEFAULT_SETTINGS, ...res.value.settings } : DEFAULT_SETTINGS;
     await apply(settings);
+    // Custom themes §2: a custom accent from before custom themes becomes a
+    // theme, once (after `apply`, so its name is in the user's language).
+    if (
+      settings.palette === 'custom' &&
+      settings.customThemes.length === 0 &&
+      settings.accentColor
+    ) {
+      const theme = migrateLegacy(settings.accentColor, i18next.t('settings.themes.legacyName'));
+      const patch = { customThemes: [theme], customTheme: theme.id };
+      settings = { ...settings, ...patch };
+      await apply(settings);
+      // The legacy accent goes in the same save; if that fails it stays, and
+      // the next load tries again (this session already looks right).
+      const saved = await settingsSet({ ...patch, accentColor: '' });
+      if (saved.ok) settings = { ...DEFAULT_SETTINGS, ...saved.value };
+      else
+        useToastStore.getState().push({
+          message: i18next.t('settings.themes.migrateFailed'),
+          detail: [saved.error.message],
+          tone: 'error',
+        });
+    }
     const warning = res.ok ? (res.value.warning ?? null) : null;
     set({ settings, warning, loaded: true });
     if (warning) {

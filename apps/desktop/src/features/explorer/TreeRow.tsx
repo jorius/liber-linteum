@@ -64,7 +64,7 @@ function FavoriteAction({ path, name }: { path: string; name: string }) {
       title={t(on ? 'favorites.removeNamed' : 'favorites.addNamed', { name })}
       onClick={() => void useFavoritesStore.getState().toggle(path)}
     >
-      <StarIcon filled={on} size={13} />
+      <StarIcon filled={on} size={13} side />
     </button>
   );
 }

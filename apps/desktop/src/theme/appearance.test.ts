@@ -1,6 +1,8 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { DEFAULT_SETTINGS } from '../stores/settingsStore';
 import { applyAppearance, CUSTOM_STYLE_ID } from './appearance';
+import { newTheme, setColor } from './customThemes';
+import { PALETTES } from './palettes';
 
 afterEach(() => {
   document.documentElement.removeAttribute('data-palette');
@@ -15,17 +17,30 @@ describe('applyAppearance (M2b §4)', () => {
     expect(document.getElementById(CUSTOM_STYLE_ID)).toBeNull();
   });
 
-  it('a custom accent injects one generated stylesheet and updates it in place', () => {
-    applyAppearance({ ...DEFAULT_SETTINGS, palette: 'custom', accentColor: '#2aa198' });
+  it('applies_selected_custom_theme: one generated stylesheet, updated in place', () => {
+    const a = newTheme(PALETTES[0], 'A', 'a');
+    const b = setColor(newTheme(PALETTES[0], 'B', 'b'), 'light', 'accent', '#0e7c7b');
+    const s = { ...DEFAULT_SETTINGS, palette: 'custom' as const, customThemes: [a, b] };
+    applyAppearance({ ...s, customTheme: 'b' });
     expect(document.documentElement.dataset.palette).toBe('custom');
     const style = document.getElementById(CUSTOM_STYLE_ID)!;
     expect(style.textContent).toContain(":root[data-palette='custom'] {");
-    expect(style.textContent).toContain('--color-accent:');
-    const first = style.textContent;
-    applyAppearance({ ...DEFAULT_SETTINGS, palette: 'custom', accentColor: '#6d28d9' });
+    expect(style.textContent).toContain('--color-accent: #0e7c7b;');
+    applyAppearance({ ...s, customTheme: 'a' });
     expect(document.querySelectorAll(`#${CUSTOM_STYLE_ID}`)).toHaveLength(1);
-    expect(document.getElementById(CUSTOM_STYLE_ID)!.textContent).not.toBe(first);
+    expect(document.getElementById(CUSTOM_STYLE_ID)!.textContent).not.toContain('#0e7c7b');
     applyAppearance({ ...DEFAULT_SETTINGS, palette: 'sepia' });
+    expect(document.getElementById(CUSTOM_STYLE_ID)).toBeNull();
+  });
+
+  it('deleting_the_selected_theme_falls_back to Lavender (custom themes plan, focus 2)', () => {
+    applyAppearance({
+      ...DEFAULT_SETTINGS,
+      palette: 'custom',
+      customThemes: [],
+      customTheme: 'gone',
+    });
+    expect(document.documentElement.dataset.palette).toBe('lavender');
     expect(document.getElementById(CUSTOM_STYLE_ID)).toBeNull();
   });
 

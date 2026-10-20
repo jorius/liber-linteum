@@ -83,9 +83,13 @@ function themeVariables(): Record<string, string> {
 export function MermaidView({ source }: { source: string }) {
   const { t } = useTranslation();
   const dark = useMediaQuery('(prefers-color-scheme: dark)');
-  const theme = useSettingsStore(
-    (s) => `${s.settings.palette}|${s.settings.accentColor}|${s.settings.theme}`,
-  );
+  const theme = useSettingsStore((s) => {
+    // A custom theme's colours are part of the key (custom themes §2).
+    const own = s.settings.customThemes.find((t) => t.id === s.settings.customTheme);
+    const colours =
+      s.settings.palette === 'custom' && own ? JSON.stringify([own.light, own.dark]) : '';
+    return `${s.settings.palette}|${colours}|${s.settings.theme}`;
+  });
   // Under "system", the tokens follow the OS, so its mode is part of the key.
   const themeKey = theme.endsWith('|system') ? `${theme}|${dark ? 'dark' : 'light'}` : theme;
   const [state, setState] = useState<{ svg?: string; error?: string }>({});

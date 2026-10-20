@@ -5,7 +5,7 @@ import { PALETTE_IDS } from '../ipc';
 import { contrast } from './color';
 import { DARK_ACCENT_FLOOR, derive, LIGHT_ACCENT_FLOOR } from './derive';
 import { paletteCss, paletteVars } from './paletteCss';
-import { PALETTES } from './palettes';
+import { PALETTES, type Palette } from './palettes';
 
 const tokensCss = readFileSync(new URL('./tokens.css', import.meta.url), 'utf8');
 /** The shared coloured-text palette (`--palette-*`, not their `-bg`) per mode. */
@@ -38,6 +38,52 @@ describe('built-in palettes (M2b §4, §10)', () => {
       }
     },
   );
+});
+
+/** Custom themes spec §2, §6: the secondary colour paints tags (text on
+ *  its own tint), manual relationship lines (on the canvas) and the filled
+ *  favourite star (on the always-dark sidebar). */
+const SECONDARY_VARS = [
+  '--color-secondary',
+  '--color-secondary-soft',
+  '--color-sidebar-secondary',
+] as const;
+function expectSecondaryFloors(p: Palette, mode: 'light' | 'dark', at: string) {
+  const v = paletteVars(p, mode);
+  for (const key of SECONDARY_VARS) expect(v[key], `${at} ${key}`).toMatch(/^#[0-9a-f]{6}$/);
+  expect(
+    contrast(v['--color-secondary'], v['--color-surface']),
+    `${at} secondary on surface`,
+  ).toBeGreaterThanOrEqual(4.5);
+  expect(
+    contrast(v['--color-secondary'], v['--color-secondary-soft']),
+    `${at} tag text on its tint`,
+  ).toBeGreaterThanOrEqual(4.5);
+  expect(v['--color-edge-manual'], `${at} manual edge`).toBe(v['--color-secondary']);
+  expect(
+    contrast(v['--color-edge-manual'], v['--color-canvas']),
+    `${at} manual edge on canvas`,
+  ).toBeGreaterThanOrEqual(3);
+  expect(
+    contrast(v['--color-sidebar-secondary'], v['--color-sidebar-bg']),
+    `${at} star on sidebar`,
+  ).toBeGreaterThanOrEqual(3);
+}
+
+describe('secondary colour (custom themes §2, §6)', () => {
+  it.each(PALETTES.flatMap((p) => (['light', 'dark'] as const).map((m) => [p.id, m] as const)))(
+    '%s %s: secondary meets its floors',
+    (id, mode) =>
+      expectSecondaryFloors(
+        PALETTES.find((p) => p.id === id)!,
+        mode,
+        `${id} ${mode}`,
+      ),
+  );
+
+  it('the default tokens define the secondary vars in both modes', () => {
+    for (const key of SECONDARY_VARS) expect(tokensCss.split(`${key}:`).length - 1, key).toBe(3);
+  });
 });
 
 /** M5b §6: the save status reads "Saved" in green and "Unsaved" in red, on
@@ -232,6 +278,7 @@ describe('custom accent → palette (M2b §4, derive.ts)', () => {
       expect(contrast(t.contrast, t.accent), `${at} text on accent`).toBeGreaterThanOrEqual(4.5);
       expect(contrast(t.text, t.bg), `${at} text on background`).toBeGreaterThanOrEqual(7);
       expectReadableGlobalView(paletteVars({ id: 'custom', ...p }, mode), `${hex} ${mode}`);
+      expectSecondaryFloors({ id: 'custom', ...p }, mode, `${hex} ${mode}`);
     }
     for (const v of Object.values(p.light).concat(Object.values(p.dark))) {
       expect(v).toMatch(/^(#[0-9a-f]{6}|rgba\(.*\))$/);
@@ -387,5 +434,28 @@ describe('code tokens (M4b part 2 §2)', () => {
   );
   it('the default tokens define them too, in both modes', () => {
     for (const key of CODE_TOKENS) expect(tokensCss.split(`${key}:`).length - 1, key).toBe(3);
+  });
+});
+
+/** Custom themes §6: where the secondary colour paints. */
+describe('secondary in use (custom themes §6)', () => {
+  const read = (rel: string) => readFileSync(new URL(rel, import.meta.url), 'utf8');
+  it('tags use the secondary on its tint, in the editor, the preview and the page header', () => {
+    for (const css of [
+      read('../features/preview/Preview.module.css'),
+      read('../features/page/PageView.module.css'),
+    ]) {
+      const tag = /\n\.tag \{([^}]*)\}/.exec(css)?.[1] ?? '';
+      expect(tag).toContain('color: var(--color-secondary)');
+      expect(tag).toContain('background: var(--color-secondary-soft)');
+    }
+    expect(read('../features/editor/livePreview.ts')).toMatch(
+      /'\.cm-liber-tag': \{ color: 'var\(--color-secondary\)'/,
+    );
+  });
+  it('the filled star takes the secondary (the dark one on the sidebar)', () => {
+    const star = read('../features/favorites/FavoritesSection.tsx');
+    expect(star).toContain('var(--color-sidebar-secondary)');
+    expect(star).toContain('var(--color-secondary)');
   });
 });

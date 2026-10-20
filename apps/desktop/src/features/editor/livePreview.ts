@@ -584,7 +584,7 @@ const theme = EditorView.baseTheme({
     borderRadius: '4px',
   },
   '.cm-liber-link': { color: 'var(--color-accent)', textDecoration: 'underline' },
-  '.cm-liber-tag': { color: 'var(--color-accent)', fontWeight: '600' },
+  '.cm-liber-tag': { color: 'var(--color-secondary)', fontWeight: '600' },
   '.cm-liber-codeblock': {
     fontFamily: 'var(--font-source)',
     fontSize: '0.9em',

@@ -7,6 +7,8 @@ export interface LatestSaver<T> {
   now: (value: T) => void;
   /** A value is waiting, queued or being saved. */
   pending: () => boolean;
+  /** Drop anything not yet sent (after a refused save). */
+  cancel: () => void;
 }
 
 /** Coalesces rapid saves so the last value always lands last: scheduled
@@ -55,6 +57,11 @@ export function useLatestSave<T>(
         flush();
       },
       pending: () => busy || queued !== undefined || waiting !== undefined,
+      cancel: () => {
+        clearTimeout(timer);
+        waiting = undefined;
+        queued = undefined;
+      },
       flush,
     };
   });
