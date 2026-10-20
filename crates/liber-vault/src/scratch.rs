@@ -43,7 +43,7 @@ impl Vault {
     /// Notes still named after their first line, re-read on every call;
     /// entries that aren't strings are left out.
     pub fn auto_named(&self) -> BTreeSet<String> {
-        let value: Value = read_json(self.root(), LIBER_JSON, &mut Vec::new());
+        let value: Value = read_json(self.storage(), LIBER_JSON, &mut Vec::new());
         value
             .get(AUTO_NAMED)
             .and_then(Value::as_array)
@@ -82,7 +82,7 @@ impl Vault {
     /// The vault's scratch folder: `scratchpadFolder`, else `Scratchpad`; a
     /// value that isn't one visible top-level name reads as the default.
     pub fn scratch_folder(&self) -> String {
-        let value: Value = read_json(self.root(), LIBER_JSON, &mut Vec::new());
+        let value: Value = read_json(self.storage(), LIBER_JSON, &mut Vec::new());
         value
             .get(SCRATCH_FOLDER)
             .and_then(Value::as_str)

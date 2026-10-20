@@ -1,7 +1,10 @@
+mod support;
+
 use liber_testkit::{copy_fixture, wait_until};
-use liber_vault::{Vault, VaultPath, WatchEvent};
+use liber_vault::{DEBOUNCE, RawEvent, Vault, VaultPath, WatchEvent};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
+use support::Spy;
 
 const WAIT: Duration = Duration::from_secs(5);
 type Seen = Arc<Mutex<Vec<WatchEvent>>>;
@@ -114,4 +117,51 @@ fn watch_folder_reports_only_the_folders_own_files() {
         .iter()
         .any(|e| matches!(e, WatchEvent::Changed(p) | WatchEvent::Removed(p) if p.as_str().starts_with("sub/")));
     assert!(!below, "{:?}", seen.lock().unwrap());
+}
+
+/// Review Focus 5: temp files, hidden and excluded paths and the root never
+/// reach the session; a batch holding `Overflow` is only `Overflow`.
+#[test]
+fn watch_drops_temp_hidden_excluded_and_flags_root() {
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::create_dir(dir.path().join(".liber")).unwrap();
+    std::fs::write(
+        dir.path().join(".liber/vault.json"),
+        r#"{"exclude":["build/**"]}"#,
+    )
+    .unwrap();
+    let spy = Spy::open(dir.path());
+    let sink = spy.sink.clone();
+    let vault = Vault::open_with(Box::new(spy)).unwrap();
+    let batches: Arc<Mutex<Vec<Vec<WatchEvent>>>> = Arc::default();
+    let seen = batches.clone();
+    let _w = vault
+        .watch(move |batch| seen.lock().unwrap().push(batch))
+        .unwrap();
+    let settle = || std::thread::sleep(DEBOUNCE * 3);
+
+    Spy::inject(
+        &sink,
+        vec![
+            RawEvent::Changed(vp(".a.md.liber-tmp-1-0")),
+            RawEvent::Changed(vp(".liber/vault.json")),
+            RawEvent::Changed(vp("build/x.md")),
+            RawEvent::Changed(VaultPath::root()),
+            RawEvent::Changed(vp("ok.md")),
+        ],
+    );
+    assert!(wait_until(WAIT, || batches.lock().unwrap().len() == 1));
+    settle();
+    assert_eq!(
+        *batches.lock().unwrap(),
+        [vec![WatchEvent::Changed(vp("ok.md"))]]
+    );
+
+    Spy::inject(
+        &sink,
+        vec![RawEvent::Overflow, RawEvent::Changed(vp("ok.md"))],
+    );
+    assert!(wait_until(WAIT, || batches.lock().unwrap().len() == 2));
+    settle();
+    assert_eq!(batches.lock().unwrap()[1..], [vec![WatchEvent::Overflow]]);
 }

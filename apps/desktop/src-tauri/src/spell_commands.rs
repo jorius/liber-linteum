@@ -41,7 +41,7 @@ pub struct SpellState {
 
 struct VaultSpelling {
     session: Weak<VaultSession>,
-    stamp: Option<(SystemTime, u64)>,
+    stamp: Option<(i128, u64)>,
     dictionaries: Option<Vec<String>>,
     words: Vec<String>,
 }

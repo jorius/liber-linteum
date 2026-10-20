@@ -402,8 +402,8 @@ impl Storage for PlainStorage {
         VaultPath::from_fs_path(&self.root, os).ok()
     }
 
-    fn watch(&self, _recursive: bool, _sink: Box<dyn Fn(RawEvent) + Send>) -> Result<WatchGuard> {
-        unimplemented!("E2 Task 3")
+    fn watch(&self, recursive: bool, sink: Box<dyn Fn(RawEvent) + Send>) -> Result<WatchGuard> {
+        super::plain_watch::watch(&self.root, recursive, sink)
     }
 }
 

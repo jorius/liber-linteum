@@ -4,6 +4,7 @@
 //! `os_path` and `vault_path_of`, which exist to talk to the OS.
 
 pub(crate) mod plain;
+mod plain_watch;
 
 use crate::error::Result;
 use crate::path::VaultPath;
@@ -88,8 +89,8 @@ pub enum RawEvent {
 
 /// Keeps a [`Storage::watch`] running until dropped.
 pub struct WatchGuard(
-    // Held only for its Drop, which stops the watch.
-    #[allow(dead_code)] pub(crate) Box<dyn Send>,
+    /// Held only for its Drop, which stops the watch.
+    pub Box<dyn Send>,
 );
 
 pub trait Storage: Send + Sync + std::fmt::Debug {

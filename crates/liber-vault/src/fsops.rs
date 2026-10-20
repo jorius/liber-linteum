@@ -1,29 +1,74 @@
-use crate::error::{Result, VaultError, io_err};
+use crate::error::{Result, VaultError};
 use crate::hash::Hash;
 use crate::path::VaultPath;
-use crate::storage::Replace;
-use crate::storage::plain;
+use crate::storage::{Child, Follow, Kind, Meta, OsUse, Reach, Reader, Replace, plain};
 use crate::vault::Vault;
 use std::io::Read;
 use std::path::{Path, PathBuf};
 
+/// Thin wrappers over the vault's [`Storage`](crate::Storage).
 impl Vault {
-    /// Absolute path for `path`, refusing anything whose deepest existing
-    /// ancestor resolves (through symlinks) outside the vault.
+    /// Transitional, until liber-session, liber-import (E2 Task 4) and the
+    /// desktop app (Task 5) use the narrow methods below; then removed.
+    #[doc(hidden)]
     pub fn fs_path(&self, path: &VaultPath) -> Result<PathBuf> {
-        plain::resolve(&self.root, path)
+        self.os_path(path, OsUse::Open)
     }
 
-    /// [`Vault::fs_path`] for a path the webview names, also refusing one
-    /// whose real location is hidden: a visible name can resolve into a
-    /// hidden folder through a symlink or, on Windows, an 8.3 short name
-    /// (`SSH~1`). A missing file is left to the read that follows.
+    /// Transitional, as [`Vault::fs_path`]; `open_read(.., Reach::Visible)`
+    /// replaces it.
+    #[doc(hidden)]
     pub fn visible_fs_path(&self, path: &VaultPath) -> Result<PathBuf> {
-        plain::resolve_visible(&self.root, path)
+        plain::resolve_visible(self.root(), path)
+    }
+
+    /// `"plain"` unless the vault was opened on another storage.
+    pub fn storage_name(&self) -> &'static str {
+        self.storage().name()
+    }
+
+    /// `Ok(None)` when nothing is at `path`.
+    pub fn meta(&self, path: &VaultPath, follow: Follow) -> Result<Option<Meta>> {
+        self.storage().meta(path, follow)
+    }
+
+    /// Direct children of `dir`, hidden names included.
+    pub fn children(&self, dir: &VaultPath) -> Result<Vec<Child>> {
+        self.storage().children(dir)
+    }
+
+    /// Opens `path` for reading and seeking; `Reach::Visible` also refuses
+    /// one whose real location is hidden (M4c review I4).
+    pub fn open_read(&self, path: &VaultPath, reach: Reach) -> Result<Reader> {
+        self.storage().open_read(path, reach)
+    }
+
+    /// A new file streamed in order; `AlreadyExists` if `path` exists.
+    pub fn create_new(&self, path: &VaultPath) -> Result<Box<dyn std::io::Write + Send>> {
+        self.storage().create_new(path)
+    }
+
+    pub fn remove_file(&self, path: &VaultPath) -> Result<()> {
+        self.storage().remove_file(path)
+    }
+
+    pub fn remove_empty_dir(&self, path: &VaultPath) -> Result<()> {
+        self.storage().remove_empty_dir(path)
+    }
+
+    /// An OS path for `use_`: opening with the default app, revealing in the
+    /// file manager, or a `file://` link.
+    pub fn os_path(&self, path: &VaultPath, use_: OsUse) -> Result<PathBuf> {
+        self.storage().os_path(path, use_)
+    }
+
+    /// The vault path of an OS path inside the vault.
+    pub fn vault_path_of(&self, os: &Path) -> Option<VaultPath> {
+        self.storage().vault_path_of(os)
     }
 
     pub fn read(&self, path: &VaultPath) -> Result<(Vec<u8>, Hash)> {
-        let bytes = std::fs::read(self.fs_path(path)?).map_err(|e| io_err(path.as_str(), e))?;
+        let bytes = self.storage().read(path)?;
         let hash = Hash::of(&bytes);
         Ok((bytes, hash))
     }
@@ -48,10 +93,10 @@ impl Vault {
                 "cannot write the vault root".into(),
             ));
         }
-        let current = match std::fs::read(self.fs_path(path)?) {
+        let current = match self.storage().read(path) {
             Ok(bytes) => Some(Hash::of(&bytes)),
-            Err(e) if e.kind() == std::io::ErrorKind::NotFound => None,
-            Err(e) => return Err(io_err(path.as_str(), e)),
+            Err(VaultError::NotFound(_)) => None,
+            Err(e) => return Err(e),
         };
         let mode = match (&expected, &current) {
             (None, Some(_)) => return Err(VaultError::AlreadyExists(path.to_string())),
@@ -65,7 +110,8 @@ impl Vault {
             (None, None) => Replace::CreateOnly,
             (Some(_), Some(_)) => Replace::Overwrite,
         };
-        plain::replace_atomic(&self.root, path, &mut &content[..], mode, false)?;
+        self.storage()
+            .replace_atomic(path, &mut &content[..], mode)?;
         Ok(Hash::of(content))
     }
 
@@ -79,12 +125,13 @@ impl Vault {
         let mut current = VaultPath::root();
         for part in dir.as_str().split('/') {
             current = current.join(part)?;
-            let full = self.fs_path(&current)?;
-            match full.metadata() {
-                Ok(meta) if meta.is_dir() => continue,
-                Ok(_) => return Err(VaultError::AlreadyExists(current.to_string())),
-                Err(_) => {
-                    std::fs::create_dir(&full).map_err(|e| io_err(current.as_str(), e))?;
+            match self.storage().meta(&current, Follow::InsideVault) {
+                Ok(Some(meta)) if meta.kind == Kind::Dir => continue,
+                Ok(Some(_)) => return Err(VaultError::AlreadyExists(current.to_string())),
+                // Nothing there, or a link out of the vault: `create_dir`
+                // refuses the latter as `fs_path` used to.
+                _ => {
+                    self.storage().create_dir(&current)?;
                     created.push(current.clone());
                 }
             }
@@ -101,19 +148,20 @@ impl Vault {
             file: None,
             hasher: blake3::Hasher::new(),
         };
-        plain::replace_atomic(&self.root, dest, &mut input, Replace::CreateOnly, false)?;
+        self.storage()
+            .replace_atomic(dest, &mut input, Replace::CreateOnly)?;
         Ok(Hash::from_bytes(*input.hasher.finalize().as_bytes()))
     }
 
     /// Creates one folder; the parent must exist.
     pub fn create_dir(&self, path: &VaultPath) -> Result<()> {
-        plain::create_dir(&self.root, path)
+        self.storage().create_dir(path)
     }
 
     /// Renames/moves a file or folder. Fails with `AlreadyExists` if `to` exists,
     /// except case-only renames of the same entry on case-insensitive filesystems.
     pub fn rename(&self, from: &VaultPath, to: &VaultPath) -> Result<()> {
-        plain::rename(&self.root, from, to)
+        self.storage().rename(from, to)
     }
 
     /// The child of `dir` named `name`, or failing that one whose name only
@@ -146,7 +194,7 @@ impl Vault {
     /// Whether two vault paths name the same entry on disk, e.g. `Notes` and
     /// `notes` (or `á`/`Á`) on a case-insensitive file system.
     pub fn same_entry(&self, a: &VaultPath, b: &VaultPath) -> bool {
-        match (self.fs_path(a), self.fs_path(b)) {
+        match (self.os_path(a, OsUse::Open), self.os_path(b, OsUse::Open)) {
             (Ok(x), Ok(y)) => plain::same_entry(&x, &y),
             _ => false,
         }
@@ -154,7 +202,7 @@ impl Vault {
 
     /// Moves a file or folder to the OS trash (EXP-03).
     pub fn trash(&self, path: &VaultPath) -> Result<()> {
-        plain::trash(&self.root, path)
+        self.storage().trash_os(path)
     }
 }
 

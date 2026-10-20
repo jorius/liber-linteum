@@ -5,6 +5,7 @@
 //! stored as given; callers check they are emoji (`liber_markdown::is_icon`).
 
 use crate::Result;
+use crate::storage::{PlainStorage, Storage};
 use crate::vault::{LIBER_JSON, Vault, read_json};
 use std::collections::BTreeMap;
 use std::path::Path;
@@ -24,7 +25,11 @@ fn parse(value: &serde_json::Value) -> Option<String> {
 /// vaults list); a vault not reopened since the rename is read where its
 /// settings still are, without moving anything.
 pub fn vault_icon_at(root: &Path) -> Option<String> {
-    let value: serde_json::Value = read_json(root, LIBER_JSON, &mut Vec::new());
+    icon_in(&PlainStorage::open(root).ok()?)
+}
+
+fn icon_in(storage: &dyn Storage) -> Option<String> {
+    let value: serde_json::Value = read_json(storage, LIBER_JSON, &mut Vec::new());
     value.get(VAULT).and_then(parse)
 }
 
@@ -51,7 +56,7 @@ impl Vault {
 
     /// The vault's own icon.
     pub fn vault_icon(&self) -> Option<String> {
-        vault_icon_at(self.root())
+        icon_in(self.storage())
     }
 
     /// Sets or clears the vault's icon; clearing what isn't set writes

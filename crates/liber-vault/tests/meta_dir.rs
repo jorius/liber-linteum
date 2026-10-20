@@ -1,9 +1,12 @@
 //! Rename to Liber Linteum: a vault's `.nimw/` folder becomes `.liber/` on
 //! open, never merged and never deleted.
 
+mod support;
+
 use liber_vault::{LEGACY_META_DIR, META_DIR, Vault, WARN_BOTH, WARN_UNMOVED, vault_icon_at};
 use std::fs;
 use std::path::Path;
+use support::Spy;
 
 fn write(root: &Path, rel: &str, text: &str) {
     let p = root.join(rel);
@@ -192,4 +195,23 @@ fn both_exist_icon_comes_from_liber_only() {
     let v = Vault::open(dir.path()).unwrap();
     assert_eq!(v.vault_icon(), None);
     assert_eq!(vault_icon_at(dir.path()), None);
+}
+
+/// E2: the move is a vault rename like any other, through `Storage`.
+#[test]
+fn legacy_folder_moves_through_storage() {
+    let dir = tempfile::tempdir().unwrap();
+    write(
+        dir.path(),
+        &legacy("vault.json"),
+        r#"{"favorites":["A.md"]}"#,
+    );
+    let spy = Spy::open(dir.path());
+    let renames = spy.renames.clone();
+    let v = Vault::open_with(Box::new(spy)).unwrap();
+    assert_eq!(
+        *renames.lock().unwrap(),
+        [(LEGACY_META_DIR.to_string(), META_DIR.to_string())]
+    );
+    assert_eq!(v.favorites(), vec!["A.md".to_string()]);
 }

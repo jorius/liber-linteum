@@ -180,9 +180,12 @@ fn review_focus_symlinks_outside_vault_and_folder_symlinks_are_skipped() {
 #[test]
 fn vault_path_maps_back_from_fs() {
     let vault = Vault::open(&fixture_path("obsidian-basic")).unwrap();
-    let fs = VaultPath::new("Game Design/Game 1.md")
-        .unwrap()
-        .to_fs_path(vault.root());
+    let fs = vault
+        .os_path(
+            &VaultPath::new("Game Design/Game 1.md").unwrap(),
+            liber_vault::OsUse::Open,
+        )
+        .unwrap();
     assert!(fs.is_file());
 }
 
@@ -287,8 +290,9 @@ fn m5b_archive_is_scanned_stat_ed_and_served_but_other_hidden_folders_are_not() 
     assert!(vault.stat(&vp(".archive/P/a.md")).unwrap().is_some());
     assert!(vault.stat(&vp(".trash/b.md")).unwrap().is_none());
     assert!(vault.stat(&vp("P/.archive/d.md")).unwrap().is_none());
-    assert!(vault.visible_fs_path(&vp(".archive/P/a.md")).is_ok());
-    assert!(vault.visible_fs_path(&vp(".archive/.x/h.md")).is_err());
+    let visible = liber_vault::Reach::Visible;
+    assert!(vault.open_read(&vp(".archive/P/a.md"), visible).is_ok());
+    assert!(vault.open_read(&vp(".archive/.x/h.md"), visible).is_err());
     assert!(liber_vault::is_hidden_path(".trash/b.md"));
     assert!(!liber_vault::is_hidden_path(".archive"));
     assert!(liber_vault::is_hidden_path(".archive/.x"));

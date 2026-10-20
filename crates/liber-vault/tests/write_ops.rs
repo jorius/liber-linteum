@@ -178,9 +178,16 @@ fn m4c_review_i4_visible_paths_never_resolve_into_hidden_ones() {
     std::os::unix::fs::symlink(dir.path().join(".secret"), dir.path().join("d")).unwrap();
     let vault = liber_vault::Vault::open(dir.path()).unwrap();
     let p = |s: &str| liber_vault::VaultPath::new(s).unwrap();
+    let open = |s: &str| vault.open_read(&p(s), liber_vault::Reach::Visible);
     for refused in ["pic.png", "h.png", "d/key.png"] {
-        assert!(vault.visible_fs_path(&p(refused)).is_err(), "{refused}");
+        assert!(
+            matches!(open(refused), Err(liber_vault::VaultError::OutsideVault(_))),
+            "{refused}"
+        );
     }
-    assert!(vault.visible_fs_path(&p("ok.png")).is_ok());
-    assert!(vault.visible_fs_path(&p("missing.png")).is_ok());
+    assert!(open("ok.png").is_ok());
+    assert!(matches!(
+        open("missing.png"),
+        Err(liber_vault::VaultError::NotFound(_))
+    ));
 }

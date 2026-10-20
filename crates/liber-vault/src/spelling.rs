@@ -4,6 +4,8 @@
 //! and unique. They live in the vault so an encrypted vault keeps them too.
 
 use crate::Result;
+use crate::path::VaultPath;
+use crate::storage::Follow;
 use crate::vault::{LIBER_JSON, Vault, read_json};
 use serde_json::{Map, Value};
 use unicode_normalization::UnicodeNormalization;
@@ -23,7 +25,7 @@ fn strings(value: Option<&Value>) -> Option<Vec<String>> {
 impl Vault {
     /// This vault's dictionaries, or `None` to use the app's.
     pub fn spelling_dictionaries(&self) -> Option<Vec<String>> {
-        let value: Value = read_json(self.root(), LIBER_JSON, &mut Vec::new());
+        let value: Value = read_json(self.storage(), LIBER_JSON, &mut Vec::new());
         strings(value.get(OVERRIDE).and_then(|o| o.get("dictionaries")))
     }
 
@@ -43,17 +45,15 @@ impl Vault {
 
     /// When `.liber/vault.json` last changed (and its size), so callers can
     /// keep the spelling settings until it does; `None` when it's absent.
-    pub fn spelling_stamp(&self) -> Option<(std::time::SystemTime, u64)> {
-        let meta = std::fs::metadata(
-            self.root()
-                .join(crate::meta_dir::resolve(self.root(), LIBER_JSON)),
-        )
-        .ok()?;
-        Some((meta.modified().ok()?, meta.len()))
+    pub fn spelling_stamp(&self) -> Option<(i128, u64)> {
+        let path = VaultPath::new(&crate::meta_dir::resolve(self.storage(), LIBER_JSON)).ok()?;
+        // Followed, as `std::fs::metadata` did: a linked file's own changes count.
+        let meta = self.storage().meta(&path, Follow::InsideVault).ok()??;
+        Some((meta.mtime_ns, meta.len))
     }
 
     pub fn spelling_words(&self) -> Vec<String> {
-        let value: Value = read_json(self.root(), LIBER_JSON, &mut Vec::new());
+        let value: Value = read_json(self.storage(), LIBER_JSON, &mut Vec::new());
         strings(value.get(WORDS)).unwrap_or_default()
     }
 
