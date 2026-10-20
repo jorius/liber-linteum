@@ -1,2 +1,4 @@
 # Fixture vaults are byte-exact test data (CRLF and invalid UTF-8 on purpose).
 fixtures/** -text
+# Frozen crypto test vectors: compared byte for byte, so never line-ending converted.
+crates/liber-crypto/tests/vectors/** -text

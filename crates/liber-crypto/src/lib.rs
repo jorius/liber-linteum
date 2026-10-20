@@ -9,6 +9,8 @@ mod names;
 mod recovery;
 mod slots;
 mod stream;
+#[cfg(test)]
+mod vectors;
 
 pub use error::{CryptoError, Result};
 pub use header::{Unlocked, VaultHeader};
