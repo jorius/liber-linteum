@@ -6,7 +6,7 @@ import { clearMocks, mockIPC } from '../../ipc/testing';
 import { useUiStore } from '../../stores/uiStore';
 import { resetVaultStore, useVaultStore } from '../../stores/vaultStore';
 import { lastOpened } from './RecentList';
-import { Welcome } from './Welcome';
+import { Welcome, welcomeShortcut } from './Welcome';
 
 const info = { name: 'Notes', root: '/v/Notes', report: { pages: 0, warnings: [] } };
 
@@ -193,6 +193,26 @@ describe('Welcome screen', () => {
       render(<Welcome version={null} />);
       window.dispatchEvent(new KeyboardEvent('keydown', { ...key, bubbles: true }));
       await waitFor(() => expect(calls.map(([c]) => c)).toContain(command));
+    });
+
+    it('review M8: a held key (repeat) does not open the picker again', async () => {
+      const calls = backend({ vaults_recent: () => [], 'plugin:dialog|open': () => null });
+      render(<Welcome version={null} />);
+      window.dispatchEvent(
+        new KeyboardEvent('keydown', { key: 'o', ctrlKey: true, repeat: true, bubbles: true }),
+      );
+      await new Promise((r) => setTimeout(r, 20));
+      expect(calls.map(([c]) => c)).not.toContain('plugin:dialog|open');
+    });
+
+    it('review M8: on macOS only ⌘ counts (Ctrl+N moves the cursor in a field); elsewhere Ctrl', () => {
+      const ev = (init: KeyboardEventInit) => new KeyboardEvent('keydown', init);
+      expect(welcomeShortcut(ev({ key: 'n', ctrlKey: true }), true)).toBeNull();
+      expect(welcomeShortcut(ev({ key: 'o', ctrlKey: true }), true)).toBeNull();
+      expect(welcomeShortcut(ev({ key: 'N', metaKey: true }), true)).toBe('n');
+      expect(welcomeShortcut(ev({ key: 'o', ctrlKey: true }), false)).toBe('o');
+      expect(welcomeShortcut(ev({ key: 'n', ctrlKey: true, shiftKey: true }), false)).toBeNull();
+      expect(welcomeShortcut(ev({ key: 'x', metaKey: true }), true)).toBeNull();
     });
 
     it('filters by name or path once there are more than five vaults', async () => {

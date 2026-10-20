@@ -24,6 +24,16 @@ import styles from './Welcome.module.css';
 
 const MAC = /Mac/i.test(navigator.platform);
 
+/** ⌘N / ⌘O here (Ctrl elsewhere). On macOS only ⌘: Ctrl+N and Ctrl+O edit
+ *  text in a field. A held key doesn't repeat the picker. */
+export function welcomeShortcut(e: KeyboardEvent, mac = MAC): 'n' | 'o' | null {
+  if (e.repeat || !(mac ? e.metaKey : e.metaKey || e.ctrlKey) || e.shiftKey || e.altKey) {
+    return null;
+  }
+  const key = e.key.toLowerCase();
+  return key === 'n' || key === 'o' ? key : null;
+}
+
 /** Native folder picker → open or create (VLT-01). A cancelled picker does nothing. */
 async function pickThen(action: (path: string) => Promise<unknown>) {
   const path = await pickFolder().catch(() => null);
@@ -71,10 +81,9 @@ export function Welcome({ version }: WelcomeProps) {
   // yet); ⌘⇧N is ScratchpadHost's everywhere.
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
-      if (!(e.metaKey || e.ctrlKey) || e.shiftKey || e.altKey) return;
+      const key = welcomeShortcut(e);
+      if (!key) return;
       if (useUiStore.getState().dialog || useVaultStore.getState().status === 'opening') return;
-      const key = e.key.toLowerCase();
-      if (key !== 'n' && key !== 'o') return;
       e.preventDefault();
       void pickThen(key === 'n' ? create : open);
     };
