@@ -35,9 +35,13 @@ fn new_vault() -> (tempfile::TempDir, EncryptedStorage) {
 /// Writes `body` at `logical` (each folder in it new) straight to disk with the crypto
 /// core, behind the storage's back. Task 2's writer replaces this.
 fn seal_file(storage: &EncryptedStorage, logical: &str, body: &[u8]) {
-    let root = storage.location();
+    seal_file_as(storage.location(), PASS, logical, body);
+}
+
+/// [`seal_file`] under the header's current epoch, unlocked with `pass`.
+fn seal_file_as(root: &Path, pass: &str, logical: &str, body: &[u8]) {
     let header = VaultHeader::parse(&std::fs::read(root.join(HEADER_FILE)).unwrap()).unwrap();
-    let u = header.unlock(Unlock::Passphrase(PASS)).unwrap();
+    let u = header.unlock(Unlock::Passphrase(pass)).unwrap();
     let codec = NameCodec::new(&u.subkeys().name, u.vault_id(), u.epoch());
     let mut parts: Vec<&str> = logical.split('/').collect();
     let file = parts.pop().unwrap();
@@ -676,4 +680,112 @@ fn removes_trash_and_locked_writes() {
         storage.create_new(&vp("c.md")).err(),
         Some(VaultError::Locked)
     ));
+}
+
+// ---- Task 2, fix round 1 ----
+
+#[test]
+fn overwrite_never_replaces_an_unreadable_duplicate() {
+    let (dir, storage) = new_vault();
+    seal_file(&storage, "n.md", b"epoch 1 copy");
+    // Mid-rotation, a current-epoch copy of the same name arrives (sync).
+    let path = dir.path().join(HEADER_FILE);
+    let mut header = VaultHeader::parse(&std::fs::read(&path).unwrap()).unwrap();
+    let u1 = header.unlock(Unlock::Passphrase(PASS)).unwrap();
+    let (u2, _rc) = header.begin_rotation_insecure(&u1, "next", TINY).unwrap();
+    std::fs::write(&path, header.to_bytes(&u2).unwrap()).unwrap();
+    seal_file_as(dir.path(), "next", "n.md", b"epoch 2 copy");
+    drop(storage);
+
+    let (rotated, _) = EncryptedStorage::unlock(dir.path(), Unlock::Passphrase("next")).unwrap();
+    assert_eq!(
+        unreadable(&rotated, "").len(),
+        2,
+        "both duplicates unreadable"
+    );
+    let before = tree(dir.path());
+    assert_eq!(before.len(), 2);
+    assert!(write(&rotated, "n.md", b"autosave", Replace::Overwrite).is_err());
+    assert_eq!(tree(dir.path()), before, "both physical files intact");
+}
+
+#[test]
+fn moving_a_folder_keeps_its_id_and_children() {
+    let (dir, storage) = new_vault();
+    storage.create_dir(&vp("A")).unwrap();
+    storage.create_dir(&vp("B")).unwrap();
+    write(&storage, "A/x.md", b"inside", Replace::CreateOnly).unwrap();
+    storage.create_dir(&vp("A/Sub")).unwrap();
+    write(&storage, "A/Sub/y.md", b"deeper", Replace::CreateOnly).unwrap();
+    let dirs_before = top_dirs(dir.path());
+    let before = tree(dir.path());
+
+    storage.rename(&vp("A"), &vp("B/A")).unwrap();
+    assert_eq!(storage.read(&vp("B/A/x.md")).unwrap(), b"inside");
+    assert_eq!(storage.read(&vp("B/A/Sub/y.md")).unwrap(), b"deeper");
+    assert!(storage.meta(&vp("A"), Follow::No).unwrap().is_none());
+
+    let [b] = top_dirs(dir.path()).try_into().unwrap();
+    let [old_a] = dirs_before
+        .into_iter()
+        .filter(|d| *d != b)
+        .collect::<Vec<_>>()
+        .try_into()
+        .unwrap();
+    let after = tree(dir.path());
+    let [new_a] = after
+        .keys()
+        .filter(|p| p.parent() == Some(Path::new(&b)))
+        .cloned()
+        .collect::<Vec<_>>()
+        .try_into()
+        .unwrap();
+    // A's own name was re-encrypted under B (it differs from its old name); its id
+    // is kept, so every child's physical name and bytes are unchanged.
+    assert_ne!(new_a.file_name().unwrap(), Path::new(&old_a).as_os_str());
+    assert_eq!(subtree(&after, &new_a), subtree(&before, Path::new(&old_a)));
+    assert_eq!(subtree(&after, &new_a).len(), 3, "x.md, Sub, Sub/y.md");
+}
+
+/// The entries of `t` strictly under `prefix`, relative to it.
+fn subtree(
+    t: &BTreeMap<PathBuf, Option<Vec<u8>>>,
+    prefix: &Path,
+) -> BTreeMap<PathBuf, Option<Vec<u8>>> {
+    t.iter()
+        .filter_map(|(p, v)| {
+            let rest = p.strip_prefix(prefix).ok()?;
+            (!rest.as_os_str().is_empty()).then(|| (rest.to_path_buf(), v.clone()))
+        })
+        .collect()
+}
+
+#[test]
+fn lock_before_finish_still_commits_ciphertext_only() {
+    let (dir, storage) = new_vault();
+    let body = b"canary-lock-finish ".repeat(5000);
+    let mut w = storage.create_new(&vp("rec.m4a")).unwrap();
+    w.write_all(&body).unwrap();
+    storage.lock();
+    w.finish().unwrap();
+    for (_, bytes) in tree(dir.path()) {
+        let bytes = bytes.unwrap_or_default();
+        assert!(!bytes.windows(18).any(|x| x == b"canary-lock-finish"));
+    }
+    let (again, _) = EncryptedStorage::unlock(dir.path(), Unlock::Passphrase(PASS)).unwrap();
+    assert_eq!(again.read(&vp("rec.m4a")).unwrap(), body);
+}
+
+#[test]
+fn same_entry_folds_normal_form() {
+    let (_dir, storage) = new_vault();
+    storage.create_dir(&vp("Caf\u{e9}")).unwrap();
+    assert!(storage.same_entry(&vp("Caf\u{e9}"), &vp("Cafe\u{301}")));
+    assert!(storage.same_entry(&vp("Caf\u{e9}"), &vp("CAFE\u{301}")));
+    assert!(
+        storage
+            .meta(&vp("cafe\u{301}"), Follow::No)
+            .unwrap()
+            .is_some()
+    );
 }

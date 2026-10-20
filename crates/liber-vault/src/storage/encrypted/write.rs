@@ -259,7 +259,10 @@ impl EncryptedStorage {
                 Some((_, e)) => e.physical.clone(),
                 None => t.parent.join(encode(u, &t.id, &t.name, None, path)?),
             };
-            self.pending(u, path, t, target, mode == Replace::CreateOnly, budget)
+            // No resolved entry: never replace a file at that name (an unreadable
+            // duplicate can share it), so commit as `CreateOnly`.
+            let create_only = mode == Replace::CreateOnly || t.existing.is_none();
+            self.pending(u, path, t, target, create_only, budget)
         })?;
         // The keys aren't held while `from` streams: `p` has its own file key.
         std::io::copy(from, &mut p).map_err(|e| io_err(path.as_str(), e))?;
@@ -369,10 +372,12 @@ impl EncryptedStorage {
                 source: std::io::Error::other(err.to_string()),
             };
             trash::delete(&e.physical).map_err(os_err)?;
-            if let Some(side) = side_file(&e.physical).filter(|s| s.exists()) {
-                trash::delete(side).map_err(os_err)?;
-            }
+            // The entry is gone: forget it whatever happens to the side file, which
+            // is harmless if left (as in `remove_side`).
             forget(cache, &canon);
+            if let Some(side) = side_file(&e.physical).filter(|s| s.exists()) {
+                let _ = trash::delete(side);
+            }
             Ok(())
         })
     }
