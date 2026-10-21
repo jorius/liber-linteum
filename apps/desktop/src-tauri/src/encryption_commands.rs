@@ -125,13 +125,28 @@ pub(crate) fn vault_create_encrypted_impl<R: Runtime>(
     passphrase: Zeroizing<String>,
 ) -> CmdResult<CreatedVault> {
     check_passphrase(&passphrase)?;
+    let state = app.state::<AppState>();
+    // Checked first: a vault whose code was never shown can't be left behind.
+    epochs::check_readable(state.settings.dir())?;
     if !path.exists() {
         std::fs::create_dir_all(&path)?; // seam: outside (the folder about to become a vault)
     }
     let (storage, code) = create_storage(&path, &passphrase)?;
-    let state = app.state::<AppState>();
-    epochs::check_and_record(state.settings.dir(), &storage.vault_id(), storage.epoch())?;
-    let info = open_unlocked(app, storage, false, None)?;
+    let opened =
+        epochs::check_and_record(state.settings.dir(), &storage.vault_id(), storage.epoch())
+            .and_then(|()| open_unlocked(app, storage, false, None));
+    // Any failure from here undoes the create (review I2): the folder was
+    // empty, so a retry must not find a vault no one has the code for.
+    let info = match opened {
+        Ok(info) => info,
+        Err(mut e) => {
+            if let Err(undo) = liber_vault::remove_new_vault(&path) {
+                e.message
+                    .push_str(&format!("; the new vault couldn't be removed: {undo}"));
+            }
+            return Err(e);
+        }
+    };
     Ok(CreatedVault {
         info,
         recovery: RecoveryText(code.to_display()),
@@ -257,7 +272,7 @@ pub(crate) fn attachment_open_decrypted_impl<R: Runtime>(
     path: String,
 ) -> CmdResult<()> {
     let state = app.state::<AppState>();
-    let session = state.session()?;
+    let session = encrypted_session(&state)?;
     let vp = VaultPath::new(&path)?;
     if vp.is_root() || is_hidden_path(vp.as_str()) {
         return Err(CommandError::new(
@@ -279,6 +294,12 @@ pub(crate) fn attachment_open_decrypted_impl<R: Runtime>(
             .map_err(|e| CommandError::new(ErrorKind::Io, e.to_string()))?,
     }
     Ok(())
+}
+
+/// Moves this device's damaged rollback memory aside (`epochs::reset`),
+/// once the user has confirmed losing its protection.
+pub(crate) fn security_reset_rollback_memory_impl(state: &AppState) -> CmdResult<()> {
+    epochs::reset(state.settings.dir())
 }
 
 // ---- command wrappers: off the UI thread (Argon2 and disk) ----
@@ -358,4 +379,12 @@ pub async fn attachment_open_decrypted<R: Runtime>(
     path: String,
 ) -> CmdResult<()> {
     blocking(app, move |app| attachment_open_decrypted_impl(&app, path)).await
+}
+
+#[tauri::command]
+pub async fn security_reset_rollback_memory<R: Runtime>(app: AppHandle<R>) -> CmdResult<()> {
+    blocking(app, move |app| {
+        security_reset_rollback_memory_impl(&app.state::<AppState>())
+    })
+    .await
 }

@@ -111,6 +111,7 @@
     "allow-vault-unreadable",
     "allow-vault-reveal-unreadable",
     "allow-attachment-open-decrypted",
+    "allow-security-reset-rollback-memory",
     "core:event:allow-listen",
     "core:event:allow-unlisten",
     "dialog:allow-open"

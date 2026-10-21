@@ -90,7 +90,7 @@ impl EncryptedStorage {
             h.remove_slot(u, &old).map_err(crypto)?;
             add(&mut h).map_err(crypto)?;
         }
-        self.write_header(&mut h, u)?;
+        self.write_header(&mut h, u, &[])?;
         *header = h;
         Ok(())
     }
@@ -109,7 +109,10 @@ impl EncryptedStorage {
             })?;
         let mut h = header.clone();
         let code = h.new_recovery(u).map_err(crypto)?;
-        self.write_header(&mut h, u)?;
+        let mine = ids(&h, is_recovery);
+        // Another device's new code on disk may win the merge (smallest id):
+        // then this code wouldn't open the vault, so none is returned.
+        self.write_header(&mut h, u, &mine)?;
         *header = h;
         Ok(code)
     }
@@ -156,7 +159,7 @@ impl EncryptedStorage {
         }
         let now = ids(&next, is_recovery);
         let local_recovery_dropped = ids(&header, is_recovery).iter().any(|id| !now.contains(id));
-        self.write_header(&mut next, u)?;
+        self.write_header(&mut next, u, &[])?;
         *header = next;
         drop(header);
         for copy in merged {
@@ -171,16 +174,23 @@ impl EncryptedStorage {
 
     /// Writes `h`, after merging in the header on disk: a change another
     /// device made since (same epoch) is kept, and a header at another
-    /// epoch (a rotation) is never overwritten.
-    fn write_header(&self, h: &mut VaultHeader, u: &Unlocked) -> Result<()> {
+    /// epoch (a rotation) is never overwritten. `Conflict` if a slot in
+    /// `keep` didn't survive the merge.
+    fn write_header(&self, h: &mut VaultHeader, u: &Unlocked, keep: &[[u8; 16]]) -> Result<()> {
         let path = self.root.join(HEADER_FILE);
-        let disk = read_header(&path).map_err(|e| io_err(HEADER_FILE, e))?;
-        let disk = VaultHeader::parse(&disk).map_err(crypto)?;
+        let bytes = read_header(&path).map_err(|e| io_err(HEADER_FILE, e))?;
+        let disk = VaultHeader::parse(&bytes).map_err(crypto)?;
         h.merge_from(&disk, u).map_err(|e| {
             VaultError::Crypto(format!(
                 "{HEADER_FILE} changed on disk ({e}): lock the vault and unlock it again"
             ))
         })?;
+        if keep.iter().any(|id| !h.slots().iter().any(|s| s.id == *id)) {
+            return Err(VaultError::Conflict {
+                path: HEADER_FILE.to_string(),
+                current: crate::Hash::of(&bytes),
+            });
+        }
         let bytes = h.to_bytes(u).map_err(crypto)?;
         replace_atomic(
             &self.root,

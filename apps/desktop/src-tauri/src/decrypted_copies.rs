@@ -7,13 +7,16 @@
 //! A run holds an exclusive lock on `.lock` in its folder while the folder
 //! exists. The OS drops a dead process's locks, so a folder whose `.lock`
 //! can be locked was left by a run that is gone (crashed or killed): the next
-//! run's startup sweep removes it.
+//! run's startup sweep removes it. `.lock` is removed last, only once every
+//! copy is gone, so a copy that couldn't be removed (open in a viewer on
+//! Windows) is still found by the next wipe or sweep (review C1).
 
 use std::fs::{File, OpenOptions};
 use std::io::Write;
-use std::path::{Path, PathBuf};
+use std::path::{Component, Path, PathBuf};
 use std::sync::Mutex;
 use std::sync::atomic::{AtomicU64, Ordering};
+use std::time::SystemTime;
 
 const LOCK_FILE: &str = ".lock";
 /// Hex digits of a folder's random part.
@@ -32,7 +35,7 @@ impl DecryptedCopies {
     /// This run's folder under `temp` (created on the first copy), after
     /// removing the folders runs no longer alive left there.
     pub fn new(temp: &Path) -> DecryptedCopies {
-        sweep(temp);
+        sweep(temp, SystemTime::now());
         let random: String = liber_crypto::FolderId::random()
             .0
             .iter()
@@ -48,12 +51,24 @@ impl DecryptedCopies {
     /// Writes `bytes` as `<folder>/<n>/<name>` and returns its path.
     /// `name` is a vault path's last component, so a single plain name.
     pub fn write(&self, name: &str, bytes: &[u8]) -> std::io::Result<PathBuf> {
+        // Exactly one plain name: never `..`, a separator or `C:x` (review M3).
+        let mut parts = Path::new(name).components();
+        if !matches!((parts.next(), parts.next()), (Some(Component::Normal(n)), None) if n == name)
+        {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidInput,
+                format!("{name:?} isn't a plain file name"),
+            ));
+        }
         let mut lock = self.lock.lock().unwrap_or_else(|e| e.into_inner());
         if lock.is_none() {
-            let mut dir = std::fs::DirBuilder::new();
             #[cfg(unix)]
-            std::os::unix::fs::DirBuilderExt::mode(&mut dir, 0o700);
-            match dir.create(&self.folder) {
+            let made =
+                std::os::unix::fs::DirBuilderExt::mode(&mut std::fs::DirBuilder::new(), 0o700)
+                    .create(&self.folder);
+            #[cfg(not(unix))]
+            let made = std::fs::create_dir(&self.folder);
+            match made {
                 Err(e) if e.kind() != std::io::ErrorKind::AlreadyExists => return Err(e),
                 _ => {}
             }
@@ -74,13 +89,20 @@ impl DecryptedCopies {
         Ok(path)
     }
 
-    /// Removes the folder and every copy in it.
-    // shortcut: a copy another app holds open on Windows can't be removed; the next run's sweep removes it. Upgrade: retry on unlock.
+    /// Removes every copy, then the folder. If a copy can't be removed
+    /// (open in another app on Windows), the lock stays held and `.lock`
+    /// stays on disk: the next wipe (at the latest on quit) or the next run's
+    /// sweep tries again.
     pub fn wipe(&self) {
         let mut lock = self.lock.lock().unwrap_or_else(|e| e.into_inner());
-        // Released first: Windows won't remove an open file.
-        if lock.take().is_some() {
-            let _ = std::fs::remove_dir_all(&self.folder);
+        if self.folder.symlink_metadata().is_err() {
+            *lock = None;
+            return;
+        }
+        if remove_copies(&self.folder).is_ok() {
+            // Released first: Windows won't remove an open file.
+            *lock = None;
+            remove_lock_and_folder(&self.folder);
         }
     }
 
@@ -104,10 +126,38 @@ fn run_pid(name: &str) -> Option<u32> {
     }
 }
 
+/// Removes everything in a run folder except its `.lock`; `Err` if anything
+/// is left.
+fn remove_copies(folder: &Path) -> std::io::Result<()> {
+    let mut result = Ok(());
+    for item in std::fs::read_dir(folder)? {
+        let item = item?;
+        if item.file_name() == LOCK_FILE {
+            continue;
+        }
+        let removed = if item.file_type()?.is_dir() {
+            std::fs::remove_dir_all(item.path())
+        } else {
+            std::fs::remove_file(item.path())
+        };
+        if removed.is_err() {
+            result = removed;
+        }
+    }
+    result
+}
+
+/// The last step, once [`remove_copies`] left only `.lock`.
+fn remove_lock_and_folder(folder: &Path) {
+    let _ = std::fs::remove_file(folder.join(LOCK_FILE));
+    let _ = std::fs::remove_dir(folder);
+}
+
 /// Removes the run folders in `temp` whose run is gone: a real folder (not
-/// a link) named exactly as [`run_pid`] wants, not this process's, holding a
-/// `.lock` that nothing holds. Anything else is left alone.
-fn sweep(temp: &Path) {
+/// a link) named exactly as [`run_pid`] wants, not this process's, holding
+/// a `.lock` that nothing holds, or no `.lock` at all and older than `start`
+/// (a run that died before making it). Anything else is left alone.
+fn sweep(temp: &Path, start: SystemTime) {
     let Ok(items) = std::fs::read_dir(temp) else {
         return;
     };
@@ -119,14 +169,26 @@ fn sweep(temp: &Path) {
         if pid == std::process::id() || !item.file_type().is_ok_and(|t| t.is_dir()) {
             continue;
         }
-        let Ok(lock) = File::open(item.path().join(LOCK_FILE)) else {
-            continue;
-        };
-        if lock.try_lock().is_err() {
-            continue;
+        let folder = item.path();
+        match File::open(folder.join(LOCK_FILE)) {
+            Ok(lock) => {
+                if lock.try_lock().is_err() || remove_copies(&folder).is_err() {
+                    continue;
+                }
+                drop(lock);
+                remove_lock_and_folder(&folder);
+            }
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
+                let old = item
+                    .metadata()
+                    .and_then(|m| m.modified())
+                    .is_ok_and(|t| t < start);
+                if old && remove_copies(&folder).is_ok() {
+                    remove_lock_and_folder(&folder);
+                }
+            }
+            Err(_) => {}
         }
-        drop(lock);
-        let _ = std::fs::remove_dir_all(item.path());
     }
 }
 
@@ -171,6 +233,7 @@ mod tests {
         let held = File::open(live.join(LOCK_FILE)).unwrap();
         held.try_lock().unwrap();
         let mine = run_folder(t, &format!("liber-{}-{HEX}", std::process::id()));
+        // No `.lock`: newer than this run (another run starting) is kept.
         let unlocked = t.join(format!("liber-4000003-{HEX}"));
         std::fs::create_dir(&unlocked).unwrap();
         let odd = run_folder(t, "liber-4000004-short");
@@ -183,14 +246,72 @@ mod tests {
             link
         };
 
-        sweep(t);
+        sweep(t, SystemTime::UNIX_EPOCH);
         assert!(!dead.exists(), "a gone run's folder is removed");
         for kept in [&live, &mine, &unlocked, &odd, &plain_file] {
             assert!(kept.exists(), "{kept:?} kept");
         }
         #[cfg(unix)]
         assert!(link.symlink_metadata().is_ok() && odd.join("copy.pdf").exists());
+
+        // Older than this run with no `.lock` (it died before making one): removed.
+        let later = SystemTime::now() + std::time::Duration::from_secs(3600);
+        sweep(t, later);
+        assert!(!unlocked.exists());
+        for kept in [&live, &mine, &odd, &plain_file] {
+            assert!(kept.exists(), "{kept:?} kept");
+        }
         drop(held);
+    }
+
+    #[test]
+    fn only_a_plain_file_name_is_written() {
+        let temp = tempfile::tempdir().unwrap();
+        let copies = DecryptedCopies::new(temp.path());
+        let mut bad = vec!["", "..", ".", "a/b", "/abs.pdf", "../up.pdf"];
+        if cfg!(windows) {
+            bad.extend(["C:x.pdf", "a\\b.pdf"]);
+        }
+        for name in bad {
+            let err = copies.write(name, b"x").unwrap_err();
+            assert_eq!(err.kind(), std::io::ErrorKind::InvalidInput, "{name:?}");
+        }
+        copies.write("fine name.pdf", b"x").unwrap();
+        copies.wipe();
+    }
+
+    /// Review C1: a copy that can't be removed keeps `.lock` (and the lock)
+    /// in place, so a later wipe, or a later run's sweep, removes it all.
+    #[cfg(unix)]
+    #[test]
+    fn a_copy_that_cant_be_removed_keeps_the_lock_for_a_later_wipe_or_sweep() {
+        use std::os::unix::fs::PermissionsExt;
+        let chmod = |p: &Path, m| std::fs::set_permissions(p, std::fs::Permissions::from_mode(m));
+        let temp = tempfile::tempdir().unwrap();
+        let copies = DecryptedCopies::new(temp.path());
+        let gone = copies.write("gone.pdf", b"one").unwrap();
+        let stuck = copies.write("stuck.pdf", b"two").unwrap();
+        let stuck_dir = stuck.parent().unwrap().to_path_buf();
+        chmod(&stuck_dir, 0o500).unwrap();
+        copies.wipe();
+        assert!(!gone.exists(), "what can go, goes");
+        assert!(stuck.exists() && copies.folder().join(LOCK_FILE).exists());
+        assert!(copies.lock.lock().unwrap().is_some(), "still held");
+        chmod(&stuck_dir, 0o700).unwrap();
+        copies.wipe();
+        assert!(!copies.folder().exists());
+
+        // The same for a gone run's folder found by a sweep.
+        let dead = run_folder(temp.path(), &format!("liber-4000007-{HEX}"));
+        let sub = dead.join("1");
+        std::fs::create_dir(&sub).unwrap();
+        std::fs::write(sub.join("stuck.pdf"), "plaintext").unwrap();
+        chmod(&sub, 0o500).unwrap();
+        sweep(temp.path(), SystemTime::UNIX_EPOCH);
+        assert!(dead.join(LOCK_FILE).exists() && sub.join("stuck.pdf").exists());
+        chmod(&sub, 0o700).unwrap();
+        sweep(temp.path(), SystemTime::UNIX_EPOCH);
+        assert!(!dead.exists());
     }
 
     #[test]
@@ -210,7 +331,10 @@ mod tests {
             assert_eq!(mode(&a), 0o600);
         }
         // A sweep never touches this run's own folder.
-        sweep(temp.path());
+        sweep(
+            temp.path(),
+            SystemTime::now() + std::time::Duration::from_secs(3600),
+        );
         assert!(a.exists());
         copies.wipe();
         assert!(!copies.folder().exists());

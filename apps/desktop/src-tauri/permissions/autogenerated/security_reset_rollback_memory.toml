@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-security-reset-rollback-memory"
+description = "Enables the security_reset_rollback_memory command without any pre-configured scope."
+commands.allow = ["security_reset_rollback_memory"]
+
+[[permission]]
+identifier = "deny-security-reset-rollback-memory"
+description = "Denies the security_reset_rollback_memory command without any pre-configured scope."
+commands.deny = ["security_reset_rollback_memory"]

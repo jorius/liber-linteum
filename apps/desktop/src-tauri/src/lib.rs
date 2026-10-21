@@ -265,6 +265,7 @@ pub fn configure<R: tauri::Runtime>(
         encryption_commands::vault_unreadable,
         encryption_commands::vault_reveal_unreadable,
         encryption_commands::attachment_open_decrypted,
+        encryption_commands::security_reset_rollback_memory,
     ])
 }
 

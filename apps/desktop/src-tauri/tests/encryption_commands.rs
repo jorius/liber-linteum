@@ -375,6 +375,131 @@ fn change_passphrase_and_new_recovery() {
     assert_eq!(kind(err), "notPermitted");
     let err = change(NEW_PASS, PASS).unwrap_err();
     assert_eq!(kind(err), "notPermitted");
+    // Review M2: nor attachments to decrypt.
+    std::fs::write(plain.join("a.pdf"), "%PDF").unwrap();
+    let err = call(
+        &h.main,
+        "attachment_open_decrypted",
+        json!({ "path": "a.pdf" }),
+    )
+    .unwrap_err();
+    assert_eq!(kind(err), "notPermitted");
+}
+
+/// Review M1: when another device's new recovery code on disk wins the
+/// merge (smallest slot id), no code that doesn't open the vault is shown.
+#[test]
+fn a_new_recovery_code_that_loses_the_merge_is_refused() {
+    let h = harness();
+    let (root, _code) = h.create("Race");
+    let mut conflicts = 0;
+    // Each round the disk's code has a tiny id, so ours loses all but ~1/512 of the time.
+    for _ in 0..20 {
+        let (base, u) = header(&root);
+        let disk = loop {
+            let mut d = base.clone();
+            d.new_recovery(&u).unwrap();
+            if recovery_id(&d)[0] == 0 {
+                break d;
+            }
+        };
+        std::fs::write(header_path(&root), disk.to_bytes(&u).unwrap()).unwrap();
+        match call(
+            &h.main,
+            "security_new_recovery",
+            json!({ "passphrase": PASS }),
+        ) {
+            Err(e) => {
+                assert_eq!(kind(e), "conflict");
+                conflicts += 1;
+            }
+            Ok(code) => {
+                // Ours won: it must open the vault.
+                let merged =
+                    VaultHeader::parse(&std::fs::read(header_path(&root)).unwrap()).unwrap();
+                let rc = liber_crypto::RecoveryCode::parse(code.as_str().unwrap()).unwrap();
+                merged.unlock(Unlock::Recovery(&rc)).unwrap();
+            }
+        }
+    }
+    assert!(conflicts > 0);
+}
+
+/// Review I2: a create that fails after the vault was made undoes it, so
+/// a retry isn't refused as `notEmpty` (a vault no one has the code for).
+#[cfg(unix)]
+#[test]
+fn a_create_that_fails_after_creating_leaves_nothing() {
+    use std::os::unix::fs::PermissionsExt;
+    let h = harness();
+    let root = h.disk.path().join("Half");
+    let chmod =
+        |m| std::fs::set_permissions(h.config.path(), std::fs::Permissions::from_mode(m)).unwrap();
+    // The epoch record can't be written: the step right after the create.
+    chmod(0o500);
+    let err = call(
+        &h.main,
+        "vault_create_encrypted",
+        json!({ "path": root, "passphrase": PASS }),
+    )
+    .unwrap_err();
+    chmod(0o700);
+    assert_eq!(kind(err), "io");
+    assert_eq!(std::fs::read_dir(&root).unwrap().count(), 0, "undone");
+    let err = call(&h.main, "page_get", json!({ "path": "x.md" })).unwrap_err();
+    assert_eq!(kind(err), "noVault");
+    call(
+        &h.main,
+        "vault_create_encrypted",
+        json!({ "path": root, "passphrase": PASS }),
+    )
+    .unwrap();
+}
+
+/// Review I4: damaged rollback memory keeps encrypted vaults closed
+/// (`damaged`, naming the file) until the user resets it; the damaged file
+/// is kept aside, never silently dropped.
+#[test]
+fn damaged_rollback_memory_fails_closed_until_reset() {
+    let h = harness();
+    let (root, _code) = h.create("Guarded");
+    h.lock();
+    let store = h.config.path().join("vault-epochs.json");
+    let err = call(&h.main, "security_reset_rollback_memory", json!({})).unwrap_err();
+    assert_eq!(kind(err), "notPermitted", "a readable store is never reset");
+    std::fs::write(&store, "{ torn").unwrap();
+    let err = h.unlock(&root, "passphrase", PASS).unwrap_err();
+    assert!(
+        err["message"]
+            .as_str()
+            .unwrap()
+            .contains(&store.display().to_string())
+    );
+    assert_eq!(kind(err), "damaged");
+    let fresh = h.disk.path().join("Fresh");
+    let err = call(
+        &h.main,
+        "vault_create_encrypted",
+        json!({ "path": fresh, "passphrase": PASS }),
+    )
+    .unwrap_err();
+    assert_eq!(kind(err), "damaged");
+    assert!(!fresh.join("liber-vault.json").exists(), "nothing created");
+
+    call(&h.main, "security_reset_rollback_memory", json!({})).unwrap();
+    let aside: Vec<_> = std::fs::read_dir(h.config.path())
+        .unwrap()
+        .map(|e| e.unwrap().path())
+        .filter(|p| {
+            p.file_name()
+                .unwrap()
+                .to_string_lossy()
+                .starts_with("vault-epochs.json.damaged-")
+        })
+        .collect();
+    assert_eq!(aside.len(), 1);
+    assert_eq!(std::fs::read(&aside[0]).unwrap(), b"{ torn");
+    h.unlock(&root, "passphrase", PASS).unwrap();
 }
 
 #[test]
@@ -516,6 +641,7 @@ fn every_encryption_command_is_main_only() {
         "vault_unreadable",
         "vault_reveal_unreadable",
         "attachment_open_decrypted",
+        "security_reset_rollback_memory",
     ] {
         if let Err(e) = call(&h.main, cmd, json!({})) {
             assert!(!e.to_string().contains("not allowed"), "{cmd}: {e}");

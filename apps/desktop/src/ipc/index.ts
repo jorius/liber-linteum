@@ -309,13 +309,23 @@ export interface SettingsPatch {
 // ---- E3: encrypted vaults (the E3 → E4 contract; E4 adds the calls) ----
 //
 // vault_create_encrypted { path, passphrase } → CreatedEncryptedVault
+//   (a create that fails after the vault was made is undone: nothing is left)
 // vault_unlock { path, secret: UnlockSecret } → VaultInfo
-// vault_lock {} → void, and `vault:locked` (VaultLockedPayload) to main
+// vault_lock {} → void, and `vault:locked` (VaultLockedPayload) to main;
+//   `notPermitted` when the open vault is plain (it never locks)
 // security_change_passphrase { current, next } → void
-// security_new_recovery { passphrase } → string (the new code, shown once)
+// security_new_recovery { passphrase } → string (the new code, shown once);
+//   `conflict` when another device's new code on disk won the merge (none shown)
 // vault_unreadable {} → UnreadableEntry[]
 // vault_reveal_unreadable { osPath } → void
-// attachment_open_decrypted { path } → void (a decrypted copy, wiped on lock)
+// attachment_open_decrypted { path } → void (a decrypted copy, wiped on lock);
+//   `notPermitted` on a plain vault (use file_open_external)
+// security_reset_rollback_memory {} → void
+//   When create/unlock fail with `damaged` naming vault-epochs.json, this
+//   device's rollback memory is damaged and every encrypted vault stays closed.
+//   After the user confirms ("you lose protection against an old header being
+//   put back"), this moves the file aside (vault-epochs.json.damaged-<secs>).
+//   `notPermitted` when the memory isn't damaged.
 
 export interface UnlockSecret {
   kind: 'passphrase' | 'recovery';

@@ -124,6 +124,7 @@ const COMMANDS: &[&str] = &[
     "vault_unreadable",
     "vault_reveal_unreadable",
     "attachment_open_decrypted",
+    "security_reset_rollback_memory",
 ];
 
 fn main() {

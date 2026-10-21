@@ -906,16 +906,17 @@ fn vault_kind_needs_a_real_header_and_never_opens_a_damaged_vault_plain() {
     damaged(bare.path());
 }
 
-/// Controller ruling (E3 Task 5): at most 64 KiB of a header is read; a longer
-/// one is unparseable (damaged beside `d/`, else the folder stays plain).
+/// E3 Task 5 review I1: at most the format's limit (`MAX_HEADER_BYTES`, 1 MiB)
+/// of a header is read; a longer one is unparseable (damaged beside `d/`,
+/// else the folder stays plain).
 #[test]
-fn vault_kind_reads_at_most_64_kib_of_header() {
+fn vault_kind_reads_at_most_the_formats_header_limit() {
     let (dir, storage) = new_vault();
     drop(storage);
     let header = dir.path().join(HEADER_FILE);
     let mut bytes = std::fs::read(&header).unwrap();
     // Trailing whitespace keeps it valid JSON: only the size changes.
-    bytes.resize(64 * 1024, b' ');
+    bytes.resize(liber_crypto::MAX_HEADER_BYTES, b' ');
     std::fs::write(&header, &bytes).unwrap();
     assert_eq!(vault_kind(dir.path()), VaultKind::Encrypted);
     EncryptedStorage::unlock(dir.path(), Unlock::Passphrase(PASS)).unwrap();
@@ -929,4 +930,25 @@ fn vault_kind_reads_at_most_64_kib_of_header() {
     assert!(EncryptedStorage::unlock(dir.path(), Unlock::Passphrase(PASS)).is_err());
     std::fs::remove_dir(dir.path().join("d")).unwrap();
     assert_eq!(vault_kind(dir.path()), VaultKind::Plain);
+}
+
+/// E3 Task 5 review I2: a create whose vault never opened is undone: the
+/// folder holds only what it held before, and a new create works.
+#[test]
+fn remove_new_vault_undoes_a_create() {
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::write(dir.path().join(".DS_Store"), "").unwrap();
+    let (storage, _rc) = EncryptedStorage::create_insecure(dir.path(), PASS, TINY).unwrap();
+    storage
+        .replace_atomic(&vp("n.md"), &mut &b"secret"[..], Replace::CreateOnly)
+        .unwrap();
+    drop(storage);
+    liber_vault::remove_new_vault(dir.path()).unwrap();
+    let left: Vec<_> = std::fs::read_dir(dir.path())
+        .unwrap()
+        .map(|e| e.unwrap().file_name())
+        .collect();
+    assert_eq!(left, [".DS_Store"]);
+    assert_eq!(vault_kind(dir.path()), VaultKind::Plain);
+    EncryptedStorage::create_insecure(dir.path(), PASS, TINY).unwrap();
 }

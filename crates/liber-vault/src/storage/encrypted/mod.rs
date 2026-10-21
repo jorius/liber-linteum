@@ -67,20 +67,18 @@ pub fn vault_kind(root: &Path) -> VaultKind {
     }
 }
 
-/// The most of a header file read: a longer one is unparseable (controller
-/// ruling, E3 Task 5), so a huge stray file is never read whole.
-const MAX_HEADER_BYTES: u64 = 64 * 1024;
-
-/// A header file's bytes, at most [`MAX_HEADER_BYTES`].
+/// A header file's bytes, at most `liber_crypto::MAX_HEADER_BYTES` (the
+/// format's limit): a longer one is never read whole, and is unparseable.
 fn read_header(path: &Path) -> std::io::Result<Vec<u8>> {
+    let max = liber_crypto::MAX_HEADER_BYTES;
     let mut bytes = Vec::new();
     File::open(path)?
-        .take(MAX_HEADER_BYTES + 1)
+        .take(max as u64 + 1)
         .read_to_end(&mut bytes)?;
-    if bytes.len() as u64 > MAX_HEADER_BYTES {
+    if bytes.len() > max {
         return Err(std::io::Error::new(
             std::io::ErrorKind::InvalidData,
-            "header over 64 KiB",
+            format!("header over {max} bytes"),
         ));
     }
     Ok(bytes)
@@ -402,6 +400,26 @@ fn load(
     };
     write(cache).insert(since, dir.to_string(), physical, Arc::clone(&listing));
     Ok(Some(listing))
+}
+
+/// Undoes a `create` in `root` whose vault never opened (E3 Task 5 review
+/// I2): the folder was empty before, so its header, `README.txt` and `d/`
+/// are all the create's own. The header goes first: the folder then stops
+/// being a vault even if the rest can't be removed.
+pub fn remove_new_vault(root: &Path) -> Result<()> {
+    let err = |name: &str, e| io_err(name.to_string(), e);
+    match std::fs::remove_file(root.join(HEADER_FILE)) {
+        Err(e) if e.kind() != std::io::ErrorKind::NotFound => return Err(err(HEADER_FILE, e)),
+        _ => {}
+    }
+    match std::fs::remove_file(root.join(README_FILE)) {
+        Err(e) if e.kind() != std::io::ErrorKind::NotFound => return Err(err(README_FILE, e)),
+        _ => {}
+    }
+    match std::fs::remove_dir_all(root.join(DATA_DIR)) {
+        Err(e) if e.kind() != std::io::ErrorKind::NotFound => Err(err(DATA_DIR, e)),
+        _ => Ok(()),
+    }
 }
 
 /// `create` accepts only an empty folder: OS files aside, it allows what a

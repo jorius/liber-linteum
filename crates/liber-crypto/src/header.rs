@@ -21,7 +21,8 @@ use crate::slots::{
 
 const FORMAT: &str = "liber-vault";
 const VERSION: u64 = 1;
-const MAX_HEADER_BYTES: usize = 1 << 20;
+/// The largest header file `parse` accepts (format §6).
+pub const MAX_HEADER_BYTES: usize = 1 << 20;
 /// Known plus unknown slots; also bounds how many KDF runs a hostile header can cause.
 pub(crate) const MAX_SLOTS: usize = 64;
 /// One normally; a few while a passphrase change or merge settles. Each costs a KDF run on unlock.
