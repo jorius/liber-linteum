@@ -300,6 +300,55 @@ impl EncryptedStorage {
         lock(&self.header).epoch()
     }
 
+    /// The complete chunks of the file at `path`, and whether it ended cleanly
+    /// (format §13.7): for a recording a crash cut short. A file never
+    /// committed exists only as a hidden temp file in its folder; the largest
+    /// one is salvaged (a recording's folder streams one file).
+    pub fn salvage(&self, path: &VaultPath) -> Result<(Vec<u8>, bool)> {
+        let not_found = || VaultError::NotFound(path.to_string());
+        self.with_keys(|u| {
+            let physical = match self.lookup(u, path)? {
+                Some(e) if e.folder.is_none() => e.physical,
+                Some(_) => return Err(not_found()),
+                None => {
+                    let dir = path.parent().unwrap_or_else(VaultPath::root);
+                    let folder = self.lookup(u, &dir)?.filter(|e| e.folder.is_some());
+                    let temps = folder.map(|f| write::temp_files(&f.physical));
+                    let largest = temps.into_iter().flatten().max_by_key(|(_, len)| *len);
+                    largest.ok_or_else(not_found)?.0
+                }
+            };
+            // As `open_read`: never a link, nor one swapped in before the open.
+            let before = physical
+                .symlink_metadata()
+                .ok()
+                .filter(Metadata::is_file)
+                .ok_or_else(not_found)?;
+            let file = File::open(&physical).map_err(|e| io_err(path.as_str(), e))?;
+            let opened = file.metadata().map_err(|e| io_err(path.as_str(), e))?;
+            if !same_file(&before, &opened) {
+                return Err(not_found());
+            }
+            let mut s = liber_crypto::salvage(file, |e| u.content_key(e))
+                .map_err(|e| content_err(path, e))?;
+            Ok((std::mem::take(&mut *s.plaintext), s.complete))
+        })
+    }
+
+    /// Deletes the hidden temp files writes a crash interrupted left in `dir`,
+    /// so it can be removed once [`Self::salvage`] is done. Only for a folder
+    /// no write is streaming into (a recording's, between takes).
+    pub fn remove_temp_files(&self, dir: &VaultPath) -> Result<()> {
+        self.with_write_keys(|u| {
+            let entry = self.lookup(u, dir)?.filter(|e| e.folder.is_some());
+            let entry = entry.ok_or_else(|| VaultError::NotFound(dir.to_string()))?;
+            for (tmp, _) in write::temp_files(&entry.physical) {
+                std::fs::remove_file(&tmp).map_err(|e| io_err(dir.as_str(), e))?;
+            }
+            Ok(())
+        })
+    }
+
     /// The keys, or `Locked`; the key lock itself is released at once.
     fn keys(&self) -> Result<Arc<Keys>> {
         read(&self.keys).clone().ok_or(VaultError::Locked)

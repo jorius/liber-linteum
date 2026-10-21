@@ -952,3 +952,38 @@ fn remove_new_vault_undoes_a_create() {
     assert_eq!(vault_kind(dir.path()), VaultKind::Plain);
     EncryptedStorage::create_insecure(dir.path(), PASS, TINY).unwrap();
 }
+
+/// E3 Task 6 (format §13.7): salvage gives a finished file whole, and a file a
+/// crash left uncommitted — only its hidden temp file exists — up to its last
+/// complete chunk. The leftover temp then goes, so the folder can be removed.
+#[test]
+fn salvage_reads_a_finished_file_and_a_crashed_one() {
+    let (_dir, storage) = new_vault();
+    let body: Vec<u8> = (0..200_000u32).map(|i| (i % 251) as u8).collect();
+    storage.create_dir(&vp("done")).unwrap();
+    let mut w = storage.create_new(&vp("done/take.wav")).unwrap();
+    w.write_all(&body).unwrap();
+    w.finish().unwrap();
+    assert_eq!(
+        storage.salvage(&vp("done/take.wav")).unwrap(),
+        (body.clone(), true)
+    );
+
+    storage.create_dir(&vp("crash")).unwrap();
+    let mut w = storage.create_new(&vp("crash/take.wav")).unwrap();
+    w.write_all(&body).unwrap();
+    w.flush().unwrap();
+    std::mem::forget(w); // the app dies: no finish, no drop
+    let (got, complete) = storage.salvage(&vp("crash/take.wav")).unwrap();
+    assert!(!complete);
+    // Three whole 64 KiB chunks were written; the rest was still buffered.
+    assert_eq!(got, body[..3 * 65_536]);
+    let err = storage.remove_empty_dir(&vp("crash")).unwrap_err();
+    assert!(matches!(err, VaultError::NotEmpty(_)), "{err}");
+    storage.remove_temp_files(&vp("crash")).unwrap();
+    storage.remove_empty_dir(&vp("crash")).unwrap();
+    assert!(matches!(
+        storage.salvage(&vp("crash/take.wav")),
+        Err(VaultError::NotFound(_))
+    ));
+}

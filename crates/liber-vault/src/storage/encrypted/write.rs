@@ -63,8 +63,11 @@ impl Write for Sink {
         Ok(n)
     }
 
+    /// Durable, not only written: a recorder flushes every 2 s so a crash,
+    /// even a power cut, keeps its complete chunks for salvage.
     fn flush(&mut self) -> std::io::Result<()> {
-        self.file.flush()
+        self.file.flush()?;
+        self.file.sync_data()
     }
 }
 
@@ -180,6 +183,26 @@ fn write_side(parent: &Path, short: &ShortName) -> std::io::Result<()> {
         let _ = std::fs::remove_file(&tmp);
     }
     r
+}
+
+/// The temp files ([`temp_name`]) in the physical folder `dir`, with their
+/// sizes: what writes a crash interrupted left. Links are skipped.
+pub(super) fn temp_files(dir: &Path) -> Vec<(PathBuf, u64)> {
+    let Ok(items) = std::fs::read_dir(dir) else {
+        return Vec::new();
+    };
+    items
+        .flatten()
+        .filter(|i| {
+            let name = i.file_name();
+            let name = name.to_string_lossy();
+            name.starts_with('.') && name.ends_with(".liber-tmp")
+        })
+        .filter_map(|i| {
+            let m = i.path().symlink_metadata().ok().filter(|m| m.is_file())?;
+            Some((i.path(), m.len()))
+        })
+        .collect()
 }
 
 /// `.<32 random hex>.liber-tmp`: a leading `.`, so listings skip it.

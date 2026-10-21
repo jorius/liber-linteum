@@ -180,7 +180,10 @@ pub(crate) fn vault_unlock_impl<R: Runtime>(
         Err(e) => (None, Some(format!("header copies weren't merged: {e}"))),
     };
     let void = merged.is_some_and(|m| m.local_recovery_dropped);
-    open_unlocked(app, storage, void, warning)
+    let info = open_unlocked(app, storage, void, warning)?;
+    // Step 5: takes a lock or a crash left in this vault (spec §4.2).
+    crate::audio_commands::recover_at_unlock(app);
+    Ok(info)
 }
 
 pub(crate) fn vault_lock_impl<R: Runtime>(app: &AppHandle<R>) -> CmdResult<()> {
@@ -190,7 +193,7 @@ pub(crate) fn vault_lock_impl<R: Runtime>(app: &AppHandle<R>) -> CmdResult<()> {
         return Err(not_encrypted());
     }
     // Spec §6.2: a take in progress is stopped and kept first.
-    crate::audio_commands::stop_orphaned(app);
+    crate::audio_commands::stop_for_lock(app);
     session.lock();
     let path = session.vault().root().to_string_lossy().into_owned();
     // Clearing the session also wipes the decrypted copies (`set_session`).

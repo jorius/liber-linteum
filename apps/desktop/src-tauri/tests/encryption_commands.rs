@@ -650,3 +650,246 @@ fn every_encryption_command_is_main_only() {
         assert!(err.to_string().contains("not allowed"), "{cmd}: {err}");
     }
 }
+
+// ---- E3 Task 6: recordings in encrypted vaults (spec §4.2) ----
+
+/// Every `.wav` (any case) under `dir`: an encrypted take must never leave one.
+fn wavs_under(dir: &Path) -> Vec<PathBuf> {
+    let mut out = Vec::new();
+    let mut stack = vec![dir.to_path_buf()];
+    while let Some(d) = stack.pop() {
+        for e in std::fs::read_dir(&d).into_iter().flatten().flatten() {
+            let p = e.path();
+            if p.is_dir() {
+                stack.push(p);
+            } else if p.extension().is_some_and(|x| x.eq_ignore_ascii_case("wav")) {
+                out.push(p);
+            }
+        }
+    }
+    out
+}
+
+impl Harness {
+    fn start_take(&self, page: &str, name: &str) -> Value {
+        call(
+            &self.main,
+            "audio_record_start",
+            json!({ "page": page, "device": null, "name": name }),
+        )
+        .unwrap()
+    }
+
+    /// The vault file at `path`, decrypted, checked as a valid 16-bit PCM WAV
+    /// whose sizes match its length: (channels, samples).
+    fn read_wav(&self, path: &str) -> (u16, u32) {
+        let session = self.state().session().unwrap();
+        let (b, _) = session
+            .vault()
+            .read(&VaultPath::new(path).unwrap())
+            .unwrap();
+        let u32_at = |at: usize| u32::from_le_bytes(b[at..at + 4].try_into().unwrap());
+        assert_eq!(
+            (&b[..4], &b[8..16], &b[36..40]),
+            (&b"RIFF"[..], &b"WAVEfmt "[..], &b"data"[..])
+        );
+        assert_eq!(u32_at(4) as usize, b.len() - 8, "RIFF size");
+        assert_eq!(u32_at(40) as usize, b.len() - 44, "data size");
+        assert_eq!(u16::from_le_bytes([b[34], b[35]]), 16, "16-bit");
+        (u16::from_le_bytes([b[22], b[23]]), u32_at(40) / 2)
+    }
+
+    /// What `.liber/recording/` holds in the open vault.
+    fn takes_left(&self) -> usize {
+        let session = self.state().session().unwrap();
+        session
+            .vault()
+            .children(&VaultPath::new(".liber/recording").unwrap())
+            .map_or(0, |c| c.len())
+    }
+}
+
+#[test]
+fn encrypted_take_round_trips() {
+    let h = harness();
+    h.create("Voice");
+    call(
+        &h.main,
+        "entry_create_page",
+        json!({ "dir": "", "name": "Diary" }),
+    )
+    .unwrap();
+    let started = h.start_take("Diary.md", "clip-20261020-101500");
+    std::thread::sleep(std::time::Duration::from_millis(400));
+    assert_eq!(
+        wavs_under(h.cache.path()),
+        Vec::<PathBuf>::new(),
+        "mid-take"
+    );
+    assert_eq!(h.takes_left(), 1, "the take is in the vault while it runs");
+    let clip = call(
+        &h.main,
+        "audio_record_stop",
+        json!({ "recordingId": started["recordingId"], "page": "Diary.md" }),
+    )
+    .unwrap();
+    let path = clip["path"].as_str().unwrap();
+    assert!(path.ends_with("clip-20261020-101500.wav"), "{clip}");
+    let (channels, samples) = h.read_wav(path);
+    assert_eq!(channels, 1);
+    assert!(samples >= 48_000 * 3 / 10, "about 0.4 s: {samples}");
+    assert_eq!(wavs_under(h.cache.path()), Vec::<PathBuf>::new());
+    assert_eq!(
+        h.takes_left(),
+        0,
+        "the take folder goes once the clip is saved"
+    );
+}
+
+/// Review Focus 5 (spec §6.2): locking mid-take stops it, ends its stream and
+/// leaves it in the vault; the next unlock saves it next to its page.
+#[test]
+fn lock_during_recording_keeps_the_take() {
+    let h = harness();
+    let (root, _) = h.create("Voice");
+    call(
+        &h.main,
+        "entry_create_page",
+        json!({ "dir": "", "name": "Diary" }),
+    )
+    .unwrap();
+    h.start_take("Diary.md", "clip-20261020-101500");
+    std::thread::sleep(std::time::Duration::from_millis(500));
+    h.lock();
+    assert!(
+        !h.app
+            .state::<liber_desktop::audio_commands::AudioState>()
+            .recording()
+    );
+    assert_eq!(wavs_under(h.cache.path()), Vec::<PathBuf>::new());
+    h.unlock(&root, "passphrase", PASS).unwrap();
+    let path = "attachments/clip-20261020-101500-recovered.wav";
+    let (channels, samples) = h.read_wav(path);
+    assert_eq!(channels, 1);
+    // About 0.5 s, less at most one 64 KiB chunk (32 768 mono samples).
+    assert!(
+        (24_000 - 32_768..=48_000 * 2).contains(&(samples as i64)),
+        "{samples}"
+    );
+    assert_eq!(
+        h.takes_left(),
+        0,
+        "a recovered take leaves the vault's take folder"
+    );
+    // Indexed like any attachment: a page can link to it.
+    let session = h.state().session().unwrap();
+    assert!(
+        session
+            .vault()
+            .stat(&VaultPath::new(path).unwrap())
+            .unwrap()
+            .is_some()
+    );
+}
+
+/// Carried item (Task 2 M4): the take lives in `.liber/recording/`, so its
+/// page's folder can move or go to the archive mid-take and Stop still saves it.
+#[test]
+fn a_take_survives_its_folder_moving_or_being_archived() {
+    let h = harness();
+    h.create("Voice");
+    call(
+        &h.main,
+        "entry_create_folder",
+        json!({ "parent": "", "name": "Trip" }),
+    )
+    .unwrap();
+    call(
+        &h.main,
+        "entry_create_page",
+        json!({ "dir": "Trip", "name": "Day" }),
+    )
+    .unwrap();
+
+    // Moved: Stop goes next to where the page is now.
+    let started = h.start_take("Trip/Day.md", "clip-20261020-101500");
+    std::thread::sleep(std::time::Duration::from_millis(200));
+    call(
+        &h.main,
+        "entry_rename",
+        json!({ "from": "Trip", "to": "Journey" }),
+    )
+    .unwrap();
+    let clip = call(
+        &h.main,
+        "audio_record_stop",
+        json!({ "recordingId": started["recordingId"], "page": "Journey/Day.md" }),
+    )
+    .unwrap();
+    assert_eq!(clip["path"], "Journey/attachments/clip-20261020-101500.wav");
+    assert!(h.read_wav("Journey/attachments/clip-20261020-101500.wav").1 > 0);
+
+    // Archived, and the UI still names the old page: never lost.
+    let started = h.start_take("Journey/Day.md", "clip-20261020-101600");
+    std::thread::sleep(std::time::Duration::from_millis(200));
+    call(&h.main, "entry_archive", json!({ "path": "Journey" })).unwrap();
+    let clip = call(
+        &h.main,
+        "audio_record_stop",
+        json!({ "recordingId": started["recordingId"], "page": "Journey/Day.md" }),
+    )
+    .unwrap();
+    let path = clip["path"].as_str().unwrap();
+    assert!(path.ends_with("clip-20261020-101600.wav"), "{clip}");
+    assert!(h.read_wav(path).1 > 0);
+    assert_eq!(h.takes_left(), 0);
+}
+
+/// Spec §4.2 Crash: a take the app died during was never committed — only its
+/// hidden temp file holds it. The next unlock salvages its complete chunks
+/// into `…-recovered.wav`; at most the last 64 KiB chunk is lost.
+#[test]
+fn a_crashed_take_is_salvaged_at_unlock() {
+    use std::io::Write;
+    let h = harness();
+    let (root, _) = h.create("Voice");
+    call(
+        &h.main,
+        "entry_create_page",
+        json!({ "dir": "", "name": "Diary" }),
+    )
+    .unwrap();
+    let dir = ".liber/recording/clip-20261020-090000-7";
+    h.write(
+        &format!("{dir}/take.json"),
+        json!({ "root": root, "page": "Diary.md" })
+            .to_string()
+            .as_bytes(),
+    );
+    let session = h.state().session().unwrap();
+    let wav = VaultPath::new(&format!("{dir}/clip-20261020-090000.wav")).unwrap();
+    let mut out = session.vault().create_new(&wav).unwrap();
+    let stop = std::sync::atomic::AtomicBool::new(false);
+    liber_audio::record_stream(
+        &liber_audio::SyntheticHost::tone(48_000, 1),
+        None,
+        &mut out,
+        &stop,
+        &mut |_, at| {
+            if at >= std::time::Duration::from_millis(1_500) {
+                stop.store(true, std::sync::atomic::Ordering::SeqCst);
+            }
+        },
+        liber_audio::MAX_DATA_BYTES,
+    )
+    .unwrap();
+    out.flush().unwrap();
+    std::mem::forget(out); // the app dies: never finished
+    drop(session);
+    h.lock();
+    h.unlock(&root, "passphrase", PASS).unwrap();
+    // 1.5 s is 144 044 bytes: two whole 64 KiB chunks made it to disk.
+    let (_, samples) = h.read_wav("attachments/clip-20261020-090000-recovered.wav");
+    assert_eq!(samples, (2 * 65_536 - 44) / 2);
+    assert_eq!(h.takes_left(), 0);
+}
