@@ -104,7 +104,8 @@ fn realistic(root: &Path) {
     put(root, "attachments/big.bin", &big, 1_000_000_800);
     put(root, "Cafe\u{301}.md", b"nfd", 1_000_000_900);
     std::fs::create_dir_all(root.join("Empty")).unwrap();
-    // Junk anywhere (never copied) and kept sync files at the root.
+    // Junk anywhere (never copied; it goes to the trash with the originals,
+    // the root's too) and kept sync files at the root.
     put(root, "Projects/.DS_Store", b"junk", 1_000_001_000);
     put(root, ".DS_Store", b"root junk", 1_000_001_100);
     put(root, ".stfolder/marker", b"syncthing", 1_000_001_200);
@@ -200,7 +201,7 @@ fn assert_encrypted(root: &Path, want: &BTreeMap<String, Node>) {
 fn assert_kept_and_clean(root: &Path, original: &BTreeMap<String, Node>) {
     let now = snapshot(root);
     for (rel, node) in original {
-        if rel == ".DS_Store" || rel.starts_with(".stfolder") {
+        if rel.starts_with(".stfolder") {
             assert_eq!(now.get(rel), Some(node), "{rel} kept as it was");
         }
     }
@@ -210,7 +211,7 @@ fn assert_kept_and_clean(root: &Path, original: &BTreeMap<String, Node>) {
     let tops: Vec<&String> = now.keys().filter(|k| !k.contains('/')).collect();
     assert_eq!(
         tops,
-        vec![".DS_Store", ".stfolder", "README.txt", "d", HEADER_FILE],
+        vec![".stfolder", "README.txt", "d", HEADER_FILE],
         "only the vault and the kept entries at the root"
     );
 }
@@ -227,7 +228,7 @@ fn assert_trashed(bin: &Path, original: &BTreeMap<String, Node>) {
         .iter()
         .filter(|(k, _)| {
             let top = k.split('/').next().unwrap();
-            top != ".DS_Store" && top != ".stfolder"
+            top != ".stfolder"
         })
         .map(|(k, v)| (k.clone(), v.clone()))
         .collect();
@@ -694,7 +695,7 @@ fn a_failed_trash_keeps_the_originals_and_the_vault_opens() {
     let kept = snapshot(&root.join(convert::ORIGINALS));
     assert_eq!(kept, {
         let mut m = original.clone();
-        m.retain(|k, _| !k.starts_with(".DS_Store") && !k.starts_with(".stfolder"));
+        m.retain(|k, _| !k.starts_with(".stfolder"));
         m
     });
     // The encrypted vault tolerates the journal, the originals and the kept
@@ -800,4 +801,220 @@ fn a_converted_vault_decrypts_with_the_python_reader() {
         Some(77) => println!("SKIP: {}", text.trim()),
         _ => panic!("xcheck failed ({}):\n{text}", out.status),
     }
+}
+
+// ---- Review fix round ----
+
+fn case_insensitive(dir: &Path) -> bool {
+    std::fs::write(dir.join("CaseProbe"), b"").unwrap();
+    let ci = dir.join("caseprobe").exists();
+    std::fs::remove_file(dir.join("CaseProbe")).unwrap();
+    ci
+}
+
+/// Review C1 (the reviewer's probes): a name that matches a reserved one
+/// only by case is refused, never deleted, scattered or truncated.
+#[test]
+fn a_lookalike_of_a_reserved_name_is_refused_and_never_touched() {
+    for (entry, file) in [
+        (".Liber-Converting", Some("precious.md")),
+        (".Liber-Plain", Some("inner.md")),
+        (".LIBER-CONVERT.json.tmp", None),
+        (".Liber-Convert.json", None),
+    ] {
+        let (_d, root) = plain_root();
+        match file {
+            Some(f) => put(&root, &format!("{entry}/{f}"), b"only copy", 2),
+            None => put(&root, entry, b"mine", 2),
+        }
+        let before = snapshot(&root);
+        let blocked = blocked_of(&root);
+        assert!(
+            blocked.contains(&Blocked {
+                path: entry.into(),
+                reason: Reason::Reserved
+            }),
+            "{entry}: {blocked:?}"
+        );
+        let err = convert::begin(&root, &[], ME, make).err().unwrap();
+        assert!(matches!(err, ConvertError::Blocked(_)), "{entry}: {err:?}");
+        let out = convert::recover(&root, ME, &no_trash, &no_index).unwrap();
+        assert_eq!(out, RecoverOutcome::Nothing, "{entry}");
+        assert_eq!(snapshot(&root), before, "{entry}: untouched");
+    }
+}
+
+/// Review C1 backstop: even with a journal (preflight bypassed), rollback
+/// only removes or empties folders it can prove are its own.
+#[test]
+fn rollback_leaves_folders_it_did_not_create() {
+    let (_d, root) = plain_root();
+    put(&root, ".Liber-Converting/precious.md", b"only copy", 2);
+    put(&root, ".Liber-Plain/inner.md", b"mine", 2);
+    let journal = convert::Journal {
+        version: 1,
+        phase: Phase::Copying,
+        started: 1,
+        install_id: ME.into(),
+        vault_id: None,
+        staging_created: false,
+        plain_created: false,
+    };
+    std::fs::write(
+        root.join(convert::JOURNAL),
+        serde_json::to_vec(&journal).unwrap(),
+    )
+    .unwrap();
+    let mut want = snapshot(&root);
+    want.remove(convert::JOURNAL);
+    let ci = case_insensitive(_d.path());
+    assert_eq!(
+        convert::recover(&root, ME, &no_trash, &no_index).unwrap(),
+        RecoverOutcome::RolledBack
+    );
+    assert_eq!(snapshot(&root), want, "case-insensitive disk: {ci}");
+    // An empty staging folder a crash left before the journal said so goes.
+    std::fs::create_dir(root.join(convert::STAGING)).unwrap_or_default();
+    if !ci {
+        std::fs::write(
+            root.join(convert::JOURNAL),
+            serde_json::to_vec(&journal).unwrap(),
+        )
+        .unwrap();
+        convert::rollback(&root).unwrap();
+        assert!(!root.join(convert::STAGING).exists());
+    }
+}
+
+/// Review I5: a vault name near the limit still gets a visible originals name.
+#[test]
+fn a_long_vault_name_still_trashes_and_shows_its_originals() {
+    for broken in [false, true] {
+        let dir = tempfile::tempdir().unwrap();
+        let root = dir.path().join("N".repeat(240));
+        std::fs::create_dir(&root).unwrap();
+        put(&root, "Notes.md", b"hello", 1);
+        let root = dunce::canonicalize(root).unwrap();
+        let (mut c, _) = convert::begin(&root, &[], ME, make).unwrap();
+        convert::copy(&mut c, |_, _| {}, &AtomicBool::new(false)).unwrap();
+        convert::stage_and_commit(c).unwrap();
+        let bin = dir.path().join("bin");
+        let fail = |_: &Path| Err(std::io::Error::other("no trash"));
+        let ok = fake_trash(&bin);
+        let trash: &dyn Fn(&Path) -> std::io::Result<()> = if broken { &fail } else { &ok };
+        let out = convert::finish(&root, trash, &no_index).unwrap();
+        if broken {
+            assert!(matches!(out, Finished::TrashPending(_)), "{out:?}");
+            let shown = convert::show_originals(&root).unwrap();
+            let name = shown.file_name().unwrap().to_string_lossy().into_owned();
+            assert!(
+                name.len() <= 255 && name.ends_with(" (unencrypted originals)"),
+                "{name}"
+            );
+            assert!(shown.join("Notes.md").exists());
+        } else {
+            assert_eq!(out, Finished::Done);
+            let got: Vec<_> = std::fs::read_dir(&bin).unwrap().collect();
+            assert_eq!(got.len(), 1);
+        }
+    }
+}
+
+/// Review M1: an entry that appears at the root while the originals move
+/// aborts before `staged`, and the rollback leaves it there.
+#[test]
+fn a_newcomer_at_the_root_during_staging_rolls_back() {
+    let (_dir, root) = vault();
+    let original = snapshot(&root);
+    let (mut c, _) = convert::begin(&root, &[], ME, make).unwrap();
+    convert::copy(&mut c, |_, _| {}, &AtomicBool::new(false)).unwrap();
+    let r = root.clone();
+    convert::crash_when(Some(Box::new(move |p| {
+        if p == CrashPoint::Staging(3) {
+            std::fs::write(r.join("newcomer.md"), b"from sync").unwrap();
+        }
+        false
+    })));
+    let err = convert::stage_and_commit(c).unwrap_err();
+    convert::crash_when(None);
+    assert!(
+        matches!(err, ConvertError::Changed(ref p) if p == "newcomer.md"),
+        "{err:?}"
+    );
+    assert_eq!(
+        convert::recover(&root, ME, &no_trash, &no_index).unwrap(),
+        RecoverOutcome::RolledBack
+    );
+    let mut now = snapshot(&root);
+    assert!(now.remove("newcomer.md").is_some());
+    assert_eq!(now, original);
+}
+
+/// Review M2: same size and mtime, different file (unix: inode or ctime).
+#[cfg(unix)]
+#[test]
+fn a_file_rewritten_with_the_same_size_and_mtime_is_a_change() {
+    let (_dir, root) = vault();
+    let (mut c, _) = convert::begin(&root, &[], ME, make).unwrap();
+    convert::copy(&mut c, |_, _| {}, &AtomicBool::new(false)).unwrap();
+    std::thread::sleep(Duration::from_millis(20));
+    put(&root, "Notes.md", b"# Notes\n\nHELLO\n", 1_000_000_000);
+    let err = convert::stage_and_commit(c).unwrap_err();
+    assert!(
+        matches!(err, ConvertError::Changed(ref p) if p == "Notes.md"),
+        "{err:?}"
+    );
+    convert::rollback(&root).unwrap();
+}
+
+/// Review M8: more crash points, and a rollback that itself crashes halfway.
+#[test]
+fn more_crash_points_recover() {
+    for (at, want) in [
+        (CrashPoint::AfterStagingDir, RecoverOutcome::RolledBack),
+        (CrashPoint::AfterStagingCreated, RecoverOutcome::RolledBack),
+        (CrashPoint::AfterCommitting, RecoverOutcome::Finished),
+    ] {
+        let (dir, root, original, out) = crash_then_recover(at);
+        assert_eq!(out, want, "{at:?}");
+        if want == RecoverOutcome::RolledBack {
+            assert_eq!(snapshot(&root), original, "{at:?}");
+        } else {
+            assert_encrypted(&root, &content(&original));
+            assert_trashed(&dir.path().join("bin"), &original);
+        }
+    }
+    let (_dir, root) = vault();
+    let original = snapshot(&root);
+    convert::crash_at(Some(CrashPoint::Staging(5)));
+    let (mut c, _) = convert::begin(&root, &[], ME, make).unwrap();
+    convert::copy(&mut c, |_, _| {}, &AtomicBool::new(false)).unwrap();
+    assert!(convert::stage_and_commit(c).is_err());
+    convert::crash_at(Some(CrashPoint::Unstaging(2)));
+    assert!(convert::recover(&root, ME, &no_trash, &no_index).is_err());
+    convert::crash_at(None);
+    assert_eq!(
+        convert::recover(&root, ME, &no_trash, &no_index).unwrap(),
+        RecoverOutcome::RolledBack
+    );
+    assert_eq!(snapshot(&root), original);
+}
+
+/// Judgment change: another device's committed conversion doesn't block
+/// opening (the vault is safe), and nothing is touched.
+#[test]
+fn another_devices_committed_conversion_opens() {
+    let (_dir, root) = vault();
+    convert::crash_at(Some(CrashPoint::AfterCommitted));
+    let (mut c, _) = convert::begin(&root, &[], "install-other", make).unwrap();
+    convert::copy(&mut c, |_, _| {}, &AtomicBool::new(false)).unwrap();
+    assert!(convert::stage_and_commit(c).is_err());
+    convert::crash_at(None);
+    let before = snapshot(&root);
+    assert_eq!(
+        convert::recover(&root, ME, &no_trash, &no_index).unwrap(),
+        RecoverOutcome::FinishingElsewhere
+    );
+    assert_eq!(snapshot(&root), before);
+    assert_eq!(vault_kind(&root), VaultKind::Encrypted);
 }

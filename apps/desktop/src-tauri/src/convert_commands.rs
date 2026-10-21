@@ -6,7 +6,7 @@
 //! is copied, §8.1) → run (progress, stage, commit, finish, then the vault
 //! opens unlocked). Cancel works at the recovery-key step and during the copy.
 
-use crate::dto::{ProgressPayload, VaultInfo};
+use crate::dto::{ProgressPayload, VaultInfo, WarningPayload};
 use crate::encryption_commands::{RecoveryText, SecretKind};
 use crate::epochs;
 use crate::error::{CmdResult, CommandError, ErrorKind};
@@ -108,6 +108,32 @@ fn drop_index(cache_dir: &Path, root: &Path) -> std::io::Result<()> {
     }
 }
 
+/// [`drop_index`], a failure told as a warning (review M7): the conversion
+/// itself is done, but the leftover index holds page text.
+fn drop_index_or_warn<R: Runtime>(app: &AppHandle<R>, root: &Path) -> std::io::Result<()> {
+    let state = app.state::<AppState>();
+    if let Err(e) = drop_index(&state.cache_dir, root) {
+        let dir = liber_session::index_db_path(&state.cache_dir, root);
+        let message = format!(
+            "The old search index of {} couldn't be deleted ({e}). It holds page text: delete {} \
+             by hand.",
+            root.display(),
+            dir.parent().unwrap_or(&dir).display()
+        );
+        let _ = app.emit_to("main", "vault:warning", WarningPayload { message });
+    }
+    Ok(())
+}
+
+/// Clears the running conversion's folder however the run ends (review I4).
+struct Active<'a>(&'a ConvertState);
+
+impl Drop for Active<'_> {
+    fn drop(&mut self) {
+        *lock(&self.0.active) = None;
+    }
+}
+
 /// Before any open of `root` (§4.3, §8.2): this device's unfinished
 /// conversion is rolled back or finished, and the UI told; another device's
 /// is refused with `convertingElsewhere`, touching nothing. `true` when the
@@ -123,7 +149,7 @@ pub(crate) fn recover_on_open<R: Runtime>(app: &AppHandle<R>, root: &Path) -> Cm
     let state = app.state::<AppState>();
     let id = epochs::install_id(state.settings.dir())?;
     let trash = state.trasher();
-    let outcome = convert::recover(&root, &id, &*trash, &|| drop_index(&state.cache_dir, &root))?;
+    let outcome = convert::recover(&root, &id, &*trash, &|| drop_index_or_warn(app, &root))?;
     let told = match outcome {
         RecoverOutcome::OtherDevice => {
             return Err(CommandError::new(
@@ -134,7 +160,9 @@ pub(crate) fn recover_on_open<R: Runtime>(app: &AppHandle<R>, root: &Path) -> Cm
         }
         RecoverOutcome::RolledBack => Some("rolledBack"),
         RecoverOutcome::Finished => Some("finished"),
-        RecoverOutcome::Nothing | RecoverOutcome::TrashPending => None,
+        RecoverOutcome::Nothing
+        | RecoverOutcome::TrashPending
+        | RecoverOutcome::FinishingElsewhere => None,
     };
     if let Some(outcome) = told {
         let path = root.to_string_lossy().into_owned();
@@ -176,23 +204,43 @@ pub(crate) fn vault_encrypt_begin_impl<R: Runtime>(
     crate::encryption_commands::check_passphrase(&passphrase)?;
     let state = app.state::<AppState>();
     let cs = app.state::<ConvertState>();
+    // One at a time: a run in progress is never replaced (review M4).
+    if lock(&cs.active).is_some() && lock(&cs.job).is_none() {
+        return Err(not_permitted("another folder is being encrypted right now"));
+    }
     // Checked first: the converted vault's epoch is recorded at the end.
     epochs::check_readable(state.settings.dir())?;
     let root = canonical(&path)?;
     not_scratchpad(&state, &root)?;
+    // A begin that never ran is undone first, this folder's too (review M5).
+    abandon(&cs)?;
+    // Refused, not closed: the window may hold unsaved edits (review I1).
+    if app
+        .try_state::<crate::file_windows::FileWindows>()
+        .is_some_and(|w| w.any_under(&root))
+    {
+        return Err(not_permitted(
+            "Close the windows showing files from this folder first",
+        ));
+    }
     let refused = refused_folders(app);
     // Read-only, before the open vault is closed for it.
     let pre = convert::preflight(&root, &refused)?;
     if !pre.blocked.is_empty() {
         return Err(convert::ConvertError::Blocked(pre.blocked).into());
     }
-    abandon(&cs)?;
-    // Nothing else edits the vault meanwhile (§4.2 step 4).
-    if state
-        .session()
-        .is_ok_and(|s| s.vault().root() == root.as_path())
+    // Nothing else edits the vault meanwhile (§4.2 step 4): the open vault
+    // closes when it is this folder, inside it or holds it (review I3).
+    if let Ok(open) = state.session().map(|s| s.vault().root().to_path_buf())
+        && (open.starts_with(&root) || root.starts_with(&open))
     {
+        // A take in progress is stopped and kept in the vault first (review I2).
+        crate::audio_commands::stop_for_lock(app);
         crate::vault_commands::close_session(app);
+        // A vault inside the folder: its plaintext index goes now.
+        if open != root {
+            drop_index_or_warn(app, &open)?;
+        }
     }
     let id = epochs::install_id(state.settings.dir())?;
     *lock(&cs.active) = Some(root.clone());
@@ -221,7 +269,8 @@ pub(crate) fn vault_encrypt_begin_impl<R: Runtime>(
     }
 }
 
-pub(crate) fn vault_encrypt_run_impl<R: Runtime>(app: &AppHandle<R>) -> CmdResult<VaultInfo> {
+#[doc(hidden)] // public for the review I4 test (crash points are per thread)
+pub fn vault_encrypt_run_impl<R: Runtime>(app: &AppHandle<R>) -> CmdResult<VaultInfo> {
     let cs = app.state::<ConvertState>();
     let Some(Job {
         mut conv,
@@ -230,6 +279,7 @@ pub(crate) fn vault_encrypt_run_impl<R: Runtime>(app: &AppHandle<R>) -> CmdResul
     else {
         return Err(not_permitted("nothing to encrypt: begin first"));
     };
+    let active = Active(&cs);
     let state = app.state::<AppState>();
     let root = conv.root().to_path_buf();
     let emitter = app.clone();
@@ -238,21 +288,33 @@ pub(crate) fn vault_encrypt_run_impl<R: Runtime>(app: &AppHandle<R>) -> CmdResul
         let _ = emitter.emit_to("main", PROGRESS_EVENT, ProgressPayload { done, total });
     };
     let trash = state.trasher();
-    let drop_idx = || drop_index(&state.cache_dir, &root);
+    let drop_idx = || drop_index_or_warn(app, &root);
     let copied = convert::copy(&mut conv, progress, &cs.cancel)
         .and_then(|()| convert::stage_and_commit(conv));
-    let done = match copied {
-        Ok(()) => convert::finish(&root, &*trash, &drop_idx).map(|_| ()),
+    let done: CmdResult<()> = match copied {
+        Ok(()) => convert::finish(&root, &*trash, &drop_idx)
+            .map(|_| ())
+            .map_err(Into::into),
         // Before `staged` this undoes it all; from `staged` on it finishes.
         Err(e) => {
             let id = epochs::install_id(state.settings.dir())?;
             match convert::recover(&root, &id, &*trash, &drop_idx) {
                 Ok(RecoverOutcome::Finished) => Ok(()),
-                _ => Err(e),
+                Ok(_) => Err(e.into()),
+                // Never "back as it was" while the undo failed (review I4).
+                Err(undo) => {
+                    let mut err = CommandError::from(undo);
+                    err.message = format!(
+                        "{e}; undoing it failed too, so the vault isn't back as it was yet \
+                         (opening it tries again): {}",
+                        err.message
+                    );
+                    Err(err)
+                }
             }
         }
     };
-    *lock(&cs.active) = None;
+    drop(active);
     done?;
     // As an unlock: the epoch recorded, the session opened, pending originals reported.
     crate::encryption_commands::vault_unlock_impl(app, root, SecretKind::Passphrase, passphrase)

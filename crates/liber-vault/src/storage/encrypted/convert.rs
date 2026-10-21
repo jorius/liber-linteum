@@ -49,8 +49,10 @@ pub const ORIGINALS: &str = ".liber-plain";
 const JOURNAL_TMP: &str = ".liber-convert.json.tmp";
 const RESERVED: [&str; 4] = [JOURNAL, JOURNAL_TMP, STAGING, ORIGINALS];
 /// Top-level entries that stay plaintext at the root, neither copied nor
-/// staged (§8.5): sync-tool control files and OS junk.
-const KEPT: [&str; 10] = [
+/// staged (§8.5): sync-tool control files only. The root's `.DS_Store` and
+/// `Thumbs.db` hold plaintext names and thumbnails: they go to the trash with
+/// the originals (review judgment change).
+const KEPT: [&str; 8] = [
     ".stfolder",
     ".stignore",
     ".stversions",
@@ -59,8 +61,6 @@ const KEPT: [&str; 10] = [
     ".dropbox.attr",
     "Icon\r",
     "desktop.ini",
-    ".DS_Store",
-    "Thumbs.db",
 ];
 /// OS junk, never copied at any depth (below the root it goes with its folder).
 const JUNK: [&str; 4] = [".DS_Store", "Thumbs.db", "desktop.ini", "Icon\r"];
@@ -154,14 +154,23 @@ pub struct Journal {
     /// The new vault's id (hex), once its header exists.
     #[serde(default)]
     pub vault_id: Option<String>,
+    /// This run created `.liber-converting/` (review C1: only then is it removed).
+    #[serde(default)]
+    pub staging_created: bool,
+    /// This run created `.liber-plain/` (only then are its entries moved back).
+    #[serde(default)]
+    pub plain_created: bool,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum RecoverOutcome {
     /// No journal.
     Nothing,
-    /// Another install's conversion: nothing touched.
+    /// Another install's conversion, before its commit: nothing touched.
     OtherDevice,
+    /// Another install's conversion, committed (the root header is its):
+    /// the vault opens; that device finishes. Nothing touched.
+    FinishingElsewhere,
     /// Interrupted before `staged`: the vault is back as it was.
     RolledBack,
     /// Finished now (the originals may still be pending: see the journal).
@@ -181,11 +190,17 @@ pub enum Finished {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum CrashPoint {
     AfterJournal,
+    /// `.liber-converting/` made, the journal not yet saying so.
+    AfterStagingDir,
+    /// The staging vault made, its id not yet in the journal.
+    AfterStagingCreated,
     /// After this many originals moved.
     Staging(usize),
     /// Every original moved and re-checked, `staged` not yet written.
     AllMoved,
     AfterStaged,
+    /// `committing` written, nothing moved up yet.
+    AfterCommitting,
     AfterData,
     AfterReadme,
     AfterHeader,
@@ -194,22 +209,35 @@ pub enum CrashPoint {
     AfterVisibleRename,
     AfterTrash,
     AfterStagingRemoved,
+    /// During a rollback, after this many originals moved back (0: before any).
+    Unstaging(usize),
 }
+
+/// Decides, at each point, whether to stop there (and may act, as a sync would).
+#[cfg(feature = "test-params")]
+pub type CrashHook = Box<dyn FnMut(CrashPoint) -> bool>;
 
 #[cfg(feature = "test-params")]
 thread_local! {
-    static CRASH: std::cell::Cell<Option<CrashPoint>> = const { std::cell::Cell::new(None) };
+    static CRASH: std::cell::RefCell<Option<CrashHook>> = const { std::cell::RefCell::new(None) };
 }
 
 /// Makes this thread's next run stop at `p` (`None` clears it).
 #[cfg(feature = "test-params")]
 pub fn crash_at(p: Option<CrashPoint>) {
-    CRASH.with(|c| c.set(p));
+    crash_when(p.map(|p| Box::new(move |q| q == p) as CrashHook));
+}
+
+/// Calls `hook` at every crash point on this thread; it stops the run there
+/// by returning `true` (`None` clears it).
+#[cfg(feature = "test-params")]
+pub fn crash_when(hook: Option<CrashHook>) {
+    CRASH.with(|c| *c.borrow_mut() = hook);
 }
 
 fn crash(at: CrashPoint) -> Result<()> {
     #[cfg(feature = "test-params")]
-    if CRASH.with(|c| c.get()) == Some(at) {
+    if CRASH.with(|c| c.borrow_mut().as_mut().is_some_and(|h| h(at))) {
         return Err(ConvertError::Refused(format!("injected crash at {at:?}")));
     }
     let _ = at;
@@ -218,6 +246,7 @@ fn crash(at: CrashPoint) -> Result<()> {
 
 /// Sends a folder to the OS trash (tests inject a fake).
 pub type Trash<'a> = &'a dyn Fn(&Path) -> std::io::Result<()>;
+
 /// The real [`Trash`]: the OS trash (recoverable; the user empties it, D4).
 pub fn os_trash(path: &Path) -> std::io::Result<()> {
     trash::delete(path).map_err(std::io::Error::other)
@@ -226,16 +255,31 @@ pub fn os_trash(path: &Path) -> std::io::Result<()> {
 /// Deletes the vault's plaintext index from the app cache (the desktop's).
 pub type DropIndex<'a> = &'a dyn Fn() -> std::io::Result<()>;
 
-/// A file's size and mtime when it was recorded.
-type Stamp = (u64, Option<SystemTime>);
+/// A file as recorded: size, mtime, and on unix its inode and ctime (review
+/// M2: a rewrite that keeps size and mtime still changes those). Windows has
+/// no stable file id in std: size and mtime only there.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct Stamp {
+    len: u64,
+    mtime: Option<SystemTime>,
+    ino: u64,
+    ctime_ns: i128,
+}
+
+impl Stamp {
+    /// What a rename keeps (it may change the ctime).
+    fn moved(self) -> (u64, Option<SystemTime>, u64) {
+        (self.len, self.mtime, self.ino)
+    }
+}
 
 /// A conversion between [`begin`] and [`stage_and_commit`]: the staging vault, unlocked.
 pub struct Converting {
     root: PathBuf,
     storage: EncryptedStorage,
     journal: Journal,
-    files: BTreeMap<String, Stamp>,
-    dirs: BTreeSet<String>,
+    /// What [`copy`] copied, as it was (no `blocked`).
+    record: Tree,
 }
 
 impl Converting {
@@ -257,6 +301,17 @@ fn exists(p: &Path) -> bool {
     p.symlink_metadata().is_ok()
 }
 
+/// Whether `dir` lists exactly `name`: on a case-insensitive disk `exists`
+/// also finds `.Liber-Plain` for `.liber-plain` (review C1).
+fn listed(dir: &Path, name: &str) -> bool {
+    std::fs::read_dir(dir).is_ok_and(|items| items.flatten().any(|i| i.file_name() == name))
+}
+
+/// A user's name that a reserved one matches by case or Unicode form only.
+fn reserved_like(name: &str) -> bool {
+    RESERVED.iter().any(|r| fold(r) == fold(name))
+}
+
 fn io(what: impl std::fmt::Display) -> impl Fn(std::io::Error) -> ConvertError {
     move |e| io_err(what.to_string(), e).into()
 }
@@ -275,6 +330,10 @@ pub fn read_journal(root: &Path) -> Result<Option<Journal>> {
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(None),
         Err(e) => return Err(io(JOURNAL)(e)),
     };
+    // A user's `.Liber-Convert.json` on a case-insensitive disk isn't ours.
+    if !listed(root, JOURNAL) {
+        return Ok(None);
+    }
     let damaged = |why: String| VaultError::Damaged(format!("{JOURNAL}: {why}"));
     let j: Journal = serde_json::from_slice(&bytes).map_err(|e| damaged(e.to_string()))?;
     if j.version != JOURNAL_VERSION {
@@ -319,7 +378,22 @@ fn join(rel: &str, name: &str) -> String {
 }
 
 fn stamp(m: &Metadata) -> Stamp {
-    (m.len(), m.modified().ok())
+    #[cfg(unix)]
+    let (ino, ctime_ns) = {
+        use std::os::unix::fs::MetadataExt;
+        (
+            m.ino(),
+            i128::from(m.ctime()) * 1_000_000_000 + i128::from(m.ctime_nsec()),
+        )
+    };
+    #[cfg(not(unix))]
+    let (ino, ctime_ns) = (0, 0);
+    Stamp {
+        len: m.len(),
+        mtime: m.modified().ok(),
+        ino,
+        ctime_ns,
+    }
 }
 
 /// Walks the vault at `base`. At its top, kept names are left out, and so are
@@ -356,8 +430,9 @@ fn walk(base: &Path, rel: &str, in_conversion: bool, out: &mut Tree) {
         if top && KEPT.contains(&name) {
             continue;
         }
-        if top && RESERVED.contains(&name) {
-            if !in_conversion {
+        if top && reserved_like(name) {
+            // During a conversion its own names are skipped; a lookalike blocks.
+            if !(in_conversion && RESERVED.contains(&name)) {
                 block(name.to_string(), Reason::Reserved);
             }
             continue;
@@ -489,7 +564,7 @@ pub fn preflight(root: &Path, refused: &[PathBuf]) -> Result<Preflight> {
     let tree = scan(&root, false);
     Ok(Preflight {
         files: tree.files.len() as u64,
-        bytes: tree.files.values().map(|s| s.0).sum(),
+        bytes: tree.files.values().map(|s| s.len).sum(),
         blocked: tree.blocked,
     })
 }
@@ -515,12 +590,19 @@ pub fn begin(
         started: now_secs(),
         install_id: install_id.to_string(),
         vault_id: None,
+        staging_created: false,
+        plain_created: false,
     };
     write_journal(&root, &journal)?;
     crash(CrashPoint::AfterJournal)?;
     let staging = root.join(STAGING);
+    // Fails on anything already there, a lookalike name included.
     std::fs::create_dir(&staging).map_err(io(STAGING))?;
+    crash(CrashPoint::AfterStagingDir)?;
+    journal.staging_created = true;
+    write_journal(&root, &journal)?;
     let (storage, code) = make(&staging)?;
+    crash(CrashPoint::AfterStagingCreated)?;
     journal.vault_id = Some(hex(&storage.vault_id()));
     write_journal(&root, &journal)?;
     Ok((
@@ -528,8 +610,7 @@ pub fn begin(
             root,
             storage,
             journal,
-            files: BTreeMap::new(),
-            dirs: BTreeSet::new(),
+            record: Tree::default(),
         },
         code,
     ))
@@ -560,8 +641,7 @@ pub fn copy(
         copy_file(&c.storage, &c.root, rel, recorded)?;
         progress(done as u64 + 1, total);
     }
-    c.files = tree.files;
-    c.dirs = tree.dirs;
+    c.record = tree;
     Ok(())
 }
 
@@ -604,7 +684,7 @@ fn copy_file(s: &EncryptedStorage, root: &Path, rel: &str, recorded: &Stamp) -> 
     if read != wrote {
         return Err(ConvertError::Mismatch(rel.to_string()));
     }
-    if let Some(t) = recorded.1 {
+    if let Some(t) = recorded.mtime {
         File::options()
             .write(true)
             .open(&physical)
@@ -614,20 +694,28 @@ fn copy_file(s: &EncryptedStorage, root: &Path, rel: &str, recorded: &Stamp) -> 
     Ok(())
 }
 
-/// `Changed` unless `now` is exactly what was recorded.
-fn check_same(now: &Tree, c: &Converting) -> Result<()> {
+/// `Changed` unless `now` is exactly what was recorded (`moved`: what a
+/// rename keeps of each file).
+fn check_same(now: &Tree, rec: &Tree, moved: bool) -> Result<()> {
     if let Some(b) = now.blocked.first() {
         return Err(ConvertError::Changed(b.path.clone()));
     }
-    if let Some(d) = now.dirs.symmetric_difference(&c.dirs).next() {
+    if let Some(d) = now.dirs.symmetric_difference(&rec.dirs).next() {
         return Err(ConvertError::Changed(d.clone()));
     }
+    let same = |a: &Stamp, b: &Stamp| {
+        if moved {
+            a.moved() == b.moved()
+        } else {
+            a == b
+        }
+    };
     let differs = |a: &BTreeMap<String, Stamp>, b: &BTreeMap<String, Stamp>| {
         a.iter()
-            .find(|(k, v)| b.get(*k) != Some(*v))
+            .find(|(k, v)| !b.get(*k).is_some_and(|w| same(v, w)))
             .map(|(k, _)| k.clone())
     };
-    match differs(&now.files, &c.files).or_else(|| differs(&c.files, &now.files)) {
+    match differs(&now.files, &rec.files).or_else(|| differs(&rec.files, &now.files)) {
         Some(rel) => Err(ConvertError::Changed(rel)),
         None => Ok(()),
     }
@@ -661,25 +749,35 @@ fn move_new(from: &Path, to: &Path) -> Result<()> {
 /// `.liber-plain/` and checks them there, writes `staged`, then commits.
 /// On error, the caller calls [`recover`]: before `staged` it rolls back.
 pub fn stage_and_commit(c: Converting) -> Result<()> {
-    check_same(&scan(&c.root, true), &c)?;
-    let plain = c.root.join(ORIGINALS);
-    std::fs::create_dir(&plain).map_err(io(ORIGINALS))?;
-    for (n, name) in movable(&c.root)?.iter().enumerate() {
-        move_new(&c.root.join(name), &plain.join(name))?;
-        crash(CrashPoint::Staging(n + 1))?;
-    }
-    sync_dir(&plain);
-    sync_dir(&c.root);
-    // A sync that wrote between the check and a move: still before `staged`.
-    check_same(&scan(&plain, true), &c)?;
-    crash(CrashPoint::AllMoved)?;
     let Converting {
         root,
         storage,
         mut journal,
-        ..
+        record,
     } = c;
     drop(storage);
+    check_same(&scan(&root, true), &record, false)?;
+    let plain = root.join(ORIGINALS);
+    // Fails on anything already there, a lookalike name included.
+    std::fs::create_dir(&plain).map_err(io(ORIGINALS))?;
+    journal.plain_created = true;
+    write_journal(&root, &journal)?;
+    for (n, name) in movable(&root)?.iter().enumerate() {
+        move_new(&root.join(name), &plain.join(name))?;
+        crash(CrashPoint::Staging(n + 1))?;
+    }
+    sync_dir(&plain);
+    sync_dir(&root);
+    // A sync that wrote between the check and a move (still before `staged`),
+    // or a newcomer at the root (review M1; OS junk there is left alone).
+    check_same(&scan(&plain, true), &record, true)?;
+    if let Some(new) = movable(&root)?
+        .into_iter()
+        .find(|n| !n.to_str().is_some_and(|n| JUNK.contains(&n)))
+    {
+        return Err(ConvertError::Changed(new.to_string_lossy().into_owned()));
+    }
+    crash(CrashPoint::AllMoved)?;
     journal.phase = Phase::Staged;
     write_journal(&root, &journal)?;
     crash(CrashPoint::AfterStaged)?;
@@ -693,6 +791,7 @@ fn commit(root: &Path, journal: &mut Journal) -> Result<()> {
         journal.phase = Phase::Committing;
         write_journal(root, journal)?;
     }
+    crash(CrashPoint::AfterCommitting)?;
     let staging = root.join(STAGING);
     for (name, point) in [
         (DATA_DIR, CrashPoint::AfterData),
@@ -736,12 +835,48 @@ fn verify_header(root: &Path, journal: &Journal) -> Result<()> {
     Ok(())
 }
 
+/// `<vault name> (unencrypted originals)`, the name shortened to fit one
+/// path component (review I5).
 fn visible_originals(root: &Path) -> PathBuf {
-    let name = root
+    const SUFFIX: &str = " (unencrypted originals)";
+    let mut name = root
         .file_name()
         .map(|n| n.to_string_lossy().into_owned())
         .unwrap_or_else(|| "Vault".into());
-    root.join(format!("{name} (unencrypted originals)"))
+    while name.len() + SUFFIX.len() > MAX_NAME_BYTES {
+        name.pop();
+    }
+    root.join(format!("{name}{SUFFIX}"))
+}
+
+/// Removes `.liber-converting/` only when it is provably this conversion's
+/// (review C1): listed under that exact name, and empty, or created by this
+/// run with no header of another vault in it. Anything else stays.
+fn remove_staging(root: &Path, journal: &Journal) -> Result<()> {
+    let staging = root.join(STAGING);
+    if !listed(root, STAGING) || std::fs::remove_dir(&staging).is_ok() {
+        return Ok(());
+    }
+    let header = staging.join(HEADER_FILE);
+    let ours = !exists(&header)
+        || journal.vault_id.is_none()
+        || read_header(&header)
+            .ok()
+            .and_then(|b| VaultHeader::parse(&b).ok())
+            .is_some_and(|h| Some(hex(&h.vault_id().0)) == journal.vault_id);
+    if journal.staging_created && ours {
+        std::fs::remove_dir_all(&staging).map_err(io(STAGING))?;
+    }
+    Ok(())
+}
+
+/// `.liber-plain/` is this conversion's: listed under that exact name, and
+/// created by this run (or empty, from a crash before the journal said so).
+fn plain_is_ours(root: &Path, journal: &Journal) -> bool {
+    let plain = root.join(ORIGINALS);
+    listed(root, ORIGINALS)
+        && (journal.plain_created
+            || std::fs::read_dir(&plain).is_ok_and(|mut d| d.next().is_none()))
 }
 
 /// The finish steps (§8.9): drop the plaintext index, trash the originals
@@ -770,10 +905,7 @@ pub fn finish(root: &Path, trash: Trash<'_>, drop_index: DropIndex<'_>) -> Resul
             Finished::TrashPending(why)
         }
     };
-    match std::fs::remove_dir_all(root.join(STAGING)) {
-        Err(e) if e.kind() != std::io::ErrorKind::NotFound => return Err(io(STAGING)(e)),
-        _ => {}
-    }
+    remove_staging(&root, &journal)?;
     crash(CrashPoint::AfterStagingRemoved)?;
     if out == Finished::Done {
         std::fs::remove_file(root.join(JOURNAL)).map_err(io(JOURNAL))?;
@@ -785,7 +917,7 @@ pub fn finish(root: &Path, trash: Trash<'_>, drop_index: DropIndex<'_>) -> Resul
 /// `Ok(Err(why))`: the originals couldn't go, and are back out of sight.
 fn trash_originals(root: &Path, trash: Trash<'_>) -> Result<std::result::Result<(), String>> {
     let (hidden, visible) = (root.join(ORIGINALS), visible_originals(root));
-    if exists(&hidden) {
+    if listed(root, ORIGINALS) {
         if exists(&visible) {
             return Ok(Err(format!("{} is in the way", visible.display())));
         }
@@ -815,13 +947,14 @@ fn trash_originals(root: &Path, trash: Trash<'_>) -> Result<std::result::Result<
 /// file manager, and says where they are.
 pub fn show_originals(root: &Path) -> Result<PathBuf> {
     let root = canonical_root(root)?;
-    if read_journal(&root)?.map(|j| j.phase) != Some(Phase::TrashPending) {
+    let journal = read_journal(&root)?;
+    if journal.as_ref().map(|j| j.phase) != Some(Phase::TrashPending) {
         return Err(ConvertError::Refused(
             "no originals are waiting here".into(),
         ));
     }
     let (hidden, visible) = (root.join(ORIGINALS), visible_originals(&root));
-    if exists(&hidden) && !exists(&visible) {
+    if journal.is_some_and(|j| plain_is_ours(&root, &j)) && !exists(&visible) {
         std::fs::rename(&hidden, &visible).map_err(io(ORIGINALS))?;
     }
     if !exists(&visible) {
@@ -844,7 +977,7 @@ pub fn rollback(root: &Path) -> Result<()> {
         ));
     }
     let plain = root.join(ORIGINALS);
-    if exists(&plain) {
+    if plain_is_ours(&root, &journal) {
         let names: Vec<OsString> = std::fs::read_dir(&plain)
             .map_err(io(ORIGINALS))?
             .map(|e| e.map(|e| e.file_name()))
@@ -854,16 +987,17 @@ pub fn rollback(root: &Path) -> Result<()> {
         if let Some(n) = names.iter().find(|n| exists(&root.join(n))) {
             return Err(ConvertError::Collision(root.join(n).display().to_string()));
         }
-        for n in &names {
+        crash(CrashPoint::Unstaging(0))?;
+        for (i, n) in names.iter().enumerate() {
             move_new(&plain.join(n), &root.join(n))?;
+            crash(CrashPoint::Unstaging(i + 1))?;
         }
         std::fs::remove_dir(&plain).map_err(io(ORIGINALS))?;
     }
-    match std::fs::remove_dir_all(root.join(STAGING)) {
-        Err(e) if e.kind() != std::io::ErrorKind::NotFound => return Err(io(STAGING)(e)),
-        _ => {}
+    remove_staging(&root, &journal)?;
+    if listed(&root, JOURNAL_TMP) {
+        let _ = std::fs::remove_file(root.join(JOURNAL_TMP));
     }
-    let _ = std::fs::remove_file(root.join(JOURNAL_TMP));
     std::fs::remove_file(root.join(JOURNAL)).map_err(io(JOURNAL))?;
     sync_dir(&root);
     Ok(())
@@ -886,7 +1020,13 @@ pub fn recover(
         return Ok(RecoverOutcome::TrashPending);
     }
     if journal.install_id != install_id {
-        return Ok(RecoverOutcome::OtherDevice);
+        // Committed there: the vault is safe to open; that device finishes.
+        let committed = journal.phase == Phase::Committed && verify_header(&root, &journal).is_ok();
+        return Ok(if committed {
+            RecoverOutcome::FinishingElsewhere
+        } else {
+            RecoverOutcome::OtherDevice
+        });
     }
     match journal.phase {
         Phase::Copying => {
