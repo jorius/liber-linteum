@@ -47,7 +47,7 @@ describe('Welcome screen', () => {
     const calls = backend({
       vaults_recent: () => [],
       'plugin:dialog|open': () => '/v/Notes',
-      folder_kind: () => 'empty',
+      folder_kind: () => 'missing',
       vault_create: () => info,
       vault_tree: () => [],
     });

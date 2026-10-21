@@ -83,15 +83,20 @@ describe('New vault dialog', () => {
     backend(['/v/Notes']);
     const dialog = await start();
     expect(await within(dialog).findByText('/v/Notes')).toBeInTheDocument();
-    expect(within(dialog).getByRole('radio', { name: /Plain/ })).toBeChecked();
-    expect(within(dialog).getByRole('radio', { name: /Encrypted/ })).not.toBeChecked();
+    expect(within(dialog).getByRole('radio', { name: 'Plain' })).toBeChecked();
+    expect(within(dialog).getByRole('radio', { name: 'Encrypted Beta' })).not.toBeChecked();
+    // The cards' hints describe their radios; the names stay short.
+    expect(within(dialog).getByRole('radio', { name: 'Plain' })).toHaveAccessibleDescription(
+      'Ordinary Markdown files any app can open.',
+    );
+    expect(
+      within(dialog).getByRole('radio', { name: 'Encrypted Beta' }),
+    ).toHaveAccessibleDescription('Names and contents encrypted. Needs a passphrase to open.');
     // The Encrypted card carries the one Beta chip.
     const beta = within(dialog).getByText('Beta');
     expect(beta).toHaveClass('liber-chip');
     expect(
-      within(dialog)
-        .getByRole('radio', { name: /Encrypted/ })
-        .closest('label'),
+      within(dialog).getByRole('radio', { name: 'Encrypted Beta' }).closest('label'),
     ).toContainElement(beta);
   });
 
@@ -109,7 +114,9 @@ describe('New vault dialog', () => {
   });
 
   it.each([
-    ['empty', 'vault_create'],
+    // An empty folder opens: vault_create refuses what a failed encrypted
+    // create leaves (README.txt, empty d/), which folder_kind calls empty.
+    ['empty', 'vault_open'],
     ['missing', 'vault_create'],
     ['plain', 'vault_open'],
   ])('Plain on a folder that is %s runs %s and closes', async (kind, cmd) => {
@@ -127,7 +134,7 @@ describe('New vault dialog', () => {
   it('Encrypted on an empty folder: passphrase, then the recovery key, held until confirmed', async () => {
     const calls = backend(['/v/Notes'], { '/v/Notes': 'empty' });
     const dialog = await start();
-    await userEvent.click(within(dialog).getByRole('radio', { name: /Encrypted/ }));
+    await userEvent.click(within(dialog).getByRole('radio', { name: 'Encrypted Beta' }));
     const go = within(dialog).getByRole('button', { name: 'Continue' });
     await waitFor(() => expect(go).toBeEnabled());
     await userEvent.click(go);
@@ -150,7 +157,7 @@ describe('New vault dialog', () => {
   it('Encrypted on a folder with notes offers to encrypt it in place', async () => {
     const calls = backend(['/v/Notes'], { '/v/Notes': 'plain' });
     const dialog = await start();
-    await userEvent.click(within(dialog).getByRole('radio', { name: /Encrypted/ }));
+    await userEvent.click(within(dialog).getByRole('radio', { name: 'Encrypted Beta' }));
     const go = within(dialog).getByRole('button', { name: 'Continue' });
     await waitFor(() => expect(go).toBeEnabled());
     await userEvent.click(go);
@@ -161,7 +168,7 @@ describe('New vault dialog', () => {
     // Back keeps the folder and the choice.
     await userEvent.click(within(dialog).getByRole('button', { name: 'Back' }));
     expect(within(dialog).getByText('/v/Notes')).toBeInTheDocument();
-    expect(within(dialog).getByRole('radio', { name: /Encrypted/ })).toBeChecked();
+    expect(within(dialog).getByRole('radio', { name: 'Encrypted Beta' })).toBeChecked();
     await userEvent.click(within(dialog).getByRole('button', { name: 'Continue' }));
     await userEvent.click(within(dialog).getByRole('button', { name: 'Encrypt in place…' }));
     expect(openEncryptInPlace).toHaveBeenCalledWith('/v/Notes');
@@ -176,7 +183,7 @@ describe('New vault dialog', () => {
       const calls = backend(['/v/Enc'], { '/v/Enc': 'encrypted' });
       const dialog = await start();
       if (choice === 'encrypted')
-        await userEvent.click(within(dialog).getByRole('radio', { name: /Encrypted/ }));
+        await userEvent.click(within(dialog).getByRole('radio', { name: 'Encrypted Beta' }));
       const go = within(dialog).getByRole('button', { name: 'Continue' });
       await waitFor(() => expect(go).toBeEnabled());
       await userEvent.click(go);

@@ -103,6 +103,8 @@ body {
   border-radius: 999px;
   color: var(--color-accent);
   background: var(--color-accent-soft);
+  /* The pill still reads on an accent-soft row or card (Safari 15: no color-mix). */
+  box-shadow: inset 0 0 0 1px currentColor;
   font: 600 11px/1 var(--font-body);
   letter-spacing: 0.02em;
   white-space: nowrap;

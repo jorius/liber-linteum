@@ -23,6 +23,8 @@ export function NewVaultDialog({ onClose }: { onClose: () => void }) {
   const [step, setStep] = useState<Step>('choose');
   const [error, setError] = useState<string | null>(null);
   const latest = useRef<string | null>(null);
+  /** The button the keyboard starts on in each step. */
+  const first = useRef<HTMLButtonElement>(null);
   const picked = useRef(false);
 
   const choose = async () => {
@@ -49,8 +51,7 @@ export function NewVaultDialog({ onClose }: { onClose: () => void }) {
 
   // A question replaces the form (and back): the keyboard goes to its answer.
   useEffect(() => {
-    if (step === 'passphrase') return;
-    document.querySelector<HTMLElement>('[role="dialog"] [data-autofocus]')?.focus();
+    first.current?.focus();
   }, [step]);
 
   const leave = (then: () => unknown) => {
@@ -64,8 +65,9 @@ export function NewVaultDialog({ onClose }: { onClose: () => void }) {
     if (kind === 'encrypted') return setStep('isEncrypted');
     if (encrypted) return setStep(kind === 'plain' ? 'hasNotes' : 'passphrase');
     const vault = useVaultStore.getState();
-    // A folder with files is opened as a vault; an empty or new one is created.
-    leave(() => (kind === 'plain' ? vault.open(path) : vault.create(path)));
+    // Only a new folder is created: vault_create refuses a failed encrypted
+    // create's leftovers, which folder_kind counts as empty; open takes any.
+    leave(() => (kind === 'missing' ? vault.create(path) : vault.open(path)));
   };
 
   if (step === 'passphrase' && path) return <CreateEncryptedDialog path={path} onClose={onClose} />;
@@ -78,7 +80,13 @@ export function NewVaultDialog({ onClose }: { onClose: () => void }) {
         <button type="button" className="btn btn-secondary" onClick={() => setStep('choose')}>
           {t('newVault.back')}
         </button>
-        <button type="button" className="btn btn-primary" data-autofocus onClick={() => leave(run)}>
+        <button
+          ref={first}
+          type="button"
+          className="btn btn-primary"
+          data-autofocus
+          onClick={() => leave(run)}
+        >
           {action}
         </button>
       </div>
@@ -104,6 +112,7 @@ export function NewVaultDialog({ onClose }: { onClose: () => void }) {
                 {path ?? t('newVault.noFolder')}
               </span>
               <button
+                ref={first}
                 type="button"
                 className="btn btn-secondary"
                 data-autofocus
@@ -127,10 +136,12 @@ export function NewVaultDialog({ onClose }: { onClose: () => void }) {
                 name={`${id}-protection`}
                 checked={!encrypted}
                 onChange={() => setEncrypted(false)}
+                aria-labelledby={`${id}-plain`}
+                aria-describedby={`${id}-plain-hint`}
               />
               <span className={styles.cardText}>
-                <strong>{t('newVault.plain')}</strong>
-                {t('newVault.plainHint')}
+                <strong id={`${id}-plain`}>{t('newVault.plain')}</strong>
+                <span id={`${id}-plain-hint`}>{t('newVault.plainHint')}</span>
               </span>
             </label>
             <label className={styles.card}>
@@ -139,13 +150,15 @@ export function NewVaultDialog({ onClose }: { onClose: () => void }) {
                 name={`${id}-protection`}
                 checked={encrypted}
                 onChange={() => setEncrypted(true)}
+                aria-labelledby={`${id}-encrypted`}
+                aria-describedby={`${id}-encrypted-hint`}
               />
               <span className={styles.cardText}>
-                <strong>
+                <strong id={`${id}-encrypted`}>
                   {t('newVault.encrypted')}{' '}
                   <span className="liber-chip">{t('encryption.beta')}</span>
                 </strong>
-                {t('newVault.encryptedHint')}
+                <span id={`${id}-encrypted-hint`}>{t('newVault.encryptedHint')}</span>
               </span>
             </label>
           </fieldset>

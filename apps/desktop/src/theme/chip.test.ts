@@ -28,6 +28,8 @@ describe('the chip', () => {
     expect(rule).toMatch(/margin-left:\s*8px/);
     expect(rule).toMatch(/color:\s*var\(--color-accent\)/);
     expect(rule).toMatch(/background:\s*var\(--color-accent-soft\)/);
+    // A ring: the pill still reads on an accent-soft row or card (Safari 15: no color-mix).
+    expect(rule).toMatch(/box-shadow:\s*inset 0 0 0 1px currentColor/);
   });
 
   it('is never pushed to the far edge (no margin-left: auto on any chip)', () => {

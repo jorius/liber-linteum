@@ -61,6 +61,26 @@ const chipFits = async (chip: Locator) => {
   expect(geo.centres).toBeLessThanOrEqual(3);
 };
 
+/** The pill reads even on an accent-soft background like its own: a ring. */
+const chipRinged = async (chip: Locator) => {
+  const { shadow, bg, parentBg } = await chip.evaluate((el) => {
+    let p = el.parentElement;
+    while (p && getComputedStyle(p).backgroundColor === 'rgba(0, 0, 0, 0)') p = p.parentElement;
+    return {
+      shadow: getComputedStyle(el).boxShadow,
+      bg: getComputedStyle(el).backgroundColor,
+      parentBg: p ? getComputedStyle(p).backgroundColor : '',
+    };
+  });
+  expect(bg).toBe(parentBg); // the case the ring is for
+  expect(shadow).toMatch(/inset/);
+  expect(shadow).toMatch(/1px/);
+  const colour = /rgba?\([^)]*\)/.exec(shadow)?.[0] ?? '';
+  expect(colour).not.toBe('');
+  expect(colour).not.toMatch(/,\s*0\)$/);
+  expect(colour).not.toBe(bg);
+};
+
 const newVault = async (page: Page) => {
   await page.getByRole('button', { name: /^New vault/ }).click();
   const dialog = page.getByRole('dialog', { name: 'New vault' });
@@ -71,10 +91,10 @@ const newVault = async (page: Page) => {
 test('New vault, Plain (the default): creates the vault and names it in Vault → Encrypt', async ({
   page,
 }) => {
-  await setup(page);
+  await setup(page, { [PICKED]: 'missing' });
   await page.goto('/');
   const dialog = await newVault(page);
-  await expect(dialog.getByRole('radio', { name: /Plain/ })).toBeChecked();
+  await expect(dialog.getByRole('radio', { name: 'Plain', exact: true })).toBeChecked();
   await dialog.getByRole('button', { name: 'Continue' }).click();
   await expect(page.locator('[data-vault-menu]')).toBeVisible();
   await expect(page.getByRole('dialog')).toHaveCount(0);
@@ -93,7 +113,7 @@ test('New vault, Encrypted, on an empty folder: through to the recovery key', as
   await setup(page);
   await page.goto('/');
   const dialog = await newVault(page);
-  await dialog.getByRole('radio', { name: /Encrypted/ }).check();
+  await dialog.getByRole('radio', { name: 'Encrypted Beta', exact: true }).check();
   await dialog.getByRole('button', { name: 'Continue' }).click();
   await expect(dialog.getByText('1 Passphrase')).toHaveAttribute('aria-current', 'step');
   await page.getByLabel('Passphrase', { exact: true }).fill(PASSPHRASE);
@@ -115,7 +135,7 @@ test('New vault, Encrypted, on a folder with notes: the in-place offer', async (
   await setup(page, { [PICKED]: 'plain' });
   await page.goto('/');
   const dialog = await newVault(page);
-  await dialog.getByRole('radio', { name: /Encrypted/ }).check();
+  await dialog.getByRole('radio', { name: 'Encrypted Beta', exact: true }).check();
   await dialog.getByRole('button', { name: 'Continue' }).click();
   await expect(
     dialog.getByText('This folder already has notes. Encrypt it in place?'),
@@ -137,7 +157,8 @@ for (const theme of ['light', 'dark'] as const) {
     const dialog = await newVault(page);
     await axeClean(page, '[role="dialog"]');
     await chipFits(dialog.locator('.liber-chip'));
-    await dialog.getByRole('radio', { name: /Encrypted/ }).check();
+    await dialog.getByRole('radio', { name: 'Encrypted Beta', exact: true }).check();
+    await chipRinged(dialog.locator('.liber-chip')); // on the selected card
     await axeClean(page, '[role="dialog"]');
     await dialog.getByRole('button', { name: 'Continue' }).click();
     await chipFits(dialog.locator('.liber-chip')); // beside the title
@@ -154,6 +175,10 @@ for (const theme of ['light', 'dark'] as const) {
     await expect(chip).toHaveText('Encrypted');
     await chipFits(chip);
     await axeClean(page, '[aria-labelledby="welcome-recent"]');
+    // As the most recent vault, its row is accent-soft too.
+    await row.evaluate((el) => el.closest('li')!.setAttribute('data-latest', ''));
+    await page.mouse.move(0, 0);
+    await chipRinged(chip);
     await row.click();
     await chipFits(page.getByTestId('unlock-screen').locator('.liber-chip'));
     await page.getByLabel('Passphrase').fill(PASSPHRASE);

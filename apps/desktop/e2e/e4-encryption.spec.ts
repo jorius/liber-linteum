@@ -159,7 +159,7 @@ const newEncrypted = async (page: import('@playwright/test').Page) => {
   await page.getByRole('button', { name: /^New vault/ }).click();
   const dialog = page.getByRole('dialog', { name: 'New vault' });
   await expect(dialog.getByText('/e2e/new-encrypted')).toBeVisible();
-  await dialog.getByRole('radio', { name: /Encrypted/ }).check();
+  await dialog.getByRole('radio', { name: 'Encrypted Beta', exact: true }).check();
   await dialog.getByRole('button', { name: 'Continue' }).click();
   return dialog;
 };
