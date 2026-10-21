@@ -38,6 +38,7 @@ export const SHORTCUT_GROUPS = [
     items: [
       { keys: 'Mod+O', label: 'openVault' },
       { keys: 'Alt+Mod+W', label: 'closeVault' },
+      { keys: 'Alt+Mod+L', label: 'lockVault' },
       { keys: 'Mod+Shift+O', label: 'openFile' },
     ],
   },

@@ -24,9 +24,9 @@ export type RestoreResult = 'done' | 'clash' | 'failed';
 /** Asks Keep both / Cancel and waits for the answer, so a bulk restore asks
  *  about each clash in turn (round-2 review I2). */
 const askKeepBoth = (kind: 'trash' | 'archive', path: string) =>
-  new Promise<boolean>((answer) =>
-    useUiStore.getState().openDialog({ type: 'binClash', kind, path, answer }),
-  );
+  new Promise<boolean>((answer) => {
+    if (!useUiStore.getState().openDialog({ type: 'binClash', kind, path, answer })) answer(false);
+  });
 
 async function settle(
   res: IpcResult<unknown>,

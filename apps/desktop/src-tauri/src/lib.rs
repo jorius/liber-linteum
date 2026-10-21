@@ -261,6 +261,7 @@ pub fn configure<R: tauri::Runtime>(
         encryption_commands::vault_create_encrypted,
         encryption_commands::vault_unlock,
         encryption_commands::vault_lock,
+        menu::menu_set_lock_enabled,
         encryption_commands::security_change_passphrase,
         encryption_commands::security_new_recovery,
         encryption_commands::vault_unreadable,

@@ -105,7 +105,7 @@ export interface VaultInfo {
   scratchpad?: boolean;
   /** The vault's emoji (M5b §4). */
   icon?: string;
-  /** E3: an encrypted vault, unlocked. */
+  /** E3: an encrypted vault, unlocked (always sent by Rust). */
   encrypted?: boolean;
   /** E3: the unlock's header merge voided the recovery code this device
    *  showed; offer a new one (`security_new_recovery`). */
@@ -163,7 +163,7 @@ export interface RecentVault {
   /** The vault's emoji (M5b §4); never for an encrypted vault. */
   icon?: string;
   /** E3: an encrypted vault (shown with a lock; opens by unlocking). */
-  encrypted?: boolean;
+  encrypted: boolean;
 }
 
 export type EditorMode = 'livePreview' | 'source' | 'split';
@@ -235,7 +235,7 @@ export interface Settings {
   sidebarWidth: number;
   /** E3: idle minutes before an encrypted vault locks, 1–60; `null` = never;
    *  15 by default. */
-  autoLockMinutes?: number | null;
+  autoLockMinutes: number | null;
   /** Where the floating Edit / Global View / Search button sits (M5b §2.2). */
   actionButton: ActionButtonPlace;
   /** Spell checking in the editor (spell checking spec §4). */
@@ -672,6 +672,26 @@ export const windowTitleSet = (title: string) => call<void>('window_title_set', 
 export const vaultOpen = (path: string) => call<VaultInfo>('vault_open', { path });
 export const vaultCreate = (path: string) => call<VaultInfo>('vault_create', { path });
 export const vaultClose = () => call<void>('vault_close');
+
+// ---- E3: encrypted vaults ----
+export const vaultCreateEncrypted = (path: string, passphrase: string) =>
+  call<CreatedEncryptedVault>('vault_create_encrypted', { path, passphrase });
+export const vaultUnlock = (path: string, secret: UnlockSecret) =>
+  call<VaultInfo>('vault_unlock', { path, secret });
+export const vaultLock = () => call<void>('vault_lock');
+/** Vault → Lock Vault is enabled only while an encrypted vault is open. */
+export const menuSetLockEnabled = (enabled: boolean) =>
+  call<void>('menu_set_lock_enabled', { enabled });
+export const securityChangePassphrase = (current: string, next: string) =>
+  call<void>('security_change_passphrase', { current, next });
+export const securityNewRecovery = (passphrase: string) =>
+  call<string>('security_new_recovery', { passphrase });
+export const securityResetRollbackMemory = () => call<void>('security_reset_rollback_memory');
+export const vaultUnreadable = () => call<UnreadableEntry[]>('vault_unreadable');
+export const vaultRevealUnreadable = (osPath: string) =>
+  call<void>('vault_reveal_unreadable', { osPath });
+export const attachmentOpenDecrypted = (path: string) =>
+  call<void>('attachment_open_decrypted', { path });
 export const vaultTree = () => call<TreeNode[]>('vault_tree');
 export const pageGet = (path: string) => call<Page>('page_get', { path });
 export const backlinkCount = (path: string) => call<number>('backlink_count', { path });
@@ -1149,6 +1169,12 @@ export const onMenuSave = (cb: () => void): Promise<UnlistenFn> =>
 /** View → Toggle Sidebar (M5b §2.5). */
 export const onMenuSidebar = (cb: () => void): Promise<UnlistenFn> =>
   listen<null>('menu:sidebar', () => cb(), mine());
+export const onVaultLocked = (cb: (path: string) => void): Promise<UnlistenFn> =>
+  listen<VaultLockedPayload>('vault:locked', (e) => cb(e.payload.path), mine());
+export const onLockRequest = (
+  cb: (reason: VaultLockRequestPayload['reason']) => void,
+): Promise<UnlistenFn> =>
+  listen<VaultLockRequestPayload>('vault:lock-request', (e) => cb(e.payload.reason), mine());
 export const onVaultWarning = (cb: (p: WarningPayload) => void): Promise<UnlistenFn> =>
   listen<WarningPayload>('vault:warning', (e) => cb(e.payload));
 

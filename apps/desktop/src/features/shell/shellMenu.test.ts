@@ -3,13 +3,23 @@ import { clearMocks, emit, mockIPC } from '../../ipc/testing';
 import { DEFAULT_SETTINGS, useSettingsStore } from '../../stores/settingsStore';
 import { useUiStore } from '../../stores/uiStore';
 import { useVaultStore } from '../../stores/vaultStore';
-import { installSaveKey, installShellMenu } from './shellMenu';
+import { installSaveKey, installShellMenu, newEncryptedVault, openSettings } from './shellMenu';
 import { useEditorStore } from '../../stores/editorStore';
+
+const prompt = vi.hoisted(() => ({ needs: false, answer: true, order: [] as string[] }));
+vi.mock('../editor/unsavedPrompt', () => ({
+  needsUnsavedPrompt: () => prompt.needs,
+  confirmUnsaved: async () => {
+    prompt.order.push('prompt');
+    return prompt.answer;
+  },
+}));
 
 let calls: { cmd: string; args: unknown }[];
 
 beforeEach(() => {
   calls = [];
+  Object.assign(prompt, { needs: false, answer: true, order: [] });
   useSettingsStore.setState({ settings: DEFAULT_SETTINGS });
   useUiStore.setState({ dialog: null });
   mockIPC(
@@ -19,7 +29,10 @@ beforeEach(() => {
         const patch = (args as { patch: Record<string, unknown> }).patch;
         return { ...useSettingsStore.getState().settings, ...patch };
       }
-      if (cmd === 'plugin:dialog|open') return null;
+      if (cmd === 'plugin:dialog|open') {
+        prompt.order.push('picker');
+        return '/v/new';
+      }
       return null;
     },
     { shouldMockEvents: true },
@@ -28,11 +41,32 @@ beforeEach(() => {
 afterEach(() => clearMocks());
 
 describe('M5b §2.1, §2.5: the app menu items the page answers', () => {
-  it('Settings… opens the Settings dialog (menu:settings)', async () => {
+  it('Settings… opens the Settings dialog (menu:settings), over Search too', async () => {
+    useVaultStore.setState({ status: 'open' });
+    useUiStore.getState().openDialog({ type: 'search' });
     const stop = await installShellMenu({ main: true });
     await emit('menu:settings', null);
     await vi.waitFor(() => expect(useUiStore.getState().dialog).toEqual({ type: 'settings' }));
     stop();
+    useVaultStore.setState({ status: 'closed' });
+  });
+
+  it('Settings… does nothing on Welcome or Unlock, where it isn’t shown', async () => {
+    const stop = await installShellMenu({ main: true });
+    for (const status of ['closed', 'locked'] as const) {
+      useVaultStore.setState({ status });
+      openSettings();
+      await emit('menu:settings', null);
+      expect(useUiStore.getState().dialog).toBeNull();
+    }
+    stop();
+    useVaultStore.setState({ status: 'closed' });
+  });
+
+  it('New Encrypted Vault takes the place of a non-sticky dialog', async () => {
+    useUiStore.getState().openDialog({ type: 'search' });
+    await newEncryptedVault();
+    expect(useUiStore.getState().dialog).toEqual({ type: 'createEncrypted', path: '/v/new' });
   });
 
   it('Vault → Close Vault closes the vault; Open Vault… asks for a folder', async () => {
@@ -43,6 +77,19 @@ describe('M5b §2.1, §2.5: the app menu items the page answers', () => {
     await vi.waitFor(() => expect(close).toHaveBeenCalledTimes(1));
     await emit('menu:vault', 'open');
     await vi.waitFor(() => expect(calls.some((c) => c.cmd === 'plugin:dialog|open')).toBe(true));
+    stop();
+  });
+
+  it('Vault → New Encrypted Vault… picks a folder, then opens the create dialog', async () => {
+    mockIPC((cmd) => (cmd === 'plugin:dialog|open' ? '/v/new' : undefined), {
+      shouldMockEvents: true,
+    });
+    const stop = await installShellMenu({ main: true });
+    await emit('menu:vault', 'newEncrypted');
+    await vi.waitFor(() =>
+      expect(useUiStore.getState().dialog).toEqual({ type: 'createEncrypted', path: '/v/new' }),
+    );
+    useUiStore.setState({ dialog: null });
     stop();
   });
 
@@ -82,5 +129,30 @@ describe('⌘S (M5b §6)', () => {
     expect(flush).toHaveBeenCalledTimes(1);
     stop();
     useEditorStore.setState({ doc: null });
+  });
+});
+
+describe('E4 Task 4 review', () => {
+  it('asks about unsaved text before the folder picker, so no question replaces the dialog', async () => {
+    prompt.needs = true;
+    await newEncryptedVault();
+    expect(prompt.order).toEqual(['prompt', 'picker']);
+    expect(useUiStore.getState().dialog).toEqual({ type: 'createEncrypted', path: '/v/new' });
+  });
+
+  it('Cancel on the unsaved question stops before the picker', async () => {
+    Object.assign(prompt, { needs: true, answer: false });
+    await newEncryptedVault();
+    expect(prompt.order).toEqual(['prompt']);
+    expect(useUiStore.getState().dialog).toBeNull();
+  });
+
+  it('Settings never replaces a create dialog holding its code', () => {
+    useVaultStore.setState({ status: 'open' });
+    useUiStore.setState({ dialog: { type: 'createEncrypted', path: '/v/new' }, held: true });
+    openSettings();
+    expect(useUiStore.getState().dialog).toEqual({ type: 'createEncrypted', path: '/v/new' });
+    useUiStore.getState().closeDialog();
+    useVaultStore.setState({ status: 'closed' });
   });
 });

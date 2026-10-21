@@ -11,6 +11,7 @@ export function installIpcMock({
   outside = {},
   filePicks = [],
   folders = [],
+  encrypted,
 }: {
   pages: Record<string, string>;
   editorMode: string;
@@ -38,6 +39,16 @@ export function installIpcMock({
   filePicks?: { path: string; name: string; url: string; inVault: string | null }[];
   /** M5b: folders the tree lists (besides those quick notes create). */
   folders?: string[];
+  /** E4: an encrypted vault at `/enc`, locked from the start; opens with this
+   *  passphrase or recovery code. */
+  encrypted?: {
+    passphrase: string;
+    recovery: string;
+    damaged?: boolean;
+    notEmpty?: boolean;
+    recoveryVoid?: boolean;
+    unreadable?: { osPath: string; reason: string }[];
+  };
 }) {
   type Args = Record<string, unknown>;
   const w = window as unknown as Record<string, unknown>;
@@ -147,6 +158,24 @@ export function installIpcMock({
       relation,
     };
   };
+  /** E4: the encrypted vault is unlocked; `vault_lock` locks it again. */
+  let encUnlocked = false;
+  const NEW_RECOVERY = `LIBER-${Array.from({ length: 14 }, (_, i) => `K${String(i + 1).padStart(2, '0')}${'ABCDEFGHJKMNPQ'[i]}`).join('-')}`;
+  const encInfo = (name: string, root: string) => ({
+    name,
+    root,
+    encrypted: true,
+    recoveryVoid: encrypted?.recoveryVoid ?? false,
+    report: {
+      files: 2,
+      pages: 2,
+      parsed: 2,
+      skippedUnchanged: 0,
+      removed: 0,
+      warnings: [],
+      durationMs: 1,
+    },
+  });
   let settings: Record<string, unknown> = {
     version: 1,
     language: 'en',
@@ -384,20 +413,90 @@ export function installIpcMock({
           folder: false,
         })),
     }),
-    vaults_recent: () => [{ path: '/vault', name: 'vault', openedAt: '', missing: false }],
-    vault_open: () => ({
-      name: 'vault',
-      root: '/vault',
-      report: {
-        files: 2,
-        pages: 2,
-        parsed: 2,
-        skippedUnchanged: 0,
-        removed: 0,
-        warnings: [],
-        durationMs: 1,
-      },
-    }),
+    vaults_recent: () => [
+      { path: '/vault', name: 'vault', openedAt: '', missing: false, encrypted: false },
+      ...(encrypted
+        ? [{ path: '/enc', name: 'enc', openedAt: '', missing: false, encrypted: true }]
+        : []),
+    ],
+    // The folder picker of Welcome and the Vault menu.
+    'plugin:dialog|open': () => '/e2e/new-encrypted',
+    vault_create_encrypted: (a) => {
+      if (encrypted?.notEmpty) throw { kind: 'notEmpty', message: 'x' };
+      if (String(a.passphrase).length < 12) throw { kind: 'invalidInput', message: 'short' };
+      encUnlocked = true;
+      const name = String(a.path).split('/').pop() ?? 'enc';
+      return {
+        info: encInfo(name, a.path as string),
+        recovery: NEW_RECOVERY,
+      };
+    },
+    vault_unlock: (a) => {
+      const secret = a.secret as { kind: string; value: string };
+      // `damaged: true`: the rollback memory is damaged until it is reset.
+      if (encrypted?.damaged) throw { kind: 'damaged', message: 'vault-epochs.json' };
+      const good = secret.kind === 'passphrase' ? encrypted?.passphrase : encrypted?.recovery;
+      // E3's recovery parser is forgiving: case and spaces don't matter.
+      const norm = (v: string) =>
+        secret.kind === 'recovery' ? v.replace(/\s/g, '').toUpperCase() : v;
+      if (!encrypted || norm(secret.value) !== good) {
+        throw { kind: 'wrongSecret', message: 'no slot opens' };
+      }
+      encUnlocked = true;
+      return encInfo('enc', '/enc');
+    },
+    menu_set_lock_enabled: () => null,
+    vault_lock: () => {
+      if (!encUnlocked) throw { kind: 'notPermitted', message: 'plain vault' };
+      encUnlocked = false;
+      (w.__liberEmit as (e: string, p: unknown) => void)('vault:locked', { path: '/enc' });
+      return null;
+    },
+    security_change_passphrase: (a) => {
+      if (!encrypted || a.current !== encrypted.passphrase) {
+        throw { kind: 'wrongSecret', message: 'no' };
+      }
+      if (String(a.next).length < 12) throw { kind: 'invalidInput', message: 'short' };
+      encrypted.passphrase = a.next as string;
+      return null;
+    },
+    security_new_recovery: (a) => {
+      if (!encrypted || a.passphrase !== encrypted.passphrase) {
+        throw { kind: 'wrongSecret', message: 'no' };
+      }
+      encrypted.recovery = NEW_RECOVERY;
+      encrypted.recoveryVoid = false;
+      return encrypted.recovery;
+    },
+    security_reset_rollback_memory: () => {
+      if (encrypted?.damaged) {
+        encrypted.damaged = false;
+        return null;
+      }
+      throw { kind: 'notPermitted', message: 'the memory is fine' };
+    },
+    vault_unreadable: () => encrypted?.unreadable ?? [],
+    vault_reveal_unreadable: () => null,
+    attachment_open_decrypted: () => null,
+    vault_open: (a) => {
+      if (encrypted && a.path === '/enc' && !encUnlocked) {
+        throw { kind: 'locked', message: 'locked' };
+      }
+      if (encrypted && a.path === '/enc') return encInfo('enc', '/enc');
+      return {
+        name: 'vault',
+        root: '/vault',
+        report: {
+          files: 2,
+          pages: 2,
+          parsed: 2,
+          skippedUnchanged: 0,
+          removed: 0,
+          warnings: [],
+          durationMs: 1,
+        },
+      };
+    },
     vault_tree: () => [
       ...[...new Set([...folders, ...madeFolders])].map((path) => ({
         path,

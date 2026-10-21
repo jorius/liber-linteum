@@ -1,4 +1,11 @@
-import { useEffect, useRef, type KeyboardEvent, type MouseEvent, type ReactNode } from 'react';
+import {
+  useEffect,
+  useId,
+  useRef,
+  type KeyboardEvent,
+  type MouseEvent,
+  type ReactNode,
+} from 'react';
 import styles from './Dialogs.module.css';
 
 const FOCUSABLE =
@@ -46,6 +53,7 @@ export function Dialog({
   describedBy?: string;
   children: ReactNode;
 }) {
+  const titleId = useId();
   const box = useRef<HTMLDivElement>(null);
   const pressedOnBackdrop = useRef(false);
   const onCloseRef = useRef(onClose);
@@ -147,12 +155,12 @@ export function Dialog({
         ref={box}
         role={alert ? 'alertdialog' : 'dialog'}
         aria-modal="true"
-        aria-labelledby="dialog-title"
+        aria-labelledby={titleId}
         aria-describedby={describedBy}
         className={`${styles.dialog} ${wide ? styles.wide : ''} ${bare ? styles.bare : ''} ${panes ? styles.panes : ''}`}
         onKeyDown={onKeyDown}
       >
-        <h2 id="dialog-title" className={hideTitle ? styles.srOnly : styles.title}>
+        <h2 id={titleId} className={hideTitle ? styles.srOnly : styles.title}>
           {title}
         </h2>
         {children}

@@ -1,0 +1,303 @@
+// @vitest-environment jsdom
+import { render, screen, waitFor } from '@testing-library/react';
+import { createElement } from 'react';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { useBinStore } from '../features/bin/binStore';
+import { App } from '../app/App';
+import { clearMocks, mockIPC } from '../ipc/testing';
+import { useEditorStore } from './editorStore';
+import { usePageStore } from './pageStore';
+import { DEFAULT_SETTINGS, useSettingsStore } from './settingsStore';
+import { useSpellStore } from './spellStore';
+import { useToastStore } from './toastStore';
+import { useUiStore } from './uiStore';
+import { onLeaveVault } from './leaveVault';
+
+const toast = () => useToastStore.getState();
+import { resetVaultStore, useVaultStore } from './vaultStore';
+
+type Handler = (args: Record<string, unknown>) => unknown;
+
+function backend(handlers: Record<string, Handler>) {
+  const calls: string[] = [];
+  mockIPC(
+    (cmd, args) => {
+      calls.push(cmd);
+      return handlers[cmd]?.((args ?? {}) as Record<string, unknown>);
+    },
+    { shouldMockEvents: true },
+  );
+  return calls;
+}
+
+const info = { name: 'V', root: '/v', report: { pages: 2, warnings: [] }, encrypted: true };
+
+const editorActions = useEditorStore.getState();
+
+beforeEach(() => {
+  useEditorStore.setState(editorActions, true);
+  useToastStore.getState().clear();
+  useSettingsStore.setState({ settings: DEFAULT_SETTINGS, warning: null, loaded: false });
+});
+
+afterEach(async () => {
+  await resetVaultStore();
+  clearMocks();
+});
+
+describe('vaultStore — encrypted vaults (E4)', () => {
+  it('open_locked_goes_to_locked', async () => {
+    backend({
+      vault_open: () => {
+        throw { kind: 'locked', message: 'locked' };
+      },
+    });
+    const res = await useVaultStore.getState().open('/v');
+    expect(res.ok).toBe(false);
+    expect(useVaultStore.getState().status).toBe('locked');
+    expect(useVaultStore.getState().lockedPath).toBe('/v');
+    expect(useToastStore.getState().toasts).toEqual([]);
+  });
+
+  it('unlock_opens_like_open', async () => {
+    backend({
+      vault_open: () => {
+        throw { kind: 'locked', message: 'locked' };
+      },
+      vault_unlock: () => info,
+      vault_tree: () => [{ path: 'a.md', kind: 'page' }],
+    });
+    await useVaultStore.getState().open('/v');
+    const before = useSpellStore.getState().setKey;
+    const res = await useVaultStore
+      .getState()
+      .unlock({ kind: 'passphrase', value: 'x'.repeat(12) });
+    expect(res.ok).toBe(true);
+    expect(useVaultStore.getState().status).toBe('open');
+    expect(useVaultStore.getState().lockedPath).toBeNull();
+    expect(useVaultStore.getState().nodes.map((n) => n.path)).toEqual(['a.md']);
+    expect(useSpellStore.getState().setKey).toBeGreaterThan(before);
+  });
+
+  it('a wrong secret stays locked, with no toast (the screen shows the error)', async () => {
+    backend({
+      vault_open: () => {
+        throw { kind: 'locked', message: 'locked' };
+      },
+      vault_unlock: () => {
+        throw { kind: 'wrongSecret', message: 'no' };
+      },
+    });
+    await useVaultStore.getState().open('/v');
+    const res = await useVaultStore.getState().unlock({ kind: 'recovery', value: 'bad' });
+    expect(res.ok).toBe(false);
+    expect(useVaultStore.getState().status).toBe('locked');
+    expect(useVaultStore.getState().lockedPath).toBe('/v');
+    expect(useToastStore.getState().toasts).toEqual([]);
+  });
+
+  it('unlock announces recovered clips like the plain path', async () => {
+    backend({
+      vault_unlock: () => ({
+        ...info,
+        recovered: [{ path: 'Audio/clip.wav', link: 'Audio/clip.wav' }],
+      }),
+      vault_tree: () => [],
+    });
+    useVaultStore.setState({ status: 'locked', lockedPath: '/v' });
+    await useVaultStore.getState().unlock({ kind: 'passphrase', value: 'x'.repeat(12) });
+    expect(useToastStore.getState().toasts[0]?.detail).toEqual(['Audio/clip.wav']);
+  });
+
+  async function openEncrypted(calls?: { vaultLock?: Handler }) {
+    const log = backend({
+      vault_unlock: () => info,
+      vault_tree: () => [],
+      vault_lock: calls?.vaultLock ?? (() => null),
+    });
+    useVaultStore.setState({ status: 'locked', lockedPath: '/v' });
+    await useVaultStore.getState().unlock({ kind: 'passphrase', value: 'x'.repeat(12) });
+    return log;
+  }
+
+  it('lock_saves_then_locks', async () => {
+    const order: string[] = [];
+    const log = await openEncrypted({
+      vaultLock: () => {
+        order.push('vaultLock');
+        return null;
+      },
+    });
+    useSettingsStore.setState({ settings: { ...DEFAULT_SETTINGS, autoSave: false } });
+    useEditorStore.setState({
+      askPaths: () => ['a.md'],
+      saveAll: async () => {
+        order.push('saveAll');
+        return [];
+      },
+    });
+    usePageStore.setState({ path: 'a.md' });
+    useUiStore.getState().openDialog({ type: 'relations', page: 'a.md' });
+    toast().push({ message: 'Opened with 1 warning', detail: ['a.md: x'] });
+    useBinStore.setState({ archive: [{ path: '.archive/b.md', from: 'b.md' } as never] });
+    const clear = vi.fn();
+    onLeaveVault(clear);
+    expect(await useVaultStore.getState().lock('menu')).toBe(true);
+    expect(order).toEqual(['saveAll', 'vaultLock']);
+    expect(log).toContain('vault_lock');
+    const s = useVaultStore.getState();
+    expect(s.status).toBe('locked');
+    expect(s.lockedPath).toBe('/v');
+    expect(s.info).toBeNull();
+    expect(usePageStore.getState().path).toBeNull();
+    expect(useUiStore.getState().dialog).toBeNull();
+    expect(toast().toasts).toEqual([]);
+    expect(useBinStore.getState().archive).toEqual([]);
+    expect(clear).toHaveBeenCalledTimes(1);
+  });
+
+  it('a lock keeps a recovery code still to be confirmed', async () => {
+    await openEncrypted();
+    useUiStore.getState().openDialog({ type: 'newRecovery', root: '/v' });
+    useUiStore.getState().hold(true);
+    expect(await useVaultStore.getState().lock('idle')).toBe(true);
+    expect(useUiStore.getState().dialog).toEqual({ type: 'newRecovery', root: '/v' });
+    useUiStore.getState().closeDialog();
+  });
+
+  it('createEncrypted shows a thrown error, not "busy"', async () => {
+    backend({});
+    useEditorStore.setState({
+      saveAll: async () => {
+        throw new Error('disk full');
+      },
+    });
+    useVaultStore.setState({ status: 'open', info: info as never });
+    const res = await useVaultStore.getState().createEncrypted('/n', 'x'.repeat(12));
+    expect(res).toEqual({ ok: false, error: { kind: 'io', message: 'disk full' } });
+    expect(useVaultStore.getState().creating).toBe(false);
+  });
+
+  it('an aborted lock gives the keyboard back to where it was', async () => {
+    await openEncrypted();
+    const field = document.createElement('input');
+    document.body.append(field);
+    field.focus();
+    useEditorStore.setState({
+      saveAll: async () => {
+        // What the browser does once the shell turns inert.
+        (document.activeElement as HTMLElement | null)?.blur();
+        return ['a.md'];
+      },
+    });
+    expect(await useVaultStore.getState().lock('idle')).toBe(false);
+    await waitFor(() => expect(field).toHaveFocus());
+    field.remove();
+  });
+
+  it('lock_aborts_when_a_save_fails', async () => {
+    const log = await openEncrypted();
+    useEditorStore.setState({ saveAll: async () => ['a.md'] });
+    expect(await useVaultStore.getState().lock('idle')).toBe(false);
+    expect(log).not.toContain('vault_lock');
+    expect(useVaultStore.getState().status).toBe('open');
+  });
+
+  it('a non-unlock open from the locked status toasts its error and closes', async () => {
+    backend({
+      vault_open: () => {
+        throw { kind: 'io', message: 'disk' };
+      },
+    });
+    useVaultStore.setState({ status: 'locked', lockedPath: '/old' });
+    await useVaultStore.getState().open('/other');
+    expect(useVaultStore.getState().status).toBe('closed');
+    expect(useVaultStore.getState().lockedPath).toBeNull();
+    expect(useToastStore.getState().toasts.map((t) => t.message)).toEqual([
+      'Something went wrong: disk',
+    ]);
+  });
+
+  it.each(['closed', 'locked'] as const)('damaged on open from %s shows a toast', async (from) => {
+    backend({
+      vault_open: () => {
+        throw { kind: 'damaged', message: 'bad' };
+      },
+    });
+    useVaultStore.setState({ status: from, lockedPath: from === 'locked' ? '/old' : null });
+    await useVaultStore.getState().open('/v');
+    expect(useToastStore.getState().toasts).toHaveLength(1);
+  });
+
+  it('cancelUnlock goes back to closed', () => {
+    useVaultStore.setState({ status: 'locked', lockedPath: '/v' });
+    useVaultStore.getState().cancelUnlock();
+    expect(useVaultStore.getState().status).toBe('closed');
+    expect(useVaultStore.getState().lockedPath).toBeNull();
+  });
+
+  it('a failed vault_lock leaves the vault open and untouched', async () => {
+    await openEncrypted({
+      vaultLock: () => {
+        throw { kind: 'io', message: 'x' };
+      },
+    });
+    expect(await useVaultStore.getState().lock('menu')).toBe(false);
+    expect(useVaultStore.getState().status).toBe('open');
+    expect(useVaultStore.getState().info).not.toBeNull();
+  });
+
+  it('open() from an open vault that answers locked closes the old one and lands on locked', async () => {
+    const log = backend({
+      vault_unlock: () => info,
+      vault_tree: () => [],
+      vault_close: () => null,
+      vault_open: () => {
+        throw { kind: 'locked', message: 'locked' };
+      },
+    });
+    useVaultStore.setState({ status: 'locked', lockedPath: '/v' });
+    await useVaultStore.getState().unlock({ kind: 'passphrase', value: 'x'.repeat(12) });
+    await useVaultStore.getState().open('/enc2');
+    expect(log).toContain('vault_close');
+    expect(useVaultStore.getState().status).toBe('locked');
+    expect(useVaultStore.getState().lockedPath).toBe('/enc2');
+    expect(useVaultStore.getState().info).toBeNull();
+    expect(useToastStore.getState().toasts).toEqual([]);
+  });
+
+  it('lock saves again when something got dirty while saving', async () => {
+    await openEncrypted();
+    let saves = 0;
+    let dirty: string[] = [];
+    useEditorStore.setState({
+      dirtyPaths: () => dirty,
+      saveAll: async () => {
+        saves++;
+        // the first save finishes, then the user types again
+        dirty = saves === 1 ? ['a.md'] : [];
+        return [];
+      },
+    });
+    // dirtied again after the first save, before vault_lock
+    expect(await useVaultStore.getState().lock('menu')).toBe(true);
+    expect(saves).toBe(2);
+  });
+
+  it('keeps the Unlock screen mounted while an unlock is in flight', async () => {
+    let release!: () => void;
+    backend({
+      vault_unlock: () => new Promise((r) => (release = () => r(info))),
+      vault_tree: () => [],
+    });
+    useVaultStore.setState({ status: 'locked', lockedPath: '/v' });
+    render(createElement(App));
+    expect(screen.getByTestId('unlock-screen')).toBeTruthy();
+    const p = useVaultStore.getState().unlock({ kind: 'passphrase', value: 'x'.repeat(12) });
+    await waitFor(() => expect(useVaultStore.getState().status).toBe('opening'));
+    expect(screen.getByTestId('unlock-screen')).toBeTruthy();
+    release();
+    await p;
+    expect(useVaultStore.getState().unlocking).toBe(false);
+  });
+});

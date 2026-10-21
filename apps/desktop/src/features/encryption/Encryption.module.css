@@ -1,0 +1,168 @@
+/* The Unlock screen: the Welcome card's look, centred (E4). */
+.page {
+  min-height: 100%;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: var(--color-bg);
+}
+
+.card {
+  width: min(380px, 100%);
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 28px 24px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-panel);
+}
+
+.head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--color-text-muted);
+}
+
+.name {
+  margin: 0;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  font: 700 22px/1.1 var(--font-display);
+  color: var(--color-text-strong);
+}
+
+.beta {
+  margin-left: auto;
+  padding: 2px 8px;
+  border: 1px solid var(--color-border-strong);
+  border-radius: 999px;
+  font: 700 11px var(--font-body);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font: 600 13px var(--font-body);
+  color: var(--color-text-body);
+}
+
+.error {
+  margin: 0;
+  font-size: 13px;
+  color: var(--color-warn-text);
+}
+
+.note,
+.working {
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--color-text-body);
+}
+
+.spinner {
+  width: 14px;
+  height: 14px;
+  border: 2px solid var(--color-border-strong);
+  border-top-color: var(--color-accent);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .spinner {
+    animation: none;
+  }
+}
+
+.link {
+  align-self: flex-start;
+  border: 0;
+  background: none;
+  padding: 4px 0;
+  min-height: 28px;
+  font: 600 13px var(--font-body);
+  color: var(--color-accent);
+  cursor: pointer;
+}
+
+.link:hover:not(:disabled) {
+  text-decoration: underline;
+}
+
+/* The create dialog (E4). */
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.hint {
+  margin: 0;
+  font-size: 12px;
+  color: var(--color-text-muted);
+}
+
+.check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--color-text-body);
+}
+
+.code {
+  display: block;
+  padding: 12px;
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-md, 6px);
+  font: 600 14px/1.6 var(--font-mono);
+  overflow-wrap: anywhere;
+  user-select: all;
+  color: var(--color-text-strong);
+}
+
+.switch {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font: 600 13px var(--font-body);
+  color: var(--color-text-body);
+}
+
+.switch .beta {
+  margin-left: 0;
+}
+
+.unreadable {
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.unreadable li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 13px;
+  color: var(--color-text-body);
+}

@@ -57,6 +57,7 @@ describe('Settings dialog (M2b §4, §5, §7)', () => {
       'Editor',
       'Spelling',
       'Files and quick notes',
+      'Security Beta',
       'Keyboard shortcuts',
     ]);
     expect(within(nav).getByRole('button', { name: 'General' })).toHaveAttribute(

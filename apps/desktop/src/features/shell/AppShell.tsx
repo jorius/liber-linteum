@@ -3,8 +3,10 @@ import { useTranslation } from 'react-i18next';
 import { SidebarIcon } from '../../app/icons';
 import { useSettingsStore } from '../../stores/settingsStore';
 import { useUiStore } from '../../stores/uiStore';
+import { useVaultStore } from '../../stores/vaultStore';
 import { BinView } from '../bin/BinView';
 import { DialogHost } from '../dialogs/DialogHost';
+import { useAutoLock } from '../encryption/autoLock';
 import { ContextMenu, type MenuState } from '../explorer/ContextMenu';
 import { requestTrash } from '../explorer/trashAction';
 import { GlobalView } from '../global-view/GlobalView';
@@ -31,10 +33,13 @@ export function AppShell() {
   }, [menu]);
   useGlobalShortcuts(menu !== null);
   useWindowTitle();
+  useAutoLock();
   const current = useUiStore((s) => s.screen);
   const collapsed = useSettingsStore((s) => s.settings.sidebarCollapsed);
+  // Keys typed while the lock runs would be dropped with the vault: none are taken.
+  const locking = useVaultStore((s) => s.locking);
   return (
-    <div className={styles.shell}>
+    <div className={styles.shell} inert={locking}>
       {!collapsed && (
         <Sidebar
           onRequestDelete={requestTrash}

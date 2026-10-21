@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-menu-set-lock-enabled"
+description = "Enables the menu_set_lock_enabled command without any pre-configured scope."
+commands.allow = ["menu_set_lock_enabled"]
+
+[[permission]]
+identifier = "deny-menu-set-lock-enabled"
+description = "Denies the menu_set_lock_enabled command without any pre-configured scope."
+commands.deny = ["menu_set_lock_enabled"]

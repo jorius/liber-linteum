@@ -48,8 +48,13 @@ export function StarIcon({
 
 const COLLAPSED = 'liber.favoritesCollapsed:';
 
-function readCollapsed(root: string): boolean {
+function readCollapsed(root: string, encrypted: boolean): boolean {
   try {
+    // An encrypted vault's path is never kept: a key left from when it was plain goes.
+    if (encrypted) {
+      localStorage.removeItem(COLLAPSED + root);
+      return false;
+    }
     return localStorage.getItem(COLLAPSED + root) === '1';
   } catch {
     return false;
@@ -82,11 +87,12 @@ export function FavoritesSection({ onRequestMenu }: { onRequestMenu?: MenuOpener
   const { t } = useTranslation();
   const headingId = useId();
   const root = useVaultStore((s) => s.info?.root ?? '');
+  const encrypted = useVaultStore((s) => s.info?.encrypted === true);
   const nodes = useVaultStore((s) => s.nodes);
   const paths = useFavoritesStore((s) => s.paths);
   const shown = shownFavorites(paths, nodes);
   const [collapsedFor, setCollapsedFor] = useState<Record<string, boolean>>({});
-  const collapsed = collapsedFor[root] ?? readCollapsed(root);
+  const collapsed = collapsedFor[root] ?? readCollapsed(root, encrypted);
   const rows = useRef(new Map<string, HTMLLIElement>());
   const drag = useRef<{ path: string; y: number; moved: boolean } | null>(null);
   const [dropBefore, setDropBefore] = useState<string | null | undefined>(undefined);
@@ -95,6 +101,8 @@ export function FavoritesSection({ onRequestMenu }: { onRequestMenu?: MenuOpener
 
   const setCollapsed = (value: boolean) => {
     setCollapsedFor((c) => ({ ...c, [root]: value }));
+    // The key holds the vault's own path: an encrypted vault keeps it in memory only.
+    if (encrypted) return;
     try {
       localStorage.setItem(COLLAPSED + root, value ? '1' : '0');
     } catch {

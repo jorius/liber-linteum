@@ -17,6 +17,7 @@ import { moveBlock, type MoveOptions } from '../../markdown/blockMoves';
 import { reparse } from '../../markdown/incremental';
 import { parsePage } from '../../markdown/parse';
 import type { ParsedPage } from '../../markdown/types';
+import { onLeaveVault } from '../../stores/leaveVault';
 import { useToastStore } from '../../stores/toastStore';
 
 interface Modelled {
@@ -29,6 +30,7 @@ interface Modelled {
  *  last one (a move needs it at once; Live Preview's model can lag). */
 const models = new WeakMap<Text, Modelled>();
 let last: Modelled | null = null;
+onLeaveVault(() => (last = null));
 
 export function modelFor(state: EditorState): Modelled {
   const known = models.get(state.doc);

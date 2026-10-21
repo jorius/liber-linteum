@@ -22,6 +22,29 @@
     "noMatch": "No vaults match “{query}”.",
     "reveal": "{os, select, mac {Show {name} in Finder} windows {Show {name} in Explorer} other {Show {name} in the file manager}}"
   },
+  "unlock": {
+    "beta": "Beta",
+    "passphrase": "Passphrase",
+    "recoveryKey": "Recovery key",
+    "recoveryPlaceholder": "LIBER-XXXX-…",
+    "submit": "Unlock",
+    "useRecovery": "Use recovery key instead",
+    "usePassphrase": "Use passphrase instead",
+    "back": "Back",
+    "working": "Unlocking… (this takes a second on purpose)",
+    "wrongPassphrase": "That passphrase doesn't open this vault.",
+    "wrongRecovery": "That recovery key doesn't open this vault.",
+    "maybeDamaged": "If you're sure it's right, this vault's key file may be damaged.",
+    "rollback": "This vault's key file is older than one this computer has already seen. It may have been restored from a backup or replaced. It wasn't opened.",
+    "badRecovery": "That doesn't look like a recovery key.",
+    "resetLink": "Reset this computer's rollback memory…",
+    "resetTitle": "Reset rollback memory?",
+    "resetBody": "Liber Linteum remembers each encrypted vault's newest key file to stop an old one being put back. Resetting removes that protection for every encrypted vault on this computer until they're opened again.",
+    "resetConfirm": "Reset rollback memory",
+    "resetDone": "Rollback memory reset. Try unlocking again.",
+    "filesDamaged": "This vault's files are damaged.",
+    "encryptedBadge": "Encrypted"
+  },
   "languages": {
     "en": "English",
     "es": "Español"
@@ -286,6 +309,8 @@
     "openFile": {
       "title": "Open “{name}” in its default app?",
       "confirm": "Open",
+      "decryptedCopy": "A decrypted copy will be written to a temporary folder until the vault locks.",
+      "openCopy": "Open copy",
       "network": "Opening it connects to “{server}”."
     },
     "createPage": {
@@ -405,6 +430,10 @@
         "title": "Files and quick notes",
         "description": "Renaming, deleting and where quick notes live."
       },
+      "security": {
+        "title": "Security",
+        "description": "Locking, passphrase and recovery key of encrypted vaults."
+      },
       "shortcuts": {
         "title": "Keyboard shortcuts",
         "description": "What the keyboard does, everywhere in the app."
@@ -444,6 +473,7 @@
         "favorite": "Add to or remove from Favorites",
         "openVault": "Open a vault",
         "closeVault": "Close the vault",
+        "lockVault": "Lock the vault",
         "openFile": "Open a file",
         "sidebar": "Show or hide the sidebar",
         "actions": "Show the actions",
@@ -1052,5 +1082,52 @@
     "cancelled": "Import stopped. What was written so far is open, with a report.",
     "partial": "The import stopped part-way: {message}. What was written is in {root}, with a report.",
     "openAnyway": "Open it anyway"
+  },
+  "encryption": {
+    "beta": "Beta",
+    "createTitle": "New encrypted vault",
+    "switch": "Encrypt this vault",
+    "passphrase": "Passphrase",
+    "confirm": "Confirm passphrase",
+    "show": "Show passphrase",
+    "hint": "Longer is stronger; a few unrelated words work well.",
+    "strength": "{level, select, tooShort {At least 12 characters.} weak {Strength: weak.} fair {Strength: fair.} other {Strength: strong.}}",
+    "mismatch": "The passphrases don't match.",
+    "continue": "Continue",
+    "creating": "Setting up encryption…",
+    "recoveryTitle": "Your recovery key",
+    "recoveryBody": "Write this down or store it in a password manager. It's the only way into this vault if you forget the passphrase. We can't recover it for you.",
+    "copy": "Copy",
+    "copied": "Copied — clear your clipboard once you've stored it.",
+    "saved": "I've saved it",
+    "confirmIntro": "Type group {a} and group {b} of the key to check you have it.",
+    "group": "Group {n}",
+    "back": "Back",
+    "done": "Done",
+    "doneHint": "Done turns on once both groups match your key.",
+    "security": {
+      "autoLock": "Lock after inactivity",
+      "never": "Never",
+      "minutes": "{count, plural, one {# minute} other {# minutes}}",
+      "autoLockHint": "Encrypted vaults also lock when the computer sleeps, the screen locks, or the app quits.",
+      "noVault": "Open an encrypted vault to change its passphrase or recovery key.",
+      "changeTitle": "Change passphrase",
+      "current": "Current passphrase",
+      "new": "New passphrase",
+      "change": "Change passphrase",
+      "changed": "Passphrase changed",
+      "newRecoveryTitle": "New recovery key",
+      "newRecoveryHint": "Your old recovery key stops working.",
+      "newRecoveryButton": "New recovery key…",
+      "newRecoveryBody": "Enter your current passphrase to make a new recovery key. Your old recovery key stops working.",
+      "conflict": "Another device changed this vault's keys. Lock the vault and unlock it again, then try.",
+      "voidTitle": "Recovery key replaced",
+      "voidBody": "Your recovery key for this vault was replaced on another device and no longer works. Make a new one now.",
+      "voidAction": "Make a new recovery key"
+    },
+    "unreadable": {
+      "title": "Couldn't read",
+      "hint": "These files are in the vault folder but their names couldn't be decrypted. They're never deleted. Export arrives in a later version."
+    }
   }
 }

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useMediaQuery } from '../../app/useMediaQuery';
+import { onLeaveVault } from '../../stores/leaveVault';
 import { useSettingsStore } from '../../stores/settingsStore';
 import styles from './Preview.module.css';
 
@@ -17,6 +18,7 @@ const cache = new Map<string, string>();
 export function clearDiagramCache(): void {
   cache.clear();
 }
+onLeaveVault(clearDiagramCache);
 
 let seq = 0;
 

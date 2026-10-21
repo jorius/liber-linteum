@@ -13,12 +13,11 @@ import {
   type AudioDevice,
   type AudioLevel,
 } from '../../ipc';
-import i18next from 'i18next';
 import { onBeforeClose } from '../../stores/editorStore';
 import type { PageDoc } from '../editor/pageDoc';
 import { errorMessage } from '../../stores/messages';
-import { useToastStore } from '../../stores/toastStore';
 import { onBeforeVaultSwitch, useVaultStore } from '../../stores/vaultStore';
+import { announceRecovered } from './announceRecovered';
 import { markupFor, reserveInsertion } from '../editor/attachments';
 import { pagePath } from '../editor/livePreview';
 import { pageDocOf } from '../editor/views';
@@ -126,7 +125,7 @@ export const useRecorderStore = create<RecorderState>((set, get) => {
         }
         recordingId = res.value.recordingId;
         set({ phase: 'recording' });
-        announceRecovered(res.value.recovered);
+        announceRecovered(res.value.recovered.map((r) => r.path));
       })();
       await starting;
       starting = null;
@@ -181,17 +180,6 @@ export const useRecorderStore = create<RecorderState>((set, get) => {
     },
   };
 });
-
-/** Takes an earlier session left behind are in the vault now (batch 6
- *  review C1): say where, until dismissed. */
-function announceRecovered(recovered: { path: string }[]): void {
-  if (!recovered.length) return;
-  useToastStore.getState().push({
-    message: i18next.t('audio.recovered', { count: recovered.length }),
-    detail: recovered.map((r) => r.path),
-  });
-  void useVaultStore.getState().refreshTree();
-}
 
 /** Stops a take in progress and inserts it (quitting, closing the window or
  *  the vault: §10.7, a recording is never silently dropped) — also one still

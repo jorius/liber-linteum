@@ -105,6 +105,39 @@ pub const SETTINGS_EVENT: &str = "menu:settings";
 pub const VAULT_OPEN_ID: &str = "liber-vault-open";
 pub const VAULT_CLOSE_ID: &str = "liber-vault-close";
 pub const VAULT_EVENT: &str = "menu:vault";
+/// Vault → Lock Vault (E4): enabled only while an encrypted vault is open
+/// (`menu_set_lock_enabled`). Plain ⌘⇧L is 1Password's global lock, so ⌥⌘L.
+pub const VAULT_LOCK_ID: &str = "liber-vault-lock";
+pub const VAULT_LOCK_ACCELERATOR: &str = "Alt+CmdOrCtrl+L";
+/// Vault → New Encrypted Vault…
+pub const VAULT_NEW_ENCRYPTED_ID: &str = "liber-vault-new-encrypted";
+
+/// The `menu:vault` payload of a Vault menu item.
+fn vault_action(id: &str) -> Option<&'static str> {
+    match id {
+        VAULT_OPEN_ID => Some("open"),
+        VAULT_CLOSE_ID => Some("close"),
+        VAULT_LOCK_ID => Some("lock"),
+        VAULT_NEW_ENCRYPTED_ID => Some("newEncrypted"),
+        _ => None,
+    }
+}
+
+/// Enables or disables Vault → Lock Vault (the page calls this as an
+/// encrypted vault opens and closes).
+#[tauri::command]
+pub fn menu_set_lock_enabled<R: Runtime>(app: AppHandle<R>, enabled: bool) {
+    fn find<R: Runtime>(items: Vec<MenuItemKind<R>>) -> Option<MenuItem<R>> {
+        items.into_iter().find_map(|i| match i {
+            MenuItemKind::MenuItem(m) if m.id() == VAULT_LOCK_ID => Some(m),
+            MenuItemKind::Submenu(s) => find(s.items().ok()?),
+            _ => None,
+        })
+    }
+    if let Some(item) = app.menu().and_then(|m| find(m.items().ok()?)) {
+        let _ = item.set_enabled(enabled);
+    }
+}
 /// File → Save (M5b §6, auto save off): the focused window saves its page.
 pub const SAVE_ID: &str = "liber-save";
 pub const SAVE_EVENT: &str = "menu:save";
@@ -208,7 +241,32 @@ pub fn app_menu<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
         true,
         Some("Alt+CmdOrCtrl+W"),
     )?;
-    let vault = Submenu::with_items(app, "Vault", true, &[&vault_open, &vault_close])?;
+    let vault_lock = MenuItem::with_id(
+        app,
+        VAULT_LOCK_ID,
+        "Lock Vault",
+        false,
+        Some(VAULT_LOCK_ACCELERATOR),
+    )?;
+    let vault_new_encrypted = MenuItem::with_id(
+        app,
+        VAULT_NEW_ENCRYPTED_ID,
+        "New Encrypted Vault…",
+        true,
+        None::<&str>,
+    )?;
+    let vault = Submenu::with_items(
+        app,
+        "Vault",
+        true,
+        &[
+            &vault_open,
+            &vault_new_encrypted,
+            &PredefinedMenuItem::separator(app)?,
+            &vault_lock,
+            &vault_close,
+        ],
+    )?;
     let edit = Submenu::with_items(
         app,
         "Edit",
@@ -344,8 +402,7 @@ pub fn on_menu_event<R: Runtime>(app: &AppHandle<R>, event: MenuEvent) {
         emit_focused(app, SETTINGS_EVENT, ());
     } else if id == SAVE_ID {
         emit_focused(app, SAVE_EVENT, ());
-    } else if id == VAULT_OPEN_ID || id == VAULT_CLOSE_ID {
-        let what = if id == VAULT_OPEN_ID { "open" } else { "close" };
+    } else if let Some(what) = vault_action(id) {
         emit_main(app, VAULT_EVENT, what);
     } else if id == SIDEBAR_ID {
         emit_main(app, SIDEBAR_EVENT, ());
@@ -455,5 +512,19 @@ mod tests {
             quick_note_label(Some(&emoji)),
             format!("Create New Scratchpad for {}👩‍💻…", "a".repeat(38))
         );
+    }
+}
+
+#[cfg(test)]
+mod lock_tests {
+    use super::*;
+
+    #[test]
+    fn vault_menu_items_emit_their_action() {
+        assert_eq!(vault_action(VAULT_LOCK_ID), Some("lock"));
+        assert_eq!(vault_action(VAULT_NEW_ENCRYPTED_ID), Some("newEncrypted"));
+        assert_eq!(vault_action(VAULT_OPEN_ID), Some("open"));
+        assert_eq!(vault_action(VAULT_CLOSE_ID), Some("close"));
+        assert_eq!(vault_action("liber-quit"), None);
     }
 }
