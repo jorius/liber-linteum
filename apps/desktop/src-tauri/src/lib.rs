@@ -18,6 +18,7 @@ pub mod fonts;
 pub mod gv_commands;
 pub mod icon_commands;
 pub mod legacy_dirs;
+pub mod lock_signals;
 pub mod menu;
 pub mod navigation;
 pub mod notion_commands;
@@ -287,6 +288,7 @@ pub fn run() {
             // Files named on the command line that started the app.
             tauri::RunEvent::Ready => {
                 quit_guard::install(app);
+                lock_signals::start(app.clone());
                 let args: Vec<std::ffi::OsString> = std::env::args_os().skip(1).collect();
                 let cwd = std::env::current_dir().unwrap_or_default();
                 opening::open_later(app, opening::paths_from_args(&args, &cwd));

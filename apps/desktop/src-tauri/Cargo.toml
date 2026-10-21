@@ -41,6 +41,10 @@ objc2 = "0.6.5"
 [target.'cfg(not(target_os = "macos"))'.dependencies]
 tauri-plugin-single-instance.workspace = true
 
+# E3 T7: lock detection polls the input desktop (a locked session has none).
+[target.'cfg(windows)'.dependencies]
+windows-sys = { version = "0.60.2", features = ["Win32_System_StationsAndDesktops"] }
+
 [features]
 # Tiny Argon2 parameters for test vaults (never in a release build): vaults
 # below the floor, and the floor itself for new passphrase slots.
