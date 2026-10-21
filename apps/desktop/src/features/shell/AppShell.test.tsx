@@ -3,7 +3,7 @@ import { EditorView } from '@codemirror/view';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import axe from 'axe-core';
-import { afterEach, beforeAll, describe, expect, it } from 'vitest';
+import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import type { TreeNode } from '../../ipc';
 import { clearMocks, mockIPC } from '../../ipc/testing';
 import { fakeDisk } from '../../test/fakeDisk';
@@ -233,9 +233,16 @@ describe('AppShell', () => {
       within(menu)
         .getAllByRole('menuitem')
         .map((m) => m.textContent),
-    ).toEqual(['Settings…', 'Open another vault…', 'Encrypt “Digital Brain”…', 'Close vault']);
-    expect(within(menu).getByRole('menuitem', { name: 'Settings…' })).toHaveFocus();
-    await userEvent.keyboard('{Enter}');
+    ).toEqual([
+      'New vault…',
+      'Open another vault…',
+      'Create new scratchpad for “Digital Brain”',
+      'Encrypt “Digital Brain”…',
+      'Settings…',
+      'Close vault',
+    ]);
+    expect(within(menu).getByRole('menuitem', { name: 'New vault…' })).toHaveFocus();
+    await userEvent.keyboard('{End}{ArrowUp}{Enter}');
     expect(useUiStore.getState().dialog).toEqual({ type: 'settings' });
     act(() => useUiStore.getState().closeDialog());
     await userEvent.click(vault);
@@ -259,7 +266,34 @@ describe('AppShell', () => {
       within(menu)
         .getAllByRole('menuitem')
         .map((m) => m.textContent),
-    ).toEqual(['Settings…', 'Open another vault…', 'Close vault']);
+    ).toEqual([
+      'New vault…',
+      'Open another vault…',
+      'Create new scratchpad for “Digital Brain”',
+      'Lock vault',
+      'Settings…',
+      'Close vault',
+    ]);
+    const lock = vi.spyOn(useVaultStore.getState(), 'lock').mockResolvedValue(true);
+    await userEvent.click(within(menu).getByRole('menuitem', { name: 'Lock vault' }));
+    expect(lock).toHaveBeenCalledWith('menu');
+    lock.mockRestore();
+  });
+
+  it('Windows and Linux have no app menu: the vault menu makes a scratchpad note', async () => {
+    const calls = backend({});
+    seed();
+    render(<AppShell />);
+    await userEvent.click(screen.getByRole('button', { name: 'Digital Brain' }));
+    await userEvent.click(
+      screen.getByRole('menuitem', { name: 'Create new scratchpad for “Digital Brain”' }),
+    );
+    await waitFor(() =>
+      expect(
+        calls.some(([c]) => c === 'quick_note_create') ||
+          useUiStore.getState().dialog?.type === 'scratchpadSetup',
+      ).toBe(true),
+    );
   });
 
   it('UX round §4.1: Encrypt “<name>”… starts encrypting the open plain vault', async () => {

@@ -2,16 +2,20 @@ import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
 import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import { useVaultStore } from '../../stores/vaultStore';
+import { openNewVault } from '../encryption/CreateEncryptedHost';
+import { newQuickNote } from '../scratchpad/quickNote';
 import { closeVault, encryptThisVault, openAnotherVault, openSettings } from './shellMenu';
 import styles from './Shell.module.css';
 
-/** The vault's name in the sidebar, as a menu button (M5b §11.1): Settings…,
- *  Open another vault…, Encrypt "<name>"… (a plain vault, UX round §4.1),
- *  Close vault — on every platform, where macOS also has them in its app menu. */
+/** The vault's name in the sidebar, as a menu button (M5b §11.1). Windows and
+ *  Linux have no app menu bar, so every vault action lives here too: New vault…,
+ *  Open another vault…, a new scratchpad note, Encrypt "<name>"… (a plain
+ *  vault) or Lock vault (an encrypted one), Settings…, Close vault. */
 export function VaultMenu({ name }: { name: string }) {
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const plain = useVaultStore((s) => !!s.info && !s.info.encrypted && !s.info.scratchpad);
+  const encrypted = useVaultStore((s) => !!s.info?.encrypted);
   const button = useRef<HTMLButtonElement>(null);
   const close = (refocus: boolean) => {
     setOpen(false);
@@ -41,11 +45,21 @@ export function VaultMenu({ name }: { name: string }) {
           anchor={button.current}
           label={name}
           items={[
-            [t('shell.settingsItem'), openSettings],
+            [t('shell.newVault'), () => void openNewVault()],
             [t('shell.openAnother'), openAnotherVault],
+            [t('shell.newScratchpad', { name }), () => void newQuickNote()],
             ...(plain
               ? [[t('shell.encryptVault', { name }), encryptThisVault] as [string, () => void]]
               : []),
+            ...(encrypted
+              ? [
+                  [t('shell.lockVault'), () => void useVaultStore.getState().lock('menu')] as [
+                    string,
+                    () => void,
+                  ],
+                ]
+              : []),
+            [t('shell.settingsItem'), openSettings],
             [t('shell.closeVault'), closeVault],
           ]}
           onClose={close}

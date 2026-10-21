@@ -142,7 +142,10 @@
     "showSidebar": "Show sidebar",
     "settingsItem": "Settings…",
     "openAnother": "Open another vault…",
-    "encryptVault": "Encrypt “{name}”…"
+    "encryptVault": "Encrypt “{name}”…",
+    "newVault": "New vault…",
+    "newScratchpad": "Create new scratchpad for “{name}”",
+    "lockVault": "Lock vault"
   },
   "page": {
     "region": "Page",
