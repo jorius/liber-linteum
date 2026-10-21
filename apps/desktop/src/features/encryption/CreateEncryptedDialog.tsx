@@ -6,7 +6,7 @@ import { useVaultStore } from '../../stores/vaultStore';
 import { Dialog } from '../dialogs/Dialog';
 import dialogs from '../dialogs/Dialogs.module.css';
 import { PassphraseFields } from './PassphraseFields';
-import { RecoveryCodeStep } from './RecoveryCodeStep';
+import { afterCode, RecoveryCodeStep } from './RecoveryCodeStep';
 import styles from './Encryption.module.css';
 import { strength } from './strength';
 
@@ -23,7 +23,7 @@ export function CreateEncryptedDialog({ path, onClose }: { path: string; onClose
   const [creating, setCreating] = useState(false);
   const [code, setCode] = useState<string | null>(null);
 
-  useEffect(() => () => useUiStore.getState().holdCreate(false), []);
+  useEffect(() => () => useUiStore.getState().hold(false), []);
 
   const valid = strength(pass) !== 'tooShort' && pass === confirm;
 
@@ -32,7 +32,7 @@ export function CreateEncryptedDialog({ path, onClose }: { path: string; onClose
     if (!valid || creating) return;
     setError(null);
     setCreating(true);
-    useUiStore.getState().holdCreate(true);
+    useUiStore.getState().hold(true);
     const res = await useVaultStore.getState().createEncrypted(path, pass);
     setCreating(false);
     // Neither outcome keeps the passphrase.
@@ -41,7 +41,7 @@ export function CreateEncryptedDialog({ path, onClose }: { path: string; onClose
     if (res.ok) {
       setCode(res.value.recovery);
     } else {
-      useUiStore.getState().holdCreate(false);
+      useUiStore.getState().hold(false);
       setError(errorMessage(res.error));
       // The form mounts again: the keyboard returns to the first field.
       setTimeout(() =>
@@ -52,7 +52,7 @@ export function CreateEncryptedDialog({ path, onClose }: { path: string; onClose
 
   const title = code ? t('encryption.recoveryTitle') : t('encryption.createTitle');
   return (
-    <Dialog title={title} onClose={() => !code && !creating && onClose()}>
+    <Dialog title={title} onClose={() => !code && !creating && onClose()} returnFocus={afterCode}>
       <span className={styles.beta}>{t('encryption.beta')}</span>
       {code ? (
         <RecoveryCodeStep

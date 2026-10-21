@@ -1,7 +1,8 @@
 // @vitest-environment jsdom
 import { render, screen, waitFor } from '@testing-library/react';
 import { createElement } from 'react';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { useBinStore } from '../features/bin/binStore';
 import { App } from '../app/App';
 import { clearMocks, mockIPC } from '../ipc/testing';
 import { useEditorStore } from './editorStore';
@@ -9,6 +10,10 @@ import { usePageStore } from './pageStore';
 import { DEFAULT_SETTINGS, useSettingsStore } from './settingsStore';
 import { useSpellStore } from './spellStore';
 import { useToastStore } from './toastStore';
+import { useUiStore } from './uiStore';
+import { onLeaveVault } from './leaveVault';
+
+const toast = () => useToastStore.getState();
 import { resetVaultStore, useVaultStore } from './vaultStore';
 
 type Handler = (args: Record<string, unknown>) => unknown;
@@ -132,6 +137,11 @@ describe('vaultStore — encrypted vaults (E4)', () => {
       },
     });
     usePageStore.setState({ path: 'a.md' });
+    useUiStore.getState().openDialog({ type: 'relations', page: 'a.md' });
+    toast().push({ message: 'Opened with 1 warning', detail: ['a.md: x'] });
+    useBinStore.setState({ archive: [{ path: '.archive/b.md', from: 'b.md' } as never] });
+    const clear = vi.fn();
+    onLeaveVault(clear);
     expect(await useVaultStore.getState().lock('menu')).toBe(true);
     expect(order).toEqual(['saveAll', 'vaultLock']);
     expect(log).toContain('vault_lock');
@@ -140,6 +150,32 @@ describe('vaultStore — encrypted vaults (E4)', () => {
     expect(s.lockedPath).toBe('/v');
     expect(s.info).toBeNull();
     expect(usePageStore.getState().path).toBeNull();
+    expect(useUiStore.getState().dialog).toBeNull();
+    expect(toast().toasts).toEqual([]);
+    expect(useBinStore.getState().archive).toEqual([]);
+    expect(clear).toHaveBeenCalledTimes(1);
+  });
+
+  it('a lock keeps a recovery code still to be confirmed', async () => {
+    await openEncrypted();
+    useUiStore.getState().openDialog({ type: 'newRecovery' });
+    useUiStore.getState().hold(true);
+    expect(await useVaultStore.getState().lock('idle')).toBe(true);
+    expect(useUiStore.getState().dialog).toEqual({ type: 'newRecovery' });
+    useUiStore.getState().closeDialog();
+  });
+
+  it('createEncrypted shows a thrown error, not "busy"', async () => {
+    backend({});
+    useEditorStore.setState({
+      saveAll: async () => {
+        throw new Error('disk full');
+      },
+    });
+    useVaultStore.setState({ status: 'open', info: info as never });
+    const res = await useVaultStore.getState().createEncrypted('/n', 'x'.repeat(12));
+    expect(res).toEqual({ ok: false, error: { kind: 'io', message: 'disk full' } });
+    expect(useVaultStore.getState().creating).toBe(false);
   });
 
   it('lock_aborts_when_a_save_fails', async () => {
@@ -150,7 +186,7 @@ describe('vaultStore — encrypted vaults (E4)', () => {
     expect(useVaultStore.getState().status).toBe('open');
   });
 
-  it('a non-unlock open from the locked status toasts its error and leaves locked', async () => {
+  it('a non-unlock open from the locked status toasts its error and closes', async () => {
     backend({
       vault_open: () => {
         throw { kind: 'io', message: 'disk' };

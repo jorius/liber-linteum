@@ -48,8 +48,13 @@ export function StarIcon({
 
 const COLLAPSED = 'liber.favoritesCollapsed:';
 
-function readCollapsed(root: string): boolean {
+function readCollapsed(root: string, encrypted: boolean): boolean {
   try {
+    // An encrypted vault's path is never kept: a key left from when it was plain goes.
+    if (encrypted) {
+      localStorage.removeItem(COLLAPSED + root);
+      return false;
+    }
     return localStorage.getItem(COLLAPSED + root) === '1';
   } catch {
     return false;
@@ -87,7 +92,7 @@ export function FavoritesSection({ onRequestMenu }: { onRequestMenu?: MenuOpener
   const paths = useFavoritesStore((s) => s.paths);
   const shown = shownFavorites(paths, nodes);
   const [collapsedFor, setCollapsedFor] = useState<Record<string, boolean>>({});
-  const collapsed = collapsedFor[root] ?? readCollapsed(root);
+  const collapsed = collapsedFor[root] ?? readCollapsed(root, encrypted);
   const rows = useRef(new Map<string, HTMLLIElement>());
   const drag = useRef<{ path: string; y: number; moved: boolean } | null>(null);
   const [dropBefore, setDropBefore] = useState<string | null | undefined>(undefined);

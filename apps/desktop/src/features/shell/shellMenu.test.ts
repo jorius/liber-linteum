@@ -41,11 +41,32 @@ beforeEach(() => {
 afterEach(() => clearMocks());
 
 describe('M5b §2.1, §2.5: the app menu items the page answers', () => {
-  it('Settings… opens the Settings dialog (menu:settings)', async () => {
+  it('Settings… opens the Settings dialog (menu:settings), over Search too', async () => {
+    useVaultStore.setState({ status: 'open' });
+    useUiStore.getState().openDialog({ type: 'search' });
     const stop = await installShellMenu({ main: true });
     await emit('menu:settings', null);
     await vi.waitFor(() => expect(useUiStore.getState().dialog).toEqual({ type: 'settings' }));
     stop();
+    useVaultStore.setState({ status: 'closed' });
+  });
+
+  it('Settings… does nothing on Welcome or Unlock, where it isn’t shown', async () => {
+    const stop = await installShellMenu({ main: true });
+    for (const status of ['closed', 'locked'] as const) {
+      useVaultStore.setState({ status });
+      openSettings();
+      await emit('menu:settings', null);
+      expect(useUiStore.getState().dialog).toBeNull();
+    }
+    stop();
+    useVaultStore.setState({ status: 'closed' });
+  });
+
+  it('New Encrypted Vault takes the place of a non-sticky dialog', async () => {
+    useUiStore.getState().openDialog({ type: 'search' });
+    await newEncryptedVault();
+    expect(useUiStore.getState().dialog).toEqual({ type: 'createEncrypted', path: '/v/new' });
   });
 
   it('Vault → Close Vault closes the vault; Open Vault… asks for a folder', async () => {
@@ -126,9 +147,12 @@ describe('E4 Task 4 review', () => {
     expect(useUiStore.getState().dialog).toBeNull();
   });
 
-  it('Settings never replaces an open dialog', () => {
-    useUiStore.setState({ dialog: { type: 'createEncrypted', path: '/v/new' } });
+  it('Settings never replaces a create dialog holding its code', () => {
+    useVaultStore.setState({ status: 'open' });
+    useUiStore.setState({ dialog: { type: 'createEncrypted', path: '/v/new' }, held: true });
     openSettings();
     expect(useUiStore.getState().dialog).toEqual({ type: 'createEncrypted', path: '/v/new' });
+    useUiStore.getState().closeDialog();
+    useVaultStore.setState({ status: 'closed' });
   });
 });

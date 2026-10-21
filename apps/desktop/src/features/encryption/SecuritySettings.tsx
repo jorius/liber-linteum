@@ -1,15 +1,16 @@
-import { useId, useRef, useState, type FormEvent } from 'react';
+import { useEffect, useId, useRef, useState, type FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { securityChangePassphrase, securityNewRecovery, type CommandError } from '../../ipc';
 import { errorMessage } from '../../stores/messages';
 import { useSettingsStore } from '../../stores/settingsStore';
 import { useToastStore } from '../../stores/toastStore';
+import { useUiStore } from '../../stores/uiStore';
 import { useVaultStore } from '../../stores/vaultStore';
 import { Dialog } from '../dialogs/Dialog';
 import dialogs from '../dialogs/Dialogs.module.css';
 import styles from './Encryption.module.css';
 import { PassphraseFields } from './PassphraseFields';
-import { RecoveryCodeStep } from './RecoveryCodeStep';
+import { afterCode, RecoveryCodeStep } from './RecoveryCodeStep';
 import { strength } from './strength';
 
 const MINUTES = [1, 5, 15, 30, 60];
@@ -24,13 +25,14 @@ function problem(t: (k: string) => string, error: CommandError): string {
 /** A new recovery key (E4): asks for the passphrase, then shows the code and
  *  checks it was written down. Neither secret outlives its step: the
  *  passphrase is cleared when the call returns, the code goes with the dialog.
- *  Nothing dismisses it once the code is on screen (`!code && onClose()`). */
+ *  From the moment the key is being replaced it holds the screen (uiStore
+ *  `held`): nothing dismisses or replaces it, and a lock leaves it up. */
 export function NewRecoveryDialog({
   onClose,
   onDone,
 }: {
   onClose: () => void;
-  onDone?: () => void;
+  onDone: () => void;
 }) {
   const { t } = useTranslation();
   const errorId = useId();
@@ -40,30 +42,39 @@ export function NewRecoveryDialog({
   const [code, setCode] = useState<string | null>(null);
   const input = useRef<HTMLInputElement>(null);
 
+  useEffect(() => () => useUiStore.getState().hold(false), []);
+
   const submit = async (e: FormEvent) => {
     e.preventDefault();
     if (pass === '' || busy) return;
     setError(null);
     setBusy(true);
+    // The old key stops working during this call: from now on the new one must reach the screen.
+    useUiStore.getState().hold(true);
     const res = await securityNewRecovery(pass);
     setBusy(false);
     setPass('');
     if (res.ok) setCode(res.value);
     else {
+      useUiStore.getState().hold(false);
       setError(problem(t, res.error));
       input.current?.focus();
     }
   };
 
   return (
-    <Dialog title={t('encryption.security.newRecoveryTitle')} onClose={() => !code && onClose()}>
+    <Dialog
+      title={t('encryption.security.newRecoveryTitle')}
+      onClose={() => !code && !busy && onClose()}
+      returnFocus={afterCode}
+    >
       <span className={styles.beta}>{t('encryption.beta')}</span>
       {code ? (
         <RecoveryCodeStep
           code={code}
           onDone={() => {
             setCode(null);
-            (onDone ?? onClose)();
+            onDone();
           }}
         />
       ) : (
@@ -90,7 +101,7 @@ export function NewRecoveryDialog({
             </p>
           )}
           <div className={dialogs.buttons}>
-            <button type="button" className="btn btn-secondary" onClick={onClose}>
+            <button type="button" className="btn btn-secondary" disabled={busy} onClick={onClose}>
               {t('dialogs.cancel')}
             </button>
             <button type="submit" className="btn btn-primary" disabled={pass === '' || busy}>
@@ -184,7 +195,6 @@ export function SecuritySettings() {
   const minutes = useSettingsStore((s) => s.settings.autoLockMinutes);
   const update = useSettingsStore((s) => s.update);
   const encrypted = useVaultStore((s) => s.info?.encrypted === true);
-  const [recovery, setRecovery] = useState(false);
   const choices = MINUTES.includes(minutes ?? 15)
     ? MINUTES
     : [...MINUTES, minutes!].sort((a, b) => a - b);
@@ -217,17 +227,16 @@ export function SecuritySettings() {
             <p className={dialogs.sectionTitle}>{t('encryption.security.newRecoveryTitle')}</p>
             <p className={dialogs.hint}>{t('encryption.security.newRecoveryHint')}</p>
             <div>
-              <button type="button" className="btn btn-secondary" onClick={() => setRecovery(true)}>
+              <button
+                type="button"
+                className="btn btn-secondary"
+                // In place of Settings, hosted by the app: the code outlives Settings and a lock.
+                onClick={() => useUiStore.getState().openDialog({ type: 'newRecovery' })}
+              >
                 {t('encryption.security.newRecoveryButton')}
               </button>
             </div>
           </div>
-          {recovery && (
-            // Its keys are its own: Escape must not also close Settings.
-            <div onKeyDown={(e) => e.stopPropagation()}>
-              <NewRecoveryDialog onClose={() => setRecovery(false)} />
-            </div>
-          )}
         </>
       ) : (
         <p className={dialogs.hint}>{t('encryption.security.noVault')}</p>

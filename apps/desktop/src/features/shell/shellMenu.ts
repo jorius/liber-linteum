@@ -15,10 +15,14 @@ import { useSettingsStore } from '../../stores/settingsStore';
 import { useUiStore } from '../../stores/uiStore';
 import { useVaultStore } from '../../stores/vaultStore';
 
+/** Settings shows in the shell: on Welcome or Unlock it would be an unseen
+ *  dialog that refuses the next one. A sticky dialog refuses it itself. */
 export const openSettings = () => {
-  // Another dialog keeps the screen (the recovery key must be confirmed first).
-  if (!useUiStore.getState().dialog) useUiStore.getState().openDialog({ type: 'settings' });
+  if (useVaultStore.getState().status === 'open') openSettingsHere();
 };
+
+/** A file window: Settings always shows. */
+const openSettingsHere = () => void useUiStore.getState().openDialog({ type: 'settings' });
 
 /** Another vault, through the folder dialog (as ⌘O). */
 export const openAnotherVault = () =>
@@ -61,7 +65,7 @@ export const saveNow = () => void useEditorStore.getState().doc?.flush();
  *  on the main one (file windows have neither). Returns the unsubscribe. */
 export async function installShellMenu({ main }: { main: boolean }): Promise<() => void> {
   const stops = await Promise.all([
-    onMenuSettings(openSettings),
+    onMenuSettings(main ? openSettings : openSettingsHere),
     onMenuSave(saveNow),
     ...(main
       ? [

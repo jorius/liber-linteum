@@ -8,6 +8,7 @@ import i18n from 'i18next';
 import type { Node, Parent } from 'mdast';
 import { spellCheck } from '../../ipc';
 import type { ParsedPage, WikiLink } from '../../markdown/types';
+import { onLeaveVault } from '../../stores/leaveVault';
 import { useSpellStore } from '../../stores/spellStore';
 import { parsedFor } from './pageModel';
 
@@ -75,6 +76,7 @@ const cache = new Map<string, boolean>();
 export function clearSpellCache(): void {
   cache.clear();
 }
+onLeaveVault(clearSpellCache);
 
 const setMisspelled = StateEffect.define<DecorationSet>();
 const mark = Decoration.mark({ class: 'cm-liber-misspelled' });

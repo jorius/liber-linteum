@@ -34,6 +34,7 @@
     "working": "Unlocking… (this takes a second on purpose)",
     "wrongPassphrase": "That passphrase doesn't open this vault.",
     "wrongRecovery": "That recovery key doesn't open this vault.",
+    "maybeDamaged": "If you're sure it's right, this vault's key file may be damaged.",
     "rollback": "This vault's key file is older than one this computer has already seen. It may have been restored from a backup or replaced. It wasn't opened.",
     "badRecovery": "That doesn't look like a recovery key.",
     "resetLink": "Reset this computer's rollback memory…",
@@ -1103,6 +1104,7 @@
     "group": "Group {n}",
     "back": "Back",
     "done": "Done",
+    "doneHint": "Done turns on once both groups match your key.",
     "security": {
       "autoLock": "Lock after inactivity",
       "never": "Never",
@@ -1118,7 +1120,7 @@
       "newRecoveryHint": "Your old recovery key stops working.",
       "newRecoveryButton": "New recovery key…",
       "newRecoveryBody": "Enter your current passphrase to make a new recovery key. Your old recovery key stops working.",
-      "conflict": "Another device changed this vault's keys at the same time. Try again.",
+      "conflict": "Another device changed this vault's keys. Lock the vault and unlock it again, then try.",
       "voidTitle": "Recovery key replaced",
       "voidBody": "Your recovery key for this vault was replaced on another device and no longer works. Make a new one now.",
       "voidAction": "Make a new recovery key"

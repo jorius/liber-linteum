@@ -48,7 +48,12 @@ afterEach(async () => {
 
 const openSecurity = async (encrypted: boolean) => {
   useVaultStore.setState({ info: encrypted ? (info as never) : null, status: 'open' });
-  render(<SettingsDialog onClose={() => undefined} />);
+  render(
+    <>
+      <SettingsDialog onClose={() => undefined} />
+      <CreateEncryptedHost />
+    </>,
+  );
   await userEvent.click(
     within(screen.getByRole('navigation', { name: 'Settings categories' })).getByRole('button', {
       name: /Security/,
@@ -130,10 +135,13 @@ describe('Settings → Security', () => {
     await openSecurity(true);
     expect(screen.getByText('Your old recovery key stops working.')).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'New recovery key…' }));
+    // The app hosts it, so closing Settings can't take the code with it.
+    expect(useUiStore.getState().dialog).toEqual({ type: 'newRecovery' });
     const dialog = screen.getByRole('dialog', { name: 'New recovery key' });
     await userEvent.type(within(dialog).getByLabelText('Current passphrase'), OLD);
     await userEvent.click(within(dialog).getByRole('button', { name: 'Continue' }));
     expect(await screen.findByTestId('recovery-code')).toHaveTextContent(CODE);
+    expect(useUiStore.getState().held).toBe(true);
     expect(calls.find(([c]) => c === 'security_new_recovery')?.[1]).toEqual({ passphrase: OLD });
     await userEvent.click(screen.getByRole('button', { name: "I've saved it" }));
     expect(screen.getAllByLabelText(/^Group \d+$/)).toHaveLength(2);
@@ -147,7 +155,7 @@ describe('Settings → Security', () => {
     await userEvent.type(within(dialog).getByLabelText('Current passphrase'), OLD);
     await userEvent.click(within(dialog).getByRole('button', { name: 'Continue' }));
     expect(await within(dialog).findByRole('alert')).toHaveTextContent(
-      "Another device changed this vault's keys at the same time. Try again.",
+      "Another device changed this vault's keys. Lock the vault and unlock it again, then try.",
     );
   });
 });
@@ -189,6 +197,7 @@ describe('a refused dialog', () => {
     const { useEditorStore } = await import('../../stores/editorStore');
     useSettingsStore.setState({ settings: { ...DEFAULT_SETTINGS, autoSave: false } });
     vi.spyOn(useEditorStore.getState(), 'askPaths').mockReturnValue(['a.md']);
+    useVaultStore.setState({ status: 'open' });
     useUiStore.getState().openDialog({ type: 'recoveryVoid' });
     // Settings from the native menu leaves the prompt in place.
     const { openSettings } = await import('../shell/shellMenu');

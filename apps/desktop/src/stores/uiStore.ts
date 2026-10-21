@@ -29,6 +29,10 @@ export type DialogState =
   | { type: 'createEncrypted'; path: string }
   /** The vault's recovery key was replaced on another device (E4). */
   | { type: 'recoveryVoid' }
+  /** Settings → Security → New recovery key (E4), hosted by the app so the
+   *  code outlives Settings, lock and Close; `fromVoid`: in place of the
+   *  voided-key prompt, which its Cancel goes back to. */
+  | { type: 'newRecovery'; fromVoid?: boolean }
   /** Save / Don't Save / Cancel before unsaved text is left (M5b §6, auto
    *  save off). `id` tells two questions apart. */
   | { type: 'unsaved'; id: number; paths: string[]; answer: (c: UnsavedChoice) => void }
@@ -60,10 +64,17 @@ interface UiState {
    *  answer treat a refusal as Cancel. */
   openDialog: (d: Exclude<DialogState, null>) => boolean;
   closeDialog: () => void;
-  /** The create dialog holds the screen while it makes the vault and shows
-   *  the recovery code. */
+  /** The create or new-recovery dialog holds the screen while it makes a
+   *  recovery code and shows it. */
   held: boolean;
-  holdCreate: (held: boolean) => void;
+  hold: (held: boolean) => void;
+}
+
+/** The voided-key prompt (or the new key made in its place), and a dialog
+ *  holding a recovery code: nothing replaces them. */
+function isSticky(d: DialogState, held: boolean): boolean {
+  if (d?.type === 'recoveryVoid' || (d?.type === 'newRecovery' && d.fromVoid)) return true;
+  return held && (d?.type === 'createEncrypted' || d?.type === 'newRecovery');
 }
 
 export const useUiStore = create<UiState>((set, get) => ({
@@ -74,12 +85,11 @@ export const useUiStore = create<UiState>((set, get) => ({
   setActionsOpen: (actionsOpen) => set({ actionsOpen }),
   openDialog: (dialog) => {
     const { dialog: now, held } = get();
-    // Sticky: the voided-key prompt, and the create dialog once it holds a code.
-    if (now?.type === 'recoveryVoid' || (now?.type === 'createEncrypted' && held)) return false;
+    if (isSticky(now, held)) return false;
     set({ dialog });
     return true;
   },
   closeDialog: () => set({ dialog: null, held: false }),
   held: false,
-  holdCreate: (held) => set({ held }),
+  hold: (held) => set({ held }),
 }));

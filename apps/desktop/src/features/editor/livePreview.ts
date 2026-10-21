@@ -24,6 +24,7 @@ import { parsePage } from '../../markdown/parse';
 import { toSafeHast, vaultJoin } from '../../markdown/sanitize';
 import type { Embed, ParsedPage, WikiLink } from '../../markdown/types';
 import { rangeOf } from '../../markdown/walk';
+import { onLeaveVault } from '../../stores/leaveVault';
 import { followLink, followOutside as followOutsideFile } from '../../stores/links';
 import {
   BulletWidget,
@@ -91,6 +92,7 @@ const IMAGE_FILE = /\.(?:png|jpe?g|gif|webp|svg|avif|bmp)$/i;
  *  such blocks keep their source, muted, so nothing silently disappears
  *  (M2c §7.7). Memoized by source text. */
 const emptyHtml = new Map<string, boolean>();
+onLeaveVault(() => emptyHtml.clear());
 function rendersEmpty(source: string): boolean {
   let empty = emptyHtml.get(source);
   if (empty === undefined) {

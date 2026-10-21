@@ -37,7 +37,9 @@ test('a wrong passphrase, then the right one, opens the shell', async ({ page })
   await page.getByRole('button', { name: /^enc Encrypted/ }).click();
   await page.getByLabel('Passphrase').fill('not the passphrase');
   await page.getByRole('button', { name: 'Unlock', exact: true }).click();
-  await expect(page.getByRole('alert')).toHaveText("That passphrase doesn't open this vault.");
+  await expect(page.getByRole('alert')).toHaveText(
+    "That passphrase doesn't open this vault. If you're sure it's right, this vault's key file may be damaged.",
+  );
   await page.getByLabel('Passphrase').fill(PASSPHRASE);
   await page.getByLabel('Passphrase').press('Enter');
   await expect(page.getByTestId('unlock-screen')).toHaveCount(0);
@@ -166,6 +168,8 @@ test('Welcome: encrypt switch, passphrase, recovery code, two groups, shell open
   await axeClean(page);
   await page.getByLabel('Passphrase', { exact: true }).fill(PASSPHRASE);
   await page.getByLabel('Confirm passphrase').fill(PASSPHRASE + 'x');
+  await expect(dialog.getByRole('alert')).toHaveCount(0); // said on leaving the field
+  await page.getByLabel('Confirm passphrase').press('Tab');
   await expect(dialog.getByRole('alert')).toHaveText("The passphrases don't match.");
   await expect(dialog.getByRole('button', { name: 'Continue' })).toBeDisabled();
   await page.getByLabel('Confirm passphrase').fill(PASSPHRASE);
@@ -249,6 +253,60 @@ test('a voided recovery key blocks the shell until a new one is made', async ({ 
   await page.getByRole('button', { name: 'Continue' }).click();
   await expect(page.getByTestId('recovery-code')).toBeVisible();
   await axeClean(page);
+});
+
+const lockRequest = (page: import('@playwright/test').Page, reason: string) =>
+  page.evaluate(
+    (r) =>
+      (window as unknown as { __liberEmit: (e: string, p: unknown) => void }).__liberEmit(
+        'vault:lock-request',
+        { reason: r },
+      ),
+    reason,
+  );
+
+test('a lock takes the voided-key prompt down; Unlock works and brings it back', async ({
+  page,
+}) => {
+  await setup(page, {}, { ...encrypted, recoveryVoid: true });
+  await unlock(page).catch(() => undefined);
+  await expect(page.getByRole('alertdialog')).toBeVisible();
+  await lockRequest(page, 'idle');
+  await expect(page.getByTestId('unlock-screen')).toBeVisible();
+  await expect(page.getByRole('alertdialog')).toHaveCount(0);
+  await page.getByLabel('Passphrase').fill(PASSPHRASE);
+  await page.getByLabel('Passphrase').press('Enter');
+  await expect(page.getByRole('alertdialog')).toContainText('replaced on another device');
+});
+
+test('Settings → New recovery key: the code outlives a lock, then Done leaves Unlock', async ({
+  page,
+}) => {
+  await setup(page);
+  await unlock(page);
+  const settings = await openSecurity(page);
+  await settings.getByRole('button', { name: 'New recovery key…' }).click();
+  const dialog = page.getByRole('dialog', { name: 'New recovery key' });
+  await expect(page.getByRole('dialog', { name: 'Settings' })).toHaveCount(0);
+  await dialog.getByLabel('Current passphrase').fill(PASSPHRASE);
+  await dialog.getByRole('button', { name: 'Continue' }).click();
+  const box = page.getByTestId('recovery-code');
+  const groups = ((await box.textContent()) ?? '').split('-').slice(1);
+  await lockRequest(page, 'sleep');
+  await expect(page.getByTestId('unlock-screen')).toBeVisible();
+  await expect(box).toBeVisible();
+  await dialog.getByRole('button', { name: "I've saved it" }).click();
+  const rows = dialog.locator('label', { hasText: /^Group \d+$/ });
+  for (let i = 0; i < 2; i++) {
+    const n = Number(((await rows.nth(i).textContent()) ?? '').replace(/\D/g, ''));
+    await rows
+      .nth(i)
+      .locator('input')
+      .fill(groups[n - 1]);
+  }
+  await dialog.getByRole('button', { name: 'Done' }).click();
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  await expect(page.getByLabel('Passphrase')).toBeFocused();
 });
 
 test("This vault lists what couldn't be read, with a reveal button", async ({ page }) => {

@@ -10,6 +10,13 @@ export const groupsOf = (code: string) => code.split('-').slice(1);
 const norm = (s: string) =>
   s.replace(/[\s-]/g, '').toUpperCase().replace(/O/g, '0').replace(/[IL]/g, '1');
 
+/** Where the keyboard goes once a code dialog closes and what had it is
+ *  gone: the Unlock field after a lock, else the editor, else the explorer. */
+export const afterCode = () =>
+  document.querySelector<HTMLElement>('[data-testid="unlock-screen"] input') ??
+  document.querySelector<HTMLElement>('.cm-content') ??
+  document.querySelector<HTMLElement>('[role="tree"] [role="treeitem"][tabindex="0"]');
+
 /** Two distinct group numbers, ascending. */
 function pickTwo(count: number): [number, number] {
   const a = 1 + Math.floor(Math.random() * count);
@@ -74,6 +81,7 @@ export function RecoveryCodeStep({ code, onDone }: { code: string; onDone: () =>
             autoComplete="off"
             spellCheck={false}
             autoFocus={i === 0}
+            aria-describedby={`${id}-why`}
             value={typed[i]}
             onChange={(e) =>
               setTyped((v) => (i === 0 ? [e.target.value, v[1]] : [v[0], e.target.value]))
@@ -81,6 +89,9 @@ export function RecoveryCodeStep({ code, onDone }: { code: string; onDone: () =>
           />
         </label>
       ))}
+      <p id={`${id}-why`} className={styles.hint}>
+        {t('encryption.doneHint')}
+      </p>
       <div className={dialogs.buttons}>
         <button type="button" className="btn btn-secondary" onClick={() => setConfirming(false)}>
           {t('encryption.back')}

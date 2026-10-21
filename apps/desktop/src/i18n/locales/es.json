@@ -34,6 +34,7 @@
     "working": "Desbloqueando… (tarda un segundo a propósito)",
     "wrongPassphrase": "Esa frase de contraseña no abre esta bóveda.",
     "wrongRecovery": "Esa clave de recuperación no abre esta bóveda.",
+    "maybeDamaged": "Si estás seguro de que es correcta, el archivo de claves de esta bóveda puede estar dañado.",
     "rollback": "El archivo de claves de esta bóveda es más antiguo que uno que este equipo ya había visto. Puede haberse restaurado desde una copia o sustituido. No se abrió.",
     "badRecovery": "Eso no parece una clave de recuperación.",
     "resetLink": "Restablecer la memoria de versiones de este equipo…",
@@ -1103,6 +1104,7 @@
     "group": "Grupo {n}",
     "back": "Atrás",
     "done": "Hecho",
+    "doneHint": "Hecho se activa cuando los dos grupos coinciden con tu clave.",
     "security": {
       "autoLock": "Bloquear tras inactividad",
       "never": "Nunca",
@@ -1118,7 +1120,7 @@
       "newRecoveryHint": "Tu clave de recuperación anterior deja de funcionar.",
       "newRecoveryButton": "Nueva clave de recuperación…",
       "newRecoveryBody": "Escribe tu frase de contraseña actual para crear una nueva clave de recuperación. Tu clave anterior deja de funcionar.",
-      "conflict": "Otro dispositivo cambió las claves de esta bóveda al mismo tiempo. Inténtalo de nuevo.",
+      "conflict": "Otro dispositivo cambió las claves de esta bóveda. Bloquea la bóveda y desbloquéala de nuevo; luego inténtalo.",
       "voidTitle": "Clave de recuperación reemplazada",
       "voidBody": "La clave de recuperación de esta bóveda se reemplazó en otro dispositivo y ya no funciona. Crea una nueva ahora.",
       "voidAction": "Crear una nueva clave de recuperación"

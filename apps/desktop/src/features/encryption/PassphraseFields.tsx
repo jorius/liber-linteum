@@ -20,7 +20,9 @@ export function PassphraseFields(props: {
   const { t } = useTranslation();
   const id = useId();
   const [shown, setShown] = useState(false);
-  const mismatch = props.confirm !== '' && props.pass !== props.confirm;
+  // Said once the confirmation is left or entered, not from its first character.
+  const [checked, setChecked] = useState(false);
+  const mismatch = checked && props.confirm !== '' && props.pass !== props.confirm;
   const level = strength(props.pass);
   const type = shown ? 'text' : 'password';
   const common = { type, autoComplete: 'off', spellCheck: false };
@@ -50,6 +52,8 @@ export function PassphraseFields(props: {
           className="field-control"
           value={props.confirm}
           onChange={(e) => props.onConfirm(e.target.value)}
+          onBlur={() => setChecked(true)}
+          onKeyDown={(e) => e.key === 'Enter' && setChecked(true)}
           aria-describedby={mismatch ? `${id}-mismatch` : undefined}
           aria-invalid={mismatch ? true : undefined}
         />

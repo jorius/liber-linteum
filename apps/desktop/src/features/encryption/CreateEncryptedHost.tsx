@@ -5,24 +5,16 @@ import { Dialog } from '../dialogs/Dialog';
 import dialogs from '../dialogs/Dialogs.module.css';
 import { CreateEncryptedDialog } from './CreateEncryptedDialog';
 import { NewRecoveryDialog } from './SecuritySettings';
-import { useState } from 'react';
 
-/** Opens the create dialog for the folder just picked; another dialog keeps the screen. */
+/** Opens the create dialog for the folder just picked (refused while a
+ *  sticky dialog shows). */
 export function openCreateEncrypted(path: string) {
-  if (!useUiStore.getState().dialog)
-    useUiStore.getState().openDialog({ type: 'createEncrypted', path });
+  useUiStore.getState().openDialog({ type: 'createEncrypted', path });
 }
 
 /** The voided-key prompt: no way out but a new recovery key. */
-function RecoveryVoidDialog({ onClose }: { onClose: () => void }) {
+function RecoveryVoidDialog() {
   const { t } = useTranslation();
-  const [making, setMaking] = useState(false);
-  const done = () => {
-    // The vault now has a working key: it is no longer void.
-    useVaultStore.setState((s) => ({ info: s.info && { ...s.info, recoveryVoid: false } }));
-    onClose();
-  };
-  if (making) return <NewRecoveryDialog onClose={() => setMaking(false)} onDone={done} />;
   return (
     <Dialog title={t('encryption.security.voidTitle')} onClose={() => undefined} alert>
       <p className={dialogs.text}>{t('encryption.security.voidBody')}</p>
@@ -31,7 +23,8 @@ function RecoveryVoidDialog({ onClose }: { onClose: () => void }) {
           type="button"
           className="btn btn-primary"
           data-autofocus
-          onClick={() => setMaking(true)}
+          // The sticky prompt hands over to its own flow (openDialog would refuse).
+          onClick={() => useUiStore.setState({ dialog: { type: 'newRecovery', fromVoid: true } })}
         >
           {t('encryption.security.voidAction')}
         </button>
@@ -41,11 +34,25 @@ function RecoveryVoidDialog({ onClose }: { onClose: () => void }) {
 }
 
 /** The dialogs, on every screen: the create dialog stays mounted when Welcome
- *  gives way to the shell, so the recovery code isn't lost with the screen. */
+ *  gives way to the shell, and a recovery code stays over the Unlock screen
+ *  after a lock, so neither code is lost with the screen. */
 export function CreateEncryptedHost() {
   const dialog = useUiStore((s) => s.dialog);
+  const open = useVaultStore((s) => s.status === 'open');
   const close = useUiStore((s) => s.closeDialog);
-  if (dialog?.type === 'recoveryVoid') return <RecoveryVoidDialog onClose={close} />;
+  // Its only action needs an unlocked vault (a lock parks it, vaultStore).
+  if (dialog?.type === 'recoveryVoid') return open ? <RecoveryVoidDialog /> : null;
+  if (dialog?.type === 'newRecovery') {
+    const done = () => {
+      // The vault now has a working key: it is no longer void.
+      useVaultStore.setState((s) => ({ info: s.info && { ...s.info, recoveryVoid: false } }));
+      close();
+    };
+    const back = dialog.fromVoid
+      ? () => useUiStore.setState({ dialog: { type: 'recoveryVoid' } })
+      : close;
+    return <NewRecoveryDialog onClose={back} onDone={done} />;
+  }
   if (dialog?.type !== 'createEncrypted') return null;
   return <CreateEncryptedDialog path={dialog.path} onClose={close} />;
 }

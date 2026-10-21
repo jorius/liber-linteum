@@ -1,10 +1,12 @@
 // @vitest-environment jsdom
-import { render, screen, waitFor } from '@testing-library/react';
+import { act, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import axe from 'axe-core';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { clearMocks, mockIPC } from '../../ipc/testing';
 import { useToastStore } from '../../stores/toastStore';
+import { useUiStore } from '../../stores/uiStore';
+import { useBinStore } from '../bin/binStore';
 import { usePageStore } from '../../stores/pageStore';
 import { resetVaultStore, useVaultStore } from '../../stores/vaultStore';
 import { useGvStore } from '../global-view/gvStore';
@@ -79,7 +81,10 @@ describe('UnlockScreen', () => {
     await userEvent.type(field(), 'wrong passphrase');
     await userEvent.click(screen.getByRole('button', { name: 'Unlock' }));
     const alert = await screen.findByRole('alert');
-    expect(alert).toHaveTextContent("That passphrase doesn't open this vault.");
+    // E3 #11: a damaged key file (header MAC) also answers wrongSecret.
+    expect(alert.textContent).toBe(
+      "That passphrase doesn't open this vault. If you're sure it's right, this vault's key file may be damaged.",
+    );
     expect(field()).toHaveAttribute('aria-describedby', alert.id);
     expect(field()).toHaveFocus();
     expect(field().value).toBe('wrong passphrase');
@@ -118,8 +123,8 @@ describe('UnlockScreen', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Use recovery key instead' }));
     await userEvent.type(field(), 'LIBER-AAAA');
     await userEvent.click(screen.getByRole('button', { name: 'Unlock' }));
-    expect(await screen.findByRole('alert')).toHaveTextContent(
-      "That recovery key doesn't open this vault.",
+    expect((await screen.findByRole('alert')).textContent).toBe(
+      "That recovery key doesn't open this vault. If you're sure it's right, this vault's key file may be damaged.",
     );
   });
 
@@ -225,6 +230,9 @@ describe('UnlockScreen', () => {
     useSearchStore.setState({ text: 'secret words' });
     usePageStore.setState({ path: 'a.md' });
     useGvStore.setState({ expanded: [{ kind: 'folder', path: 'a' } as never] });
+    useBinStore.setState({ trash: [{ path: '.trash/a.md', from: 'a.md' } as never] });
+    useUiStore.getState().openDialog({ type: 'delete', path: 'a.md' });
+    useToastStore.getState().push({ message: 'Moved to the Trash', detail: ['a.md'] });
     expect(await useVaultStore.getState().lock('menu')).toBe(true);
     render(<UnlockScreen />);
     await userEvent.click(screen.getByRole('button', { name: 'Back' }));
@@ -234,6 +242,20 @@ describe('UnlockScreen', () => {
     expect(usePageStore.getState().page).toBeNull();
     expect(useSearchStore.getState().text).toBe('');
     expect(useGvStore.getState().expanded).toEqual([]);
+    expect(useUiStore.getState().dialog).toBeNull();
+    expect(useToastStore.getState().toasts).toEqual([]);
+    expect(useBinStore.getState().trash).toEqual([]);
+  });
+
+  it('another locked vault gets a fresh Unlock screen (no error from the last one)', async () => {
+    backend({ vault_unlock: fail('wrongSecret') });
+    render(<App />);
+    await userEvent.type(field(), 'nope');
+    await userEvent.click(screen.getByRole('button', { name: 'Unlock' }));
+    await screen.findByRole('alert');
+    act(() => useVaultStore.setState({ lockedPath: '/v/Other' }));
+    expect(screen.getByRole('heading', { name: 'Other' })).toBeInTheDocument();
+    expect(screen.queryByRole('alert')).toBeNull();
   });
 
   it('the passphrase never reaches a store, a toast or the console', async () => {

@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { LockIcon } from '../../app/icons';
 import { securityResetRollbackMemory, type CommandError } from '../../ipc';
 import { errorMessage } from '../../stores/messages';
+import { useUiStore } from '../../stores/uiStore';
 import { useVaultStore } from '../../stores/vaultStore';
 import { Dialog } from '../dialogs/Dialog';
 import dialogs from '../dialogs/Dialogs.module.css';
@@ -18,6 +19,8 @@ export function UnlockScreen() {
   const { t } = useTranslation();
   const lockedPath = useVaultStore((s) => s.lockedPath);
   const unlocking = useVaultStore((s) => s.unlocking);
+  // A recovery code still on screen keeps the keyboard (it outlived a lock).
+  const held = useUiStore((s) => s.held);
   const [mode, setMode] = useState<Mode>('passphrase');
   const [error, setError] = useState<{ error: CommandError; mode: Mode } | null>(null);
   const [filesDamaged, setFilesDamaged] = useState(false);
@@ -32,7 +35,8 @@ export function UnlockScreen() {
     if (!error) return null;
     switch (error.error.kind) {
       case 'wrongSecret':
-        return t(error.mode === 'recovery' ? 'unlock.wrongRecovery' : 'unlock.wrongPassphrase');
+        // E3 #11: a damaged key file (its MAC) reads as a wrong secret too.
+        return `${t(error.mode === 'recovery' ? 'unlock.wrongRecovery' : 'unlock.wrongPassphrase')} ${t('unlock.maybeDamaged')}`;
       case 'rollback':
         return t('unlock.rollback');
       case 'invalidInput':
@@ -105,7 +109,7 @@ export function UnlockScreen() {
             className="field-control"
             type={mode === 'recovery' ? 'text' : 'password'}
             placeholder={mode === 'recovery' ? t('unlock.recoveryPlaceholder') : undefined}
-            autoFocus
+            autoFocus={!held}
             autoComplete="off"
             spellCheck={false}
             readOnly={unlocking}

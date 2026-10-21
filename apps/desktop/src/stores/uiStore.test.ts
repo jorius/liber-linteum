@@ -26,10 +26,22 @@ describe('sticky dialogs', () => {
     ui.openDialog({ type: 'createEncrypted', path: '/p' });
     expect(ui.openDialog({ type: 'settings' })).toBe(true);
     ui.openDialog({ type: 'createEncrypted', path: '/p' });
-    useUiStore.getState().holdCreate(true);
+    useUiStore.getState().hold(true);
     expect(useUiStore.getState().openDialog({ type: 'settings' })).toBe(false);
     expect(useUiStore.getState().dialog?.type).toBe('createEncrypted');
     useUiStore.getState().closeDialog();
     expect(useUiStore.getState().openDialog({ type: 'settings' })).toBe(true);
+  });
+
+  it('a new recovery key is sticky once its code is held, or while it stands in for the voided prompt', () => {
+    const ui = useUiStore.getState();
+    ui.openDialog({ type: 'newRecovery' });
+    expect(ui.openDialog({ type: 'search' })).toBe(true);
+    ui.openDialog({ type: 'newRecovery' });
+    useUiStore.getState().hold(true);
+    expect(useUiStore.getState().openDialog({ type: 'settings' })).toBe(false);
+    useUiStore.getState().closeDialog();
+    useUiStore.setState({ dialog: { type: 'newRecovery', fromVoid: true } });
+    expect(useUiStore.getState().openDialog({ type: 'settings' })).toBe(false);
   });
 });

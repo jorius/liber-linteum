@@ -21,6 +21,7 @@ import { parsePage } from '../../markdown/parse';
 import { text as nodeText } from '../../markdown/section';
 import { iconsOf } from '../icons/ItemIcon';
 import { announce } from './announce';
+import { onLeaveVault } from '../../stores/leaveVault';
 import { useVaultStore } from '../../stores/vaultStore';
 import { pagePath } from './livePreview';
 
@@ -123,6 +124,7 @@ function headingsIn(source: string): HeadingItem[] {
 /** Another page's text for `#` completion, cached briefly per target. */
 const pageCache = new Map<string, { at: number; text: Promise<string | null> }>();
 const PAGE_CACHE_MS = 5000;
+onLeaveVault(() => pageCache.clear());
 
 function pageText(path: string): Promise<string | null> {
   const hit = pageCache.get(path);

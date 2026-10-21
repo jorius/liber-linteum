@@ -23,6 +23,7 @@ import {
   vaultOpen,
   vaultUnlock,
   vaultTree,
+  toCommandError,
   type ChangedPayload,
   type CommandError,
   type IpcResult,
@@ -42,6 +43,7 @@ import { usePageStore } from './pageStore';
 import { useToastStore } from './toastStore';
 import { useTrailStore } from './trailStore';
 import { useUiStore } from './uiStore';
+import { clearVaultCaches } from './leaveVault';
 import {
   childrenByParent,
   folderPageOf,
@@ -75,6 +77,8 @@ interface VaultState {
   unlocking: boolean;
   /** `createEncrypted` is running (the dialog shows its own progress). */
   creating: boolean;
+  /** A lock is running: the shell takes no input (keys typed now would be lost). */
+  locking: boolean;
   info: VaultInfo | null;
   nodes: TreeNode[];
   children: Map<string, TreeNode[]>;
@@ -160,8 +164,10 @@ export function onBeforeVaultSwitch(run: () => Promise<unknown>): () => void {
 const toast = () => useToastStore.getState();
 const BUSY: CommandError = { kind: 'io', message: 'the vault is busy' };
 let treeSeq = 0;
-/** A lock is running (see `lock`). */
-let locking = false;
+/** The vault whose voided-key prompt a lock or Close took down: it shows
+ *  again on that vault's next open (E3 reports a voided key only once). In
+ *  memory only: the path never reaches storage. */
+let voidPending: string | null = null;
 let unlisten: (() => void)[] = [];
 let pending: ChangedPayload | null = null;
 let timer: ReturnType<typeof setTimeout> | null = null;
@@ -202,7 +208,25 @@ function stopListening() {
 export async function resetVaultStore() {
   stopListening();
   treeSeq++;
-  useVaultStore.setState({ ...EMPTY, children: new Map(), expanded: new Set() });
+  voidPending = null;
+  useVaultStore.setState({ ...EMPTY, locking: false, children: new Map(), expanded: new Set() });
+}
+
+/** Leaving a vault's UI (lock, Close, Back; E4 final review C1/I2): nothing
+ *  of it stays on screen or in memory but a recovery code still to be
+ *  confirmed. A pending question is answered Cancel; the voided-key prompt
+ *  is parked for `root`'s next open. */
+function leaveVaultUi(root: string | null) {
+  const ui = useUiStore.getState();
+  const d = ui.dialog;
+  if (d?.type === 'unsaved') d.answer('cancel');
+  if (d?.type === 'binClash') d.answer(false);
+  const voided = d?.type === 'recoveryVoid' || (d?.type === 'newRecovery' && d.fromVoid);
+  if (voided && !ui.held && root) voidPending = root;
+  if (!(ui.held && (d?.type === 'createEncrypted' || d?.type === 'newRecovery'))) ui.closeDialog();
+  useToastStore.getState().clear();
+  useBinStore.getState().reset();
+  clearVaultCaches();
 }
 
 /** Open warnings: the settings-folder codes from the rename are translated
@@ -286,6 +310,7 @@ export const useVaultStore = create<VaultState>((set, get) => {
 
   /** Drops everything of the vault on screen (close and lock share it). */
   function dropVault() {
+    leaveVaultUi(get().info?.root ?? null);
     useEditorStore.getState().reset();
     stopListening();
     useTrailStore.getState().reset();
@@ -341,7 +366,10 @@ export const useVaultStore = create<VaultState>((set, get) => {
     set({ status: 'open', progress: null });
     // Another vault: its own words and dictionaries (spell checking).
     useSpellStore.getState().bump();
-    if (res.value.recoveryVoid) useUiStore.getState().openDialog({ type: 'recoveryVoid' });
+    if (res.value.recoveryVoid || voidPending === info.root) {
+      // Refused (a recovery code still on screen): asked again on the next open.
+      voidPending = useUiStore.getState().openDialog({ type: 'recoveryVoid' }) ? null : info.root;
+    }
     const warnings = res.value.report.warnings ?? [];
     if (warnings.length) {
       toast().push({
@@ -380,6 +408,7 @@ export const useVaultStore = create<VaultState>((set, get) => {
 
   return {
     ...EMPTY,
+    locking: false,
     open: (path) => withProgress(() => vaultOpen(path), { path }),
     openScratchpad: () => withProgress(() => scratchpadOpen()),
     importNotion: async (name) => {
@@ -422,16 +451,21 @@ export const useVaultStore = create<VaultState>((set, get) => {
           },
           { quiet: true },
         );
+      } catch (e) {
+        // Saving the open vault first failed: the dialog says why.
+        res = { ok: false, error: toCommandError(e) };
       } finally {
         set({ creating: false });
       }
-      return res.ok && created ? created : (created ?? { ok: false, error: BUSY });
+      // A vault that was created shows its code, even if opening it failed.
+      const made = created as IpcResult<CreatedEncryptedVault> | null;
+      return made ?? (res.ok ? { ok: false, error: BUSY } : res);
     },
     lock: async () => {
       // `locking` also keeps the backend's own `vault:locked` (sent while
       // `vault_lock` runs) from dropping the vault a second time.
-      if (locking || get().status !== 'open' || !get().info) return false;
-      locking = true;
+      if (get().locking || get().status !== 'open' || !get().info) return false;
+      set({ locking: true });
       try {
         const root = get().info!.root;
         // beforeSwitch includes the recorder's stop (a running take is kept).
@@ -453,15 +487,18 @@ export const useVaultStore = create<VaultState>((set, get) => {
         set({ status: 'locked', lockedPath: root });
         return true;
       } finally {
-        locking = false;
+        set({ locking: false });
       }
     },
     lockedByBackend: (path) => {
-      if (locking || get().status !== 'open' || !get().info?.encrypted) return;
+      if (get().locking || get().status !== 'open' || !get().info?.encrypted) return;
       dropVault();
       set({ status: 'locked', lockedPath: path });
     },
-    cancelUnlock: () => set({ status: 'closed', lockedPath: null }),
+    cancelUnlock: () => {
+      leaveVaultUi(null);
+      set({ status: 'closed', lockedPath: null });
+    },
     close: async () => {
       // Unsaved text is written before the vault goes away (M2a §3.3).
       if (!(await savedEverything())) return;

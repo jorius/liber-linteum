@@ -67,4 +67,26 @@ describe('no_canary_in_localStorage', () => {
     expect(all.join('\n')).not.toContain(CANARY);
     expect(all.join('\n')).not.toContain('/enc');
   });
+
+  it('an encrypted vault never reads the Favorites collapse key, and drops a stale one', async () => {
+    // Left by an earlier session when the vault was still plain.
+    localStorage.setItem('liber.favoritesCollapsed:/enc', '1');
+    mockIPC((cmd) => (cmd === 'favorites_get' ? [`${CANARY}.md`] : null));
+    useVaultStore.setState({
+      status: 'open',
+      info,
+      nodes,
+      children: childrenByParent(nodes),
+      expanded: new Set(),
+      selected: null,
+      renaming: null,
+    });
+    render(<ExplorerTree />);
+    const section = await screen.findByRole('region', { name: 'Favorites' });
+    expect(within(section).getByRole('button', { name: 'Favorites' })).toHaveAttribute(
+      'aria-expanded',
+      'true',
+    );
+    expect(localStorage.getItem('liber.favoritesCollapsed:/enc')).toBeNull();
+  });
 });

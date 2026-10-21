@@ -15,12 +15,14 @@ export function App() {
   const status = useVaultStore((s) => s.status);
   const unlocking = useVaultStore((s) => s.unlocking);
   const creating = useVaultStore((s) => s.creating);
+  const lockedPath = useVaultStore((s) => s.lockedPath);
   return (
     <>
       {status === 'open' ? (
         <AppShell />
       ) : status === 'locked' || (status === 'opening' && unlocking) ? (
-        <UnlockScreen />
+        // Another vault's door starts fresh: no error or mode from the last one.
+        <UnlockScreen key={lockedPath} />
       ) : (
         <Welcome version={version} />
       )}

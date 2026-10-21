@@ -70,6 +70,7 @@ export function DialogHost() {
     case 'notionImport':
       return null; // NotionHost shows it, on the Welcome screen too
     case 'createEncrypted':
+    case 'newRecovery':
       return null; // CreateEncryptedHost shows it, on the Welcome screen too
   }
 }

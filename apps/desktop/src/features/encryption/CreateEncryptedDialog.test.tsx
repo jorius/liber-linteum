@@ -59,11 +59,25 @@ describe('CreateEncryptedDialog', () => {
     expect(pass).toHaveAttribute('type', 'password');
     expect(screen.getByText('Beta')).toBeInTheDocument();
     await userEvent.type(pass, PASS);
-    await userEvent.type(screen.getByLabelText('Confirm passphrase'), PASS + 'x');
+    await userEvent.type(screen.getByLabelText('Confirm passphrase'), 'c');
+    // Not while the confirmation is still being typed: on leaving it, or Enter.
+    expect(screen.queryByRole('alert')).toBeNull();
+    await userEvent.type(screen.getByLabelText('Confirm passphrase'), 'x');
+    expect(screen.queryByRole('alert')).toBeNull();
+    await userEvent.tab();
     expect(screen.getByRole('alert')).toHaveTextContent("The passphrases don't match.");
+    expect(screen.getByRole('button', { name: 'Continue' })).toBeDisabled();
     expect(screen.getByRole('button', { name: 'Continue' })).toBeDisabled();
     await userEvent.click(screen.getByLabelText('Show passphrase'));
     expect(pass).toHaveAttribute('type', 'text');
+  });
+
+  it('Enter in a mismatched confirmation shows why nothing happens', async () => {
+    backend();
+    render(<CreateEncryptedDialog path="/v/new" onClose={() => undefined} />);
+    await userEvent.type(screen.getByLabelText('Passphrase'), PASS);
+    await userEvent.type(screen.getByLabelText('Confirm passphrase'), 'other{Enter}');
+    expect(screen.getByRole('alert')).toHaveTextContent("The passphrases don't match.");
   });
 
   it('keeps Continue disabled while the passphrase is too short', async () => {
@@ -141,6 +155,9 @@ describe('CreateEncryptedDialog', () => {
     expect(screen.queryByTestId('recovery-code')).toBeNull();
     const done = screen.getByRole('button', { name: 'Done' });
     expect(done).toBeDisabled();
+    // Why Done is off, read with each field.
+    expect(a.el).toHaveAccessibleDescription('Done turns on once both groups match your key.');
+    expect(b.el).toHaveAccessibleDescription('Done turns on once both groups match your key.');
     await userEvent.type(a.el, 'nope');
     await userEvent.type(b.el, GROUPS[b.n - 1]);
     expect(done).toBeDisabled();
@@ -154,6 +171,21 @@ describe('CreateEncryptedDialog', () => {
     expect(view.container.innerHTML + document.body.innerHTML).not.toContain(GROUPS[0]);
     expect(JSON.stringify(useVaultStore.getState())).not.toContain(CODE);
     expect(JSON.stringify(useVaultStore.getState())).not.toContain(PASS);
+  });
+
+  it('after Done the keyboard goes to the editor of the new vault', async () => {
+    backend();
+    const editor = document.createElement('div');
+    editor.className = 'cm-content';
+    editor.tabIndex = 0;
+    document.body.append(editor);
+    const { view } = await toCode();
+    await userEvent.click(screen.getByRole('button', { name: "I've saved it" }));
+    for (const { el, n } of asked()) await userEvent.type(el, GROUPS[n - 1]);
+    await userEvent.click(screen.getByRole('button', { name: 'Done' }));
+    view.unmount(); // the host drops the dialog
+    expect(editor).toHaveFocus();
+    editor.remove();
   });
 
   it('passes axe on the passphrase and the code steps', async () => {
