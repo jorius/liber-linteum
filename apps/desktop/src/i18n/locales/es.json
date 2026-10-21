@@ -22,6 +22,28 @@
     "noMatch": "Ninguna bóveda coincide con «{query}».",
     "reveal": "{os, select, mac {Mostrar {name} en el Finder} windows {Mostrar {name} en el Explorador} other {Mostrar {name} en el gestor de archivos}}"
   },
+  "unlock": {
+    "beta": "Beta",
+    "passphrase": "Frase de contraseña",
+    "recoveryKey": "Clave de recuperación",
+    "recoveryPlaceholder": "LIBER-XXXX-…",
+    "submit": "Desbloquear",
+    "useRecovery": "Usar la clave de recuperación",
+    "usePassphrase": "Usar la frase de contraseña",
+    "back": "Volver",
+    "working": "Desbloqueando… (tarda un segundo a propósito)",
+    "wrongPassphrase": "Esa frase de contraseña no abre esta bóveda.",
+    "wrongRecovery": "Esa clave de recuperación no abre esta bóveda.",
+    "rollback": "El archivo de claves de esta bóveda es más antiguo que uno que este equipo ya había visto. Puede haberse restaurado desde una copia o sustituido. No se abrió.",
+    "badRecovery": "Eso no parece una clave de recuperación.",
+    "resetLink": "Restablecer la memoria de versiones de este equipo…",
+    "resetTitle": "¿Restablecer la memoria de versiones?",
+    "resetBody": "Liber Linteum recuerda el archivo de claves más reciente de cada bóveda cifrada para evitar que se vuelva a poner uno antiguo. Al restablecerla se pierde esa protección en todas las bóvedas cifradas de este equipo hasta que se abran de nuevo.",
+    "resetConfirm": "Restablecer memoria",
+    "resetDone": "Memoria de versiones restablecida. Vuelve a intentar desbloquear.",
+    "filesDamaged": "Los archivos de esta bóveda están dañados.",
+    "encryptedBadge": "Cifrada"
+  },
   "languages": {
     "en": "English",
     "es": "Español"

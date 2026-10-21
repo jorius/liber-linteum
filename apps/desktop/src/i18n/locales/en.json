@@ -22,6 +22,28 @@
     "noMatch": "No vaults match “{query}”.",
     "reveal": "{os, select, mac {Show {name} in Finder} windows {Show {name} in Explorer} other {Show {name} in the file manager}}"
   },
+  "unlock": {
+    "beta": "Beta",
+    "passphrase": "Passphrase",
+    "recoveryKey": "Recovery key",
+    "recoveryPlaceholder": "LIBER-XXXX-…",
+    "submit": "Unlock",
+    "useRecovery": "Use recovery key instead",
+    "usePassphrase": "Use passphrase instead",
+    "back": "Back",
+    "working": "Unlocking… (this takes a second on purpose)",
+    "wrongPassphrase": "That passphrase doesn't open this vault.",
+    "wrongRecovery": "That recovery key doesn't open this vault.",
+    "rollback": "This vault's key file is older than one this computer has already seen. It may have been restored from a backup or replaced. It wasn't opened.",
+    "badRecovery": "That doesn't look like a recovery key.",
+    "resetLink": "Reset this computer's rollback memory…",
+    "resetTitle": "Reset rollback memory?",
+    "resetBody": "Liber Linteum remembers each encrypted vault's newest key file to stop an old one being put back. Resetting removes that protection for every encrypted vault on this computer until they're opened again.",
+    "resetConfirm": "Reset rollback memory",
+    "resetDone": "Rollback memory reset. Try unlocking again.",
+    "filesDamaged": "This vault's files are damaged.",
+    "encryptedBadge": "Encrypted"
+  },
   "languages": {
     "en": "English",
     "es": "Español"

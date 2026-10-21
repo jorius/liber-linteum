@@ -41,7 +41,7 @@ export function installIpcMock({
   folders?: string[];
   /** E4: an encrypted vault at `/enc`, locked from the start; opens with this
    *  passphrase or recovery code. */
-  encrypted?: { passphrase: string; recovery: string };
+  encrypted?: { passphrase: string; recovery: string; damaged?: boolean };
 }) {
   type Args = Record<string, unknown>;
   const w = window as unknown as Record<string, unknown>;
@@ -422,6 +422,8 @@ export function installIpcMock({
     },
     vault_unlock: (a) => {
       const secret = a.secret as { kind: string; value: string };
+      // `damaged: true`: the rollback memory is damaged until it is reset.
+      if (encrypted?.damaged) throw { kind: 'damaged', message: 'vault-epochs.json' };
       const good = secret.kind === 'passphrase' ? encrypted?.passphrase : encrypted?.recovery;
       if (!encrypted || secret.value !== good) {
         throw { kind: 'wrongSecret', message: 'no slot opens' };
@@ -451,6 +453,10 @@ export function installIpcMock({
       return encrypted.recovery;
     },
     security_reset_rollback_memory: () => {
+      if (encrypted?.damaged) {
+        encrypted.damaged = false;
+        return null;
+      }
       throw { kind: 'notPermitted', message: 'the memory is fine' };
     },
     vault_unreadable: () => [],

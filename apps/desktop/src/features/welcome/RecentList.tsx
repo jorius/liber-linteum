@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { FolderIcon, SearchIcon, SmallCloseIcon } from '../../app/icons';
+import { FolderIcon, LockIcon, SearchIcon, SmallCloseIcon } from '../../app/icons';
 import { vaultsForget, vaultsRecent, vaultsReveal, type RecentVault } from '../../ipc';
 import { errorMessage } from '../../stores/messages';
 import { useToastStore } from '../../stores/toastStore';
@@ -136,6 +136,8 @@ export function RecentList() {
                         <span data-quick-note-icon>
                           <QuickNoteIcon />
                         </span>
+                      ) : item.encrypted ? (
+                        <LockIcon />
                       ) : item.icon ? (
                         <ItemIcon icon={item.icon} />
                       ) : (
@@ -144,6 +146,9 @@ export function RecentList() {
                     </span>
                     <span className={styles.recentText}>
                       <span className={styles.recentName}>{item.name}</span>
+                      {item.encrypted && (
+                        <span className="liber-sr-only">{t('unlock.encryptedBadge')}</span>
+                      )}
                       <span className={styles.recentPath}>{middle(item.path)}</span>
                     </span>
                     <span className={styles.recentMeta}>
