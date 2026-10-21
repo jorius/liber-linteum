@@ -43,7 +43,7 @@ impl Listing {
 }
 
 /// A name's NFC, lower-cased form (stored names are NFC: format §14.3).
-fn fold(name: &str) -> String {
+pub(super) fn fold(name: &str) -> String {
     name.nfc().collect::<String>().to_lowercase()
 }
 

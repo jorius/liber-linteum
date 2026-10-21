@@ -22,6 +22,10 @@ pub type Opener = Arc<dyn Fn(&Path) -> std::io::Result<()> + Send + Sync>;
 /// Where a merged copy of an encrypted vault's header goes.
 pub type Discard = fn(&Path) -> std::io::Result<()>;
 
+/// Where the readable originals go after encrypting in place (encryption UX
+/// §8.8): the OS trash; tests replace it.
+pub type Trasher = Arc<dyn Fn(&Path) -> std::io::Result<()> + Send + Sync>;
+
 pub struct AppState {
     session: Mutex<Option<Arc<VaultSession>>>,
     pub settings: SettingsStore,
@@ -39,6 +43,7 @@ pub struct AppState {
     pub copies: DecryptedCopies,
     opener: Mutex<Option<Opener>>,
     pub discard_header_copy: Discard,
+    trasher: Mutex<Trasher>,
 }
 
 impl AppState {
@@ -46,14 +51,33 @@ impl AppState {
     /// header copies to the OS trash.
     pub fn new(settings: SettingsStore, cache_dir: PathBuf) -> AppState {
         let copies = DecryptedCopies::new(&std::env::temp_dir());
-        AppState::with(settings, cache_dir, copies, liber_vault::trash_header_copy)
+        let trasher: Trasher = Arc::new(liber_vault::convert::os_trash);
+        AppState::with(
+            settings,
+            cache_dir,
+            copies,
+            liber_vault::trash_header_copy,
+            trasher,
+        )
     }
 
     /// Tests (which pass their own dirs): decrypted copies under the cache
-    /// dir, and merged header copies deleted, never sent to the OS trash.
+    /// dir, merged header copies deleted, and converted originals moved into
+    /// `<cache_dir>/test-trash/`: never the OS trash.
     pub fn for_tests(settings: SettingsStore, cache_dir: PathBuf) -> AppState {
         let copies = DecryptedCopies::new(&cache_dir);
-        AppState::with(settings, cache_dir, copies, |p| std::fs::remove_file(p)) // seam: outside (a test's header copy)
+        let bin = cache_dir.join("test-trash");
+        let trasher: Trasher = Arc::new(move |p: &Path| {
+            std::fs::create_dir_all(&bin)?; // seam: outside (a test's stand-in for the OS trash)
+            std::fs::rename(p, bin.join(p.file_name().unwrap_or_default())) // seam: outside (same)
+        });
+        AppState::with(
+            settings,
+            cache_dir,
+            copies,
+            |p| std::fs::remove_file(p), // seam: outside (a test's header copy)
+            trasher,
+        )
     }
 
     fn with(
@@ -61,8 +85,10 @@ impl AppState {
         cache_dir: PathBuf,
         copies: DecryptedCopies,
         discard_header_copy: Discard,
+        trasher: Trasher,
     ) -> AppState {
         AppState {
+            trasher: Mutex::new(trasher),
             copies,
             opener: Mutex::new(None),
             discard_header_copy,
@@ -111,6 +137,15 @@ impl AppState {
 
     pub fn opener(&self) -> Option<Opener> {
         lock(&self.opener).clone()
+    }
+
+    /// Replaces where converted originals go (tests).
+    pub fn set_trasher(&self, trasher: Trasher) {
+        *lock(&self.trasher) = trasher;
+    }
+
+    pub fn trasher(&self) -> Trasher {
+        lock(&self.trasher).clone()
     }
 
     /// The open vault, or `noVault`.

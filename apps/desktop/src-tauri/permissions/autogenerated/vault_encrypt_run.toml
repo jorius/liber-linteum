@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-vault-encrypt-run"
+description = "Enables the vault_encrypt_run command without any pre-configured scope."
+commands.allow = ["vault_encrypt_run"]
+
+[[permission]]
+identifier = "deny-vault-encrypt-run"
+description = "Denies the vault_encrypt_run command without any pre-configured scope."
+commands.deny = ["vault_encrypt_run"]

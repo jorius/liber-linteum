@@ -73,6 +73,9 @@
     "wrongSecret": "That passphrase or recovery key doesn't open this vault, or its header is damaged.",
     "rollback": "This vault's key file is older than one this device has already seen, so it wasn't opened. Someone may have put an old copy back.",
     "damaged": "This encrypted vault, or a file in it, is damaged and can't be read.",
+    "convertingElsewhere": "This vault is being encrypted on another device. Finish there, or wait for sync to finish.",
+    "changedDuringConvert": "Files changed while encrypting — probably a sync service. Pause syncing and try again.",
+    "cancelled": "Encrypting was stopped. The vault is back as it was.",
     "io": "Something went wrong: {message}"
   },
   "toasts": {

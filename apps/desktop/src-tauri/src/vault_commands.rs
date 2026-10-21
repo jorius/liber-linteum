@@ -31,6 +31,8 @@ fn dir_path(s: &str) -> CmdResult<VaultPath> {
 #[doc(hidden)] // public for the menu test (round 3 review #8)
 pub fn open_session<R: Runtime>(app: &AppHandle<R>, root: &Path) -> CmdResult<VaultInfo> {
     let state = app.state::<AppState>();
+    // An encryption in place this device left unfinished: undone or finished first.
+    crate::convert_commands::recover_on_open(app, root)?;
     // An encrypted folder is `locked` here (`Vault::open`): it opens by unlocking.
     let (session, report) = VaultSession::open(root, &state.cache_dir, session_events(app))?;
     install_session(app, session, &report, false)
@@ -112,6 +114,7 @@ pub(crate) fn install_session<R: Runtime>(
         encrypted,
         recovery_void,
         recovered: Vec::new(),
+        originals_pending: false,
     })
 }
 

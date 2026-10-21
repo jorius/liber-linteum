@@ -98,6 +98,13 @@ impl NewFile for Pending {
 }
 
 impl Pending {
+    /// Commits, then where the ciphertext now is (the in-place conversion
+    /// reads it back and sets its mtime there).
+    pub(super) fn commit_to(mut self) -> Result<PathBuf> {
+        self.commit()?;
+        Ok(self.target.clone())
+    }
+
     fn writer(&mut self) -> std::io::Result<&mut StreamWriter<Sink>> {
         self.w
             .as_mut()
