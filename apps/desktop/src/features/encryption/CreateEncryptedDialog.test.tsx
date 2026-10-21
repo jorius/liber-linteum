@@ -99,6 +99,20 @@ describe('CreateEncryptedDialog', () => {
     expect(useVaultStore.getState().status).not.toBe('open');
   });
 
+  it('clears the passphrase after a failed create and refocuses the field', async () => {
+    backend(() => {
+      throw { kind: 'io', message: 'x' };
+    });
+    render(<CreateEncryptedDialog path="/v/new" onClose={() => undefined} />);
+    await userEvent.type(screen.getByLabelText('Passphrase'), PASS);
+    await userEvent.type(screen.getByLabelText('Confirm passphrase'), PASS);
+    await userEvent.click(screen.getByRole('button', { name: 'Continue' }));
+    await screen.findByRole('alert');
+    expect(screen.getByLabelText('Passphrase')).toHaveValue('');
+    expect(screen.getByLabelText('Confirm passphrase')).toHaveValue('');
+    await waitFor(() => expect(screen.getByLabelText('Passphrase')).toHaveFocus());
+  });
+
   it('copies the code and tells the user to clear the clipboard', async () => {
     backend();
     const user = userEvent.setup();
@@ -132,7 +146,7 @@ describe('CreateEncryptedDialog', () => {
     expect(done).toBeDisabled();
     await userEvent.clear(a.el);
     // lower case and spaces; O for 0 and l for 1 as the backend reads them
-    await userEvent.type(a.el, ` ${GROUPS[a.n - 1].toLowerCase().replace('0', 'o')} `);
+    await userEvent.type(a.el, ` ${GROUPS[a.n - 1].toLowerCase().replace('0', 'o')} - `);
     await waitFor(() => expect(done).toBeEnabled());
     await userEvent.click(done);
     expect(onClose).toHaveBeenCalledTimes(1);

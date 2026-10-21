@@ -7,7 +7,8 @@ import styles from './Encryption.module.css';
 export const groupsOf = (code: string) => code.split('-').slice(1);
 
 /** The backend's Crockford reading: case, spaces, O as 0, I and L as 1. */
-const norm = (s: string) => s.trim().toUpperCase().replace(/O/g, '0').replace(/[IL]/g, '1');
+const norm = (s: string) =>
+  s.replace(/[\s-]/g, '').toUpperCase().replace(/O/g, '0').replace(/[IL]/g, '1');
 
 /** Two distinct group numbers, ascending. */
 function pickTwo(count: number): [number, number] {

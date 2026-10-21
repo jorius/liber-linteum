@@ -7,6 +7,7 @@ describe('strength', () => {
     ['aaaaaaaaaaaa', 'weak'],
     ['short', 'tooShort'],
     ['Tr0ub4dor&3xx!', 'strong'],
+    ['blue cat sun', 'fair'], // the space is a symbol: 12 * log2(59) = 70.6
   ] as const)('%s is %s', (input, want) => {
     expect(strength(input)).toBe(want);
   });

@@ -14,6 +14,7 @@ export function App() {
   const version = useAppVersion();
   const status = useVaultStore((s) => s.status);
   const unlocking = useVaultStore((s) => s.unlocking);
+  const creating = useVaultStore((s) => s.creating);
   return (
     <>
       {status === 'open' ? (
@@ -23,7 +24,7 @@ export function App() {
       ) : (
         <Welcome version={version} />
       )}
-      {status === 'opening' && !unlocking && <OpeningOverlay />}
+      {status === 'opening' && !unlocking && !creating && <OpeningOverlay />}
       <ScratchpadHost />
       <NotionHost />
       <CreateEncryptedHost />

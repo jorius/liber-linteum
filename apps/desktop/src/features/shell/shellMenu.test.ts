@@ -3,13 +3,23 @@ import { clearMocks, emit, mockIPC } from '../../ipc/testing';
 import { DEFAULT_SETTINGS, useSettingsStore } from '../../stores/settingsStore';
 import { useUiStore } from '../../stores/uiStore';
 import { useVaultStore } from '../../stores/vaultStore';
-import { installSaveKey, installShellMenu } from './shellMenu';
+import { installSaveKey, installShellMenu, newEncryptedVault, openSettings } from './shellMenu';
 import { useEditorStore } from '../../stores/editorStore';
+
+const prompt = vi.hoisted(() => ({ needs: false, answer: true, order: [] as string[] }));
+vi.mock('../editor/unsavedPrompt', () => ({
+  needsUnsavedPrompt: () => prompt.needs,
+  confirmUnsaved: async () => {
+    prompt.order.push('prompt');
+    return prompt.answer;
+  },
+}));
 
 let calls: { cmd: string; args: unknown }[];
 
 beforeEach(() => {
   calls = [];
+  Object.assign(prompt, { needs: false, answer: true, order: [] });
   useSettingsStore.setState({ settings: DEFAULT_SETTINGS });
   useUiStore.setState({ dialog: null });
   mockIPC(
@@ -19,7 +29,10 @@ beforeEach(() => {
         const patch = (args as { patch: Record<string, unknown> }).patch;
         return { ...useSettingsStore.getState().settings, ...patch };
       }
-      if (cmd === 'plugin:dialog|open') return null;
+      if (cmd === 'plugin:dialog|open') {
+        prompt.order.push('picker');
+        return '/v/new';
+      }
       return null;
     },
     { shouldMockEvents: true },
@@ -95,5 +108,27 @@ describe('⌘S (M5b §6)', () => {
     expect(flush).toHaveBeenCalledTimes(1);
     stop();
     useEditorStore.setState({ doc: null });
+  });
+});
+
+describe('E4 Task 4 review', () => {
+  it('asks about unsaved text before the folder picker, so no question replaces the dialog', async () => {
+    prompt.needs = true;
+    await newEncryptedVault();
+    expect(prompt.order).toEqual(['prompt', 'picker']);
+    expect(useUiStore.getState().dialog).toEqual({ type: 'createEncrypted', path: '/v/new' });
+  });
+
+  it('Cancel on the unsaved question stops before the picker', async () => {
+    Object.assign(prompt, { needs: true, answer: false });
+    await newEncryptedVault();
+    expect(prompt.order).toEqual(['prompt']);
+    expect(useUiStore.getState().dialog).toBeNull();
+  });
+
+  it('Settings never replaces an open dialog', () => {
+    useUiStore.setState({ dialog: { type: 'createEncrypted', path: '/v/new' } });
+    openSettings();
+    expect(useUiStore.getState().dialog).toEqual({ type: 'createEncrypted', path: '/v/new' });
   });
 });

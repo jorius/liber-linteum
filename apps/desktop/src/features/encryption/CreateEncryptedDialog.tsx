@@ -31,12 +31,17 @@ export function CreateEncryptedDialog({ path, onClose }: { path: string; onClose
     setCreating(true);
     const res = await useVaultStore.getState().createEncrypted(path, pass);
     setCreating(false);
+    // Neither outcome keeps the passphrase.
+    setPass('');
+    setConfirm('');
     if (res.ok) {
-      setPass('');
-      setConfirm('');
       setCode(res.value.recovery);
     } else {
       setError(errorMessage(res.error));
+      // The form mounts again: the keyboard returns to the first field.
+      setTimeout(() =>
+        document.querySelector<HTMLElement>('[role="dialog"] [data-autofocus]')?.focus(),
+      );
     }
   };
 

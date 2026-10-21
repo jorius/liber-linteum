@@ -73,6 +73,8 @@ interface VaultState {
   lockedPath: string | null;
   /** An unlock is in flight: the Unlock screen stays up under the overlay. */
   unlocking: boolean;
+  /** `createEncrypted` is running (the dialog shows its own progress). */
+  creating: boolean;
   info: VaultInfo | null;
   nodes: TreeNode[];
   children: Map<string, TreeNode[]>;
@@ -169,6 +171,7 @@ const EMPTY = {
   progress: null,
   lockedPath: null as string | null,
   unlocking: false,
+  creating: false,
   info: null,
   nodes: [] as TreeNode[],
   children: new Map<string, TreeNode[]>(),
@@ -407,14 +410,20 @@ export const useVaultStore = create<VaultState>((set, get) => {
     },
     createEncrypted: async (path, passphrase) => {
       let created: IpcResult<CreatedEncryptedVault> | null = null;
-      const res = await withProgress(
-        async () => {
-          created = await vaultCreateEncrypted(path, passphrase);
-          return created.ok ? { ok: true, value: created.value.info } : created;
-          // quiet: the dialog shows the refusal inline.
-        },
-        { quiet: true },
-      );
+      set({ creating: true });
+      let res: IpcResult<VaultInfo>;
+      try {
+        // quiet: the dialog shows the refusal inline.
+        res = await withProgress(
+          async () => {
+            created = await vaultCreateEncrypted(path, passphrase);
+            return created.ok ? { ok: true, value: created.value.info } : created;
+          },
+          { quiet: true },
+        );
+      } finally {
+        set({ creating: false });
+      }
       return res.ok && created ? created : (created ?? { ok: false, error: BUSY });
     },
     lock: async () => {

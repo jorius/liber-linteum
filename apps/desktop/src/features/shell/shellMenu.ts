@@ -8,13 +8,17 @@ import {
   onMenuVault,
   pickFolder,
 } from '../../ipc';
+import { confirmUnsaved, needsUnsavedPrompt } from '../editor/unsavedPrompt';
 import { openCreateEncrypted } from '../encryption/CreateEncryptedHost';
 import { useEditorStore } from '../../stores/editorStore';
 import { useSettingsStore } from '../../stores/settingsStore';
 import { useUiStore } from '../../stores/uiStore';
 import { useVaultStore } from '../../stores/vaultStore';
 
-export const openSettings = () => useUiStore.getState().openDialog({ type: 'settings' });
+export const openSettings = () => {
+  // Another dialog keeps the screen (the recovery key must be confirmed first).
+  if (!useUiStore.getState().dialog) useUiStore.getState().openDialog({ type: 'settings' });
+};
 
 /** Another vault, through the folder dialog (as ⌘O). */
 export const openAnotherVault = () =>
@@ -23,10 +27,13 @@ export const openAnotherVault = () =>
     .then((path) => (path ? useVaultStore.getState().open(path) : undefined));
 
 /** Vault → New Encrypted Vault…: pick a folder, then the passphrase dialog. */
-export const newEncryptedVault = () =>
-  void pickFolder()
-    .catch(() => null)
-    .then((path) => (path ? openCreateEncrypted(path) : undefined));
+export const newEncryptedVault = async () => {
+  // Unsaved text is asked about before the dialog exists: the question would
+  // replace it, and the recovery code would be lost.
+  if (needsUnsavedPrompt() && !(await confirmUnsaved())) return;
+  const path = await pickFolder().catch(() => null);
+  if (path) openCreateEncrypted(path);
+};
 
 export const closeVault = () => void useVaultStore.getState().close();
 
@@ -61,7 +68,7 @@ export async function installShellMenu({ main }: { main: boolean }): Promise<() 
           onMenuVault((what) => {
             if (what === 'open') openAnotherVault();
             else if (what === 'close') closeVault();
-            else if (what === 'newEncrypted') newEncryptedVault();
+            else if (what === 'newEncrypted') void newEncryptedVault();
             else if (what === 'lock') void useVaultStore.getState().lock('menu');
           }),
           onMenuSidebar(toggleSidebar),
