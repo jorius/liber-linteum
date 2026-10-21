@@ -426,6 +426,13 @@ No `localStorage` key holds page text, titles or page paths, and the UI uses no 
 
 **The canary** (`apps/desktop/src-tauri/tests/encrypted_canary.rs`, §10). Through the real IPC path it creates an encrypted vault, writes `Canary-7f3a.md` holding `canary-7f3a`, a folder `canary-7f3a/` and an attachment holding the canary, searches for it, records 0.5 s into the page (fake audio host), opens the attachment as a decrypted copy (fake opener), then calls `vault_lock`. It then scans every file under the vault, the config dir and the cache dir (the decrypted copies' temp root in tests), names and bytes, ASCII case-insensitively: zero hits. Before the lock it checks that the scan does find the decrypted copy. With the index temporarily written to the cache dir, it fails on `index.sqlite`. Not covered: the WebView's own data dirs (the mock runtime has none), the real Windows build, and swap or crash dumps. The spec's "lock and quit" step is covered by lock; quit runs the same wipe.
 
+**Independent reader** (Global Constraints: format v1 exactly). `crates/liber-vault/tests/encrypted_xcheck.rs` writes a vault through `EncryptedStorage` (a short page, a 200,000-byte file over several chunks, nested folders, a long file name and a long folder name through `.liberl`/`.libern`, a file renamed into another folder, an NFD name, and a take streamed in pieces through `create_new` and `finish`), then runs `xcheck.py vault <dir> <passphrase> <expected.json>`. That mode uses only the Python standard library and `cryptography`: it unlocks the passphrase slot with Argon2id, checks the header MAC, decrypts every name and file under `d/` and compares the tree, byte for byte, with what was written. It passes, and a flipped ciphertext byte makes it fail (asserted in the test). It runs when `LIBER_XCHECK_PY` names a Python with `cryptography` >= 44 and prints SKIP otherwise; the gate doesn't set it, so run it by hand before a release:
+
+```sh
+python3 -m venv ~/.liber-xcheck && ~/.liber-xcheck/bin/pip install 'cryptography>=44'
+LIBER_XCHECK_PY=~/.liber-xcheck/bin/python cargo test -p liber-vault --test encrypted_xcheck -- --nocapture
+```
+
 **Performance** (§10): unlock to the first successful search on the sealed 10,000-note reference vault is **1.75 s** (budget 3 s) in release on Jose's Mac, 2026-10-20: about 1.71 s indexing, 34 ms for the first search, under 1 ms of unlock with tiny Argon2 parameters (`crates/liber-session/tests/encrypted_perf.rs`, opt-in with `LIBER_PERF=1`). The encrypted snapshot of §5.1 isn't needed.
 
 **Residuals** (documented, accepted):
@@ -446,4 +453,3 @@ No `localStorage` key holds page text, titles or page paths, and the UI uses no 
 - The rollback error could name the higher-epoch header copy; `Crypto` errors map to `damaged`, so a slot-limit error reads unclearly.
 - Unlock waits for recording recovery (could run in the background); if removing a take folder fails, the next unlock may recover the clip twice (the plain path does the same).
 - Lock signals: no real sleep, screen-lock or Windows lock was exercised in tests (the pure `slept` and `newly_locked` functions are unit-tested; the macOS observer is registered only on the real runtime). Jose's manual check: open an encrypted vault, put another app in front, lock the screen, wait, unlock: the vault is locked.
-- The cross-check of an E3-written vault file with `xcheck.py`'s logic (Global Constraints) wasn't run: the Python `cryptography` package isn't installed here. E3 writes files only through `liber-crypto`'s `StreamWriter` and name functions, whose output the frozen vectors pin and `xcheck.py` reads.
