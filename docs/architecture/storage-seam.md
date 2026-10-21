@@ -1,6 +1,6 @@
 # The storage seam
 
-Since encryption phase E2, all vault content goes through one trait: `Storage`, in `crates/liber-vault/src/storage/`. `Vault` owns a `Box<dyn Storage>`. Today the only production implementation is `PlainStorage`, which keeps the pre-E2 behaviour. E3 adds `EncryptedStorage` behind the same trait, and its callers don't change. Spec: `superpowers/specs/2026-10-20-encryption-design.md` §8. Plan: `superpowers/plans/2026-10-20-enc-e2-storage-seam.md`.
+Since encryption phase E2, all vault content goes through one trait: `Storage`, in `crates/liber-vault/src/storage/`. `Vault` owns a `Box<dyn Storage>`. There are two production implementations: `PlainStorage`, which keeps the pre-E2 behaviour, and `EncryptedStorage` (E3, below), behind the same trait, so its callers didn't change. Spec: `superpowers/specs/2026-10-20-encryption-design.md` §8. Plan: `superpowers/plans/2026-10-20-enc-e2-storage-seam.md`.
 
 Every path that crosses the trait is a `VaultPath`. There are three exceptions, and each exists to talk to the OS: `location()` (identity only), `os_path()` and `vault_path_of()`.
 
@@ -33,7 +33,7 @@ Every path that crosses the trait is a `VaultPath`. There are three exceptions, 
 These touch app folders, or files the user picked, never vault content:
 - app settings (`src-tauri/settings.rs`) and the first-launch adoption of legacy dirs (`legacy_dirs.rs`);
 - imported dictionaries (`spell_commands.rs`, `liber-spell`);
-- audio takes in the app cache (`audio_commands.rs`, `liber-audio/record.rs`; E3 spec §4.2);
+- audio takes of a plain vault in the app cache (`audio_commands.rs`, `liber-audio/record.rs`). An encrypted vault's take goes into the vault instead (below);
 - the index DB (`liber-index`; E3 uses `:memory:` for encrypted vaults, spec §5.1);
 - a new vault's own folder before `Vault::open` (`vault_commands.rs`, `scratchpad_commands.rs`, `notion_commands.rs`, `import.rs`);
 - a Notion export zip (`archive.rs`);
@@ -90,12 +90,30 @@ The feature is enabled only through `[dev-dependencies]`: in liber-vault itself,
 
 Tests that build their own storage with `PlainStorage::open` or `Vault::open_with` ignore the switch. So does `vault_icon_at`, which reads through `PlainStorage` directly.
 
-## What E3 must do
+## `EncryptedStorage` (E3, as built)
 
-- **`Storage::same_entry`**: implement it by comparing logical paths after E3's own name resolution. `Vault::same_entry` forwards to it.
-- **`create_new`** returns a `NewFile`: `finish()` commits, `flush()` doesn't end the stream, and a drop without `finish` deletes the temp file.
-- **`watch`** sends `Overflow` for lost events and root-level changes.
-- **`os_path(_, Reveal)`** must refuse hidden names, as `PlainStorage` does. With no symlinks, the name alone decides.
-- **Dropping the `WatchGuard`** must drop the sink.
-- **`vault_icon_at(root)`** hardcodes `PlainStorage::open`. Route it through the vault's real storage.
-- **`liber-testkit`** writes plaintext fixtures with `std::fs`. Under `encrypted`, fixtures must go through `Storage`.
+`crates/liber-vault/src/storage/encrypted/` stores the vault as format v1 ciphertext ([`../security/vault-format-v1.md`](../security/vault-format-v1.md)): `liber-vault.json` (the header), `README.txt`, and every logical entry under `d/` with an encrypted name. Spec: `superpowers/specs/2026-10-20-encryption-design.md` §4, §16 "E3 as built". Plan: `superpowers/plans/2026-10-20-enc-e3-encrypted-storage.md`.
+
+**Lifecycle.**
+- `EncryptedStorage::create(root, passphrase, params)` makes a vault in an empty folder (OS files like `.DS_Store`, and what a create that failed before its header left, are allowed). `params` must pass the Argon2 floor. `create_insecure` skips the floor and exists only with the `test-params` feature (plan ruling 2); `apps/desktop/src-tauri/tests/release_features.rs` checks that a release build of the app never enables it.
+- `EncryptedStorage::unlock(root, Unlock)` runs Argon2id (or the recovery code's KDF) once and keeps the unwrapped keys. It never merges header copies itself: the app checks the epoch first (`UnlockReport.merged` is always `None`), then calls `merge_header_copies`.
+- `lock()` drops the keys (their `Secret`s zeroize) and every decrypted name. Every later call, open readers included, fails with `VaultError::Locked`. `Drop` locks too.
+- `Storage::as_encrypted()` is the one trait addition (plan ruling 1, default `None`). Lock, salvage and the unreadable list stay inherent methods, so `PlainStorage` didn't grow.
+
+**Names** (`names.rs`, format §14). Each physical folder's listing is decrypted once and cached under its logical path; the cache is the only place decrypted names live, and `lock()` clears it.
+- Names resolve **case- and NFC-insensitively on every OS**, Linux too: a synced encrypted vault behaves the same on every machine, so two entries differing only in case can't coexist.
+- `:` is refused in names on every OS, both when listing and when writing (the UI already forbids it).
+- A name longer than the 200-byte threshold is stored under a hashed physical name with a `.libern` side file holding the encoded name. A side file stays while any sibling's conflict copy still names it.
+- A decrypted name is used only if it is exactly one `Normal` path component. Anything that fails (a bad name, two physical names decrypting to one logical name, an orphan `.libern`, a side file over 2048 bytes) is **unreadable**: `unreadable()` lists its physical path and the reason, and **no operation ever deletes, overwrites or renames it**. `replace_atomic(Overwrite)` never replaces an unresolved file; with no logical entry it commits as `CreateOnly`.
+
+**Writes** (`write.rs`, format §13.8). Every save is a new ciphertext with a fresh salt, streamed to a hidden `.liber-tmp` file in the target's physical folder and renamed into place. Nothing seeks into ciphertext. A rename or move re-encrypts names only; a folder keeps its id, so its children are untouched. `create_new` returns a `NewFile` that commits on `finish()` and deletes its temp file on drop (plan ruling 3); `flush()` is durability only. A save in flight when `lock()` runs still commits its ciphertext: only ciphertext is ever written. `trash_os` sends the ciphertext entry to the OS trash; the in-app Bin works through `rename`.
+
+**Recordings** (E3 Task 6). An encrypted vault's take streams into the vault itself, under `.liber/recording/<take>/`, as one `create_new` file (the WAV header first, sizes fixed at Stop by streaming into a second file). The recorder calls `finish_or_keep`: a failed `finish` (a full disk) keeps the temp file instead of deleting it. At unlock, `salvage_uncommitted` streams the complete chunks of a crashed or locked take into `<name>-recovered.wav` beside its page's other attachments (format §13.7), restricted to `.liber/recording/`, and `VaultInfo.recovered` lists the clips recovered. Nothing is held whole in memory.
+
+**Watching** (`watch.rs`). `notify` events on `<root>/d` are translated to logical paths through the name cache; a path the cache can't map becomes `RawEvent::Overflow`, so the session rescans. It works on a clone of the keys and delivers events with no lock held.
+
+**Header** (`header.rs`). Every header write goes through `VaultHeader`, which verifies the on-disk MAC before it signs (spec §16 #19), and merges the on-disk header first. Sync-conflict copies of `liber-vault.json` are merged (format §11) and then sent to the OS trash, never deleted (plan ruling 5). The epoch check comes before any merge, in the app (`epochs.rs`).
+
+**What a folder is** (`vault_kind`, above): encrypted only when the header parses **and** `d/` is a folder; otherwise signs of one make it `Damaged`, never plain. The header read is bounded by the format's own maximum (1 MiB).
+
+**Locking.** The keys sit behind an `RwLock<Option<Arc<Keys>>>`: each call clones the `Arc` and lets go at once, so no lock is held across I/O, and a call in flight at `lock` finishes with its clone. The name cache has its own `RwLock`. A `writing` mutex serializes writes from a name's free-check to its placement; reads never take it. `open_read` compares the opened file with the one it checked (inode on unix; size and mtime on Windows, where std has no stable file index).

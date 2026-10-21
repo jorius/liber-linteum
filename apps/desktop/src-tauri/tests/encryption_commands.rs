@@ -773,9 +773,11 @@ fn lock_during_recording_keeps_the_take() {
     assert_eq!(info["recovered"][0]["path"], path, "{info}");
     let (channels, samples) = h.read_wav(path);
     assert_eq!(channels, 1);
-    // Lock finishes the stream, so no chunk is lost: about 0.5 s. The
-    // real-time fake host's 10 ms sleeps run long, hence 0.4 s at least.
-    assert!((19_200..=48_000 * 2).contains(&samples), "{samples}");
+    // Lock finishes the stream, so no chunk is lost: about 0.5 s, all in the
+    // last (partial) 64 KiB chunk, which a lost chunk would leave empty. The
+    // real-time fake host's 10 ms sleeps run long on a loaded machine (0.39 s
+    // seen at load 10), hence 0.25 s at least.
+    assert!((12_000..=48_000 * 2).contains(&samples), "{samples}");
     assert_eq!(
         h.takes_left(),
         0,
