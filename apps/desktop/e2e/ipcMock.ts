@@ -58,6 +58,9 @@ export function installIpcMock({
   encryptInPlace?: {
     blocked?: { path: string; reason: string }[];
     originalsPending?: boolean;
+    /** The run stops after its first file until `__liberFinishEncrypt()`
+     *  (or Stop and undo), so its progress step can be checked. */
+    holdRun?: boolean;
   };
 }) {
   type Args = Record<string, unknown>;
@@ -524,12 +527,16 @@ export function installIpcMock({
       convertJob = { path: String(a.path), cancelled: false };
       return { recovery: NEW_RECOVERY };
     },
-    vault_encrypt_run: () => {
+    vault_encrypt_run: async () => {
       const job = convertJob;
       if (!job) throw { kind: 'notPermitted', message: 'nothing to encrypt: begin first' };
-      convertJob = null;
       const total = Object.keys(pages).length + files.size;
       const emit = w.__liberEmit as (e: string, p: unknown) => void;
+      if (encryptInPlace.holdRun) {
+        emit('vault:encrypt-progress', { done: 1, total });
+        await new Promise((resolve) => (w.__liberFinishEncrypt = resolve));
+      }
+      convertJob = null;
       for (let done = 0; done <= total; done++) {
         emit('vault:encrypt-progress', { done, total });
       }
@@ -544,6 +551,7 @@ export function installIpcMock({
     },
     vault_encrypt_cancel: () => {
       if (convertJob) convertJob.cancelled = true;
+      (w.__liberFinishEncrypt as (() => void) | undefined)?.();
       return null;
     },
     vault_trash_originals: () => {

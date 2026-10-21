@@ -13,7 +13,6 @@ import { openPage } from '../../stores/navigate';
 import { usePageStore } from '../../stores/pageStore';
 import { DEFAULT_SETTINGS, useSettingsStore } from '../../stores/settingsStore';
 import { childrenByParent } from '../../stores/tree';
-import { useToastStore } from '../../stores/toastStore';
 import { useUiStore } from '../../stores/uiStore';
 import { resetVaultStore, useVaultStore } from '../../stores/vaultStore';
 import { AppShell } from './AppShell';
@@ -269,9 +268,9 @@ describe('AppShell', () => {
     render(<AppShell />);
     await userEvent.click(screen.getByRole('button', { name: 'Digital Brain' }));
     await userEvent.click(screen.getByRole('menuitem', { name: 'Encrypt “Digital Brain”…' }));
-    // The stub until the convert flow lands (encryptInPlace.ts).
-    expect(useToastStore.getState().toasts.at(-1)?.message).toBe(
-      'Encrypting in place is coming in the next step.',
+    const root = useVaultStore.getState().info!.root;
+    await waitFor(() =>
+      expect(useUiStore.getState().dialog).toEqual({ type: 'encryptInPlace', root }),
     );
   });
 

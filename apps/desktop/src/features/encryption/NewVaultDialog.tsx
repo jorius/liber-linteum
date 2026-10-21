@@ -6,7 +6,7 @@ import { useVaultStore } from '../../stores/vaultStore';
 import { Dialog } from '../dialogs/Dialog';
 import dialogs from '../dialogs/Dialogs.module.css';
 import { CreateEncryptedDialog } from './CreateEncryptedDialog';
-import { openEncryptInPlace } from './encryptInPlace';
+import { openEncryptInPlace, refusedText } from './encryptInPlace';
 import styles from './Encryption.module.css';
 
 /** After Continue: E4's encrypted steps, or a question about the folder. */
@@ -63,6 +63,8 @@ export function NewVaultDialog({ onClose }: { onClose: () => void }) {
     e.preventDefault();
     if (!path || !kind) return;
     if (kind === 'encrypted') return setStep('isEncrypted');
+    // §8.10: never offered for the Scratchpad, home, Desktop, Documents, Downloads, a volume root.
+    if (encrypted && kind === 'refused') return setError(refusedText(path));
     if (encrypted) return setStep(kind === 'plain' ? 'hasNotes' : 'passphrase');
     const vault = useVaultStore.getState();
     // Only a new folder is created: vault_create refuses a failed encrypted
@@ -96,8 +98,10 @@ export function NewVaultDialog({ onClose }: { onClose: () => void }) {
   return (
     <Dialog title={t('newVault.title')} onClose={onClose}>
       {step === 'hasNotes' && path ? (
-        question(t('newVault.hasNotes'), t('newVault.encryptInPlace'), () =>
-          openEncryptInPlace(path),
+        question(
+          t('newVault.hasNotes'),
+          t('newVault.encryptInPlace'),
+          () => void openEncryptInPlace(path),
         )
       ) : step === 'isEncrypted' && path ? (
         question(t('newVault.isEncrypted'), t('newVault.openIt'), () =>
@@ -135,7 +139,10 @@ export function NewVaultDialog({ onClose }: { onClose: () => void }) {
                 type="radio"
                 name={`${id}-protection`}
                 checked={!encrypted}
-                onChange={() => setEncrypted(false)}
+                onChange={() => {
+                  setEncrypted(false);
+                  if (kind === 'refused') setError(null); // Plain opens it
+                }}
                 aria-labelledby={`${id}-plain`}
                 aria-describedby={`${id}-plain-hint`}
               />

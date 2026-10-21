@@ -35,7 +35,7 @@ export const openAnotherVault = () =>
 export const encryptThisVault = () => {
   const { status, info } = useVaultStore.getState();
   if (status === 'open' && info && !info.encrypted && !info.scratchpad)
-    openEncryptInPlace(info.root);
+    void openEncryptInPlace(info.root);
 };
 
 export const closeVault = () => void useVaultStore.getState().close();

@@ -74,8 +74,8 @@
     "rollback": "El archivo de claves de esta bóveda es más antiguo que uno que este dispositivo ya vio, así que no se abrió. Puede que alguien haya restaurado una copia antigua.",
     "damaged": "Esta bóveda cifrada, o un archivo en ella, está dañada y no se puede leer.",
     "convertingElsewhere": "Esta bóveda se está cifrando en otro dispositivo. Termina allí o espera a que acabe la sincronización.",
-    "changedDuringConvert": "Algunos archivos cambiaron durante el cifrado, probablemente por un servicio de sincronización. Pausa la sincronización y vuelve a intentarlo.",
-    "cancelled": "Se detuvo el cifrado. La bóveda está como estaba.",
+    "changedDuringConvert": "Algunos archivos cambiaron durante el cifrado, probablemente por un servicio de sincronización. No se cambió nada. Pausa la sincronización y vuelve a intentarlo.",
+    "cancelled": "Detenido. La bóveda está como estaba.",
     "io": "Algo salió mal: {message}"
   },
   "toasts": {
@@ -1147,7 +1147,30 @@
     "encryptInPlace": "Cifrar donde está…",
     "isEncrypted": "Esta carpeta ya es una bóveda cifrada.",
     "openIt": "Abrirla",
-    "back": "Atrás",
-    "encryptSoon": "Cifrar una bóveda donde está llega en el siguiente paso."
+    "back": "Atrás"
+  },
+  "encryptInPlace": {
+    "title": "Cifrar «{name}»",
+    "intro": "Cada página, nombre de carpeta y archivo adjunto de esta carpeta se cifrará donde está.",
+    "files": "{count, plural, one {# archivo.} other {# archivos.}}",
+    "counting": "Contando archivos…",
+    "warning": "Cifrar no alcanza las copias que ya existen en otros sitios: las copias de seguridad, Time Machine y el historial de versiones de tu servicio de sincronización (Dropbox, iCloud) pueden conservar los archivos legibles antiguos.",
+    "pauseSync": "Pausa Dropbox, iCloud u otra sincronización de esta carpeta mientras dure.",
+    "syncthing": "Si esta carpeta usa Syncthing, su carpeta .stversions guarda versiones legibles antiguas; vacíala después.",
+    "choosePassphrase": "Elegir una frase de contraseña…",
+    "blocked": "Esto no se puede cifrar:",
+    "blockedHint": "Cámbiales el nombre o quítalos y vuelve a intentarlo.",
+    "reason": "{reason, select, badChar {un carácter que los nombres cifrados no admiten (: o \\)} twin {otro nombre aquí solo se distingue de este en mayúsculas o acentos} symlink {un enlace a otro sitio} unreadable {no se puede leer} special {no es un archivo ni una carpeta} reserved {un nombre que Liber Linteum reserva para sí} git {un repositorio git: cifrarlo rompería el repositorio} cloud {solo está en la nube: descárgalo antes (disponible sin conexión)} longName {el nombre es demasiado largo} notUtf8 {el nombre no es texto válido} other {no se puede cifrar}}",
+    "progressLabel": "Cifrando",
+    "progress": "{done, number} de {total, number} archivos · cada uno se comprueba antes de mover el original",
+    "stop": "Detener y deshacer",
+    "done": "{count, plural, one {# archivo cifrado y comprobado.} other {# archivos cifrados y comprobados.}} Los originales sin cifrar están en la Papelera como «{name} (unencrypted originals)»: vacíala cuando estés conforme.",
+    "donePending": "{count, plural, one {# archivo cifrado y comprobado.} other {# archivos cifrados y comprobados.}} Los originales sin cifrar no se pudieron mover a la Papelera: siguen en la carpeta de la bóveda.",
+    "open": "Abrir",
+    "moveToTrash": "Mover a la Papelera",
+    "refused": "Cifra una carpeta de bóveda, no {folder}.",
+    "interrupted": "Se interrumpió el cifrado de «{name}»; la bóveda está como estaba.",
+    "finished": "Terminó el cifrado de «{name}».",
+    "banner": "Los originales sin cifrar de esta bóveda siguen en su carpeta."
   }
 }

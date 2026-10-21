@@ -386,3 +386,45 @@ fn the_scratchpad_blocked_folders_and_short_passphrases_are_refused() {
     let err = call(&h.main, "vault_encrypt_preflight", json!({ "path": enc })).unwrap_err();
     assert_eq!(kind(err), "notPermitted");
 }
+
+/// The New vault dialog's `folder_kind` recovers this device's interrupted
+/// conversion first: mid-commit the root has `d/` and no header, which
+/// would otherwise read as damaged. It also names the folders never
+/// encrypted in place (§8.10), so the dialog doesn't offer it.
+#[test]
+fn folder_kind_recovers_an_interrupted_conversion_and_names_refused_folders() {
+    let h = harness();
+    let me = h.install_id();
+    let recovered = h.events("vault:encrypt-recovered");
+    let ask = |p: &Path| call(&h.main, "folder_kind", json!({ "path": p }));
+
+    let root = h.plain("Mid");
+    h.crash(&root, &me, CrashPoint::AfterData);
+    assert_eq!(ask(&root).unwrap(), "encrypted");
+    assert!(convert::read_journal(&root).unwrap().is_none());
+
+    let root = h.plain("Early");
+    let before = snapshot(&root);
+    h.crash(&root, &me, CrashPoint::Staging(1));
+    assert_eq!(ask(&root).unwrap(), "plain");
+    assert_eq!(snapshot(&root), before);
+    let outcomes: Vec<Value> = recovered
+        .lock()
+        .unwrap()
+        .iter()
+        .map(|e| e["outcome"].clone())
+        .collect();
+    assert_eq!(outcomes, vec![json!("finished"), json!("rolledBack")]);
+
+    let root = h.plain("Elsewhere");
+    h.crash(&root, "another-install", CrashPoint::AfterData);
+    assert_eq!(kind(ask(&root).unwrap_err()), "convertingElsewhere");
+
+    let root = h.plain("Scratch");
+    h.state()
+        .settings
+        .set_scratchpad_path(Some(root.to_string_lossy().into_owned()))
+        .unwrap();
+    assert_eq!(ask(&root).unwrap(), "refused");
+    assert_eq!(ask(Path::new("/")).unwrap(), "refused", "a volume root");
+}

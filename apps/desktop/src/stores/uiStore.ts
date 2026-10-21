@@ -33,6 +33,9 @@ export type DialogState =
    *  app so the code outlives Settings, lock and Close; `fromVoid`: in place
    *  of the voided-key prompt, which its Cancel goes back to. */
   | { type: 'newRecovery'; root: string; fromVoid?: boolean }
+  /** Encrypt the plain vault at `root` in place (encryption UX §4.2, §8);
+   *  `EncryptInPlaceHost`. Held from its begin until it is done. */
+  | { type: 'encryptInPlace'; root: string }
   /** Save / Don't Save / Cancel before unsaved text is left (M5b §6, auto
    *  save off). `id` tells two questions apart. */
   | { type: 'unsaved'; id: number; paths: string[]; answer: (c: UnsavedChoice) => void }
@@ -64,8 +67,8 @@ interface UiState {
    *  answer treat a refusal as Cancel. */
   openDialog: (d: Exclude<DialogState, null>) => boolean;
   closeDialog: () => void;
-  /** The create or new-recovery dialog holds the screen while it makes a
-   *  recovery code and shows it. */
+  /** The create, new-recovery or encrypt-in-place dialog holds the screen
+   *  while it makes a recovery code and shows it (and while encrypting). */
   held: boolean;
   hold: (held: boolean) => void;
 }
@@ -74,8 +77,11 @@ interface UiState {
  *  holding a recovery code: nothing replaces them. */
 function isSticky(d: DialogState, held: boolean): boolean {
   if (d?.type === 'recoveryVoid' || (d?.type === 'newRecovery' && d.fromVoid)) return true;
-  return held && (d?.type === 'newVault' || d?.type === 'newRecovery');
+  return held && HOLDERS.has(d?.type ?? '');
 }
+
+/** The dialogs that can hold the screen (`hold`). */
+export const HOLDERS = new Set(['newVault', 'newRecovery', 'encryptInPlace']);
 
 export const useUiStore = create<UiState>((set, get) => ({
   dialog: null,

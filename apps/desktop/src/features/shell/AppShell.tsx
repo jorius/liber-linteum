@@ -7,6 +7,7 @@ import { useVaultStore } from '../../stores/vaultStore';
 import { BinView } from '../bin/BinView';
 import { DialogHost } from '../dialogs/DialogHost';
 import { useAutoLock } from '../encryption/autoLock';
+import { OriginalsBanner } from '../encryption/EncryptInPlaceDialog';
 import { useEncryptMenuItem } from '../encryption/encryptInPlace';
 import { ContextMenu, type MenuState } from '../explorer/ContextMenu';
 import { requestTrash } from '../explorer/trashAction';
@@ -62,6 +63,7 @@ export function AppShell() {
             <SidebarIcon />
           </button>
         )}
+        <OriginalsBanner />
         <main className={styles.content}>
           {/* The editor stays mounted while the Global View shows, so text,
               selection and undo survive switching (M3a §2). */}

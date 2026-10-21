@@ -240,3 +240,56 @@
   font-weight: 700;
   color: var(--color-text-strong);
 }
+
+/* Encrypt in place (encryption UX §4.2, §8). */
+.warning {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 12px;
+  border: 1px solid var(--color-warn-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-warn-bg);
+  color: var(--color-warn-text);
+  font-size: 13px;
+}
+
+.warning p {
+  margin: 0;
+}
+
+.progress {
+  width: 100%;
+  accent-color: var(--color-accent);
+}
+
+/* The originals-pending banner (§8.8), above the page. */
+.banner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 16px;
+  margin: 12px 16px 0;
+  padding: 10px 14px;
+  border: 1px solid var(--color-warn-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-warn-bg);
+  color: var(--color-warn-text);
+  font-size: 13px;
+}
+
+/* Clear of the collapsed sidebar's button, top left. */
+:global([data-collapsed]) > .banner {
+  margin-left: 56px;
+}
+
+.banner p {
+  margin: 0;
+}
+
+.bannerActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}

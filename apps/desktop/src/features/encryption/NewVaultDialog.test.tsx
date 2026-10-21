@@ -177,6 +177,25 @@ describe('New vault dialog', () => {
     expect(sent(calls, 'vault_create')).toEqual([]);
   });
 
+  it('a folder never encrypted in place (§8.10): no offer, it says why; Plain still opens it', async () => {
+    const calls = backend(['/Users/jose/Documents'], { '/Users/jose/Documents': 'refused' });
+    const dialog = await start();
+    await userEvent.click(within(dialog).getByRole('radio', { name: 'Encrypted Beta' }));
+    const go = within(dialog).getByRole('button', { name: 'Continue' });
+    await waitFor(() => expect(go).toBeEnabled());
+    await userEvent.click(go);
+    expect(within(dialog).getByRole('alert')).toHaveTextContent(
+      'Encrypt a vault folder, not Documents.',
+    );
+    expect(within(dialog).queryByRole('button', { name: 'Encrypt in place…' })).toBeNull();
+    expect(openEncryptInPlace).not.toHaveBeenCalled();
+    expect(sent(calls, 'vault_create_encrypted')).toEqual([]);
+    await userEvent.click(within(dialog).getByRole('radio', { name: 'Plain' }));
+    await userEvent.click(go);
+    await waitFor(() => expect(useVaultStore.getState().status).toBe('open'));
+    expect(sent(calls, 'vault_open')).toEqual([{ path: '/Users/jose/Documents' }]);
+  });
+
   it.each(['plain', 'encrypted'])(
     'a folder that is already an encrypted vault (%s chosen) offers to open it',
     async (choice) => {

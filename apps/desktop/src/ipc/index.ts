@@ -757,8 +757,11 @@ export const menuSetLockEnabled = (enabled: boolean) =>
 export const menuSetEncryptItem = (vault: string | null) =>
   call<void>('menu_set_encrypt_item', { vault });
 /** What a folder chosen for a new vault holds (UX round §2): `empty` (OS
- *  files aside) or `missing` can be created in; `plain` has files. */
-export type FolderKind = 'empty' | 'missing' | 'plain' | 'encrypted' | 'damaged';
+ *  files aside) or `missing` can be created in; `plain` has files;
+ *  `refused`: never encrypted in place (Scratchpad, home, Desktop,
+ *  Documents, Downloads, a volume root; §8.10). Asking finishes or undoes
+ *  this device's interrupted conversion of it first. */
+export type FolderKind = 'empty' | 'missing' | 'plain' | 'encrypted' | 'damaged' | 'refused';
 export const folderKind = (path: string) => call<FolderKind>('folder_kind', { path });
 export const securityChangePassphrase = (current: string, next: string) =>
   call<void>('security_change_passphrase', { current, next });
@@ -1262,6 +1265,12 @@ export const onLockRequest = (
   cb: (reason: VaultLockRequestPayload['reason']) => void,
 ): Promise<UnlistenFn> =>
   listen<VaultLockRequestPayload>('vault:lock-request', (e) => cb(e.payload.reason), mine());
+/** Encrypt in place: after each file copied and checked. */
+export const onEncryptProgress = (cb: (p: EncryptProgressPayload) => void): Promise<UnlistenFn> =>
+  listen<EncryptProgressPayload>('vault:encrypt-progress', (e) => cb(e.payload), mine());
+/** Encrypt in place: an open finished or undid an interrupted conversion. */
+export const onEncryptRecovered = (cb: (p: EncryptRecoveredPayload) => void): Promise<UnlistenFn> =>
+  listen<EncryptRecoveredPayload>('vault:encrypt-recovered', (e) => cb(e.payload), mine());
 export const onVaultWarning = (cb: (p: WarningPayload) => void): Promise<UnlistenFn> =>
   listen<WarningPayload>('vault:warning', (e) => cb(e.payload));
 

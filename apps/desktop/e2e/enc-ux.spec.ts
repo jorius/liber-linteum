@@ -9,7 +9,12 @@ const AXE = readFileSync(new URL('../node_modules/axe-core/axe.min.js', import.m
 const PASSPHRASE = 'correct horse battery';
 const PICKED = '/e2e/new-encrypted';
 
-const setup = (page: Page, folderKinds: Record<string, string> = {}, theme = 'light') =>
+const setup = (
+  page: Page,
+  folderKinds: Record<string, string> = {},
+  theme = 'light',
+  encryptInPlace: Parameters<typeof installIpcMock>[0]['encryptInPlace'] = {},
+) =>
   page.addInitScript(installIpcMock, {
     settings: { theme },
     pages: { 'Welcome.md': '# Welcome\n\nStart here.\n' },
@@ -17,6 +22,7 @@ const setup = (page: Page, folderKinds: Record<string, string> = {}, theme = 'li
     remoteCover: false,
     encrypted: { passphrase: PASSPHRASE, recovery: 'LIBER-AAAA-BBBB' },
     folderKinds,
+    encryptInPlace,
   });
 
 const axeClean = async (page: Page, scope: string) => {
@@ -106,7 +112,7 @@ test('New vault, Plain (the default): creates the vault and names it in Vault �
   // The sidebar's vault menu has the same item.
   await page.locator('[data-vault-menu]').click();
   await page.getByRole('menuitem', { name: 'Encrypt “new-encrypted”…' }).click();
-  await expect(page.getByText('Encrypting in place is coming in the next step.')).toBeVisible();
+  await expect(page.getByRole('dialog', { name: 'Encrypt “new-encrypted”' })).toBeVisible();
 });
 
 test('New vault, Encrypted, on an empty folder: through to the recovery key', async ({ page }) => {
@@ -143,8 +149,9 @@ test('New vault, Encrypted, on a folder with notes: the in-place offer', async (
   await expect(dialog.getByRole('button', { name: 'Encrypt in place…' })).toBeFocused();
   await axeClean(page, '[role="dialog"]');
   await dialog.getByRole('button', { name: 'Encrypt in place…' }).click();
-  await expect(page.getByRole('dialog')).toHaveCount(0);
-  await expect(page.getByText('Encrypting in place is coming in the next step.')).toBeVisible();
+  const encrypt = page.getByRole('dialog', { name: 'Encrypt “new-encrypted”' });
+  await expect(encrypt.getByText(/will be encrypted where it is\. 1 file\./)).toBeVisible();
+  await expect(encrypt.getByRole('button', { name: 'Choose a passphrase…' })).toBeFocused();
 });
 
 for (const theme of ['light', 'dark'] as const) {
@@ -189,5 +196,137 @@ for (const theme of ['light', 'dark'] as const) {
     await settings.getByRole('button', { name: /^Security/ }).click();
     await chipFits(settings.locator('[data-nav="security"] .liber-chip'));
     await chipFits(settings.locator('h3 .liber-chip'));
+  });
+}
+
+// ---- Encrypt in place (encryption UX §4.2 as amended by §8) ----
+
+/** Types back the two groups the key step asks for, from the code shown. */
+async function confirmKey(dialog: Locator) {
+  const code = (await dialog.getByTestId('recovery-code').textContent()) ?? '';
+  await dialog.getByRole('button', { name: "I've saved it" }).click();
+  for (const input of await dialog.getByRole('textbox').all()) {
+    const label = (await input.evaluate((el) => el.closest('label')?.textContent)) ?? '';
+    const n = Number(/Group (\d+)/.exec(label)![1]);
+    await input.fill(code.split('-')[n]);
+  }
+  await dialog.getByRole('button', { name: 'Done' }).click();
+}
+
+/** Vault menu → Encrypt "vault"… (from Welcome, `fromWelcome`, opening it first). */
+const openPlainVault = async (page: Page, fromWelcome = true) => {
+  if (fromWelcome) await page.getByRole('button', { name: /^vault/ }).click();
+  await page.locator('[data-vault-menu]').click();
+  await page.getByRole('menuitem', { name: 'Encrypt “vault”…' }).click();
+  return page.getByRole('dialog', { name: 'Encrypt “vault”' });
+};
+
+for (const theme of ['light', 'dark'] as const) {
+  test(`Vault → Encrypt: intro, passphrase, recovery key, progress, done, the shell (${theme})`, async ({
+    page,
+  }) => {
+    await page.emulateMedia({ colorScheme: theme });
+    await setup(page, {}, theme, { holdRun: true });
+    await page.goto('/');
+    const dialog = await openPlainVault(page);
+    await expect(dialog.getByText(/1 file\./)).toBeVisible();
+    await expect(dialog.getByText(/Pause Dropbox, iCloud or other sync/)).toBeVisible();
+    await chipFits(dialog.locator('.liber-chip'));
+    await axeClean(page, '[role="dialog"]');
+    await dialog.getByRole('button', { name: 'Choose a passphrase…' }).click();
+    await expect(dialog.getByLabel('Passphrase', { exact: true })).toBeFocused();
+    await dialog.getByLabel('Passphrase', { exact: true }).fill(PASSPHRASE);
+    await dialog.getByLabel('Confirm passphrase').fill(PASSPHRASE);
+    await axeClean(page, '[role="dialog"]');
+    await dialog.getByRole('button', { name: 'Continue' }).click();
+    await expect(dialog.getByTestId('recovery-code')).toBeVisible();
+    await axeClean(page, '[role="dialog"]');
+    // Held: Escape doesn't dismiss the key.
+    await page.keyboard.press('Escape');
+    await expect(dialog.getByTestId('recovery-code')).toBeVisible();
+    await confirmKey(dialog);
+    await expect(
+      dialog.getByText('1 of 1 files · each one is checked before the original is moved'),
+    ).toBeVisible();
+    await expect(dialog.getByRole('button', { name: 'Stop and undo' })).toBeFocused();
+    await axeClean(page, '[role="dialog"]');
+    await page.evaluate(() =>
+      (window as unknown as { __liberFinishEncrypt: () => void }).__liberFinishEncrypt(),
+    );
+    await expect(dialog.getByText(/1 file encrypted and checked\./)).toBeVisible();
+    await axeClean(page, '[role="dialog"]');
+    await dialog.getByRole('button', { name: 'Open' }).click();
+    await expect(page.getByRole('dialog')).toHaveCount(0);
+    await expect(page.locator('[data-vault-menu]')).toBeVisible();
+    // Now encrypted: Encrypt is off.
+    await expect
+      .poll(() =>
+        page.evaluate(() => (window as unknown as Record<string, unknown>).__liberEncryptItem),
+      )
+      .toBeNull();
+  });
+
+  test(`a blocked preflight lists what stops it, and changes nothing (${theme})`, async ({
+    page,
+  }) => {
+    await page.emulateMedia({ colorScheme: theme });
+    await setup(page, {}, theme, {
+      blocked: [
+        { path: 'a:b.md', reason: 'badChar' },
+        { path: '.git', reason: 'git' },
+      ],
+    });
+    await page.goto('/');
+    const dialog = await openPlainVault(page);
+    await expect(dialog.getByText('a:b.md')).toBeVisible();
+    await expect(dialog.getByText('Rename or remove these, then try again.')).toBeVisible();
+    await expect(dialog.getByRole('button')).toHaveText(['Close']);
+    await axeClean(page, '[role="dialog"]');
+    await dialog.getByRole('button', { name: 'Close' }).click();
+    await expect(page.getByRole('dialog')).toHaveCount(0);
+    await expect(page.locator('[data-vault-menu]')).toBeVisible();
+  });
+
+  test(`Stop and undo puts the plain vault back; originals the Trash refused get a banner (${theme})`, async ({
+    page,
+  }) => {
+    await page.emulateMedia({ colorScheme: theme });
+    await setup(page, {}, theme, { holdRun: true, originalsPending: true });
+    await page.goto('/');
+    let dialog = await openPlainVault(page);
+    const toKey = async () => {
+      await dialog.getByRole('button', { name: 'Choose a passphrase…' }).click();
+      await dialog.getByLabel('Passphrase', { exact: true }).fill(PASSPHRASE);
+      await dialog.getByLabel('Confirm passphrase').fill(PASSPHRASE);
+      await dialog.getByRole('button', { name: 'Continue' }).click();
+      await confirmKey(dialog);
+    };
+    await toKey();
+    await dialog.getByRole('button', { name: 'Stop and undo' }).click();
+    await expect(dialog.getByRole('alert')).toHaveText('Stopped. The vault is back as it was.');
+    await axeClean(page, '[role="dialog"]');
+    await dialog.getByRole('button', { name: 'Close' }).click();
+    await expect(page.locator('[data-vault-menu]')).toBeVisible();
+    await expect
+      .poll(() =>
+        page.evaluate(() => (window as unknown as Record<string, unknown>).__liberEncryptItem),
+      )
+      .toBe('vault');
+
+    dialog = await openPlainVault(page, false);
+    await toKey();
+    await page.evaluate(() =>
+      (window as unknown as { __liberFinishEncrypt: () => void }).__liberFinishEncrypt(),
+    );
+    await expect(dialog.getByText(/still in the vault folder/)).toBeVisible();
+    await axeClean(page, '[role="dialog"]');
+    await dialog.getByRole('button', { name: 'Open' }).click();
+    const banner = page.getByText(
+      'The unencrypted originals of this vault are still in its folder.',
+    );
+    await expect(banner).toBeVisible();
+    await axeClean(page, '[data-banner="originals"]');
+    await page.getByRole('button', { name: 'Move to Trash' }).click();
+    await expect(banner).toHaveCount(0);
   });
 }

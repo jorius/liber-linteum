@@ -74,8 +74,8 @@
     "rollback": "This vault's key file is older than one this device has already seen, so it wasn't opened. Someone may have put an old copy back.",
     "damaged": "This encrypted vault, or a file in it, is damaged and can't be read.",
     "convertingElsewhere": "This vault is being encrypted on another device. Finish there, or wait for sync to finish.",
-    "changedDuringConvert": "Files changed while encrypting — probably a sync service. Pause syncing and try again.",
-    "cancelled": "Encrypting was stopped. The vault is back as it was.",
+    "changedDuringConvert": "Files changed while encrypting — probably a sync service. Nothing was changed. Pause syncing and try again.",
+    "cancelled": "Stopped. The vault is back as it was.",
     "io": "Something went wrong: {message}"
   },
   "toasts": {
@@ -1147,7 +1147,30 @@
     "encryptInPlace": "Encrypt in place…",
     "isEncrypted": "This folder is already an encrypted vault.",
     "openIt": "Open it",
-    "back": "Back",
-    "encryptSoon": "Encrypting in place is coming in the next step."
+    "back": "Back"
+  },
+  "encryptInPlace": {
+    "title": "Encrypt “{name}”",
+    "intro": "Every page, folder name and attachment in this folder will be encrypted where it is.",
+    "files": "{count, plural, one {# file.} other {# files.}}",
+    "counting": "Counting files…",
+    "warning": "Encrypting can't reach copies that already exist elsewhere — backups, Time Machine, and your sync service's version history (Dropbox, iCloud) may still hold the old readable files.",
+    "pauseSync": "Pause Dropbox, iCloud or other sync for this folder while it runs.",
+    "syncthing": "If this folder uses Syncthing, its .stversions folder keeps old readable versions; empty it afterwards.",
+    "choosePassphrase": "Choose a passphrase…",
+    "blocked": "These can't be encrypted:",
+    "blockedHint": "Rename or remove these, then try again.",
+    "reason": "{reason, select, badChar {a character encrypted names can't hold (: or \\)} twin {another name here differs from it only in case or accents} symlink {a link to somewhere else} unreadable {it can't be read} special {not a file or a folder} reserved {a name Liber Linteum keeps for itself} git {a git repository: encrypting it would break the repository} cloud {only in the cloud: download it first (make it available offline)} longName {the name is too long} notUtf8 {the name isn't valid text} other {it can't be encrypted}}",
+    "progressLabel": "Encrypting",
+    "progress": "{done, number} of {total, number} files · each one is checked before the original is moved",
+    "stop": "Stop and undo",
+    "done": "{count, plural, one {# file encrypted and checked.} other {# files encrypted and checked.}} The unencrypted originals are in the Trash as “{name} (unencrypted originals)”: empty it when you're happy.",
+    "donePending": "{count, plural, one {# file encrypted and checked.} other {# files encrypted and checked.}} The unencrypted originals couldn't be moved to the Trash: they're still in the vault folder.",
+    "open": "Open",
+    "moveToTrash": "Move to Trash",
+    "refused": "Encrypt a vault folder, not {folder}.",
+    "interrupted": "Encrypting “{name}” was interrupted; the vault is back as it was.",
+    "finished": "Finished encrypting “{name}”.",
+    "banner": "The unencrypted originals of this vault are still in its folder."
   }
 }

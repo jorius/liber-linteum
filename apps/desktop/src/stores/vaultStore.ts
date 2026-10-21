@@ -19,6 +19,8 @@ import {
   vaultClose,
   vaultCreate,
   vaultCreateEncrypted,
+  vaultEncryptBegin,
+  vaultEncryptRun,
   vaultLock,
   vaultOpen,
   vaultUnlock,
@@ -42,7 +44,7 @@ import { errorMessage } from './messages';
 import { usePageStore } from './pageStore';
 import { useToastStore } from './toastStore';
 import { useTrailStore } from './trailStore';
-import { useUiStore } from './uiStore';
+import { HOLDERS, useUiStore } from './uiStore';
 import { clearVaultCaches } from './leaveVault';
 import {
   childrenByParent,
@@ -104,6 +106,18 @@ interface VaultState {
    *  screen up and is not toasted (the screen shows it). */
   unlock: (secret: UnlockSecret) => Promise<IpcResult<VaultInfo>>;
   createEncrypted: (path: string, passphrase: string) => Promise<IpcResult<CreatedEncryptedVault>>;
+  /** Encrypt in place, begin (UX §4.2): every page saved without asking
+   *  (`null`: one couldn't be, and a toast says so), then the vault on screen
+   *  left if it is `root` (begin closes its session), then the staging vault
+   *  made. Its recovery code is only returned, for the dialog. */
+  encryptBegin: (
+    root: string,
+    passphrase: string,
+  ) => Promise<IpcResult<{ recovery: string }> | null>;
+  /** Encrypt in place, run: the encrypted vault opens as an unlock does. On
+   *  any failure (Stop and undo too; the backend rolled back) the plain vault
+   *  left at begin opens again. */
+  encryptRun: () => Promise<IpcResult<VaultInfo>>;
   /** Saves every page (never asking), then locks (spec §6.2). `false`: a save
    *  failed and nothing was locked. */
   lock: (reason: 'menu' | 'idle' | 'sleep' | 'screenLock') => Promise<boolean>;
@@ -168,6 +182,9 @@ let treeSeq = 0;
  *  again on that vault's next open (E3 reports a voided key only once). In
  *  memory only: the path never reaches storage. */
 let voidPending: string | null = null;
+/** The plain vault an encrypt in place left (its begin closed it): opened
+ *  again if the conversion fails. */
+let convertLeft: string | null = null;
 let unlisten: (() => void)[] = [];
 let pending: ChangedPayload | null = null;
 let timer: ReturnType<typeof setTimeout> | null = null;
@@ -209,6 +226,7 @@ export async function resetVaultStore() {
   stopListening();
   treeSeq++;
   voidPending = null;
+  convertLeft = null;
   useVaultStore.setState({ ...EMPTY, locking: false, children: new Map(), expanded: new Set() });
 }
 
@@ -226,7 +244,7 @@ function leaveVaultUi() {
   if (d?.type === 'binClash') d.answer(false);
   const voided = d?.type === 'recoveryVoid' || (d?.type === 'newRecovery' && d.fromVoid);
   if (voided && !ui.held) voidPending = d.root;
-  const held = ui.held && (d?.type === 'newVault' || d?.type === 'newRecovery');
+  const held = ui.held && HOLDERS.has(d?.type ?? '');
   if (!held && !APP_DIALOGS.has(d?.type ?? '')) ui.closeDialog();
   useToastStore.getState().clear();
   useBinStore.getState().reset();
@@ -394,6 +412,13 @@ export const useVaultStore = create<VaultState>((set, get) => {
     return res;
   }
 
+  /** The plain vault an encrypt in place left, back (it was rolled back). */
+  async function reopenLeft() {
+    const root = convertLeft;
+    convertLeft = null;
+    if (root) await get().open(root);
+  }
+
   async function withProgress(
     run: () => Promise<IpcResult<VaultInfo>>,
     opts?: OpenOpts,
@@ -474,6 +499,27 @@ export const useVaultStore = create<VaultState>((set, get) => {
       // A vault that was created shows its code, even if opening it failed.
       const made = created as IpcResult<CreatedEncryptedVault> | null;
       return made ?? (res.ok ? { ok: false, error: BUSY } : res);
+    },
+    encryptBegin: async (root, passphrase) => {
+      const { status, info } = get();
+      if (status === 'opening') return { ok: false, error: BUSY };
+      if (status === 'open' && !(await savedEverything({ ask: false }))) return null;
+      if (status === 'open' && info?.root === root) {
+        dropVault();
+        convertLeft = root;
+      }
+      const res = await vaultEncryptBegin(root, passphrase);
+      if (!res.ok) await reopenLeft();
+      return res;
+    },
+    encryptRun: async () => {
+      const res = await vaultEncryptRun();
+      if (!res.ok) {
+        await reopenLeft();
+        return res;
+      }
+      convertLeft = null;
+      return opened(res, get().status, { path: res.value.root });
     },
     lock: async () => {
       // `locking` also keeps the backend's own `vault:locked` (sent while
