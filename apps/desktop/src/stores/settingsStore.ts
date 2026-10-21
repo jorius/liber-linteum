@@ -17,6 +17,7 @@ import { useToastStore } from './toastStore';
 
 export const DEFAULT_SETTINGS: Settings = {
   version: 1,
+  autoLockMinutes: 15,
   language: null,
   theme: 'system',
   rewriteLinks: true,

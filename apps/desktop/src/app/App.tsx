@@ -3,6 +3,7 @@ import { NotionHost } from '../features/notion/NotionHost';
 import { ScratchpadHost } from '../features/scratchpad/ScratchpadHost';
 import { AppShell } from '../features/shell/AppShell';
 import { Toaster } from '../features/toasts/Toaster';
+import { UnlockScreen } from '../features/unlock/UnlockScreen';
 import { Welcome } from '../features/welcome/Welcome';
 import { useVaultStore } from '../stores/vaultStore';
 import { useAppVersion } from './useAppVersion';
@@ -13,7 +14,13 @@ export function App() {
   const status = useVaultStore((s) => s.status);
   return (
     <>
-      {status === 'open' ? <AppShell /> : <Welcome version={version} />}
+      {status === 'open' ? (
+        <AppShell />
+      ) : status === 'locked' ? (
+        <UnlockScreen />
+      ) : (
+        <Welcome version={version} />
+      )}
       {status === 'opening' && <OpeningOverlay />}
       <ScratchpadHost />
       <NotionHost />

@@ -11,6 +11,7 @@ export function installIpcMock({
   outside = {},
   filePicks = [],
   folders = [],
+  encrypted,
 }: {
   pages: Record<string, string>;
   editorMode: string;
@@ -38,6 +39,9 @@ export function installIpcMock({
   filePicks?: { path: string; name: string; url: string; inVault: string | null }[];
   /** M5b: folders the tree lists (besides those quick notes create). */
   folders?: string[];
+  /** E4: an encrypted vault at `/enc`, locked from the start; opens with this
+   *  passphrase or recovery code. */
+  encrypted?: { passphrase: string; recovery: string };
 }) {
   type Args = Record<string, unknown>;
   const w = window as unknown as Record<string, unknown>;
@@ -147,6 +151,23 @@ export function installIpcMock({
       relation,
     };
   };
+  /** E4: the encrypted vault is unlocked; `vault_lock` locks it again. */
+  let encUnlocked = false;
+  const encInfo = (name: string, root: string) => ({
+    name,
+    root,
+    encrypted: true,
+    recoveryVoid: false,
+    report: {
+      files: 2,
+      pages: 2,
+      parsed: 2,
+      skippedUnchanged: 0,
+      removed: 0,
+      warnings: [],
+      durationMs: 1,
+    },
+  });
   let settings: Record<string, unknown> = {
     version: 1,
     language: 'en',
@@ -384,20 +405,76 @@ export function installIpcMock({
           folder: false,
         })),
     }),
-    vaults_recent: () => [{ path: '/vault', name: 'vault', openedAt: '', missing: false }],
-    vault_open: () => ({
-      name: 'vault',
-      root: '/vault',
-      report: {
-        files: 2,
-        pages: 2,
-        parsed: 2,
-        skippedUnchanged: 0,
-        removed: 0,
-        warnings: [],
-        durationMs: 1,
-      },
-    }),
+    vaults_recent: () => [
+      { path: '/vault', name: 'vault', openedAt: '', missing: false, encrypted: false },
+      ...(encrypted
+        ? [{ path: '/enc', name: 'enc', openedAt: '', missing: false, encrypted: true }]
+        : []),
+    ],
+    vault_create_encrypted: (a) => {
+      if (String(a.passphrase).length < 12) throw { kind: 'invalidInput', message: 'short' };
+      encUnlocked = true;
+      const name = String(a.path).split('/').pop() ?? 'enc';
+      return {
+        info: encInfo(name, a.path as string),
+        recovery: encrypted?.recovery ?? 'LIBER-MOCK',
+      };
+    },
+    vault_unlock: (a) => {
+      const secret = a.secret as { kind: string; value: string };
+      const good = secret.kind === 'passphrase' ? encrypted?.passphrase : encrypted?.recovery;
+      if (!encrypted || secret.value !== good) {
+        throw { kind: 'wrongSecret', message: 'no slot opens' };
+      }
+      encUnlocked = true;
+      return encInfo('enc', '/enc');
+    },
+    vault_lock: () => {
+      if (!encUnlocked) throw { kind: 'notPermitted', message: 'plain vault' };
+      encUnlocked = false;
+      (w.__liberEmit as (e: string, p: unknown) => void)('vault:locked', { path: '/enc' });
+      return null;
+    },
+    security_change_passphrase: (a) => {
+      if (!encrypted || a.current !== encrypted.passphrase) {
+        throw { kind: 'wrongSecret', message: 'no' };
+      }
+      if (String(a.next).length < 12) throw { kind: 'invalidInput', message: 'short' };
+      encrypted.passphrase = a.next as string;
+      return null;
+    },
+    security_new_recovery: (a) => {
+      if (!encrypted || a.passphrase !== encrypted.passphrase) {
+        throw { kind: 'wrongSecret', message: 'no' };
+      }
+      encrypted.recovery = `LIBER-NEW-${nextId++}`;
+      return encrypted.recovery;
+    },
+    security_reset_rollback_memory: () => {
+      throw { kind: 'notPermitted', message: 'the memory is fine' };
+    },
+    vault_unreadable: () => [],
+    vault_reveal_unreadable: () => null,
+    attachment_open_decrypted: () => null,
+    vault_open: (a) => {
+      if (encrypted && a.path === '/enc' && !encUnlocked) {
+        throw { kind: 'locked', message: 'locked' };
+      }
+      if (encrypted && a.path === '/enc') return encInfo('enc', '/enc');
+      return {
+        name: 'vault',
+        root: '/vault',
+        report: {
+          files: 2,
+          pages: 2,
+          parsed: 2,
+          skippedUnchanged: 0,
+          removed: 0,
+          warnings: [],
+          durationMs: 1,
+        },
+      };
+    },
     vault_tree: () => [
       ...[...new Set([...folders, ...madeFolders])].map((path) => ({
         path,
