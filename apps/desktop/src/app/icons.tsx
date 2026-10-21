@@ -7,33 +7,24 @@ const stroke = {
 } as const;
 
 /** The app's mark (the app icon without its tile): a stack of pages in
- *  linen, terracotta and plum, with the woven LL monogram and a ribbon. Fixed
+ *  linen, terracotta and ochre, with a terracotta L and a ribbon. Fixed
  *  brand colours, so it reads the same in every palette. Source:
  *  src-tauri/icons/app-icon.svg. */
 export function BrandMark({ size = 40 }: { size?: number }) {
   return (
     <svg width={size} height={size} viewBox="19 16 62 66" aria-hidden="true">
-      <rect x="33" y="30" width="44" height="48" rx="5" fill="#5e3ba3" />
+      <rect x="33" y="30" width="44" height="48" rx="5" fill="#c99033" />
       <rect x="28" y="25" width="44" height="48" rx="5" fill="#b9501f" />
       <rect x="23" y="20" width="44" height="48" rx="5" fill="#f2e9da" />
       <path d="M55 20v19l5-4 5 4V20z" fill="#b9501f" />
       <path
-        d="M32 28v24h19"
-        fill="none"
-        stroke="#2d2a33"
-        strokeWidth="7"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-      <path
-        d="M43 35v28h15"
+        d="M36 29v29h17"
         fill="none"
         stroke="#c25a28"
-        strokeWidth="7"
+        strokeWidth="8"
         strokeLinecap="round"
         strokeLinejoin="round"
       />
-      <path d="M39.3 52h7.4" stroke="#2d2a33" strokeWidth="7" />
     </svg>
   );
 }
