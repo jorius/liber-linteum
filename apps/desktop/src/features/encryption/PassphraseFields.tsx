@@ -13,6 +13,9 @@ export function PassphraseFields(props: {
   onPass: (v: string) => void;
   onConfirm: (v: string) => void;
   error?: string | null;
+  /** Settings: "New passphrase", and no autofocus (the panel is always mounted). */
+  label?: string;
+  autoFocus?: boolean;
 }) {
   const { t } = useTranslation();
   const id = useId();
@@ -24,11 +27,11 @@ export function PassphraseFields(props: {
   return (
     <>
       <label className={dialogs.field}>
-        {t('encryption.passphrase')}
+        {props.label ?? t('encryption.passphrase')}
         <input
           {...common}
           className="field-control"
-          data-autofocus
+          data-autofocus={props.autoFocus === false ? undefined : true}
           value={props.pass}
           onChange={(e) => props.onPass(e.target.value)}
           aria-describedby={`${id}-hint${props.error ? ` ${id}-error` : ''}`}

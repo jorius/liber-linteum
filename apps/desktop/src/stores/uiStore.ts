@@ -27,6 +27,8 @@ export type DialogState =
   | { type: 'notionImport' }
   /** New encrypted vault in the folder just picked (E4); `CreateEncryptedHost`. */
   | { type: 'createEncrypted'; path: string }
+  /** The vault's recovery key was replaced on another device (E4). */
+  | { type: 'recoveryVoid' }
   /** Save / Don't Save / Cancel before unsaved text is left (M5b §6, auto
    *  save off). `id` tells two questions apart. */
   | { type: 'unsaved'; id: number; paths: string[]; answer: (c: UnsavedChoice) => void }

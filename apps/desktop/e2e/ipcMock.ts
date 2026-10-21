@@ -41,7 +41,14 @@ export function installIpcMock({
   folders?: string[];
   /** E4: an encrypted vault at `/enc`, locked from the start; opens with this
    *  passphrase or recovery code. */
-  encrypted?: { passphrase: string; recovery: string; damaged?: boolean; notEmpty?: boolean };
+  encrypted?: {
+    passphrase: string;
+    recovery: string;
+    damaged?: boolean;
+    notEmpty?: boolean;
+    recoveryVoid?: boolean;
+    unreadable?: { osPath: string; reason: string }[];
+  };
 }) {
   type Args = Record<string, unknown>;
   const w = window as unknown as Record<string, unknown>;
@@ -158,7 +165,7 @@ export function installIpcMock({
     name,
     root,
     encrypted: true,
-    recoveryVoid: false,
+    recoveryVoid: encrypted?.recoveryVoid ?? false,
     report: {
       files: 2,
       pages: 2,
@@ -454,7 +461,8 @@ export function installIpcMock({
       if (!encrypted || a.passphrase !== encrypted.passphrase) {
         throw { kind: 'wrongSecret', message: 'no' };
       }
-      encrypted.recovery = `LIBER-NEW-${nextId++}`;
+      encrypted.recovery = NEW_RECOVERY;
+      encrypted.recoveryVoid = false;
       return encrypted.recovery;
     },
     security_reset_rollback_memory: () => {
@@ -464,7 +472,7 @@ export function installIpcMock({
       }
       throw { kind: 'notPermitted', message: 'the memory is fine' };
     },
-    vault_unreadable: () => [],
+    vault_unreadable: () => encrypted?.unreadable ?? [],
     vault_reveal_unreadable: () => null,
     attachment_open_decrypted: () => null,
     vault_open: (a) => {

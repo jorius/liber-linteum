@@ -8,6 +8,8 @@ import {
   type LinkFormat,
 } from '../../ipc';
 import { errorMessage } from '../../stores/messages';
+import { useVaultStore } from '../../stores/vaultStore';
+import { UnreadableList } from '../encryption/UnreadableList';
 import { usePageWidthStore } from '../../stores/pageWidthStore';
 import { validateName } from '../explorer/nameRules';
 import { ScratchFolderSetting } from '../scratchpad/ScratchFolderSetting';
@@ -49,6 +51,7 @@ export function VaultSettingsSection() {
   const [obsidian, setObsidian] = useState<string | null>(null);
   const [own, setOwn] = useState(false);
   const vaultWidth = usePageWidthStore((s) => s.vault);
+  const encrypted = useVaultStore((s) => s.info?.encrypted === true);
   const widthId = useId();
   const formatId = useId();
   const formatHintId = useId();
@@ -266,6 +269,7 @@ export function VaultSettingsSection() {
       </label>
       <ScratchFolderSetting />
       <VaultSpelling />
+      {encrypted && <UnreadableList />}
     </section>
   );
 }

@@ -427,6 +427,10 @@
         "title": "Archivos y notas rápidas",
         "description": "Renombrar, borrar y dónde viven las notas rápidas."
       },
+      "security": {
+        "title": "Seguridad",
+        "description": "Bloqueo, frase de contraseña y clave de recuperación de las bóvedas cifradas."
+      },
       "shortcuts": {
         "title": "Atajos de teclado",
         "description": "Lo que hace el teclado en toda la app."
@@ -1096,6 +1100,30 @@
     "confirmIntro": "Escribe el grupo {a} y el grupo {b} de la clave para comprobar que la tienes.",
     "group": "Grupo {n}",
     "back": "Atrás",
-    "done": "Hecho"
+    "done": "Hecho",
+    "security": {
+      "autoLock": "Bloquear tras inactividad",
+      "never": "Nunca",
+      "minutes": "{count, plural, one {# minuto} other {# minutos}}",
+      "autoLockHint": "Las bóvedas cifradas también se bloquean cuando el equipo se suspende, la pantalla se bloquea o la app se cierra.",
+      "noVault": "Abre una bóveda cifrada para cambiar su frase de contraseña o su clave de recuperación.",
+      "changeTitle": "Cambiar frase de contraseña",
+      "current": "Frase de contraseña actual",
+      "new": "Nueva frase de contraseña",
+      "change": "Cambiar frase de contraseña",
+      "changed": "Frase de contraseña cambiada",
+      "newRecoveryTitle": "Nueva clave de recuperación",
+      "newRecoveryHint": "Tu clave de recuperación anterior deja de funcionar.",
+      "newRecoveryButton": "Nueva clave de recuperación…",
+      "newRecoveryBody": "Escribe tu frase de contraseña actual para crear una nueva clave de recuperación. Tu clave anterior deja de funcionar.",
+      "conflict": "Otro dispositivo cambió las claves de esta bóveda al mismo tiempo. Inténtalo de nuevo.",
+      "voidTitle": "Clave de recuperación reemplazada",
+      "voidBody": "La clave de recuperación de esta bóveda se reemplazó en otro dispositivo y ya no funciona. Crea una nueva ahora.",
+      "voidAction": "Crear una nueva clave de recuperación"
+    },
+    "unreadable": {
+      "title": "No se pudo leer",
+      "hint": "Estos archivos están en la carpeta de la bóveda, pero no se pudo descifrar su nombre. Nunca se borran. La exportación llegará en una versión futura."
+    }
   }
 }

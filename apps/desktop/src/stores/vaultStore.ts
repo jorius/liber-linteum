@@ -338,6 +338,7 @@ export const useVaultStore = create<VaultState>((set, get) => {
     set({ status: 'open', progress: null });
     // Another vault: its own words and dictionaries (spell checking).
     useSpellStore.getState().bump();
+    if (res.value.recoveryVoid) useUiStore.getState().openDialog({ type: 'recoveryVoid' });
     const warnings = res.value.report.warnings ?? [];
     if (warnings.length) {
       toast().push({

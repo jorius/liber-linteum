@@ -37,6 +37,7 @@ import { ScratchpadLocation } from '../scratchpad/ScratchpadLocation';
 import { VaultSettingsSection } from './VaultSettingsSection';
 import { SpellingSettings } from './SpellingSettings';
 import { ThemeSettings } from './ThemeSettings';
+import { SecuritySettings } from '../encryption/SecuritySettings';
 
 const THEMES: Theme[] = ['system', 'light', 'dark'];
 const themeKey = { system: 'themeSystem', light: 'themeLight', dark: 'themeDark' } as const;
@@ -59,6 +60,7 @@ const APP_CATEGORIES = [
   'editor',
   'spelling',
   'files',
+  'security',
   'shortcuts',
 ] as const;
 type Category = (typeof APP_CATEGORIES)[number] | 'vault';
@@ -175,6 +177,8 @@ export function SettingsDialog({ onClose }: { onClose: () => void }) {
     >
       <CategoryIcon category={c} />
       {t(`settings.categories.${c}.title`)}
+      {c === 'security' && ' '}
+      {c === 'security' && <span className={styles.betaPill}>{t('encryption.beta')}</span>}
     </button>
   );
 
@@ -233,6 +237,9 @@ export function SettingsDialog({ onClose }: { onClose: () => void }) {
           <div className={styles.paneHeadText}>
             <h3 ref={heading} tabIndex={-1} className={styles.paneTitle}>
               {searching ? t('settings.searchResults') : t(`settings.categories.${category}.title`)}
+              {!searching && category === 'security' && (
+                <span className={styles.betaPill}>{t('encryption.beta')}</span>
+              )}
             </h3>
             {!searching && (
               <p className={styles.hint}>{t(`settings.categories.${category}.description`)}</p>
@@ -459,6 +466,7 @@ export function SettingsDialog({ onClose }: { onClose: () => void }) {
             </>,
           )}
           {panel('spelling', <SpellingSettings vaultOpen={vaultOpen} />)}
+          {panel('security', <SecuritySettings />)}
           {panel('shortcuts', <ShortcutList />)}
           {vaultOpen && panel('vault', <VaultSettingsSection />)}
         </div>
@@ -504,6 +512,8 @@ function CategoryIcon({ category }: { category: Category }) {
       return <FormatIcon />;
     case 'files':
       return <NewPageIcon />;
+    case 'security':
+      return <LockIcon />;
     case 'shortcuts':
       return <FormatIcon />;
     case 'vault':

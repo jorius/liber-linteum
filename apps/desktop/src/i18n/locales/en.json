@@ -427,6 +427,10 @@
         "title": "Files and quick notes",
         "description": "Renaming, deleting and where quick notes live."
       },
+      "security": {
+        "title": "Security",
+        "description": "Locking, passphrase and recovery key of encrypted vaults."
+      },
       "shortcuts": {
         "title": "Keyboard shortcuts",
         "description": "What the keyboard does, everywhere in the app."
@@ -1096,6 +1100,30 @@
     "confirmIntro": "Type group {a} and group {b} of the key to check you have it.",
     "group": "Group {n}",
     "back": "Back",
-    "done": "Done"
+    "done": "Done",
+    "security": {
+      "autoLock": "Lock after inactivity",
+      "never": "Never",
+      "minutes": "{count, plural, one {# minute} other {# minutes}}",
+      "autoLockHint": "Encrypted vaults also lock when the computer sleeps, the screen locks, or the app quits.",
+      "noVault": "Open an encrypted vault to change its passphrase or recovery key.",
+      "changeTitle": "Change passphrase",
+      "current": "Current passphrase",
+      "new": "New passphrase",
+      "change": "Change passphrase",
+      "changed": "Passphrase changed",
+      "newRecoveryTitle": "New recovery key",
+      "newRecoveryHint": "Your old recovery key stops working.",
+      "newRecoveryButton": "New recovery key…",
+      "newRecoveryBody": "Enter your current passphrase to make a new recovery key. Your old recovery key stops working.",
+      "conflict": "Another device changed this vault's keys at the same time. Try again.",
+      "voidTitle": "Recovery key replaced",
+      "voidBody": "Your recovery key for this vault was replaced on another device and no longer works. Make a new one now.",
+      "voidAction": "Make a new recovery key"
+    },
+    "unreadable": {
+      "title": "Couldn't read",
+      "hint": "These files are in the vault folder but their names couldn't be decrypted. They're never deleted. Export arrives in a later version."
+    }
   }
 }

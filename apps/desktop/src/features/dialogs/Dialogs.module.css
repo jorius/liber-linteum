@@ -558,3 +558,16 @@
   font-size: 12px;
   color: var(--color-text-muted);
 }
+
+/* The Beta label beside a title (E4). */
+.betaPill {
+  margin-left: 8px;
+  padding: 1px 7px;
+  border: 1px solid currentColor;
+  border-radius: 999px;
+  font: 700 10px var(--font-body);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: inherit;
+  vertical-align: middle;
+}

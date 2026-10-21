@@ -2,10 +2,11 @@
 import { readFileSync } from 'node:fs';
 import { expect, test } from '@playwright/test';
 import { installIpcMock } from './ipcMock';
+import { openSettings } from './shell';
 
 const AXE = readFileSync(new URL('../node_modules/axe-core/axe.min.js', import.meta.url), 'utf8');
 const PASSPHRASE = 'correct horse battery';
-const encrypted: { passphrase: string; recovery: string; damaged?: boolean; notEmpty?: boolean } = {
+const encrypted: NonNullable<Parameters<typeof installIpcMock>[0]['encrypted']> = {
   passphrase: PASSPHRASE,
   recovery: 'LIBER-AAAA-BBBB',
 };
@@ -202,4 +203,68 @@ test('a folder that is not empty is refused inline', async ({ page }) => {
   await page.getByRole('button', { name: 'Continue' }).click();
   await expect(page.getByRole('alert')).toHaveText('Pick an empty or new folder.');
   await expect(page.getByLabel('Passphrase', { exact: true })).toBeVisible();
+});
+
+const openSecurity = async (page: import('@playwright/test').Page) => {
+  await openSettings(page);
+  const dialog = page.getByRole('dialog', { name: 'Settings' });
+  await dialog.getByRole('button', { name: /^Security/ }).click();
+  return dialog;
+};
+
+test('Settings → Security: change the passphrase, lock, unlock with the new one; axe', async ({
+  page,
+}) => {
+  const NEW = 'a brand new passphrase';
+  await setup(page);
+  await unlock(page);
+  const dialog = await openSecurity(page);
+  await dialog.getByLabel('Current passphrase').fill(PASSPHRASE);
+  await dialog.getByLabel('New passphrase').fill(NEW);
+  await dialog.getByLabel('Confirm passphrase').fill(NEW);
+  await dialog.getByRole('button', { name: 'Change passphrase' }).click();
+  await expect(page.getByText('Passphrase changed')).toBeVisible();
+  await axeClean(page);
+  await page.keyboard.press('Escape');
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  await page.keyboard.press('Alt+Control+KeyL');
+  await expect(page.getByTestId('unlock-screen')).toBeVisible();
+  await page.getByLabel('Passphrase').fill(PASSPHRASE);
+  await page.getByRole('button', { name: 'Unlock', exact: true }).click();
+  await expect(page.getByRole('alert')).toBeVisible();
+  await page.getByLabel('Passphrase').fill(NEW);
+  await page.getByRole('button', { name: 'Unlock', exact: true }).click();
+  await expect(page.getByTestId('unlock-screen')).toHaveCount(0);
+});
+
+test('a voided recovery key blocks the shell until a new one is made', async ({ page }) => {
+  await setup(page, {}, { ...encrypted, recoveryVoid: true });
+  await unlock(page).catch(() => undefined);
+  const prompt = page.getByRole('alertdialog');
+  await expect(prompt).toContainText('replaced on another device');
+  await page.keyboard.press('Escape');
+  await expect(prompt).toBeVisible();
+  await prompt.getByRole('button', { name: 'Make a new recovery key' }).click();
+  await page.getByLabel('Current passphrase').fill(PASSPHRASE);
+  await page.getByRole('button', { name: 'Continue' }).click();
+  await expect(page.getByTestId('recovery-code')).toBeVisible();
+  await axeClean(page);
+});
+
+test("This vault lists what couldn't be read, with a reveal button", async ({ page }) => {
+  await setup(
+    page,
+    {},
+    { ...encrypted, unreadable: [{ osPath: '/enc/aaa', reason: 'name could not be decrypted' }] },
+  );
+  await unlock(page);
+  const dialog = await (async () => {
+    await openSettings(page);
+    const d = page.getByRole('dialog', { name: 'Settings' });
+    await d.getByRole('button', { name: 'This vault' }).click();
+    return d;
+  })();
+  await expect(dialog.getByText("Couldn't read")).toBeVisible();
+  await expect(dialog.getByText('name could not be decrypted')).toBeVisible();
+  await expect(dialog.getByRole('button', { name: /^Show in / })).toBeVisible();
 });
