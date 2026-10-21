@@ -97,9 +97,47 @@ Use a throwaway copy of a folder: the originals go to the real Trash as
 - Windows: `cargo xwin check -p liber-desktop --tests` passes (offline, with the
   `~/.nimw-cross` toolchain).
 
+## Final whole-branch review fixes
+
+- **The backend's reasons reach the user.** Each convert refusal has its own error kind and en/es copy. Those that name a path carry it as the message:
+
+  | Kind | Means |
+  |---|---|
+  | `convertWindowsOpen` | a file window from this folder is open |
+  | `convertBusy` | another folder is being encrypted |
+  | `convertActive` | this folder is being encrypted right now |
+  | `convertPending` | part-way through a conversion |
+  | `convertRefusedFolder` | home, Desktop, Documents, Downloads, the Scratchpad or a volume root |
+  | `convertInsideVault` | inside an encrypted vault |
+  | `convertCollision` | something is in the way; nothing was overwritten |
+  | `convertMismatch` | a file didn't read back the same; undone |
+  | `convertUndoFailed` | the undo failed; the notes are safe in `.liber-plain` |
+  | `convertFinishFailed` | past `staged`; the next open finishes it |
+  | `convertingElsewhereFinishing` | another device's conversion, past `staged` |
+
+- **Locks during a conversion.** An idle, sleep or screen-lock lock that comes after begin (at the key step or while copying) marks the converted vault to lock as soon as it opens. The Done step stays over the Unlock screen. The dialog listens for these itself, because the shell that normally does may be gone.
+- **Nested vaults.** A vault of its own inside the folder blocks preflight with the reason `vault`. A folder inside an encrypted or damaged vault (its `d/` or below) is refused whole with `convertInsideVault`.
+- **Another device's unfinished conversion** (spec §8 item 11):
+  - Still `copying`: the `convertingElsewhere` toast offers "Undo it on this device…". After a confirm, `vault_encrypt_undo_elsewhere` runs the ordinary rollback, then the folder opens.
+  - From `staged` on: the refusal stays and its text gives the manual steps.
+- **Minors:**
+  - progress is announced to screen readers every 10 % or 5 s;
+  - `folder_kind` checks `empty` before `refused`, so a new encrypted vault on an empty USB stick works (in place stays refused);
+  - the progress listener is set up before the step shows, and Stop is enabled from the first file;
+  - a cleanup failure after the commit is a warning, and the vault still opens;
+  - a failed run past `staged` says the next open finishes it;
+  - no file window opens under a folder being encrypted;
+  - quitting mid-run first shows "Encrypting “<name>”… Quit anyway?" with a "Quit anyway" action.
+
 ## Open ends
 
 - Opening, from the native menu, a vault that doesn't overlap the folder isn't
   possible during the run (refused), but between the intro and begin it is; a
   `closesOpen` read at the intro could then be stale. The backend still closes
   the session it must.
+- **M8:** a webview reload at the recovery-key step loses the dialog, and with
+  it the code, while the backend keeps the begun job. The next begin undoes
+  it. Until then, opening that folder says it is being encrypted right now;
+  after an app restart, recovery undoes it on open. No notes are lost, only
+  the shown key, which is then never used.
+- **M9:** `closesOpen` is read at the intro (see above).

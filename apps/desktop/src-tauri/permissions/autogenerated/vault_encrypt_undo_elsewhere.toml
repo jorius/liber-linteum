@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-vault-encrypt-undo-elsewhere"
+description = "Enables the vault_encrypt_undo_elsewhere command without any pre-configured scope."
+commands.allow = ["vault_encrypt_undo_elsewhere"]
+
+[[permission]]
+identifier = "deny-vault-encrypt-undo-elsewhere"
+description = "Denies the vault_encrypt_undo_elsewhere command without any pre-configured scope."
+commands.deny = ["vault_encrypt_undo_elsewhere"]

@@ -4,7 +4,7 @@ import { folderKind, menuSetEncryptItem, onEncryptRecovered } from '../../ipc';
 import { errorMessage } from '../../stores/messages';
 import { useToastStore } from '../../stores/toastStore';
 import { useUiStore } from '../../stores/uiStore';
-import { useVaultStore } from '../../stores/vaultStore';
+import { undoElsewhereAction, useVaultStore } from '../../stores/vaultStore';
 import { quietly } from '../scratchpad/ScratchpadHost';
 
 /** A folder's own name (either separator); a volume root is its path. */
@@ -24,8 +24,10 @@ export const refusedText = (path: string) =>
 export async function openEncryptInPlace(path: string): Promise<void> {
   const kind = await folderKind(path);
   const toast = useToastStore.getState();
-  if (!kind.ok) toast.push({ message: errorMessage(kind.error), tone: 'error' });
-  else if (kind.value === 'refused') toast.push({ message: refusedText(path), tone: 'error' });
+  if (!kind.ok) {
+    const undo = kind.error.kind === 'convertingElsewhere' ? undoElsewhereAction(path) : undefined;
+    toast.push({ message: errorMessage(kind.error), tone: 'error', action: undo });
+  } else if (kind.value === 'refused') toast.push({ message: refusedText(path), tone: 'error' });
   else useUiStore.getState().openDialog({ type: 'encryptInPlace', root: path });
 }
 

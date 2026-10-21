@@ -78,6 +78,17 @@ pub enum ConvertError {
     /// The whole folder is refused, or the step can't run in this state.
     #[error("{0}")]
     Refused(String),
+    /// A folder never encrypted in place (§8.10): home, Desktop, …, a volume root.
+    #[error("Encrypt a vault folder, not {0}")]
+    Folder(String),
+    /// The folder is part-way through a conversion: opening it finishes or undoes that.
+    #[error(
+        "this folder is part-way through being encrypted: open it to finish or undo that first"
+    )]
+    Pending,
+    /// The folder is inside an encrypted (or damaged) vault (final review I3).
+    #[error("this folder is inside the encrypted vault {0}")]
+    InsideVault(String),
     #[error("encrypting was stopped")]
     Cancelled,
     /// A file changed, or an entry appeared, after it was recorded (§8.3).
@@ -113,6 +124,8 @@ pub enum Reason {
     /// Over 255 bytes once NFC-encoded.
     LongName,
     NotUtf8,
+    /// A vault of its own (encrypted or damaged): move it out first (final review I3).
+    Vault,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
@@ -465,6 +478,8 @@ fn walk(base: &Path, rel: &str, in_conversion: bool, out: &mut Tree) {
             block(path, Reason::Symlink);
         } else if in_cloud(name, &meta) {
             block(path, Reason::Cloud);
+        } else if kind.is_dir() && !matches!(vault_kind(&item.path()), VaultKind::Plain) {
+            block(path, Reason::Vault);
         } else if kind.is_dir() {
             subdirs.push(path);
         } else if !kind.is_file() {
@@ -515,10 +530,7 @@ fn refuse_folder(root: &Path, refused: &[PathBuf]) -> Result<()> {
         .iter()
         .any(|r| dunce::canonicalize(r).is_ok_and(|r| r == root));
     if listed || volume_root(root) {
-        return Err(ConvertError::Refused(format!(
-            "Encrypt a vault folder, not {}",
-            root.display()
-        )));
+        return Err(ConvertError::Folder(root.display().to_string()));
     }
     Ok(())
 }
@@ -544,11 +556,16 @@ fn volume_root(root: &Path) -> bool {
 pub fn preflight(root: &Path, refused: &[PathBuf]) -> Result<Preflight> {
     let root = canonical_root(root)?;
     refuse_folder(&root, refused)?;
+    // Inside an encrypted vault (its `d/` or below): that vault's ciphertext.
+    if let Some(vault) = root
+        .ancestors()
+        .skip(1)
+        .find(|a| !matches!(vault_kind(a), VaultKind::Plain))
+    {
+        return Err(ConvertError::InsideVault(vault.display().to_string()));
+    }
     if read_journal(&root)?.is_some() {
-        return Err(ConvertError::Refused(
-            "This folder is part-way through being encrypted: open it to finish or undo that first"
-                .into(),
-        ));
+        return Err(ConvertError::Pending);
     }
     match vault_kind(&root) {
         VaultKind::Plain => {}

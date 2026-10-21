@@ -278,6 +278,7 @@ pub fn configure<R: tauri::Runtime>(
         convert_commands::vault_encrypt_begin,
         convert_commands::vault_encrypt_run,
         convert_commands::vault_encrypt_cancel,
+        convert_commands::vault_encrypt_undo_elsewhere,
         convert_commands::vault_trash_originals,
         convert_commands::vault_reveal_originals,
     ])

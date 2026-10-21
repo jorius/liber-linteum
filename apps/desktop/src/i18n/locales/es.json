@@ -76,6 +76,17 @@
     "convertingElsewhere": "Esta bóveda se está cifrando en otro dispositivo. Termina allí o espera a que acabe la sincronización.",
     "changedDuringConvert": "Algunos archivos cambiaron durante el cifrado, probablemente por un servicio de sincronización. No se cambió nada. Pausa la sincronización y vuelve a intentarlo.",
     "cancelled": "Detenido. La bóveda está como estaba.",
+    "convertingElsewhereFinishing": "{message} se estaba cifrando en otro dispositivo y ya pasó el punto en que puede deshacerse aquí. Termínalo allí abriendo la bóveda en ese dispositivo. Si ese dispositivo ya no está: sal de Liber Linteum y mueve todo lo que hay en la carpeta oculta .liber-plain de la carpeta a una carpeta nueva: son tus notas, sin cifrar.",
+    "convertWindowsOpen": "Cierra antes las ventanas que muestran archivos de esta carpeta.",
+    "convertBusy": "Se está cifrando otra carpeta. Espera a que termine.",
+    "convertActive": "Esta carpeta se está cifrando ahora mismo. Espera a que termine.",
+    "convertPending": "Esta carpeta quedó a medio cifrar. Ábrela antes para terminar o deshacer eso.",
+    "convertRefusedFolder": "Cifra una carpeta de bóveda, no {message}.",
+    "convertInsideVault": "Esta carpeta está dentro de la bóveda cifrada {message}, así que ya está cifrada.",
+    "convertCollision": "{message} está en medio, así que el cifrado no pudo terminar ni deshacerse. No se sobrescribió nada: muévelo o cámbiale el nombre y vuelve a abrir la carpeta.",
+    "convertMismatch": "Un archivo no se leyó igual después de cifrarlo ({message}), así que no se cambió nada. Revisa el disco y vuelve a intentarlo.",
+    "convertUndoFailed": "No terminó de deshacerse el cifrado de {message}. Tus notas están a salvo en su carpeta oculta .liber-plain. Vuelve a abrir la carpeta para terminar de deshacerlo; si sigue fallando, mueve a mano todo lo que hay en .liber-plain de vuelta a la carpeta.",
+    "convertFinishFailed": "El cifrado de {message} se detuvo a medias y aún no pudo terminar. Tus notas están a salvo. Vuelve a abrir la carpeta para terminar de cifrarla.",
     "io": "Algo salió mal: {message}"
   },
   "toasts": {
@@ -1160,7 +1171,7 @@
     "choosePassphrase": "Elegir una frase de contraseña…",
     "blocked": "Esto no se puede cifrar:",
     "blockedHint": "Cámbiales el nombre o quítalos y vuelve a intentarlo.",
-    "reason": "{reason, select, badChar {un carácter que los nombres cifrados no admiten (: o \\)} twin {otro nombre aquí solo se distingue de este en mayúsculas o acentos} symlink {un enlace a otro sitio} unreadable {no se puede leer} special {no es un archivo ni una carpeta} reserved {un nombre que Liber Linteum reserva para sí} git {un repositorio git: cifrarlo rompería el repositorio} cloud {solo está en la nube: descárgalo antes (disponible sin conexión)} longName {el nombre es demasiado largo} notUtf8 {el nombre no es texto válido} other {no se puede cifrar}}",
+    "reason": "{reason, select, badChar {un carácter que los nombres cifrados no admiten (: o \\)} twin {otro nombre aquí solo se distingue de este en mayúsculas o acentos} symlink {un enlace a otro sitio} unreadable {no se puede leer} special {no es un archivo ni una carpeta} reserved {un nombre que Liber Linteum reserva para sí} git {un repositorio git: cifrarlo rompería el repositorio} cloud {solo está en la nube: descárgalo antes (disponible sin conexión)} longName {el nombre es demasiado largo} notUtf8 {el nombre no es texto válido} vault {una bóveda propia: sácala antes} other {no se puede cifrar}}",
     "progressLabel": "Cifrando",
     "progress": "{done, number} de {total, number} archivos · cada uno se comprueba antes de mover el original",
     "stop": "Detener y deshacer",
@@ -1172,6 +1183,13 @@
     "interrupted": "Se interrumpió el cifrado de «{name}»; la bóveda está como estaba.",
     "finished": "Terminó el cifrado de «{name}».",
     "banner": "Los originales sin cifrar de esta bóveda siguen en su carpeta.",
-    "wait": "Espera a que termine el cifrado."
+    "wait": "Espera a que termine el cifrado.",
+    "announce": "{done, number} de {total, number} archivos cifrados",
+    "undoElsewhere": "Deshacerlo en este dispositivo…",
+    "undoTitle": "¿Deshacer el cifrado en este dispositivo?",
+    "undoBody": "Hazlo solo si el otro dispositivo no está cifrando esta carpeta ahora mismo. La bóveda vuelve a quedar sin cifrar.",
+    "undoConfirm": "Deshacerlo en este dispositivo",
+    "quitWhile": "Cifrando «{name}»… ¿Salir de todos modos? Terminará o se deshará sola la próxima vez que la abras.",
+    "quitAnyway": "Salir de todos modos"
   }
 }

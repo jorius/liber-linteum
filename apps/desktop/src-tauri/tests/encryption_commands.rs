@@ -764,6 +764,7 @@ fn every_encryption_command_is_main_only() {
         "vault_reveal_unreadable",
         "attachment_open_decrypted",
         "security_reset_rollback_memory",
+        "vault_encrypt_undo_elsewhere",
     ] {
         if let Err(e) = call(&h.main, cmd, json!({})) {
             assert!(!e.to_string().contains("not allowed"), "{cmd}: {e}");

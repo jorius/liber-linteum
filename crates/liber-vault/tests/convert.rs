@@ -614,9 +614,9 @@ fn preflight_refuses_twins_long_and_non_utf8_names_where_the_disk_allows_them() 
 fn preflight_refuses_whole_folders() {
     let (_d, root) = plain_root();
     let err = convert::preflight(&root, std::slice::from_ref(&root)).unwrap_err();
-    assert!(matches!(err, ConvertError::Refused(_)), "{err:?}");
+    assert!(matches!(err, ConvertError::Folder(_)), "{err:?}");
     let err = convert::preflight(Path::new("/"), &[]).unwrap_err();
-    assert!(matches!(err, ConvertError::Refused(_)), "{err:?}");
+    assert!(matches!(err, ConvertError::Folder(_)), "{err:?}");
     // Already encrypted, and damaged.
     let dir = tempfile::tempdir().unwrap();
     make(dir.path()).unwrap();
@@ -1046,4 +1046,45 @@ fn rollback_puts_back_os_junk_the_os_wrote_again() {
     want.remove("Thumbs.db");
     assert_eq!(now, want);
     assert!(convert::read_journal(&root).unwrap().is_none());
+}
+
+/// Final review I3 (a): a vault of its own inside the folder (encrypted, or
+/// damaged) is blocked: converting it would turn its header and `d/` into
+/// opaque files of the outer vault.
+#[test]
+fn a_vault_inside_the_folder_is_blocked() {
+    let (_dir, root) = plain_root();
+    let inner = root.join("Projects/Secret");
+    std::fs::create_dir_all(&inner).unwrap();
+    make(&inner).unwrap();
+    let before = snapshot(&root);
+    assert_eq!(
+        blocked_of(&root),
+        vec![Blocked {
+            path: "Projects/Secret".into(),
+            reason: Reason::Vault
+        }]
+    );
+    assert!(convert::begin(&root, &[], ME, make).is_err());
+    assert_eq!(snapshot(&root), before);
+}
+
+/// Final review I3 (b): a folder inside an encrypted vault (its `d/`, or a
+/// folder below it) is refused whole: it would trash that vault's ciphertext.
+#[test]
+fn a_folder_inside_an_encrypted_vault_is_refused() {
+    let dir = tempfile::tempdir().unwrap();
+    let vault = dir.path().join("Enc");
+    std::fs::create_dir(&vault).unwrap();
+    make(&vault).unwrap();
+    let sub = vault.join("d").join("sub");
+    std::fs::create_dir_all(&sub).unwrap();
+    std::fs::write(sub.join("x"), b"ciphertext").unwrap();
+    for folder in [vault.join("d"), sub] {
+        let before = snapshot(&vault);
+        let err = convert::preflight(&folder, &[]).unwrap_err();
+        assert!(matches!(err, ConvertError::InsideVault(_)), "{err:?}");
+        assert!(convert::begin(&folder, &[], ME, make).is_err());
+        assert_eq!(snapshot(&vault), before);
+    }
 }

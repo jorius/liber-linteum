@@ -119,6 +119,7 @@
     "allow-vault-encrypt-begin",
     "allow-vault-encrypt-run",
     "allow-vault-encrypt-cancel",
+    "allow-vault-encrypt-undo-elsewhere",
     "allow-vault-trash-originals",
     "allow-vault-reveal-originals",
     "core:event:allow-listen",

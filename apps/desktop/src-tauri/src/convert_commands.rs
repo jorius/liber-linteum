@@ -94,9 +94,22 @@ fn refused_folders<R: Runtime>(app: &AppHandle<R>) -> Vec<PathBuf> {
 
 fn not_scratchpad(state: &AppState, root: &Path) -> CmdResult<()> {
     if state.settings.is_scratchpad(root) || state.opened_as_scratchpad(root) {
-        return Err(not_permitted("Encrypt a vault folder, not the Scratchpad"));
+        return Err(convert::ConvertError::Folder(root.display().to_string()).into());
     }
     Ok(())
+}
+
+/// The folder being encrypted right now, if `path` is in it (final review M6).
+pub(crate) fn refuse_under_active<R: Runtime>(app: &AppHandle<R>, path: &Path) -> CmdResult<()> {
+    let active = lock(&app.state::<ConvertState>().active).clone();
+    let path = canonical(path).unwrap_or_else(|_| path.to_path_buf());
+    match active {
+        Some(root) if path.starts_with(&root) => Err(CommandError::new(
+            ErrorKind::ConvertActive,
+            root.display().to_string(),
+        )),
+        _ => Ok(()),
+    }
 }
 
 /// The vault's plaintext index in the app cache (it holds page text).
@@ -148,19 +161,25 @@ pub(crate) fn recover_on_open<R: Runtime>(app: &AppHandle<R>, root: &Path) -> Cm
     }
     let root = canonical(root)?;
     if lock(&app.state::<ConvertState>().active).as_deref() == Some(root.as_path()) {
-        return Err(not_permitted("this folder is being encrypted right now"));
+        return Err(CommandError::new(
+            ErrorKind::ConvertActive,
+            root.display().to_string(),
+        ));
     }
     let state = app.state::<AppState>();
     let id = epochs::install_id(state.settings.dir())?;
     let trash = state.trasher();
     let outcome = convert::recover(&root, &id, &*trash, &|| drop_index_or_warn(app, &root))?;
     let told = match outcome {
+        // Still copying there: undoable here on request (§8.11); past it, not.
         RecoverOutcome::OtherDevice => {
-            return Err(CommandError::new(
-                ErrorKind::ConvertingElsewhere,
-                "This vault is being encrypted on another device. Finish there, or wait for \
-                 sync to finish.",
-            ));
+            let copying = convert::read_journal(&root)?.is_some_and(|j| j.phase == Phase::Copying);
+            let kind = if copying {
+                ErrorKind::ConvertingElsewhere
+            } else {
+                ErrorKind::ConvertingElsewhereFinishing
+            };
+            return Err(CommandError::new(kind, root.display().to_string()));
         }
         RecoverOutcome::RolledBack => Some("rolledBack"),
         RecoverOutcome::Finished => Some("finished"),
@@ -233,7 +252,10 @@ pub(crate) fn vault_encrypt_begin_impl<R: Runtime>(
     let cs = app.state::<ConvertState>();
     // One at a time: a run in progress is never replaced (review M4).
     if lock(&cs.active).is_some() && lock(&cs.job).is_none() {
-        return Err(not_permitted("another folder is being encrypted right now"));
+        return Err(CommandError::new(
+            ErrorKind::ConvertBusy,
+            "another folder is being encrypted right now",
+        ));
     }
     // Checked first: the converted vault's epoch is recorded at the end.
     epochs::check_readable(state.settings.dir())?;
@@ -246,8 +268,9 @@ pub(crate) fn vault_encrypt_begin_impl<R: Runtime>(
         .try_state::<crate::file_windows::FileWindows>()
         .is_some_and(|w| w.any_under(&root))
     {
-        return Err(not_permitted(
-            "Close the windows showing files from this folder first",
+        return Err(CommandError::new(
+            ErrorKind::ConvertWindowsOpen,
+            root.display().to_string(),
         ));
     }
     let refused = refused_folders(app);
@@ -323,32 +346,78 @@ pub fn vault_encrypt_run_impl<R: Runtime>(app: &AppHandle<R>) -> CmdResult<Vault
     let copied = convert::copy(&mut conv, progress, &cs.cancel)
         .and_then(|()| convert::stage_and_commit(conv));
     let done: CmdResult<()> = match copied {
-        Ok(()) => convert::finish(&root, &*trash, &drop_idx)
-            .map(|_| ())
-            .map_err(Into::into),
+        // Committed: a cleanup that fails is a warning, and the next open
+        // finishes it (final review M4).
+        Ok(()) => {
+            if let Err(e) = convert::finish(&root, &*trash, &drop_idx) {
+                let message = format!(
+                    "{} is encrypted, but cleaning up didn't finish ({e}). Opening the vault \
+                     again finishes it.",
+                    root.display()
+                );
+                let _ = app.emit_to("main", "vault:warning", WarningPayload { message });
+            }
+            Ok(())
+        }
         // Before `staged` this undoes it all; from `staged` on it finishes.
         Err(e) => {
             let id = epochs::install_id(state.settings.dir())?;
             match convert::recover(&root, &id, &*trash, &drop_idx) {
                 Ok(RecoverOutcome::Finished) => Ok(()),
                 Ok(_) => Err(e.into()),
-                // Never "back as it was" while the undo failed (review I4).
-                Err(undo) => {
-                    let mut err = CommandError::from(undo);
-                    err.message = format!(
-                        "{e}; undoing it failed too, so the vault isn't back as it was yet \
-                         (opening it tries again): {}",
-                        err.message
-                    );
-                    Err(err)
+                // Never "back as it was" while that failed too (review I4): past
+                // `staged` the next open finishes it, before it undoes it (M5).
+                Err(_) => {
+                    let forward = convert::read_journal(&root)
+                        .ok()
+                        .flatten()
+                        .is_some_and(|j| j.phase != Phase::Copying);
+                    let kind = if forward {
+                        ErrorKind::ConvertFinishFailed
+                    } else {
+                        ErrorKind::ConvertUndoFailed
+                    };
+                    Err(CommandError::new(kind, root.display().to_string()))
                 }
             }
         }
     };
     drop(active);
     done?;
-    // As an unlock: the epoch recorded, the session opened, pending originals reported.
-    crate::encryption_commands::vault_unlock_impl(app, root, SecretKind::Passphrase, passphrase)
+    // As an unlock (the epoch recorded, the session opened), without running
+    // the recovery again: a cleanup that just failed would fail the open.
+    let pending = convert::read_journal(&root)?.is_some_and(|j| j.phase == Phase::TrashPending);
+    crate::encryption_commands::unlock_recovered(
+        app,
+        root,
+        SecretKind::Passphrase,
+        passphrase,
+        pending,
+    )
+}
+
+/// Final review I4 (spec §8.11): another device's conversion still in
+/// `copying` is undone here, on the user's confirmed request. From `staged`
+/// on it isn't (that device, or the manual steps, finish it).
+pub(crate) fn vault_encrypt_undo_elsewhere_impl<R: Runtime>(
+    app: &AppHandle<R>,
+    path: PathBuf,
+) -> CmdResult<()> {
+    let root = canonical(&path)?;
+    refuse_under_active(app, &root)?;
+    let Some(journal) = convert::read_journal(&root)? else {
+        return Err(not_permitted(
+            "nothing to undo: this folder isn't being encrypted",
+        ));
+    };
+    if journal.phase != Phase::Copying {
+        return Err(CommandError::new(
+            ErrorKind::ConvertingElsewhereFinishing,
+            root.display().to_string(),
+        ));
+    }
+    // Rollback keeps every check of its own (exact names, created by that run).
+    Ok(convert::rollback(&root)?)
 }
 
 /// Stop and undo: during the copy, the run stops and undoes it (`cancelled`);
@@ -423,6 +492,17 @@ pub async fn vault_encrypt_begin<R: Runtime>(
 #[tauri::command]
 pub async fn vault_encrypt_run<R: Runtime>(app: AppHandle<R>) -> CmdResult<VaultInfo> {
     blocking(app, move |app| vault_encrypt_run_impl(&app)).await
+}
+
+#[tauri::command]
+pub async fn vault_encrypt_undo_elsewhere<R: Runtime>(
+    app: AppHandle<R>,
+    path: PathBuf,
+) -> CmdResult<()> {
+    blocking(app, move |app| {
+        vault_encrypt_undo_elsewhere_impl(&app, path)
+    })
+    .await
 }
 
 #[tauri::command]

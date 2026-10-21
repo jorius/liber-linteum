@@ -22,6 +22,7 @@ import {
   vaultEncryptBegin,
   vaultEncryptCancel,
   vaultEncryptRun,
+  destroyWindow,
   vaultLock,
   vaultOpen,
   vaultUnlock,
@@ -40,10 +41,10 @@ import {
 } from '../ipc';
 import { announceRecovered } from '../features/audio/announceRecovered';
 import { useBinStore } from '../features/bin/binStore';
-import { useEditorStore, warnUnsaved } from './editorStore';
+import { onQuitCheck, useEditorStore, warnUnsaved } from './editorStore';
 import { errorMessage } from './messages';
 import { usePageStore } from './pageStore';
-import { useToastStore } from './toastStore';
+import { useToastStore, type ToastAction } from './toastStore';
 import { useTrailStore } from './trailStore';
 import { HOLDERS, useUiStore } from './uiStore';
 import { clearVaultCaches } from './leaveVault';
@@ -192,8 +193,38 @@ let voidPending: string | null = null;
 /** The plain vault an encrypt in place left (its begin closed it): opened
  *  again if the conversion fails. */
 let convertLeft: string | null = null;
-/** From an encrypt in place's begin until it ends: no vault switch. */
-let converting = false;
+/** The folder from an encrypt in place's begin until it ends: no vault switch. */
+let converting: string | null = null;
+/** An idle, sleep or screen lock came while converting: the converted vault
+ *  locks as soon as it opens (final review I2). */
+let lockAfterConvert = false;
+
+/** A folder's own name, either separator. */
+const folderName = (path: string) =>
+  path
+    .replace(/[\\/]+$/, '')
+    .split(/[\\/]/)
+    .pop() || path;
+
+/** "Undo it on this device…" on another device's conversion that is still
+ *  copying (spec §8.11): asks first. */
+export const undoElsewhereAction = (path: string): ToastAction => ({
+  label: i18next.t('encryptInPlace.undoElsewhere'),
+  run: () => void useUiStore.getState().openDialog({ type: 'undoElsewhere', path }),
+});
+
+/** Quitting mid-run asks first (final review M7): the next open finishes or
+ *  undoes it. Registered at the first begin (editorStore loads after this). */
+let quitCheck: (() => void) | null = null;
+const convertingQuitCheck = () => {
+  if (!converting) return true;
+  useToastStore.getState().push({
+    message: i18next.t('encryptInPlace.quitWhile', { name: folderName(converting) }),
+    tone: 'error',
+    action: { label: i18next.t('encryptInPlace.quitAnyway'), run: () => void destroyWindow() },
+  });
+  return false;
+};
 
 /** While a folder is being encrypted in place, any switch of vault (open,
  *  New vault, Close, Lock from the menu, Back) says to wait: `true`. */
@@ -244,7 +275,8 @@ export async function resetVaultStore() {
   treeSeq++;
   voidPending = null;
   convertLeft = null;
-  converting = false;
+  converting = null;
+  lockAfterConvert = false;
   useVaultStore.setState({ ...EMPTY, locking: false, children: new Map(), expanded: new Set() });
 }
 
@@ -363,12 +395,17 @@ export const useVaultStore = create<VaultState>((set, get) => {
   /** Back to where an open started. The backend keeps the vault it had (M1b
    *  §10 a). A failed unlock (`quiet`) stays on the Unlock screen, which shows
    *  the error; any other open started from there leaves it: closed. */
-  function failed(before: VaultStatus, opts: OpenOpts | undefined, message: string) {
+  function failed(
+    before: VaultStatus,
+    opts: OpenOpts | undefined,
+    message: string,
+    action?: ToastAction,
+  ) {
     if (opts?.quiet) set({ status: before, progress: null });
     else {
       set({ status: before === 'open' ? 'open' : 'closed', progress: null });
       if (before === 'locked') set({ lockedPath: null });
-      toast().push({ message, tone: 'error' });
+      toast().push({ message, tone: 'error', action });
     }
   }
 
@@ -388,7 +425,9 @@ export const useVaultStore = create<VaultState>((set, get) => {
         set({ status: 'locked', lockedPath: path, progress: null });
         return res;
       }
-      failed(before, opts, errorMessage(res.error));
+      const undo =
+        res.error.kind === 'convertingElsewhere' && path ? undoElsewhereAction(path) : undefined;
+      failed(before, opts, errorMessage(res.error), undo);
       return res;
     }
     // Another vault replaces the one on screen or at the door (plain or
@@ -521,37 +560,47 @@ export const useVaultStore = create<VaultState>((set, get) => {
     encryptBegin: async (root, passphrase, closesOpen) => {
       const { status, info } = get();
       if (status === 'opening' || converting) return { ok: false, error: BUSY };
+      lockAfterConvert = false;
       if (status === 'open' && !(await savedEverything({ ask: false }))) return null;
       if (status === 'open' && info && (closesOpen || info.root === root)) {
         dropVault();
         convertLeft = info.root;
       }
-      converting = true;
+      converting = root;
+      quitCheck ??= onQuitCheck(convertingQuitCheck);
       const res = await vaultEncryptBegin(root, passphrase);
       if (!res.ok) {
-        converting = false;
+        converting = null;
+        lockAfterConvert = false;
         await reopenLeft();
       }
       return res;
     },
     encryptCancel: async () => {
       const res = await vaultEncryptCancel();
-      converting = false;
+      converting = null;
+      lockAfterConvert = false;
       await reopenLeft();
       return res;
     },
     encryptRun: async () => {
       const res = await vaultEncryptRun();
-      converting = false;
+      converting = null;
+      const lockNow = lockAfterConvert;
+      lockAfterConvert = false;
       if (!res.ok) {
         await reopenLeft();
         return res;
       }
       convertLeft = null;
-      return opened(res, get().status, { path: res.value.root });
+      const out = await opened(res, get().status, { path: res.value.root });
+      if (lockNow) await get().lock('idle');
+      return out;
     },
     lock: async (reason) => {
-      // A lock the user asks for waits; idle, sleep and screen lock still lock.
+      // A lock the user asks for waits; idle, sleep and screen lock still lock
+      // what is open, and the converted vault as soon as it opens.
+      if (converting && reason !== 'menu') lockAfterConvert = true;
       if (reason === 'menu' && refuseWhileConverting()) return false;
       // `locking` also keeps the backend's own `vault:locked` (sent while
       // `vault_lock` runs) from dropping the vault a second time.

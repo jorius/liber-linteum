@@ -163,6 +163,18 @@ pub(crate) fn vault_unlock_impl<R: Runtime>(
 ) -> CmdResult<VaultInfo> {
     // An encryption in place this device left unfinished: undone or finished first.
     let originals_pending = crate::convert_commands::recover_on_open(app, &path)?;
+    unlock_recovered(app, path, kind, value, originals_pending)
+}
+
+/// [`vault_unlock_impl`] once any conversion recovery is done (the convert
+/// run's own end uses it directly).
+pub(crate) fn unlock_recovered<R: Runtime>(
+    app: &AppHandle<R>,
+    path: PathBuf,
+    kind: SecretKind,
+    value: Zeroizing<String>,
+    originals_pending: bool,
+) -> CmdResult<VaultInfo> {
     let code;
     let with = match kind {
         SecretKind::Passphrase => Unlock::Passphrase(&value),

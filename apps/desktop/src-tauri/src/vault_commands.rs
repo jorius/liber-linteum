@@ -155,8 +155,8 @@ pub async fn vault_create<R: Runtime>(app: AppHandle<R>, path: PathBuf) -> CmdRe
 
 /// What the folder chosen in the New vault dialog holds (encryption UX round
 /// §2): `missing`, `empty` (as an encrypted create counts it), `plain` (files,
-/// a plain vault or not), `encrypted`, `damaged`, or `refused` (never
-/// encrypted in place, §8.10). Reads only, after this device's interrupted
+/// a plain vault or not), `encrypted`, `damaged`, or `refused` (has files,
+/// but is never encrypted in place, §8.10). Reads only, after this device's interrupted
 /// conversion of it is finished or undone: mid-commit it reads as damaged.
 #[tauri::command]
 pub async fn folder_kind<R: Runtime>(app: AppHandle<R>, path: PathBuf) -> CmdResult<&'static str> {
@@ -174,8 +174,9 @@ fn folder_kind_of<R: Runtime>(app: &AppHandle<R>, path: &Path) -> &'static str {
     match liber_vault::vault_kind(path) {
         liber_vault::VaultKind::Encrypted => "encrypted",
         liber_vault::VaultKind::Damaged(_) => "damaged",
-        _ if is_refused(app, path) => "refused",
+        // Empty first: a new encrypted vault on an empty USB stick is fine (M2).
         liber_vault::VaultKind::Plain if liber_vault::is_empty_for_create(path) => "empty",
+        _ if is_refused(app, path) => "refused",
         liber_vault::VaultKind::Plain => "plain",
     }
 }

@@ -36,6 +36,9 @@ export type DialogState =
   /** Encrypt the plain vault at `root` in place (encryption UX §4.2, §8);
    *  `EncryptInPlaceHost`. Held from its begin until it is done. */
   | { type: 'encryptInPlace'; root: string }
+  /** Undo another device's conversion of `path` that is still copying
+   *  (spec §8.11), confirmed first; `EncryptInPlaceHost`. */
+  | { type: 'undoElsewhere'; path: string }
   /** Save / Don't Save / Cancel before unsaved text is left (M5b §6, auto
    *  save off). `id` tells two questions apart. */
   | { type: 'unsaved'; id: number; paths: string[]; answer: (c: UnsavedChoice) => void }

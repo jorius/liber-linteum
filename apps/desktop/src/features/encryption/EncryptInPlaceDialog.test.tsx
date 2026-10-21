@@ -6,7 +6,7 @@ import userEvent from '@testing-library/user-event';
 import axe from 'axe-core';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { clearMocks, emit, mockIPC } from '../../ipc/testing';
-import { useEditorStore } from '../../stores/editorStore';
+import { mayClose, useEditorStore } from '../../stores/editorStore';
 import { useToastStore } from '../../stores/toastStore';
 import { useUiStore } from '../../stores/uiStore';
 import { resetVaultStore, useVaultStore } from '../../stores/vaultStore';
@@ -258,12 +258,15 @@ describe('Encrypt in place: passphrase and recovery key', () => {
   });
 
   it('a refused begin is said inline, the passphrase cleared and the plain vault back', async () => {
-    backend({ beginError: { kind: 'notPermitted', message: 'blocked' } });
+    backend({ beginError: { kind: 'convertWindowsOpen', message: ROOT } });
     openPlain();
     const dialog = await start();
     await toPassphrase(dialog);
     await userEvent.click(within(dialog).getByRole('button', { name: 'Continue' }));
-    expect(await within(dialog).findByRole('alert')).toHaveTextContent("That isn't allowed here.");
+    // Final review I1: the backend's reason, not "That isn't allowed here."
+    expect(await within(dialog).findByRole('alert')).toHaveTextContent(
+      'Close the windows showing files from this folder first.',
+    );
     expect(within(dialog).getByLabelText('Passphrase')).toHaveValue('');
     expect(sent('vault_open')).toEqual([{ path: ROOT }]);
     await waitFor(() => expect(useVaultStore.getState().status).toBe('open'));
@@ -378,6 +381,13 @@ describe('Encrypt in place: encrypting, done and errors', () => {
     const dialog = await toRun();
     expect(within(dialog).queryByTestId('recovery-code')).toBeNull();
     await act(() => emit('vault:encrypt-progress', { done: 3, total: 1204 }));
+    // M1: announced, but not every file (every 10 % or 5 s).
+    expect(within(dialog).getByRole('status')).toHaveTextContent('3 of 1,204 files encrypted');
+    await act(() => emit('vault:encrypt-progress', { done: 4, total: 1204 }));
+    expect(within(dialog).getByRole('status')).toHaveTextContent('3 of 1,204 files encrypted');
+    await act(() => emit('vault:encrypt-progress', { done: 200, total: 1204 }));
+    expect(within(dialog).getByRole('status')).toHaveTextContent('200 of 1,204 files encrypted');
+    await act(() => emit('vault:encrypt-progress', { done: 3, total: 1204 }));
     expect(
       within(dialog).getByText(
         '3 of 1,204 files · each one is checked before the original is moved',
@@ -410,6 +420,9 @@ describe('Encrypt in place: encrypting, done and errors', () => {
 
   it('Stop and undo cancels; the plain vault is back and the dialog lets go', async () => {
     const dialog = await toRun();
+    // M3: Stop waits for the run to have started.
+    expect(within(dialog).getByRole('button', { name: 'Stop and undo' })).toBeDisabled();
+    await act(() => emit('vault:encrypt-progress', { done: 1, total: 1204 }));
     await userEvent.click(within(dialog).getByRole('button', { name: 'Stop and undo' }));
     expect(sent('vault_encrypt_cancel')).toHaveLength(1);
     await act(async () => runGate!.reject({ kind: 'cancelled', message: 'stopped' }));
@@ -458,6 +471,101 @@ describe('Encrypt in place: encrypting, done and errors', () => {
       await within(dialog).findByText(/in the Trash as “Smartjob \(unencrypted originals\)”/),
     ).toBeInTheDocument();
     expect(useVaultStore.getState().info?.originalsPending).toBe(false);
+  });
+});
+
+describe('Encrypt in place: final review', () => {
+  async function toRun() {
+    backend();
+    openPlain();
+    const dialog = await start();
+    await toKey(dialog);
+    return dialog;
+  }
+
+  it.each([
+    ['convertUndoFailed', /Your notes are safe in its hidden \.liber-plain folder/],
+    ['convertFinishFailed', /stopped part-way and couldn't finish yet/],
+    ['convertCollision', /is in the way.*Nothing was overwritten/],
+    ['convertMismatch', /didn't read back the same after encrypting/],
+  ])('%s says what happened, naming the folder', async (kind, text) => {
+    const dialog = await toRun();
+    await confirmKey(dialog);
+    await waitFor(() => expect(runGate).not.toBeNull());
+    await act(async () => runGate!.reject({ kind, message: ROOT }));
+    const alert = await within(dialog).findByRole('alert');
+    expect(alert).toHaveTextContent(text);
+    expect(alert).toHaveTextContent(ROOT);
+  });
+
+  it.each(['key', 'run'])(
+    'a sleep or screen lock during the conversion (%s step) locks the vault once it opens',
+    async (when) => {
+      const dialog = await toRun();
+      if (when === 'run') {
+        await confirmKey(dialog);
+        await waitFor(() => expect(runGate).not.toBeNull());
+      }
+      await act(() => emit('vault:lock-request', { reason: 'sleep' }));
+      expect(sent('vault_lock')).toEqual([]);
+      if (when === 'key') {
+        await confirmKey(dialog);
+        await waitFor(() => expect(runGate).not.toBeNull());
+      }
+      await act(async () => runGate!.resolve(encrypted()));
+      await waitFor(() => expect(useVaultStore.getState().status).toBe('locked'));
+      expect(sent('vault_lock')).toHaveLength(1);
+      // The Done step stays, over the Unlock screen.
+      expect(within(dialog).getByRole('button', { name: 'Open' })).toBeInTheDocument();
+    },
+  );
+
+  it('quitting while it runs asks first; Quit anyway quits', async () => {
+    const dialog = await toRun();
+    await confirmKey(dialog);
+    await waitFor(() => expect(runGate).not.toBeNull());
+    expect(await mayClose()).toBe(false);
+    const toast = useToastStore.getState().toasts.at(-1)!;
+    expect(toast.message).toBe(
+      'Encrypting “Smartjob”… Quit anyway? It will finish or undo itself next time you open it.',
+    );
+    act(() => toast.action!.run());
+    await waitFor(() => expect(sent('window_close_self')).toHaveLength(1));
+  });
+
+  it("another device's unfinished copy: Undo it on this device, confirmed, then it opens", async () => {
+    let undone = false;
+    calls = [];
+    mockIPC(
+      (cmd, args) => {
+        calls.push([cmd, (args ?? {}) as Record<string, unknown>]);
+        if (cmd === 'vault_open') {
+          if (!undone) throw { kind: 'convertingElsewhere', message: ROOT };
+          return plain;
+        }
+        if (cmd === 'vault_encrypt_undo_elsewhere') undone = true;
+        if (cmd === 'vault_tree') return [];
+        return null;
+      },
+      { shouldMockEvents: true },
+    );
+    render(<EncryptInPlaceHost />);
+    await act(() => useVaultStore.getState().open(ROOT));
+    const toast = useToastStore.getState().toasts.at(-1)!;
+    expect(toast.message).toMatch(/being encrypted on another device/);
+    expect(toast.action?.label).toBe('Undo it on this device…');
+    act(() => toast.action!.run());
+    const confirm = await screen.findByRole('alertdialog', {
+      name: 'Undo encrypting on this device?',
+    });
+    expect(confirm).toHaveTextContent(
+      "Only do this if the other device isn't encrypting this folder right now. The vault goes back to unencrypted.",
+    );
+    expect((await axe.run(document.body)).violations).toEqual([]);
+    await userEvent.click(within(confirm).getByRole('button', { name: 'Undo it on this device' }));
+    expect(sent('vault_encrypt_undo_elsewhere')).toEqual([{ path: ROOT }]);
+    await waitFor(() => expect(useVaultStore.getState().status).toBe('open'));
+    expect(useUiStore.getState().dialog).toBeNull();
   });
 });
 

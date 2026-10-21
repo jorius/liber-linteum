@@ -76,6 +76,17 @@
     "convertingElsewhere": "This vault is being encrypted on another device. Finish there, or wait for sync to finish.",
     "changedDuringConvert": "Files changed while encrypting — probably a sync service. Nothing was changed. Pause syncing and try again.",
     "cancelled": "Stopped. The vault is back as it was.",
+    "convertingElsewhereFinishing": "{message} was being encrypted on another device and is past the point where it can be undone here. Finish it there by opening the vault on that device. If that device is gone: quit Liber Linteum and move everything in the folder's hidden .liber-plain folder into a new folder: those are your notes, unencrypted.",
+    "convertWindowsOpen": "Close the windows showing files from this folder first.",
+    "convertBusy": "Another folder is being encrypted. Wait until it finishes.",
+    "convertActive": "This folder is being encrypted right now. Wait until it finishes.",
+    "convertPending": "This folder is part-way through being encrypted. Open it to finish or undo that first.",
+    "convertRefusedFolder": "Encrypt a vault folder, not {message}.",
+    "convertInsideVault": "This folder is inside the encrypted vault {message}, so it's encrypted already.",
+    "convertCollision": "{message} is in the way, so encrypting couldn't finish or undo itself. Nothing was overwritten: move or rename it, then open the folder again.",
+    "convertMismatch": "A file didn't read back the same after encrypting ({message}), so nothing was changed. Check the disk, then try again.",
+    "convertUndoFailed": "Undoing the encryption of {message} didn't finish. Your notes are safe in its hidden .liber-plain folder. Open the folder again to finish the undo; if that keeps failing, move everything in .liber-plain back into the folder by hand.",
+    "convertFinishFailed": "Encrypting {message} stopped part-way and couldn't finish yet. Your notes are safe. Open the folder again to finish encrypting it.",
     "io": "Something went wrong: {message}"
   },
   "toasts": {
@@ -1160,7 +1171,7 @@
     "choosePassphrase": "Choose a passphrase…",
     "blocked": "These can't be encrypted:",
     "blockedHint": "Rename or remove these, then try again.",
-    "reason": "{reason, select, badChar {a character encrypted names can't hold (: or \\)} twin {another name here differs from it only in case or accents} symlink {a link to somewhere else} unreadable {it can't be read} special {not a file or a folder} reserved {a name Liber Linteum keeps for itself} git {a git repository: encrypting it would break the repository} cloud {only in the cloud: download it first (make it available offline)} longName {the name is too long} notUtf8 {the name isn't valid text} other {it can't be encrypted}}",
+    "reason": "{reason, select, badChar {a character encrypted names can't hold (: or \\)} twin {another name here differs from it only in case or accents} symlink {a link to somewhere else} unreadable {it can't be read} special {not a file or a folder} reserved {a name Liber Linteum keeps for itself} git {a git repository: encrypting it would break the repository} cloud {only in the cloud: download it first (make it available offline)} longName {the name is too long} notUtf8 {the name isn't valid text} vault {a vault of its own: move it out first} other {it can't be encrypted}}",
     "progressLabel": "Encrypting",
     "progress": "{done, number} of {total, number} files · each one is checked before the original is moved",
     "stop": "Stop and undo",
@@ -1172,6 +1183,13 @@
     "interrupted": "Encrypting “{name}” was interrupted; the vault is back as it was.",
     "finished": "Finished encrypting “{name}”.",
     "banner": "The unencrypted originals of this vault are still in its folder.",
-    "wait": "Wait until encrypting finishes."
+    "wait": "Wait until encrypting finishes.",
+    "announce": "{done, number} of {total, number} files encrypted",
+    "undoElsewhere": "Undo it on this device…",
+    "undoTitle": "Undo encrypting on this device?",
+    "undoBody": "Only do this if the other device isn't encrypting this folder right now. The vault goes back to unencrypted.",
+    "undoConfirm": "Undo it on this device",
+    "quitWhile": "Encrypting “{name}”… Quit anyway? It will finish or undo itself next time you open it.",
+    "quitAnyway": "Quit anyway"
   }
 }

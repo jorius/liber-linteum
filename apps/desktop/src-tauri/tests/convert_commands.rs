@@ -326,14 +326,17 @@ fn originals_the_trash_refused_are_reported_and_can_be_trashed_later() {
 #[test]
 fn another_devices_conversion_refuses_to_open_and_touches_nothing() {
     let h = harness();
-    for at in [CrashPoint::Staging(1), CrashPoint::AfterData] {
+    for (at, want) in [
+        (CrashPoint::Staging(1), "convertingElsewhere"),
+        (CrashPoint::AfterData, "convertingElsewhereFinishing"),
+    ] {
         let root = h.plain(&format!("{at:?}"));
         h.crash(&root, "another-install", at);
         let before = snapshot(&root);
         let err = call(&h.main, "vault_open", json!({ "path": root })).unwrap_err();
-        assert_eq!(kind(err.clone()), "convertingElsewhere", "{err}");
+        assert_eq!(kind(err.clone()), want, "{err}");
         let err = h.unlock(&root, "passphrase", PASS).unwrap_err();
-        assert_eq!(kind(err), "convertingElsewhere");
+        assert_eq!(kind(err), want);
         assert_eq!(snapshot(&root), before);
     }
 }
@@ -349,7 +352,7 @@ fn the_scratchpad_blocked_folders_and_short_passphrases_are_refused() {
         .unwrap();
     for cmd in ["vault_encrypt_preflight", "vault_encrypt_begin"] {
         let err = call(&h.main, cmd, json!({ "path": root, "passphrase": PASS })).unwrap_err();
-        assert_eq!(kind(err), "notPermitted", "{cmd}");
+        assert_eq!(kind(err), "convertRefusedFolder", "{cmd}");
     }
     assert_eq!(snapshot(&root), before);
 
@@ -418,7 +421,10 @@ fn folder_kind_recovers_an_interrupted_conversion_and_names_refused_folders() {
 
     let root = h.plain("Elsewhere");
     h.crash(&root, "another-install", CrashPoint::AfterData);
-    assert_eq!(kind(ask(&root).unwrap_err()), "convertingElsewhere");
+    assert_eq!(
+        kind(ask(&root).unwrap_err()),
+        "convertingElsewhereFinishing"
+    );
 
     let root = h.plain("Scratch");
     h.state()
@@ -427,6 +433,15 @@ fn folder_kind_recovers_an_interrupted_conversion_and_names_refused_folders() {
         .unwrap();
     assert_eq!(ask(&root).unwrap(), "refused");
     assert_eq!(ask(Path::new("/")).unwrap(), "refused", "a volume root");
+    // An empty one can still get a new encrypted vault (a USB stick, M2).
+    let empty = h.disk.path().join("EmptyScratch");
+    std::fs::create_dir(&empty).unwrap();
+    let empty = empty.canonicalize().unwrap();
+    h.state()
+        .settings
+        .set_scratchpad_path(Some(empty.to_string_lossy().into_owned()))
+        .unwrap();
+    assert_eq!(ask(&empty).unwrap(), "empty");
 }
 
 // ---- Review fix round ----
@@ -449,12 +464,22 @@ fn a_file_window_inside_the_folder_refuses_begin() {
     liber_desktop::file_windows::open_file_window(h.app.handle(), &root.join("Sub/Deep.md"))
         .expect("file window opens");
     let err = begin(&h, &root).unwrap_err();
-    assert_eq!(kind(err.clone()), "notPermitted", "{err}");
-    assert!(
-        err["message"].as_str().unwrap().contains("windows"),
-        "{err}"
-    );
+    assert_eq!(kind(err.clone()), "convertWindowsOpen", "{err}");
     assert_eq!(snapshot(&root), before);
+}
+
+/// Final review M6: no file window opens under the folder while it converts.
+#[test]
+fn no_file_window_opens_under_a_folder_being_encrypted() {
+    let h = harness();
+    let root = h.plain("Busy");
+    begin(&h, &root).unwrap();
+    let err = liber_desktop::file_windows::open_file_window(h.app.handle(), &root.join("Notes.md"))
+        .unwrap_err();
+    assert_eq!(err.kind, liber_desktop::error::ErrorKind::ConvertActive);
+    call(&h.main, "vault_encrypt_cancel", json!({})).unwrap();
+    liber_desktop::file_windows::open_file_window(h.app.handle(), &root.join("Notes.md"))
+        .expect("opens once the conversion is undone");
 }
 
 /// Review I2: a take in progress in the plain vault is stopped and kept in
@@ -539,8 +564,8 @@ fn a_failed_undo_is_reported_and_retried_on_open() {
     })));
     let err = liber_desktop::convert_commands::vault_encrypt_run_impl(h.app.handle()).unwrap_err();
     convert::crash_when(None);
-    assert!(err.message.contains("undoing it failed too"), "{err:?}");
-    assert!(err.message.contains("Unstaging"), "{err:?}");
+    assert_eq!(err.kind, liber_desktop::error::ErrorKind::ConvertUndoFailed);
+    assert_eq!(err.message, root.display().to_string());
     call(&h.main, "vault_open", json!({ "path": root })).unwrap();
     assert_eq!(snapshot(&root), before);
 }
@@ -576,7 +601,7 @@ fn one_conversion_at_a_time_and_a_new_begin_replaces_an_unrun_one() {
     });
     call(&h.main, "vault_encrypt_run", json!({})).unwrap();
     let refused = refused.lock().unwrap().clone().unwrap();
-    assert_eq!(kind(refused), "notPermitted");
+    assert_eq!(kind(refused), "convertBusy");
 }
 
 /// Final round N3: "Move to Trash" only for originals the Trash refused
@@ -662,4 +687,123 @@ fn preflight_says_whether_begin_closes_the_open_vault() {
     let other = h.plain("Other");
     call(&h.main, "vault_open", json!({ "path": other })).unwrap();
     assert_eq!(closes(&root), json!(false), "an unrelated vault");
+}
+
+/// Final review M5: a failure after `staged` that also can't finish yet says
+/// it's finishing forward (the next open does), never "back as it was".
+#[test]
+fn a_failure_past_staged_says_it_finishes_on_the_next_open() {
+    let h = harness();
+    let root = h.plain("Forward");
+    begin(&h, &root).unwrap();
+    convert::crash_when(Some(Box::new(|p| {
+        matches!(p, CrashPoint::AfterStaged | CrashPoint::AfterData)
+    })));
+    let err = liber_desktop::convert_commands::vault_encrypt_run_impl(h.app.handle()).unwrap_err();
+    convert::crash_when(None);
+    assert_eq!(
+        err.kind,
+        liber_desktop::error::ErrorKind::ConvertFinishFailed
+    );
+    assert_eq!(err.message, root.display().to_string());
+    let err = call(&h.main, "vault_open", json!({ "path": root })).unwrap_err();
+    assert_eq!(kind(err), "locked", "finished on open");
+}
+
+/// Final review M4: once committed, a finish that fails (the cleanup) is a
+/// warning; the vault opens unlocked and the next open finishes it.
+#[test]
+fn a_finish_failure_after_commit_still_opens_the_vault() {
+    let h = harness();
+    let root = h.plain("Committed");
+    let warnings = h.events("vault:warning");
+    begin(&h, &root).unwrap();
+    convert::crash_when(Some(Box::new(|p| matches!(p, CrashPoint::AfterIndex))));
+    let run = liber_desktop::convert_commands::vault_encrypt_run_impl(h.app.handle());
+    convert::crash_when(None);
+    let info = run.expect("the vault opens");
+    assert!(info.encrypted);
+    assert_eq!(warnings.lock().unwrap().len(), 1, "a warning says so");
+    call(&h.main, "vault_lock", json!({})).unwrap();
+    h.unlock(&root, "passphrase", PASS).unwrap();
+    assert!(
+        h.bin()
+            .join("Committed (unencrypted originals)/Notes.md")
+            .exists()
+    );
+}
+
+/// Final review I1: the backend's reasons reach the UI as their own kinds.
+#[test]
+fn convert_refusals_have_their_own_kinds() {
+    let h = harness();
+    let me = h.install_id();
+    let root = h.plain("Pending");
+    h.crash(&root, &me, CrashPoint::Staging(1));
+    let err = call(&h.main, "vault_encrypt_preflight", json!({ "path": root })).unwrap_err();
+    assert_eq!(kind(err), "convertPending");
+
+    let scratch = h.plain("Scratch");
+    h.state()
+        .settings
+        .set_scratchpad_path(Some(scratch.to_string_lossy().into_owned()))
+        .unwrap();
+    let err = call(
+        &h.main,
+        "vault_encrypt_preflight",
+        json!({ "path": scratch }),
+    )
+    .unwrap_err();
+    assert_eq!(kind(err.clone()), "convertRefusedFolder");
+    assert_eq!(err["message"], json!(scratch.display().to_string()));
+
+    let enc = h.disk.path().join("Enc");
+    call(
+        &h.main,
+        "vault_create_encrypted",
+        json!({ "path": enc, "passphrase": PASS }),
+    )
+    .unwrap();
+    let err = call(
+        &h.main,
+        "vault_encrypt_preflight",
+        json!({ "path": enc.join("d") }),
+    )
+    .unwrap_err();
+    assert_eq!(kind(err), "convertInsideVault");
+}
+
+/// Final review I4 (spec §8.11): another install's conversion still in
+/// `copying` can be undone here, on request; from `staged` on it can't.
+#[test]
+fn another_devices_unfinished_copy_can_be_undone_here() {
+    let h = harness();
+    let root = h.plain("Stranded");
+    let before = snapshot(&root);
+    h.crash(&root, "another-install", CrashPoint::Staging(1));
+    let err = call(&h.main, "vault_open", json!({ "path": root })).unwrap_err();
+    assert_eq!(kind(err), "convertingElsewhere");
+    call(
+        &h.main,
+        "vault_encrypt_undo_elsewhere",
+        json!({ "path": root }),
+    )
+    .unwrap();
+    assert_eq!(snapshot(&root), before);
+    let info = call(&h.main, "vault_open", json!({ "path": root })).unwrap();
+    assert_eq!(info["encrypted"], false);
+
+    let root = h.plain("Late");
+    h.crash(&root, "another-install", CrashPoint::AfterData);
+    let late = snapshot(&root);
+    let err = call(&h.main, "vault_open", json!({ "path": root })).unwrap_err();
+    assert_eq!(kind(err), "convertingElsewhereFinishing");
+    let err = call(
+        &h.main,
+        "vault_encrypt_undo_elsewhere",
+        json!({ "path": root }),
+    )
+    .unwrap_err();
+    assert_eq!(kind(err), "convertingElsewhereFinishing");
+    assert_eq!(snapshot(&root), late, "untouched");
 }

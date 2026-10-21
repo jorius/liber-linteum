@@ -317,6 +317,8 @@ pub fn grant_for<R: Runtime>(app: &AppHandle<R>, label: &str) -> CmdResult<Arc<F
 /// Opens `path` in a window of its own, or brings forward the window that
 /// already shows it. Returns the window's label.
 pub fn open_file_window<R: Runtime>(app: &AppHandle<R>, path: &Path) -> CmdResult<String> {
+    // Its own plain vault would write plaintext into a folder being encrypted.
+    crate::convert_commands::refuse_under_active(app, path)?;
     let windows = app.state::<FileWindows>();
     let (label, grant, existed) = windows.grant(path, |l| app.get_webview_window(l).is_some())?;
     if existed {

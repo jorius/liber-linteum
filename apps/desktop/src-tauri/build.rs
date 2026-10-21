@@ -134,6 +134,7 @@ const COMMANDS: &[&str] = &[
     "vault_encrypt_begin",
     "vault_encrypt_run",
     "vault_encrypt_cancel",
+    "vault_encrypt_undo_elsewhere",
     "vault_trash_originals",
     "vault_reveal_originals",
 ];

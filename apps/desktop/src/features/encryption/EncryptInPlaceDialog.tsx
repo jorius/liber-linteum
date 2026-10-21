@@ -2,7 +2,9 @@ import { useEffect, useId, useRef, useState, type FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   onEncryptProgress,
+  onLockRequest,
   vaultEncryptCancel,
+  vaultEncryptUndoElsewhere,
   vaultEncryptPreflight,
   vaultRevealOriginals,
   vaultTrashOriginals,
@@ -11,6 +13,7 @@ import {
 } from '../../ipc';
 import { errorMessage } from '../../stores/messages';
 import { useToastStore } from '../../stores/toastStore';
+import { useSettingsStore } from '../../stores/settingsStore';
 import { useUiStore } from '../../stores/uiStore';
 import { useVaultStore } from '../../stores/vaultStore';
 import { Dialog } from '../dialogs/Dialog';
@@ -61,7 +64,41 @@ export function EncryptInPlaceDialog({ root, onClose }: { root: string; onClose:
   const [progress, setProgress] = useState<EncryptProgressPayload | null>(null);
   const [stopping, setStopping] = useState(false);
   const [pending, setPending] = useState(false);
+  /** The progress read out (M1): every 10 % or 5 s, not every file. */
+  const [announced, setAnnounced] = useState('');
+  const lastSaid = useRef({ at: 0, share: -1 });
   const body = useRef<HTMLDivElement>(null);
+
+  // Idle, sleep and screen lock still count while the key shows and the
+  // files are copied (the shell that listens for them may be gone): the
+  // vault locks as soon as it opens (final review I2).
+  const converting = step === 'key' || step === 'encrypting';
+  useEffect(() => {
+    if (!converting) return;
+    const lock = (reason: 'idle' | 'sleep' | 'screenLock') =>
+      void useVaultStore.getState().lock(reason);
+    const minutes = useSettingsStore.getState().settings.autoLockMinutes;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const arm = () => {
+      clearTimeout(timer);
+      if (minutes != null) timer = setTimeout(() => lock('idle'), minutes * 60_000);
+    };
+    arm();
+    window.addEventListener('keydown', arm);
+    window.addEventListener('pointerdown', arm);
+    let stopped = false;
+    let stop: (() => void) | null = null;
+    onLockRequest(lock)
+      .then((s) => (stopped ? quietly(s) : (stop = s)))
+      .catch(() => undefined);
+    return () => {
+      stopped = true;
+      clearTimeout(timer);
+      window.removeEventListener('keydown', arm);
+      window.removeEventListener('pointerdown', arm);
+      if (stop) quietly(stop);
+    };
+  }, [converting]);
 
   useEffect(() => {
     let live = true;
@@ -83,9 +120,10 @@ export function EncryptInPlaceDialog({ root, onClose }: { root: string; onClose:
   useEffect(() => () => useUiStore.getState().hold(false), []);
 
   // Each step's content replaces the last: the keyboard goes to its first control.
+  const started = progress !== null;
   useEffect(() => {
     body.current?.querySelector<HTMLElement>('[data-autofocus]')?.focus();
-  }, [step, pre]);
+  }, [step, pre, started]);
 
   const busy = step === 'beginning' || step === 'key' || step === 'encrypting';
   const valid = strength(pass) !== 'tooShort' && pass === confirm;
@@ -111,10 +149,22 @@ export function EncryptInPlaceDialog({ root, onClose }: { root: string; onClose:
     setStep('passphrase');
   };
 
+  const onProgress = (p: EncryptProgressPayload) => {
+    setProgress(p);
+    const share = p.total ? p.done / p.total : 1;
+    const now = Date.now();
+    const said = lastSaid.current;
+    if (share - said.share >= 0.1 || now - said.at >= 5000 || p.done === p.total) {
+      lastSaid.current = { at: now, share };
+      setAnnounced(t('encryptInPlace.announce', { done: p.done, total: p.total }));
+    }
+  };
+
   const run = async () => {
+    // Listening before the step shows (M3): Stop waits for the first file.
+    const stop = await onEncryptProgress(onProgress).catch(() => null);
     setCode(null);
     setStep('encrypting');
-    const stop = await onEncryptProgress(setProgress).catch(() => null);
     const res = await useVaultStore.getState().encryptRun();
     if (stop) quietly(stop);
     useUiStore.getState().hold(false);
@@ -244,7 +294,7 @@ export function EncryptInPlaceDialog({ root, onClose }: { root: string; onClose:
                 type="button"
                 className="btn btn-secondary"
                 data-autofocus
-                disabled={stopping}
+                disabled={stopping || !started}
                 onClick={() => {
                   setStopping(true);
                   void vaultEncryptCancel();
@@ -253,6 +303,9 @@ export function EncryptInPlaceDialog({ root, onClose }: { root: string; onClose:
                 {t('encryptInPlace.stop')}
               </button>
             </div>
+            <p role="status" className={dialogs.srOnly}>
+              {announced}
+            </p>
           </>
         )}
         {step === 'done' && (
@@ -298,12 +351,57 @@ export function EncryptInPlaceDialog({ root, onClose }: { root: string; onClose:
   );
 }
 
-/** The dialog on every screen (a lock or Close leaves it up), and the
- *  toasts for a conversion an open recovered. */
+/** Another device's conversion of `path`, still copying: undone here once
+ *  confirmed (spec §8.11), then the folder opens. */
+function UndoElsewhereDialog({ path, onClose }: { path: string; onClose: () => void }) {
+  const { t } = useTranslation();
+  const id = useId();
+  const [error, setError] = useState<string | null>(null);
+  const [working, setWorking] = useState(false);
+  const undo = async () => {
+    setWorking(true);
+    const res = await vaultEncryptUndoElsewhere(path);
+    setWorking(false);
+    if (!res.ok) return setError(errorMessage(res.error));
+    onClose();
+    await useVaultStore.getState().open(path);
+  };
+  return (
+    <Dialog title={t('encryptInPlace.undoTitle')} onClose={onClose} alert describedBy={id}>
+      <p id={id} className={dialogs.text}>
+        {t('encryptInPlace.undoBody')}
+      </p>
+      <p className={styles.path}>{path}</p>
+      {error && (
+        <p role="alert" className={styles.error}>
+          {error}
+        </p>
+      )}
+      <div className={dialogs.buttons}>
+        <button type="button" className="btn btn-secondary" data-autofocus onClick={onClose}>
+          {t('dialogs.cancel')}
+        </button>
+        <button
+          type="button"
+          className="btn btn-primary"
+          disabled={working}
+          onClick={() => void undo()}
+        >
+          {t('encryptInPlace.undoConfirm')}
+        </button>
+      </div>
+    </Dialog>
+  );
+}
+
+/** The dialogs on every screen (a lock or Close leaves the encrypt dialog
+ *  up), and the toasts for a conversion an open recovered. */
 export function EncryptInPlaceHost() {
   const dialog = useUiStore((s) => s.dialog);
   const close = useUiStore((s) => s.closeDialog);
   useEncryptRecovered();
+  if (dialog?.type === 'undoElsewhere')
+    return <UndoElsewhereDialog path={dialog.path} onClose={close} />;
   if (dialog?.type !== 'encryptInPlace') return null;
   return <EncryptInPlaceDialog key={dialog.root} root={dialog.root} onClose={close} />;
 }

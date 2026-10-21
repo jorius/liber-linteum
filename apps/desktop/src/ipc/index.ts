@@ -52,6 +52,23 @@ export type ErrorKind =
   | 'changedDuringConvert'
   /** Encrypt in place: Stop and undo; the vault is back as it was. */
   | 'cancelled'
+  /** Encrypt in place (final review): the backend's own reasons. Those
+   *  carrying a path have it as the message: `convertRefusedFolder` (the
+   *  folder), `convertInsideVault` (the vault), `convertCollision` (what is in
+   *  the way), `convertMismatch` (the file), `convertUndoFailed`,
+   *  `convertFinishFailed`, `convertingElsewhereFinishing`, `convertActive`
+   *  and `convertWindowsOpen` (the folder). */
+  | 'convertingElsewhereFinishing'
+  | 'convertWindowsOpen'
+  | 'convertBusy'
+  | 'convertActive'
+  | 'convertPending'
+  | 'convertRefusedFolder'
+  | 'convertInsideVault'
+  | 'convertCollision'
+  | 'convertMismatch'
+  | 'convertUndoFailed'
+  | 'convertFinishFailed'
   | 'io';
 
 export interface CommandError {
@@ -400,7 +417,9 @@ export type EncryptBlockedReason =
   | 'git'
   | 'cloud'
   | 'longName'
-  | 'notUtf8';
+  | 'notUtf8'
+  /** A vault of its own inside the folder (final review I3). */
+  | 'vault';
 
 export interface EncryptBlocked {
   /** Vault-relative, `/`-separated. */
@@ -783,6 +802,9 @@ export const vaultEncryptBegin = (path: string, passphrase: string) =>
   call<{ recovery: string }>('vault_encrypt_begin', { path, passphrase });
 export const vaultEncryptRun = () => call<VaultInfo>('vault_encrypt_run');
 export const vaultEncryptCancel = () => call<void>('vault_encrypt_cancel');
+/** Another device's conversion still copying, undone here (spec §8.11). */
+export const vaultEncryptUndoElsewhere = (path: string) =>
+  call<void>('vault_encrypt_undo_elsewhere', { path });
 export const vaultTrashOriginals = () => call<void>('vault_trash_originals');
 export const vaultRevealOriginals = () => call<void>('vault_reveal_originals');
 export const vaultTree = () => call<TreeNode[]>('vault_tree');
