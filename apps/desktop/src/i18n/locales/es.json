@@ -73,6 +73,9 @@
     "wrongSecret": "Esa frase de contraseña o clave de recuperación no abre esta bóveda, o su cabecera está dañada.",
     "rollback": "El archivo de claves de esta bóveda es más antiguo que uno que este dispositivo ya vio, así que no se abrió. Puede que alguien haya restaurado una copia antigua.",
     "damaged": "Esta bóveda cifrada, o un archivo en ella, está dañada y no se puede leer.",
+    "convertingElsewhere": "Esta bóveda se está cifrando en otro dispositivo. Termina allí o espera a que acabe la sincronización.",
+    "changedDuringConvert": "Algunos archivos cambiaron durante el cifrado, probablemente por un servicio de sincronización. Pausa la sincronización y vuelve a intentarlo.",
+    "cancelled": "Se detuvo el cifrado. La bóveda está como estaba.",
     "io": "Algo salió mal: {message}"
   },
   "toasts": {

@@ -12,6 +12,7 @@ export function installIpcMock({
   filePicks = [],
   folders = [],
   encrypted,
+  encryptInPlace = {},
 }: {
   pages: Record<string, string>;
   editorMode: string;
@@ -48,6 +49,12 @@ export function installIpcMock({
     notEmpty?: boolean;
     recoveryVoid?: boolean;
     unreadable?: { osPath: string; reason: string }[];
+  };
+  /** Encrypt in place (encryption UX §4.3): what preflight blocks, and
+   *  whether the run leaves the originals pending (the Trash refused). */
+  encryptInPlace?: {
+    blocked?: { path: string; reason: string }[];
+    originalsPending?: boolean;
   };
 }) {
   type Args = Record<string, unknown>;
@@ -160,6 +167,8 @@ export function installIpcMock({
   };
   /** E4: the encrypted vault is unlocked; `vault_lock` locks it again. */
   let encUnlocked = false;
+  /** Encrypt in place: the conversion between `vault_encrypt_begin` and `_run`. */
+  let convertJob: { path: string; cancelled: boolean } | null = null;
   const NEW_RECOVERY = `LIBER-${Array.from({ length: 14 }, (_, i) => `K${String(i + 1).padStart(2, '0')}${'ABCDEFGHJKMNPQ'[i]}`).join('-')}`;
   const encInfo = (name: string, root: string) => ({
     name,
@@ -478,6 +487,48 @@ export function installIpcMock({
     vault_unreadable: () => encrypted?.unreadable ?? [],
     vault_reveal_unreadable: () => null,
     attachment_open_decrypted: () => null,
+    // Encrypt in place (encryption UX §4.3, §8).
+    vault_encrypt_preflight: () => {
+      const all = [...Object.keys(pages), ...files];
+      return {
+        files: all.length,
+        bytes: Object.values(pages).reduce((n, t) => n + t.length, 0),
+        blocked: encryptInPlace.blocked ?? [],
+      };
+    },
+    vault_encrypt_begin: (a) => {
+      if (String(a.passphrase).length < 12) throw { kind: 'invalidInput', message: 'short' };
+      if (encryptInPlace.blocked?.length) throw { kind: 'notPermitted', message: 'blocked' };
+      convertJob = { path: String(a.path), cancelled: false };
+      return { recovery: NEW_RECOVERY };
+    },
+    vault_encrypt_run: () => {
+      const job = convertJob;
+      if (!job) throw { kind: 'notPermitted', message: 'nothing to encrypt: begin first' };
+      convertJob = null;
+      const total = Object.keys(pages).length + files.size;
+      const emit = w.__liberEmit as (e: string, p: unknown) => void;
+      for (let done = 0; done <= total; done++) {
+        emit('vault:encrypt-progress', { done, total });
+      }
+      if (job.cancelled) throw { kind: 'cancelled', message: 'encrypting was stopped' };
+      encUnlocked = true;
+      const name = job.path.split('/').pop() ?? 'vault';
+      return {
+        ...encInfo(name, job.path),
+        recoveryVoid: false,
+        originalsPending: encryptInPlace.originalsPending ?? false,
+      };
+    },
+    vault_encrypt_cancel: () => {
+      if (convertJob) convertJob.cancelled = true;
+      return null;
+    },
+    vault_trash_originals: () => {
+      encryptInPlace.originalsPending = false;
+      return null;
+    },
+    vault_reveal_originals: () => null,
     vault_open: (a) => {
       if (encrypted && a.path === '/enc' && !encUnlocked) {
         throw { kind: 'locked', message: 'locked' };
