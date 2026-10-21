@@ -559,6 +559,86 @@ fn decrypted_copy_lives_only_until_lock() {
     assert_eq!(kind(err), "noVault");
 }
 
+/// Every file named `name` under `dir`.
+fn files_named(dir: &Path, name: &str) -> Vec<PathBuf> {
+    let mut out = Vec::new();
+    let mut stack = vec![dir.to_path_buf()];
+    while let Some(d) = stack.pop() {
+        for e in std::fs::read_dir(&d).into_iter().flatten().flatten() {
+            let p = e.path();
+            if p.is_dir() {
+                stack.push(p);
+            } else if p.file_name().is_some_and(|n| n == name) {
+                out.push(p);
+            }
+        }
+    }
+    out
+}
+
+/// Final review M5: a decrypted copy streams (several 64 KiB chunks, never
+/// whole in memory); one that fails part way leaves no partial plaintext.
+#[test]
+fn a_decrypted_copy_streams_and_a_damaged_one_leaves_nothing() {
+    let h = harness();
+    let (root, _code) = h.create("Big");
+    let body: Vec<u8> = (0..200_000u32).map(|i| (i % 251) as u8).collect();
+    h.write("Docs/big.pdf", &body);
+    let opened: Arc<Mutex<Vec<PathBuf>>> = Arc::default();
+    let seen = opened.clone();
+    h.state().set_opener(Some(Arc::new(move |p: &Path| {
+        seen.lock().unwrap().push(p.to_path_buf());
+        Ok(())
+    })));
+    call(
+        &h.main,
+        "attachment_open_decrypted",
+        json!({ "path": "Docs/big.pdf" }),
+    )
+    .unwrap();
+    let copy = opened.lock().unwrap()[0].clone();
+    assert_eq!(std::fs::read(&copy).unwrap(), body);
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let mode = std::fs::metadata(&copy).unwrap().permissions().mode();
+        assert_eq!(mode & 0o777, 0o600);
+    }
+
+    // Damage the third chunk: the first two would already be copied.
+    let largest = |dir: &Path| -> PathBuf {
+        let mut all = Vec::new();
+        let mut stack = vec![dir.to_path_buf()];
+        while let Some(d) = stack.pop() {
+            for e in std::fs::read_dir(&d).unwrap().flatten() {
+                if e.path().is_dir() {
+                    stack.push(e.path());
+                } else {
+                    all.push((e.metadata().unwrap().len(), e.path()));
+                }
+            }
+        }
+        all.into_iter().max().unwrap().1
+    };
+    let physical = largest(&root.join("d"));
+    let mut bytes = std::fs::read(&physical).unwrap();
+    let at = 150_000; // the third 64 KiB chunk (the last is checked on open)
+    bytes[at] ^= 0xff;
+    std::fs::write(&physical, bytes).unwrap();
+    let err = call(
+        &h.main,
+        "attachment_open_decrypted",
+        json!({ "path": "Docs/big.pdf" }),
+    )
+    .unwrap_err();
+    assert_eq!(kind(err), "damaged");
+    assert_eq!(
+        files_named(h.cache.path(), "big.pdf"),
+        vec![copy],
+        "no partial copy"
+    );
+}
+
 #[test]
 fn recent_list_marks_encrypted() {
     let h = harness();
@@ -792,6 +872,42 @@ fn lock_during_recording_keeps_the_take() {
             .unwrap()
             .is_some()
     );
+}
+
+/// Final review M4: opening another vault locks the encrypted one first, as
+/// Lock does: its take is stopped and kept, its keys go (the take's own hold
+/// on the session doesn't keep them), and its next unlock saves the take.
+#[test]
+fn opening_another_vault_locks_the_encrypted_one_and_keeps_its_take() {
+    let h = harness();
+    let (root, _) = h.create("Voice");
+    call(
+        &h.main,
+        "entry_create_page",
+        json!({ "dir": "", "name": "Diary" }),
+    )
+    .unwrap();
+    h.start_take("Diary.md", "clip-20261020-101500");
+    std::thread::sleep(std::time::Duration::from_millis(500));
+    let old = h.state().session().unwrap();
+    call(
+        &h.main,
+        "vault_create",
+        json!({ "path": h.disk.path().join("Plain") }),
+    )
+    .unwrap();
+    let storage = old.vault().encrypted().unwrap();
+    assert!(storage.is_locked(), "the keys went with the switch");
+    assert!(
+        !h.app
+            .state::<liber_desktop::audio_commands::AudioState>()
+            .recording()
+    );
+    drop(old);
+    let info = h.unlock(&root, "passphrase", PASS).unwrap();
+    let path = "attachments/clip-20261020-101500-recovered.wav";
+    assert_eq!(info["recovered"][0]["path"], path, "{info}");
+    assert_eq!(h.read_wav(path).0, 1);
 }
 
 /// Carried item (Task 2 M4): the take lives in `.liber/recording/`, so its

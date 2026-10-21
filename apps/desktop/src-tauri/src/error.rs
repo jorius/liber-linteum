@@ -125,7 +125,20 @@ impl From<SessionError> for CommandError {
 
 impl From<std::io::Error> for CommandError {
     fn from(e: std::io::Error) -> CommandError {
-        CommandError::new(ErrorKind::Io, e.to_string())
+        // A stream read from an encrypted vault fails with why: the vault
+        // locked, or the file is damaged (a decrypted copy, review M5).
+        let inner = e.get_ref();
+        let kind = if inner
+            .and_then(|i| i.downcast_ref::<VaultError>())
+            .is_some_and(|v| matches!(v, VaultError::Locked))
+        {
+            ErrorKind::Locked
+        } else if inner.is_some_and(|i| i.is::<liber_crypto::CryptoError>()) {
+            ErrorKind::Damaged
+        } else {
+            ErrorKind::Io
+        };
+        CommandError::new(kind, e.to_string())
     }
 }
 

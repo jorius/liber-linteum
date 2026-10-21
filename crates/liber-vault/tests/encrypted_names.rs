@@ -440,3 +440,270 @@ fn decrypted_names_are_single_components() {
         "{err:?}"
     );
 }
+
+// ---- Final review C1: names a sync duplicated stay readable ----
+
+/// What another device made offline: a folder `name` with its own random id
+/// in the physical folder `parent` (id `parent_id`), its physical name sorting
+/// after `after` (so it is the duplicate), holding the files `files`.
+fn plant_dir(
+    root: &Path,
+    parent: &Path,
+    parent_id: &FolderId,
+    name: &str,
+    after: &str,
+    files: &[(&str, &[u8])],
+) -> (PathBuf, FolderId) {
+    with_codec(root, |codec, u| {
+        let (id, on_disk) = loop {
+            let id = FolderId::random();
+            let on_disk = codec.encrypt_folder(parent_id, &id, name).unwrap();
+            if on_disk.as_str() > after {
+                break (id, on_disk);
+            }
+        };
+        let dir = parent.join(on_disk);
+        std::fs::create_dir(&dir).unwrap();
+        for (file, body) in files {
+            let out =
+                std::fs::File::create(dir.join(codec.encrypt_file(&id, file).unwrap())).unwrap();
+            let mut w = StreamWriter::new(out, &u.subkeys().content, u.epoch()).unwrap();
+            w.write_all(body).unwrap();
+            w.finish().unwrap();
+        }
+        (dir, id)
+    })
+}
+
+/// The only physical folder directly in `folder`.
+fn only_dir(folder: &Path) -> String {
+    let dirs: Vec<String> = on_disk(folder)
+        .into_iter()
+        .filter(|n| folder.join(n).is_dir())
+        .collect();
+    assert_eq!(dirs.len(), 1, "{dirs:?}");
+    dirs[0].clone()
+}
+
+const DUP: &str = "attachments (duplicate 1)";
+
+#[test]
+fn a_folder_two_devices_made_offline_lists_twice_and_stays_writable() {
+    let (dir, storage) = new_vault();
+    let d = storage.location().join("d");
+    storage.create_dir(&vp("attachments")).unwrap();
+    write(&storage, "attachments/mine.png", b"mine");
+    let primary = only_dir(&d);
+    plant_dir(
+        dir.path(),
+        &d,
+        &FolderId::ROOT,
+        "attachments",
+        &primary,
+        &[("theirs.png", b"theirs")],
+    );
+
+    assert_eq!(names(&storage, ""), ["attachments", DUP]);
+    assert!(
+        storage.unreadable().is_empty(),
+        "{:?}",
+        storage.unreadable()
+    );
+    assert_eq!(names(&storage, "attachments"), ["mine.png"]);
+    assert_eq!(names(&storage, DUP), ["theirs.png"]);
+    assert_eq!(
+        storage.read(&vp(&format!("{DUP}/theirs.png"))).unwrap(),
+        b"theirs"
+    );
+
+    // Creating the folder again resolves the primary: no third copy.
+    assert!(matches!(
+        storage.create_dir(&vp("attachments")),
+        Err(VaultError::AlreadyExists(_))
+    ));
+    let vault = liber_vault::Vault::open_with(Box::new(storage)).unwrap();
+    vault
+        .create_dir_all(&vp("attachments/sub"))
+        .expect("create_dir_all through the primary");
+    vault
+        .write_cas(&vp("attachments/sub/new.md"), b"new", None)
+        .unwrap();
+    let dirs = on_disk(&d)
+        .into_iter()
+        .filter(|n| d.join(n).is_dir())
+        .count();
+    assert_eq!(dirs, 2, "no extra physical folder");
+    assert_eq!(vault.read(&vp("attachments/sub/new.md")).unwrap().0, b"new");
+    assert!(
+        on_disk(&d.join(&primary))
+            .iter()
+            .any(|n| d.join(&primary).join(n).is_dir()),
+        "landed in the primary"
+    );
+
+    // The duplicate renamed to a free name is an ordinary folder.
+    vault.rename(&vp(DUP), &vp("attachments 2")).unwrap();
+    let storage = vault.encrypted().unwrap();
+    assert_eq!(names(storage, ""), ["attachments", "attachments 2"]);
+    assert_eq!(
+        vault.read(&vp("attachments 2/theirs.png")).unwrap().0,
+        b"theirs"
+    );
+    let (again, _) = EncryptedStorage::unlock(dir.path(), Unlock::Passphrase(PASS)).unwrap();
+    assert_eq!(names(&again, ""), ["attachments", "attachments 2"]);
+}
+
+#[test]
+fn renaming_the_primary_away_promotes_the_duplicate() {
+    let (dir, storage) = new_vault();
+    let d = storage.location().join("d");
+    storage.create_dir(&vp("attachments")).unwrap();
+    write(&storage, "attachments/mine.png", b"mine");
+    let primary = only_dir(&d);
+    plant_dir(
+        dir.path(),
+        &d,
+        &FolderId::ROOT,
+        "attachments",
+        &primary,
+        &[("theirs.png", b"theirs")],
+    );
+    // Both listings cached under their logical names first.
+    assert_eq!(names(&storage, ""), ["attachments", DUP]);
+    assert_eq!(names(&storage, DUP), ["theirs.png"]);
+    assert_eq!(names(&storage, "attachments"), ["mine.png"]);
+
+    storage.rename(&vp("attachments"), &vp("old")).unwrap();
+    assert_eq!(names(&storage, ""), ["attachments", "old"]);
+    assert_eq!(names(&storage, "attachments"), ["theirs.png"]);
+    assert_eq!(
+        storage.read(&vp("attachments/theirs.png")).unwrap(),
+        b"theirs"
+    );
+    assert_eq!(storage.read(&vp("old/mine.png")).unwrap(), b"mine");
+
+    // A new duplicate takes the freed suffix: never the stale cached listing.
+    let (_, _) = plant_dir(
+        dir.path(),
+        &d,
+        &FolderId::ROOT,
+        "attachments",
+        &on_disk(&d).into_iter().max().unwrap(),
+        &[("third.png", b"third")],
+    );
+    assert_eq!(names(&storage, ""), ["attachments", DUP, "old"]);
+    assert_eq!(
+        storage.read(&vp(&format!("{DUP}/third.png"))).unwrap(),
+        b"third"
+    );
+    assert_eq!(names(&storage, DUP), ["third.png"]);
+}
+
+#[test]
+fn a_duplicated_recording_folder_still_takes_a_new_take() {
+    let (dir, storage) = new_vault();
+    let d = storage.location().join("d");
+    let vault = liber_vault::Vault::open_with(Box::new(storage)).unwrap();
+    vault.create_dir_all(&vp(".liber/recording")).unwrap();
+    // Another device made `.liber` and `.liber/recording` too.
+    let liber = only_dir(&d);
+    let (their_liber, id) = plant_dir(dir.path(), &d, &FolderId::ROOT, ".liber", &liber, &[]);
+    plant_dir(dir.path(), &their_liber, &id, "recording", "", &[]);
+
+    vault
+        .create_dir_all(&vp(".liber/recording/take-1"))
+        .unwrap();
+    let mut out = vault
+        .create_new(&vp(".liber/recording/take-1/clip.wav"))
+        .unwrap();
+    out.write_all(b"RIFF").unwrap();
+    out.finish().unwrap();
+    assert_eq!(
+        vault
+            .read(&vp(".liber/recording/take-1/clip.wav"))
+            .unwrap()
+            .0,
+        b"RIFF"
+    );
+    let storage = vault.encrypted().unwrap();
+    assert_eq!(names(storage, ""), [".liber", ".liber (duplicate 1)"]);
+    assert!(
+        storage.unreadable().is_empty(),
+        "{:?}",
+        storage.unreadable()
+    );
+}
+
+#[test]
+fn case_variant_files_from_a_sync_both_list() {
+    let (dir, storage) = new_vault();
+    let d = storage.location().join("d");
+    write(&storage, "n.md", b"lower");
+    write(&storage, "x (duplicate 1).md", b"taken");
+    // Another device's `N.md`, and `x.md` twice, whose duplicate's suffixed name is taken.
+    with_codec(dir.path(), |codec, u| {
+        for (name, body) in [("N.md", &b"upper"[..]), ("x.md", b"x1"), ("X.md", b"x2")] {
+            let out =
+                std::fs::File::create(d.join(codec.encrypt_file(&FolderId::ROOT, name).unwrap()))
+                    .unwrap();
+            let mut w = StreamWriter::new(out, &u.subkeys().content, u.epoch()).unwrap();
+            w.write_all(body).unwrap();
+            w.finish().unwrap();
+        }
+    });
+    let listed = names(&storage, "");
+    assert_eq!(listed.len(), 4, "{listed:?}");
+    let n_dup = listed
+        .iter()
+        .find(|n| n.ends_with("(duplicate 1).md") && n.to_lowercase().starts_with("n "))
+        .expect("n.md's duplicate listed")
+        .clone();
+    let pair = [
+        storage.read(&vp("n.md")).unwrap(),
+        storage.read(&vp(&n_dup)).unwrap(),
+    ];
+    assert!(pair.contains(&b"lower".to_vec()) && pair.contains(&b"upper".to_vec()));
+    // `x (duplicate 1).md` is taken: that one duplicate alone stays unreadable.
+    assert_eq!(storage.read(&vp("x (duplicate 1).md")).unwrap(), b"taken");
+    let found = storage.unreadable();
+    assert_eq!(found.len(), 1, "{found:?}");
+    assert!(found[0].1.contains("also named"), "{found:?}");
+}
+
+#[test]
+fn the_watcher_names_a_duplicate_as_listed() {
+    let (dir, storage) = new_vault();
+    let d = dunce::canonicalize(storage.location()).unwrap().join("d");
+    storage.create_dir(&vp("attachments")).unwrap();
+    let primary = only_dir(&d);
+    let seen = Arc::new(Mutex::new(Vec::<RawEvent>::new()));
+    let sink = Arc::clone(&seen);
+    let _guard = storage
+        .watch(true, Box::new(move |ev| sink.lock().unwrap().push(ev)))
+        .unwrap();
+    std::thread::sleep(Duration::from_millis(300));
+    let saw = |ev: RawEvent| {
+        wait_until(Duration::from_secs(2), || {
+            seen.lock().unwrap().contains(&ev)
+        })
+    };
+    plant_dir(
+        dir.path(),
+        &d,
+        &FolderId::ROOT,
+        "attachments",
+        &primary,
+        &[],
+    );
+    assert!(
+        saw(RawEvent::Changed(vp(DUP))),
+        "{:?}",
+        seen.lock().unwrap()
+    );
+    write(&storage, &format!("{DUP}/w.md"), b"w");
+    assert!(
+        saw(RawEvent::Changed(vp(&format!("{DUP}/w.md")))),
+        "{:?}",
+        seen.lock().unwrap()
+    );
+}

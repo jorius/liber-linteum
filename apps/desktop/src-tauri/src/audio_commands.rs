@@ -592,8 +592,9 @@ impl Done<'_> {
                     self.at.remove(&self.session);
                     Ok(attached.into())
                 }
+                // Its own kind: a lock during Stop is `locked` (review M6).
                 Err(e) => Err(CommandError::new(
-                    ErrorKind::Io,
+                    e.kind,
                     format!(
                         "{}. The clip is kept and goes into the vault the next time you record.",
                         e.message

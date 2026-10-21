@@ -218,3 +218,23 @@ fn m4c_review_i4_visible_paths_never_resolve_into_hidden_ones() {
         Err(liber_vault::VaultError::NotFound(_))
     ));
 }
+
+/// Final review M6: a write whose source failed because the vault locked
+/// (however deeply the `Locked` is wrapped) is `Locked`, not an I/O error.
+#[test]
+fn a_source_that_locked_mid_write_is_locked() {
+    let (_dir, vault) = fresh();
+    let locked = || std::io::Error::other(VaultError::Locked);
+    let wrapped = || {
+        std::io::Error::other(VaultError::Io {
+            path: "take.wav".into(),
+            source: std::io::Error::other(VaultError::Locked),
+        })
+    };
+    for fail in [locked as fn() -> std::io::Error, wrapped] {
+        let err = vault
+            .write_new_with(&vp("clip.wav"), &mut |_| Err(fail()))
+            .unwrap_err();
+        assert!(matches!(err, VaultError::Locked), "{err:?}");
+    }
+}

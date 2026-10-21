@@ -44,9 +44,22 @@ pub type Result<T> = std::result::Result<T, VaultError>;
 
 pub(crate) fn io_err(path: impl Into<String>, source: std::io::Error) -> VaultError {
     let path = path.into();
+    if carries_locked(&source) {
+        return VaultError::Locked;
+    }
     match source.kind() {
         std::io::ErrorKind::NotFound => VaultError::NotFound(path),
         std::io::ErrorKind::AlreadyExists => VaultError::AlreadyExists(path),
         _ => VaultError::Io { path, source },
+    }
+}
+
+/// Whether `e` failed because the vault locked: a `Locked` inside it, however
+/// deeply wrapped as an I/O error (a lock during a streamed copy, review M6).
+fn carries_locked(e: &std::io::Error) -> bool {
+    match e.get_ref().and_then(|e| e.downcast_ref::<VaultError>()) {
+        Some(VaultError::Locked) => true,
+        Some(VaultError::Io { source, .. }) => carries_locked(source),
+        _ => false,
     }
 }

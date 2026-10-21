@@ -174,16 +174,17 @@ impl EncryptedStorage {
 
     /// Writes `h`, after merging in the header on disk: a change another
     /// device made since (same epoch) is kept, and a header at another
-    /// epoch (a rotation) is never overwritten. `Conflict` if a slot in
-    /// `keep` didn't survive the merge.
+    /// epoch (a rotation) is never overwritten: `Conflict`. `Conflict` too
+    /// if a slot in `keep` didn't survive the merge.
     fn write_header(&self, h: &mut VaultHeader, u: &Unlocked, keep: &[[u8; 16]]) -> Result<()> {
         let path = self.root.join(HEADER_FILE);
         let bytes = read_header(&path).map_err(|e| io_err(HEADER_FILE, e))?;
         let disk = VaultHeader::parse(&bytes).map_err(crypto)?;
-        h.merge_from(&disk, u).map_err(|e| {
-            VaultError::Crypto(format!(
-                "{HEADER_FILE} changed on disk ({e}): lock the vault and unlock it again"
-            ))
+        // Another device rotated it (or it won't merge): a sync conflict, not
+        // damage; locking and unlocking again reads the new one (review M1).
+        h.merge_from(&disk, u).map_err(|_| VaultError::Conflict {
+            path: HEADER_FILE.to_string(),
+            current: crate::Hash::of(&bytes),
         })?;
         if keep.iter().any(|id| !h.slots().iter().any(|s| s.id == *id)) {
             return Err(VaultError::Conflict {

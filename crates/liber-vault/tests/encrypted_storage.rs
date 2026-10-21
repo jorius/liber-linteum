@@ -305,29 +305,33 @@ fn lock_drops_keys() {
     ));
 }
 
+/// Final review C1 (reverses Task 1's "both unreadable"): by physical name,
+/// the first keeps the name and the other is `A (duplicate 1)`, both readable.
 #[test]
-fn duplicate_names_are_both_unreadable_in_a_stable_order() {
-    let (_dir, storage) = new_vault();
+fn duplicate_names_both_list_in_a_stable_order() {
+    let (dir, storage) = new_vault();
     // A folder `A` and a file `A` at the root both decrypt to "A".
     seal_file(&storage, "A/b.md", b"x");
     seal_file(&storage, "A", b"y");
-    let first = unreadable(&storage, "");
-    assert_eq!(first.len(), 2, "{first:?}");
-    assert!(
-        first
-            .iter()
-            .all(|m| m.contains("another entry is also named"))
-    );
-    let mut sorted = first.clone();
-    sorted.sort();
-    assert_eq!(first, sorted);
-    assert_eq!(unreadable(&storage, ""), first);
-    assert!(
-        storage
-            .meta(&vp("A"), liber_vault::Follow::No)
-            .unwrap()
-            .is_none()
-    );
+    let first = entries(&storage, "");
+    let names: Vec<&str> = first.iter().map(|e| e.0.as_str()).collect();
+    assert_eq!(names, ["A", "A (duplicate 1)"]);
+    let folder_first = std::fs::read_dir(dir.path().join("d"))
+        .unwrap()
+        .map(|e| e.unwrap())
+        .min_by_key(|e| e.file_name())
+        .unwrap()
+        .file_type()
+        .unwrap()
+        .is_dir();
+    let (folder, file) = if folder_first {
+        ("A", "A (duplicate 1)")
+    } else {
+        ("A (duplicate 1)", "A")
+    };
+    assert_eq!(storage.read(&vp(&format!("{folder}/b.md"))).unwrap(), b"x");
+    assert_eq!(storage.read(&vp(file)).unwrap(), b"y");
+    assert_eq!(entries(&storage, ""), first, "stable");
 }
 
 #[test]
@@ -698,15 +702,19 @@ fn overwrite_never_replaces_an_unreadable_duplicate() {
     drop(storage);
 
     let (rotated, _) = EncryptedStorage::unlock(dir.path(), Unlock::Passphrase("next")).unwrap();
-    assert_eq!(
-        unreadable(&rotated, "").len(),
-        2,
-        "both duplicates unreadable"
-    );
+    let listed: Vec<String> = entries(&rotated, "").into_iter().map(|e| e.0).collect();
+    assert_eq!(listed, ["n (duplicate 1).md", "n.md"], "both readable");
+    let dup = rotated.read(&vp("n (duplicate 1).md")).unwrap();
     let before = tree(dir.path());
     assert_eq!(before.len(), 2);
-    assert!(write(&rotated, "n.md", b"autosave", Replace::Overwrite).is_err());
-    assert_eq!(tree(dir.path()), before, "both physical files intact");
+    write(&rotated, "n.md", b"autosave", Replace::Overwrite).unwrap();
+    assert_eq!(rotated.read(&vp("n.md")).unwrap(), b"autosave");
+    assert_eq!(
+        rotated.read(&vp("n (duplicate 1).md")).unwrap(),
+        dup,
+        "the duplicate is never replaced"
+    );
+    assert_eq!(tree(dir.path()).len(), 2, "still two physical files");
 }
 
 #[test]
@@ -1044,4 +1052,21 @@ fn a_failed_stream_is_kept_for_salvage() {
     assert!(w.finish().is_err());
     let err = storage.salvage_uncommitted(&other, &mut Vec::new());
     assert!(matches!(err, Err(VaultError::NotFound(_))), "{err:?}");
+}
+
+/// Final review M1: a header another device rotated since this unlock is a
+/// sync conflict to resolve by locking and unlocking, never "damaged".
+#[test]
+fn a_header_changed_on_disk_is_a_conflict() {
+    let (dir, storage) = new_vault();
+    let path = dir.path().join(HEADER_FILE);
+    let mut header = VaultHeader::parse(&std::fs::read(&path).unwrap()).unwrap();
+    let u1 = header.unlock(Unlock::Passphrase(PASS)).unwrap();
+    let (u2, _rc) = header.begin_rotation_insecure(&u1, "next", TINY).unwrap();
+    std::fs::write(&path, header.to_bytes(&u2).unwrap()).unwrap();
+    let err = storage.new_recovery(PASS).err().expect("refused");
+    assert!(
+        matches!(&err, VaultError::Conflict { path, .. } if path == HEADER_FILE),
+        "{err:?}"
+    );
 }

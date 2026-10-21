@@ -165,7 +165,7 @@ fn encode(
 ) -> Result<(String, Option<ShortName>)> {
     // A name a listing would refuse (`names::decode`) is refused here too.
     if !one_component(name) {
-        return Err(invalid(path, "not a single name, or has a ':'"));
+        return Err(invalid(path, "not a single name, or has a ':' or '\\'"));
     }
     let codec = NameCodec::new(&u.subkeys().name, u.vault_id(), u.epoch());
     let encoded = match folder {

@@ -97,6 +97,7 @@ pub(crate) fn install_session<R: Runtime>(
         .vault_icon()
         .filter(|i| liber_markdown::is_icon(i));
     let encrypted = session.vault().encrypted().is_some();
+    leave_encrypted(app);
     state.set_session(Some(session));
     let scratchpad = state.settings.is_scratchpad(&root);
     state.set_scratchpad_root(scratchpad.then(|| root.clone()));
@@ -153,9 +154,23 @@ pub(crate) fn vault_close_impl(state: &AppState) {
     state.set_session(None);
 }
 
+/// Before an encrypted vault stops being the open one, its take in progress
+/// is stopped and kept, as Lock does (spec §6.2); `set_session` then locks it.
+/// The take held the session, so dropping it alone kept the keys (review M4).
+fn leave_encrypted<R: Runtime>(app: &AppHandle<R>) {
+    let state = app.state::<AppState>();
+    if state
+        .session()
+        .is_ok_and(|s| s.vault().encrypted().is_some())
+    {
+        crate::audio_commands::stop_for_lock(app);
+    }
+}
+
 /// Closes the vault and puts the generic File-menu label back.
 #[doc(hidden)] // public for the menu test (round 3 review #8)
 pub fn close_session<R: Runtime>(app: &AppHandle<R>) {
+    leave_encrypted(app);
     vault_close_impl(&app.state::<AppState>());
     crate::menu::show_vault_in_menu(app, None);
 }

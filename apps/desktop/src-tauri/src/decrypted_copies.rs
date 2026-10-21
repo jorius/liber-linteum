@@ -12,7 +12,7 @@
 //! Windows) is still found by the next wipe or sweep (review C1).
 
 use std::fs::{File, OpenOptions};
-use std::io::Write;
+use std::io::Read;
 use std::path::{Component, Path, PathBuf};
 use std::sync::Mutex;
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -48,9 +48,10 @@ impl DecryptedCopies {
         }
     }
 
-    /// Writes `bytes` as `<folder>/<n>/<name>` and returns its path.
-    /// `name` is a vault path's last component, so a single plain name.
-    pub fn write(&self, name: &str, bytes: &[u8]) -> std::io::Result<PathBuf> {
+    /// Streams `from` into `<folder>/<n>/<name>` and returns its path; a copy
+    /// that fails part way is removed. `name` is a vault path's last
+    /// component, so a single plain name.
+    pub fn write(&self, name: &str, mut from: impl Read) -> std::io::Result<PathBuf> {
         // Exactly one plain name: never `..`, a separator or `C:x` (review M3).
         let mut parts = Path::new(name).components();
         if !matches!((parts.next(), parts.next()), (Some(Component::Normal(n)), None) if n == name)
@@ -85,7 +86,11 @@ impl DecryptedCopies {
         options.write(true).create_new(true);
         #[cfg(unix)]
         std::os::unix::fs::OpenOptionsExt::mode(&mut options, 0o600);
-        options.open(&path)?.write_all(bytes)?;
+        let copied = std::io::copy(&mut from, &mut options.open(&path)?);
+        if let Err(e) = copied {
+            let _ = std::fs::remove_file(&path);
+            return Err(e);
+        }
         Ok(path)
     }
 
@@ -380,10 +385,10 @@ mod tests {
             bad.extend(["C:x.pdf", "a\\b.pdf"]);
         }
         for name in bad {
-            let err = copies.write(name, b"x").unwrap_err();
+            let err = copies.write(name, &b"x"[..]).unwrap_err();
             assert_eq!(err.kind(), std::io::ErrorKind::InvalidInput, "{name:?}");
         }
-        copies.write("fine name.pdf", b"x").unwrap();
+        copies.write("fine name.pdf", &b"x"[..]).unwrap();
         copies.wipe();
     }
 
@@ -396,8 +401,8 @@ mod tests {
         let chmod = |p: &Path, m| std::fs::set_permissions(p, std::fs::Permissions::from_mode(m));
         let temp = tempfile::tempdir().unwrap();
         let copies = DecryptedCopies::new(temp.path());
-        let gone = copies.write("gone.pdf", b"one").unwrap();
-        let stuck = copies.write("stuck.pdf", b"two").unwrap();
+        let gone = copies.write("gone.pdf", &b"one"[..]).unwrap();
+        let stuck = copies.write("stuck.pdf", &b"two"[..]).unwrap();
         let stuck_dir = stuck.parent().unwrap().to_path_buf();
         chmod(&stuck_dir, 0o500).unwrap();
         copies.wipe();
@@ -425,8 +430,8 @@ mod tests {
     fn copies_live_in_a_private_folder_until_wiped() {
         let temp = tempfile::tempdir().unwrap();
         let copies = DecryptedCopies::new(temp.path());
-        let a = copies.write("same.pdf", b"one").unwrap();
-        let b = copies.write("same.pdf", b"two").unwrap();
+        let a = copies.write("same.pdf", &b"one"[..]).unwrap();
+        let b = copies.write("same.pdf", &b"two"[..]).unwrap();
         assert_ne!(a, b);
         assert_eq!(std::fs::read(&a).unwrap(), b"one");
         assert!(a.starts_with(copies.folder()));
@@ -446,7 +451,7 @@ mod tests {
         copies.wipe();
         assert!(!copies.folder().exists());
         // The next copy makes the folder again.
-        let c = copies.write("again.pdf", b"three").unwrap();
+        let c = copies.write("again.pdf", &b"three"[..]).unwrap();
         assert!(c.exists());
         copies.wipe();
     }

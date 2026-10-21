@@ -5,8 +5,8 @@
 //! the tree with what was written. Runs when `LIBER_XCHECK_PY` names a Python
 //! with `cryptography` >= 44 (AES-SIV, Argon2id); otherwise it prints SKIP.
 
-use liber_crypto::Argon2Params;
-use liber_vault::{EncryptedStorage, Replace, Storage, VaultPath};
+use liber_crypto::{Argon2Params, FolderId, NameCodec, Unlock, VaultHeader};
+use liber_vault::{EncryptedStorage, HEADER_FILE, Replace, Storage, VaultPath};
 use std::collections::BTreeMap;
 use std::io::Write;
 use std::path::{Path, PathBuf};
@@ -97,6 +97,33 @@ fn an_e3_vault_decrypts_with_the_python_reader() {
     let nfd = want.remove("Cafe\u{301}.md").unwrap();
     want.insert("Café.md".into(), nfd);
 
+    // Final review C1: a folder another device made offline under the same
+    // name (its own id). Both decrypt as `Shared`; a write into the one listed
+    // as `Shared (duplicate 1)` lands in it.
+    s.create_dir(&vp("Shared")).unwrap();
+    s.replace_atomic(
+        &vp("Shared/mine.md"),
+        &mut &b"mine"[..],
+        Replace::CreateOnly,
+    )
+    .unwrap();
+    let header = VaultHeader::parse(&std::fs::read(root.join(HEADER_FILE)).unwrap()).unwrap();
+    let u = header.unlock(Unlock::Passphrase(PASS)).unwrap();
+    let codec = NameCodec::new(&u.subkeys().name, u.vault_id(), u.epoch());
+    let theirs = codec
+        .encrypt_folder(&FolderId::ROOT, &FolderId::random(), "Shared")
+        .unwrap();
+    std::fs::create_dir(root.join("d").join(theirs)).unwrap();
+    s.children(&VaultPath::root()).unwrap();
+    s.replace_atomic(
+        &vp("Shared (duplicate 1)/theirs.md"),
+        &mut &b"theirs"[..],
+        Replace::CreateOnly,
+    )
+    .unwrap();
+    want.insert("Shared/mine.md".into(), hex(b"mine"));
+    want.insert("Shared/theirs.md".into(), hex(b"theirs"));
+
     // A recording-style take: streamed in pieces through `create_new`, then `finish`.
     s.create_dir(&vp("Recordings")).unwrap();
     let take: Vec<u8> = (0..150_000u32).map(|i| (i * 7 % 256) as u8).collect();
@@ -108,6 +135,7 @@ fn an_e3_vault_decrypts_with_the_python_reader() {
     file.finish().unwrap();
     want.insert("Recordings/clip.wav".into(), hex(&take));
     for folder in [
+        "Shared",
         "Projects",
         "Projects/Résumé",
         "Recordings",

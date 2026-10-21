@@ -2,7 +2,7 @@
 //! path translated to its logical one through the name cache. A path the cache
 //! can't map becomes [`RawEvent::Overflow`], so the session rescans.
 
-use super::names::{self, Cache, side_owner};
+use super::names::{self, Cache, Entry, side_owner};
 use super::{DATA_DIR, EncryptedStorage, KeyHolder, load, read, write};
 use crate::error::{Result, VaultError};
 use crate::path::VaultPath;
@@ -112,8 +112,10 @@ impl Translate {
         })
     }
 
-    /// The canonical logical path of `<d>/<dirs…>/<last>`: each folder through
-    /// its (re-read if dropped) listing, `last` by decrypting its name.
+    /// The canonical logical path of `<d>/<dirs…>/<last>`, each name as its
+    /// folder's (re-read if dropped) listing shows it: a sync duplicate is
+    /// `<name> (duplicate N)` there. A `last` that is gone and no longer
+    /// listed is named by decrypting it.
     fn logical(&self, u: &Unlocked, dirs: &[&str], last: &str) -> Option<String> {
         let mut physical = self.data.clone();
         let mut id = FolderId::ROOT;
@@ -121,16 +123,29 @@ impl Translate {
         for part in dirs {
             let listing = load(u, &self.cache, &canon, &physical, id).ok()??;
             physical.push(part);
-            let (name, e) = listing
-                .entries
-                .iter()
-                .find(|(_, e)| e.physical == physical)?;
+            let (name, e) = listed(&listing, &physical)?;
             id = e.folder?;
             canon = join(&canon, name);
+        }
+        let entry = physical.join(last);
+        let listing = load(u, &self.cache, &canon, &physical, id).ok()??;
+        if let Some((name, _)) = listed(&listing, &entry) {
+            return Some(join(&canon, name));
+        }
+        if entry.symlink_metadata().is_ok() {
+            // New since the cached listing: read it again; still unlisted is unreadable.
+            write(&self.cache).drop_listing(&canon);
+            let listing = load(u, &self.cache, &canon, &physical, id).ok()??;
+            return listed(&listing, &entry).map(|(name, _)| join(&canon, name));
         }
         let (name, _) = names::decode(&names::codecs(u), &physical, &id, last).ok()?;
         Some(join(&canon, &name))
     }
+}
+
+/// The entry of `listing` at the physical path `physical`, with its name.
+fn listed<'a>(listing: &'a names::Listing, physical: &Path) -> Option<(&'a String, &'a Entry)> {
+    listing.entries.iter().find(|(_, e)| e.physical == physical)
 }
 
 fn join(dir: &str, name: &str) -> String {

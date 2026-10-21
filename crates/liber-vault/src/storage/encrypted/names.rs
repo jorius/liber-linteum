@@ -2,7 +2,7 @@
 //! decrypted once and cached under its logical path.
 
 use liber_crypto::{FolderId, NameCodec, Unlocked, shorten, strip_conflict};
-use std::collections::{BTreeMap, HashMap};
+use std::collections::{BTreeMap, HashMap, HashSet};
 use std::io::Read;
 use std::path::{Component, Path, PathBuf};
 use std::sync::Arc;
@@ -15,10 +15,12 @@ pub(super) struct Entry {
     pub folder: Option<FolderId>,
 }
 
-/// A physical folder's decrypted listing (the folder's own physical path and
-/// id are in its [`Entry`]).
+/// A physical folder's decrypted listing (the folder's own id is in its [`Entry`]).
 #[derive(Debug)]
 pub(super) struct Listing {
+    /// The physical folder read: a cached listing is used only for it, since
+    /// a logical name (`x (duplicate 1)`) can move to another physical folder.
+    pub physical: PathBuf,
     pub entries: HashMap<String, Entry>,
     /// Each entry whose name won't decrypt: its physical path and why.
     pub unreadable: Vec<(PathBuf, String)>,
@@ -121,11 +123,12 @@ pub(super) fn codecs(u: &Unlocked) -> Vec<NameCodec<'_>> {
 }
 
 /// A name is used only as exactly one normal path component (E1 hand-off §5: on
-/// Windows `C:x` would otherwise carry a prefix), and never with a `:`, so a vault
-/// lists the same on every OS.
+/// Windows `C:x` would otherwise carry a prefix), and never with a `:` or `\\`, so
+/// a vault lists the same on every OS.
 pub(super) fn one_component(name: &str) -> bool {
     let mut c = Path::new(name).components();
-    matches!((c.next(), c.next()), (Some(Component::Normal(_)), None)) && !name.contains(':')
+    matches!((c.next(), c.next()), (Some(Component::Normal(_)), None))
+        && !name.contains([':', '\\'])
 }
 
 /// For a long name's side file (or a sync copy of one), which is never an entry
@@ -157,7 +160,8 @@ pub(super) fn decode(
         Err(reason) => {
             let c = strip_conflict(on_disk).ok_or(reason.clone())?;
             let (name, folder) = decode_exact(codecs, dir, id, &c.original).map_err(|_| reason)?;
-            (conflict_name(&name, &c.label, folder.is_none()), folder)
+            let label = format!("conflict {}", c.label);
+            (suffixed(&name, &label, folder.is_none()), folder)
         }
         ok => ok?,
     };
@@ -207,23 +211,25 @@ fn read_side(dir: &Path, on_disk: &str) -> Result<String, String> {
     Ok(encoded)
 }
 
-/// `n.md` → `n (conflict <label>).md`; a folder's name keeps any dot as is.
-fn conflict_name(name: &str, label: &str, file: bool) -> String {
+/// `n.md` → `n (<label>).md`; a folder's name keeps any dot as is.
+fn suffixed(name: &str, label: &str, file: bool) -> String {
     let (stem, ext) = match name.rfind('.') {
         Some(i) if file && i > 0 => name.split_at(i),
         _ => (name, ""),
     };
-    format!("{stem} (conflict {label}){ext}")
+    format!("{stem} ({label}){ext}")
 }
 
 /// Reads and decrypts the physical folder `physical`, whose folder id is `id`.
 pub(super) fn list(u: &Unlocked, physical: &Path, id: FolderId) -> std::io::Result<Listing> {
     let codecs = codecs(u);
     let mut listing = Listing {
+        physical: physical.to_path_buf(),
         entries: HashMap::new(),
         unreadable: Vec::new(),
     };
-    let mut named: HashMap<String, Vec<Entry>> = HashMap::new();
+    // By folded name, as `find` matches: a group of more than one came from a sync.
+    let mut named: BTreeMap<String, Vec<(String, Entry)>> = BTreeMap::new();
     let items = std::fs::read_dir(physical)?.collect::<std::io::Result<Vec<_>>>()?;
     let all: Vec<String> = items
         .iter()
@@ -259,23 +265,35 @@ pub(super) fn list(u: &Unlocked, physical: &Path, id: FolderId) -> std::io::Resu
             Err("not a file or folder".into())
         };
         match decoded {
-            Ok((name, folder)) => named.entry(name).or_default().push(Entry {
-                physical: path,
-                folder,
-            }),
+            Ok((name, folder)) => named.entry(fold(&name)).or_default().push((
+                name,
+                Entry {
+                    physical: path,
+                    folder,
+                },
+            )),
             Err(reason) => listing.unreadable.push((path, reason)),
         }
     }
-    // Two entries with one name: neither wins, so the result doesn't depend on `read_dir` order.
-    for (name, mut found) in named {
-        if found.len() == 1 {
-            listing.entries.insert(name, found.remove(0));
-        } else {
-            let reason = format!("another entry is also named {name:?}");
-            for e in found {
-                listing.unreadable.push((e.physical, reason.clone()));
+    // Two entries with one name (two devices each made `attachments` offline: a
+    // folder's name carries its own id): by physical name, so not by `read_dir`
+    // order, the first keeps it and each other is `<name> (duplicate N)`, readable
+    // like a conflict copy. Only one whose suffixed name is taken too stays unreadable.
+    let mut taken: HashSet<String> = named.keys().cloned().collect();
+    for mut found in named.into_values() {
+        found.sort_by(|a, b| a.1.physical.cmp(&b.1.physical));
+        let mut found = found.into_iter();
+        let (name, first) = found.next().expect("a group is never empty");
+        for (n, (other, e)) in found.enumerate() {
+            let dup = suffixed(&other, &format!("duplicate {}", n + 1), e.folder.is_none());
+            if taken.insert(fold(&dup)) {
+                listing.entries.insert(dup, e);
+            } else {
+                let reason = format!("another entry is also named {other:?}");
+                listing.unreadable.push((e.physical, reason));
             }
         }
+        listing.entries.insert(name, first);
     }
     listing.unreadable.sort();
     Ok(listing)
@@ -305,6 +323,7 @@ mod tests {
     fn a_listing_read_before_an_invalidation_or_lock_is_not_cached() {
         let empty = || {
             Arc::new(Listing {
+                physical: Default::default(),
                 entries: Default::default(),
                 unreadable: Vec::new(),
             })
@@ -338,7 +357,7 @@ mod tests {
     fn only_single_normal_components_pass() {
         assert!(one_component("note.md"));
         assert!(one_component(".liber"));
-        for bad in ["", ".", "..", "a/b", "/a"] {
+        for bad in ["", ".", "..", "a/b", "/a", "a\\b", "a:b"] {
             assert!(!one_component(bad), "{bad:?}");
         }
         #[cfg(windows)]

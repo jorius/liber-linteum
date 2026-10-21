@@ -13,7 +13,7 @@ use crate::state::AppState;
 use crate::vault_commands::{blocking, install_session, session_events};
 use liber_crypto::{Argon2Params, RecoveryCode, Unlock, Zeroizing};
 use liber_session::VaultSession;
-use liber_vault::{EncryptedStorage, VaultPath, is_hidden_path};
+use liber_vault::{EncryptedStorage, Reach, VaultPath, is_hidden_path};
 use serde::{Deserialize, Serialize, Serializer};
 use std::path::{Path, PathBuf};
 use tauri::{AppHandle, Emitter, Manager, Runtime};
@@ -283,8 +283,9 @@ pub(crate) fn attachment_open_decrypted_impl<R: Runtime>(
             format!("{path} can't be opened"),
         ));
     }
-    let (bytes, _) = session.vault().read(&vp)?;
-    let copy = state.copies.write(vp.file_name(), &bytes)?;
+    // Streamed, never whole in memory (review M5).
+    let from = session.vault().open_read(&vp, Reach::Any)?.inner;
+    let copy = state.copies.write(vp.file_name(), from)?;
     if let Err(e) = crate::editor_commands::check_openable(&copy) {
         let _ = std::fs::remove_file(&copy); // seam: outside (a decrypted copy, spec §5.5)
         return Err(e);

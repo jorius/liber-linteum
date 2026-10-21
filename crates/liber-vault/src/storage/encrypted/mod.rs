@@ -427,7 +427,7 @@ fn load(
 ) -> Result<Option<Arc<Listing>>> {
     let since = {
         let c = read(cache);
-        if let Some(l) = c.listings.get(dir) {
+        if let Some(l) = c.listings.get(dir).filter(|l| l.physical == physical) {
             return Ok(Some(Arc::clone(l)));
         }
         c.generation

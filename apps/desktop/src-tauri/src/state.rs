@@ -119,13 +119,15 @@ impl AppState {
     }
 
     /// Replaces the open vault (dropping the previous session stops its
-    /// watcher). An encrypted vault's decrypted copies go with it: on lock,
-    /// on close, or when another vault opens (spec §5.5).
+    /// watcher). An encrypted vault is locked, whoever else still holds it,
+    /// and its decrypted copies go with it: on lock, on close, or when
+    /// another vault opens (spec §5.5, review M4).
     pub fn set_session(&self, session: Option<Arc<VaultSession>>) {
         let old = std::mem::replace(&mut *self.slot(), session);
         if let Some(old) = old {
             old.stop_watching();
             if old.vault().encrypted().is_some() {
+                old.lock();
                 self.copies.wipe();
             }
         }
