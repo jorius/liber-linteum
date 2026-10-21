@@ -57,6 +57,13 @@ import { useSpellStore } from './spellStore';
 /** External changes arriving within this window trigger one tree refresh. */
 export const COALESCE_MS = 100;
 
+interface OpenOpts {
+  /** The vault being opened: an encrypted one answers `locked`. */
+  path?: string;
+  /** An unlock: its failure is shown by the Unlock screen, not toasted. */
+  quiet?: boolean;
+}
+
 export type VaultStatus = 'closed' | 'opening' | 'open' | 'locked';
 
 interface VaultState {
@@ -64,6 +71,8 @@ interface VaultState {
   progress: ProgressPayload | null;
   /** The encrypted vault waiting for Unlock (status `locked`). */
   lockedPath: string | null;
+  /** An unlock is in flight: the Unlock screen stays up under the overlay. */
+  unlocking: boolean;
   info: VaultInfo | null;
   nodes: TreeNode[];
   children: Map<string, TreeNode[]>;
@@ -154,6 +163,7 @@ const EMPTY = {
   status: 'closed' as VaultStatus,
   progress: null,
   lockedPath: null as string | null,
+  unlocking: false,
   info: null,
   nodes: [] as TreeNode[],
   children: new Map<string, TreeNode[]>(),
@@ -277,11 +287,24 @@ export const useVaultStore = create<VaultState>((set, get) => {
     useSpellStore.getState().bump();
   }
 
+  /** Back to where an open started. The backend keeps the vault it had (M1b
+   *  §10 a). A failed unlock (`quiet`) stays on the Unlock screen, which shows
+   *  the error; any other open started from there leaves it: closed. */
+  function failed(before: VaultStatus, opts: OpenOpts | undefined, message: string) {
+    if (opts?.quiet) set({ status: before, progress: null });
+    else {
+      set({ status: before === 'open' ? 'open' : 'closed', progress: null });
+      if (before === 'locked') set({ lockedPath: null });
+      toast().push({ message, tone: 'error' });
+    }
+  }
+
   async function opened(
     res: IpcResult<VaultInfo>,
     before: VaultStatus,
-    path?: string,
+    opts?: OpenOpts,
   ): Promise<IpcResult<VaultInfo>> {
+    const path = opts?.path;
     if (!res.ok) {
       if (res.error.kind === 'locked' && path) {
         // An encrypted vault: the Unlock screen, not an error.
@@ -292,10 +315,7 @@ export const useVaultStore = create<VaultState>((set, get) => {
         set({ status: 'locked', lockedPath: path, progress: null });
         return res;
       }
-      // The backend keeps the vault it had (M1b §10 a). A failed unlock stays
-      // on its screen, which shows the error.
-      set({ status: before === 'open' || before === 'locked' ? before : 'closed', progress: null });
-      if (before !== 'locked') toast().push({ message: errorMessage(res.error), tone: 'error' });
+      failed(before, opts, errorMessage(res.error));
       return res;
     }
     // The global Scratchpad reads as "Quick notes" wherever the vault's
@@ -325,7 +345,7 @@ export const useVaultStore = create<VaultState>((set, get) => {
 
   async function withProgress(
     run: () => Promise<IpcResult<VaultInfo>>,
-    path?: string,
+    opts?: OpenOpts,
   ): Promise<IpcResult<VaultInfo>> {
     const before = get().status;
     // One open at a time (M1b §10 b).
@@ -335,15 +355,14 @@ export const useVaultStore = create<VaultState>((set, get) => {
     // Progress is a nicety: if it can't be subscribed, open without it.
     const stop = await onVaultProgress((p) => set({ progress: p })).catch(() => null);
     try {
-      return await opened(await run(), before, path);
+      return await opened(await run(), before, opts);
     } catch (e) {
       // Never leave the opening overlay up without a way out.
-      set({ status: before === 'open' || before === 'locked' ? before : 'closed', progress: null });
       const error: CommandError = {
         kind: 'io',
         message: e instanceof Error ? e.message : String(e),
       };
-      if (before !== 'locked') toast().push({ message: errorMessage(error), tone: 'error' });
+      failed(before, opts, errorMessage(error));
       return { ok: false, error };
     } finally {
       if (stop) safeUnlisten(stop);
@@ -352,7 +371,7 @@ export const useVaultStore = create<VaultState>((set, get) => {
 
   return {
     ...EMPTY,
-    open: (path) => withProgress(() => vaultOpen(path), path),
+    open: (path) => withProgress(() => vaultOpen(path), { path }),
     openScratchpad: () => withProgress(() => scratchpadOpen()),
     importNotion: async (name) => {
       const before = get().status;
@@ -369,7 +388,14 @@ export const useVaultStore = create<VaultState>((set, get) => {
     unlock: async (secret) => {
       const path = get().lockedPath;
       if (!path) return { ok: false, error: BUSY };
-      const res = await withProgress(() => vaultUnlock(path, secret), path);
+      // The Unlock screen stays mounted while this runs (`unlocking`).
+      set({ unlocking: true });
+      let res: IpcResult<VaultInfo>;
+      try {
+        res = await withProgress(() => vaultUnlock(path, secret), { path, quiet: true });
+      } finally {
+        set({ unlocking: false });
+      }
       if (res.ok && res.value.recovered?.length) announceRecovered(res.value.recovered);
       return res;
     },
@@ -386,6 +412,13 @@ export const useVaultStore = create<VaultState>((set, get) => {
       const root = get().info!.root;
       // beforeSwitch includes the recorder's stop (a running take is kept).
       if (!(await savedEverything({ ask: false }))) return false;
+      // Something typed while the saves ran must not be dropped with the vault.
+      if (
+        useEditorStore.getState().dirtyPaths().length &&
+        !(await savedEverything({ ask: false }))
+      ) {
+        return false;
+      }
       const res = await vaultLock();
       if (!res.ok) {
         toast().push({ message: errorMessage(res.error), tone: 'error' });

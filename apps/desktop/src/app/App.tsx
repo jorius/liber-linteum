@@ -12,11 +12,12 @@ import { useAppVersion } from './useAppVersion';
 export function App() {
   const version = useAppVersion();
   const status = useVaultStore((s) => s.status);
+  const unlocking = useVaultStore((s) => s.unlocking);
   return (
     <>
       {status === 'open' ? (
         <AppShell />
-      ) : status === 'locked' ? (
+      ) : status === 'locked' || (status === 'opening' && unlocking) ? (
         <UnlockScreen />
       ) : (
         <Welcome version={version} />
