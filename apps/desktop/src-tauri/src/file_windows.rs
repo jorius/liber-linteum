@@ -278,6 +278,15 @@ impl FileWindows {
         lock(&self.grants).get(label).cloned()
     }
 
+    /// Whether a window shows a file in `root` or below it (encrypt in
+    /// place refuses until it closes: its plain vault would write plaintext
+    /// into the encrypted folder, review I1).
+    pub fn any_under(&self, root: &Path) -> bool {
+        lock(&self.grants)
+            .values()
+            .any(|g| g.folder().starts_with(root))
+    }
+
     /// The window is gone: so is its grant (and its watcher).
     pub fn revoke(&self, label: &str) {
         lock(&self.grants).remove(label);

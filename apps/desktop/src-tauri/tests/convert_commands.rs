@@ -386,3 +386,153 @@ fn the_scratchpad_blocked_folders_and_short_passphrases_are_refused() {
     let err = call(&h.main, "vault_encrypt_preflight", json!({ "path": enc })).unwrap_err();
     assert_eq!(kind(err), "notPermitted");
 }
+
+// ---- Review fix round ----
+
+fn begin(h: &Harness, root: &Path) -> Result<Value, Value> {
+    call(
+        &h.main,
+        "vault_encrypt_begin",
+        json!({ "path": root, "passphrase": PASS }),
+    )
+}
+
+/// Review I1: a single-file window on a note in the folder refuses begin
+/// (its own plain vault would later write plaintext into the encrypted root).
+#[test]
+fn a_file_window_inside_the_folder_refuses_begin() {
+    let h = harness();
+    let root = h.plain("Win");
+    let before = snapshot(&root);
+    liber_desktop::file_windows::open_file_window(h.app.handle(), &root.join("Sub/Deep.md"))
+        .expect("file window opens");
+    let err = begin(&h, &root).unwrap_err();
+    assert_eq!(kind(err.clone()), "notPermitted", "{err}");
+    assert!(
+        err["message"].as_str().unwrap().contains("windows"),
+        "{err}"
+    );
+    assert_eq!(snapshot(&root), before);
+}
+
+/// Review I2: a take in progress in the plain vault is stopped and kept in
+/// it before the conversion, so it ends up encrypted too.
+#[test]
+fn a_take_in_progress_is_kept_and_encrypted() {
+    let h = harness();
+    let root = h.plain("Rec");
+    call(&h.main, "vault_open", json!({ "path": root })).unwrap();
+    let started = call(
+        &h.main,
+        "audio_record_start",
+        json!({ "page": "Notes.md", "device": null, "name": "clip-20261021-120000" }),
+    )
+    .unwrap();
+    std::thread::sleep(std::time::Duration::from_millis(250));
+    begin(&h, &root).unwrap();
+    let id = started["recordingId"].clone();
+    let err = call(&h.main, "audio_record_stop", json!({ "recordingId": id })).unwrap_err();
+    assert_eq!(kind(err), "notFound", "the take already ended");
+    call(&h.main, "vault_encrypt_run", json!({})).unwrap();
+    let tree = call(&h.main, "vault_tree", json!({})).unwrap();
+    assert!(
+        tree.as_array().unwrap().iter().any(|n| n["path"]
+            .as_str()
+            .unwrap()
+            .ends_with("clip-20261021-120000.wav")),
+        "{tree}"
+    );
+    let plain_wavs: Vec<_> = snapshot(&root)
+        .into_keys()
+        .filter(|k| k.ends_with(".wav"))
+        .collect();
+    assert!(
+        plain_wavs.is_empty(),
+        "no plaintext clip at the root: {plain_wavs:?}"
+    );
+}
+
+/// Review I3: the open vault closes when it is inside the folder (its
+/// plaintext index goes too) or holds it.
+#[test]
+fn an_open_vault_inside_or_around_the_folder_is_closed() {
+    let h = harness();
+    let root = h.plain("Outer");
+    let inner = root.join("Sub");
+    call(&h.main, "vault_open", json!({ "path": inner })).unwrap();
+    let index = liber_session::index_db_path(h.cache.path(), &inner);
+    assert!(index.parent().unwrap().exists());
+    begin(&h, &root).unwrap();
+    assert_eq!(
+        kind(call(&h.main, "vault_tree", json!({})).unwrap_err()),
+        "noVault"
+    );
+    assert!(
+        !index.parent().unwrap().exists(),
+        "the inner vault's index is gone"
+    );
+    call(&h.main, "vault_encrypt_cancel", json!({})).unwrap();
+
+    let parent = h.disk.path().canonicalize().unwrap();
+    call(&h.main, "vault_open", json!({ "path": parent })).unwrap();
+    begin(&h, &root).unwrap();
+    assert_eq!(
+        kind(call(&h.main, "vault_tree", json!({})).unwrap_err()),
+        "noVault"
+    );
+    call(&h.main, "vault_encrypt_cancel", json!({})).unwrap();
+}
+
+/// Review I4: when undoing a failed run fails too, the run says so (never
+/// "back as it was"), the folder isn't left marked as running, and the next
+/// open finishes the undo.
+#[test]
+fn a_failed_undo_is_reported_and_retried_on_open() {
+    let h = harness();
+    let root = h.plain("Undo");
+    let before = snapshot(&root);
+    begin(&h, &root).unwrap();
+    convert::crash_when(Some(Box::new(|p| {
+        matches!(p, CrashPoint::Staging(1) | CrashPoint::Unstaging(0))
+    })));
+    let err = liber_desktop::convert_commands::vault_encrypt_run_impl(h.app.handle()).unwrap_err();
+    convert::crash_when(None);
+    assert!(err.message.contains("undoing it failed too"), "{err:?}");
+    assert!(err.message.contains("Unstaging"), "{err:?}");
+    call(&h.main, "vault_open", json!({ "path": root })).unwrap();
+    assert_eq!(snapshot(&root), before);
+}
+
+/// Review M4, M5: a run in progress can't be replaced; a begin never run is
+/// undone by the next begin, the same folder's included.
+#[test]
+fn one_conversion_at_a_time_and_a_new_begin_replaces_an_unrun_one() {
+    let h = harness();
+    let root = h.plain("Again");
+    let before = snapshot(&root);
+    let first = begin(&h, &root).unwrap();
+    let second = begin(&h, &root).unwrap();
+    assert_ne!(first["recovery"], second["recovery"]);
+    call(&h.main, "vault_encrypt_cancel", json!({})).unwrap();
+    assert_eq!(snapshot(&root), before);
+
+    let other = h.plain("Other");
+    begin(&h, &root).unwrap();
+    let w = h.main.clone();
+    let refused: Arc<Mutex<Option<Value>>> = Arc::default();
+    let sink = refused.clone();
+    h.app.listen_any("vault:encrypt-progress", move |e| {
+        let p: Value = serde_json::from_str(e.payload()).unwrap();
+        if p["done"] == 1 {
+            let r = call(
+                &w,
+                "vault_encrypt_begin",
+                json!({ "path": other, "passphrase": PASS }),
+            );
+            *sink.lock().unwrap() = Some(r.unwrap_err());
+        }
+    });
+    call(&h.main, "vault_encrypt_run", json!({})).unwrap();
+    let refused = refused.lock().unwrap().clone().unwrap();
+    assert_eq!(kind(refused), "notPermitted");
+}
