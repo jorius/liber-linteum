@@ -121,6 +121,9 @@ describe('Settings → Security', () => {
       "That passphrase doesn't open this vault.",
     );
     expect(useToastStore.getState().toasts).toHaveLength(0);
+    expect(screen.getByLabelText('New passphrase')).toHaveValue('');
+    expect(screen.getByLabelText('Confirm passphrase')).toHaveValue('');
+    expect(screen.getByLabelText('Current passphrase')).toHaveFocus();
   });
 
   it('new recovery key asks for the passphrase, then shows the code to confirm', async () => {
@@ -176,6 +179,26 @@ describe('the voided recovery key prompt', () => {
       return null;
     });
     await useVaultStore.getState().open('/enc');
+    expect(useUiStore.getState().dialog).toEqual({ type: 'recoveryVoid' });
+  });
+});
+
+describe('a refused dialog', () => {
+  it('confirmUnsaved and a bin clash resolve as cancel while the voided prompt shows', async () => {
+    const { confirmUnsaved } = await import('../editor/unsavedPrompt');
+    const { useEditorStore } = await import('../../stores/editorStore');
+    useSettingsStore.setState({ settings: { ...DEFAULT_SETTINGS, autoSave: false } });
+    vi.spyOn(useEditorStore.getState(), 'askPaths').mockReturnValue(['a.md']);
+    useUiStore.getState().openDialog({ type: 'recoveryVoid' });
+    // Settings from the native menu leaves the prompt in place.
+    const { openSettings } = await import('../shell/shellMenu');
+    openSettings();
+    expect(useUiStore.getState().dialog).toEqual({ type: 'recoveryVoid' });
+    const answered = await Promise.race([
+      confirmUnsaved(),
+      new Promise((r) => setTimeout(() => r('hung'), 200)),
+    ]);
+    expect(answered).toBe(false);
     expect(useUiStore.getState().dialog).toEqual({ type: 'recoveryVoid' });
   });
 });

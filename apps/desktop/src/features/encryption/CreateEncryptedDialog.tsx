@@ -1,4 +1,5 @@
-import { useState, type FormEvent } from 'react';
+import { useEffect, useState, type FormEvent } from 'react';
+import { useUiStore } from '../../stores/uiStore';
 import { useTranslation } from 'react-i18next';
 import { errorMessage } from '../../stores/messages';
 import { useVaultStore } from '../../stores/vaultStore';
@@ -22,6 +23,8 @@ export function CreateEncryptedDialog({ path, onClose }: { path: string; onClose
   const [creating, setCreating] = useState(false);
   const [code, setCode] = useState<string | null>(null);
 
+  useEffect(() => () => useUiStore.getState().holdCreate(false), []);
+
   const valid = strength(pass) !== 'tooShort' && pass === confirm;
 
   const submit = async (e: FormEvent) => {
@@ -29,6 +32,7 @@ export function CreateEncryptedDialog({ path, onClose }: { path: string; onClose
     if (!valid || creating) return;
     setError(null);
     setCreating(true);
+    useUiStore.getState().holdCreate(true);
     const res = await useVaultStore.getState().createEncrypted(path, pass);
     setCreating(false);
     // Neither outcome keeps the passphrase.
@@ -37,6 +41,7 @@ export function CreateEncryptedDialog({ path, onClose }: { path: string; onClose
     if (res.ok) {
       setCode(res.value.recovery);
     } else {
+      useUiStore.getState().holdCreate(false);
       setError(errorMessage(res.error));
       // The form mounts again: the keyboard returns to the first field.
       setTimeout(() =>

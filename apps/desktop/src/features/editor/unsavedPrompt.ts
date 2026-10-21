@@ -21,9 +21,11 @@ export function needsUnsavedPrompt(): boolean {
 export async function confirmUnsaved(): Promise<boolean> {
   if (!needsUnsavedPrompt()) return true;
   const paths = useEditorStore.getState().askPaths();
-  const choice = await new Promise<UnsavedChoice>((answer) =>
-    useUiStore.getState().openDialog({ type: 'unsaved', id: ++asked, paths, answer }),
-  );
+  const choice = await new Promise<UnsavedChoice>((answer) => {
+    // A sticky dialog is showing: stay.
+    if (!useUiStore.getState().openDialog({ type: 'unsaved', id: ++asked, paths, answer }))
+      answer('cancel');
+  });
   if (choice === 'cancel') return false;
   if (choice === 'discard') {
     useEditorStore.getState().discardAll();

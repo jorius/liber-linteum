@@ -56,16 +56,30 @@ interface UiState {
   actionsOpen: boolean;
   setActionsOpen: (open: boolean) => void;
   setScreen: (screen: Screen) => void;
-  openDialog: (d: Exclude<DialogState, null>) => void;
+  /** `false`: refused, a sticky dialog is showing. Callers that wait for an
+   *  answer treat a refusal as Cancel. */
+  openDialog: (d: Exclude<DialogState, null>) => boolean;
   closeDialog: () => void;
+  /** The create dialog holds the screen while it makes the vault and shows
+   *  the recovery code. */
+  held: boolean;
+  holdCreate: (held: boolean) => void;
 }
 
-export const useUiStore = create<UiState>((set) => ({
+export const useUiStore = create<UiState>((set, get) => ({
   dialog: null,
   screen: 'edit',
   setScreen: (screen) => set({ screen }),
   actionsOpen: false,
   setActionsOpen: (actionsOpen) => set({ actionsOpen }),
-  openDialog: (dialog) => set({ dialog }),
-  closeDialog: () => set({ dialog: null }),
+  openDialog: (dialog) => {
+    const { dialog: now, held } = get();
+    // Sticky: the voided-key prompt, and the create dialog once it holds a code.
+    if (now?.type === 'recoveryVoid' || (now?.type === 'createEncrypted' && held)) return false;
+    set({ dialog });
+    return true;
+  },
+  closeDialog: () => set({ dialog: null, held: false }),
+  held: false,
+  holdCreate: (held) => set({ held }),
 }));

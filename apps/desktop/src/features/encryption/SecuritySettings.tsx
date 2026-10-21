@@ -24,7 +24,7 @@ function problem(t: (k: string) => string, error: CommandError): string {
 /** A new recovery key (E4): asks for the passphrase, then shows the code and
  *  checks it was written down. Neither secret outlives its step: the
  *  passphrase is cleared when the call returns, the code goes with the dialog.
- *  `locked`: nothing dismisses it once the code is on screen. */
+ *  Nothing dismisses it once the code is on screen (`!code && onClose()`). */
 export function NewRecoveryDialog({
   onClose,
   onDone,
@@ -124,14 +124,17 @@ function ChangePassphrase() {
     const res = await securityChangePassphrase(current, pass);
     setBusy(false);
     setCurrent('');
+    setPass('');
+    setConfirm('');
     if (res.ok) {
-      setPass('');
-      setConfirm('');
       useToastStore.getState().push({ message: t('encryption.security.changed') });
     } else if (res.error.kind === 'wrongSecret') {
       setWrong(problem(t, res.error));
       input.current?.focus();
-    } else setOther(problem(t, res.error));
+    } else {
+      setOther(problem(t, res.error));
+      input.current?.focus();
+    }
   };
 
   return (
