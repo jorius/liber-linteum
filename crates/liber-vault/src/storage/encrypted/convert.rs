@@ -218,6 +218,11 @@ fn crash(at: CrashPoint) -> Result<()> {
 
 /// Sends a folder to the OS trash (tests inject a fake).
 pub type Trash<'a> = &'a dyn Fn(&Path) -> std::io::Result<()>;
+/// The real [`Trash`]: the OS trash (recoverable; the user empties it, D4).
+pub fn os_trash(path: &Path) -> std::io::Result<()> {
+    trash::delete(path).map_err(std::io::Error::other)
+}
+
 /// Deletes the vault's plaintext index from the app cache (the desktop's).
 pub type DropIndex<'a> = &'a dyn Fn() -> std::io::Result<()>;
 

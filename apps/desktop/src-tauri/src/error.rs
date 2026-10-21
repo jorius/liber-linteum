@@ -44,6 +44,14 @@ pub enum ErrorKind {
     /// An encrypted vault that can't be read: a damaged or unparseable
     /// header, a missing `d/`, or ciphertext that fails to decrypt.
     Damaged,
+    /// Encrypt in place (encryption UX §8.2): another device's conversion
+    /// of this folder is under way. Nothing was touched.
+    ConvertingElsewhere,
+    /// Encrypt in place (§8.3): files changed while encrypting, so it was
+    /// undone.
+    ChangedDuringConvert,
+    /// Encrypt in place: Stop and undo.
+    Cancelled,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
@@ -137,6 +145,21 @@ impl From<std::io::Error> for CommandError {
             ErrorKind::Damaged
         } else {
             ErrorKind::Io
+        };
+        CommandError::new(kind, e.to_string())
+    }
+}
+
+impl From<liber_vault::convert::ConvertError> for CommandError {
+    fn from(e: liber_vault::convert::ConvertError) -> CommandError {
+        use liber_vault::convert::ConvertError as C;
+        let kind = match e {
+            C::Vault(v) => return v.into(),
+            C::Blocked(_) | C::Refused(_) => ErrorKind::NotPermitted,
+            C::Cancelled => ErrorKind::Cancelled,
+            C::Changed(_) => ErrorKind::ChangedDuringConvert,
+            C::Collision(_) => ErrorKind::Conflict,
+            C::Mismatch(_) => ErrorKind::Damaged,
         };
         CommandError::new(kind, e.to_string())
     }

@@ -3,6 +3,7 @@ pub mod attachment_commands;
 pub mod audio_commands;
 pub mod bin_commands;
 pub mod commands;
+pub mod convert_commands;
 pub mod decrypted_copies;
 pub mod drops;
 pub mod dto;
@@ -96,6 +97,8 @@ pub fn configure<R: tauri::Runtime>(
         // The Notion import (M7): its dialogs' picks and cancel flag.
         .manage(notion_commands::NotionState::default())
         .manage(spell_commands::SpellState::default())
+        // Encrypt in place (encryption UX §4.3): the conversion between begin and run.
+        .manage(convert_commands::ConvertState::default())
         .register_asynchronous_uri_scheme_protocol(asset::SCHEME, |ctx, request, responder| {
             let app = ctx.app_handle().clone();
             // A single-file window is served its file's folder (M4c §4).
@@ -268,6 +271,13 @@ pub fn configure<R: tauri::Runtime>(
         encryption_commands::vault_reveal_unreadable,
         encryption_commands::attachment_open_decrypted,
         encryption_commands::security_reset_rollback_memory,
+        // Encrypt in place (encryption UX §4.3, §8).
+        convert_commands::vault_encrypt_preflight,
+        convert_commands::vault_encrypt_begin,
+        convert_commands::vault_encrypt_run,
+        convert_commands::vault_encrypt_cancel,
+        convert_commands::vault_trash_originals,
+        convert_commands::vault_reveal_originals,
     ])
 }
 

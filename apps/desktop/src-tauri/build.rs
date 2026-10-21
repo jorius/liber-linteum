@@ -126,6 +126,13 @@ const COMMANDS: &[&str] = &[
     "vault_reveal_unreadable",
     "attachment_open_decrypted",
     "security_reset_rollback_memory",
+    // Encrypt in place (encryption UX §4.3, §8; main window only).
+    "vault_encrypt_preflight",
+    "vault_encrypt_begin",
+    "vault_encrypt_run",
+    "vault_encrypt_cancel",
+    "vault_trash_originals",
+    "vault_reveal_originals",
 ];
 
 fn main() {

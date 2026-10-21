@@ -48,6 +48,10 @@ pub struct VaultInfo {
     /// Clips the unlock recovered from takes a lock or a crash left (E3
     /// spec §4.2): E4 announces them as the recorder does at Start.
     pub recovered: Vec<AttachedDto>,
+    /// Encrypt in place (encryption UX §8.8): the readable originals
+    /// couldn't go to the Trash and are still in the vault folder. The UI
+    /// offers `vault_trash_originals` and `vault_reveal_originals`.
+    pub originals_pending: bool,
 }
 
 #[derive(Debug, Clone, Serialize)]
