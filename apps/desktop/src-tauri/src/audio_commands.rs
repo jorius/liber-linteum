@@ -13,9 +13,12 @@ use crate::state::AppState;
 use crate::vault_commands::{blocking, not_archived};
 use liber_audio::{AudioError, Device, Ended, Host, Take};
 use liber_session::{Attached, VaultSession};
-use liber_vault::{Child, Kind, NewFile, Vault, VaultError, VaultPath};
+use liber_vault::{
+    Child, EncryptedStorage, Kind, NewFile, RECORDING_DIR, Reach, Vault, VaultError, VaultPath,
+};
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
+use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::mpsc;
@@ -48,9 +51,6 @@ struct Running {
     stop: Arc<AtomicBool>,
     thread: JoinHandle<Result<Take, AudioError>>,
 }
-
-/// Where an encrypted vault keeps its takes in progress (spec §4.2).
-const RECORDING_DIR: &str = ".liber/recording";
 
 /// A take's own folder (batch 6 review M5) and file: in the app cache for a
 /// plain vault; in the vault's [`RECORDING_DIR`] for an encrypted one.
@@ -272,16 +272,79 @@ fn recover(
     out
 }
 
-/// A take's WAV bytes, sizes fixed (they are placeholders while recording),
-/// saved as `name` in `page`'s attachment folder: a new file, fresh salt.
-fn save_wav(
+/// [`liber_audio::record_stream`] into an encrypted vault's new file, then
+/// ends the stream. When a write failed (a full disk) or the end can't be
+/// written, what reached the disk is kept for salvage (review I1): the take
+/// reads as `WriteFailed`, Stop finds no file and keeps the take folder.
+pub fn record_into_vault(
+    host: &dyn Host,
+    device: Option<&str>,
+    mut out: Box<dyn NewFile>,
+    stop: &AtomicBool,
+    on_level: &mut dyn FnMut(liber_audio::Level, Duration),
+) -> Result<Take, AudioError> {
+    let max = liber_audio::MAX_DATA_BYTES;
+    let take = liber_audio::record_stream(host, device, &mut out, stop, on_level, max)?;
+    Ok(match out.finish_or_keep() {
+        Ok(()) => take,
+        Err(_) => Take {
+            ended: Ended::WriteFailed,
+            ..take
+        },
+    })
+}
+
+/// `copy` (a take of `total` bytes, its sizes placeholders) saved as `name`
+/// in `page`'s attachment folder with its sizes fixed: a new file, fresh
+/// salt, streamed (review I2: a take can be 4 GB, never whole in memory).
+fn save_take(
     session: &VaultSession,
     page: &VaultPath,
-    mut bytes: Vec<u8>,
     name: &str,
+    total: u64,
+    mut copy: impl FnMut(&mut dyn Write) -> liber_vault::Result<()>,
 ) -> CmdResult<Attached> {
-    liber_audio::fix_wav_sizes(&mut bytes)?;
-    Ok(session.save_attachment(page, name, &bytes)?)
+    Ok(session.save_attachment_with(page, name, |out| {
+        let mut fixed = liber_audio::fixed_wav(out, total);
+        copy(&mut fixed).map_err(std::io::Error::other)?;
+        fixed.finish().map(|_| ()).map_err(std::io::Error::other)
+    })?)
+}
+
+/// Streams what is left of the take `wav` in its folder `dir` into `out`:
+/// the file a Stop or lock ended, else the stream a crash or a failed write
+/// left uncommitted.
+fn salvage_take(
+    storage: &EncryptedStorage,
+    dir: &VaultPath,
+    wav: &VaultPath,
+    out: &mut dyn Write,
+) -> liber_vault::Result<()> {
+    match storage.salvage(wav, out) {
+        Err(VaultError::NotFound(_)) => storage.salvage_uncommitted(dir, out),
+        done => done,
+    }
+    .map(|_| ())
+}
+
+/// Counts a salvage's bytes and keeps its first four, so recovery knows the
+/// take's length before streaming it (a WAV header comes first).
+#[derive(Default)]
+struct Probe {
+    len: u64,
+    magic: Vec<u8>,
+}
+
+impl Write for Probe {
+    fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
+        let n = buf.len().min(4 - self.magic.len());
+        self.magic.extend_from_slice(&buf[..n]);
+        self.len += buf.len() as u64;
+        Ok(buf.len())
+    }
+    fn flush(&mut self) -> std::io::Result<()> {
+        Ok(())
+    }
 }
 
 /// Saves the takes an encrypted vault's [`RECORDING_DIR`] holds — one a lock
@@ -329,15 +392,19 @@ fn recover_in_vault(
         let (Some(page), Ok(wav)) = (page, dir.join(&format!("{stem}.wav"))) else {
             continue;
         };
-        match storage.salvage(&wav) {
+        // Two passes, never the take in memory: its length, then the fix-up.
+        let mut probe = Probe::default();
+        match salvage_take(storage, &dir, &wav, &mut probe) {
             // Anything but a WAV with sound (a crash before the first chunk) is dropped.
-            Ok((bytes, _)) if bytes.len() > 44 && bytes.starts_with(b"RIFF") => {
-                match save_wav(session, &page, bytes, &format!("{stem}-recovered.wav")) {
+            Ok(()) if probe.len > 44 && probe.magic == b"RIFF" => {
+                let name = format!("{stem}-recovered.wav");
+                let copy = |out: &mut dyn Write| salvage_take(storage, &dir, &wav, out);
+                match save_take(session, &page, &name, probe.len, copy) {
                     Ok(attached) => out.push(attached.into()),
                     Err(_) => continue,
                 }
             }
-            Ok(_) | Err(VaultError::NotFound(_) | VaultError::Crypto(_)) => {}
+            Ok(()) | Err(VaultError::NotFound(_) | VaultError::Crypto(_)) => {}
             Err(_) => continue,
         }
         let _ = remove_vault_take(vault, &dir);
@@ -346,16 +413,14 @@ fn recover_in_vault(
 }
 
 /// Step 5 of `vault_unlock` (spec §4.2): saves the takes a lock or a crash
-/// left in the vault just opened. Not while a take runs (it may be this
-/// vault's): the next Start does it then.
-pub(crate) fn recover_at_unlock<R: Runtime>(app: &AppHandle<R>) {
+/// left in the vault just opened, for the UI to announce. Not while a take
+/// runs (it may be this vault's): the next Start does it then.
+pub(crate) fn recover_at_unlock<R: Runtime>(app: &AppHandle<R>) -> Vec<AttachedDto> {
     let audio = app.state::<AudioState>();
     let slot = audio.running();
-    if slot.is_some() {
-        return;
-    }
-    if let Ok(session) = app.state::<AppState>().session() {
-        recover_in_vault(&session, None, &audio.finishing());
+    match (slot.is_some(), app.state::<AppState>().session()) {
+        (false, Ok(session)) => recover_in_vault(&session, None, &audio.finishing()),
+        _ => Vec::new(),
     }
 }
 
@@ -467,24 +532,9 @@ pub(crate) fn audio_record_start_impl<R: Runtime>(
                 Writer::Cache(file) => {
                     liber_audio::record(&*host, device, &file, &stop, &mut on_level)
                 }
-                Writer::Vault(mut out) => {
-                    let max = liber_audio::MAX_DATA_BYTES;
-                    let take = liber_audio::record_stream(
-                        &*host,
-                        device,
-                        &mut out,
-                        &stop,
-                        &mut on_level,
-                        max,
-                    );
-                    // Ends the stream (a periodic flush never does): Stop, and a
-                    // lock (spec §6.2), find a whole file.
-                    take.and_then(|t| {
-                        out.finish()
-                            .map(|()| t)
-                            .map_err(|e| AudioError::Write(e.to_string()))
-                    })
-                }
+                // Ends the stream (a periodic flush never does): Stop, and a
+                // lock (spec §6.2), find a whole file.
+                Writer::Vault(out) => record_into_vault(&*host, device, out, &stop, &mut on_level),
             };
             // Ended by itself: the bar says so, Stop & insert keeps the sound.
             if let Ok(t) = &take
@@ -565,8 +615,16 @@ impl Done<'_> {
         match &self.at {
             TakeAt::Cache { file, .. } => Ok(self.session.import_attachment(page, file)?),
             TakeAt::Vault { file, .. } => {
-                let (bytes, _) = self.session.vault().read(file)?;
-                save_wav(&self.session, page, bytes, file.file_name())
+                let vault = self.session.vault();
+                let total = vault.open_read(file, Reach::Any)?.len;
+                save_take(&self.session, page, file.file_name(), total, |out| {
+                    let mut r = vault.open_read(file, Reach::Any)?.inner;
+                    std::io::copy(&mut r, out).map_err(|e| VaultError::Io {
+                        path: file.to_string(),
+                        source: e,
+                    })?;
+                    Ok(())
+                })
             }
         }
     }

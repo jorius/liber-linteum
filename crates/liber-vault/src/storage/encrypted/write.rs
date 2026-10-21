@@ -44,6 +44,8 @@ pub(super) struct Pending {
     /// The parent folder's canonical path, whose cached listing goes on commit.
     dir: String,
     cache: Arc<RwLock<Cache>>,
+    /// Set by a failed `finish_or_keep`: the temp file stays for salvage.
+    keep: bool,
 }
 
 /// The temp file. `budget` is how many more bytes it accepts: `u64::MAX`,
@@ -85,6 +87,13 @@ impl Write for Pending {
 impl NewFile for Pending {
     fn finish(mut self: Box<Self>) -> Result<()> {
         self.commit()
+    }
+
+    /// The writer (and its file key) goes either way, inside `commit`.
+    fn finish_or_keep(mut self: Box<Self>) -> Result<()> {
+        let done = self.commit();
+        self.keep = done.is_err();
+        done
     }
 }
 
@@ -131,7 +140,9 @@ impl Drop for Pending {
         // Close it first: Windows can't delete an open file. After a commit the
         // temp name is gone and this does nothing.
         self.w = None;
-        let _ = std::fs::remove_file(&self.tmp);
+        if !self.keep {
+            let _ = std::fs::remove_file(&self.tmp);
+        }
     }
 }
 
@@ -272,6 +283,7 @@ impl EncryptedStorage {
             path: path.to_string(),
             dir: t.dir,
             cache: Arc::clone(&self.cache),
+            keep: false,
         };
         // A fresh random salt (format §13.8); on error, dropping `p` removes the temp file.
         p.w = Some(
@@ -326,7 +338,14 @@ impl EncryptedStorage {
         self.replace_with(path, from, mode, (HEADER_LEN + CHUNK_LEN + TAG_LEN) as u64)
     }
 
-    pub(super) fn new_file(&self, path: &VaultPath) -> Result<Pending> {
+    /// [`Storage::create_new`](crate::Storage::create_new) whose temp file
+    /// fails after `budget` bytes (a full disk, review I1).
+    #[cfg(feature = "test-params")]
+    pub fn create_new_failing(&self, path: &VaultPath, budget: u64) -> Result<Box<dyn NewFile>> {
+        Ok(Box::new(self.new_file(path, budget)?))
+    }
+
+    pub(super) fn new_file(&self, path: &VaultPath, budget: u64) -> Result<Pending> {
         self.with_write_keys(|u| {
             let t = self.target(u, path)?;
             if t.existing.is_some() {
@@ -334,7 +353,7 @@ impl EncryptedStorage {
             }
             let (name, side) = encode(u, &t.id, &t.name, None, path)?;
             let target = t.parent.join(name);
-            self.pending(u, path, t, target, side, u64::MAX)
+            self.pending(u, path, t, target, side, budget)
         })
     }
 

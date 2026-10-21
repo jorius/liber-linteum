@@ -26,6 +26,7 @@ pub use recovery::RecoveryCode;
 pub use slots::{NewSlot, Slot, SlotKind, Unlock};
 pub use stream::{
     CHUNK_LEN, HEADER_LEN, Salvaged, StreamReader, StreamWriter, TAG_LEN, header_epoch, salvage,
+    salvage_to,
 };
 /// Wipes a passphrase or recovery code on drop: what callers hold them in
 /// (`RecoveryCode::to_display` returns one), so they need no `zeroize` edge.

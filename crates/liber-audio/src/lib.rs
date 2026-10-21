@@ -14,7 +14,7 @@ pub use cpal_host::CpalHost;
 pub use host::{Device, Ended, Host, SYNTHETIC_DEVICE, Sink, StreamFormat, SyntheticHost};
 pub use level::{Level, level};
 pub use record::{MAX_DATA_BYTES, Take, record, record_with};
-pub use stream_wav::{fix_wav_sizes, record_stream};
+pub use stream_wav::{FixedWav, fix_wav_sizes, fixed_wav, record_stream};
 
 use serde::{Deserialize, Serialize};
 

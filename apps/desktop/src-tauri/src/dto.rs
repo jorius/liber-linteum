@@ -45,6 +45,9 @@ pub struct VaultInfo {
     /// The unlock's header merge voided the recovery code this device
     /// showed (`MergeOutcome::local_recovery_dropped`): E4 offers a new one.
     pub recovery_void: bool,
+    /// Clips the unlock recovered from takes a lock or a crash left (E3
+    /// spec §4.2): E4 announces them as the recorder does at Start.
+    pub recovered: Vec<AttachedDto>,
 }
 
 #[derive(Debug, Clone, Serialize)]

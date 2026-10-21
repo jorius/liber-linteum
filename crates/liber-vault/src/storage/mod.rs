@@ -12,8 +12,8 @@ use crate::path::VaultPath;
 use std::path::{Path, PathBuf};
 
 pub use encrypted::{
-    EncryptedStorage, HEADER_FILE, UnlockReport, VaultKind, is_encrypted_vault, remove_new_vault,
-    trash_header_copy, vault_kind,
+    EncryptedStorage, HEADER_FILE, RECORDING_DIR, UnlockReport, VaultKind, is_encrypted_vault,
+    remove_new_vault, trash_header_copy, vault_kind,
 };
 pub use plain::PlainStorage;
 
@@ -108,6 +108,12 @@ pub enum RawEvent {
 ///   does, on any write or finish error).
 pub trait NewFile: std::io::Write + Send {
     fn finish(self: Box<Self>) -> Result<()>;
+    /// [`NewFile::finish`] for a recording (E3 Task 6 review I1): if it fails
+    /// (a full disk, an earlier failed write), what reached the disk stays for
+    /// salvage instead of being deleted. Only the bytes stay, never a key.
+    fn finish_or_keep(self: Box<Self>) -> Result<()> {
+        self.finish()
+    }
 }
 
 /// Keeps a [`Storage::watch`] running until dropped. Dropping it must also

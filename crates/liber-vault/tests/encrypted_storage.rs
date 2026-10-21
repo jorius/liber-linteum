@@ -953,37 +953,95 @@ fn remove_new_vault_undoes_a_create() {
     EncryptedStorage::create_insecure(dir.path(), PASS, TINY).unwrap();
 }
 
-/// E3 Task 6 (format §13.7): salvage gives a finished file whole, and a file a
-/// crash left uncommitted — only its hidden temp file exists — up to its last
-/// complete chunk. The leftover temp then goes, so the folder can be removed.
+/// E3 Task 6 (format §13.7): salvage streams a finished file whole. A file a
+/// crash left uncommitted — only its hidden temp file exists — is salvaged up
+/// to its last complete chunk, but only explicitly and only in a recording
+/// folder (review M2); its leftover temp then goes, so the folder can be removed.
 #[test]
 fn salvage_reads_a_finished_file_and_a_crashed_one() {
     let (_dir, storage) = new_vault();
     let body: Vec<u8> = (0..200_000u32).map(|i| (i % 251) as u8).collect();
-    storage.create_dir(&vp("done")).unwrap();
-    let mut w = storage.create_new(&vp("done/take.wav")).unwrap();
+    let rec = vp(".liber/recording/clip-1");
+    storage.create_dir(&vp(".liber")).unwrap();
+    storage.create_dir(&vp(".liber/recording")).unwrap();
+    storage.create_dir(&rec).unwrap();
+    let mut w = storage.create_new(&rec.join("done.wav").unwrap()).unwrap();
     w.write_all(&body).unwrap();
     w.finish().unwrap();
-    assert_eq!(
-        storage.salvage(&vp("done/take.wav")).unwrap(),
-        (body.clone(), true)
+    let mut got = Vec::new();
+    assert!(
+        storage
+            .salvage(&rec.join("done.wav").unwrap(), &mut got)
+            .unwrap()
     );
+    assert_eq!(got, body);
 
-    storage.create_dir(&vp("crash")).unwrap();
-    let mut w = storage.create_new(&vp("crash/take.wav")).unwrap();
+    let crash = vp(".liber/recording/clip-2");
+    storage.create_dir(&crash).unwrap();
+    let mut w = storage
+        .create_new(&crash.join("take.wav").unwrap())
+        .unwrap();
     w.write_all(&body).unwrap();
     w.flush().unwrap();
     std::mem::forget(w); // the app dies: no finish, no drop
-    let (got, complete) = storage.salvage(&vp("crash/take.wav")).unwrap();
-    assert!(!complete);
+    // No silent fallback: the file itself isn't there.
+    let err = storage.salvage(&crash.join("take.wav").unwrap(), &mut Vec::new());
+    assert!(matches!(err, Err(VaultError::NotFound(_))), "{err:?}");
+    let mut got = Vec::new();
+    assert!(!storage.salvage_uncommitted(&crash, &mut got).unwrap());
     // Three whole 64 KiB chunks were written; the rest was still buffered.
     assert_eq!(got, body[..3 * 65_536]);
-    let err = storage.remove_empty_dir(&vp("crash")).unwrap_err();
+    let err = storage.remove_empty_dir(&crash).unwrap_err();
     assert!(matches!(err, VaultError::NotEmpty(_)), "{err}");
-    storage.remove_temp_files(&vp("crash")).unwrap();
-    storage.remove_empty_dir(&vp("crash")).unwrap();
-    assert!(matches!(
-        storage.salvage(&vp("crash/take.wav")),
-        Err(VaultError::NotFound(_))
-    ));
+    storage.remove_temp_files(&crash).unwrap();
+    storage.remove_empty_dir(&crash).unwrap();
+
+    // Anywhere else the uncommitted helpers refuse.
+    storage.create_dir(&vp("notes")).unwrap();
+    for dir in ["notes", ".liber/recording", ".liber"] {
+        let err = storage.salvage_uncommitted(&vp(dir), &mut Vec::new());
+        assert!(
+            matches!(err, Err(VaultError::NotPermitted(_))),
+            "{dir}: {err:?}"
+        );
+        let err = storage.remove_temp_files(&vp(dir));
+        assert!(
+            matches!(err, Err(VaultError::NotPermitted(_))),
+            "{dir}: {err:?}"
+        );
+    }
+}
+
+/// Review I1: a stream whose write failed (a full disk) keeps what reached the
+/// disk when the recorder asks (`finish_or_keep`): no key is kept, only the
+/// ciphertext, for salvage.
+#[test]
+fn a_failed_stream_is_kept_for_salvage() {
+    let (_dir, storage) = new_vault();
+    let rec = vp(".liber/recording/clip-1");
+    storage.create_dir(&vp(".liber")).unwrap();
+    storage.create_dir(&vp(".liber/recording")).unwrap();
+    storage.create_dir(&rec).unwrap();
+    let path = rec.join("take.wav").unwrap();
+    // Room for the header and two chunks.
+    let mut w = storage
+        .create_new_failing(&path, 48 + 2 * (65_536 + 16))
+        .unwrap();
+    let body: Vec<u8> = (0..300_000u32).map(|i| (i % 251) as u8).collect();
+    assert!(w.write_all(&body).is_err());
+    assert!(w.finish_or_keep().is_err());
+    let mut got = Vec::new();
+    assert!(!storage.salvage_uncommitted(&rec, &mut got).unwrap());
+    assert_eq!(got, body[..2 * 65_536]);
+
+    // A plain `finish` that fails still leaves nothing behind.
+    let other = vp(".liber/recording/clip-2");
+    storage.create_dir(&other).unwrap();
+    let mut w = storage
+        .create_new_failing(&other.join("take.wav").unwrap(), 48 + 65_552)
+        .unwrap();
+    assert!(w.write_all(&body).is_err());
+    assert!(w.finish().is_err());
+    let err = storage.salvage_uncommitted(&other, &mut Vec::new());
+    assert!(matches!(err, Err(VaultError::NotFound(_))), "{err:?}");
 }

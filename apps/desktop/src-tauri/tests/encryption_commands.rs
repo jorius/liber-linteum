@@ -720,7 +720,8 @@ fn encrypted_take_round_trips() {
     )
     .unwrap();
     let started = h.start_take("Diary.md", "clip-20261020-101500");
-    std::thread::sleep(std::time::Duration::from_millis(400));
+    // About 2 s: more than two 64 KiB chunks, so Stop streams a multi-chunk take.
+    std::thread::sleep(std::time::Duration::from_millis(2_000));
     assert_eq!(
         wavs_under(h.cache.path()),
         Vec::<PathBuf>::new(),
@@ -737,7 +738,7 @@ fn encrypted_take_round_trips() {
     assert!(path.ends_with("clip-20261020-101500.wav"), "{clip}");
     let (channels, samples) = h.read_wav(path);
     assert_eq!(channels, 1);
-    assert!(samples >= 48_000 * 3 / 10, "about 0.4 s: {samples}");
+    assert!(samples > 65_536, "more than two chunks of sound: {samples}");
     assert_eq!(wavs_under(h.cache.path()), Vec::<PathBuf>::new());
     assert_eq!(
         h.takes_left(),
@@ -767,15 +768,14 @@ fn lock_during_recording_keeps_the_take() {
             .recording()
     );
     assert_eq!(wavs_under(h.cache.path()), Vec::<PathBuf>::new());
-    h.unlock(&root, "passphrase", PASS).unwrap();
+    let info = h.unlock(&root, "passphrase", PASS).unwrap();
     let path = "attachments/clip-20261020-101500-recovered.wav";
+    assert_eq!(info["recovered"][0]["path"], path, "{info}");
     let (channels, samples) = h.read_wav(path);
     assert_eq!(channels, 1);
-    // About 0.5 s, less at most one 64 KiB chunk (32 768 mono samples).
-    assert!(
-        (24_000 - 32_768..=48_000 * 2).contains(&(samples as i64)),
-        "{samples}"
-    );
+    // Lock finishes the stream, so no chunk is lost: about 0.5 s. The
+    // real-time fake host's 10 ms sleeps run long, hence 0.4 s at least.
+    assert!((19_200..=48_000 * 2).contains(&samples), "{samples}");
     assert_eq!(
         h.takes_left(),
         0,
@@ -891,5 +891,57 @@ fn a_crashed_take_is_salvaged_at_unlock() {
     // 1.5 s is 144 044 bytes: two whole 64 KiB chunks made it to disk.
     let (_, samples) = h.read_wav("attachments/clip-20261020-090000-recovered.wav");
     assert_eq!(samples, (2 * 65_536 - 44) / 2);
+    assert_eq!(h.takes_left(), 0);
+}
+
+/// Review I1: a take whose writes fail (a full disk) keeps what reached the
+/// disk: Stop can't read it and says it's kept; the next unlock salvages it up
+/// to its last complete chunk.
+#[test]
+fn a_take_whose_writes_fail_is_kept_and_recovered() {
+    let h = harness();
+    let (root, _) = h.create("Voice");
+    call(
+        &h.main,
+        "entry_create_page",
+        json!({ "dir": "", "name": "Diary" }),
+    )
+    .unwrap();
+    let dir = ".liber/recording/clip-20261020-090000-7";
+    h.write(
+        &format!("{dir}/take.json"),
+        json!({ "root": root, "page": "Diary.md" })
+            .to_string()
+            .as_bytes(),
+    );
+    let session = h.state().session().unwrap();
+    let wav = VaultPath::new(&format!("{dir}/clip-20261020-090000.wav")).unwrap();
+    // The disk fills after the header and two chunks.
+    let out = session
+        .vault()
+        .encrypted()
+        .unwrap()
+        .create_new_failing(&wav, 48 + 2 * (65_536 + 16))
+        .unwrap();
+    let stop = std::sync::atomic::AtomicBool::new(false);
+    let take = liber_desktop::audio_commands::record_into_vault(
+        &liber_audio::SyntheticHost::tone(48_000, 1),
+        None,
+        out,
+        &stop,
+        &mut |_, at| {
+            if at >= std::time::Duration::from_secs(5) {
+                stop.store(true, std::sync::atomic::Ordering::SeqCst);
+            }
+        },
+    )
+    .unwrap();
+    assert_eq!(take.ended, liber_audio::Ended::WriteFailed);
+    drop(session);
+    h.lock();
+    let info = h.unlock(&root, "passphrase", PASS).unwrap();
+    let path = "attachments/clip-20261020-090000-recovered.wav";
+    assert_eq!(info["recovered"][0]["path"], path, "{info}");
+    assert_eq!(h.read_wav(path).1, (2 * 65_536 - 44) / 2);
     assert_eq!(h.takes_left(), 0);
 }

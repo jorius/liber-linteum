@@ -96,6 +96,19 @@ impl VaultSession {
         self.place(page, name, |dest| self.vault.write_cas(dest, bytes, None))
     }
 
+    /// Saves a new file `name` in the page's attachment folder that `write`
+    /// streams in: never whole in memory (a recording's fix-up, E3 spec §4.2).
+    pub fn save_attachment_with(
+        &self,
+        page: &VaultPath,
+        name: &str,
+        mut write: impl FnMut(&mut dyn std::io::Write) -> std::io::Result<()>,
+    ) -> Result<Attached> {
+        self.place(page, name, |dest| {
+            self.vault.write_new_with(dest, &mut write)
+        })
+    }
+
     /// Copies the outside file `src` into the page's attachment folder; a file
     /// already inside the vault is only linked. Folders are refused.
     pub fn import_attachment(&self, page: &VaultPath, src: &Path) -> Result<Attached> {
@@ -242,7 +255,7 @@ impl VaultSession {
         &self,
         page: &VaultPath,
         name: &str,
-        write: impl Fn(&VaultPath) -> liber_vault::Result<Hash>,
+        mut write: impl FnMut(&VaultPath) -> liber_vault::Result<Hash>,
     ) -> Result<Attached> {
         let dir = self.vault.attachment_policy().dir_for(page)?;
         for folder in self.vault.create_dir_all(&dir)? {

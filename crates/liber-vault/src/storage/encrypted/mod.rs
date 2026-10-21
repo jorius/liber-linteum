@@ -22,7 +22,7 @@ use liber_crypto::{
 };
 use names::{Cache, Entry, Listing};
 use std::fs::{File, Metadata};
-use std::io::{Read, Seek, SeekFrom};
+use std::io::{Read, Seek, SeekFrom, Write};
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex, MutexGuard, RwLock, RwLockReadGuard, RwLockWriteGuard};
 
@@ -300,45 +300,35 @@ impl EncryptedStorage {
         lock(&self.header).epoch()
     }
 
-    /// The complete chunks of the file at `path`, and whether it ended cleanly
-    /// (format §13.7): for a recording a crash cut short. A file never
-    /// committed exists only as a hidden temp file in its folder; the largest
-    /// one is salvaged (a recording's folder streams one file).
-    pub fn salvage(&self, path: &VaultPath) -> Result<(Vec<u8>, bool)> {
-        let not_found = || VaultError::NotFound(path.to_string());
-        self.with_keys(|u| {
-            let physical = match self.lookup(u, path)? {
-                Some(e) if e.folder.is_none() => e.physical,
-                Some(_) => return Err(not_found()),
-                None => {
-                    let dir = path.parent().unwrap_or_else(VaultPath::root);
-                    let folder = self.lookup(u, &dir)?.filter(|e| e.folder.is_some());
-                    let temps = folder.map(|f| write::temp_files(&f.physical));
-                    let largest = temps.into_iter().flatten().max_by_key(|(_, len)| *len);
-                    largest.ok_or_else(not_found)?.0
-                }
-            };
-            // As `open_read`: never a link, nor one swapped in before the open.
-            let before = physical
-                .symlink_metadata()
-                .ok()
-                .filter(Metadata::is_file)
-                .ok_or_else(not_found)?;
-            let file = File::open(&physical).map_err(|e| io_err(path.as_str(), e))?;
-            let opened = file.metadata().map_err(|e| io_err(path.as_str(), e))?;
-            if !same_file(&before, &opened) {
-                return Err(not_found());
-            }
-            let mut s = liber_crypto::salvage(file, |e| u.content_key(e))
-                .map_err(|e| content_err(path, e))?;
-            Ok((std::mem::take(&mut *s.plaintext), s.complete))
+    /// Streams the complete chunks of the file at `path` into `out` (format
+    /// §13.7); `true` if it ended cleanly. For a recording a lock or crash ended.
+    pub fn salvage(&self, path: &VaultPath, out: &mut dyn Write) -> Result<bool> {
+        self.with_keys(|u| match self.lookup(u, path)? {
+            Some(e) if e.folder.is_none() => salvage_file(u, &e.physical, path, out),
+            _ => Err(VaultError::NotFound(path.to_string())),
         })
     }
 
-    /// Deletes the hidden temp files writes a crash interrupted left in `dir`,
-    /// so it can be removed once [`Self::salvage`] is done. Only for a folder
-    /// no write is streaming into (a recording's, between takes).
+    /// [`Self::salvage`] of the stream a crash left uncommitted in the
+    /// recording folder `dir` (one under [`RECORDING_DIR`]): only its hidden
+    /// temp file exists. The largest one is taken: a take streams one file.
+    pub fn salvage_uncommitted(&self, dir: &VaultPath, out: &mut dyn Write) -> Result<bool> {
+        recording_folder(dir)?;
+        self.with_keys(|u| {
+            let entry = self.lookup(u, dir)?.filter(|e| e.folder.is_some());
+            let temps = entry.map(|e| write::temp_files(&e.physical));
+            match temps.into_iter().flatten().max_by_key(|(_, len)| *len) {
+                Some((tmp, _)) => salvage_file(u, &tmp, dir, out),
+                None => Err(VaultError::NotFound(format!("{dir}: no unfinished take"))),
+            }
+        })
+    }
+
+    /// Deletes the hidden temp files a crash or a failed write left in the
+    /// recording folder `dir`, once [`Self::salvage_uncommitted`] is done, so
+    /// the folder can be removed. Only between takes: nothing streams there.
     pub fn remove_temp_files(&self, dir: &VaultPath) -> Result<()> {
+        recording_folder(dir)?;
         self.with_write_keys(|u| {
             let entry = self.lookup(u, dir)?.filter(|e| e.folder.is_some());
             let entry = entry.ok_or_else(|| VaultError::NotFound(dir.to_string()))?;
@@ -449,6 +439,43 @@ fn load(
     };
     write(cache).insert(since, dir.to_string(), physical, Arc::clone(&listing));
     Ok(Some(listing))
+}
+
+/// Where a vault keeps its takes in progress, one folder each (spec §4.2).
+pub const RECORDING_DIR: &str = ".liber/recording";
+
+/// Only a take's own folder, under [`RECORDING_DIR`], holds a stream worth
+/// salvaging uncommitted (review M2).
+fn recording_folder(dir: &VaultPath) -> Result<()> {
+    let root = VaultPath::new(RECORDING_DIR)?;
+    if dir.starts_with(&root) && *dir != root {
+        return Ok(());
+    }
+    Err(VaultError::NotPermitted(format!(
+        "{dir}: not a recording folder"
+    )))
+}
+
+/// Streams the complete chunks of the physical file `physical` (never a link,
+/// nor one swapped in before the open, as `open_read`) into `out`.
+fn salvage_file(
+    u: &Unlocked,
+    physical: &Path,
+    path: &VaultPath,
+    out: &mut dyn Write,
+) -> Result<bool> {
+    let not_found = || VaultError::NotFound(path.to_string());
+    let before = physical
+        .symlink_metadata()
+        .ok()
+        .filter(Metadata::is_file)
+        .ok_or_else(not_found)?;
+    let file = File::open(physical).map_err(|e| io_err(path.as_str(), e))?;
+    let opened = file.metadata().map_err(|e| io_err(path.as_str(), e))?;
+    if !same_file(&before, &opened) {
+        return Err(not_found());
+    }
+    liber_crypto::salvage_to(file, |e| u.content_key(e), out).map_err(|e| content_err(path, e))
 }
 
 /// Undoes a `create` in `root` whose vault never opened (E3 Task 5 review
@@ -679,7 +706,7 @@ impl Storage for EncryptedStorage {
     }
 
     fn create_new(&self, path: &VaultPath) -> Result<Box<dyn NewFile>> {
-        Ok(Box::new(self.new_file(path)?))
+        Ok(Box::new(self.new_file(path, u64::MAX)?))
     }
 
     fn create_dir(&self, path: &VaultPath) -> Result<()> {

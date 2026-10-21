@@ -110,6 +110,7 @@ pub(crate) fn install_session<R: Runtime>(
         report,
         encrypted,
         recovery_void,
+        recovered: Vec::new(),
     })
 }
 

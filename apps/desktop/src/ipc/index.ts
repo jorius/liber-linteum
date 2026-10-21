@@ -110,6 +110,9 @@ export interface VaultInfo {
   /** E3: the unlock's header merge voided the recovery code this device
    *  showed; offer a new one (`security_new_recovery`). */
   recoveryVoid?: boolean;
+  /** E3: clips `vault_unlock` recovered from takes a lock or a crash left
+   *  (`…-recovered.wav`); announce them as the recorder does at Start. */
+  recovered?: Attached[];
 }
 
 export type NodeKind = 'page' | 'folder' | 'attachment';
@@ -311,6 +314,8 @@ export interface SettingsPatch {
 // vault_create_encrypted { path, passphrase } → CreatedEncryptedVault
 //   (a create that fails after the vault was made is undone: nothing is left)
 // vault_unlock { path, secret: UnlockSecret } → VaultInfo
+//   `info.recovered`: clips saved from takes a lock or a crash left in this
+//   vault; show the same toast as the recorder's announceRecovered.
 // vault_lock {} → void, and `vault:locked` (VaultLockedPayload) to main;
 //   `notPermitted` when the open vault is plain (it never locks)
 // security_change_passphrase { current, next } → void

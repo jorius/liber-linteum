@@ -180,9 +180,9 @@ pub(crate) fn vault_unlock_impl<R: Runtime>(
         Err(e) => (None, Some(format!("header copies weren't merged: {e}"))),
     };
     let void = merged.is_some_and(|m| m.local_recovery_dropped);
-    let info = open_unlocked(app, storage, void, warning)?;
+    let mut info = open_unlocked(app, storage, void, warning)?;
     // Step 5: takes a lock or a crash left in this vault (spec §4.2).
-    crate::audio_commands::recover_at_unlock(app);
+    info.recovered = crate::audio_commands::recover_at_unlock(app);
     Ok(info)
 }
 
