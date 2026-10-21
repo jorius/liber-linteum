@@ -466,6 +466,7 @@
         "favorite": "Add to or remove from Favorites",
         "openVault": "Open a vault",
         "closeVault": "Close the vault",
+        "lockVault": "Lock the vault",
         "openFile": "Open a file",
         "sidebar": "Show or hide the sidebar",
         "actions": "Show the actions",

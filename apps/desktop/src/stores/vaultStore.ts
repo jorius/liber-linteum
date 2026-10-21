@@ -101,6 +101,9 @@ interface VaultState {
   /** Saves every page (never asking), then locks (spec §6.2). `false`: a save
    *  failed and nothing was locked. */
   lock: (reason: 'menu' | 'idle' | 'sleep' | 'screenLock') => Promise<boolean>;
+  /** The backend locked the vault (`vault:locked`): to `locked` without IPC.
+   *  Idempotent, and a no-op while this UI's own lock is running. */
+  lockedByBackend: (path: string) => void;
   /** Back to Welcome from the Unlock screen. */
   cancelUnlock: () => void;
   close: () => Promise<void>;
@@ -155,6 +158,8 @@ export function onBeforeVaultSwitch(run: () => Promise<unknown>): () => void {
 const toast = () => useToastStore.getState();
 const BUSY: CommandError = { kind: 'io', message: 'the vault is busy' };
 let treeSeq = 0;
+/** A lock is running (see `lock`). */
+let locking = false;
 let unlisten: (() => void)[] = [];
 let pending: ChangedPayload | null = null;
 let timer: ReturnType<typeof setTimeout> | null = null;
@@ -408,26 +413,38 @@ export const useVaultStore = create<VaultState>((set, get) => {
       return res.ok && created ? created : (created ?? { ok: false, error: BUSY });
     },
     lock: async () => {
-      if (get().status !== 'open' || !get().info) return false;
-      const root = get().info!.root;
-      // beforeSwitch includes the recorder's stop (a running take is kept).
-      if (!(await savedEverything({ ask: false }))) return false;
-      // Something typed while the saves ran must not be dropped with the vault.
-      if (
-        useEditorStore.getState().dirtyPaths().length &&
-        !(await savedEverything({ ask: false }))
-      ) {
-        return false;
+      // `locking` also keeps the backend's own `vault:locked` (sent while
+      // `vault_lock` runs) from dropping the vault a second time.
+      if (locking || get().status !== 'open' || !get().info) return false;
+      locking = true;
+      try {
+        const root = get().info!.root;
+        // beforeSwitch includes the recorder's stop (a running take is kept).
+        if (!(await savedEverything({ ask: false }))) return false;
+        // Something typed while the saves ran must not be dropped with the vault.
+        if (
+          useEditorStore.getState().dirtyPaths().length &&
+          !(await savedEverything({ ask: false }))
+        ) {
+          return false;
+        }
+        const res = await vaultLock();
+        if (!res.ok) {
+          toast().push({ message: errorMessage(res.error), tone: 'error' });
+          return false;
+        }
+        // Search and the Global View reset with `info` going away.
+        dropVault();
+        set({ status: 'locked', lockedPath: root });
+        return true;
+      } finally {
+        locking = false;
       }
-      const res = await vaultLock();
-      if (!res.ok) {
-        toast().push({ message: errorMessage(res.error), tone: 'error' });
-        return false;
-      }
-      // Search and the Global View reset with `info` going away.
+    },
+    lockedByBackend: (path) => {
+      if (locking || get().status !== 'open' || !get().info?.encrypted) return;
       dropVault();
-      set({ status: 'locked', lockedPath: root });
-      return true;
+      set({ status: 'locked', lockedPath: path });
     },
     cancelUnlock: () => set({ status: 'closed', lockedPath: null }),
     close: async () => {

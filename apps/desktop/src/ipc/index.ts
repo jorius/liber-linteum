@@ -679,6 +679,9 @@ export const vaultCreateEncrypted = (path: string, passphrase: string) =>
 export const vaultUnlock = (path: string, secret: UnlockSecret) =>
   call<VaultInfo>('vault_unlock', { path, secret });
 export const vaultLock = () => call<void>('vault_lock');
+/** Vault → Lock Vault is enabled only while an encrypted vault is open. */
+export const menuSetLockEnabled = (enabled: boolean) =>
+  call<void>('menu_set_lock_enabled', { enabled });
 export const securityChangePassphrase = (current: string, next: string) =>
   call<void>('security_change_passphrase', { current, next });
 export const securityNewRecovery = (passphrase: string) =>

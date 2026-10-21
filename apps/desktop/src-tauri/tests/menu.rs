@@ -158,7 +158,16 @@ fn macos_menu_quit_is_ours_and_the_standard_items_stay() {
         .position(|(t, _)| t == "Vault")
         .expect("Vault menu");
     assert!(file_at < vault_at && vault_at < edit_at, "{outline:?}");
-    assert_eq!(texts("Vault"), ["Open Vault…", "Close Vault"]);
+    // E4: New Encrypted Vault… and Lock Vault (⌥⌘L, enabled with an encrypted vault).
+    assert_eq!(
+        texts("Vault"),
+        [
+            "Open Vault…",
+            "New Encrypted Vault…",
+            "Lock Vault",
+            "Close Vault"
+        ]
+    );
     assert!(texts("File").contains(&"Save".to_string()));
     assert!(view.iter().any(|t| t == "Toggle Sidebar"), "{view:?}");
 }

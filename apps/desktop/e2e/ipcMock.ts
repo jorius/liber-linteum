@@ -431,6 +431,7 @@ export function installIpcMock({
       encUnlocked = true;
       return encInfo('enc', '/enc');
     },
+    menu_set_lock_enabled: () => null,
     vault_lock: () => {
       if (!encUnlocked) throw { kind: 'notPermitted', message: 'plain vault' };
       encUnlocked = false;

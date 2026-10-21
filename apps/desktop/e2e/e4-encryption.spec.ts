@@ -82,3 +82,43 @@ for (const theme of ['light', 'dark']) {
     expect(violations).toEqual([]);
   });
 }
+
+const unlock = async (page: import('@playwright/test').Page) => {
+  await page.goto('/');
+  await page.getByRole('button', { name: /^enc Encrypted/ }).click();
+  await page.getByLabel('Passphrase').fill(PASSPHRASE);
+  await page.getByLabel('Passphrase').press('Enter');
+  await expect(page.locator('[data-vault-menu]')).toBeVisible();
+};
+const writes = (page: import('@playwright/test').Page) =>
+  page.evaluate(() =>
+    ((window as unknown as { __liberWrites?: { text: string }[] }).__liberWrites ?? []).map(
+      (w) => w.text,
+    ),
+  );
+
+test('⌥⌘L locks the vault', async ({ page }) => {
+  await setup(page);
+  await unlock(page);
+  await page.keyboard.press('Alt+Control+KeyL');
+  await expect(page.getByTestId('unlock-screen')).toBeVisible();
+});
+
+test('a sleep request saves an unsaved edit (auto save off), then Unlock shows', async ({
+  page,
+}) => {
+  await setup(page, { settings: { autoSave: false } });
+  await unlock(page);
+  await page.getByRole('treeitem', { name: 'Welcome', exact: true }).click();
+  await page.locator('.cm-content').click();
+  await page.keyboard.type('typed before sleep');
+  expect(await writes(page)).toEqual([]);
+  await page.evaluate(() =>
+    (window as unknown as { __liberEmit: (e: string, p: unknown) => void }).__liberEmit(
+      'vault:lock-request',
+      { reason: 'sleep' },
+    ),
+  );
+  await expect(page.getByTestId('unlock-screen')).toBeVisible();
+  expect((await writes(page)).join('\n')).toContain('typed before sleep');
+});

@@ -106,6 +106,7 @@
     "allow-vault-create-encrypted",
     "allow-vault-unlock",
     "allow-vault-lock",
+    "allow-menu-set-lock-enabled",
     "allow-security-change-passphrase",
     "allow-security-new-recovery",
     "allow-vault-unreadable",

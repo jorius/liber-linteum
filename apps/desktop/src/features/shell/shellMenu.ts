@@ -54,6 +54,7 @@ export async function installShellMenu({ main }: { main: boolean }): Promise<() 
           onMenuVault((what) => {
             if (what === 'open') openAnotherVault();
             else if (what === 'close') closeVault();
+            else if (what === 'lock') void useVaultStore.getState().lock('menu');
           }),
           onMenuSidebar(toggleSidebar),
         ]

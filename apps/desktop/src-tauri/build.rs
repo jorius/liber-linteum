@@ -119,6 +119,7 @@ const COMMANDS: &[&str] = &[
     "vault_create_encrypted",
     "vault_unlock",
     "vault_lock",
+    "menu_set_lock_enabled",
     "security_change_passphrase",
     "security_new_recovery",
     "vault_unreadable",
