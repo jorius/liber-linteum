@@ -198,7 +198,7 @@
   color: var(--color-text-body);
 }
 
-.card {
+.choice {
   display: flex;
   align-items: flex-start;
   gap: 8px;
@@ -208,12 +208,12 @@
   cursor: pointer;
 }
 
-.card:has(input:checked) {
+.choice:has(input:checked) {
   border-color: var(--color-accent);
   background: var(--color-accent-soft);
 }
 
-.card input {
+.choice input {
   margin: 2px 0 0;
   accent-color: var(--color-accent);
 }

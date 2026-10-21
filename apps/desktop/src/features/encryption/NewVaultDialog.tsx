@@ -134,7 +134,7 @@ export function NewVaultDialog({ onClose }: { onClose: () => void }) {
           )}
           <fieldset className={styles.cards}>
             <legend>{t('newVault.protection')}</legend>
-            <label className={styles.card}>
+            <label className={styles.choice}>
               <input
                 type="radio"
                 name={`${id}-protection`}
@@ -151,7 +151,7 @@ export function NewVaultDialog({ onClose }: { onClose: () => void }) {
                 <span id={`${id}-plain-hint`}>{t('newVault.plainHint')}</span>
               </span>
             </label>
-            <label className={styles.card}>
+            <label className={styles.choice}>
               <input
                 type="radio"
                 name={`${id}-protection`}

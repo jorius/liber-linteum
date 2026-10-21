@@ -380,3 +380,23 @@ test('journey: create, write, lock, unlock, screen lock, unlock with a lower-cas
   await page.getByLabel('Recovery key').press('Enter');
   await expect(page.getByTestId('unlock-screen')).toHaveCount(0);
 });
+
+test('the Unlock card: the field spans the card, Back and Unlock share the bottom row', async ({
+  page,
+}) => {
+  await setup(page);
+  await page.goto('/');
+  await page.getByRole('button', { name: /^enc Encrypted/ }).click();
+  const card = page.getByTestId('unlock-screen').locator('form');
+  const field = page.getByLabel('Passphrase');
+  const back = page.getByRole('button', { name: 'Back', exact: true });
+  const unlock = page.getByRole('button', { name: 'Unlock', exact: true });
+  const [c, f, b, u] = await Promise.all(
+    [card, field, back, unlock].map(async (l) => (await l.boundingBox())!),
+  );
+  const pad = (await card.evaluate((el) => parseFloat(getComputedStyle(el).paddingLeft))) * 2;
+  expect(f.width).toBeGreaterThan(c.width - pad - 4);
+  expect(Math.abs(b.y - u.y)).toBeLessThan(2);
+  expect(u.x + u.width).toBeGreaterThan(c.x + c.width - pad);
+  await page.screenshot({ path: process.env.LIBER_SHOT ?? 'test-results/unlock-card.png' });
+});
