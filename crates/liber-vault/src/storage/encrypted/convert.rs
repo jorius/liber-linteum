@@ -993,8 +993,26 @@ pub fn rollback(root: &Path) -> Result<()> {
             "this conversion can't be undone any more: opening the vault finishes it".into(),
         ));
     }
+    unstage(&root, &journal)
+}
+
+/// A `staged`/`committing` run that can't commit: its staging vault is gone
+/// and nothing of it reached the root (an undo on another device raced it;
+/// final re-check 3), while every original sits in our `.liber-plain`.
+fn stranded(root: &Path, journal: &Journal) -> bool {
+    !exists(&root.join(STAGING).join(HEADER_FILE))
+        && !exists(&root.join(DATA_DIR))
+        && verify_header(root, journal).is_err()
+        && journal.plain_created
+        && plain_is_ours(root, journal)
+}
+
+/// Rollback's moves: the originals back (all checked first, never
+/// overwriting), then the staging folder this run made, then the journal.
+fn unstage(root: &Path, journal: &Journal) -> Result<()> {
+    let root = root.to_path_buf();
     let plain = root.join(ORIGINALS);
-    if plain_is_ours(&root, &journal) {
+    if plain_is_ours(&root, journal) {
         let names: Vec<OsString> = std::fs::read_dir(&plain)
             .map_err(io(ORIGINALS))?
             .map(|e| e.map(|e| e.file_name()))
@@ -1023,7 +1041,7 @@ pub fn rollback(root: &Path) -> Result<()> {
         }
         std::fs::remove_dir(&plain).map_err(io(ORIGINALS))?;
     }
-    remove_staging(&root, &journal)?;
+    remove_staging(&root, journal)?;
     if listed(&root, JOURNAL_TMP) {
         let _ = std::fs::remove_file(root.join(JOURNAL_TMP));
     }
@@ -1060,6 +1078,10 @@ pub fn recover(
     match journal.phase {
         Phase::Copying => {
             rollback(&root)?;
+            return Ok(RecoverOutcome::RolledBack);
+        }
+        Phase::Staged | Phase::Committing if stranded(&root, &journal) => {
+            unstage(&root, &journal)?;
             return Ok(RecoverOutcome::RolledBack);
         }
         Phase::Staged | Phase::Committing => commit(&root, &mut journal)?,

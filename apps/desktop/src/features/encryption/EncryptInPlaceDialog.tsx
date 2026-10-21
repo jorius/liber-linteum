@@ -1,6 +1,7 @@
 import { useEffect, useId, useRef, useState, type FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
+  destroyWindow,
   onEncryptProgress,
   onLockRequest,
   vaultEncryptCancel,
@@ -72,11 +73,14 @@ export function EncryptInPlaceDialog({ root, onClose }: { root: string; onClose:
   // Idle, sleep and screen lock still count while the key shows and the
   // files are copied (the shell that listens for them may be gone): the
   // vault locks as soon as it opens (final review I2).
-  const converting = step === 'key' || step === 'encrypting';
+  const converting = step === 'beginning' || step === 'key' || step === 'encrypting';
   useEffect(() => {
     if (!converting) return;
-    const lock = (reason: 'idle' | 'sleep' | 'screenLock') =>
-      void useVaultStore.getState().lock(reason);
+    // A plain vault still open (its pages being saved) has nothing to lock.
+    const lock = (reason: 'idle' | 'sleep' | 'screenLock') => {
+      const vault = useVaultStore.getState();
+      if (vault.status !== 'open' || vault.info?.encrypted) void vault.lock(reason);
+    };
     const minutes = useSettingsStore.getState().settings.autoLockMinutes;
     let timer: ReturnType<typeof setTimeout> | undefined;
     const arm = () => {
@@ -121,6 +125,25 @@ export function EncryptInPlaceDialog({ root, onClose }: { root: string; onClose:
 
   // Each step's content replaces the last: the keyboard goes to its first control.
   const started = progress !== null;
+  const quitAsked = useUiStore((s) => s.quitAsked);
+  /** What had the keyboard when the quit question took it. */
+  const beforeQuit = useRef<HTMLElement | null>(null);
+  const keep = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    if (!quitAsked) return;
+    beforeQuit.current = document.activeElement as HTMLElement | null;
+    keep.current?.focus();
+  }, [quitAsked]);
+  const keepEncrypting = () => {
+    useUiStore.setState({ quitAsked: false });
+    const back = beforeQuit.current;
+    setTimeout(() =>
+      (back?.isConnected
+        ? back
+        : body.current?.querySelector<HTMLElement>('[data-autofocus]')
+      )?.focus(),
+    );
+  };
   useEffect(() => {
     body.current?.querySelector<HTMLElement>('[data-autofocus]')?.focus();
   }, [step, pre, started]);
@@ -204,6 +227,23 @@ export function EncryptInPlaceDialog({ root, onClose }: { root: string; onClose:
       badge={<span className="liber-chip">{t('encryption.beta')}</span>}
     >
       <div ref={body} className={styles.form}>
+        {quitAsked && (
+          <div role="alert" className={styles.warning}>
+            <p>{t('encryptInPlace.quitWhile', { name })}</p>
+            <div className={dialogs.buttons}>
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={() => void destroyWindow()}
+              >
+                {t('encryptInPlace.quitAnyway')}
+              </button>
+              <button ref={keep} type="button" className="btn btn-primary" onClick={keepEncrypting}>
+                {t('encryptInPlace.keepEncrypting')}
+              </button>
+            </div>
+          </div>
+        )}
         {step === 'intro' && (
           <>
             <p className={dialogs.text}>

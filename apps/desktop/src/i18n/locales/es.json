@@ -1190,6 +1190,7 @@
     "undoBody": "Hazlo solo si el otro dispositivo no está cifrando esta carpeta ahora mismo. La bóveda vuelve a quedar sin cifrar.",
     "undoConfirm": "Deshacerlo en este dispositivo",
     "quitWhile": "Cifrando «{name}»… ¿Salir de todos modos? Terminará o se deshará sola la próxima vez que la abras.",
-    "quitAnyway": "Salir de todos modos"
+    "quitAnyway": "Salir de todos modos",
+    "keepEncrypting": "Seguir cifrando"
   }
 }

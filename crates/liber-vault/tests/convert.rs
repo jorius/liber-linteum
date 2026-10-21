@@ -1088,3 +1088,22 @@ fn a_folder_inside_an_encrypted_vault_is_refused() {
         assert_eq!(snapshot(&vault), before);
     }
 }
+
+/// Final re-check 3: an undo on another device raced this one's run, so the
+/// journal says `staged` but the staging vault is gone and no header of this
+/// conversion is at the root. The originals are all in `.liber-plain`: they
+/// go back (never "damaged" with the notes hidden).
+#[test]
+fn a_staged_run_whose_staging_vanished_rolls_back() {
+    let (dir, root) = vault();
+    let original = snapshot(&root);
+    convert::crash_at(Some(CrashPoint::AfterStaged));
+    let (mut c, _) = convert::begin(&root, &[], ME, make).unwrap();
+    convert::copy(&mut c, |_, _| {}, &AtomicBool::new(false)).unwrap();
+    assert!(convert::stage_and_commit(c).is_err());
+    convert::crash_at(None);
+    std::fs::remove_dir_all(root.join(".liber-converting")).unwrap();
+    let out = convert::recover(&root, ME, &fake_trash(&dir.path().join("bin")), &no_index).unwrap();
+    assert_eq!(out, RecoverOutcome::RolledBack);
+    assert_eq!(snapshot(&root), original);
+}

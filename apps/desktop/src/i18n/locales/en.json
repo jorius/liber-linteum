@@ -1190,6 +1190,7 @@
     "undoBody": "Only do this if the other device isn't encrypting this folder right now. The vault goes back to unencrypted.",
     "undoConfirm": "Undo it on this device",
     "quitWhile": "Encrypting “{name}”… Quit anyway? It will finish or undo itself next time you open it.",
-    "quitAnyway": "Quit anyway"
+    "quitAnyway": "Quit anyway",
+    "keepEncrypting": "Keep encrypting"
   }
 }

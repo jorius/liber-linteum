@@ -47,6 +47,7 @@ interface Deferred {
 let calls: [string, Record<string, unknown>][] = [];
 let order: string[] = [];
 let runGate: Deferred | null = null;
+let beginGate: Deferred | null = null;
 
 function backend(
   opts: {
@@ -54,6 +55,7 @@ function backend(
     preflightError?: object;
     beginError?: object;
     closesOpen?: boolean;
+    holdBegin?: boolean;
     kind?: string;
     pending?: boolean;
   } = {},
@@ -77,6 +79,10 @@ function backend(
       }
       if (cmd === 'vault_encrypt_begin') {
         if (opts.beginError) throw opts.beginError;
+        if (opts.holdBegin)
+          return new Promise((resolve, reject) => {
+            beginGate = { resolve, reject };
+          });
         return { recovery: CODE };
       }
       if (cmd === 'vault_encrypt_run')
@@ -146,6 +152,7 @@ const secretsKept = () =>
 beforeEach(() => {
   prompt.asked = 0;
   runGate = null;
+  beginGate = null;
 });
 
 afterEach(async () => {
@@ -520,17 +527,44 @@ describe('Encrypt in place: final review', () => {
     },
   );
 
-  it('quitting while it runs asks first; Quit anyway quits', async () => {
+  it('quitting while it runs asks in the dialog; Keep encrypting goes back, Quit anyway quits', async () => {
     const dialog = await toRun();
     await confirmKey(dialog);
     await waitFor(() => expect(runGate).not.toBeNull());
-    expect(await mayClose()).toBe(false);
-    const toast = useToastStore.getState().toasts.at(-1)!;
-    expect(toast.message).toBe(
+    await act(() => emit('vault:encrypt-progress', { done: 1, total: 1204 }));
+    const stop = within(dialog).getByRole('button', { name: 'Stop and undo' });
+    expect(stop).toHaveFocus();
+    expect(await act(() => mayClose())).toBe(false);
+    const question = within(dialog).getByRole('alert');
+    expect(question).toHaveTextContent(
       'Encrypting “Smartjob”… Quit anyway? It will finish or undo itself next time you open it.',
     );
-    act(() => toast.action!.run());
+    const keep = within(question).getByRole('button', { name: 'Keep encrypting' });
+    expect(keep).toHaveFocus();
+    expect((await axe.run(document.body)).violations).toEqual([]);
+    await userEvent.click(keep);
+    expect(within(dialog).queryByRole('alert')).toBeNull();
+    expect(stop).toHaveFocus();
+    expect(sent('window_close_self')).toEqual([]);
+    expect(await act(() => mayClose())).toBe(false);
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Quit anyway' }));
     await waitFor(() => expect(sent('window_close_self')).toHaveLength(1));
+  });
+
+  it('a sleep while begin is still working (Argon2) also locks the vault once it opens', async () => {
+    backend({ holdBegin: true });
+    openPlain();
+    const dialog = await start();
+    await toPassphrase(dialog);
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Continue' }));
+    await waitFor(() => expect(beginGate).not.toBeNull());
+    await act(() => emit('vault:lock-request', { reason: 'screenLock' }));
+    await act(async () => beginGate!.resolve({ recovery: CODE }));
+    await within(dialog).findByTestId('recovery-code');
+    await confirmKey(dialog);
+    await waitFor(() => expect(runGate).not.toBeNull());
+    await act(async () => runGate!.resolve(encrypted()));
+    await waitFor(() => expect(useVaultStore.getState().status).toBe('locked'));
   });
 
   it("another device's unfinished copy: Undo it on this device, confirmed, then it opens", async () => {

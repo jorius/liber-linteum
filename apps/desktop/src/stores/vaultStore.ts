@@ -22,7 +22,6 @@ import {
   vaultEncryptBegin,
   vaultEncryptCancel,
   vaultEncryptRun,
-  destroyWindow,
   vaultLock,
   vaultOpen,
   vaultUnlock,
@@ -199,13 +198,6 @@ let converting: string | null = null;
  *  locks as soon as it opens (final review I2). */
 let lockAfterConvert = false;
 
-/** A folder's own name, either separator. */
-const folderName = (path: string) =>
-  path
-    .replace(/[\\/]+$/, '')
-    .split(/[\\/]/)
-    .pop() || path;
-
 /** "Undo it on this device…" on another device's conversion that is still
  *  copying (spec §8.11): asks first. */
 export const undoElsewhereAction = (path: string): ToastAction => ({
@@ -218,11 +210,7 @@ export const undoElsewhereAction = (path: string): ToastAction => ({
 let quitCheck: (() => void) | null = null;
 const convertingQuitCheck = () => {
   if (!converting) return true;
-  useToastStore.getState().push({
-    message: i18next.t('encryptInPlace.quitWhile', { name: folderName(converting) }),
-    tone: 'error',
-    action: { label: i18next.t('encryptInPlace.quitAnyway'), run: () => void destroyWindow() },
-  });
+  useUiStore.setState({ quitAsked: true });
   return false;
 };
 
@@ -277,6 +265,7 @@ export async function resetVaultStore() {
   convertLeft = null;
   converting = null;
   lockAfterConvert = false;
+  useUiStore.setState({ quitAsked: false });
   useVaultStore.setState({ ...EMPTY, locking: false, children: new Map(), expanded: new Set() });
 }
 
@@ -571,6 +560,7 @@ export const useVaultStore = create<VaultState>((set, get) => {
       const res = await vaultEncryptBegin(root, passphrase);
       if (!res.ok) {
         converting = null;
+        useUiStore.setState({ quitAsked: false });
         lockAfterConvert = false;
         await reopenLeft();
       }
@@ -579,6 +569,7 @@ export const useVaultStore = create<VaultState>((set, get) => {
     encryptCancel: async () => {
       const res = await vaultEncryptCancel();
       converting = null;
+      useUiStore.setState({ quitAsked: false }); // the question is moot once it ends
       lockAfterConvert = false;
       await reopenLeft();
       return res;
@@ -586,6 +577,7 @@ export const useVaultStore = create<VaultState>((set, get) => {
     encryptRun: async () => {
       const res = await vaultEncryptRun();
       converting = null;
+      useUiStore.setState({ quitAsked: false }); // the question is moot once it ends
       const lockNow = lockAfterConvert;
       lockAfterConvert = false;
       if (!res.ok) {

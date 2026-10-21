@@ -74,6 +74,9 @@ interface UiState {
    *  while it makes a recovery code and shows it (and while encrypting). */
   held: boolean;
   hold: (held: boolean) => void;
+  /** A quit came while a folder is being encrypted: the encrypt dialog asks
+   *  "Quit anyway?" inside itself (a toast would sit under its backdrop). */
+  quitAsked: boolean;
 }
 
 /** The voided-key prompt (or the new key made in its place), and a dialog
@@ -101,4 +104,5 @@ export const useUiStore = create<UiState>((set, get) => ({
   closeDialog: () => set({ dialog: null, held: false }),
   held: false,
   hold: (held) => set({ held }),
+  quitAsked: false,
 }));

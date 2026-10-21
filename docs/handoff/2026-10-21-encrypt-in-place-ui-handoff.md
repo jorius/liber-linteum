@@ -127,7 +127,16 @@ Use a throwaway copy of a folder: the originals go to the real Trash as
   - a cleanup failure after the commit is a warning, and the vault still opens;
   - a failed run past `staged` says the next open finishes it;
   - no file window opens under a folder being encrypted;
-  - quitting mid-run first shows "Encrypting “<name>”… Quit anyway?" with a "Quit anyway" action.
+  - quitting mid-run asks first, inside the encrypt dialog (see the re-check below).
+
+## Re-check fixes
+
+- **The quit question lives inside the encrypt dialog.** A toast sits under the dialog's backdrop and focus trap, so its button couldn't be reached. Now a quit or window close during a conversion sets `uiStore.quitAsked`. The dialog then shows an inline `role="alert"`: "Encrypting “<name>”… Quit anyway? It will finish or undo itself next time you open it."
+  - The keyboard moves to "Keep encrypting". Pressing it puts focus back where it was.
+  - "Quit anyway" closes through `window_close_self`.
+  - The question clears when the run ends.
+- **A lock during begin counts.** The dialog's own idle timer and lock-request listener now start at the `beginning` step (Argon2), not just at the key step. They skip a plain vault that is still open, since it has nothing to lock.
+- **A run stranded by an undo elsewhere goes back.** The engine's `recover` handles a journal at `staged` or `committing` whose staging header is gone, with no `d/` at the root and no header of this conversion at the root, while every original sits in this run's `.liber-plain`. It now rolls back (`unstage`: rollback's exact-name and collision checks) instead of reporting "damaged".
 
 ## Open ends
 
