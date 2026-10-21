@@ -48,6 +48,18 @@
   color: var(--color-text-body);
 }
 
+/* The Unlock card: the field spans the card, the buttons share the last row. */
+.wide {
+  width: 100%;
+}
+
+.actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 4px;
+}
+
 .error {
   margin: 0;
   font-size: 13px;

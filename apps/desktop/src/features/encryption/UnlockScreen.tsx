@@ -108,7 +108,7 @@ export function UnlockScreen() {
           <input
             key={mode}
             ref={input}
-            className="field-control"
+            className={`field-control ${styles.wide}`}
             type={mode === 'recovery' ? 'text' : 'password'}
             placeholder={mode === 'recovery' ? t('unlock.recoveryPlaceholder') : undefined}
             autoFocus={!held}
@@ -140,20 +140,22 @@ export function UnlockScreen() {
             t('unlock.resetDone')
           ) : null}
         </p>
-        <button type="submit" className="btn btn-primary" disabled={unlocking}>
-          {t('unlock.submit')}
-        </button>
         <button type="button" className={styles.link} disabled={unlocking} onClick={switchMode}>
           {t(mode === 'recovery' ? 'unlock.usePassphrase' : 'unlock.useRecovery')}
         </button>
-        <button
-          type="button"
-          className="btn btn-secondary"
-          disabled={unlocking}
-          onClick={() => useVaultStore.getState().cancelUnlock()}
-        >
-          {t('unlock.back')}
-        </button>
+        <div className={styles.actions}>
+          <button
+            type="button"
+            className="btn btn-secondary"
+            disabled={unlocking}
+            onClick={() => useVaultStore.getState().cancelUnlock()}
+          >
+            {t('unlock.back')}
+          </button>
+          <button type="submit" className="btn btn-primary" disabled={unlocking}>
+            {t('unlock.submit')}
+          </button>
+        </div>
       </form>
       {confirmReset && (
         <Dialog
