@@ -905,3 +905,28 @@ fn vault_kind_needs_a_real_header_and_never_opens_a_damaged_vault_plain() {
     std::fs::remove_dir(bare.path().join("d")).unwrap();
     damaged(bare.path());
 }
+
+/// Controller ruling (E3 Task 5): at most 64 KiB of a header is read; a longer
+/// one is unparseable (damaged beside `d/`, else the folder stays plain).
+#[test]
+fn vault_kind_reads_at_most_64_kib_of_header() {
+    let (dir, storage) = new_vault();
+    drop(storage);
+    let header = dir.path().join(HEADER_FILE);
+    let mut bytes = std::fs::read(&header).unwrap();
+    // Trailing whitespace keeps it valid JSON: only the size changes.
+    bytes.resize(64 * 1024, b' ');
+    std::fs::write(&header, &bytes).unwrap();
+    assert_eq!(vault_kind(dir.path()), VaultKind::Encrypted);
+    EncryptedStorage::unlock(dir.path(), Unlock::Passphrase(PASS)).unwrap();
+    bytes.push(b' ');
+    std::fs::write(&header, &bytes).unwrap();
+    assert!(
+        matches!(vault_kind(dir.path()), VaultKind::Damaged(_)),
+        "{:?}",
+        vault_kind(dir.path())
+    );
+    assert!(EncryptedStorage::unlock(dir.path(), Unlock::Passphrase(PASS)).is_err());
+    std::fs::remove_dir(dir.path().join("d")).unwrap();
+    assert_eq!(vault_kind(dir.path()), VaultKind::Plain);
+}

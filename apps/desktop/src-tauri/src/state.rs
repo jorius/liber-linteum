@@ -1,5 +1,6 @@
 //! Per-window app state (M1b spec §2.2).
 
+use crate::decrypted_copies::DecryptedCopies;
 use crate::drops::DropGrants;
 use crate::error::CommandError;
 use crate::settings::SettingsStore;
@@ -15,6 +16,12 @@ pub type CoverPicker = Arc<dyn Fn() -> Option<PathBuf> + Send + Sync>;
 /// native dialog with this.
 pub type FilePicker = Arc<dyn Fn() -> Vec<PathBuf> + Send + Sync>;
 
+/// Opens a file in its default app. Tests replace the OS opener with this.
+pub type Opener = Arc<dyn Fn(&Path) -> std::io::Result<()> + Send + Sync>;
+
+/// Where a merged copy of an encrypted vault's header goes.
+pub type Discard = fn(&Path) -> std::io::Result<()>;
+
 pub struct AppState {
     session: Mutex<Option<Arc<VaultSession>>>,
     pub settings: SettingsStore,
@@ -28,11 +35,37 @@ pub struct AppState {
     /// for the session, so Change… doesn't turn it into a vault (M4c final
     /// review M9).
     scratchpad_root: Mutex<Option<PathBuf>>,
+    /// Plaintext copies of an encrypted vault's attachments (spec §5.5).
+    pub copies: DecryptedCopies,
+    opener: Mutex<Option<Opener>>,
+    pub discard_header_copy: Discard,
 }
 
 impl AppState {
+    /// The app's state: decrypted copies under the OS temp folder, merged
+    /// header copies to the OS trash.
     pub fn new(settings: SettingsStore, cache_dir: PathBuf) -> AppState {
+        let copies = DecryptedCopies::new(&std::env::temp_dir());
+        AppState::with(settings, cache_dir, copies, liber_vault::trash_header_copy)
+    }
+
+    /// Tests (which pass their own dirs): decrypted copies under the cache
+    /// dir, and merged header copies deleted, never sent to the OS trash.
+    pub fn for_tests(settings: SettingsStore, cache_dir: PathBuf) -> AppState {
+        let copies = DecryptedCopies::new(&cache_dir);
+        AppState::with(settings, cache_dir, copies, |p| std::fs::remove_file(p)) // seam: outside (a test's header copy)
+    }
+
+    fn with(
+        settings: SettingsStore,
+        cache_dir: PathBuf,
+        copies: DecryptedCopies,
+        discard_header_copy: Discard,
+    ) -> AppState {
         AppState {
+            copies,
+            opener: Mutex::new(None),
+            discard_header_copy,
             session: Mutex::new(None),
             scratchpad_root: Mutex::new(None),
             settings,
@@ -71,16 +104,30 @@ impl AppState {
         lock(&self.file_picker).clone()
     }
 
+    /// Replaces the OS opener for decrypted copies (tests); `None` restores it.
+    pub fn set_opener(&self, opener: Option<Opener>) {
+        *lock(&self.opener) = opener;
+    }
+
+    pub fn opener(&self) -> Option<Opener> {
+        lock(&self.opener).clone()
+    }
+
     /// The open vault, or `noVault`.
     pub fn session(&self) -> Result<Arc<VaultSession>, CommandError> {
         self.slot().clone().ok_or_else(CommandError::no_vault)
     }
 
-    /// Replaces the open vault (dropping the previous session stops its watcher).
+    /// Replaces the open vault (dropping the previous session stops its
+    /// watcher). An encrypted vault's decrypted copies go with it: on lock,
+    /// on close, or when another vault opens (spec §5.5).
     pub fn set_session(&self, session: Option<Arc<VaultSession>>) {
         let old = std::mem::replace(&mut *self.slot(), session);
         if let Some(old) = old {
             old.stop_watching();
+            if old.vault().encrypted().is_some() {
+                self.copies.wipe();
+            }
         }
     }
 

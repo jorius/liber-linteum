@@ -46,6 +46,10 @@
     "tooLarge": "That file is too large to paste.",
     "notAText": "This file can't be opened as text: it isn't UTF-8 text, or it's over 2 MB.",
     "invalidInput": "That value isn't valid here.",
+    "locked": "This vault is locked. Unlock it to open it.",
+    "wrongSecret": "That passphrase or recovery key doesn't open this vault, or its header is damaged.",
+    "rollback": "This vault's key file is older than one this device has already seen, so it wasn't opened. Someone may have put an old copy back.",
+    "damaged": "This encrypted vault, or a file in it, is damaged and can't be read.",
     "io": "Something went wrong: {message}"
   },
   "toasts": {

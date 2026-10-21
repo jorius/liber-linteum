@@ -472,6 +472,7 @@ fn nfr_ui_thread_never_runs_disk_or_index_commands() {
         include_str!("../src/editor_commands.rs"),
         include_str!("../src/fonts.rs"),
         include_str!("../src/attachment_commands.rs"),
+        include_str!("../src/encryption_commands.rs"),
     ];
     let mut offenders = Vec::new();
     for src in sources {

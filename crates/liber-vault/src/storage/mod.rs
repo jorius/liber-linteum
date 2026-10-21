@@ -12,7 +12,8 @@ use crate::path::VaultPath;
 use std::path::{Path, PathBuf};
 
 pub use encrypted::{
-    EncryptedStorage, HEADER_FILE, UnlockReport, VaultKind, is_encrypted_vault, vault_kind,
+    EncryptedStorage, HEADER_FILE, UnlockReport, VaultKind, is_encrypted_vault, trash_header_copy,
+    vault_kind,
 };
 pub use plain::PlainStorage;
 

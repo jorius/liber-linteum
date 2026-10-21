@@ -2,9 +2,12 @@
 //! `liber-vault.json`, `README.txt`, and every logical entry under `d/` with an
 //! encrypted name.
 
+mod header;
 mod names;
 mod watch;
 mod write;
+
+pub use header::trash_header_copy;
 
 use super::plain::{canonical_root, mtime_ns, replace_atomic};
 use super::{
@@ -49,7 +52,7 @@ pub fn vault_kind(root: &Path) -> VaultKind {
         .symlink_metadata()
         .is_ok_and(|m| m.is_file())
         .then(|| {
-            std::fs::read(&header)
+            read_header(&header)
                 .map_err(|e| e.to_string())
                 .and_then(|b| VaultHeader::parse(&b).map_err(|e| e.to_string()))
         });
@@ -62,6 +65,25 @@ pub fn vault_kind(root: &Path) -> VaultKind {
         }
         _ => VaultKind::Plain,
     }
+}
+
+/// The most of a header file read: a longer one is unparseable (controller
+/// ruling, E3 Task 5), so a huge stray file is never read whole.
+const MAX_HEADER_BYTES: u64 = 64 * 1024;
+
+/// A header file's bytes, at most [`MAX_HEADER_BYTES`].
+fn read_header(path: &Path) -> std::io::Result<Vec<u8>> {
+    let mut bytes = Vec::new();
+    File::open(path)?
+        .take(MAX_HEADER_BYTES + 1)
+        .read_to_end(&mut bytes)?;
+    if bytes.len() as u64 > MAX_HEADER_BYTES {
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::InvalidData,
+            "header over 64 KiB",
+        ));
+    }
+    Ok(bytes)
 }
 
 /// Whether `d/` holds encrypted files or long names at its top level (an
@@ -87,7 +109,8 @@ pub fn is_encrypted_vault(root: &Path) -> bool {
 pub struct UnlockReport {
     pub vault_id: [u8; 16],
     pub epoch: u32,
-    /// A header sync-conflict copy merged on unlock (E3 Task 5).
+    /// Always `None` from `unlock`: the app merges header copies with
+    /// [`EncryptedStorage::merge_header_copies`] after its rollback check.
     pub merged: Option<MergeOutcome>,
 }
 
@@ -213,7 +236,7 @@ impl EncryptedStorage {
 
     pub fn unlock(root: &Path, with: Unlock<'_>) -> Result<(EncryptedStorage, UnlockReport)> {
         let root = canonical_root(root)?;
-        let bytes = std::fs::read(root.join(HEADER_FILE)).map_err(|e| io_err(HEADER_FILE, e))?;
+        let bytes = read_header(&root.join(HEADER_FILE)).map_err(|e| io_err(HEADER_FILE, e))?;
         // Never follow a link out of the vault for its whole content tree.
         match root.join(DATA_DIR).symlink_metadata() {
             Ok(m) if m.is_dir() => {}

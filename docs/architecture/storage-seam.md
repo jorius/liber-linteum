@@ -40,7 +40,8 @@ These touch app folders, or files the user picked, never vault content:
 - the outside source of an import or a drop (`attachments.rs`, `external.rs`, `HashingReader` in `fsops.rs`);
 - single-file windows (`file_windows.rs`);
 - the OS path that `os_path` already returned (`check_openable`);
-- test fixtures (`liber-testkit`; E3 must write its fixtures through `Storage`).
+- test fixtures (`liber-testkit`; E3 must write its fixtures through `Storage`);
+- E3's epoch store (`epochs.rs`: vault ids and numbers) and the per-session decrypted copies (`decrypted_copies.rs`: plaintext read through `Vault`, wiped on lock and quit). These are two of E3's audited exceptions to "no plaintext outside the vault".
 
 ## The guard
 
@@ -53,7 +54,7 @@ std::fs|\bfs::|\bFile::|OpenOptions|read_dir|symlink_metadata|canonicalize|notif
 ```
 
 There are three ways to pass:
-- the file is allow-listed: `liber-vault/src/storage/`, `liber-testkit`, `settings.rs`, `legacy_dirs.rs` or `liber-crypto/src/vectors.rs`;
+- the file is allow-listed: `liber-vault/src/storage/`, `liber-testkit`, `settings.rs`, `legacy_dirs.rs`, `epochs.rs`, `decrypted_copies.rs` or `liber-crypto/src/vectors.rs`;
 - the line carries `// seam: outside (<reason>)`;
 - the line is the `to_fs_path` definition in `path.rs`, the one line-level entry. rustfmt moves a comment after `{` onto the next line, so this line can't carry the mark.
 

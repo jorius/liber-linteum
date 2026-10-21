@@ -2780,6 +2780,8 @@ dependencies = [
  "dunce",
  "fontdb",
  "liber-audio",
+ "liber-crypto",
+ "liber-desktop",
  "liber-import",
  "liber-markdown",
  "liber-session",

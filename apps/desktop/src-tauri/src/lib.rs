@@ -3,9 +3,12 @@ pub mod attachment_commands;
 pub mod audio_commands;
 pub mod bin_commands;
 pub mod commands;
+pub mod decrypted_copies;
 pub mod drops;
 pub mod dto;
 pub mod editor_commands;
+pub mod encryption_commands;
+pub mod epochs;
 pub mod error;
 pub mod external_commands;
 pub mod favorite_commands;
@@ -127,7 +130,10 @@ pub fn configure<R: tauri::Runtime>(
     // Known dirs (tests): manage the state up front. Otherwise resolve the OS
     // dirs once the app exists.
     let builder = match dirs {
-        Some(dirs) => builder.manage(AppState::new(SettingsStore::load(&dirs.config), dirs.cache)),
+        Some(dirs) => builder.manage(AppState::for_tests(
+            SettingsStore::load(&dirs.config),
+            dirs.cache,
+        )),
         None => builder.setup(|app| {
             let config = app.path().app_config_dir()?;
             let cache = app.path().app_cache_dir()?;
@@ -250,6 +256,15 @@ pub fn configure<R: tauri::Runtime>(
         spell_commands::spell_vault_set,
         theme_commands::theme_export,
         theme_commands::theme_import,
+        // E3: encrypted vaults (the E3 → E4 contract).
+        encryption_commands::vault_create_encrypted,
+        encryption_commands::vault_unlock,
+        encryption_commands::vault_lock,
+        encryption_commands::security_change_passphrase,
+        encryption_commands::security_new_recovery,
+        encryption_commands::vault_unreadable,
+        encryption_commands::vault_reveal_unreadable,
+        encryption_commands::attachment_open_decrypted,
     ])
 }
 
@@ -275,8 +290,14 @@ pub fn run() {
                 let cwd = std::env::current_dir().unwrap_or_default();
                 opening::open_later(app, opening::paths_from_args(&args, &cwd));
             }
-            // Whatever way the app ends, a take in progress is kept (batch 6 review C1).
-            tauri::RunEvent::Exit => audio_commands::stop_orphaned(app),
+            // Whatever way the app ends, a take in progress is kept (batch 6
+            // review C1), and decrypted copies are removed (spec §5.5).
+            tauri::RunEvent::Exit => {
+                audio_commands::stop_orphaned(app);
+                if let Some(state) = app.try_state::<AppState>() {
+                    state.copies.wipe();
+                }
+            }
             // Finder's Open With and the Dock (M4c §3).
             #[cfg(target_os = "macos")]
             tauri::RunEvent::Opened { urls } => {

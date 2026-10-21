@@ -42,7 +42,7 @@ pub use storage::plain::TMP_MARKER;
 pub use storage::{
     Child, EncryptedStorage, Follow, HEADER_FILE, Kind, Meta, NewFile, OsUse, PlainStorage,
     RawEvent, Reach, ReadSeek, Reader, Replace, Storage, UnlockReport, VaultKind, WatchGuard,
-    is_encrypted_vault, vault_kind,
+    is_encrypted_vault, trash_header_copy, vault_kind,
 };
 #[cfg(feature = "test-params")]
 pub use storage::{TEST_PASSPHRASE, seal_in_place};

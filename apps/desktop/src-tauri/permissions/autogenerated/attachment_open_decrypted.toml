@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-attachment-open-decrypted"
+description = "Enables the attachment_open_decrypted command without any pre-configured scope."
+commands.allow = ["attachment_open_decrypted"]
+
+[[permission]]
+identifier = "deny-attachment-open-decrypted"
+description = "Denies the attachment_open_decrypted command without any pre-configured scope."
+commands.deny = ["attachment_open_decrypted"]

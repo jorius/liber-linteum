@@ -26,6 +26,7 @@ serde_json.workspace = true
 thiserror.workspace = true
 liber-session = { path = "../../../crates/liber-session" }
 liber-vault = { path = "../../../crates/liber-vault" }
+liber-crypto = { path = "../../../crates/liber-crypto" }
 liber-markdown = { path = "../../../crates/liber-markdown" }
 liber-audio = { path = "../../../crates/liber-audio" }
 liber-import = { path = "../../../crates/liber-import" }
@@ -40,7 +41,15 @@ objc2 = "0.6.5"
 [target.'cfg(not(target_os = "macos"))'.dependencies]
 tauri-plugin-single-instance.workspace = true
 
+[features]
+# Tiny Argon2 parameters for test vaults (never in a release build): vaults
+# below the floor, and the floor itself for new passphrase slots.
+test-params = ["liber-vault/test-params"]
+
 [dev-dependencies]
+# Its own integration tests build with `test-params`.
+liber-desktop = { path = ".", features = ["test-params"] }
+liber-crypto = { path = "../../../crates/liber-crypto", features = ["test-params"] }
 tauri = { workspace = true, features = ["test"] }
 liber-vault = { path = "../../../crates/liber-vault", features = ["test-storage"] }
 tempfile.workspace = true

@@ -804,3 +804,36 @@ fn review_legacy_accent_is_dropped() {
     let raw = std::fs::read_to_string(dir.path().join("settings.json")).unwrap();
     assert!(!raw.contains("accentColor"), "{raw}");
 }
+
+/// E3: idle minutes before an encrypted vault locks: 15 by default, 1–60 or
+/// `null` (never); anything else resets to 15 with a warning. A patch tells
+/// "never" (`null`) from "unchanged" (absent).
+#[test]
+fn auto_lock_minutes_default_persist_never_and_reset() {
+    let dir = tempfile::tempdir().unwrap();
+    let s = store(dir.path());
+    let minutes = |s: &SettingsStore| s.get().0.auto_lock_minutes.map(|m| m.get());
+    assert_eq!(minutes(&s), Some(15));
+    let patch = |json: &str| serde_json::from_str::<SettingsPatch>(json).unwrap();
+    s.update(patch(r#"{"autoLockMinutes":60}"#)).unwrap();
+    assert_eq!(minutes(&store(dir.path())), Some(60));
+    s.update(patch(r#"{"theme":"dark"}"#)).unwrap();
+    assert_eq!(minutes(&s), Some(60), "absent: unchanged");
+    s.update(patch(r#"{"autoLockMinutes":null}"#)).unwrap();
+    let saved: serde_json::Value =
+        serde_json::from_str(&std::fs::read_to_string(dir.path().join("settings.json")).unwrap())
+            .unwrap();
+    assert!(saved["autoLockMinutes"].is_null());
+    assert_eq!(minutes(&store(dir.path())), None, "never");
+    assert!(serde_json::from_str::<SettingsPatch>(r#"{"autoLockMinutes":0}"#).is_err());
+    for text in [
+        r#"{"autoLockMinutes":0}"#,
+        r#"{"autoLockMinutes":61}"#,
+        r#"{"autoLockMinutes":"soon"}"#,
+    ] {
+        std::fs::write(dir.path().join("settings.json"), text).unwrap();
+        let s = store(dir.path());
+        assert_eq!(minutes(&s), Some(15), "{text}");
+        assert!(s.get().1.unwrap().contains("autoLockMinutes"), "{text}");
+    }
+}

@@ -486,6 +486,44 @@ impl From<SidebarWidth> for u16 {
     }
 }
 
+/// Minutes of idle before an encrypted vault locks (spec §6.2): 1–60. A
+/// stored value outside that range resets to the default with a warning.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(try_from = "u32", into = "u8")]
+pub struct AutoLockMinutes(u8);
+
+impl AutoLockMinutes {
+    pub const DEFAULT: AutoLockMinutes = AutoLockMinutes(15);
+
+    pub fn get(self) -> u8 {
+        self.0
+    }
+}
+
+impl TryFrom<u32> for AutoLockMinutes {
+    type Error = String;
+    fn try_from(m: u32) -> Result<AutoLockMinutes, String> {
+        match m {
+            1..=60 => Ok(AutoLockMinutes(m as u8)),
+            _ => Err(format!("auto-lock minutes must be 1–60, not {m}")),
+        }
+    }
+}
+
+impl From<AutoLockMinutes> for u8 {
+    fn from(m: AutoLockMinutes) -> u8 {
+        m.0
+    }
+}
+
+/// `Some(x)` for a present key, whatever `x` is (`null` included), so a
+/// patch can tell "unchanged" (absent) from "never" (`null`).
+fn present<'de, D: serde::Deserializer<'de>, T: Deserialize<'de>>(
+    d: D,
+) -> Result<Option<T>, D::Error> {
+    T::deserialize(d).map(Some)
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct RecentVault {
@@ -541,6 +579,8 @@ pub struct Settings {
     pub sidebar_collapsed: bool,
     /// The sidebar's width (round 3 §2.1), app-wide.
     pub sidebar_width: SidebarWidth,
+    /// Idle minutes before an encrypted vault locks; `None` = never (E3).
+    pub auto_lock_minutes: Option<AutoLockMinutes>,
     /// Where the floating Edit / Global View / Search button sits (M5b §2.2).
     pub action_button: ActionButton,
     /// Spell checking in the editor (spell checking spec §4).
@@ -586,6 +626,7 @@ impl Default for Settings {
             auto_save: true,
             sidebar_collapsed: false,
             sidebar_width: SidebarWidth::default(),
+            auto_lock_minutes: Some(AutoLockMinutes::DEFAULT),
             action_button: ActionButton::BottomRight,
             spellcheck: true,
             spell_dictionaries: None,
@@ -625,6 +666,9 @@ pub struct SettingsPatch {
     pub auto_save: Option<bool>,
     pub sidebar_collapsed: Option<bool>,
     pub sidebar_width: Option<SidebarWidth>,
+    /// `null` = never.
+    #[serde(default, deserialize_with = "present")]
+    pub auto_lock_minutes: Option<Option<AutoLockMinutes>>,
     pub action_button: Option<ActionButton>,
     pub spellcheck: Option<bool>,
     pub spell_dictionaries: Option<Vec<String>>,
@@ -651,9 +695,12 @@ pub struct RecentVaultDto {
     pub missing: bool,
     /// The global Scratchpad (M4c §2): shown as "Quick notes".
     pub scratchpad: bool,
-    /// The vault's emoji (M5b §4), read from its `.liber/vault.json`.
+    /// The vault's emoji (M5b §4), read from its `.liber/vault.json`; never
+    /// for an encrypted vault (it lives inside, encrypted).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub icon: Option<String>,
+    /// An encrypted vault (E3): shown with a lock, opened by unlocking it.
+    pub encrypted: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
@@ -710,6 +757,7 @@ fn parse_lenient(text: &str) -> Result<(Settings, Vec<String>), serde_json::Erro
     field!("autoSave", auto_save);
     field!("sidebarCollapsed", sidebar_collapsed);
     field!("sidebarWidth", sidebar_width);
+    field!("autoLockMinutes", auto_lock_minutes);
     field!("actionButton", action_button);
     field!("spellcheck", spellcheck);
     field!("spellDictionaries", spell_dictionaries);
@@ -893,6 +941,9 @@ impl SettingsStore {
         if let Some(v) = patch.sidebar_width {
             next.sidebar_width = v;
         }
+        if let Some(v) = patch.auto_lock_minutes {
+            next.auto_lock_minutes = v;
+        }
         if let Some(v) = patch.action_button {
             next.action_button = v;
         }
@@ -944,14 +995,21 @@ impl SettingsStore {
         let s = self.lock();
         s.recent_vaults
             .iter()
-            .map(|r| RecentVaultDto {
-                path: r.path.clone(),
-                name: r.name.clone(),
-                opened_at: r.opened_at.clone(),
-                missing: !Path::new(&r.path).is_dir(),
-                scratchpad: s.scratchpad_path.as_deref() == Some(r.path.as_str()),
-                icon: liber_vault::vault_icon_at(Path::new(&r.path))
-                    .filter(|i| liber_markdown::is_icon(i)),
+            .map(|r| {
+                let root = Path::new(&r.path);
+                let encrypted = liber_vault::is_encrypted_vault(root);
+                RecentVaultDto {
+                    path: r.path.clone(),
+                    name: r.name.clone(),
+                    opened_at: r.opened_at.clone(),
+                    missing: !root.is_dir(),
+                    scratchpad: s.scratchpad_path.as_deref() == Some(r.path.as_str()),
+                    icon: (!encrypted)
+                        .then(|| liber_vault::vault_icon_at(root))
+                        .flatten()
+                        .filter(|i| liber_markdown::is_icon(i)),
+                    encrypted,
+                }
             })
             .collect()
     }

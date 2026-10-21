@@ -40,6 +40,11 @@ pub struct VaultInfo {
     /// The vault's emoji (M5b §4).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub icon: Option<String>,
+    /// An encrypted vault, unlocked (E3).
+    pub encrypted: bool,
+    /// The unlock's header merge voided the recovery code this device
+    /// showed (`MergeOutcome::local_recovery_dropped`): E4 offers a new one.
+    pub recovery_void: bool,
 }
 
 #[derive(Debug, Clone, Serialize)]
