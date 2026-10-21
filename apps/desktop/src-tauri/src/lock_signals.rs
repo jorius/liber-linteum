@@ -9,6 +9,8 @@
 //!   notification center.
 //! - Screen lock, Windows: polled every 5 s; a locked session has no input
 //!   desktop.
+//!   Also null during a UAC secure-desktop prompt, Ctrl+Alt+Del and service or
+//!   disconnected-RDP contexts: those may lock too (fail-safe).
 //! - Linux: sleep detection only (no portable screen-lock signal).
 
 use std::time::{Duration, SystemTime};
@@ -36,6 +38,12 @@ fn slept(expected: SystemTime, now: SystemTime) -> bool {
     now.duration_since(expected).is_ok_and(|d| d > SLEEP_GAP)
 }
 
+/// Windows poller: emit on the transition into locked only.
+#[cfg_attr(not(windows), allow(dead_code))]
+fn newly_locked(was: bool, now: bool) -> bool {
+    now && !was
+}
+
 fn request<R: tauri::Runtime>(app: &tauri::AppHandle<R>, reason: Reason) {
     use tauri::{Emitter, Manager};
     let open = app
@@ -57,6 +65,11 @@ pub fn start<R: tauri::Runtime>(app: tauri::AppHandle<R>) {
             #[cfg(windows)]
             let mut was_locked = false;
             loop {
+                // `expected` uses the wall clock with a monotonic sleep: a machine
+                // sleep shows as a wall-clock gap on all three OSes (Instant is
+                // not used: QueryPerformanceCounter across suspend is unverified).
+                // False positives (a 30 s stall, a forward clock step) only
+                // lock, which is fail-safe.
                 let expected = SystemTime::now() + TICK;
                 std::thread::sleep(TICK);
                 if slept(expected, SystemTime::now()) {
@@ -65,14 +78,16 @@ pub fn start<R: tauri::Runtime>(app: tauri::AppHandle<R>) {
                 #[cfg(windows)]
                 {
                     let locked = win::locked();
-                    if locked && !was_locked {
+                    if newly_locked(was_locked, locked) {
                         request(&app, Reason::ScreenLock);
                     }
                     was_locked = locked;
                 }
             }
         });
-    drop(spawned);
+    if let Err(e) = spawned {
+        eprintln!("lock signals: sleep detection not started: {e}");
+    }
 }
 
 #[cfg(windows)]
@@ -98,14 +113,13 @@ mod win {
 #[cfg(target_os = "macos")]
 mod mac {
     use super::Reason;
-    use objc2::declare::ClassBuilder;
-    use objc2::runtime::{AnyClass, AnyObject, Sel};
+    use objc2::runtime::{AnyClass, AnyObject, ClassBuilder, Sel};
     use objc2::{class, msg_send, sel};
     use std::sync::OnceLock;
 
     static APP: OnceLock<tauri::AppHandle<tauri::Wry>> = OnceLock::new();
 
-    extern "C" fn screen_locked(_this: &AnyObject, _sel: Sel, _note: *mut AnyObject) {
+    extern "C-unwind" fn screen_locked(_this: &AnyObject, _sel: Sel, _note: *mut AnyObject) {
         if let Some(app) = APP.get() {
             super::request(app, Reason::ScreenLock);
         }
@@ -127,7 +141,10 @@ mod mac {
         };
         // SAFETY: the IMP matches `- (void)screenLocked:(NSNotification *)`.
         unsafe {
-            builder.add_method(sel!(screenLocked:), screen_locked as extern "C" fn(_, _, _));
+            builder.add_method(
+                sel!(screenLocked:),
+                screen_locked as extern "C-unwind" fn(_, _, _),
+            );
         }
         let cls: &AnyClass = builder.register();
         // SAFETY: standard Foundation calls; the observer is leaked on purpose.
@@ -137,7 +154,10 @@ mod mac {
             let center: *mut AnyObject =
                 msg_send![class!(NSDistributedNotificationCenter), defaultCenter];
             let nil: *mut AnyObject = std::ptr::null_mut();
-            let _: () = msg_send![center, addObserver: observer, selector: sel!(screenLocked:), name: name, object: nil];
+            // 4 = NSNotificationSuspensionBehaviorDeliverImmediately: the default
+            // (coalesce) holds delivery while the app is inactive, which is the
+            // state when the screen locks, so the lock would arrive after unlock.
+            let _: () = msg_send![center, addObserver: observer, selector: sel!(screenLocked:), name: name, object: nil, suspensionBehavior: 4usize];
         }
     }
 }
@@ -155,5 +175,17 @@ mod tests {
             !slept(t, t - Duration::from_secs(10)),
             "backwards is not a sleep"
         );
+        assert!(
+            !slept(t, t + SLEEP_GAP),
+            "exactly the gap is not yet a sleep"
+        );
+    }
+
+    #[test]
+    fn newly_locked_fires_only_on_the_transition() {
+        assert!(newly_locked(false, true));
+        assert!(!newly_locked(true, true));
+        assert!(!newly_locked(true, false));
+        assert!(!newly_locked(false, false));
     }
 }
