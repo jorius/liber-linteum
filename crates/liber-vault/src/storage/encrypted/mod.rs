@@ -2,6 +2,7 @@
 //! `liber-vault.json`, `README.txt`, and every logical entry under `d/` with an
 //! encrypted name.
 
+pub mod convert;
 mod header;
 mod names;
 mod watch;
