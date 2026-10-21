@@ -81,6 +81,9 @@ fn m5_review_i1_a_renamed_page_is_found_by_its_new_name_only() {
 /// Final review I1, the watcher's half: a rename made by another program.
 #[test]
 fn m5_review_i1_an_outside_rename_is_found_by_its_new_name_only() {
+    if liber_testkit::plain_disk_only() {
+        return;
+    }
     let dir = tempfile::tempdir().unwrap();
     write(dir.path(), "Old Name.md", "Just text.\n");
     let (_c, s) = open(dir.path());

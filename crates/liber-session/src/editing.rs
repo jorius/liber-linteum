@@ -17,7 +17,7 @@ impl VaultSession {
             .vault
             .write_cas(path, text.as_bytes(), Some(expected))?;
         self.reindex_written(path, text, hash)?;
-        let mut index = self.index();
+        let mut index = self.index()?;
         let files = index.file_set()?;
         index.resolve_from(&files, path.as_str())?;
         Ok(hash)
@@ -65,7 +65,7 @@ impl VaultSession {
         source: &VaultPath,
         targets: &[(LinkKind, String)],
     ) -> Result<Vec<Option<String>>> {
-        let files = self.index().file_set()?;
+        let files = self.index()?.file_set()?;
         Ok(targets
             .iter()
             .map(|(kind, target)| resolve(*kind, target, source.as_str(), &files))

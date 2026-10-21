@@ -140,6 +140,33 @@ impl Vault {
         Ok(Hash::from_bytes(*input.hasher.finalize().as_bytes()))
     }
 
+    /// A new file at `dest` that `write` streams through
+    /// [`Storage::create_new`](crate::Storage::create_new), hashed on the way:
+    /// never whole in memory (a recording's fix-up, E3 spec §4.2).
+    /// Create-only: `AlreadyExists` before `write` runs. A failure leaves nothing.
+    pub fn write_new_with(
+        &self,
+        dest: &VaultPath,
+        write: &mut dyn FnMut(&mut dyn std::io::Write) -> std::io::Result<()>,
+    ) -> Result<Hash> {
+        let mut out = HashingWriter {
+            inner: self.storage().create_new(dest)?,
+            hasher: blake3::Hasher::new(),
+        };
+        let done = match write(&mut out) {
+            Ok(()) => {
+                let hash = Hash::from_bytes(*out.hasher.finalize().as_bytes());
+                out.inner.finish().map(|()| hash)
+            }
+            Err(e) => Err(crate::error::io_err(dest.as_str(), e)),
+        };
+        // An encrypted file cleans up its own temp; a plain one is written in place.
+        if done.is_err() && self.encrypted().is_none() {
+            let _ = self.storage().remove_file(dest);
+        }
+        done
+    }
+
     /// Creates one folder; the parent must exist.
     pub fn create_dir(&self, path: &VaultPath) -> Result<()> {
         self.storage().create_dir(path)
@@ -210,6 +237,23 @@ impl Read for HashingReader<'_> {
         let n = file.read(buf)?;
         self.hasher.update(&buf[..n]);
         Ok(n)
+    }
+}
+
+/// A new file's writer that hashes what goes through it.
+struct HashingWriter {
+    inner: Box<dyn NewFile>,
+    hasher: blake3::Hasher,
+}
+
+impl std::io::Write for HashingWriter {
+    fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
+        let n = self.inner.write(buf)?;
+        self.hasher.update(&buf[..n]);
+        Ok(n)
+    }
+    fn flush(&mut self) -> std::io::Result<()> {
+        self.inner.flush()
     }
 }
 

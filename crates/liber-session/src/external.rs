@@ -222,7 +222,7 @@ impl VaultSession {
         source: &VaultPath,
         targets: &[(LinkKind, String)],
     ) -> Result<Vec<Option<ExternalFile>>> {
-        let files = self.index().file_set()?;
+        let files = self.index()?.file_set()?;
         let mut out = Vec::with_capacity(targets.len());
         for (kind, target) in targets {
             if resolve(*kind, target, source.as_str(), &files).is_some() {
@@ -285,7 +285,7 @@ impl VaultSession {
     /// The allow-list: whether an indexed page links (in its body, unresolved
     /// in the vault) to exactly `path`.
     pub fn external_allowed(&self, path: &str) -> Result<bool> {
-        let rows = self.index().links_by_key(&[link_key(path)])?;
+        let rows = self.index()?.links_by_key(&[link_key(path)])?;
         Ok(rows.iter().any(|row| {
             row.target_path.is_none()
                 && BODY_KINDS.contains(&row.kind)

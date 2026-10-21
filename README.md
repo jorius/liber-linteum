@@ -36,10 +36,12 @@ network requests.
 | `pnpm test:e2e` | Playwright against the built UI with a mocked backend, in Chromium and WebKit (≈ WKWebView). First run: `pnpm --filter @liber/desktop exec playwright install chromium webkit`. `LIBER_E2E_PORT` (default 4317) lets several checkouts run it side by side |
 | `cargo deny check` | License and banned-crate checks. Needs cargo-deny installed (`brew install cargo-deny` or `cargo install cargo-deny --locked`) |
 | `cargo test --release -p liber-session --test search -- --ignored --nocapture` | The NFR-03 performance tests on a generated 10k-note vault (also `--test global_view`) |
+| `LIBER_XCHECK_PY=<venv>/bin/python cargo test -p liber-vault --test encrypted_xcheck -- --nocapture` | An encrypted vault the app wrote, decrypted by the independent Python reader (`xcheck.py vault`). Needs a Python with `cryptography>=44` (`python3 -m venv <venv> && <venv>/bin/pip install 'cryptography>=44'`); without the variable it prints SKIP |
+| `LIBER_PERF=1 cargo test --release -p liber-session --test encrypted_perf -- --nocapture` | Encrypted vaults: unlock to searchable on a sealed 10k-note vault, budget 3 s |
 
 ### Windows installer from macOS
 
-The Windows test builds are cross-compiled with [cargo-xwin](https://github.com/rust-cross/cargo-xwin), using a toolchain kept apart in `~/.liber-cross`:
+The Windows test builds are cross-compiled with [cargo-xwin](https://github.com/rust-cross/cargo-xwin), using a toolchain kept apart in `~/.liber-cross`. A machine set up before the rename to Liber Linteum has it in `~/.nimw-cross` (rename note): rename that folder, or use that path in the exports below. The same exports run `cargo xwin check -p liber-desktop --tests --target x86_64-pc-windows-msvc`, the Windows compile check.
 
 ```sh
 cd apps/desktop

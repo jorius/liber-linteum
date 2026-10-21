@@ -31,6 +31,17 @@ pub fn real_trash_tests_enabled() -> bool {
     enabled
 }
 
+/// Whether this run seals every vault `Vault::open` sees (`LIBER_TEST_STORAGE=encrypted`,
+/// E3): a test that asserts on plaintext bytes on disk, or on behaviour encrypted
+/// vaults change by design, returns early when this is `true` (and prints why).
+pub fn plain_disk_only() -> bool {
+    let sealed = std::env::var("LIBER_TEST_STORAGE").as_deref() == Ok("encrypted");
+    if sealed {
+        eprintln!("skipped: needs a plaintext vault on disk (LIBER_TEST_STORAGE=encrypted)");
+    }
+    sealed
+}
+
 /// Like [`copy_fixture`], but inside the user's home folder so the OS trash
 /// works (on Linux the system temp dir is often a different filesystem than
 /// `~/.local/share/Trash`). Use only in tests that call `trash`.

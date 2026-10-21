@@ -30,6 +30,9 @@ fn saw(seen: &Seen, event: WatchEvent) -> bool {
 
 #[test]
 fn vlt_04_external_create_modify_remove_are_reported() {
+    if liber_testkit::plain_disk_only() {
+        return;
+    }
     let dir = copy_fixture("ambiguous-names");
     let (_w, seen) = watch(dir.path());
     std::fs::write(dir.path().join("New.md"), "# new").unwrap();
@@ -46,6 +49,9 @@ fn vlt_04_external_create_modify_remove_are_reported() {
 
 #[test]
 fn vlt_04_external_rename_reports_new_path_and_old_path_gone() {
+    if liber_testkit::plain_disk_only() {
+        return;
+    }
     let dir = copy_fixture("ambiguous-names");
     let (_w, seen) = watch(dir.path());
     std::fs::rename(dir.path().join("Links.md"), dir.path().join("Renamed.md")).unwrap();
@@ -56,6 +62,9 @@ fn vlt_04_external_rename_reports_new_path_and_old_path_gone() {
 
 #[test]
 fn vlt_05_hidden_and_excluded_changes_are_dropped() {
+    if liber_testkit::plain_disk_only() {
+        return;
+    }
     let dir = copy_fixture("ambiguous-names");
     std::fs::create_dir(dir.path().join(".liber")).unwrap();
     std::fs::write(
@@ -78,6 +87,9 @@ fn vlt_05_hidden_and_excluded_changes_are_dropped() {
 
 #[test]
 fn review_focus_burst_of_changes_is_delivered_without_loss() {
+    if liber_testkit::plain_disk_only() {
+        return;
+    }
     let dir = copy_fixture("ambiguous-names");
     let (_w, seen) = watch(dir.path());
     for i in 0..200 {
@@ -98,6 +110,9 @@ fn review_focus_burst_of_changes_is_delivered_without_loss() {
 /// folders below it (a file in the home folder must not watch all of it).
 #[test]
 fn watch_folder_reports_only_the_folders_own_files() {
+    if liber_testkit::plain_disk_only() {
+        return;
+    }
     let dir = tempfile::tempdir().unwrap();
     std::fs::create_dir(dir.path().join("sub")).unwrap();
     let vault = Vault::open(dir.path()).unwrap();

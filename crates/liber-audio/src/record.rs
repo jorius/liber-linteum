@@ -51,8 +51,45 @@ pub fn record_with<W: Write + Seek>(
     on_level: &mut dyn FnMut(Level, Duration),
     max_bytes: u64,
 ) -> Result<Take, AudioError> {
+    let start = |w, spec| hound::WavWriter::new(w, spec).map_err(write_error);
+    run(host, device, writer, start, stop, on_level, max_bytes)
+}
+
+/// Where a take's samples go once the stream's format is known: a seekable
+/// WAV (`hound`) or an append-only one ([`crate::stream_wav`]).
+pub(crate) trait Pcm {
+    fn sample(&mut self, s: i16) -> Result<(), AudioError>;
+    /// Makes the sound so far survive a killed app.
+    fn flush(&mut self) -> Result<(), AudioError>;
+    fn finalize(self) -> Result<(), AudioError>;
+}
+
+impl<W: Write + Seek> Pcm for hound::WavWriter<W> {
+    fn sample(&mut self, s: i16) -> Result<(), AudioError> {
+        self.write_sample(s).map_err(write_error)
+    }
+    fn flush(&mut self) -> Result<(), AudioError> {
+        hound::WavWriter::flush(self).map_err(write_error)
+    }
+    fn finalize(self) -> Result<(), AudioError> {
+        hound::WavWriter::finalize(self).map_err(write_error)
+    }
+}
+
+/// A take from `host` into `writer`, which `start` turns into samples once
+/// the format arrives.
+pub(crate) fn run<W, P: Pcm>(
+    host: &dyn Host,
+    device: Option<&str>,
+    writer: W,
+    start: fn(W, hound::WavSpec) -> Result<P, AudioError>,
+    stop: &AtomicBool,
+    on_level: &mut dyn FnMut(Level, Duration),
+    max_bytes: u64,
+) -> Result<Take, AudioError> {
     let mut sink = WavSink {
         out: Some(writer),
+        start,
         on_level,
         writer: None,
         meter: Meter::default(),
@@ -85,7 +122,7 @@ pub fn record_with<W: Write + Seek>(
         (Ok(_), Some(limit)) => limit,
         (Ok(ended), None) => ended,
     };
-    writer.finalize().map_err(write_error)?;
+    writer.finalize()?;
     Ok(Take { ended, duration })
 }
 
@@ -123,11 +160,12 @@ impl Seek for LazyFile<'_> {
     }
 }
 
-struct WavSink<'a, W: Write + Seek> {
+struct WavSink<'a, W, P> {
     /// The writer until the format arrives and the WAV starts.
     out: Option<W>,
+    start: fn(W, hound::WavSpec) -> Result<P, AudioError>,
     on_level: &'a mut dyn FnMut(Level, Duration),
-    writer: Option<hound::WavWriter<W>>,
+    writer: Option<P>,
     meter: Meter,
     format: Option<StreamFormat>,
     /// Samples per channel written so far.
@@ -140,7 +178,7 @@ struct WavSink<'a, W: Write + Seek> {
     ended: Option<Ended>,
 }
 
-impl<W: Write + Seek> WavSink<'_, W> {
+impl<W, P> WavSink<'_, W, P> {
     fn elapsed(&self) -> Duration {
         match self.format {
             Some(f) if f.sample_rate > 0 => {
@@ -151,7 +189,7 @@ impl<W: Write + Seek> WavSink<'_, W> {
     }
 }
 
-impl<W: Write + Seek> Sink for WavSink<'_, W> {
+impl<W, P: Pcm> Sink for WavSink<'_, W, P> {
     fn format(&mut self, format: StreamFormat) -> Result<(), AudioError> {
         if format.channels == 0 || format.sample_rate == 0 {
             return Err(AudioError::Device(format!("unusable stream {format:?}")));
@@ -166,7 +204,7 @@ impl<W: Write + Seek> Sink for WavSink<'_, W> {
             .out
             .take()
             .ok_or_else(|| AudioError::Device("the stream started twice".into()))?;
-        self.writer = Some(hound::WavWriter::new(out, spec).map_err(write_error)?);
+        self.writer = Some((self.start)(out, spec)?);
         // A reading per 50 ms of sound, whatever the rate and channels.
         self.meter = Meter::new(format.sample_rate as usize * format.channels as usize / 20);
         self.format = Some(format);
@@ -186,9 +224,7 @@ impl<W: Write + Seek> Sink for WavSink<'_, W> {
         let take = interleaved.len().min(room - room % channels);
         let mut failed = interleaved[..take]
             .iter()
-            .try_for_each(|&s| {
-                writer.write_sample((s.clamp(-1.0, 1.0) * f32::from(i16::MAX)) as i16)
-            })
+            .try_for_each(|&s| writer.sample((s.clamp(-1.0, 1.0) * f32::from(i16::MAX)) as i16))
             .err();
         self.frames += (take / channels) as u64;
         let due = u64::from(format.sample_rate) * FLUSH_EVERY.as_secs();
@@ -198,7 +234,7 @@ impl<W: Write + Seek> Sink for WavSink<'_, W> {
         }
         if let Some(e) = failed {
             self.ended = Some(Ended::WriteFailed);
-            return Err(write_error(e));
+            return Err(e);
         }
         if take < interleaved.len() {
             self.ended = Some(Ended::LengthLimit);

@@ -33,6 +33,17 @@ pub enum ErrorKind {
     NotAText,
     /// A value the command refuses: a word or dictionary id (spell checking).
     InvalidInput,
+    /// The vault is encrypted and locked: unlock it first (E3).
+    Locked,
+    /// The passphrase or recovery code opens no slot, or the header's MAC
+    /// failed (E3 Task 1 ruling: the UI says both).
+    WrongSecret,
+    /// The vault's header is at a lower epoch than this device has seen: an
+    /// old header put back (spec §16 #18). Never opened.
+    Rollback,
+    /// An encrypted vault that can't be read: a damaged or unparseable
+    /// header, a missing `d/`, or ciphertext that fails to decrypt.
+    Damaged,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
@@ -74,6 +85,13 @@ impl From<VaultError> for CommandError {
             VaultError::Conflict { .. } => ErrorKind::Conflict,
             VaultError::OutsideVault(_) => ErrorKind::OutsideVault,
             VaultError::Watch(_) => ErrorKind::Watch,
+            VaultError::NotEmpty(_) => ErrorKind::NotEmpty,
+            VaultError::NotPermitted(_) => ErrorKind::NotPermitted,
+            VaultError::Locked => ErrorKind::Locked,
+            VaultError::WrongSecret => ErrorKind::WrongSecret,
+            // `Crypto` is data that doesn't decrypt or parse (a damaged or
+            // modified file or header), never a disk failure: `damaged`.
+            VaultError::Crypto(_) | VaultError::Damaged(_) => ErrorKind::Damaged,
             VaultError::NotUtf8(_) | VaultError::InvalidConfig { .. } | VaultError::Io { .. } => {
                 ErrorKind::Io
             }
@@ -107,7 +125,20 @@ impl From<SessionError> for CommandError {
 
 impl From<std::io::Error> for CommandError {
     fn from(e: std::io::Error) -> CommandError {
-        CommandError::new(ErrorKind::Io, e.to_string())
+        // A stream read from an encrypted vault fails with why: the vault
+        // locked, or the file is damaged (a decrypted copy, review M5).
+        let inner = e.get_ref();
+        let kind = if inner
+            .and_then(|i| i.downcast_ref::<VaultError>())
+            .is_some_and(|v| matches!(v, VaultError::Locked))
+        {
+            ErrorKind::Locked
+        } else if inner.is_some_and(|i| i.is::<liber_crypto::CryptoError>()) {
+            ErrorKind::Damaged
+        } else {
+            ErrorKind::Io
+        };
+        CommandError::new(kind, e.to_string())
     }
 }
 

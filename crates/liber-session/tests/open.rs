@@ -34,6 +34,10 @@ fn targets(s: &VaultSession, page: &str) -> Vec<(String, Option<String>)> {
 
 #[test]
 fn vlt_02_opening_any_fixture_changes_nothing() {
+    // On the encrypted switch, opening seals the folder.
+    if liber_testkit::plain_disk_only() {
+        return;
+    }
     for name in ["obsidian-basic", "ambiguous-names", "edge-cases"] {
         let vault = copy_fixture(name);
         let cache = tempfile::tempdir().unwrap();
@@ -199,6 +203,9 @@ fn edge_cases_are_indexed_with_warnings_not_errors() {
 
 #[test]
 fn nfr_03_reopen_is_incremental() {
+    if liber_testkit::plain_disk_only() {
+        return;
+    }
     let vault = copy_fixture("obsidian-basic");
     let cache = tempfile::tempdir().unwrap();
     let (_, first, _) = open(vault.path(), cache.path());
@@ -217,6 +224,9 @@ fn nfr_03_reopen_is_incremental() {
 
 #[test]
 fn exp_02_create_page_and_folder_resolve_waiting_links() {
+    if liber_testkit::plain_disk_only() {
+        return;
+    }
     let vault = copy_fixture("obsidian-basic");
     let cache = tempfile::tempdir().unwrap();
     let (s, ..) = open(vault.path(), cache.path());
@@ -285,6 +295,10 @@ fn review_focus_names_differing_only_by_case_on_case_sensitive_fs() {
 
 #[test]
 fn m5b_r2_folders_list_their_entries_in_their_own_order() {
+    // Plaintext mtimes don't survive sealing.
+    if liber_testkit::plain_disk_only() {
+        return;
+    }
     use liber_vault::FolderSort;
     use std::time::{Duration, SystemTime};
     let vault = tempfile::tempdir().unwrap();

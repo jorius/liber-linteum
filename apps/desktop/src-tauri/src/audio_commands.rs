@@ -1,6 +1,10 @@
 //! M6 audio clips (spec §3, §10): one take at a time, recorded on its own
 //! thread into the app's cache, then imported as an attachment of the page it
 //! started on. The microphone is open only between start and stop or cancel.
+//!
+//! An encrypted vault's take never touches the cache (E3 spec §4.2): it is
+//! appended, encrypted, into the vault's own `.liber/recording/`, and fixed up
+//! into a new file at Stop, or at the next Start or unlock after a lock or crash.
 
 use crate::attachment_commands::visible_page;
 use crate::dto::AttachedDto;
@@ -8,10 +12,13 @@ use crate::error::{CmdResult, CommandError, ErrorKind};
 use crate::state::AppState;
 use crate::vault_commands::{blocking, not_archived};
 use liber_audio::{AudioError, Device, Ended, Host, Take};
-use liber_session::VaultSession;
-use liber_vault::VaultPath;
+use liber_session::{Attached, VaultSession};
+use liber_vault::{
+    Child, EncryptedStorage, Kind, NewFile, RECORDING_DIR, Reach, Vault, VaultError, VaultPath,
+};
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
+use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::mpsc;
@@ -40,11 +47,58 @@ struct Running {
     /// vault opened meanwhile.
     session: Arc<VaultSession>,
     page: VaultPath,
-    /// The take's own folder in the cache (batch 6 review M5).
-    dir: PathBuf,
-    file: PathBuf,
+    at: TakeAt,
     stop: Arc<AtomicBool>,
     thread: JoinHandle<Result<Take, AudioError>>,
+}
+
+/// A take's own folder (batch 6 review M5) and file: in the app cache for a
+/// plain vault; in the vault's [`RECORDING_DIR`] for an encrypted one.
+enum TakeAt {
+    Cache { dir: PathBuf, file: PathBuf },
+    Vault { dir: VaultPath, file: VaultPath },
+}
+
+impl TakeAt {
+    /// Its key in [`AudioState::finishing`].
+    fn key(&self) -> PathBuf {
+        match self {
+            TakeAt::Cache { dir, .. } => dir.clone(),
+            TakeAt::Vault { dir, .. } => PathBuf::from(dir.as_str()),
+        }
+    }
+
+    fn remove(&self, session: &VaultSession) {
+        match self {
+            TakeAt::Cache { dir, .. } => {
+                let _ = std::fs::remove_dir_all(dir); // seam: outside (audio takes live in the app cache, E3 spec §4.2)
+            }
+            TakeAt::Vault { dir, .. } => {
+                let _ = remove_vault_take(session.vault(), dir);
+            }
+        }
+    }
+}
+
+/// A take's folder in the vault: its files, any temp file a crash left, then
+/// the folder. An unreadable entry in it is never touched, so the folder stays.
+fn remove_vault_take(vault: &Vault, dir: &VaultPath) -> liber_vault::Result<()> {
+    for child in vault.children(dir)? {
+        if let Child::Entry { name, .. } = child {
+            vault.remove_file(&dir.join(&name)?)?;
+        }
+    }
+    if let Some(storage) = vault.encrypted() {
+        storage.remove_temp_files(dir)?;
+    }
+    vault.remove_empty_dir(dir)
+}
+
+/// Where the record thread writes: a WAV file in the cache, or the vault's
+/// append-only stream.
+enum Writer {
+    Cache(PathBuf),
+    Vault(Box<dyn NewFile>),
 }
 
 impl AudioState {
@@ -218,6 +272,186 @@ fn recover(
     out
 }
 
+/// [`liber_audio::record_stream`] into an encrypted vault's new file, then
+/// ends the stream. When a write failed (a full disk) or the end can't be
+/// written, what reached the disk is kept for salvage (review I1): the take
+/// reads as `WriteFailed`, Stop finds no file and keeps the take folder.
+pub fn record_into_vault(
+    host: &dyn Host,
+    device: Option<&str>,
+    mut out: Box<dyn NewFile>,
+    stop: &AtomicBool,
+    on_level: &mut dyn FnMut(liber_audio::Level, Duration),
+) -> Result<Take, AudioError> {
+    let max = liber_audio::MAX_DATA_BYTES;
+    let take = liber_audio::record_stream(host, device, &mut out, stop, on_level, max)?;
+    Ok(match out.finish_or_keep() {
+        Ok(()) => take,
+        Err(_) => Take {
+            ended: Ended::WriteFailed,
+            ..take
+        },
+    })
+}
+
+/// `copy` (a take of `total` bytes, its sizes placeholders) saved as `name`
+/// in `page`'s attachment folder with its sizes fixed: a new file, fresh
+/// salt, streamed (review I2: a take can be 4 GB, never whole in memory).
+fn save_take(
+    session: &VaultSession,
+    page: &VaultPath,
+    name: &str,
+    total: u64,
+    mut copy: impl FnMut(&mut dyn Write) -> liber_vault::Result<()>,
+) -> CmdResult<Attached> {
+    Ok(session.save_attachment_with(page, name, |out| {
+        let mut fixed = liber_audio::fixed_wav(out, total);
+        copy(&mut fixed).map_err(std::io::Error::other)?;
+        fixed.finish().map(|_| ()).map_err(std::io::Error::other)
+    })?)
+}
+
+/// Streams what is left of the take `wav` in its folder `dir` into `out`:
+/// the file a Stop or lock ended, else the stream a crash or a failed write
+/// left uncommitted.
+fn salvage_take(
+    storage: &EncryptedStorage,
+    dir: &VaultPath,
+    wav: &VaultPath,
+    out: &mut dyn Write,
+) -> liber_vault::Result<()> {
+    match storage.salvage(wav, out) {
+        Err(VaultError::NotFound(_)) => storage.salvage_uncommitted(dir, out),
+        done => done,
+    }
+    .map(|_| ())
+}
+
+/// Counts a salvage's bytes and keeps its first four, so recovery knows the
+/// take's length before streaming it (a WAV header comes first).
+#[derive(Default)]
+struct Probe {
+    len: u64,
+    magic: Vec<u8>,
+}
+
+impl Write for Probe {
+    fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
+        let n = buf.len().min(4 - self.magic.len());
+        self.magic.extend_from_slice(&buf[..n]);
+        self.len += buf.len() as u64;
+        Ok(buf.len())
+    }
+    fn flush(&mut self) -> std::io::Result<()> {
+        Ok(())
+    }
+}
+
+/// Saves the takes an encrypted vault's [`RECORDING_DIR`] holds — one a lock
+/// ended, or the complete chunks of one a crash cut short — as
+/// `…-recovered.wav` next to the page each was recorded on, else next to
+/// `fallback`. With no fallback (at unlock), a take whose page is gone waits
+/// for the next Start. A take that fails to save stays for the next try.
+fn recover_in_vault(
+    session: &VaultSession,
+    fallback: Option<&VaultPath>,
+    busy: &HashSet<PathBuf>,
+) -> Vec<AttachedDto> {
+    let vault = session.vault();
+    let (Some(storage), Ok(root)) = (vault.encrypted(), VaultPath::new(RECORDING_DIR)) else {
+        return Vec::new();
+    };
+    let Ok(children) = vault.children(&root) else {
+        return Vec::new();
+    };
+    let mut out = Vec::new();
+    for child in children {
+        let Child::Entry { name, meta } = child else {
+            continue;
+        };
+        // `<clip name>-<id>`, as `start_in_vault` names it.
+        let Some((stem, _)) = name.rsplit_once('-') else {
+            continue;
+        };
+        let Ok(dir) = root.join(&name) else {
+            continue;
+        };
+        if meta.kind != Kind::Dir || !valid_name(stem) || busy.contains(Path::new(dir.as_str())) {
+            continue;
+        }
+        let page = dir
+            .join("take.json")
+            .ok()
+            .and_then(|p| vault.read(&p).ok())
+            .and_then(|(b, _)| serde_json::from_slice::<TakeRecord>(&b).ok())
+            .and_then(|r| {
+                not_archived(&r.page).ok()?;
+                visible_page(session, &r.page).ok()
+            })
+            .or_else(|| fallback.cloned());
+        let (Some(page), Ok(wav)) = (page, dir.join(&format!("{stem}.wav"))) else {
+            continue;
+        };
+        // Two passes, never the take in memory: its length, then the fix-up.
+        let mut probe = Probe::default();
+        match salvage_take(storage, &dir, &wav, &mut probe) {
+            // Anything but a WAV with sound (a crash before the first chunk) is dropped.
+            Ok(()) if probe.len > 44 && probe.magic == b"RIFF" => {
+                let name = format!("{stem}-recovered.wav");
+                let copy = |out: &mut dyn Write| salvage_take(storage, &dir, &wav, out);
+                match save_take(session, &page, &name, probe.len, copy) {
+                    Ok(attached) => out.push(attached.into()),
+                    Err(_) => continue,
+                }
+            }
+            Ok(()) | Err(VaultError::NotFound(_) | VaultError::Crypto(_)) => {}
+            Err(_) => continue,
+        }
+        let _ = remove_vault_take(vault, &dir);
+    }
+    out
+}
+
+/// Step 5 of `vault_unlock` (spec §4.2): saves the takes a lock or a crash
+/// left in the vault just opened, for the UI to announce. Not while a take
+/// runs (it may be this vault's): the next Start does it then.
+pub(crate) fn recover_at_unlock<R: Runtime>(app: &AppHandle<R>) -> Vec<AttachedDto> {
+    let audio = app.state::<AudioState>();
+    let slot = audio.running();
+    match (slot.is_some(), app.state::<AppState>().session()) {
+        (false, Ok(session)) => recover_in_vault(&session, None, &audio.finishing()),
+        _ => Vec::new(),
+    }
+}
+
+/// A new take's folder and stream in the encrypted vault: `take.json` first,
+/// then `<name>.wav`, which only the record thread appends to.
+fn start_in_vault(
+    session: &VaultSession,
+    name: &str,
+    id: u64,
+    json: &[u8],
+) -> CmdResult<(TakeAt, Box<dyn NewFile>)> {
+    let vault = session.vault();
+    vault.create_dir_all(&VaultPath::new(RECORDING_DIR)?)?;
+    let dir = VaultPath::new(&format!("{RECORDING_DIR}/{name}-{id}"))?;
+    // Not `create_dir_all`: a kept take of the same name is never reused.
+    vault.create_dir(&dir)?;
+    let file = dir.join(&format!("{name}.wav"))?;
+    let made = dir
+        .join("take.json")
+        .and_then(|p| vault.write_cas(&p, json, None))
+        .and_then(|_| vault.create_new(&file));
+    let at = TakeAt::Vault { dir, file };
+    match made {
+        Ok(out) => Ok((at, out)),
+        Err(e) => {
+            at.remove(session);
+            Err(e.into())
+        }
+    }
+}
+
 pub(crate) fn audio_record_start_impl<R: Runtime>(
     app: &AppHandle<R>,
     page: String,
@@ -243,25 +477,37 @@ pub(crate) fn audio_record_start_impl<R: Runtime>(
         ));
     }
     let cache = state.cache_dir.join("audio");
-    let recovered = recover(&cache, &session, &page, &audio.finishing());
+    let mut recovered = recover(&cache, &session, &page, &audio.finishing());
+    recovered.extend(recover_in_vault(&session, Some(&page), &audio.finishing()));
     let id = audio.next.fetch_add(1, Ordering::SeqCst);
-    let dir = cache.join(format!("{name}-{id}"));
-    let _ = std::fs::remove_dir_all(&dir); // seam: outside (audio takes live in the app cache, E3 spec §4.2)
-    std::fs::create_dir_all(&dir)?; // seam: outside (audio takes live in the app cache, E3 spec §4.2)
     let record = TakeRecord {
         root: session.vault().root().to_path_buf(),
         page: page.to_string(),
     };
     let json =
         serde_json::to_vec(&record).map_err(|e| CommandError::new(ErrorKind::Io, e.to_string()))?;
-    std::fs::write(dir.join("take.json"), json)?; // seam: outside (audio takes live in the app cache, E3 spec §4.2)
-    let file = dir.join(format!("{name}.wav"));
+    let (at, writer) = if session.vault().encrypted().is_some() {
+        let (at, out) = start_in_vault(&session, &name, id, &json)?;
+        (at, Writer::Vault(out))
+    } else {
+        let dir = cache.join(format!("{name}-{id}"));
+        let _ = std::fs::remove_dir_all(&dir); // seam: outside (audio takes live in the app cache, E3 spec §4.2)
+        std::fs::create_dir_all(&dir)?; // seam: outside (audio takes live in the app cache, E3 spec §4.2)
+        std::fs::write(dir.join("take.json"), json)?; // seam: outside (audio takes live in the app cache, E3 spec §4.2)
+        let file = dir.join(format!("{name}.wav"));
+        (
+            TakeAt::Cache {
+                dir,
+                file: file.clone(),
+            },
+            Writer::Cache(file),
+        )
+    };
     let stop = Arc::new(AtomicBool::new(false));
     let (started, first) = mpsc::channel::<()>();
     let thread = {
         let host = audio.host.clone();
         let stop = stop.clone();
-        let file = file.clone();
         let app = app.clone();
         std::thread::spawn(move || {
             let emit = |level: liber_audio::Level, elapsed: Duration, ended| {
@@ -277,11 +523,19 @@ pub(crate) fn audio_record_start_impl<R: Runtime>(
                     },
                 );
             };
-            let take =
-                liber_audio::record(&*host, device.as_deref(), &file, &stop, &mut |l, at| {
-                    let _ = started.send(());
-                    emit(l, at, None);
-                });
+            let mut on_level = |l, at| {
+                let _ = started.send(());
+                emit(l, at, None);
+            };
+            let device = device.as_deref();
+            let take = match writer {
+                Writer::Cache(file) => {
+                    liber_audio::record(&*host, device, &file, &stop, &mut on_level)
+                }
+                // Ends the stream (a periodic flush never does): Stop, and a
+                // lock (spec §6.2), find a whole file.
+                Writer::Vault(out) => record_into_vault(&*host, device, out, &stop, &mut on_level),
+            };
             // Ended by itself: the bar says so, Stop & insert keeps the sound.
             if let Ok(t) = &take
                 && t.ended != Ended::Stopped
@@ -294,7 +548,7 @@ pub(crate) fn audio_record_start_impl<R: Runtime>(
     // The first reading means the microphone opened; an error ends the thread
     // first. A silent stream still reads (zero), so this never waits long.
     if first.recv_timeout(Duration::from_secs(3)).is_err() && thread.is_finished() {
-        let _ = std::fs::remove_dir_all(&dir); // seam: outside (audio takes live in the app cache, E3 spec §4.2)
+        at.remove(&session);
         return match thread.join() {
             Ok(Err(e)) => Err(e.into()),
             _ => Err(CommandError::new(
@@ -307,8 +561,7 @@ pub(crate) fn audio_record_start_impl<R: Runtime>(
         id,
         session,
         page,
-        dir,
-        file,
+        at,
         stop,
         thread,
     });
@@ -318,14 +571,13 @@ pub(crate) fn audio_record_start_impl<R: Runtime>(
     })
 }
 
-/// A take that was stopped: its file is still in the cache, and its folder
-/// is marked as being finished until [`Done::release`].
+/// A take that was stopped: its file is still in its folder, which is marked
+/// as being finished until it is imported, discarded or kept.
 struct Done<'a> {
     audio: &'a AudioState,
     session: Arc<VaultSession>,
     page: VaultPath,
-    dir: PathBuf,
-    file: PathBuf,
+    at: TakeAt,
     take: Result<Take, AudioError>,
 }
 
@@ -335,30 +587,57 @@ impl Done<'_> {
     /// it (batch 6 review I1). A take with no sound is dropped.
     fn import(self, page: &VaultPath) -> CmdResult<AttachedDto> {
         let out = match &self.take {
-            Ok(_) => match self.session.import_attachment(page, &self.file) {
+            Ok(_) => match self.save(page) {
                 Ok(attached) => {
-                    let _ = std::fs::remove_dir_all(&self.dir); // seam: outside (audio takes live in the app cache, E3 spec §4.2)
+                    self.at.remove(&self.session);
                     Ok(attached.into())
                 }
+                // Its own kind: a lock during Stop is `locked` (review M6).
                 Err(e) => Err(CommandError::new(
-                    ErrorKind::Io,
+                    e.kind,
                     format!(
-                        "{e}. The clip is kept and goes into the vault the next time you record."
+                        "{}. The clip is kept and goes into the vault the next time you record.",
+                        e.message
                     ),
                 )),
             },
             Err(e) => {
-                let _ = std::fs::remove_dir_all(&self.dir); // seam: outside (audio takes live in the app cache, E3 spec §4.2)
+                self.at.remove(&self.session);
                 Err(CommandError::new(ErrorKind::Io, e.to_string()))
             }
         };
-        self.audio.finishing().remove(&self.dir);
+        self.keep();
         out
     }
 
+    /// The cache file imported, or the vault stream read back and saved as a
+    /// new file with its sizes fixed (spec §4.2).
+    fn save(&self, page: &VaultPath) -> CmdResult<Attached> {
+        match &self.at {
+            TakeAt::Cache { file, .. } => Ok(self.session.import_attachment(page, file)?),
+            TakeAt::Vault { file, .. } => {
+                let vault = self.session.vault();
+                let total = vault.open_read(file, Reach::Any)?.len;
+                save_take(&self.session, page, file.file_name(), total, |out| {
+                    let mut r = vault.open_read(file, Reach::Any)?.inner;
+                    std::io::copy(&mut r, out).map_err(|e| VaultError::Io {
+                        path: file.to_string(),
+                        source: e,
+                    })?;
+                    Ok(())
+                })
+            }
+        }
+    }
+
     fn discard(self) {
-        let _ = std::fs::remove_dir_all(&self.dir); // seam: outside (audio takes live in the app cache, E3 spec §4.2)
-        self.audio.finishing().remove(&self.dir);
+        self.at.remove(&self.session);
+        self.keep();
+    }
+
+    /// Leaves the take where it is, for recovery.
+    fn keep(self) {
+        self.audio.finishing().remove(&self.at.key());
     }
 }
 
@@ -368,8 +647,7 @@ fn finish(audio: &AudioState, id: Option<u64>) -> CmdResult<Done<'_>> {
     let Running {
         session,
         page,
-        dir,
-        file,
+        at,
         stop,
         thread,
         ..
@@ -385,7 +663,7 @@ fn finish(audio: &AudioState, id: Option<u64>) -> CmdResult<Done<'_>> {
             ));
         }
         let running = slot.take().expect("checked above");
-        audio.finishing().insert(running.dir.clone());
+        audio.finishing().insert(running.at.key());
         running
     };
     stop.store(true, Ordering::SeqCst);
@@ -396,8 +674,7 @@ fn finish(audio: &AudioState, id: Option<u64>) -> CmdResult<Done<'_>> {
         audio,
         session,
         page,
-        dir,
-        file,
+        at,
         take,
     })
 }
@@ -434,6 +711,25 @@ pub fn stop_orphaned<R: Runtime>(app: &AppHandle<R>) {
     if let Ok(done) = finish(&audio, None) {
         let page = done.page.clone();
         let _ = done.import(&page);
+    }
+}
+
+/// Spec §6.2 lock, step 2: stops the take, its thread ending its stream, and
+/// leaves an encrypted vault's take in place for the next unlock (the vault
+/// is about to lock: nothing more is written). Any other take is imported as
+/// [`stop_orphaned`] does.
+pub(crate) fn stop_for_lock<R: Runtime>(app: &AppHandle<R>) {
+    let Some(audio) = app.try_state::<AudioState>() else {
+        return;
+    };
+    if let Ok(done) = finish(&audio, None) {
+        match done.at {
+            TakeAt::Vault { .. } => done.keep(),
+            TakeAt::Cache { .. } => {
+                let page = done.page.clone();
+                let _ = done.import(&page);
+            }
+        }
     }
 }
 

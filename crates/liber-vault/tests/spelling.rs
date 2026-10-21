@@ -20,6 +20,9 @@ fn json(dir: &tempfile::TempDir) -> serde_json::Value {
 
 #[test]
 fn override_round_trips_and_clears() {
+    if liber_testkit::plain_disk_only() {
+        return;
+    }
     let (dir, vault) = fresh();
     assert_eq!(vault.spelling_dictionaries(), None);
     vault.set_vault_icon(Some("🌌")).unwrap();
@@ -43,6 +46,9 @@ fn an_empty_override_means_no_dictionaries() {
 
 #[test]
 fn words_are_sorted_unique_nfc() {
+    if liber_testkit::plain_disk_only() {
+        return;
+    }
     let (dir, vault) = fresh();
     for w in ["zeta", "Ioque", "cancio\u{301}n", "zeta", "canción"] {
         vault.add_spelling_word(w).unwrap();
@@ -53,6 +59,9 @@ fn words_are_sorted_unique_nfc() {
 
 #[test]
 fn removing_the_last_word_drops_the_key() {
+    if liber_testkit::plain_disk_only() {
+        return;
+    }
     let (dir, vault) = fresh();
     vault.add_spelling_word("Ioque").unwrap();
     vault.remove_spelling_word("Ioque").unwrap();

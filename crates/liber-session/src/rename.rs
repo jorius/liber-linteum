@@ -381,7 +381,9 @@ impl VaultSession {
     fn drop_created_folder(&self, folder: &VaultPath) {
         // Only ever an empty folder; one still holding a page stays indexed.
         if self.vault.remove_empty_dir(folder).is_ok() {
-            let _ = self.index().transaction(|tx| tx.remove(folder.as_str()));
+            if let Ok(mut index) = self.index() {
+                let _ = index.transaction(|tx| tx.remove(folder.as_str()));
+            }
         }
     }
 
@@ -394,7 +396,7 @@ impl VaultSession {
     ) -> Result<RenameOutcome> {
         check_target(from, to)?;
         let (plan, sources) = {
-            let index = self.index();
+            let index = self.index()?;
             let stats = index.stats()?;
             if !stats.contains_key(from.as_str()) {
                 return Err(SessionError::NotIndexed(from.to_string()));
@@ -439,7 +441,7 @@ impl VaultSession {
         };
 
         self.vault.rename(from, to)?;
-        self.index()
+        self.index()?
             .transaction(|tx| tx.rename(from.as_str(), to.as_str()))?;
         self.retext_renamed(&[(from.to_string(), to.to_string())])?;
         self.follow_layout(&[(from.to_string(), to.to_string())]);
@@ -484,7 +486,7 @@ impl VaultSession {
             }
         }
 
-        let mut index = self.index();
+        let mut index = self.index()?;
         let files = index.file_set()?;
         let keys: Vec<String> = plan
             .moved
@@ -505,7 +507,7 @@ impl VaultSession {
         };
         let mut warnings = Vec::new();
         if let Some(loaded) = self.load(&entry, None, &mut warnings) {
-            self.index().transaction(|tx| write_loaded(tx, &loaded))?;
+            self.index()?.transaction(|tx| write_loaded(tx, &loaded))?;
         }
         Ok(())
     }
@@ -586,13 +588,17 @@ mod tests {
     /// index too, so a page left inside it after a failed undo stays found.
     #[test]
     fn subpages_followup_a_folder_left_on_disk_stays_indexed() {
+        // Writes the page behind the session, on the plaintext tree.
+        if liber_testkit::plain_disk_only() {
+            return;
+        }
         let (dir, _c, s) = session("ambiguous-names");
         s.create_folder(&VaultPath::root(), "P").unwrap();
         std::fs::write(dir.path().join("P/P.md"), "# P\n").unwrap();
         s.apply(vec![liber_vault::WatchEvent::Overflow]).unwrap();
         s.drop_created_folder(&vp("P"));
         assert!(dir.path().join("P/P.md").is_file());
-        assert!(s.index().stats().unwrap().contains_key("P/P.md"));
+        assert!(s.index().unwrap().stats().unwrap().contains_key("P/P.md"));
     }
 
     /// Follow-up: a conversion that can't be undone says so (a Warning), as
@@ -634,6 +640,9 @@ mod tests {
 
     #[test]
     fn exp_04_conflict_is_retried_with_fresh_content() {
+        if liber_testkit::plain_disk_only() {
+            return;
+        }
         let (dir, _c, s) = session("ambiguous-names");
         let calls = AtomicUsize::new(0);
         let hook = |p: &VaultPath| {
@@ -658,6 +667,9 @@ mod tests {
 
     #[test]
     fn exp_04_persistent_conflict_is_reported_not_fatal() {
+        if liber_testkit::plain_disk_only() {
+            return;
+        }
         let (dir, _c, s) = session("ambiguous-names");
         let hook = |p: &VaultPath| {
             if p.as_str() == "Links.md" {

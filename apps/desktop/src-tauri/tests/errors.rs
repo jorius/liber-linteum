@@ -68,6 +68,36 @@ fn session_and_vault_errors_map_to_kinds() {
         serde_json::to_value(CommandError::new(ErrorKind::TooLarge, "x")).unwrap()["kind"],
         "tooLarge"
     );
+    // E3: encrypted vaults' own kinds.
+    assert_eq!(
+        kind(SessionError::Vault(VaultError::Locked)),
+        ErrorKind::Locked
+    );
+    assert_eq!(
+        kind(SessionError::Vault(VaultError::WrongSecret)),
+        ErrorKind::WrongSecret
+    );
+    assert_eq!(
+        kind(SessionError::Vault(VaultError::Damaged("x".into()))),
+        ErrorKind::Damaged
+    );
+    assert_eq!(
+        kind(SessionError::Vault(VaultError::Crypto(
+            "a.md: damaged".into()
+        ))),
+        ErrorKind::Damaged
+    );
+    for (k, name) in [
+        (ErrorKind::Locked, "locked"),
+        (ErrorKind::WrongSecret, "wrongSecret"),
+        (ErrorKind::Rollback, "rollback"),
+        (ErrorKind::Damaged, "damaged"),
+    ] {
+        assert_eq!(
+            serde_json::to_value(CommandError::new(k, "x")).unwrap()["kind"],
+            name
+        );
+    }
     let io = std::io::Error::other("disk");
     assert_eq!(
         kind(SessionError::Vault(VaultError::Io {

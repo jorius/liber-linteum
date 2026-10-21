@@ -126,7 +126,7 @@ impl VaultSession {
     fn level_cards(&self, level: &GvLevel) -> Result<GvChildren> {
         let policy = self.vault.attachment_policy();
         let picks = self.vault.index_picks();
-        let index = self.index();
+        let index = self.index()?;
         let ctx = Ctx {
             index: &index,
             policy: &policy,
@@ -311,7 +311,7 @@ impl VaultSession {
     /// §6). Answers the folder's card as the Global View now shows it.
     pub fn index_pick_set(&self, folder: &VaultPath, page: Option<&VaultPath>) -> Result<GvCard> {
         let row = {
-            let index = self.index();
+            let index = self.index()?;
             let row = index
                 .card(folder.as_str())?
                 .filter(|r| r.kind == FileKind::Folder)
@@ -331,7 +331,7 @@ impl VaultSession {
             .set_index_pick(folder.as_str(), page.map(VaultPath::as_str))?;
         let policy = self.vault.attachment_policy();
         let picks = self.vault.index_picks();
-        let index = self.index();
+        let index = self.index()?;
         let ctx = Ctx {
             index: &index,
             policy: &policy,
@@ -350,7 +350,7 @@ impl VaultSession {
     /// The wiki target a relationship from `source` to `target` writes: the
     /// shortest one that resolves back to `target` (M3b §2, §6).
     pub fn link_target(&self, source: &VaultPath, target: &VaultPath) -> Result<String> {
-        let index = self.index();
+        let index = self.index()?;
         if index.card(target.as_str())?.is_none() {
             return Err(SessionError::NotIndexed(target.to_string()));
         }
@@ -615,7 +615,7 @@ impl VaultSession {
         };
         let policy = self.vault.attachment_policy();
         let picks = self.vault.index_picks();
-        let index = self.index();
+        let index = self.index()?;
         let ctx = Ctx {
             index: &index,
             policy: &policy,

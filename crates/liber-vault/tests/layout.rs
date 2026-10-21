@@ -39,6 +39,9 @@ fn touch(dir: &tempfile::TempDir, paths: &[&str]) {
 
 #[test]
 fn gv_31_positions_are_saved_per_level_lazily_and_read_back() {
+    if liber_testkit::plain_disk_only() {
+        return;
+    }
     let (dir, vault) = fresh();
     touch(&dir, &["Alpha", "Notes/a.md", "Notes/b.md"]);
     assert!(vault.layout_level("").is_empty());
@@ -61,6 +64,9 @@ fn gv_31_positions_are_saved_per_level_lazily_and_read_back() {
 
 #[test]
 fn gv_32_an_empty_level_is_removed_and_unknown_keys_survive() {
+    if liber_testkit::plain_disk_only() {
+        return;
+    }
     let (dir, vault) = fresh();
     std::fs::create_dir(dir.path().join(".liber")).unwrap();
     std::fs::write(
@@ -77,6 +83,9 @@ fn gv_32_an_empty_level_is_removed_and_unknown_keys_survive() {
 
 #[test]
 fn m3a_layout_follows_renames_of_folders_and_pages() {
+    if liber_testkit::plain_disk_only() {
+        return;
+    }
     let (dir, vault) = fresh();
     touch(
         &dir,
@@ -142,6 +151,9 @@ fn m3a_layout_follows_renames_of_folders_and_pages() {
 /// the file; a batch of renames is applied in one pass.
 #[test]
 fn m3a_a_remap_that_matches_nothing_leaves_the_file_untouched() {
+    if liber_testkit::plain_disk_only() {
+        return;
+    }
     let (dir, vault) = fresh();
     std::fs::create_dir(dir.path().join(".liber")).unwrap();
     // Compact on purpose: any write would pretty-print it.
@@ -176,6 +188,9 @@ fn m3a_a_remap_that_matches_nothing_leaves_the_file_untouched() {
 /// folder or page with that name: the moved positions replace them.
 #[test]
 fn m3a_moved_positions_win_over_leftovers_at_the_destination() {
+    if liber_testkit::plain_disk_only() {
+        return;
+    }
     let (dir, vault) = fresh();
     touch(&dir, &["A/a.md"]);
     std::fs::create_dir(dir.path().join(".liber")).unwrap();
@@ -205,6 +220,9 @@ fn m3a_moved_positions_win_over_leftovers_at_the_destination() {
 /// write just to prune.
 #[test]
 fn m3a_writes_prune_levels_and_positions_of_deleted_paths() {
+    if liber_testkit::plain_disk_only() {
+        return;
+    }
     let (dir, vault) = fresh();
     touch(&dir, &["Alpha/a.md", "b.md"]);
     std::fs::create_dir(dir.path().join(".liber")).unwrap();
@@ -261,6 +279,9 @@ fn m3a_writes_prune_levels_and_positions_of_deleted_paths() {
 /// version can't read survives a save.
 #[test]
 fn m3a_a_malformed_entry_hides_only_itself_and_unknown_data_survives() {
+    if liber_testkit::plain_disk_only() {
+        return;
+    }
     let (dir, vault) = fresh();
     touch(&dir, &["Alpha/a.md", "Alpha/b.md", "Beta", "Gamma"]);
     std::fs::create_dir(dir.path().join(".liber")).unwrap();
@@ -312,6 +333,9 @@ fn m3a_remap_without_a_layout_writes_nothing_and_bad_numbers_are_refused() {
 /// is lost.
 #[test]
 fn m3a_concurrent_layout_writers_neither_fail_nor_lose_updates() {
+    if liber_testkit::plain_disk_only() {
+        return;
+    }
     let (dir, vault) = fresh();
     let names: Vec<String> = (0..8).map(|i| format!("L{i}")).collect();
     for name in &names {

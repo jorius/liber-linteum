@@ -31,8 +31,17 @@ fn dir_path(s: &str) -> CmdResult<VaultPath> {
 #[doc(hidden)] // public for the menu test (round 3 review #8)
 pub fn open_session<R: Runtime>(app: &AppHandle<R>, root: &Path) -> CmdResult<VaultInfo> {
     let state = app.state::<AppState>();
+    // An encrypted folder is `locked` here (`Vault::open`): it opens by unlocking.
+    let (session, report) = VaultSession::open(root, &state.cache_dir, session_events(app))?;
+    install_session(app, session, &report, false)
+}
+
+/// Forwards a session's events to the main window.
+pub(crate) fn session_events<R: Runtime>(
+    app: &AppHandle<R>,
+) -> impl Fn(SessionEvent) + Send + Sync + 'static {
     let emitter = app.clone();
-    let (session, report) = VaultSession::open(root, &state.cache_dir, move |event| match event {
+    move |event| match event {
         SessionEvent::Progress { done, total } => {
             let _ = emitter.emit_to("main", "vault:progress", ProgressPayload { done, total });
         }
@@ -57,7 +66,18 @@ pub fn open_session<R: Runtime>(app: &AppHandle<R>, root: &Path) -> CmdResult<Va
             let _ = emitter.emit_to("main", "vault:warning", WarningPayload { message });
         }
         SessionEvent::Indexed(_) => {}
-    })?;
+    }
+}
+
+/// Makes `session` the open vault: starts watching, records it as recent,
+/// names it in the menu.
+pub(crate) fn install_session<R: Runtime>(
+    app: &AppHandle<R>,
+    session: VaultSession,
+    report: &liber_session::IndexReport,
+    recovery_void: bool,
+) -> CmdResult<VaultInfo> {
+    let state = app.state::<AppState>();
     let session = Arc::new(session);
     session.start_watching()?;
     let root = session.vault().root().to_path_buf();
@@ -65,7 +85,7 @@ pub fn open_session<R: Runtime>(app: &AppHandle<R>, root: &Path) -> CmdResult<Va
         .file_name()
         .map(|n| n.to_string_lossy().into_owned())
         .unwrap_or_else(|| root.to_string_lossy().into_owned());
-    let mut report: crate::dto::IndexReportDto = (&report).into();
+    let mut report: crate::dto::IndexReportDto = report.into();
     // A read-only config dir must not stop the vault from opening (M1b §10 j).
     if let Err(e) = state.settings.push_recent(&root, &name) {
         report
@@ -76,6 +96,8 @@ pub fn open_session<R: Runtime>(app: &AppHandle<R>, root: &Path) -> CmdResult<Va
         .vault()
         .vault_icon()
         .filter(|i| liber_markdown::is_icon(i));
+    let encrypted = session.vault().encrypted().is_some();
+    leave_encrypted(app);
     state.set_session(Some(session));
     let scratchpad = state.settings.is_scratchpad(&root);
     state.set_scratchpad_root(scratchpad.then(|| root.clone()));
@@ -87,6 +109,9 @@ pub fn open_session<R: Runtime>(app: &AppHandle<R>, root: &Path) -> CmdResult<Va
         icon,
         root: root.to_string_lossy().into_owned(),
         report,
+        encrypted,
+        recovery_void,
+        recovered: Vec::new(),
     })
 }
 
@@ -129,9 +154,23 @@ pub(crate) fn vault_close_impl(state: &AppState) {
     state.set_session(None);
 }
 
+/// Before an encrypted vault stops being the open one, its take in progress
+/// is stopped and kept, as Lock does (spec §6.2); `set_session` then locks it.
+/// The take held the session, so dropping it alone kept the keys (review M4).
+fn leave_encrypted<R: Runtime>(app: &AppHandle<R>) {
+    let state = app.state::<AppState>();
+    if state
+        .session()
+        .is_ok_and(|s| s.vault().encrypted().is_some())
+    {
+        crate::audio_commands::stop_for_lock(app);
+    }
+}
+
 /// Closes the vault and puts the generic File-menu label back.
 #[doc(hidden)] // public for the menu test (round 3 review #8)
 pub fn close_session<R: Runtime>(app: &AppHandle<R>) {
+    leave_encrypted(app);
     vault_close_impl(&app.state::<AppState>());
     crate::menu::show_vault_in_menu(app, None);
 }

@@ -29,6 +29,9 @@ fn cover_nothing_set_reads_as_nothing_and_writes_nothing() {
 
 #[test]
 fn cover_heights_round_trip_and_keep_other_keys() {
+    if liber_testkit::plain_disk_only() {
+        return;
+    }
     let (dir, vault) = fresh();
     std::fs::create_dir(dir.path().join(".liber")).unwrap();
     std::fs::write(
@@ -59,6 +62,9 @@ fn cover_heights_round_trip_and_keep_other_keys() {
 
 #[test]
 fn cover_heights_are_clamped_to_the_allowed_range() {
+    if liber_testkit::plain_disk_only() {
+        return;
+    }
     let (dir, vault) = fresh();
     assert_eq!((MIN_COVER_HEIGHT, MAX_COVER_HEIGHT), (132, 2000));
     vault.set_cover_height("Low.md", Some(20)).unwrap();
@@ -94,6 +100,9 @@ fn cover_heights_follow_renames_and_folder_moves() {
 
 #[test]
 fn cover_a_malformed_height_hides_only_itself() {
+    if liber_testkit::plain_disk_only() {
+        return;
+    }
     let (dir, _) = fresh();
     std::fs::create_dir(dir.path().join(".liber")).unwrap();
     std::fs::write(
@@ -114,6 +123,9 @@ fn cover_a_malformed_height_hides_only_itself() {
 
 #[test]
 fn cover_heights_of_deleted_pages_and_folders_are_forgotten() {
+    if liber_testkit::plain_disk_only() {
+        return;
+    }
     let (dir, vault) = fresh();
     for (path, height) in [
         ("Notes/A.md", 240),

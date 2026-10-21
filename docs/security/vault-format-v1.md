@@ -627,6 +627,8 @@ Names in the table: `Notes.md` (root), the folder `Projects`, `Plan.md`, `Café 
 
 `cargo test -p liber-crypto` regenerates every vector from the real code under a seeded RNG and compares them byte for byte. `REGEN=1` rewrites them, which is only for a deliberate format change (and a new version). The same test runs `xcheck.py` when `python3` with `cryptography` (AES-SIV, and Argon2id from version 44) is installed. Otherwise it prints `SKIP` with the reason.
 
+`xcheck.py` has a second mode, `xcheck.py vault <vault dir> <passphrase> <expected.json>`, that reads a whole vault the app wrote (§3–§8, §13, §14): it unlocks the passphrase slot, checks the header MAC and decrypts every name and file under `d/`. `crates/liber-vault/tests/encrypted_xcheck.rs` runs it when `LIBER_XCHECK_PY` names a Python with `cryptography` >= 44. That mode reads one epoch only (no `retiring`) and doesn't recognise conflict suffixes (§14.6).
+
 **Not covered by the Python reader**, so checked only by the Rust tests:
 
 - **X-Wing**: the vault's keyring slot (decapsulation, and the KEK from `ss`) and the keyring's public key, because `cryptography` has no X-Wing. The Rust vector test unlocks the vault through the keyring slot.

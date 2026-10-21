@@ -21,7 +21,8 @@ use crate::slots::{
 
 const FORMAT: &str = "liber-vault";
 const VERSION: u64 = 1;
-const MAX_HEADER_BYTES: usize = 1 << 20;
+/// The largest header file `parse` accepts (format §6).
+pub const MAX_HEADER_BYTES: usize = 1 << 20;
 /// Known plus unknown slots; also bounds how many KDF runs a hostile header can cause.
 pub(crate) const MAX_SLOTS: usize = 64;
 /// One normally; a few while a passphrase change or merge settles. Each costs a KDF run on unlock.
@@ -154,6 +155,16 @@ impl VaultHeader {
         params: Argon2Params,
     ) -> Result<(VaultHeader, Unlocked, RecoveryCode)> {
         params.check_floor()?;
+        Self::create_unchecked(passphrase, params)
+    }
+
+    /// `create` below the Argon2 floor, for test fixtures in other crates (`test-params`
+    /// feature, which a release build must never enable).
+    #[cfg(any(test, feature = "test-params"))]
+    pub fn create_insecure(
+        passphrase: &str,
+        params: Argon2Params,
+    ) -> Result<(VaultHeader, Unlocked, RecoveryCode)> {
         Self::create_unchecked(passphrase, params)
     }
 
@@ -440,6 +451,17 @@ impl VaultHeader {
         params: Argon2Params,
     ) -> Result<(Unlocked, RecoveryCode)> {
         params.check_floor()?;
+        self.begin_rotation_unchecked(u, passphrase, params)
+    }
+
+    /// `begin_rotation` below the Argon2 floor, as [`Self::create_insecure`].
+    #[cfg(any(test, feature = "test-params"))]
+    pub fn begin_rotation_insecure(
+        &mut self,
+        u: &Unlocked,
+        passphrase: &str,
+        params: Argon2Params,
+    ) -> Result<(Unlocked, RecoveryCode)> {
         self.begin_rotation_unchecked(u, passphrase, params)
     }
 

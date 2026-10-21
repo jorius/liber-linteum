@@ -46,6 +46,10 @@
     "tooLarge": "Ese archivo es demasiado grande para pegarlo.",
     "notAText": "Este archivo no se puede abrir como texto: no es texto UTF-8 o supera los 2 MB.",
     "invalidInput": "Ese valor no es válido aquí.",
+    "locked": "Esta bóveda está bloqueada. Desbloquéala para abrirla.",
+    "wrongSecret": "Esa frase de contraseña o clave de recuperación no abre esta bóveda, o su cabecera está dañada.",
+    "rollback": "El archivo de claves de esta bóveda es más antiguo que uno que este dispositivo ya vio, así que no se abrió. Puede que alguien haya restaurado una copia antigua.",
+    "damaged": "Esta bóveda cifrada, o un archivo en ella, está dañada y no se puede leer.",
     "io": "Algo salió mal: {message}"
   },
   "toasts": {

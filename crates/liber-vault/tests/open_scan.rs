@@ -13,7 +13,9 @@ fn paths(vault: &Vault) -> Vec<String> {
 
 #[test]
 fn vlt_01_open_reads_obsidian_attachment_setting() {
-    let vault = Vault::open(&fixture_path("obsidian-basic")).unwrap();
+    // A copy: the encrypted switch seals what it opens.
+    let dir = copy_fixture("obsidian-basic");
+    let vault = Vault::open(dir.path()).unwrap();
     assert_eq!(
         vault.attachment_policy(),
         AttachmentPolicy::Subfolder("assets".into())
@@ -29,7 +31,9 @@ fn vlt_01_open_missing_folder_is_not_found() {
 
 #[test]
 fn vlt_05_scan_skips_hidden_entries_and_sorts() {
-    let vault = Vault::open(&fixture_path("obsidian-basic")).unwrap();
+    // A copy: the encrypted switch seals what it opens.
+    let dir = copy_fixture("obsidian-basic");
+    let vault = Vault::open(dir.path()).unwrap();
     let p = paths(&vault);
     assert!(
         p.iter()
@@ -44,7 +48,9 @@ fn vlt_05_scan_skips_hidden_entries_and_sorts() {
 
 #[test]
 fn vlt_05_scan_reports_kinds_and_sizes() {
-    let vault = Vault::open(&fixture_path("obsidian-basic")).unwrap();
+    // A copy: the encrypted switch seals what it opens.
+    let dir = copy_fixture("obsidian-basic");
+    let vault = Vault::open(dir.path()).unwrap();
     let scan = vault.scan().unwrap();
     let welcome = scan
         .entries
@@ -63,6 +69,10 @@ fn vlt_05_scan_reports_kinds_and_sizes() {
 
 #[test]
 fn vlt_05_exclude_globs_and_bad_config_are_handled() {
+    // No symlinks in an encrypted vault (E3).
+    if liber_testkit::plain_disk_only() {
+        return;
+    }
     let dir = copy_fixture("obsidian-basic");
     std::fs::create_dir(dir.path().join(".liber")).unwrap();
     std::fs::write(
@@ -102,6 +112,9 @@ fn vlt_05_exclude_globs_and_bad_config_are_handled() {
 /// keeps private folders out of the index) or `attachments` with it.
 #[test]
 fn m3a_a_malformed_field_in_vault_json_never_disables_the_excludes() {
+    if liber_testkit::plain_disk_only() {
+        return;
+    }
     let dir = tempfile::tempdir().unwrap();
     for page in ["Private/secret.md", "Notes/a.md"] {
         let path = dir.path().join(page);
@@ -144,6 +157,10 @@ fn m3a_a_malformed_field_in_vault_json_never_disables_the_excludes() {
 
 #[test]
 fn vlt_02_open_and_scan_write_nothing() {
+    // On the encrypted switch, opening seals the folder.
+    if liber_testkit::plain_disk_only() {
+        return;
+    }
     for name in ["obsidian-basic", "ambiguous-names", "edge-cases"] {
         let dir = copy_fixture(name);
         let before = snapshot(dir.path());
@@ -157,6 +174,10 @@ fn vlt_02_open_and_scan_write_nothing() {
 #[cfg(unix)]
 #[test]
 fn review_focus_symlinks_outside_vault_and_folder_symlinks_are_skipped() {
+    // No symlinks in an encrypted vault (E3).
+    if liber_testkit::plain_disk_only() {
+        return;
+    }
     let dir = copy_fixture("ambiguous-names");
     let outside = tempfile::tempdir().unwrap();
     std::fs::write(outside.path().join("secret.md"), "# secret").unwrap();
@@ -179,6 +200,10 @@ fn review_focus_symlinks_outside_vault_and_folder_symlinks_are_skipped() {
 
 #[test]
 fn vault_path_maps_back_from_fs() {
+    // No OS path names an entry of an encrypted vault (E3).
+    if liber_testkit::plain_disk_only() {
+        return;
+    }
     let vault = Vault::open(&fixture_path("obsidian-basic")).unwrap();
     let fs = vault
         .os_path(
@@ -191,7 +216,9 @@ fn vault_path_maps_back_from_fs() {
 
 #[test]
 fn scan_from_list_dir_and_stat() {
-    let vault = Vault::open(&fixture_path("obsidian-basic")).unwrap();
+    // A copy: the encrypted switch seals what it opens.
+    let dir = copy_fixture("obsidian-basic");
+    let vault = Vault::open(dir.path()).unwrap();
     let dir = VaultPath::new("Character Design").unwrap();
     let sub: Vec<_> = vault
         .scan_from(&dir)
@@ -240,6 +267,10 @@ fn scan_from_list_dir_and_stat() {
 #[cfg(unix)]
 #[test]
 fn vlt_01_unreadable_subfolder_is_skipped_not_fatal() {
+    // Plaintext folder permissions don't survive sealing.
+    if liber_testkit::plain_disk_only() {
+        return;
+    }
     use std::os::unix::fs::PermissionsExt;
     let dir = tempfile::tempdir().unwrap();
     std::fs::write(dir.path().join("a.md"), "# a").unwrap();
@@ -303,6 +334,10 @@ fn m5b_archive_is_scanned_stat_ed_and_served_but_other_hidden_folders_are_not() 
 #[cfg(unix)]
 #[test]
 fn e2_scan_skip_messages_keep_their_text() {
+    // No symlinks in an encrypted vault (E3).
+    if liber_testkit::plain_disk_only() {
+        return;
+    }
     use std::os::unix::fs::PermissionsExt;
     let dir = tempfile::tempdir().unwrap();
     let outside = tempfile::tempdir().unwrap();

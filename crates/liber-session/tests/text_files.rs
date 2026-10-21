@@ -53,16 +53,13 @@ fn text_names_by_extension_and_whole_name() {
 
 #[test]
 fn read_and_write_text_with_compare_and_swap() {
-    let (dir, _c, s) = session_with(&[("conf/app.json", b"{\"a\": 1}\n")]);
+    let (_dir, _c, s) = session_with(&[("conf/app.json", b"{\"a\": 1}\n")]);
     let path = vp("conf/app.json");
     let (text, hash) = s.read_text(&path).unwrap();
     assert_eq!(text, "{\"a\": 1}\n");
     let new_hash = s.write_text(&path, "{\"a\": 2}\n", hash).unwrap();
     assert_eq!(new_hash, Hash::of(b"{\"a\": 2}\n"));
-    assert_eq!(
-        std::fs::read_to_string(dir.path().join("conf/app.json")).unwrap(),
-        "{\"a\": 2}\n"
-    );
+    assert_eq!(s.read_text(&path).unwrap().0, "{\"a\": 2}\n");
     // Indexed as an attachment with the new hash, never as a page.
     let tree = s.tree().unwrap();
     let node = tree.iter().find(|n| n.path == "conf/app.json").unwrap();
@@ -120,6 +117,9 @@ fn kind_of(s: &VaultSession, path: &str) -> Option<FileKind> {
 /// `data (conflict).csv` — still a text file, never a page holding CSV.
 #[test]
 fn a_text_files_conflict_copy_keeps_its_type() {
+    if liber_testkit::plain_disk_only() {
+        return;
+    }
     let (dir, _c, s) = session_with(&[("data/data.csv", b"a,b\n"), ("Dockerfile", b"FROM x\n")]);
     let first = s
         .create_conflict_copy(&vp("data/data.csv"), "theirs 1\n")
@@ -149,13 +149,10 @@ fn a_text_files_conflict_copy_keeps_its_type() {
 /// creates a text file again (`notes.json`, not `notes.json.md`).
 #[test]
 fn create_text_file_keeps_the_name_and_refuses_taken_or_other_names() {
-    let (dir, _c, s) = session_with(&[("conf/app.json", b"{}\n")]);
+    let (_dir, _c, s) = session_with(&[("conf/app.json", b"{}\n")]);
     let made = s.create_text_file(&vp("conf"), "notes.json").unwrap();
     assert_eq!(made.as_str(), "conf/notes.json");
-    assert_eq!(
-        std::fs::read_to_string(dir.path().join("conf/notes.json")).unwrap(),
-        ""
-    );
+    assert_eq!(s.read_text(&made).unwrap().0, "");
     assert_eq!(kind_of(&s, "conf/notes.json"), Some(FileKind::Attachment));
     let (_, hash) = s.read_text(&made).unwrap();
     s.write_text(&made, "{\"kept\": true}\n", hash).unwrap();

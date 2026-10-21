@@ -46,6 +46,9 @@ fn changed(events: &Events) -> Vec<SessionEvent> {
 
 #[test]
 fn vlt_04_external_create_modify_delete_update_the_index() {
+    if liber_testkit::plain_disk_only() {
+        return;
+    }
     let (dir, _c, s, events) = watched("obsidian-basic");
     std::fs::write(
         dir.path().join("Character Design/Generator Rex.md"),
@@ -93,6 +96,9 @@ fn vlt_04_external_create_modify_delete_update_the_index() {
 
 #[test]
 fn vlt_04_external_rename_moves_rows_without_rewriting_links() {
+    if liber_testkit::plain_disk_only() {
+        return;
+    }
     let (dir, _c, s, events) = watched("obsidian-basic");
     let before = std::fs::read_to_string(dir.path().join("Character Design/rex-draft.md")).unwrap();
     std::fs::rename(
@@ -143,6 +149,9 @@ fn vlt_04_own_writes_are_not_reported_as_external_changes() {
 
 #[test]
 fn vlt_04_overflow_triggers_full_rescan() {
+    if liber_testkit::plain_disk_only() {
+        return;
+    }
     let vault = copy_fixture("ambiguous-names");
     let cache = tempfile::tempdir().unwrap();
     let events: Events = Arc::new(Mutex::new(Vec::new()));
@@ -159,6 +168,9 @@ fn vlt_04_overflow_triggers_full_rescan() {
 
 #[test]
 fn review_focus_git_checkout_like_burst_converges() {
+    if liber_testkit::plain_disk_only() {
+        return;
+    }
     let (dir, _c, s, _events) = watched("ambiguous-names");
     std::fs::create_dir(dir.path().join("Imported")).unwrap();
     for i in 0..300 {
@@ -209,6 +221,9 @@ fn target_of(s: &VaultSession, page: &str) -> Option<String> {
 /// FSEvents asks for a folder rescan) reconciles that folder's subtree.
 #[test]
 fn vlt_04_change_on_indexed_folder_reconciles_its_subtree() {
+    if liber_testkit::plain_disk_only() {
+        return;
+    }
     let (dir, _c, s) = unwatched(&[("F/a.md", "# a"), ("F/Sub/old.md", "# old")]);
     std::fs::write(dir.path().join("F/b.md"), "# b").unwrap();
     std::fs::remove_file(dir.path().join("F/Sub/old.md")).unwrap();
@@ -223,6 +238,9 @@ fn vlt_04_change_on_indexed_folder_reconciles_its_subtree() {
 /// every file that was inside it, so they can move to another candidate.
 #[test]
 fn vlt_04_removed_folder_re_resolves_links_to_its_contents() {
+    if liber_testkit::plain_disk_only() {
+        return;
+    }
     let (dir, _c, s) = unwatched(&[
         ("Projects/Note.md", "[[Plan]]"),
         ("Archive/Plan.md", "# archived plan"),
@@ -245,6 +263,10 @@ fn vlt_04_removed_folder_re_resolves_links_to_its_contents() {
 #[cfg(unix)]
 #[test]
 fn vlt_04_unreadable_new_folder_does_not_drop_the_batch() {
+    // Plaintext folder permissions don't survive sealing.
+    if liber_testkit::plain_disk_only() {
+        return;
+    }
     use std::os::unix::fs::PermissionsExt;
     let (dir, _c, s) = unwatched(&[("a.md", "# a")]);
     let locked = dir.path().join("locked");
@@ -265,6 +287,9 @@ fn vlt_04_unreadable_new_folder_does_not_drop_the_batch() {
 /// their own event, not an `Indexed` report with zero files.
 #[test]
 fn vlt_04_watcher_warnings_are_warning_events() {
+    if liber_testkit::plain_disk_only() {
+        return;
+    }
     let vault = tempfile::tempdir().unwrap();
     std::fs::write(vault.path().join("a.md"), "# a").unwrap();
     let cache = tempfile::tempdir().unwrap();
@@ -293,6 +318,9 @@ fn vlt_04_watcher_warnings_are_warning_events() {
 /// folder) take their width with them; a rename by another program keeps it.
 #[test]
 fn m4b2_pages_deleted_outside_forget_their_width() {
+    if liber_testkit::plain_disk_only() {
+        return;
+    }
     let (dir, _c, s) = unwatched(&[
         ("A.md", "# a"),
         ("F/B.md", "# b"),
@@ -323,6 +351,9 @@ fn m4b2_pages_deleted_outside_forget_their_width() {
 /// keeps it, at the new path.
 #[test]
 fn cover_heights_of_pages_deleted_outside_are_forgotten_renames_keep_them() {
+    if liber_testkit::plain_disk_only() {
+        return;
+    }
     let (dir, _c, s) = unwatched(&[
         ("A.md", "# a"),
         ("F/B.md", "# b"),
@@ -356,6 +387,9 @@ fn cover_heights_of_pages_deleted_outside_are_forgotten_renames_keep_them() {
 /// and strip width with them; a rename by another program keeps them.
 #[test]
 fn cover_sides_and_widths_of_pages_deleted_outside_are_forgotten() {
+    if liber_testkit::plain_disk_only() {
+        return;
+    }
     let (dir, _c, s) = unwatched(&[("A.md", "# a"), ("Kept.md", "# kept"), ("Moved.md", "# m")]);
     for page in ["A.md", "Kept.md", "Moved.md"] {
         s.vault().set_cover_side(page, CoverSide::Left).unwrap();
@@ -384,6 +418,9 @@ fn cover_sides_and_widths_of_pages_deleted_outside_are_forgotten() {
 /// subfolders', with it.
 #[test]
 fn m5b_folder_icons_of_folders_deleted_outside_are_forgotten() {
+    if liber_testkit::plain_disk_only() {
+        return;
+    }
     let (dir, _c, s) = unwatched(&[("Lore/A.md", "# a"), ("Kept/B.md", "# b")]);
     s.vault().set_folder_icon("Lore", Some("🐉")).unwrap();
     s.vault().set_folder_icon("Kept", Some("📌")).unwrap();
@@ -398,6 +435,9 @@ fn m5b_folder_icons_of_folders_deleted_outside_are_forgotten() {
 /// Batch 6: a text file changed outside the app is found by its new words.
 #[test]
 fn b6_an_outside_edit_to_a_text_file_reaches_search() {
+    if liber_testkit::plain_disk_only() {
+        return;
+    }
     let (dir, _c, s, _events) = watched("obsidian-basic");
     std::fs::write(dir.path().join("Game Design/notes.txt"), "labradorite\n").unwrap();
     let find = |w: &str| {
@@ -418,6 +458,9 @@ fn b6_an_outside_edit_to_a_text_file_reaches_search() {
 /// Batch 6 review M1: the same through the watcher (a rename made outside).
 #[test]
 fn b6_review_m1_an_outside_rename_rechecks_whether_a_file_is_text() {
+    if liber_testkit::plain_disk_only() {
+        return;
+    }
     let (dir, _c, s, _events) = watched("obsidian-basic");
     let find = |w: &str| {
         s.search(&liber_session::SearchQuery {

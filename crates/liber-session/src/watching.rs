@@ -51,7 +51,7 @@ impl VaultSession {
             );
             return Ok(());
         }
-        let stats = self.index().stats()?;
+        let stats = self.index()?.stats()?;
         let mut dirty: BTreeSet<VaultPath> = BTreeSet::new();
         for ev in &events {
             if let WatchEvent::Changed(p) | WatchEvent::Removed(p) = ev {
@@ -199,7 +199,7 @@ impl VaultSession {
             }
         }
 
-        let mut index = self.index();
+        let mut index = self.index()?;
         index.transaction(|tx| {
             for (from, to) in &renamed {
                 tx.rename(from, to)?;
@@ -217,7 +217,7 @@ impl VaultSession {
         })?;
         drop(index);
         self.retext_renamed(&renamed)?;
-        let mut index = self.index();
+        let mut index = self.index()?;
         let files = index.file_set()?;
         // A removed folder takes every file inside it with it: re-resolve links
         // to all of them, not just to the folder's own name (final review I5).

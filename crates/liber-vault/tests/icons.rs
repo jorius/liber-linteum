@@ -47,6 +47,10 @@ fn folder_icons_follow_renames_and_are_forgotten() {
 
 #[test]
 fn the_vault_icon_round_trips_and_is_read_without_opening() {
+    // An encrypted vault is never read without unlocking it (E3).
+    if liber_testkit::plain_disk_only() {
+        return;
+    }
     let (dir, vault) = fresh();
     vault.set_vault_icon(Some("🌌")).unwrap();
     assert_eq!(vault.vault_icon().as_deref(), Some("🌌"));

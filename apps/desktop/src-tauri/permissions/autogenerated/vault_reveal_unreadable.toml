@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-vault-reveal-unreadable"
+description = "Enables the vault_reveal_unreadable command without any pre-configured scope."
+commands.allow = ["vault_reveal_unreadable"]
+
+[[permission]]
+identifier = "deny-vault-reveal-unreadable"
+description = "Denies the vault_reveal_unreadable command without any pre-configured scope."
+commands.deny = ["vault_reveal_unreadable"]

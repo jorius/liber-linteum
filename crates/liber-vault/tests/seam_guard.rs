@@ -11,6 +11,10 @@ const ALLOWED: &[&str] = &[
     "crates/liber-testkit/",
     "apps/desktop/src-tauri/src/settings.rs",
     "apps/desktop/src-tauri/src/legacy_dirs.rs",
+    // E3's audited exceptions outside any vault: the epoch store and the
+    // per-session decrypted copies.
+    "apps/desktop/src-tauri/src/epochs.rs",
+    "apps/desktop/src-tauri/src/decrypted_copies.rs",
     "crates/liber-crypto/src/vectors.rs",
 ];
 

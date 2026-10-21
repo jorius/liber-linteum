@@ -3,6 +3,7 @@
 //! Every path crossing the trait is a [`VaultPath`], except `location`,
 //! `os_path` and `vault_path_of`, which exist to talk to the OS.
 
+pub(crate) mod encrypted;
 pub(crate) mod plain;
 mod plain_watch;
 
@@ -10,6 +11,10 @@ use crate::error::Result;
 use crate::path::VaultPath;
 use std::path::{Path, PathBuf};
 
+pub use encrypted::{
+    EncryptedStorage, HEADER_FILE, RECORDING_DIR, UnlockReport, VaultKind, is_encrypted_vault,
+    remove_new_vault, trash_header_copy, vault_kind,
+};
 pub use plain::PlainStorage;
 
 pub trait ReadSeek: std::io::Read + std::io::Seek + Send {}
@@ -103,6 +108,12 @@ pub enum RawEvent {
 ///   does, on any write or finish error).
 pub trait NewFile: std::io::Write + Send {
     fn finish(self: Box<Self>) -> Result<()>;
+    /// [`NewFile::finish`] for a recording (E3 Task 6 review I1): if it fails
+    /// (a full disk, an earlier failed write), what reached the disk stays for
+    /// salvage instead of being deleted. Only the bytes stay, never a key.
+    fn finish_or_keep(self: Box<Self>) -> Result<()> {
+        self.finish()
+    }
 }
 
 /// Keeps a [`Storage::watch`] running until dropped. Dropping it must also
@@ -146,6 +157,11 @@ pub trait Storage: Send + Sync + std::fmt::Debug {
     /// which must drop `sink` too (see [`WatchGuard`]). Lost events and
     /// changes on the vault root must reach `sink` as [`RawEvent::Overflow`].
     fn watch(&self, recursive: bool, sink: Box<dyn Fn(RawEvent) + Send>) -> Result<WatchGuard>;
+    /// The encrypted storage behind this one, for what only it has (lock,
+    /// salvage, unreadable entries): `None` for every other storage.
+    fn as_encrypted(&self) -> Option<&EncryptedStorage> {
+        None
+    }
 }
 
 /// The storage `Vault::open` uses: `PlainStorage`, unless built with
@@ -156,17 +172,111 @@ pub(crate) fn open_storage(root: &Path) -> Result<Box<dyn Storage>> {
     if let Ok(name) = std::env::var("LIBER_TEST_STORAGE") {
         return storage_named(&name, root);
     }
-    Ok(Box::new(PlainStorage::open(root)?))
+    open_plain(root).map(|s| Box::new(s) as Box<dyn Storage>)
+}
+
+/// `PlainStorage`; an encrypted vault opens only by unlocking it (E4's Unlock
+/// screen), and a damaged one never opens as plain.
+fn open_plain(root: &Path) -> Result<PlainStorage> {
+    use crate::error::VaultError;
+    match vault_kind(root) {
+        VaultKind::Plain => PlainStorage::open(root),
+        VaultKind::Encrypted => Err(VaultError::Locked),
+        VaultKind::Damaged(why) => Err(VaultError::Damaged(format!("{}: {why}", root.display()))),
+    }
 }
 
 #[cfg(any(test, feature = "test-storage"))]
 fn storage_named(name: &str, root: &Path) -> Result<Box<dyn Storage>> {
-    let plain = PlainStorage::open(root)?;
     Ok(match name {
-        "plain" => Box::new(plain),
-        "pass-through" => Box::new(PassThrough(plain)),
-        other => panic!("LIBER_TEST_STORAGE={other:?}: expected \"plain\" or \"pass-through\""),
+        "plain" => Box::new(open_plain(root)?),
+        "pass-through" => Box::new(PassThrough(open_plain(root)?)),
+        #[cfg(feature = "test-params")]
+        "encrypted" => Box::new(seal_in_place(root)?),
+        #[cfg(not(feature = "test-params"))]
+        "encrypted" => panic!("LIBER_TEST_STORAGE=encrypted needs liber-vault/test-params"),
+        other => panic!(
+            "LIBER_TEST_STORAGE={other:?}: expected \"plain\", \"pass-through\" or \"encrypted\""
+        ),
     })
+}
+
+/// The passphrase of every vault [`seal_in_place`] makes.
+#[cfg(feature = "test-params")]
+pub const TEST_PASSPHRASE: &str = "liber-test-passphrase";
+
+/// The `encrypted` test switch (E3, tests only): unlocks `root` if it is sealed
+/// already; else moves the plaintext tree under it into a fresh encrypted vault
+/// there ([`TEST_PASSPHRASE`], tiny Argon2 parameters) and unlocks that.
+/// Symlinks and non-UTF-8 names are left out: an encrypted vault has neither.
+/// Only under the system temp folder, so a committed fixture is never sealed.
+#[cfg(feature = "test-params")]
+pub fn seal_in_place(root: &Path) -> Result<EncryptedStorage> {
+    use crate::error::io_err;
+    use liber_crypto::{Argon2Params, FolderId, Unlock};
+    match vault_kind(root) {
+        VaultKind::Encrypted => {
+            return Ok(EncryptedStorage::unlock(root, Unlock::Passphrase(TEST_PASSPHRASE))?.0);
+        }
+        VaultKind::Damaged(why) => {
+            return Err(crate::error::VaultError::Damaged(format!(
+                "{}: {why}",
+                root.display()
+            )));
+        }
+        VaultKind::Plain => {}
+    }
+    let canon = plain::canonical_root(root)?;
+    let temp = plain::canonical_root(&std::env::temp_dir())?;
+    assert!(
+        canon.starts_with(&temp),
+        "seal_in_place: {} is outside the temp folder",
+        canon.display()
+    );
+    let hex: String = FolderId::random()
+        .0
+        .iter()
+        .map(|b| format!("{b:02x}"))
+        .collect();
+    let staging = temp.join(format!(".liber-seal-{hex}"));
+    let err = |p: &Path, e| io_err(p.display().to_string(), e);
+    std::fs::create_dir(&staging).map_err(|e| err(&staging, e))?;
+    for item in std::fs::read_dir(&canon).map_err(|e| err(&canon, e))? {
+        let name = item.map_err(|e| err(&canon, e))?.file_name();
+        std::fs::rename(canon.join(&name), staging.join(&name)).map_err(|e| err(&canon, e))?;
+    }
+    let tiny = Argon2Params {
+        m_kib: 64,
+        t: 1,
+        p: 1,
+    };
+    let (storage, _) = EncryptedStorage::create_insecure(&canon, TEST_PASSPHRASE, tiny)?;
+    copy_in(&storage, &staging, &VaultPath::root())?;
+    std::fs::remove_dir_all(&staging).map_err(|e| err(&staging, e))?;
+    Ok(storage)
+}
+
+/// Writes the plaintext tree `from` into `to` at `at`.
+#[cfg(feature = "test-params")]
+fn copy_in(to: &EncryptedStorage, from: &Path, at: &VaultPath) -> Result<()> {
+    use crate::error::io_err;
+    let err = |e| io_err(from.display().to_string(), e);
+    for item in std::fs::read_dir(from).map_err(err)? {
+        let item = item.map_err(err)?;
+        let Ok(name) = item.file_name().into_string() else {
+            continue;
+        };
+        let path = at.join(&name)?;
+        let kind = item.file_type().map_err(err)?;
+        if kind.is_dir() {
+            to.create_dir(&path)?;
+            copy_in(to, &item.path(), &path)?;
+        } else if kind.is_file() {
+            let mut file = std::fs::File::open(item.path()).map_err(err)?;
+            to.replace_atomic(&path, &mut file, Replace::CreateOnly)?;
+        }
+    }
+    Ok(())
 }
 
 /// A second `Storage` for the test switch: every method delegates to
@@ -255,6 +365,24 @@ mod tests {
         assert_eq!(storage_named("plain", dir.path()).unwrap().name(), "plain");
         let want = std::env::var("LIBER_TEST_STORAGE").unwrap_or_else(|_| "plain".into());
         assert_eq!(Vault::open(dir.path()).unwrap().storage_name(), want);
+    }
+
+    #[cfg(feature = "test-params")]
+    #[test]
+    fn test_switch_seals_in_place() {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::create_dir(dir.path().join("F")).unwrap();
+        std::fs::write(dir.path().join("F/n.md"), "hello").unwrap();
+        let note = VaultPath::new("F/n.md").unwrap();
+        let s = storage_named("encrypted", dir.path()).unwrap();
+        assert_eq!(s.name(), "encrypted");
+        assert_eq!(s.read(&note).unwrap(), b"hello");
+        drop(s);
+        assert!(!dir.path().join("F").exists(), "no plaintext left");
+        let plain = storage_named("plain", dir.path()).unwrap_err();
+        assert!(matches!(plain, crate::VaultError::Locked), "{plain:?}");
+        let again = storage_named("encrypted", dir.path()).unwrap();
+        assert_eq!(again.read(&note).unwrap(), b"hello");
     }
 
     #[test]

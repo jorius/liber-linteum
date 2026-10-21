@@ -215,7 +215,7 @@ impl VaultSession {
         self.vault.create_dir_all(&bin)?;
         let dest = self.free_path(&bin, path.file_name(), self.is_dir(path))?;
         let keys: Vec<String> = self
-            .index()
+            .index()?
             .file_set()?
             .iter()
             .filter(|p| VaultPath::new(p).is_ok_and(|vp| vp.starts_with(path)))
@@ -226,7 +226,7 @@ impl VaultSession {
             self.forget_record(Bin::Trash, &dest);
             return Err(e.into());
         }
-        let mut index = self.index();
+        let mut index = self.index()?;
         index.transaction(|tx| tx.remove(path.as_str()))?;
         let files = index.file_set()?;
         index.resolve_affected(&files, &keys)?;
@@ -421,7 +421,7 @@ impl VaultSession {
     /// there some other way (from where their path says).
     pub fn archive_list(&self) -> Result<Vec<BinItem>> {
         let records = self.vault.bin_records(Bin::Archive);
-        let stats = self.index().stats()?;
+        let stats = self.index()?.stats()?;
         let mut items: Vec<BinItem> = Vec::new();
         for (path, r) in &records {
             if let Some(stat) = stats.get(path) {
@@ -492,7 +492,9 @@ impl VaultSession {
             if self.vault.remove_empty_dir(&d).is_err() {
                 return;
             }
-            let _ = self.index().transaction(|tx| tx.remove(d.as_str()));
+            if let Ok(mut index) = self.index() {
+                let _ = index.transaction(|tx| tx.remove(d.as_str()));
+            }
             dir = d.parent();
         }
     }
@@ -551,6 +553,25 @@ mod tests {
         root.join(p).exists()
     }
 
+    /// Through the vault, so the test runs on the encrypted switch too.
+    fn in_vault(f: &Fx, p: &str) -> bool {
+        f.s.vault()
+            .meta(&vp(p), liber_vault::Follow::No)
+            .unwrap()
+            .is_some()
+    }
+
+    fn read(f: &Fx, p: &str) -> String {
+        f.s.vault().read_to_string(&vp(p)).unwrap().0
+    }
+
+    /// A file made behind the session's back (sync, another app).
+    fn put(f: &Fx, p: &str, text: &str) {
+        f.s.vault()
+            .write_cas(&vp(p), text.as_bytes(), None)
+            .unwrap();
+    }
+
     fn backlinks(s: &VaultSession, p: &str) -> usize {
         s.backlinks(&vp(p)).unwrap().len()
     }
@@ -605,7 +626,7 @@ mod tests {
 
         let inner = f.s.trash(&vp("P/B.md")).unwrap();
         assert_eq!(inner.as_str(), ".trash/B.md");
-        assert!(exists(&f.root, ".trash/B.md") && !exists(&f.root, "P/B.md"));
+        assert!(in_vault(&f, ".trash/B.md") && !in_vault(&f, "P/B.md"));
         assert!(f.s.page(&vp("P/B.md")).unwrap().is_none());
         let items = f.s.trash_list().unwrap();
         assert_eq!(items.len(), 1);
@@ -614,10 +635,10 @@ mod tests {
         assert!(!items[0].folder);
 
         // The folder it came from is gone too: restore recreates it.
-        std::fs::remove_dir(f.root.join("P")).unwrap();
+        f.s.vault().remove_empty_dir(&vp("P")).unwrap();
         let back = f.s.trash_restore(&inner, false).unwrap();
         assert_eq!(back.as_str(), "P/B.md");
-        assert!(exists(&f.root, "P/B.md") && !exists(&f.root, ".trash/B.md"));
+        assert!(in_vault(&f, "P/B.md") && !in_vault(&f, ".trash/B.md"));
         assert!(f.s.page(&vp("P/B.md")).unwrap().is_some(), "indexed again");
         assert_eq!(backlinks(&f.s, "P/B.md"), 1, "links resolve again");
         assert!(f.s.trash_list().unwrap().is_empty());
@@ -632,12 +653,12 @@ mod tests {
         assert_eq!(f.s.trash(&vp("a.md")).unwrap().as_str(), ".trash/a.md");
         assert_eq!(f.s.trash(&vp("F/a.md")).unwrap().as_str(), ".trash/a 1.md");
         assert_eq!(f.s.trash(&vp("Dir")).unwrap().as_str(), ".trash/Dir");
-        std::fs::create_dir(f.root.join("Dir")).unwrap();
-        std::fs::write(f.root.join("Dir/x.md"), "new").unwrap();
+        f.s.vault().create_dir(&vp("Dir")).unwrap();
+        put(&f, "Dir/x.md", "new");
         assert_eq!(f.s.trash(&vp("Dir")).unwrap().as_str(), ".trash/Dir 1");
 
         // Something new took the old place: refused, unless both are kept.
-        std::fs::write(f.root.join("a.md"), "newer").unwrap();
+        put(&f, "a.md", "newer");
         let err = f.s.trash_restore(&vp(".trash/a.md"), false).unwrap_err();
         assert!(
             matches!(
@@ -648,15 +669,15 @@ mod tests {
         );
         let kept = f.s.trash_restore(&vp(".trash/a.md"), true).unwrap();
         assert_eq!(kept.as_str(), "a 1.md");
-        assert_eq!(
-            std::fs::read_to_string(f.root.join("a.md")).unwrap(),
-            "newer"
-        );
-        assert_eq!(std::fs::read_to_string(f.root.join("a 1.md")).unwrap(), "1");
+        assert_eq!(read(&f, "a.md"), "newer");
+        assert_eq!(read(&f, "a 1.md"), "1");
     }
 
     #[test]
     fn m5b_the_list_shows_unrecorded_items_and_drops_stale_records() {
+        if liber_testkit::plain_disk_only() {
+            return;
+        }
         let f = fx(&[(".trash/obsidian.md", "from Obsidian"), ("a.md", "x")]);
         let inner = f.s.trash(&vp("a.md")).unwrap();
         // Deleted from .trash outside the app: its record is stale.
@@ -683,6 +704,9 @@ mod tests {
 
     #[test]
     fn m5b_the_scratch_folder_hidden_paths_and_the_bins_themselves_are_refused() {
+        if liber_testkit::plain_disk_only() {
+            return;
+        }
         let f = fx(&[
             ("Scratchpad/q.md", "q"),
             (".archive/x.md", "x"),
@@ -714,6 +738,9 @@ mod tests {
 
     #[test]
     fn m5b_deleting_from_the_trash_goes_through_the_os_call_and_forgets_it() {
+        if liber_testkit::plain_disk_only() {
+            return;
+        }
         let f = fx(&[("a.md", "a"), ("b.md", "b")]);
         f.s.vault()
             .set_page_width("a.md", Some(PageWidth::Full))
@@ -731,6 +758,9 @@ mod tests {
 
     #[test]
     fn m5b_r2_review_m13_deleting_skips_an_item_already_gone() {
+        if liber_testkit::plain_disk_only() {
+            return;
+        }
         let f = fx(&[("a.md", "a"), ("b.md", "b")]);
         let a = f.s.trash(&vp("a.md")).unwrap();
         let b = f.s.trash(&vp("b.md")).unwrap();
@@ -752,6 +782,9 @@ mod tests {
 
     #[test]
     fn m5b_archive_keeps_links_working_and_hides_it_from_the_tree_and_global_view() {
+        if liber_testkit::plain_disk_only() {
+            return;
+        }
         let f = fx(&[
             ("P/Old.md", "# Old"),
             ("A.md", "see [[Old]] and [[P/Old]]"),
@@ -810,7 +843,7 @@ mod tests {
         let items = f.s.archive_list().unwrap();
         assert_eq!(items.len(), 1, "{items:?}");
         assert!(items[0].folder);
-        std::fs::create_dir(f.root.join("Camp")).unwrap();
+        f.s.vault().create_dir(&vp("Camp")).unwrap();
         let err =
             f.s.unarchive(&vp(".archive/Camp"), false, true)
                 .unwrap_err();
@@ -819,12 +852,15 @@ mod tests {
             "{err:?}"
         );
         f.s.unarchive(&vp(".archive/Camp"), true, true).unwrap();
-        assert!(exists(&f.root, "Camp 1/a.md"));
+        assert!(in_vault(&f, "Camp 1/a.md"));
         assert!(f.s.page(&vp("Camp 1/b.md")).unwrap().is_some());
     }
 
     #[test]
     fn m5b_files_put_in_the_archive_by_hand_are_listed() {
+        if liber_testkit::plain_disk_only() {
+            return;
+        }
         let f = fx(&[(".archive/Notes/x.md", "x")]);
         let items = f.s.archive_list().unwrap();
         assert_eq!(items.len(), 1);
@@ -837,6 +873,9 @@ mod tests {
 
     #[test]
     fn m5b_review_i1_a_record_never_restores_into_a_hidden_folder() {
+        if liber_testkit::plain_disk_only() {
+            return;
+        }
         let f = fx(&[
             (".trash/post-checkout", "#!/bin/sh"),
             (".archive/x.md", "x"),
@@ -876,6 +915,10 @@ mod tests {
     #[cfg(unix)]
     #[test]
     fn m5b_review_i2_a_bin_that_is_a_symlink_is_refused() {
+        // No symlinks in an encrypted vault (E3).
+        if liber_testkit::plain_disk_only() {
+            return;
+        }
         let f = fx(&[("Notes/a.md", "a"), ("b.md", "b")]);
         std::os::unix::fs::symlink(".", f.root.join(".trash")).unwrap();
         assert!(f.s.trash_list().is_err());
@@ -889,6 +932,9 @@ mod tests {
 
     #[test]
     fn m5b_review_m1_a_live_page_wins_a_name_over_an_archived_one() {
+        if liber_testkit::plain_disk_only() {
+            return;
+        }
         // `.archive/Old.md` and `Q/Old.md` tie on depth, and `.` sorts first.
         let f = fx(&[
             ("Old.md", "# Old"),
@@ -910,6 +956,9 @@ mod tests {
 
     #[test]
     fn m5b_review_m2_restoring_under_what_is_now_a_file_goes_to_the_root() {
+        if liber_testkit::plain_disk_only() {
+            return;
+        }
         let f = fx(&[("P/a.md", "a")]);
         let inner = f.s.trash(&vp("P/a.md")).unwrap();
         std::fs::remove_dir(f.root.join("P")).unwrap();
@@ -924,6 +973,9 @@ mod tests {
 
     #[test]
     fn m5b_review_m6_deleting_from_the_trash_forgets_positions_and_picks() {
+        if liber_testkit::plain_disk_only() {
+            return;
+        }
         let f = fx(&[("F/a.md", "a"), ("F/b.md", "b")]);
         let at = liber_vault::CardPosition { x: 1.0, y: 2.0 };
         f.s.vault()
@@ -941,6 +993,9 @@ mod tests {
 
     #[test]
     fn m5b_favorites_follow_trash_restore_archive_and_are_forgotten_on_delete() {
+        if liber_testkit::plain_disk_only() {
+            return;
+        }
         let f = fx(&[("a.md", "a"), ("F/b.md", "b"), ("c.md", "c")]);
         let v = f.s.vault();
         v.set_favorites(&["a.md".into(), "F".into(), "c.md".into()])
@@ -973,6 +1028,10 @@ mod tests {
     #[cfg(unix)]
     #[test]
     fn a_restore_through_a_parent_linked_outside_is_refused() {
+        // No symlinks in an encrypted vault (E3).
+        if liber_testkit::plain_disk_only() {
+            return;
+        }
         let f = fx(&[("sub/a.md", "a")]);
         let inner = f.s.trash(&vp("sub/a.md")).unwrap();
         let outside = tempfile::tempdir().unwrap();

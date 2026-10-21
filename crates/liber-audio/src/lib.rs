@@ -1,17 +1,20 @@
 //! Microphone capture and WAV encoding for audio clips (M6).
 //!
 //! No Tauri here: the desktop app runs [`record`] on a thread of its own with
-//! [`CpalHost`]; tests use [`SyntheticHost`] and never open a microphone.
+//! [`CpalHost`]; tests use [`SyntheticHost`] and never open a microphone. An
+//! encrypted vault records with [`record_stream`], which never seeks.
 
 mod cpal_host;
 mod host;
 mod level;
 mod record;
+mod stream_wav;
 
 pub use cpal_host::CpalHost;
 pub use host::{Device, Ended, Host, SYNTHETIC_DEVICE, Sink, StreamFormat, SyntheticHost};
 pub use level::{Level, level};
 pub use record::{MAX_DATA_BYTES, Take, record, record_with};
+pub use stream_wav::{FixedWav, fix_wav_sizes, fixed_wav, record_stream};
 
 use serde::{Deserialize, Serialize};
 

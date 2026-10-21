@@ -339,18 +339,30 @@ pub struct Salvaged {
 
 /// Decrypts consecutive chunks until one fails or the input ends (spec §4.2, recordings).
 pub fn salvage<'k, R: Read>(
-    mut inner: R,
+    inner: R,
     key_for_epoch: impl Fn(u32) -> Option<&'k Secret<32>>,
 ) -> Result<Salvaged> {
+    let mut plaintext = Zeroizing::new(Vec::new());
+    let complete = salvage_to(inner, key_for_epoch, &mut ZeroingVec(&mut plaintext))?;
+    Ok(Salvaged {
+        plaintext,
+        complete,
+    })
+}
+
+/// [`salvage`] streamed: each authenticated chunk goes to `out` as it is
+/// decrypted, so a long recording never sits whole in memory. Returns
+/// whether a valid last-flagged chunk ended the stream.
+pub fn salvage_to<'k, R: Read, W: Write + ?Sized>(
+    mut inner: R,
+    key_for_epoch: impl Fn(u32) -> Option<&'k Secret<32>>,
+    out: &mut W,
+) -> Result<bool> {
     let mut head = [0u8; HEADER_LEN];
     read_full(&mut inner, &mut head)?;
     let h = parse_header(&head)?;
     let key = key_for_epoch(h.epoch).ok_or(CryptoError::Authentication)?;
     let cipher = file_cipher(key, &h.salt);
-    let mut out = Salvaged {
-        plaintext: Zeroizing::new(Vec::new()),
-        complete: false,
-    };
     let mut buf = Zeroizing::new(vec![0u8; SEG as usize]);
     for i in 0u64.. {
         buf.resize(SEG as usize, 0);
@@ -360,17 +372,30 @@ pub fn salvage<'k, R: Read>(
         }
         buf.truncate(n);
         if open_chunk(&cipher, &h.bytes, i, false, &mut buf).is_ok() {
-            append(&mut out.plaintext, &buf);
+            out.write_all(&buf)?;
             continue;
         }
         if open_chunk(&cipher, &h.bytes, i, true, &mut buf).is_ok() {
-            append(&mut out.plaintext, &buf);
+            out.write_all(&buf)?;
             // Complete only if nothing follows the last chunk.
-            out.complete = read_up_to(&mut inner, &mut [0u8; 1])? == 0;
+            return Ok(read_up_to(&mut inner, &mut [0u8; 1])? == 0);
         }
         break;
     }
-    Ok(out)
+    Ok(false)
+}
+
+/// Appends to a zeroizing buffer through [`append`].
+struct ZeroingVec<'a>(&'a mut Zeroizing<Vec<u8>>);
+
+impl Write for ZeroingVec<'_> {
+    fn write(&mut self, data: &[u8]) -> io::Result<usize> {
+        append(self.0, data);
+        Ok(data.len())
+    }
+    fn flush(&mut self) -> io::Result<()> {
+        Ok(())
+    }
 }
 
 /// Reads until `buf` is full or the input ends; returns the bytes read.
@@ -706,6 +731,40 @@ mod tests {
             salvage(&out[..], |_| None).map(|_| ()),
             Err(CryptoError::Authentication)
         ));
+    }
+
+    /// E3 Task 6 review I2: salvage streams chunk by chunk into a writer, so a
+    /// 4 GB take never sits whole in memory; same bytes and flag as `salvage`.
+    #[test]
+    fn salvage_to_streams_what_salvage_returns() {
+        struct Chunks(Vec<usize>, Vec<u8>);
+        impl Write for Chunks {
+            fn write(&mut self, b: &[u8]) -> io::Result<usize> {
+                self.0.push(b.len());
+                self.1.extend_from_slice(b);
+                Ok(b.len())
+            }
+            fn flush(&mut self) -> io::Result<()> {
+                Ok(())
+            }
+        }
+        let key = Secret::random();
+        let pt = plaintext(3 * CHUNK_LEN + 7);
+        let ct = encrypt(&key, 4, &pt);
+        for cut in [ct.len(), ct.len() - 100, HEADER_LEN] {
+            let mut out = Chunks(Vec::new(), Vec::new());
+            let complete = salvage_to(&ct[..cut], |e| (e == 4).then_some(&key), &mut out).unwrap();
+            let s = salvage(&ct[..cut], |e| (e == 4).then_some(&key)).unwrap();
+            assert_eq!(out.1, *s.plaintext, "cut {cut}");
+            assert_eq!(complete, s.complete, "cut {cut}");
+            assert!(out.0.iter().all(|&n| n <= CHUNK_LEN), "one chunk at a time");
+        }
+        let mut full = [0u8; 10];
+        let err = salvage_to(&ct[..], |e| (e == 4).then_some(&key), &mut &mut full[..]);
+        assert!(
+            matches!(err, Err(CryptoError::Io(_))),
+            "a writer error stops it"
+        );
     }
 
     #[test]

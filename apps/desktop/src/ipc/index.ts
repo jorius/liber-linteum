@@ -38,6 +38,14 @@ export type ErrorKind =
   | 'tooLarge'
   | 'notAText'
   | 'invalidInput'
+  /** E3: the vault is encrypted and locked; unlock it first. */
+  | 'locked'
+  /** E3: the passphrase or recovery code opens no slot (or the header is damaged). */
+  | 'wrongSecret'
+  /** E3: an old header was put back (lower key epoch than this device has seen). */
+  | 'rollback'
+  /** E3: an encrypted vault, or a file in it, that can't be read. */
+  | 'damaged'
   | 'io';
 
 export interface CommandError {
@@ -97,6 +105,14 @@ export interface VaultInfo {
   scratchpad?: boolean;
   /** The vault's emoji (M5b §4). */
   icon?: string;
+  /** E3: an encrypted vault, unlocked. */
+  encrypted?: boolean;
+  /** E3: the unlock's header merge voided the recovery code this device
+   *  showed; offer a new one (`security_new_recovery`). */
+  recoveryVoid?: boolean;
+  /** E3: clips `vault_unlock` recovered from takes a lock or a crash left
+   *  (`…-recovered.wav`); announce them as the recorder does at Start. */
+  recovered?: Attached[];
 }
 
 export type NodeKind = 'page' | 'folder' | 'attachment';
@@ -144,8 +160,10 @@ export interface RecentVault {
   missing: boolean;
   /** The global Scratchpad (M4c §2): shown as "Quick notes". */
   scratchpad?: boolean;
-  /** The vault's emoji (M5b §4). */
+  /** The vault's emoji (M5b §4); never for an encrypted vault. */
   icon?: string;
+  /** E3: an encrypted vault (shown with a lock; opens by unlocking). */
+  encrypted?: boolean;
 }
 
 export type EditorMode = 'livePreview' | 'source' | 'split';
@@ -215,6 +233,9 @@ export interface Settings {
   sidebarCollapsed: boolean;
   /** The sidebar's width in px (round 3 §2.1), 200–560; 270 by default. */
   sidebarWidth: number;
+  /** E3: idle minutes before an encrypted vault locks, 1–60; `null` = never;
+   *  15 by default. */
+  autoLockMinutes?: number | null;
   /** Where the floating Edit / Global View / Search button sits (M5b §2.2). */
   actionButton: ActionButtonPlace;
   /** Spell checking in the editor (spell checking spec §4). */
@@ -278,12 +299,62 @@ export interface SettingsPatch {
   autoSave?: boolean;
   sidebarCollapsed?: boolean;
   sidebarWidth?: number;
+  /** 1–60, or `null` for never. */
+  autoLockMinutes?: number | null;
   actionButton?: ActionButtonPlace;
   spellcheck?: boolean;
   spellDictionaries?: string[];
   customThemes?: CustomTheme[];
   /** `''` clears it. */
   customTheme?: string;
+}
+
+// ---- E3: encrypted vaults (the E3 → E4 contract; E4 adds the calls) ----
+//
+// vault_create_encrypted { path, passphrase } → CreatedEncryptedVault
+//   (a create that fails after the vault was made is undone: nothing is left)
+// vault_unlock { path, secret: UnlockSecret } → VaultInfo
+//   `info.recovered`: clips saved from takes a lock or a crash left in this
+//   vault; show the same toast as the recorder's announceRecovered.
+// vault_lock {} → void, and `vault:locked` (VaultLockedPayload) to main;
+//   `notPermitted` when the open vault is plain (it never locks)
+// security_change_passphrase { current, next } → void
+// security_new_recovery { passphrase } → string (the new code, shown once);
+//   `conflict` when another device's new code on disk won the merge (none shown)
+// vault_unreadable {} → UnreadableEntry[]
+// vault_reveal_unreadable { osPath } → void
+// attachment_open_decrypted { path } → void (a decrypted copy, wiped on lock);
+//   `notPermitted` on a plain vault (use file_open_external)
+// security_reset_rollback_memory {} → void
+//   When create/unlock fail with `damaged` naming vault-epochs.json, this
+//   device's rollback memory is damaged and every encrypted vault stays closed.
+//   After the user confirms ("you lose protection against an old header being
+//   put back"), this moves the file aside (vault-epochs.json.damaged-<secs>).
+//   `notPermitted` when the memory isn't damaged.
+
+export interface UnlockSecret {
+  kind: 'passphrase' | 'recovery';
+  value: string;
+}
+
+export interface CreatedEncryptedVault {
+  info: VaultInfo;
+  /** `LIBER-` + 14 groups of 4: shown once. */
+  recovery: string;
+}
+
+export interface UnreadableEntry {
+  osPath: string;
+  reason: string;
+}
+
+export interface VaultLockedPayload {
+  path: string;
+}
+
+/** `vault:lock-request` (E3 Task 7). */
+export interface VaultLockRequestPayload {
+  reason: 'sleep' | 'screenLock';
 }
 
 export interface SettingsResponse {

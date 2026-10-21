@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-vault-create-encrypted"
+description = "Enables the vault_create_encrypted command without any pre-configured scope."
+commands.allow = ["vault_create_encrypted"]
+
+[[permission]]
+identifier = "deny-vault-create-encrypted"
+description = "Denies the vault_create_encrypted command without any pre-configured scope."
+commands.deny = ["vault_create_encrypted"]

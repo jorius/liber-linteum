@@ -38,6 +38,17 @@ Who owns what:
 - **Moving or renaming a vault folder** changes its canonical path, so it gets a fresh database (a full re-index) and the old one is left behind. **Orphaned databases are never cleaned up** (not handled).
 - **A safe reset:** quit the app and delete the vault's `<hash>` folder, or the whole `liber/` folder. The next open rebuilds it.
 
+### 1a. Encrypted vaults: the index lives in memory (E3)
+
+An encrypted vault's index is **never on disk** (encryption spec §5.1). `VaultSession::open_encrypted(storage, sink)` (`crates/liber-session/src/session.rs`) opens `Index::open_in_memory()` (`:memory:`) instead of a file under the cache dir, then runs the same `reindex_all` as a plain vault. Nothing is written under `<app cache dir>/liber/` for it.
+
+- **Same schema, same pragmas.** `temp_store = MEMORY` keeps search's temp tables in RAM, and a `:memory:` database's journal is in memory too, so SQLite writes no temp file. `PRAGMA database_list` reports an empty file name (`VaultSession::index_file()` returns `""`; `encrypted_session_indexes_in_memory_only` asserts it).
+- **Every unlock is a full index.** There is nothing to diff against, so the first open after each unlock parses every page. On the 10,000-note reference vault, unlock to the first successful search takes **1.75 s** in release (budget 3 s, spec §10; `crates/liber-session/tests/encrypted_perf.rs`, 2026-10-20, on Jose's Mac while other builds ran), measured warm: right after sealing, with the ciphertext in the OS file cache. A cold-cache unlock (after a reboot, or after sync brought the files) is slower. The breakdown: about 1.71 s of indexing, 34 ms for the first search, and well under 1 ms of unlock with the test's tiny Argon2 parameters. The real Argon2id run (calibrated per device by `Argon2Params::calibrate()`) comes on top, by design. If this ever exceeds 3 s, phase E3b adds an encrypted snapshot (spec §5.1).
+- **Lock drops it.** `VaultSession::lock()` stops the watcher, locks the storage and sets the session's index to `None` under the index mutex, which frees the whole database. Every index-backed call after that returns `VaultError::Locked`, so a watcher batch or a save that read before the lock can't write rows after it. Unlocking builds a fresh session.
+- **Residual.** The decrypted rows live in the process's memory while the vault is unlocked. The OS may page that memory to swap or include it in a crash dump; that is outside what the app controls.
+
+The canary test `apps/desktop/src-tauri/tests/encrypted_canary.rs` byte-scans the cache dir after a lock and finds nothing.
+
 ## 2. SQLite setup
 
 - **Library:** `rusqlite 0.40` with the `bundled` feature (`Cargo.toml:23`). SQLite is compiled in, FTS5 included, so the system's SQLite version never matters.
@@ -372,12 +383,19 @@ NFR-03, on a generated 10,000-note vault (`liber_testkit::generate_vault`, `Vaul
 | Re-index one changed page < 100 ms | same test | 20.9 ms |
 | A 200-card Global View level and its edges < 100 ms | `nfr_03_a_200_card_level_and_its_edges_in_under_100_ms` (`crates/liber-session/tests/global_view.rs:403`) | |
 | An outside move of 1,000 pinned notes writes the layout once | `m3a_an_external_move_of_1000_pinned_notes_writes_the_layout_once` (`global_view.rs:517`) | |
+| Encrypted vault: unlock to the first search ≤ 3 s, excluding Argon2id (encryption spec §10) | `unlock_to_searchable_10k` (`crates/liber-session/tests/encrypted_perf.rs`) | 1.75 s warm (§1a) |
 
 They are `#[ignore]`d. Run them in release:
 
 ```sh
 cargo test --release -p liber-session --test search -- --ignored --nocapture
 cargo test --release -p liber-session --test global_view -- --ignored
+```
+
+The encrypted one is opt-in through an environment variable instead (it seals a 10k vault first, about 90 s):
+
+```sh
+LIBER_PERF=1 cargo test --release -p liber-session --test encrypted_perf -- --nocapture
 ```
 
 There is no nightly benchmark job yet (architecture §9.2 planned one for M8).

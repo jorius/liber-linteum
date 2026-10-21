@@ -115,6 +115,16 @@ const COMMANDS: &[&str] = &[
     "spell_remove_word",
     "spell_vault_get",
     "spell_vault_set",
+    // E3: encrypted vaults (main window only).
+    "vault_create_encrypted",
+    "vault_unlock",
+    "vault_lock",
+    "security_change_passphrase",
+    "security_new_recovery",
+    "vault_unreadable",
+    "vault_reveal_unreadable",
+    "attachment_open_decrypted",
+    "security_reset_rollback_memory",
 ];
 
 fn main() {
