@@ -1,12 +1,12 @@
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { clearMocks } from '../../ipc/testing';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { clearMocks, mockIPC } from '../../ipc/testing';
 import { resetEditorStore } from '../../stores/editorStore';
 import { usePageStore } from '../../stores/pageStore';
 import { resetVaultStore, useVaultStore } from '../../stores/vaultStore';
 import { fakeDisk } from '../../test/fakeDisk';
-import { CreatePageDialog, createTarget } from './LinkDialogs';
+import { CreatePageDialog, createTarget, OpenFileDialog } from './LinkDialogs';
 
 function disk(folders: string[] = []) {
   const made: string[] = [];
@@ -132,5 +132,46 @@ describe('CreatePageDialog (M2c §7.6)', () => {
     expect(screen.getByRole('alert')).toHaveTextContent('“Bad:Name” can’t be used as a name');
     expect(screen.getByRole('button', { name: 'Create page' })).toBeDisabled();
     expect(d.calls.some(([c]) => c.startsWith('entry_create'))).toBe(false);
+  });
+});
+
+describe('OpenFileDialog in an encrypted vault (E4 §6.4)', () => {
+  const setup = (encrypted: boolean) => {
+    const calls: string[] = [];
+    mockIPC((cmd) => {
+      calls.push(cmd);
+      return null;
+    });
+    useVaultStore.setState({
+      info: { name: 'V', root: '/v', encrypted, report: {} as never },
+    });
+    const onClose = vi.fn();
+    render(<OpenFileDialog path="assets/a.pdf" onClose={onClose} />);
+    return { calls, onClose };
+  };
+
+  it('asks first, and Cancel calls nothing', async () => {
+    const { calls, onClose } = setup(true);
+    expect(
+      screen.getByText(
+        'A decrypted copy will be written to a temporary folder until the vault locks.',
+      ),
+    ).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+    expect(onClose).toHaveBeenCalled();
+    expect(calls).toEqual([]);
+  });
+
+  it('Open copy decrypts to a temporary copy', async () => {
+    const { calls } = setup(true);
+    await userEvent.click(screen.getByRole('button', { name: 'Open copy' }));
+    await waitFor(() => expect(calls).toEqual(['attachment_open_decrypted']));
+  });
+
+  it('a plain vault has no decrypted-copy text and opens as before', async () => {
+    const { calls } = setup(false);
+    expect(screen.queryByText(/decrypted copy/)).toBeNull();
+    await userEvent.click(screen.getByRole('button', { name: 'Open' }));
+    await waitFor(() => expect(calls).toEqual(['file_open_external']));
   });
 });

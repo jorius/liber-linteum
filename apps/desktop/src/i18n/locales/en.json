@@ -308,6 +308,8 @@
     "openFile": {
       "title": "Open “{name}” in its default app?",
       "confirm": "Open",
+      "decryptedCopy": "A decrypted copy will be written to a temporary folder until the vault locks.",
+      "openCopy": "Open copy",
       "network": "Opening it connects to “{server}”."
     },
     "createPage": {

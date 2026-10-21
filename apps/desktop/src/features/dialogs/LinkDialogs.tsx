@@ -1,5 +1,6 @@
 import { useTranslation } from 'react-i18next';
 import {
+  attachmentOpenDecrypted,
   entryCreateFolder,
   entryCreatePage,
   externalNetworkAllow,
@@ -102,7 +103,10 @@ export function OpenFileDialog({
   onClose: () => void;
 }) {
   const { t } = useTranslation();
+  // An encrypted vault's file is decrypted to a temporary copy first (E4).
+  const encrypted = useVaultStore((s) => s.info?.encrypted === true) && !external;
   const open = async () => {
+    if (encrypted) return report(await attachmentOpenDecrypted(path));
     if (!external) return report(await fileOpenExternal(path));
     if (network) {
       const loaded = await externalNetworkAllow(path);
@@ -123,9 +127,9 @@ export function OpenFileDialog({
       title={t('dialogs.openFile.title', {
         name: external ? path.split(/[\\/]/).pop() : nameOf(path),
       })}
-      text={external ? path : undefined}
+      text={external ? path : encrypted ? t('dialogs.openFile.decryptedCopy') : undefined}
       note={network ? t('dialogs.openFile.network', { server: networkServer(path) }) : undefined}
-      confirm={t('dialogs.openFile.confirm')}
+      confirm={t(encrypted ? 'dialogs.openFile.openCopy' : 'dialogs.openFile.confirm')}
       onConfirm={open}
       onClose={onClose}
     />

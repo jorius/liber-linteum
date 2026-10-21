@@ -82,6 +82,7 @@ export function FavoritesSection({ onRequestMenu }: { onRequestMenu?: MenuOpener
   const { t } = useTranslation();
   const headingId = useId();
   const root = useVaultStore((s) => s.info?.root ?? '');
+  const encrypted = useVaultStore((s) => s.info?.encrypted === true);
   const nodes = useVaultStore((s) => s.nodes);
   const paths = useFavoritesStore((s) => s.paths);
   const shown = shownFavorites(paths, nodes);
@@ -95,6 +96,8 @@ export function FavoritesSection({ onRequestMenu }: { onRequestMenu?: MenuOpener
 
   const setCollapsed = (value: boolean) => {
     setCollapsedFor((c) => ({ ...c, [root]: value }));
+    // The key holds the vault's own path: an encrypted vault keeps it in memory only.
+    if (encrypted) return;
     try {
       localStorage.setItem(COLLAPSED + root, value ? '1' : '0');
     } catch {

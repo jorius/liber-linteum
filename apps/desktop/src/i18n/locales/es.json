@@ -308,6 +308,8 @@
     "openFile": {
       "title": "¿Abrir «{name}» en su app predeterminada?",
       "confirm": "Abrir",
+      "decryptedCopy": "Se escribirá una copia descifrada en una carpeta temporal hasta que se bloquee la bóveda.",
+      "openCopy": "Abrir copia",
       "network": "Abrirlo conecta con “{server}”."
     },
     "createPage": {

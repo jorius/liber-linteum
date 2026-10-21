@@ -436,7 +436,10 @@ export function installIpcMock({
       // `damaged: true`: the rollback memory is damaged until it is reset.
       if (encrypted?.damaged) throw { kind: 'damaged', message: 'vault-epochs.json' };
       const good = secret.kind === 'passphrase' ? encrypted?.passphrase : encrypted?.recovery;
-      if (!encrypted || secret.value !== good) {
+      // E3's recovery parser is forgiving: case and spaces don't matter.
+      const norm = (v: string) =>
+        secret.kind === 'recovery' ? v.replace(/\s/g, '').toUpperCase() : v;
+      if (!encrypted || norm(secret.value) !== good) {
         throw { kind: 'wrongSecret', message: 'no slot opens' };
       }
       encUnlocked = true;

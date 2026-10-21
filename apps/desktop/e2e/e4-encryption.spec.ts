@@ -268,3 +268,54 @@ test("This vault lists what couldn't be read, with a reveal button", async ({ pa
   await expect(dialog.getByText('name could not be decrypted')).toBeVisible();
   await expect(dialog.getByRole('button', { name: /^Show in / })).toBeVisible();
 });
+
+// ---- Task 6: the whole journey ----
+test('journey: create, write, lock, unlock, screen lock, unlock with a lower-case recovery key; axe', async ({
+  page,
+}) => {
+  await setup(page);
+  await page.goto('/');
+  await page.getByRole('switch', { name: /Encrypt this vault/ }).check();
+  await page.getByRole('button', { name: /^New vault/ }).click();
+  const dialog = page.getByRole('dialog');
+  await page.getByLabel('Passphrase', { exact: true }).fill(PASSPHRASE);
+  await page.getByLabel('Confirm passphrase').fill(PASSPHRASE);
+  await dialog.getByRole('button', { name: 'Continue' }).click();
+  const box = page.getByTestId('recovery-code');
+  const groups = ((await box.textContent()) ?? '').split('-').slice(1);
+  await dialog.getByRole('button', { name: "I've saved it" }).click();
+  const rows = dialog.locator('label', { hasText: /^Group \d+$/ });
+  for (let i = 0; i < 2; i++) {
+    const n = Number(((await rows.nth(i).textContent()) ?? '').replace(/\D/g, ''));
+    await rows
+      .nth(i)
+      .locator('input')
+      .fill(groups[n - 1]);
+  }
+  await dialog.getByRole('button', { name: 'Done' }).click();
+  await expect(page.locator('[data-vault-menu]')).toBeVisible();
+
+  await page.getByRole('treeitem', { name: 'Welcome', exact: true }).click();
+  await page.locator('.cm-content').click();
+  await page.keyboard.type('journey text');
+  await page.keyboard.press('Alt+Control+KeyL');
+  await expect(page.getByTestId('unlock-screen')).toBeVisible();
+  await page.getByLabel('Passphrase').fill(PASSPHRASE);
+  await page.getByLabel('Passphrase').press('Enter');
+  await expect(page.getByTestId('unlock-screen')).toHaveCount(0);
+  await page.getByRole('treeitem', { name: 'Welcome', exact: true }).click();
+  await expect(page.locator('.cm-content')).toContainText('journey text');
+
+  await page.evaluate(() =>
+    (window as unknown as { __liberEmit: (e: string, p: unknown) => void }).__liberEmit(
+      'vault:lock-request',
+      { reason: 'screenLock' },
+    ),
+  );
+  await expect(page.getByTestId('unlock-screen')).toBeVisible();
+  await page.getByRole('button', { name: 'Use recovery key instead' }).click();
+  await page.getByLabel('Recovery key').fill(encrypted.recovery.toLowerCase());
+  await axeClean(page); // the shell's own chrome has known contrast debt: axe the new screen
+  await page.getByLabel('Recovery key').press('Enter');
+  await expect(page.getByTestId('unlock-screen')).toHaveCount(0);
+});
