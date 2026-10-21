@@ -1075,5 +1075,27 @@
     "cancelled": "Importación detenida. Lo escrito hasta ahora está abierto, con un informe.",
     "partial": "La importación se detuvo a medias: {message}. Lo escrito está en {root}, con un informe.",
     "openAnyway": "Abrirla de todos modos"
+  },
+  "encryption": {
+    "beta": "Beta",
+    "createTitle": "Nueva bóveda cifrada",
+    "switch": "Cifrar esta bóveda",
+    "passphrase": "Frase de contraseña",
+    "confirm": "Confirmar frase de contraseña",
+    "show": "Mostrar frase de contraseña",
+    "hint": "Cuanto más larga, más segura; funcionan bien unas cuantas palabras sin relación.",
+    "strength": "{level, select, tooShort {Al menos 12 caracteres.} weak {Seguridad: débil.} fair {Seguridad: media.} other {Seguridad: fuerte.}}",
+    "mismatch": "Las frases de contraseña no coinciden.",
+    "continue": "Continuar",
+    "creating": "Configurando el cifrado…",
+    "recoveryTitle": "Tu clave de recuperación",
+    "recoveryBody": "Anótala o guárdala en un gestor de contraseñas. Es la única forma de entrar en esta bóveda si olvidas la frase de contraseña. No podemos recuperarla por ti.",
+    "copy": "Copiar",
+    "copied": "Copiado: borra el portapapeles cuando la hayas guardado.",
+    "saved": "Ya la guardé",
+    "confirmIntro": "Escribe el grupo {a} y el grupo {b} de la clave para comprobar que la tienes.",
+    "group": "Grupo {n}",
+    "back": "Atrás",
+    "done": "Hecho"
   }
 }

@@ -46,6 +46,19 @@ describe('M5b §2.1, §2.5: the app menu items the page answers', () => {
     stop();
   });
 
+  it('Vault → New Encrypted Vault… picks a folder, then opens the create dialog', async () => {
+    mockIPC((cmd) => (cmd === 'plugin:dialog|open' ? '/v/new' : undefined), {
+      shouldMockEvents: true,
+    });
+    const stop = await installShellMenu({ main: true });
+    await emit('menu:vault', 'newEncrypted');
+    await vi.waitFor(() =>
+      expect(useUiStore.getState().dialog).toEqual({ type: 'createEncrypted', path: '/v/new' }),
+    );
+    useUiStore.setState({ dialog: null });
+    stop();
+  });
+
   it('View → Toggle Sidebar flips sidebarCollapsed (menu:sidebar)', async () => {
     const stop = await installShellMenu({ main: true });
     await emit('menu:sidebar', null);

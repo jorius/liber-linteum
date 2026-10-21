@@ -1,4 +1,5 @@
 import { OpeningOverlay } from '../features/opening/OpeningOverlay';
+import { CreateEncryptedHost } from '../features/encryption/CreateEncryptedHost';
 import { NotionHost } from '../features/notion/NotionHost';
 import { ScratchpadHost } from '../features/scratchpad/ScratchpadHost';
 import { AppShell } from '../features/shell/AppShell';
@@ -25,6 +26,7 @@ export function App() {
       {status === 'opening' && !unlocking && <OpeningOverlay />}
       <ScratchpadHost />
       <NotionHost />
+      <CreateEncryptedHost />
       <Toaster />
     </>
   );

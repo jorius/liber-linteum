@@ -406,10 +406,14 @@ export const useVaultStore = create<VaultState>((set, get) => {
     },
     createEncrypted: async (path, passphrase) => {
       let created: IpcResult<CreatedEncryptedVault> | null = null;
-      const res = await withProgress(async () => {
-        created = await vaultCreateEncrypted(path, passphrase);
-        return created.ok ? { ok: true, value: created.value.info } : created;
-      });
+      const res = await withProgress(
+        async () => {
+          created = await vaultCreateEncrypted(path, passphrase);
+          return created.ok ? { ok: true, value: created.value.info } : created;
+          // quiet: the dialog shows the refusal inline.
+        },
+        { quiet: true },
+      );
       return res.ok && created ? created : (created ?? { ok: false, error: BUSY });
     },
     lock: async () => {

@@ -5,7 +5,7 @@ import { installIpcMock } from './ipcMock';
 
 const AXE = readFileSync(new URL('../node_modules/axe-core/axe.min.js', import.meta.url), 'utf8');
 const PASSPHRASE = 'correct horse battery';
-const encrypted: { passphrase: string; recovery: string; damaged?: boolean } = {
+const encrypted: { passphrase: string; recovery: string; damaged?: boolean; notEmpty?: boolean } = {
   passphrase: PASSPHRASE,
   recovery: 'LIBER-AAAA-BBBB',
 };
@@ -129,4 +129,77 @@ test('a sleep request saves an unsaved edit (auto save off), then Unlock shows',
   );
   await expect(page.getByTestId('unlock-screen')).toBeVisible();
   expect((await writes(page)).join('\n')).toContain('typed before sleep');
+});
+
+// ---- Task 4: creating an encrypted vault ----
+const axeClean = async (page: import('@playwright/test').Page) => {
+  await page.evaluate(AXE);
+  const violations = await page.evaluate(async () => {
+    const { axe } = window as unknown as {
+      axe: {
+        run: (
+          el: Element,
+          opts: object,
+        ) => Promise<{ violations: { id: string; nodes: { target: string[] }[] }[] }>;
+      };
+    };
+    const res = await axe.run(document.querySelector('[role="dialog"]') ?? document.body, {
+      resultTypes: ['violations'],
+    });
+    return res.violations.map((v) => `${v.id}: ${v.nodes.map((n) => n.target.join(' '))}`);
+  });
+  expect(violations).toEqual([]);
+};
+
+test('Welcome: encrypt switch, passphrase, recovery code, two groups, shell opens', async ({
+  page,
+}) => {
+  await setup(page);
+  await page.goto('/');
+  const sw = page.getByRole('switch', { name: /Encrypt this vault/ });
+  await expect(sw).not.toBeChecked();
+  await sw.check();
+  await page.getByRole('button', { name: /^New vault/ }).click();
+  const dialog = page.getByRole('dialog');
+  await expect(page.getByLabel('Passphrase', { exact: true })).toBeFocused();
+  await axeClean(page);
+  await page.getByLabel('Passphrase', { exact: true }).fill(PASSPHRASE);
+  await page.getByLabel('Confirm passphrase').fill(PASSPHRASE + 'x');
+  await expect(dialog.getByRole('alert')).toHaveText("The passphrases don't match.");
+  await expect(dialog.getByRole('button', { name: 'Continue' })).toBeDisabled();
+  await page.getByLabel('Confirm passphrase').fill(PASSPHRASE);
+  await dialog.getByRole('button', { name: 'Continue' }).click();
+  const box = page.getByTestId('recovery-code');
+  await expect(box).toBeVisible();
+  await expect(page.locator('[data-vault-menu]')).toBeVisible(); // the vault is open behind
+  await axeClean(page);
+  const groups = ((await box.textContent()) ?? '').split('-').slice(1);
+  expect(groups).toHaveLength(14);
+  await page.keyboard.press('Escape');
+  await expect(box).toBeVisible();
+  await dialog.getByRole('button', { name: "I've saved it" }).click();
+  await axeClean(page);
+  const rows = dialog.locator('label', { hasText: /^Group \d+$/ });
+  for (let i = 0; i < 2; i++) {
+    const n = Number(((await rows.nth(i).textContent()) ?? '').replace(/\D/g, ''));
+    await rows
+      .nth(i)
+      .locator('input')
+      .fill(` ${groups[n - 1].toLowerCase()} `);
+  }
+  await dialog.getByRole('button', { name: 'Done' }).click();
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  await expect(page.locator('[data-vault-menu]')).toBeVisible();
+});
+
+test('a folder that is not empty is refused inline', async ({ page }) => {
+  await setup(page, {}, { ...encrypted, notEmpty: true });
+  await page.goto('/');
+  await page.getByRole('switch', { name: /Encrypt this vault/ }).check();
+  await page.getByRole('button', { name: /^New vault/ }).click();
+  await page.getByLabel('Passphrase', { exact: true }).fill(PASSPHRASE);
+  await page.getByLabel('Confirm passphrase').fill(PASSPHRASE);
+  await page.getByRole('button', { name: 'Continue' }).click();
+  await expect(page.getByRole('alert')).toHaveText('Pick an empty or new folder.');
+  await expect(page.getByLabel('Passphrase', { exact: true })).toBeVisible();
 });

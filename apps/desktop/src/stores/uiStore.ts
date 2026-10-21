@@ -25,6 +25,8 @@ export type DialogState =
   /** Import from Notion (M7 §3). Rendered by `NotionHost` (it also shows on
    *  the Welcome screen). */
   | { type: 'notionImport' }
+  /** New encrypted vault in the folder just picked (E4); `CreateEncryptedHost`. */
+  | { type: 'createEncrypted'; path: string }
   /** Save / Don't Save / Cancel before unsaved text is left (M5b §6, auto
    *  save off). `id` tells two questions apart. */
   | { type: 'unsaved'; id: number; paths: string[]; answer: (c: UnsavedChoice) => void }

@@ -1075,5 +1075,27 @@
     "cancelled": "Import stopped. What was written so far is open, with a report.",
     "partial": "The import stopped part-way: {message}. What was written is in {root}, with a report.",
     "openAnyway": "Open it anyway"
+  },
+  "encryption": {
+    "beta": "Beta",
+    "createTitle": "New encrypted vault",
+    "switch": "Encrypt this vault",
+    "passphrase": "Passphrase",
+    "confirm": "Confirm passphrase",
+    "show": "Show passphrase",
+    "hint": "Longer is stronger; a few unrelated words work well.",
+    "strength": "{level, select, tooShort {At least 12 characters.} weak {Strength: weak.} fair {Strength: fair.} other {Strength: strong.}}",
+    "mismatch": "The passphrases don't match.",
+    "continue": "Continue",
+    "creating": "Setting up encryption…",
+    "recoveryTitle": "Your recovery key",
+    "recoveryBody": "Write this down or store it in a password manager. It's the only way into this vault if you forget the passphrase. We can't recover it for you.",
+    "copy": "Copy",
+    "copied": "Copied — clear your clipboard once you've stored it.",
+    "saved": "I've saved it",
+    "confirmIntro": "Type group {a} and group {b} of the key to check you have it.",
+    "group": "Group {n}",
+    "back": "Back",
+    "done": "Done"
   }
 }

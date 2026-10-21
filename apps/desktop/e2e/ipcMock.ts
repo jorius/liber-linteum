@@ -41,7 +41,7 @@ export function installIpcMock({
   folders?: string[];
   /** E4: an encrypted vault at `/enc`, locked from the start; opens with this
    *  passphrase or recovery code. */
-  encrypted?: { passphrase: string; recovery: string; damaged?: boolean };
+  encrypted?: { passphrase: string; recovery: string; damaged?: boolean; notEmpty?: boolean };
 }) {
   type Args = Record<string, unknown>;
   const w = window as unknown as Record<string, unknown>;
@@ -153,6 +153,7 @@ export function installIpcMock({
   };
   /** E4: the encrypted vault is unlocked; `vault_lock` locks it again. */
   let encUnlocked = false;
+  const NEW_RECOVERY = `LIBER-${Array.from({ length: 14 }, (_, i) => `K${String(i + 1).padStart(2, '0')}${'ABCDEFGHJKMNPQ'[i]}`).join('-')}`;
   const encInfo = (name: string, root: string) => ({
     name,
     root,
@@ -411,13 +412,16 @@ export function installIpcMock({
         ? [{ path: '/enc', name: 'enc', openedAt: '', missing: false, encrypted: true }]
         : []),
     ],
+    // The folder picker of Welcome and the Vault menu.
+    'plugin:dialog|open': () => '/e2e/new-encrypted',
     vault_create_encrypted: (a) => {
+      if (encrypted?.notEmpty) throw { kind: 'notEmpty', message: 'x' };
       if (String(a.passphrase).length < 12) throw { kind: 'invalidInput', message: 'short' };
       encUnlocked = true;
       const name = String(a.path).split('/').pop() ?? 'enc';
       return {
         info: encInfo(name, a.path as string),
-        recovery: encrypted?.recovery ?? 'LIBER-MOCK',
+        recovery: NEW_RECOVERY,
       };
     },
     vault_unlock: (a) => {

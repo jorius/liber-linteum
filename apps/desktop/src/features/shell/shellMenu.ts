@@ -8,6 +8,7 @@ import {
   onMenuVault,
   pickFolder,
 } from '../../ipc';
+import { openCreateEncrypted } from '../encryption/CreateEncryptedHost';
 import { useEditorStore } from '../../stores/editorStore';
 import { useSettingsStore } from '../../stores/settingsStore';
 import { useUiStore } from '../../stores/uiStore';
@@ -20,6 +21,12 @@ export const openAnotherVault = () =>
   void pickFolder()
     .catch(() => null)
     .then((path) => (path ? useVaultStore.getState().open(path) : undefined));
+
+/** Vault → New Encrypted Vault…: pick a folder, then the passphrase dialog. */
+export const newEncryptedVault = () =>
+  void pickFolder()
+    .catch(() => null)
+    .then((path) => (path ? openCreateEncrypted(path) : undefined));
 
 export const closeVault = () => void useVaultStore.getState().close();
 
@@ -54,6 +61,7 @@ export async function installShellMenu({ main }: { main: boolean }): Promise<() 
           onMenuVault((what) => {
             if (what === 'open') openAnotherVault();
             else if (what === 'close') closeVault();
+            else if (what === 'newEncrypted') newEncryptedVault();
             else if (what === 'lock') void useVaultStore.getState().lock('menu');
           }),
           onMenuSidebar(toggleSidebar),
