@@ -44,6 +44,8 @@ pub use storage::{
     RawEvent, Reach, ReadSeek, Reader, Replace, Storage, UnlockReport, WatchGuard,
     is_encrypted_vault,
 };
+#[cfg(feature = "test-params")]
+pub use storage::{TEST_PASSPHRASE, seal_in_place};
 pub use vault::Vault;
 pub use watch::{DEBOUNCE, WatchEvent, Watcher};
 

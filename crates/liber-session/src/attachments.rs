@@ -338,8 +338,12 @@ impl VaultSession {
                     .unwrap_or(shortest)
             }
             LinkFormat::Absolute => {
-                let full = self.vault.os_path(path, OsUse::FileUrl)?;
-                let url = full.to_str().map(file_url);
+                let url = match self.vault.os_path(path, OsUse::FileUrl) {
+                    Ok(full) => full.to_str().map(file_url),
+                    // An encrypted vault has no OS path (E3): the shortest link stands.
+                    Err(VaultError::NotPermitted(_)) => None,
+                    Err(e) => return Err(e.into()),
+                };
                 return Ok((shortest, url));
             }
         };

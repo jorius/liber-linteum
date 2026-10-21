@@ -571,6 +571,9 @@ mod tests {
 
     #[test]
     fn exp_04_conflict_is_retried_with_fresh_content() {
+        if liber_testkit::plain_disk_only() {
+            return;
+        }
         let (dir, _c, s) = session("ambiguous-names");
         let calls = AtomicUsize::new(0);
         let hook = |p: &VaultPath| {
@@ -595,6 +598,9 @@ mod tests {
 
     #[test]
     fn exp_04_persistent_conflict_is_reported_not_fatal() {
+        if liber_testkit::plain_disk_only() {
+            return;
+        }
         let (dir, _c, s) = session("ambiguous-names");
         let hook = |p: &VaultPath| {
             if p.as_str() == "Links.md" {

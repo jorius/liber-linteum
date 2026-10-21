@@ -224,6 +224,10 @@ fn gv_16_page_level_is_the_page_and_its_neighbourhood() {
 /// `gv_edges` limit.
 #[test]
 fn m3a_a_hub_page_neighbourhood_is_capped_and_counts_the_rest() {
+    // Plaintext mtimes don't survive sealing.
+    if liber_testkit::plain_disk_only() {
+        return;
+    }
     use liber_session::{MAX_NEIGHBOURS, MAX_VISIBLE};
     const BACKLINKS: usize = 300;
     let dir = tempfile::tempdir().unwrap();
@@ -439,6 +443,9 @@ fn nfr_03_a_200_card_level_and_its_edges_in_under_100_ms() {
 
 #[test]
 fn m3a_pinned_positions_follow_in_app_and_external_renames() {
+    if liber_testkit::plain_disk_only() {
+        return;
+    }
     use liber_vault::{CardPosition, WatchEvent};
     use std::collections::BTreeMap;
     let dir = vault();
@@ -486,6 +493,9 @@ fn m3a_pinned_positions_follow_in_app_and_external_renames() {
 /// would come back pretty-printed after any write).
 #[test]
 fn m3a_layout_is_not_rewritten_when_a_rename_matches_nothing() {
+    if liber_testkit::plain_disk_only() {
+        return;
+    }
     use liber_vault::WatchEvent;
     let dir = vault();
     let compact = r#"{"version":1,"levels":{"":{"Alpha":{"x":1,"y":2}}}}"#;
@@ -587,6 +597,9 @@ fn m3b_index_from_tells_which_rule_chose_the_index_note() {
 /// (other keys kept) and answers the folder's new card; clearing removes it.
 #[test]
 fn m3b_index_pick_set_writes_the_pick_and_answers_the_card() {
+    if liber_testkit::plain_disk_only() {
+        return;
+    }
     let dir = vault();
     std::fs::write(
         dir.path().join(".liber/vault.json"),
@@ -636,6 +649,9 @@ fn m3b_index_pick_set_writes_the_pick_and_answers_the_card() {
 /// A vault with no `.liber/` gets one only when something is picked (VLT-02).
 #[test]
 fn m3b_a_pick_creates_vault_json_lazily() {
+    if liber_testkit::plain_disk_only() {
+        return;
+    }
     let dir = vault();
     std::fs::remove_dir_all(dir.path().join(".liber")).unwrap();
     let (_c, s) = open(dir.path());
@@ -693,6 +709,9 @@ fn m3b_a_pick_is_dropped_when_its_page_moves_out_of_the_folder_in_app() {
 /// watcher reports a delete and a create with the same content).
 #[test]
 fn m3b_a_pick_is_dropped_when_its_page_moves_out_of_the_folder_externally() {
+    if liber_testkit::plain_disk_only() {
+        return;
+    }
     use liber_vault::WatchEvent;
     let dir = vault();
     write(dir.path(), "Gamma/c.md", "# Gamma C\n");
@@ -777,6 +796,9 @@ fn m3b_a_hand_written_pick_outside_its_folder_is_ignored() {
 /// their rules.
 #[test]
 fn m3b_relationships_of_folder_cards_index_notes_are_direct_edges() {
+    if liber_testkit::plain_disk_only() {
+        return;
+    }
     let dir = vault();
     let r = dir.path();
     // Gamma's index note (picked) → a root page and Alpha's index note.

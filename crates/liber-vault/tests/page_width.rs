@@ -26,6 +26,9 @@ fn m4b2_nothing_set_reads_as_nothing_and_writes_nothing() {
 
 #[test]
 fn m4b2_page_and_vault_widths_round_trip_and_keep_other_keys() {
+    if liber_testkit::plain_disk_only() {
+        return;
+    }
     let (dir, vault) = fresh();
     std::fs::create_dir(dir.path().join(".liber")).unwrap();
     std::fs::write(
@@ -84,6 +87,9 @@ fn m4b2_page_widths_follow_renames_and_folder_moves() {
 
 #[test]
 fn m4b2_a_malformed_width_hides_only_itself() {
+    if liber_testkit::plain_disk_only() {
+        return;
+    }
     let (dir, _) = fresh();
     std::fs::create_dir(dir.path().join(".liber")).unwrap();
     std::fs::write(
@@ -103,6 +109,9 @@ fn m4b2_a_malformed_width_hides_only_itself() {
 /// the same path starts at the default); a deleted folder takes its pages'.
 #[test]
 fn m4b2_widths_of_deleted_pages_and_folders_are_forgotten() {
+    if liber_testkit::plain_disk_only() {
+        return;
+    }
     let (dir, vault) = fresh();
     for (path, width) in [
         ("Notes/A.md", PageWidth::Full),
@@ -133,6 +142,9 @@ fn m4b2_widths_of_deleted_pages_and_folders_are_forgotten() {
 /// M4b part 3 (wide elements §2): `wide` is a third width, at both levels.
 #[test]
 fn m4b3_wide_round_trips_at_page_and_vault_level() {
+    if liber_testkit::plain_disk_only() {
+        return;
+    }
     let (dir, vault) = fresh();
     vault.set_page_width("A.md", Some(PageWidth::Wide)).unwrap();
     vault.set_vault_page_width(Some(PageWidth::Wide)).unwrap();

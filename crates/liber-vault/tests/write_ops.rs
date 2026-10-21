@@ -14,6 +14,9 @@ fn fresh() -> (tempfile::TempDir, Vault) {
 
 #[test]
 fn nfr_08_write_cas_create_update_and_conflict() {
+    if liber_testkit::plain_disk_only() {
+        return;
+    }
     let (dir, vault) = fresh();
     let p = vp("note.md");
     let h1 = vault.write_cas(&p, b"one", None).unwrap();
@@ -40,6 +43,9 @@ fn nfr_08_write_cas_create_update_and_conflict() {
 
 #[test]
 fn read_returns_bytes_hash_and_utf8_errors() {
+    if liber_testkit::plain_disk_only() {
+        return;
+    }
     let (dir, vault) = fresh();
     std::fs::write(dir.path().join("bin.md"), [0xff, 0xfe]).unwrap();
     let (bytes, hash) = vault.read(&vp("bin.md")).unwrap();
@@ -57,6 +63,10 @@ fn read_returns_bytes_hash_and_utf8_errors() {
 #[cfg(unix)]
 #[test]
 fn nfr_08_write_cas_preserves_permissions() {
+    // Plaintext folder permissions don't survive sealing.
+    if liber_testkit::plain_disk_only() {
+        return;
+    }
     use std::os::unix::fs::PermissionsExt;
     let (dir, vault) = fresh();
     let p = vp("x.md");
@@ -72,6 +82,9 @@ fn nfr_08_write_cas_preserves_permissions() {
 
 #[test]
 fn exp_02_create_dir_and_rename() {
+    if liber_testkit::plain_disk_only() {
+        return;
+    }
     let (dir, vault) = fresh();
     vault.create_dir(&vp("A")).unwrap();
     assert!(matches!(
@@ -103,6 +116,9 @@ fn exp_02_create_dir_and_rename() {
 
 #[test]
 fn exp_02_case_only_rename() {
+    if liber_testkit::plain_disk_only() {
+        return;
+    }
     let (dir, vault) = fresh();
     vault.write_cas(&vp("ideas.md"), b"x", None).unwrap();
     vault.rename(&vp("ideas.md"), &vp("Ideas.md")).unwrap();
@@ -131,6 +147,10 @@ fn exp_03_trash_moves_to_os_trash() {
 #[cfg(unix)]
 #[test]
 fn review_focus_writes_through_symlink_escaping_the_vault_are_refused() {
+    // No symlinks in an encrypted vault (E3).
+    if liber_testkit::plain_disk_only() {
+        return;
+    }
     let (dir, vault) = fresh();
     let outside = tempfile::tempdir().unwrap();
     std::os::unix::fs::symlink(outside.path(), dir.path().join("out")).unwrap();
@@ -147,6 +167,9 @@ proptest! {
     fn nfr_08_successive_writes_round_trip_without_temp_leftovers(
         contents in proptest::collection::vec(proptest::collection::vec(any::<u8>(), 0..2048), 1..6)
     ) {
+        if liber_testkit::plain_disk_only() {
+            return Ok(());
+        }
         let (dir, vault) = fresh();
         let p = vp("p.md");
         let mut expected = None;
@@ -164,6 +187,10 @@ proptest! {
 #[cfg(unix)]
 #[test]
 fn m4c_review_i4_visible_paths_never_resolve_into_hidden_ones() {
+    // No symlinks in an encrypted vault (E3).
+    if liber_testkit::plain_disk_only() {
+        return;
+    }
     let dir = tempfile::tempdir().unwrap();
     std::fs::create_dir(dir.path().join(".secret")).unwrap();
     std::fs::write(dir.path().join(".secret/key.png"), "k").unwrap();

@@ -353,6 +353,9 @@ mod tests {
     /// it wrote, so neither change is lost.
     #[test]
     fn m11_an_outside_write_between_read_and_write_is_retried_once() {
+        if liber_testkit::plain_disk_only() {
+            return;
+        }
         let (dir, vault) = vault_with_layout(r#"{"version":1,"a":1}"#);
         let mut calls = 0;
         vault
@@ -374,6 +377,9 @@ mod tests {
     /// Only once: a file that keeps changing under us is still an error.
     #[test]
     fn m11_a_second_conflict_is_reported() {
+        if liber_testkit::plain_disk_only() {
+            return;
+        }
         let (dir, vault) = vault_with_layout(r#"{"version":1}"#);
         let mut calls = 0;
         let result = vault.update_json_object(LAYOUT, false, |map| {

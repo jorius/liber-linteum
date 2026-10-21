@@ -308,6 +308,9 @@ mod tests {
 
     #[test]
     fn m4c_quick_notes_are_deduplicated_and_flagged() {
+        if liber_testkit::plain_disk_only() {
+            return;
+        }
         let f = open(&[]);
         let a = f.s.create_quick_note(&VaultPath::root(), "Q").unwrap();
         let b = f.s.create_quick_note(&VaultPath::root(), "Q").unwrap();
@@ -318,6 +321,9 @@ mod tests {
 
     #[test]
     fn m4c_a_vault_scratch_folder_is_created_on_first_use() {
+        if liber_testkit::plain_disk_only() {
+            return;
+        }
         let f = open(&[("Notes/a.md", "# a")]);
         assert!(!f.root.join("Scratchpad").exists());
         let note = f.s.create_quick_note(&vp("Scratchpad"), "Q").unwrap();
@@ -330,6 +336,9 @@ mod tests {
 
     #[test]
     fn m4c_auto_name_follows_the_first_line() {
+        if liber_testkit::plain_disk_only() {
+            return;
+        }
         let f = open(&[]);
         let q = f.s.create_quick_note(&vp("Scratchpad"), "Q").unwrap();
         std::fs::write(f.root.join("Scratchpad/Q.md"), "# Groceries\nmilk").unwrap();
@@ -353,6 +362,9 @@ mod tests {
 
     #[test]
     fn m4c_same_first_line_gets_a_number_and_does_not_ping_pong() {
+        if liber_testkit::plain_disk_only() {
+            return;
+        }
         let f = open(&[]);
         let a = f.s.create_quick_note(&VaultPath::root(), "A").unwrap();
         let b = f.s.create_quick_note(&VaultPath::root(), "B").unwrap();
@@ -390,6 +402,9 @@ mod tests {
 
     #[test]
     fn m4c_unflagged_notes_are_never_renamed() {
+        if liber_testkit::plain_disk_only() {
+            return;
+        }
         let f = open(&[("Plain.md", "# Something else")]);
         let out = f.s.auto_name(&vp("Plain.md"), true).unwrap();
         assert_eq!(out.path.as_str(), "Plain.md");
@@ -400,6 +415,9 @@ mod tests {
 
     #[test]
     fn m4c_a_manual_rename_or_delete_drops_the_flag() {
+        if liber_testkit::plain_disk_only() {
+            return;
+        }
         let f = open(&[]);
         let q = f.s.create_quick_note(&VaultPath::root(), "Q").unwrap();
         let r = f.s.create_quick_note(&VaultPath::root(), "R").unwrap();
@@ -419,6 +437,9 @@ mod tests {
 
     #[test]
     fn m4c_renaming_the_scratch_folder_from_settings() {
+        if liber_testkit::plain_disk_only() {
+            return;
+        }
         let f = open(&[
             ("Links.md", "See [[Scratchpad/Trip]]."),
             ("Scratchpad/Trip.md", "x"),
@@ -485,6 +506,9 @@ mod tests {
 
     #[test]
     fn m4c_final_i1_never_takes_a_name_a_link_already_means() {
+        if liber_testkit::plain_disk_only() {
+            return;
+        }
         let f = open(&[
             ("Home.md", "See [[Groceries]]."),
             ("Shopping/Groceries.md", "milk"),
@@ -511,6 +535,9 @@ mod tests {
 
     #[test]
     fn m4c_final_i2_flags_of_notes_changed_while_closed_are_dropped() {
+        if liber_testkit::plain_disk_only() {
+            return;
+        }
         let vault = tempfile::tempdir().unwrap();
         let cache = tempfile::tempdir().unwrap();
         let root = vault.path();
@@ -545,6 +572,9 @@ mod tests {
     /// notes it doesn't see as changed.
     #[test]
     fn rename_review_flags_survive_the_first_open_after_the_rename() {
+        if liber_testkit::plain_disk_only() {
+            return;
+        }
         let vault = tempfile::tempdir().unwrap();
         let root = vault.path();
         let s = VaultSession::open(root, tempfile::tempdir().unwrap().path(), |_| {})
@@ -566,6 +596,9 @@ mod tests {
 
     #[test]
     fn m4c_final_i4_a_case_only_change_renames_the_folder() {
+        if liber_testkit::plain_disk_only() {
+            return;
+        }
         let f = open(&[("Scratchpad/a.md", "x")]);
         assert!(
             f.s.set_scratch_folder("scratchpad", true)

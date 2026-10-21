@@ -789,3 +789,77 @@ fn same_entry_folds_normal_form() {
             .is_some()
     );
 }
+
+/// E3 Task 4 lock rework: reads, listings and renames from several threads at
+/// once never deadlock, and each sees a state the renames allow.
+#[test]
+fn concurrent_reads_listings_and_renames_stay_consistent() {
+    use std::sync::atomic::{AtomicBool, Ordering};
+    use std::sync::{Arc, mpsc};
+    use std::time::Duration;
+
+    fn rename(s: &EncryptedStorage) {
+        s.rename(&vp("F/a.md"), &vp("F/b.md")).unwrap();
+        s.rename(&vp("F/b.md"), &vp("F/a.md")).unwrap();
+    }
+    fn read(s: &EncryptedStorage) {
+        assert_eq!(s.read(&vp("F/still.md")).unwrap(), b"still");
+        for name in ["F/a.md", "F/b.md"] {
+            match s.read(&vp(name)) {
+                Ok(bytes) => assert_eq!(bytes, b"moving"),
+                Err(e) => assert!(matches!(e, VaultError::NotFound(_)), "{e:?}"),
+            }
+        }
+        assert!(s.meta(&vp("F/still.md"), Follow::No).unwrap().is_some());
+    }
+    fn list(s: &EncryptedStorage) {
+        let names: Vec<String> = s
+            .children(&vp("F"))
+            .unwrap()
+            .into_iter()
+            .map(|c| match c {
+                Child::Entry { name, .. } => name,
+                Child::Unreadable(why) => panic!("unreadable: {why}"),
+            })
+            .collect();
+        assert!(names.contains(&"still.md".to_string()), "{names:?}");
+        let known = ["a.md", "b.md", "still.md"];
+        assert!(
+            names.iter().all(|n| known.contains(&n.as_str())),
+            "{names:?}"
+        );
+    }
+
+    let (_dir, storage) = new_vault();
+    storage.create_dir(&vp("F")).unwrap();
+    for (name, body) in [("F/a.md", "moving"), ("F/still.md", "still")] {
+        storage
+            .replace_atomic(&vp(name), &mut body.as_bytes(), Replace::CreateOnly)
+            .unwrap();
+    }
+    let storage = Arc::new(storage);
+    let stop = Arc::new(AtomicBool::new(false));
+    let (tx, rx) = mpsc::channel();
+    let jobs: [fn(&EncryptedStorage); 4] = [rename, read, read, list];
+    for job in jobs {
+        let (s, stop, tx) = (Arc::clone(&storage), Arc::clone(&stop), tx.clone());
+        std::thread::spawn(move || {
+            let r = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                while !stop.load(Ordering::Relaxed) {
+                    job(&s);
+                }
+            }));
+            let _ = tx.send(r);
+        });
+    }
+    std::thread::sleep(Duration::from_millis(400));
+    stop.store(true, Ordering::Relaxed);
+    for _ in jobs {
+        match rx.recv_timeout(Duration::from_secs(10)) {
+            Ok(Ok(())) => {}
+            Ok(Err(panic)) => std::panic::resume_unwind(panic),
+            Err(_) => panic!("a thread didn't finish: deadlock"),
+        }
+    }
+    assert_eq!(storage.read(&vp("F/a.md")).unwrap(), b"moving");
+}

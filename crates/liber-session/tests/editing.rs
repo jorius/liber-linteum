@@ -19,6 +19,9 @@ fn session(fixture: &str) -> (tempfile::TempDir, tempfile::TempDir, VaultSession
 
 #[test]
 fn ed_08_write_page_is_compare_and_swap_and_reindexes() {
+    if liber_testkit::plain_disk_only() {
+        return;
+    }
     let (dir, _c, s) = session("obsidian-basic");
     let path = vp("Welcome.md");
     let (_, hash) = s.vault().read_to_string(&path).unwrap();
@@ -50,6 +53,9 @@ fn ed_08_write_page_is_compare_and_swap_and_reindexes() {
 
 #[test]
 fn ed_08_conflict_copies_get_free_names_next_to_the_page() {
+    if liber_testkit::plain_disk_only() {
+        return;
+    }
     let (dir, _c, s) = session("obsidian-basic");
     let first = s
         .create_conflict_copy(&vp("Game Design/Game 1.md"), "theirs 1")

@@ -21,6 +21,9 @@ fn write(dir: &tempfile::TempDir, json: &str) {
 
 #[test]
 fn m4c_auto_named_round_trip_keeps_other_keys() {
+    if liber_testkit::plain_disk_only() {
+        return;
+    }
     let (dir, vault) = fresh();
     write(&dir, r#"{"version":1,"pageWidth":"full"}"#);
     vault.set_auto_named("Quick note 1.md", true).unwrap();
@@ -77,6 +80,9 @@ fn m4c_unchanged_lists_are_not_rewritten() {
 
 #[test]
 fn m4c_hand_edited_garbage_is_ignored() {
+    if liber_testkit::plain_disk_only() {
+        return;
+    }
     let (dir, vault) = fresh();
     write(&dir, r#"{"autoNamed":["a.md",3,null,"b.md"]}"#);
     assert_eq!(
@@ -105,6 +111,9 @@ fn m4c_hand_edited_garbage_is_ignored() {
 
 #[test]
 fn m4c_scratch_folder_defaults_is_set_and_follows_top_level_renames() {
+    if liber_testkit::plain_disk_only() {
+        return;
+    }
     let (dir, vault) = fresh();
     assert_eq!(vault.scratch_folder(), "Scratchpad");
     vault.set_scratch_folder("Inbox").unwrap();

@@ -32,6 +32,9 @@ fn nothing_set_reads_as_nothing_and_writes_nothing() {
 
 #[test]
 fn sides_and_widths_round_trip_and_keep_other_keys() {
+    if liber_testkit::plain_disk_only() {
+        return;
+    }
     let (dir, vault) = fresh();
     std::fs::create_dir(dir.path().join(".liber")).unwrap();
     std::fs::write(
@@ -70,6 +73,9 @@ fn sides_and_widths_round_trip_and_keep_other_keys() {
 
 #[test]
 fn widths_are_clamped_to_the_allowed_range() {
+    if liber_testkit::plain_disk_only() {
+        return;
+    }
     let (dir, vault) = fresh();
     assert_eq!((MIN_COVER_WIDTH, MAX_COVER_WIDTH), (160, 2000));
     vault.set_cover_width("Low.md", Some(20)).unwrap();
@@ -82,6 +88,9 @@ fn widths_are_clamped_to_the_allowed_range() {
 
 #[test]
 fn malformed_entries_hide_only_themselves() {
+    if liber_testkit::plain_disk_only() {
+        return;
+    }
     let (dir, _) = fresh();
     std::fs::create_dir(dir.path().join(".liber")).unwrap();
     std::fs::write(
@@ -133,6 +142,9 @@ fn sides_and_widths_follow_renames_and_folder_moves() {
 
 #[test]
 fn sides_and_widths_of_deleted_pages_and_folders_are_forgotten() {
+    if liber_testkit::plain_disk_only() {
+        return;
+    }
     let (dir, vault) = fresh();
     for path in ["Notes/A.md", "Notes/Sub/B.md", "Notes2/C.md", "D.md"] {
         vault.set_cover_side(path, CoverSide::Left).unwrap();

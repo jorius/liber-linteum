@@ -2,7 +2,10 @@ use crate::error::{Result, SessionError};
 use crate::events::{IndexReport, SessionEvent};
 use liber_index::{FileKind, FileRow, Index, Stat, cache_dir_name};
 use liber_markdown::{PageMeta, link_key, parse_page};
-use liber_vault::{Entry, EntryKind, Follow, Hash, Vault, VaultPath, Watcher, is_hidden_name};
+use liber_vault::{
+    EncryptedStorage, Entry, EntryKind, Follow, Hash, Vault, VaultError, VaultPath, Watcher,
+    is_hidden_name,
+};
 use rayon::prelude::*;
 use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
@@ -101,6 +104,40 @@ impl VaultSession {
     ) -> Result<(VaultSession, IndexReport)> {
         let vault = Vault::open(root)?;
         let index = Index::open(&index_db_path(cache_root, vault.root()))?;
+        Self::start(vault, index, sink)
+    }
+
+    /// An unlocked encrypted vault: the index lives in memory only (spec §5.1).
+    pub fn open_encrypted(
+        storage: EncryptedStorage,
+        sink: impl Fn(SessionEvent) + Send + Sync + 'static,
+    ) -> Result<(VaultSession, IndexReport)> {
+        let vault = Vault::open_with(Box::new(storage))?;
+        Self::start(vault, Index::open_in_memory()?, sink)
+    }
+
+    /// Locks an encrypted vault (spec §6.2): stops the watcher, drops the keys
+    /// and decrypted names, then the index's rows. Every later read fails with
+    /// `Locked`, open readers included. Does nothing for a plain vault.
+    pub fn lock(&self) {
+        let Some(storage) = self.vault.encrypted() else {
+            return;
+        };
+        self.stop_watching();
+        // Held across the lock, so a re-index that read before it can't write after it.
+        let mut index = self.index();
+        storage.lock();
+        // A fresh `:memory:` database: the old one's pages go with its connection.
+        if let Ok(empty) = Index::open_in_memory() {
+            *index = empty;
+        }
+    }
+
+    fn start(
+        vault: Vault,
+        index: Index,
+        sink: impl Fn(SessionEvent) + Send + Sync + 'static,
+    ) -> Result<(VaultSession, IndexReport)> {
         let session = VaultSession {
             vault,
             index: Mutex::new(index),
@@ -228,6 +265,10 @@ impl VaultSession {
 
         {
             let mut index = self.index();
+            // Locked since the files were read: their rows must not enter the emptied index.
+            if self.vault.encrypted().is_some_and(|s| s.is_locked()) {
+                return Err(VaultError::Locked.into());
+            }
             for chunk in removed.chunks(BATCH_ROWS) {
                 index.transaction(|tx| chunk.iter().try_for_each(|p| tx.remove(p)))?;
             }
@@ -612,6 +653,9 @@ mod tests {
     /// folder's its pages' (the OS call is a plain removal here).
     #[test]
     fn m4b2_trashed_pages_forget_their_width() {
+        if liber_testkit::plain_disk_only() {
+            return;
+        }
         let vault = tempfile::tempdir().unwrap();
         let root = vault.path().to_path_buf();
         std::fs::write(root.join("a.md"), "# a").unwrap();
@@ -649,6 +693,9 @@ mod tests {
     /// folder's its pages' (the OS call is a plain removal here).
     #[test]
     fn trashed_pages_forget_their_cover_height() {
+        if liber_testkit::plain_disk_only() {
+            return;
+        }
         let vault = tempfile::tempdir().unwrap();
         let root = vault.path().to_path_buf();
         std::fs::write(root.join("a.md"), "# a").unwrap();
@@ -682,6 +729,9 @@ mod tests {
 
     #[test]
     fn exp_03_trash_does_not_hold_the_index_lock_during_the_os_call() {
+        if liber_testkit::plain_disk_only() {
+            return;
+        }
         let vault = tempfile::tempdir().unwrap();
         std::fs::write(vault.path().join("a.md"), "# a").unwrap();
         let cache = tempfile::tempdir().unwrap();

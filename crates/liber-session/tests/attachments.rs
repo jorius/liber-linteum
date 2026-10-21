@@ -29,6 +29,9 @@ fn resolves_to(s: &VaultSession, page: &str, link: &str) -> Option<String> {
 
 #[test]
 fn m2c_paste_goes_to_obsidians_folder_dedupes_and_resolves_at_once() {
+    if liber_testkit::plain_disk_only() {
+        return;
+    }
     let dir = copy_fixture("obsidian-basic"); // attachmentFolderPath "./assets"
     let (_c, s) = open(dir.path());
     let page = vp("Character Design/rex-draft.md");
@@ -90,6 +93,10 @@ fn m2c_names_are_sanitized_not_refused() {
 
 #[test]
 fn m2c_import_copies_outside_files_and_links_inside_ones() {
+    // No OS path names an entry of an encrypted vault (E3).
+    if liber_testkit::plain_disk_only() {
+        return;
+    }
     let vault = tempfile::tempdir().unwrap();
     std::fs::write(vault.path().join("P.md"), "").unwrap();
     std::fs::create_dir(vault.path().join("Docs")).unwrap();
@@ -141,6 +148,10 @@ fn m2c_import_copies_outside_files_and_links_inside_ones() {
 #[cfg(unix)]
 #[test]
 fn m2c_import_follows_a_symlink_and_keeps_the_dropped_name() {
+    // No symlinks in an encrypted vault (E3).
+    if liber_testkit::plain_disk_only() {
+        return;
+    }
     let vault = tempfile::tempdir().unwrap();
     std::fs::write(vault.path().join("P.md"), "").unwrap();
     let outside = tempfile::tempdir().unwrap();
@@ -283,6 +294,10 @@ fn m2c_link_suggest_ranks_exact_then_prefix_then_substring_and_limits() {
 
 #[test]
 fn m2c_link_suggest_empty_query_lists_recent_files_first() {
+    // Plaintext mtimes don't survive sealing.
+    if liber_testkit::plain_disk_only() {
+        return;
+    }
     let vault = tempfile::tempdir().unwrap();
     for name in ["Old.md", "New.md", "Mid.md"] {
         std::fs::write(vault.path().join(name), "").unwrap();
@@ -344,6 +359,11 @@ fn m4b3_new_attachments_follow_the_link_format() {
         "../../Assets/three.png"
     );
     let absolute = save(Some(LinkFormat::Absolute), "four four.png");
+    // An encrypted vault has no OS path: the shortest link and no file URL (E3).
+    if liber_testkit::plain_disk_only() {
+        assert_eq!(absolute.url, None);
+        return;
+    }
     let root = dunce::canonicalize(vault.path()).unwrap();
     assert_eq!(
         absolute.url.as_deref(),

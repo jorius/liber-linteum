@@ -17,6 +17,9 @@ fn fresh() -> (tempfile::TempDir, Vault) {
 
 #[test]
 fn m2c_obsidian_setting_wins_over_liber_and_is_re_read() {
+    if liber_testkit::plain_disk_only() {
+        return;
+    }
     let dir = copy_fixture("obsidian-basic"); // app.json: "./assets"
     std::fs::create_dir(dir.path().join(".liber")).unwrap();
     std::fs::write(
@@ -83,6 +86,9 @@ fn m2c_folder_mode_and_dirs_per_policy() {
 
 #[test]
 fn m2c_set_liber_attachments_keeps_other_keys_and_creates_liber_lazily() {
+    if liber_testkit::plain_disk_only() {
+        return;
+    }
     let (dir, vault) = fresh();
     assert!(
         !dir.path().join(".liber").exists(),
@@ -118,6 +124,9 @@ fn m2c_set_liber_attachments_keeps_other_keys_and_creates_liber_lazily() {
 
 #[test]
 fn m2c_set_liber_attachments_refuses_bad_values_and_never_clobbers_broken_json() {
+    if liber_testkit::plain_disk_only() {
+        return;
+    }
     let (dir, vault) = fresh();
     for (mode, path) in [
         ("folder", "../out"),
@@ -147,6 +156,9 @@ fn m2c_set_liber_attachments_refuses_bad_values_and_never_clobbers_broken_json()
 
 #[test]
 fn m2c_create_dir_all_reports_what_it_created() {
+    if liber_testkit::plain_disk_only() {
+        return;
+    }
     let (dir, vault) = fresh();
     std::fs::create_dir(dir.path().join("A")).unwrap();
     let created = vault.create_dir_all(&vp("A/B/C")).unwrap();
@@ -166,6 +178,9 @@ fn m2c_create_dir_all_reports_what_it_created() {
 
 #[test]
 fn m2c_import_file_streams_a_create_only_copy() {
+    if liber_testkit::plain_disk_only() {
+        return;
+    }
     let (dir, vault) = fresh();
     let outside = tempfile::tempdir().unwrap();
     let src = outside.path().join("photo.png");
@@ -197,6 +212,9 @@ fn m2c_import_file_streams_a_create_only_copy() {
 /// `.obsidian/app.json` is never written.
 #[test]
 fn m4b_liber_override_wins_over_obsidian_until_turned_off() {
+    if liber_testkit::plain_disk_only() {
+        return;
+    }
     let dir = copy_fixture("obsidian-basic"); // app.json: "./assets"
     let app_json = std::fs::read(dir.path().join(".obsidian/app.json")).unwrap();
     let vault = Vault::open(dir.path()).unwrap();

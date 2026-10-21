@@ -28,6 +28,9 @@ fn nothing_set_writes_nothing() {
 
 #[test]
 fn favorites_keep_their_order_and_other_keys() {
+    if liber_testkit::plain_disk_only() {
+        return;
+    }
     let (dir, vault) = fresh();
     vault.set_vault_icon(Some("🌌")).unwrap();
     vault.set_favorites(&s(&["B.md", "A", "C.md"])).unwrap();

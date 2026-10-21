@@ -17,10 +17,11 @@ use liber_crypto::{
     Argon2Params, CryptoError, FolderId, MergeOutcome, RecoveryCode, StreamReader, Unlock,
     Unlocked, VaultHeader,
 };
-use names::{Cache, Entry};
-use std::io::Read;
+use names::{Cache, Entry, Listing};
+use std::fs::{File, Metadata};
+use std::io::{Read, Seek, SeekFrom};
 use std::path::{Path, PathBuf};
-use std::sync::{Arc, Mutex, MutexGuard};
+use std::sync::{Arc, Mutex, MutexGuard, RwLock, RwLockReadGuard, RwLockWriteGuard};
 
 pub const HEADER_FILE: &str = "liber-vault.json";
 const DATA_DIR: &str = "d";
@@ -47,15 +48,22 @@ struct Keys {
     unlocked: Unlocked,
 }
 
+/// `None` once locked. Each call clones the `Arc` and lets go at once, so no
+/// lock is held across I/O; a call in flight at `lock` finishes with its clone.
+type KeyHolder = RwLock<Option<Arc<Keys>>>;
+
 pub struct EncryptedStorage {
     /// Canonical.
     root: PathBuf,
-    /// `None` once locked. Shared with the watcher.
-    keys: Arc<Mutex<Option<Keys>>>,
+    /// Shared with the watcher and with every open [`Reader`].
+    keys: Arc<KeyHolder>,
     header: Mutex<VaultHeader>,
-    /// Decrypted names: dropped on lock with the keys. Shared with each file
-    /// being written ([`write::Pending`]), which invalidates its folder on commit.
-    cache: Arc<Mutex<Cache>>,
+    /// Decrypted names: dropped on lock with the keys. Shared with the watcher
+    /// and each file being written ([`write::Pending`]), which invalidates its
+    /// folder on commit.
+    cache: Arc<RwLock<Cache>>,
+    /// Serializes writes, from a name's free-check to its placement; reads never take it.
+    writing: Mutex<()>,
 }
 
 /// A watcher can outlive the storage holding the shared keys: clear them now.
@@ -67,8 +75,8 @@ impl Drop for EncryptedStorage {
 
 impl std::fmt::Debug for EncryptedStorage {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        // `try_lock`: formatting while a call holds the keys must not deadlock.
-        let locked = match self.keys.try_lock() {
+        // `try_read`: formatting while `lock` holds the keys must not deadlock.
+        let locked = match self.keys.try_read() {
             Ok(k) => format!("{}", k.is_none()),
             Err(std::sync::TryLockError::Poisoned(k)) => format!("{}", k.into_inner().is_none()),
             Err(std::sync::TryLockError::WouldBlock) => "busy".to_string(),
@@ -82,6 +90,14 @@ impl std::fmt::Debug for EncryptedStorage {
 
 fn lock<T>(m: &Mutex<T>) -> MutexGuard<'_, T> {
     m.lock().unwrap_or_else(|e| e.into_inner())
+}
+
+fn read<T>(l: &RwLock<T>) -> RwLockReadGuard<'_, T> {
+    l.read().unwrap_or_else(|e| e.into_inner())
+}
+
+fn write<T>(l: &RwLock<T>) -> RwLockWriteGuard<'_, T> {
+    l.write().unwrap_or_else(|e| e.into_inner())
 }
 
 fn crypto(e: CryptoError) -> VaultError {
@@ -175,32 +191,35 @@ impl EncryptedStorage {
     fn new(root: PathBuf, header: VaultHeader, unlocked: Unlocked) -> Self {
         EncryptedStorage {
             root,
-            keys: Arc::new(Mutex::new(Some(Keys { unlocked }))),
+            keys: Arc::new(RwLock::new(Some(Arc::new(Keys { unlocked })))),
             header: Mutex::new(header),
-            cache: Arc::new(Mutex::new(Cache::default())),
+            cache: Arc::new(RwLock::new(Cache::default())),
+            writing: Mutex::new(()),
         }
     }
 
     /// Drops the keys and every decrypted name; later calls fail with `Locked`.
     pub fn lock(&self) {
-        *lock(&self.keys) = None;
-        *lock(&self.cache) = Cache::default();
+        *write(&self.keys) = None;
+        write(&self.cache).close();
     }
 
     pub fn is_locked(&self) -> bool {
-        lock(&self.keys).is_none()
+        read(&self.keys).is_none()
     }
 
     /// Physical paths whose names couldn't be read on the last listing, with
     /// the reason. Never deleted by any operation.
     pub fn unreadable(&self) -> Vec<(PathBuf, String)> {
-        // A folder moved or removed since its listing leaves stale paths: skipped.
-        lock(&self.cache)
+        let all: Vec<_> = read(&self.cache)
             .unreadable
             .values()
             .flatten()
-            .filter(|(p, _)| p.symlink_metadata().is_ok())
             .cloned()
+            .collect();
+        // A folder moved or removed since its listing leaves stale paths: skipped.
+        all.into_iter()
+            .filter(|(p, _)| p.symlink_metadata().is_ok())
             .collect()
     }
 
@@ -212,26 +231,30 @@ impl EncryptedStorage {
         lock(&self.header).epoch()
     }
 
-    /// Runs `f` with the keys and the name cache, or fails with `Locked`.
-    fn with_keys<T>(&self, f: impl FnOnce(&Unlocked, &mut Cache) -> Result<T>) -> Result<T> {
-        let keys = lock(&self.keys);
-        let keys = keys.as_ref().ok_or(VaultError::Locked)?;
-        f(&keys.unlocked, &mut lock(&self.cache))
+    /// The keys, or `Locked`; the key lock itself is released at once.
+    fn keys(&self) -> Result<Arc<Keys>> {
+        read(&self.keys).clone().ok_or(VaultError::Locked)
+    }
+
+    /// Runs `f` with the keys, or fails with `Locked`.
+    fn with_keys<T>(&self, f: impl FnOnce(&Unlocked) -> Result<T>) -> Result<T> {
+        f(&self.keys()?.unlocked)
+    }
+
+    /// [`Self::with_keys`] for a write: one at a time.
+    fn with_write_keys<T>(&self, f: impl FnOnce(&Unlocked) -> Result<T>) -> Result<T> {
+        let _one = lock(&self.writing);
+        self.with_keys(f)
     }
 
     /// The entry at `path`, decrypting (and caching) each folder on the way.
-    fn lookup(&self, u: &Unlocked, cache: &mut Cache, path: &VaultPath) -> Result<Option<Entry>> {
-        Ok(self.resolve(u, cache, path)?.map(|(_, e)| e))
+    fn lookup(&self, u: &Unlocked, path: &VaultPath) -> Result<Option<Entry>> {
+        Ok(self.resolve(u, path)?.map(|(_, e)| e))
     }
 
     /// [`Self::lookup`], with the entry's canonical logical path: each name as
     /// stored, whatever its case in `path` (the cache's keys).
-    fn resolve(
-        &self,
-        u: &Unlocked,
-        cache: &mut Cache,
-        path: &VaultPath,
-    ) -> Result<Option<(String, Entry)>> {
+    fn resolve(&self, u: &Unlocked, path: &VaultPath) -> Result<Option<(String, Entry)>> {
         let mut cur = Entry {
             physical: self.root.join(DATA_DIR),
             folder: Some(FolderId::ROOT),
@@ -241,7 +264,7 @@ impl EncryptedStorage {
             let Some(id) = cur.folder else {
                 return Ok(None);
             };
-            let Some(listing) = load(u, cache, &dir, &cur.physical, id)? else {
+            let Some(listing) = load(u, &self.cache, &dir, &cur.physical, id)? else {
                 return Ok(None);
             };
             let Some((real, next)) = listing.find(name) else {
@@ -258,7 +281,7 @@ impl EncryptedStorage {
     }
 
     /// `None` if the physical entry is gone.
-    fn meta_of(&self, u: &Unlocked, cache: &mut Cache, entry: &Entry) -> Result<Option<Meta>> {
+    fn meta_of(&self, u: &Unlocked, entry: &Entry) -> Result<Option<Meta>> {
         let m = match entry.physical.symlink_metadata() {
             Ok(m) => m,
             Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(None),
@@ -273,7 +296,7 @@ impl EncryptedStorage {
             Some(_) => (Kind::Dir, 0),
             None => (
                 Kind::File,
-                plain_len(u, cache, &entry.physical, mtime, m.len()),
+                plain_len(u, &self.cache, &entry.physical, mtime, m.len()),
             ),
         };
         Ok(Some(Meta {
@@ -285,24 +308,29 @@ impl EncryptedStorage {
     }
 }
 
-/// The cached listing of the folder `dir` (canonical), read if absent; `None`
-/// if its physical folder is gone.
-fn load<'c>(
+/// The cached listing of the folder `dir` (canonical), read (with no lock held)
+/// if absent; `None` if its physical folder is gone.
+fn load(
     u: &Unlocked,
-    cache: &'c mut Cache,
+    cache: &RwLock<Cache>,
     dir: &str,
     physical: &Path,
     id: FolderId,
-) -> Result<Option<&'c names::Listing>> {
-    if !cache.listings.contains_key(dir) {
-        let listing = match names::list(u, physical, id) {
-            Ok(l) => l,
-            Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(None),
-            Err(e) => return Err(io_err(dir, e)),
-        };
-        cache.insert(dir.to_string(), physical, listing);
-    }
-    Ok(cache.listings.get(dir))
+) -> Result<Option<Arc<Listing>>> {
+    let since = {
+        let c = read(cache);
+        if let Some(l) = c.listings.get(dir) {
+            return Ok(Some(Arc::clone(l)));
+        }
+        c.generation
+    };
+    let listing = match names::list(u, physical, id) {
+        Ok(l) => Arc::new(l),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(None),
+        Err(e) => return Err(io_err(dir, e)),
+    };
+    write(cache).insert(since, dir.to_string(), physical, Arc::clone(&listing));
+    Ok(Some(listing))
 }
 
 /// `create` accepts only an empty folder: OS files aside, it allows what a
@@ -332,23 +360,78 @@ fn refuse_non_empty(root: &Path) -> Result<()> {
 
 /// A file's plaintext length, cached by its physical mtime and size. A file
 /// whose content won't open lists as 0 bytes: reading it reports the damage.
-fn plain_len(u: &Unlocked, cache: &mut Cache, physical: &Path, mtime: i128, size: u64) -> u64 {
-    if let Some(&(t, s, len)) = cache.lens.get(physical)
-        && (t, s) == (mtime, size)
-    {
-        return len;
-    }
-    let Some(len) = std::fs::File::open(physical)
+fn plain_len(u: &Unlocked, cache: &RwLock<Cache>, physical: &Path, mtime: i128, size: u64) -> u64 {
+    let since = {
+        let c = read(cache);
+        if let Some(&(t, s, len)) = c.lens.get(physical)
+            && (t, s) == (mtime, size)
+        {
+            return len;
+        }
+        c.generation
+    };
+    let Some(len) = File::open(physical)
         .ok()
         .and_then(|f| StreamReader::open(f, |e| u.content_key(e)).ok())
         .map(|r| r.len())
     else {
         return 0;
     };
-    cache
-        .lens
-        .insert(physical.to_path_buf(), (mtime, size, len));
+    write(cache).insert_len(since, physical, (mtime, size, len));
     len
+}
+
+/// Whether the file opened is the one stat-ed before opening it (no swap in between).
+#[cfg(unix)]
+fn same_file(before: &Metadata, opened: &Metadata) -> bool {
+    use std::os::unix::fs::MetadataExt;
+    (before.dev(), before.ino()) == (opened.dev(), opened.ino())
+}
+
+/// shortcut: no stable file index in std on Windows, so size and mtime stand in;
+/// upgrade when `windows_by_handle` is stable.
+#[cfg(not(unix))]
+fn same_file(before: &Metadata, opened: &Metadata) -> bool {
+    opened.is_file()
+        && before.len() == opened.len()
+        && before.modified().ok() == opened.modified().ok()
+}
+
+/// An open file's plaintext that ends with the keys: once the vault locks, the
+/// next read or seek fails with `Locked` and the file's key is dropped.
+struct KeyedReader {
+    keys: Arc<KeyHolder>,
+    inner: Option<StreamReader<File>>,
+}
+
+impl KeyedReader {
+    fn live(&mut self) -> std::io::Result<&mut StreamReader<File>> {
+        if read(&self.keys).is_none() {
+            self.inner = None;
+        }
+        self.inner
+            .as_mut()
+            .ok_or_else(|| std::io::Error::other(VaultError::Locked))
+    }
+}
+
+impl Read for KeyedReader {
+    fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
+        self.live()?.read(buf)
+    }
+}
+
+impl Seek for KeyedReader {
+    fn seek(&mut self, pos: SeekFrom) -> std::io::Result<u64> {
+        self.live()?.seek(pos)
+    }
+}
+
+/// `Locked` if a read failed because the vault locked under it ([`KeyedReader`]).
+fn locked_read(e: &std::io::Error) -> bool {
+    e.get_ref()
+        .and_then(|e| e.downcast_ref::<VaultError>())
+        .is_some_and(|e| matches!(e, VaultError::Locked))
 }
 
 impl Storage for EncryptedStorage {
@@ -366,24 +449,25 @@ impl Storage for EncryptedStorage {
 
     /// No symlinks in an encrypted vault: `follow` changes nothing.
     fn meta(&self, path: &VaultPath, _follow: Follow) -> Result<Option<Meta>> {
-        self.with_keys(|u, cache| match self.lookup(u, cache, path)? {
-            Some(entry) => self.meta_of(u, cache, &entry),
+        self.with_keys(|u| match self.lookup(u, path)? {
+            Some(entry) => self.meta_of(u, &entry),
             None => Ok(None),
         })
     }
 
     fn children(&self, dir: &VaultPath) -> Result<Vec<Child>> {
-        self.with_keys(|u, cache| {
+        self.with_keys(|u| {
             let not_found = || VaultError::NotFound(dir.to_string());
-            let (canon, entry) = self.resolve(u, cache, dir)?.ok_or_else(not_found)?;
+            let (canon, entry) = self.resolve(u, dir)?.ok_or_else(not_found)?;
             let id = entry.folder.ok_or_else(not_found)?;
+            let since = read(&self.cache).generation;
             // Always re-read: a listing is how changes from elsewhere (sync) come in.
             let listing =
                 names::list(u, &entry.physical, id).map_err(|e| io_err(dir.as_str(), e))?;
             let mut out = Vec::new();
             for (name, e) in &listing.entries {
                 // Gone or unstattable since the listing: skipped silently, as `PlainStorage` does.
-                if let Ok(Some(meta)) = self.meta_of(u, cache, e) {
+                if let Ok(Some(meta)) = self.meta_of(u, e) {
                     out.push(Child::Entry {
                         name: name.clone(),
                         meta,
@@ -396,7 +480,7 @@ impl Storage for EncryptedStorage {
                     p.display()
                 ))
             }));
-            cache.insert(canon, &entry.physical, listing);
+            write(&self.cache).insert(since, canon, &entry.physical, Arc::new(listing));
             Ok(out)
         })
     }
@@ -404,9 +488,13 @@ impl Storage for EncryptedStorage {
     fn read(&self, path: &VaultPath) -> Result<Vec<u8>> {
         let mut r = self.open_read(path, Reach::Any)?;
         let mut out = Vec::with_capacity(usize::try_from(r.len).unwrap_or(0));
-        r.inner
-            .read_to_end(&mut out)
-            .map_err(|e| content_err(path, e.into()))?;
+        r.inner.read_to_end(&mut out).map_err(|e| {
+            if locked_read(&e) {
+                VaultError::Locked
+            } else {
+                content_err(path, e.into())
+            }
+        })?;
         Ok(out)
     }
 
@@ -415,24 +503,35 @@ impl Storage for EncryptedStorage {
         if reach == Reach::Visible && crate::is_hidden_path(path.as_str()) {
             return Err(VaultError::OutsideVault(path.to_string()));
         }
-        self.with_keys(|u, cache| {
+        self.with_keys(|u| {
             let entry = self
-                .lookup(u, cache, path)?
+                .lookup(u, path)?
                 .ok_or_else(|| VaultError::NotFound(path.to_string()))?;
+            let not_file = || VaultError::NotFound(format!("{path} is not a file"));
             if entry.folder.is_some() {
-                return Err(VaultError::NotFound(format!("{path} is not a file")));
+                return Err(not_file());
             }
-            // Never follow a link swapped in since the listing.
-            if !entry.physical.symlink_metadata().is_ok_and(|m| m.is_file()) {
-                return Err(VaultError::NotFound(format!("{path} is not a file")));
+            // Never follow a link swapped in since the listing, nor one swapped
+            // in between this check and the open.
+            let before = entry
+                .physical
+                .symlink_metadata()
+                .ok()
+                .filter(Metadata::is_file)
+                .ok_or_else(not_file)?;
+            let file = File::open(&entry.physical).map_err(|e| io_err(path.as_str(), e))?;
+            let opened = file.metadata().map_err(|e| io_err(path.as_str(), e))?;
+            if !same_file(&before, &opened) {
+                return Err(not_file());
             }
-            let file =
-                std::fs::File::open(&entry.physical).map_err(|e| io_err(path.as_str(), e))?;
             let r =
                 StreamReader::open(file, |e| u.content_key(e)).map_err(|e| content_err(path, e))?;
             Ok(Reader {
                 len: r.len(),
-                inner: Box::new(r),
+                inner: Box::new(KeyedReader {
+                    keys: Arc::clone(&self.keys),
+                    inner: Some(r),
+                }),
             })
         })
     }
@@ -481,13 +580,11 @@ impl Storage for EncryptedStorage {
 
     /// Same physical entry after name resolution, which folds case.
     fn same_entry(&self, a: &VaultPath, b: &VaultPath) -> bool {
-        self.with_keys(|u, cache| {
-            Ok(
-                match (self.lookup(u, cache, a)?, self.lookup(u, cache, b)?) {
-                    (Some(x), Some(y)) => x.physical == y.physical,
-                    _ => false,
-                },
-            )
+        self.with_keys(|u| {
+            Ok(match (self.lookup(u, a)?, self.lookup(u, b)?) {
+                (Some(x), Some(y)) => x.physical == y.physical,
+                _ => false,
+            })
         })
         .unwrap_or(false)
     }
@@ -511,7 +608,7 @@ mod tests {
         };
         let (s, _) = EncryptedStorage::create_insecure(dir.path(), "pw", tiny).unwrap();
         assert!(format!("{s:?}").contains("locked: false"));
-        let held = lock(&s.keys);
+        let held = write(&s.keys);
         assert!(format!("{s:?}").contains("locked: busy"));
         drop(held);
         s.lock();

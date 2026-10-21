@@ -148,6 +148,9 @@ proptest! {
     #![proptest_config(ProptestConfig::with_cases(48))]
     #[test]
     fn exp_04_file_rename_preserves_targets_and_bytes(c in case()) {
+        if liber_testkit::plain_disk_only() {
+            return Ok(());
+        }
         let paths: Vec<String> = c.files.iter().map(|&(f, n)| path(f, n)).collect();
         let (file_idx, new_folder, new_name) = c.rename;
         let to = path(new_folder, new_name);
@@ -159,6 +162,9 @@ proptest! {
 
     #[test]
     fn exp_04_folder_move_preserves_targets_and_bytes(c in case()) {
+        if liber_testkit::plain_disk_only() {
+            return Ok(());
+        }
         let paths: Vec<String> = c.files.iter().map(|&(f, n)| path(f, n)).collect();
         prop_assume!(paths.iter().any(|p| p.starts_with("x/")));
         let map = |p: &str| match p.strip_prefix("x/") {

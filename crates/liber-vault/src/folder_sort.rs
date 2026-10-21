@@ -53,6 +53,9 @@ mod tests {
 
     #[test]
     fn m5b_r2_folder_sorts_are_kept_follow_renames_and_are_forgotten() {
+        if liber_testkit::plain_disk_only() {
+            return;
+        }
         let dir = tempfile::tempdir().unwrap();
         let vault = Vault::open(dir.path()).unwrap();
         vault.set_folder_sort("", FolderSort::ModifiedDesc).unwrap();

@@ -5,7 +5,7 @@
 //! so its children are untouched.
 
 use super::names::{Cache, Entry, one_component, serves, side_file, side_owner};
-use super::{EncryptedStorage, load, lock};
+use super::{EncryptedStorage, load, write};
 use crate::error::{Result, VaultError, io_err};
 use crate::path::VaultPath;
 use crate::storage::plain::sync_dir;
@@ -16,7 +16,7 @@ use liber_crypto::{
 use std::fs::File;
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, RwLock};
 
 /// Where a new entry `name` goes: its parent folder (canonical logical path,
 /// physical folder, id), and what is already there under that name, case folded.
@@ -43,7 +43,7 @@ pub(super) struct Pending {
     path: String,
     /// The parent folder's canonical path, whose cached listing goes on commit.
     dir: String,
-    cache: Arc<Mutex<Cache>>,
+    cache: Arc<RwLock<Cache>>,
 }
 
 /// The temp file. `budget` is how many more bytes it accepts: `u64::MAX`,
@@ -118,7 +118,7 @@ impl Pending {
             Ok(())
         })()
         .map_err(|e| io_err(&*self.path, e))?;
-        lock(&self.cache).listings.remove(&self.dir);
+        write(&self.cache).drop_listing(&self.dir);
         Ok(())
     }
 }
@@ -193,21 +193,6 @@ fn temp_name() -> String {
     format!(".{hex}.liber-tmp")
 }
 
-/// The canonical parent folder of a canonical path (`""` is the root).
-fn parent_of(canon: &str) -> &str {
-    canon.rsplit_once('/').map_or("", |(dir, _)| dir)
-}
-
-/// Drops what the cache knows of the entry `canon` after it moved or went: its
-/// parent's listing and, for a folder, every listing under it.
-pub(super) fn forget(cache: &mut Cache, canon: &str) {
-    cache.listings.remove(parent_of(canon));
-    let below = format!("{canon}/");
-    cache
-        .listings
-        .retain(|k, _| k != canon && !k.starts_with(&below));
-}
-
 fn refuse_root(path: &VaultPath, what: &str) -> Result<()> {
     if path.is_root() {
         return Err(VaultError::OutsideVault(format!(
@@ -218,13 +203,13 @@ fn refuse_root(path: &VaultPath, what: &str) -> Result<()> {
 }
 
 impl EncryptedStorage {
-    fn target(&self, u: &Unlocked, cache: &mut Cache, path: &VaultPath) -> Result<Target> {
+    fn target(&self, u: &Unlocked, path: &VaultPath) -> Result<Target> {
         refuse_root(path, "write")?;
         let parent = path.parent().unwrap_or_else(VaultPath::root);
         let not_found = || VaultError::NotFound(parent.to_string());
-        let (dir, entry) = self.resolve(u, cache, &parent)?.ok_or_else(not_found)?;
+        let (dir, entry) = self.resolve(u, &parent)?.ok_or_else(not_found)?;
         let id = entry.folder.ok_or_else(not_found)?;
-        let listing = load(u, cache, &dir, &entry.physical, id)?.ok_or_else(not_found)?;
+        let listing = load(u, &self.cache, &dir, &entry.physical, id)?.ok_or_else(not_found)?;
         let name = path.file_name().to_string();
         let existing = listing.find(&name).map(|(n, e)| (n.to_string(), e.clone()));
         Ok(Target {
@@ -281,8 +266,8 @@ impl EncryptedStorage {
         mode: Replace,
         budget: u64,
     ) -> Result<()> {
-        let mut p = self.with_keys(|u, cache| {
-            let t = self.target(u, cache, path)?;
+        let mut p = self.with_write_keys(|u| {
+            let t = self.target(u, path)?;
             let (target, side) = match &t.existing {
                 Some(_) if mode == Replace::CreateOnly => {
                     return Err(VaultError::AlreadyExists(path.to_string()));
@@ -319,8 +304,8 @@ impl EncryptedStorage {
     }
 
     pub(super) fn new_file(&self, path: &VaultPath) -> Result<Pending> {
-        self.with_keys(|u, cache| {
-            let t = self.target(u, cache, path)?;
+        self.with_write_keys(|u| {
+            let t = self.target(u, path)?;
             if t.existing.is_some() {
                 return Err(VaultError::AlreadyExists(path.to_string()));
             }
@@ -331,8 +316,8 @@ impl EncryptedStorage {
     }
 
     pub(super) fn make_dir(&self, path: &VaultPath) -> Result<()> {
-        self.with_keys(|u, cache| {
-            let t = self.target(u, cache, path)?;
+        self.with_write_keys(|u| {
+            let t = self.target(u, path)?;
             if t.existing.is_some() {
                 return Err(VaultError::AlreadyExists(path.to_string()));
             }
@@ -340,7 +325,7 @@ impl EncryptedStorage {
             let dst = t.parent.join(name);
             place(&t.parent, &dst, side.as_ref(), || std::fs::create_dir(&dst))
                 .map_err(|e| io_err(path.as_str(), e))?;
-            cache.listings.remove(&t.dir);
+            write(&self.cache).drop_listing(&t.dir);
             Ok(())
         })
     }
@@ -348,9 +333,9 @@ impl EncryptedStorage {
     /// `remove_file`, or `remove_empty_dir` when `dir`.
     pub(super) fn remove(&self, path: &VaultPath, dir: bool) -> Result<()> {
         refuse_root(path, "remove")?;
-        self.with_keys(|u, cache| {
+        self.with_write_keys(|u| {
             let (canon, e) = self
-                .resolve(u, cache, path)?
+                .resolve(u, path)?
                 .ok_or_else(|| VaultError::NotFound(path.to_string()))?;
             if e.folder.is_some() != dir {
                 let kind = if dir { "folder" } else { "file" };
@@ -367,7 +352,7 @@ impl EncryptedStorage {
                 _ => io_err(path.as_str(), err),
             })?;
             remove_side(&e.physical);
-            forget(cache, &canon);
+            write(&self.cache).forget(&canon);
             Ok(())
         })
     }
@@ -377,11 +362,11 @@ impl EncryptedStorage {
     pub(super) fn move_entry(&self, from: &VaultPath, to: &VaultPath) -> Result<()> {
         refuse_root(from, "rename")?;
         refuse_root(to, "rename")?;
-        self.with_keys(|u, cache| {
+        self.with_write_keys(|u| {
             let (canon, e) = self
-                .resolve(u, cache, from)?
+                .resolve(u, from)?
                 .ok_or_else(|| VaultError::NotFound(from.to_string()))?;
-            let t = self.target(u, cache, to)?;
+            let t = self.target(u, to)?;
             if let Some((name, there)) = &t.existing {
                 // The one clash allowed: a case-only rename of the entry itself.
                 if there.physical != e.physical || *name == t.name {
@@ -401,26 +386,28 @@ impl EncryptedStorage {
             })?;
             remove_side(&e.physical);
             sync_dir(&t.parent);
-            forget(cache, &canon);
-            cache.listings.remove(&t.dir);
+            let mut cache = write(&self.cache);
+            cache.forget(&canon);
+            cache.drop_listing(&t.dir);
             Ok(())
         })
     }
 
     pub(super) fn trash(&self, path: &VaultPath) -> Result<()> {
         refuse_root(path, "trash")?;
-        self.with_keys(|u, cache| {
+        self.with_write_keys(|u| {
             let (canon, e) = self
-                .resolve(u, cache, path)?
+                .resolve(u, path)?
                 .ok_or_else(|| VaultError::NotFound(path.to_string()))?;
             let os_err = |err: trash::Error| VaultError::Io {
                 path: path.to_string(),
                 source: std::io::Error::other(err.to_string()),
             };
+            // Neither the keys nor the cache is held here, only the write turn.
             trash::delete(&e.physical).map_err(os_err)?;
             // The entry is gone: forget it whatever happens to the side file, which
             // is harmless if left (as in `remove_side`).
-            forget(cache, &canon);
+            write(&self.cache).forget(&canon);
             for side in unused_sides(&e.physical) {
                 let _ = trash::delete(side);
             }

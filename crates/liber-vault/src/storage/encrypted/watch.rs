@@ -3,15 +3,14 @@
 //! can't map becomes [`RawEvent::Overflow`], so the session rescans.
 
 use super::names::{self, Cache, side_owner};
-use super::write::forget;
-use super::{DATA_DIR, EncryptedStorage, Keys, load, lock};
+use super::{DATA_DIR, EncryptedStorage, KeyHolder, load, read, write};
 use crate::error::{Result, VaultError};
 use crate::path::VaultPath;
 use crate::storage::{RawEvent, WatchGuard};
 use liber_crypto::{FolderId, Unlocked};
 use notify::{Event, RecursiveMode, Watcher as _};
 use std::path::{Component, Path, PathBuf};
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, RwLock};
 
 pub(super) fn watch(
     s: &EncryptedStorage,
@@ -45,8 +44,8 @@ pub(super) fn watch(
 struct Translate {
     /// `<root>/d`, the root canonical.
     data: PathBuf,
-    keys: Arc<Mutex<Option<Keys>>>,
-    cache: Arc<Mutex<Cache>>,
+    keys: Arc<KeyHolder>,
+    cache: Arc<RwLock<Cache>>,
 }
 
 impl Translate {
@@ -57,15 +56,13 @@ impl Translate {
             Ok(event) if !event.need_rescan() => event,
             _ => return vec![RawEvent::Overflow],
         };
-        // Keys, then cache (the storage's lock order).
-        let keys = lock(&self.keys);
-        let Some(keys) = keys.as_ref() else {
+        // A clone: no lock is held while paths are resolved and listings read.
+        let Some(keys) = read(&self.keys).clone() else {
             return vec![RawEvent::Overflow];
         };
-        let mut cache = lock(&self.cache);
         let mut out: Vec<RawEvent> = Vec::new();
         for p in &event.paths {
-            let ev = self.one(&keys.unlocked, &mut cache, p);
+            let ev = self.one(&keys.unlocked, p);
             if let Some(ev) = ev.filter(|ev| !out.contains(ev)) {
                 out.push(ev);
             }
@@ -74,7 +71,7 @@ impl Translate {
     }
 
     /// `None` for a path to drop.
-    fn one(&self, u: &Unlocked, cache: &mut Cache, p: &Path) -> Option<RawEvent> {
+    fn one(&self, u: &Unlocked, p: &Path) -> Option<RawEvent> {
         // As canonical as the cache's paths (`/var` vs `/private/var` on macOS).
         let p = match (
             p.parent().and_then(|d| dunce::canonicalize(d).ok()),
@@ -100,14 +97,14 @@ impl Translate {
         if last.starts_with('.') || side_owner(last).is_some() {
             return None;
         }
-        let Some(canon) = self.logical(u, cache, &parts, last) else {
+        let Some(canon) = self.logical(u, &parts, last) else {
             return Some(RawEvent::Overflow);
         };
         let Ok(path) = VaultPath::new(&canon) else {
             return Some(RawEvent::Overflow);
         };
         // Reads after this event must see the change.
-        forget(cache, &canon);
+        write(&self.cache).forget(&canon);
         Some(if p.symlink_metadata().is_ok() {
             RawEvent::Changed(path)
         } else {
@@ -117,18 +114,12 @@ impl Translate {
 
     /// The canonical logical path of `<d>/<dirs…>/<last>`: each folder through
     /// its (re-read if dropped) listing, `last` by decrypting its name.
-    fn logical(
-        &self,
-        u: &Unlocked,
-        cache: &mut Cache,
-        dirs: &[&str],
-        last: &str,
-    ) -> Option<String> {
+    fn logical(&self, u: &Unlocked, dirs: &[&str], last: &str) -> Option<String> {
         let mut physical = self.data.clone();
         let mut id = FolderId::ROOT;
         let mut canon = String::new();
         for part in dirs {
-            let listing = load(u, cache, &canon, &physical, id).ok()??;
+            let listing = load(u, &self.cache, &canon, &physical, id).ok()??;
             physical.push(part);
             let (name, e) = listing
                 .entries

@@ -126,6 +126,9 @@ mod tests {
 
     #[test]
     fn obsidians_new_link_format_applies_until_liber_has_its_own() {
+        if liber_testkit::plain_disk_only() {
+            return;
+        }
         let (dir, v) = vault(Some(r#"{ "newLinkFormat": "absolute", "x": 1 }"#));
         assert_eq!(v.link_formats().obsidian, Some(LinkFormat::Vault));
         assert_eq!(v.link_formats().effective(), LinkFormat::Vault);
@@ -142,6 +145,9 @@ mod tests {
 
     #[test]
     fn the_setting_keeps_other_keys_and_ignores_unknown_values() {
+        if liber_testkit::plain_disk_only() {
+            return;
+        }
         let (dir, v) = vault(Some(r#"{ "newLinkFormat": "weird" }"#));
         std::fs::create_dir(dir.path().join(".liber")).unwrap();
         std::fs::write(

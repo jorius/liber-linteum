@@ -69,11 +69,19 @@ To fix a failure, route the call through `Vault`. Mark the line only if it truly
 - `plain` (the default);
 - `pass-through`: a `PassThrough` that delegates every method to `PlainStorage`. A suite that passes on it doesn't depend on the concrete type. It is a smoke switch only: it can't catch a caller that relies on plain behaviour (a missing `finish`, an `os_path` that only plain answers). The real proof is `LIBER_TEST_STORAGE=encrypted` in E3.
 
-An unknown name panics, so a typo can't silently test plain storage. E3 adds `encrypted`.
+- `encrypted` (E3, needs `liber-vault/test-params` too): `seal_in_place` moves the plaintext tree into a fresh encrypted vault in the same folder (passphrase `TEST_PASSPHRASE`, tiny Argon2 parameters) and unlocks it; a folder sealed already is just unlocked. It refuses a folder outside the system temp folder, so a committed fixture is never sealed. Symlinks and non-UTF-8 names are left out.
+
+An unknown name panics, so a typo can't silently test plain storage.
 
 ```sh
 LIBER_TEST_STORAGE=pass-through cargo test --workspace
+LIBER_TEST_STORAGE=encrypted cargo test -p liber-vault -p liber-session -p liber-index -p liber-import \
+  --features liber-vault/test-storage,liber-vault/test-params
 ```
+
+On `encrypted`, a test that reads or writes the plaintext tree on disk after opening (or relies on symlinks, permission bits, mtimes set before opening, or OS paths) starts with `if liber_testkit::plain_disk_only() { return; }`. E3 Task 4 gated 185 tests this way; every other test passes on encrypted storage.
+
+Outside the switch, `Vault::open` on an encrypted folder fails with `VaultError::Locked`: an encrypted vault opens only through `EncryptedStorage::unlock` and `VaultSession::open_encrypted`, whose index lives in memory (spec §5.1).
 
 The feature is enabled only through `[dev-dependencies]`: in liber-vault itself, liber-session, liber-import and src-tauri. Release builds never read the variable.
 

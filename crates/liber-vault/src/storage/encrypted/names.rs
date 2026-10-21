@@ -5,6 +5,7 @@ use liber_crypto::{FolderId, NameCodec, Unlocked, shorten, strip_conflict};
 use std::collections::{BTreeMap, HashMap};
 use std::io::Read;
 use std::path::{Component, Path, PathBuf};
+use std::sync::Arc;
 use unicode_normalization::UnicodeNormalization;
 
 /// One decrypted entry: `folder` is `Some(id)` for a folder.
@@ -49,23 +50,64 @@ pub(super) fn side_file(physical: &Path) -> Option<PathBuf> {
     (physical.extension()? == "liberl").then(|| physical.with_extension("libern"))
 }
 
+/// Shared by every reader, writer and the watcher, and never locked across disk
+/// I/O or decryption: a listing is read unlocked and cached after, unless the
+/// cache was invalidated meanwhile (`generation`).
 #[derive(Debug, Default)]
 pub(super) struct Cache {
     /// Keyed by logical folder path (`""` is the root).
-    pub listings: HashMap<String, Listing>,
+    pub listings: HashMap<String, Arc<Listing>>,
     /// Physical file → (mtime_ns, size, plaintext length).
     pub lens: HashMap<PathBuf, (i128, u64, u64)>,
     /// Physical folder → its last listing's unreadable entries. Kept when the
     /// listing itself is dropped, so writes elsewhere don't hide them.
     pub unreadable: BTreeMap<PathBuf, Vec<(PathBuf, String)>>,
+    /// Bumped by every invalidation, so what was read before one isn't cached after it.
+    pub generation: u64,
+    /// Locked: a call that took the keys just before caches nothing after.
+    closed: bool,
 }
 
 impl Cache {
-    /// Caches `listing`, read from the physical folder `physical`, as the folder `dir`.
-    pub fn insert(&mut self, dir: String, physical: &Path, listing: Listing) {
+    /// Caches `listing`, read from the physical folder `physical` as the folder
+    /// `dir` after the cache was at generation `since`; dropped if stale.
+    pub fn insert(&mut self, since: u64, dir: String, physical: &Path, listing: Arc<Listing>) {
+        if self.closed || since != self.generation {
+            return;
+        }
         self.unreadable
             .insert(physical.to_path_buf(), listing.unreadable.clone());
         self.listings.insert(dir, listing);
+    }
+
+    /// Caches a file's plaintext length, read after generation `since`.
+    pub fn insert_len(&mut self, since: u64, physical: &Path, stat: (i128, u64, u64)) {
+        if !self.closed && since == self.generation {
+            self.lens.insert(physical.to_path_buf(), stat);
+        }
+    }
+
+    /// Drops the folder `dir`'s listing after a change in it.
+    pub fn drop_listing(&mut self, dir: &str) {
+        self.generation += 1;
+        self.listings.remove(dir);
+    }
+
+    /// Drops what the cache knows of the entry `canon` after it moved or went:
+    /// its parent's listing and, for a folder, every listing under it.
+    pub fn forget(&mut self, canon: &str) {
+        self.drop_listing(canon.rsplit_once('/').map_or("", |(dir, _)| dir));
+        let below = format!("{canon}/");
+        self.listings
+            .retain(|k, _| k != canon && !k.starts_with(&below));
+    }
+
+    /// Everything decrypted goes, for good (lock: a new unlock makes a new storage).
+    pub fn close(&mut self) {
+        *self = Cache {
+            closed: true,
+            ..Cache::default()
+        };
     }
 }
 
@@ -255,8 +297,30 @@ fn first_ok<T>(
 
 #[cfg(test)]
 mod tests {
-    use super::{fold, one_component, side_file};
+    use super::{Cache, Listing, fold, one_component, side_file};
     use std::path::Path;
+    use std::sync::Arc;
+
+    #[test]
+    fn a_listing_read_before_an_invalidation_or_lock_is_not_cached() {
+        let empty = || {
+            Arc::new(Listing {
+                entries: Default::default(),
+                unreadable: Vec::new(),
+            })
+        };
+        let mut c = Cache::default();
+        let since = c.generation;
+        c.drop_listing("x");
+        c.insert(since, "x".into(), Path::new("d/x"), empty());
+        assert!(c.listings.is_empty(), "stale");
+        c.insert(c.generation, "x".into(), Path::new("d/x"), empty());
+        assert_eq!(c.listings.len(), 1);
+        c.close();
+        c.insert(c.generation, "x".into(), Path::new("d/x"), empty());
+        c.insert_len(c.generation, Path::new("d/x/f"), (0, 0, 0));
+        assert!(c.listings.is_empty() && c.lens.is_empty() && c.unreadable.is_empty());
+    }
 
     #[test]
     fn fold_ignores_case_and_normal_form() {

@@ -34,6 +34,9 @@ fn all_targets(s: &VaultSession) -> Vec<(String, Option<String>)> {
 
 #[test]
 fn exp_04_rename_page_rewrites_wikilinks_related_and_markdown_links() {
+    if liber_testkit::plain_disk_only() {
+        return;
+    }
     let (dir, _c, s) = session("obsidian-basic");
     let out = s
         .rename(
@@ -84,6 +87,9 @@ fn exp_04_rename_page_rewrites_wikilinks_related_and_markdown_links() {
 
 #[test]
 fn exp_04_rename_attachment_rewrites_cover_and_embeds() {
+    if liber_testkit::plain_disk_only() {
+        return;
+    }
     let (dir, _c, s) = session("obsidian-basic");
     s.rename(
         &vp("Character Design/assets/rex-cover.png"),
@@ -104,6 +110,9 @@ fn exp_04_rename_attachment_rewrites_cover_and_embeds() {
 
 #[test]
 fn exp_02_04_move_folder_rewrites_only_links_that_would_break() {
+    if liber_testkit::plain_disk_only() {
+        return;
+    }
     let (dir, _c, s) = session("obsidian-basic");
     let before_mine = read(&dir, "Character Design/My characters.md");
     s.create_folder(&VaultPath::root(), "Archive").unwrap();
@@ -139,6 +148,9 @@ fn exp_02_04_move_folder_rewrites_only_links_that_would_break() {
 
 #[test]
 fn exp_04_moving_a_page_fixes_its_own_relative_links() {
+    if liber_testkit::plain_disk_only() {
+        return;
+    }
     let (dir, _c, s) = session("obsidian-basic");
     s.rename(
         &vp("Character Design/rex-draft.md"),
@@ -185,6 +197,9 @@ fn exp_04_moving_a_page_fixes_its_own_relative_links() {
 
 #[test]
 fn exp_04_ambiguity_keeps_every_link_on_its_target() {
+    if liber_testkit::plain_disk_only() {
+        return;
+    }
     let (dir, _c, s) = session("ambiguous-names");
     let out = s
         .rename(&vp("Archive/Old/Ideas.md"), &vp("Elsewhere/Ideas.md"), true)
@@ -244,6 +259,9 @@ fn exp_04_rewrite_disabled_only_moves() {
 
 #[test]
 fn exp_02_case_only_rename_of_a_page() {
+    if liber_testkit::plain_disk_only() {
+        return;
+    }
     let (dir, _c, s) = session("ambiguous-names");
     s.rename(&vp("Links.md"), &vp("links.md"), true).unwrap();
     let names: Vec<_> = std::fs::read_dir(dir.path())
@@ -292,6 +310,9 @@ fn vault_with(files: &[(&str, &[u8])]) -> (tempfile::TempDir, tempfile::TempDir,
 /// recognise used to produce overlapping edits that corrupted the note.
 #[test]
 fn exp_04_linked_image_and_unrecognised_frontmatter_rewrite_cleanly() {
+    if liber_testkit::plain_disk_only() {
+        return;
+    }
     let (dir, _c, s) = vault_with(&[
         ("x.png", b"png"),
         ("A.md", b"# A\n"),
@@ -315,6 +336,9 @@ fn exp_04_linked_image_and_unrecognised_frontmatter_rewrite_cleanly() {
 /// Final review I1: names that cannot be linked to are refused up front.
 #[test]
 fn exp_02_names_that_would_break_links_are_rejected() {
+    if liber_testkit::plain_disk_only() {
+        return;
+    }
     let (dir, _c, s) = vault_with(&[("A.md", b"# A\n"), ("p.md", b"[[A]]\n")]);
     for bad in [
         "C# basics.md",
@@ -348,6 +372,9 @@ fn exp_02_names_that_would_break_links_are_rejected() {
 /// destination gets %-encoded, so the link keeps pointing at the file.
 #[test]
 fn exp_04_markdown_destination_into_hash_folder_is_encoded() {
+    if liber_testkit::plain_disk_only() {
+        return;
+    }
     let (dir, _c, s) = vault_with(&[
         ("A.md", b"# A\n"),
         ("C#/keep.md", b"x\n"),
@@ -369,6 +396,9 @@ fn exp_04_markdown_destination_into_hash_folder_is_encoded() {
 /// reported instead of being rewritten to a link that resolves elsewhere.
 #[test]
 fn exp_04_unlinkable_rewrite_is_reported_not_written() {
+    if liber_testkit::plain_disk_only() {
+        return;
+    }
     let (dir, _c, s) = vault_with(&[
         ("A.md", b"# A\n"),
         ("B/A.md", b"# other A\n"),
@@ -386,6 +416,10 @@ fn exp_04_unlinkable_rewrite_is_reported_not_written() {
 #[cfg(unix)]
 #[test]
 fn exp_04_symlinked_notes_stay_symlinks() {
+    // No symlinks in an encrypted vault (E3).
+    if liber_testkit::plain_disk_only() {
+        return;
+    }
     let (dir, _c, s) = vault_with(&[("A.md", b"# A\n"), ("real.md", b"[[A]]\n")]);
     std::os::unix::fs::symlink(dir.path().join("real.md"), dir.path().join("alias.md")).unwrap();
     drop(s);
@@ -467,6 +501,9 @@ fn m5b_folder_icons_follow_renames() {
 /// pages too, so they keep working once unarchived.
 #[test]
 fn m5b_r2_review_m1_a_rename_rewrites_links_inside_archived_pages() {
+    if liber_testkit::plain_disk_only() {
+        return;
+    }
     let vault = copy_fixture("obsidian-basic");
     std::fs::create_dir_all(vault.path().join(".archive")).unwrap();
     std::fs::write(
@@ -519,6 +556,9 @@ fn pair(a: &str, b: &str) -> Option<(String, String)> {
 
 #[test]
 fn r3b_renaming_a_folder_renames_its_page() {
+    if liber_testkit::plain_disk_only() {
+        return;
+    }
     let (dir, _c, s) = lore_session(&[]);
     let out = s.rename(&vp("Lore"), &vp("Myths"), true).unwrap();
     assert!(dir.path().join("Myths/Myths.md").exists());
@@ -534,6 +574,9 @@ fn r3b_renaming_a_folder_renames_its_page() {
 
 #[test]
 fn r3b_renaming_a_folder_page_renames_its_folder() {
+    if liber_testkit::plain_disk_only() {
+        return;
+    }
     let (dir, _c, s) = lore_session(&[]);
     let out = s
         .rename(&vp("Lore/Lore.md"), &vp("Lore/Myths.md"), true)
@@ -551,6 +594,9 @@ fn r3b_renaming_a_folder_page_renames_its_folder() {
 
 #[test]
 fn r3b_a_taken_pair_name_refuses_the_whole_rename() {
+    if liber_testkit::plain_disk_only() {
+        return;
+    }
     let (dir, _c, s) = lore_session(&["Myths"]);
     let err = s
         .rename(&vp("Lore/Lore.md"), &vp("Lore/Myths.md"), true)
@@ -568,6 +614,9 @@ fn r3b_a_taken_pair_name_refuses_the_whole_rename() {
 
 #[test]
 fn r3b_moving_a_page_into_its_namesake_folder_is_a_plain_move() {
+    if liber_testkit::plain_disk_only() {
+        return;
+    }
     let (dir, _c, s) = lore_session(&["Saga"]);
     s.create_page(&VaultPath::root(), "Saga").unwrap();
     let out = s.rename(&vp("Saga.md"), &vp("Saga/Saga.md"), true).unwrap();
@@ -577,6 +626,9 @@ fn r3b_moving_a_page_into_its_namesake_folder_is_a_plain_move() {
 
 #[test]
 fn r3b_plain_renames_have_no_pair() {
+    if liber_testkit::plain_disk_only() {
+        return;
+    }
     let (dir, _c, s) = lore_session(&[]);
     let out = s
         .rename(&vp("Lore/Other.md"), &vp("Lore/Else.md"), true)
@@ -589,6 +641,9 @@ fn r3b_plain_renames_have_no_pair() {
 // coordinates before anything moves.
 #[test]
 fn r3b_review_folder_renamed_onto_a_sibling_page_name_refuses_before_moving() {
+    if liber_testkit::plain_disk_only() {
+        return;
+    }
     let (dir, _c, s) = lore_session(&[]);
     // `Lore/Other.md` is where the paired page would land as `Other/Other.md`.
     let err = s.rename(&vp("Lore"), &vp("Other"), true).unwrap_err();
@@ -607,6 +662,9 @@ fn r3b_review_folder_renamed_onto_a_sibling_page_name_refuses_before_moving() {
 
 #[test]
 fn r3b_review_a_folder_name_the_vault_refuses_stops_the_page_rename_too() {
+    if liber_testkit::plain_disk_only() {
+        return;
+    }
     let (dir, _c, s) = lore_session(&[]);
     let err = s.rename(&vp("Lore/Lore.md"), &vp("Lore/Myths .md"), true);
     assert!(err.is_err(), "{err:?}");
@@ -618,6 +676,9 @@ fn r3b_review_a_folder_name_the_vault_refuses_stops_the_page_rename_too() {
 // at the paths they have after the second.
 #[test]
 fn r3b_review_updated_files_are_reported_where_they_end_up() {
+    if liber_testkit::plain_disk_only() {
+        return;
+    }
     let (dir, _c, s) = vault_with(&[
         ("Lore/Lore.md", b"# Lore\n"),
         ("Lore/Other.md", b"# Other\n\nUp: [[Lore]]\n"),
@@ -640,6 +701,9 @@ fn r3b_review_updated_files_are_reported_where_they_end_up() {
 // whatever the letters (Unicode, not ASCII, case).
 #[test]
 fn r3b_review_case_only_pair_rename_with_an_accented_letter() {
+    if liber_testkit::plain_disk_only() {
+        return;
+    }
     let vault = copy_fixture("obsidian-basic");
     std::fs::create_dir_all(vault.path().join("árbol")).unwrap();
     std::fs::write(vault.path().join("árbol/árbol.md"), "# árbol\n").unwrap();
@@ -671,6 +735,9 @@ fn names(dir: &tempfile::TempDir, rel: &str) -> Vec<String> {
 /// Round 3 §9: `SmartJob/Smartjob.md` is its folder's page despite the case.
 #[test]
 fn subpages_case_variant_page_renames_with_its_folder() {
+    if liber_testkit::plain_disk_only() {
+        return;
+    }
     let (dir, _c, s) = vault_with(&[
         ("SmartJob/Smartjob.md", b"# S\n"),
         ("SmartJob/Teams.md", b""),
@@ -681,6 +748,9 @@ fn subpages_case_variant_page_renames_with_its_folder() {
 
 #[test]
 fn subpages_renaming_a_case_variant_page_moves_its_folder() {
+    if liber_testkit::plain_disk_only() {
+        return;
+    }
     let (dir, _c, s) = vault_with(&[
         ("SmartJob/Smartjob.md", b"# S\n"),
         ("SmartJob/Teams.md", b""),
@@ -696,6 +766,9 @@ fn subpages_renaming_a_case_variant_page_moves_its_folder() {
 /// the folder where it is.
 #[test]
 fn subpages_matching_the_page_name_keeps_the_folder() {
+    if liber_testkit::plain_disk_only() {
+        return;
+    }
     let (dir, _c, s) = vault_with(&[("SmartJob/Smartjob.md", b"# S\n")]);
     let out = s
         .rename(
@@ -712,6 +785,9 @@ fn subpages_matching_the_page_name_keeps_the_folder() {
 /// Add sub-page on a plain page: `P.md` becomes `P/P.md`, links follow.
 #[test]
 fn subpages_plain_page_becomes_its_folder_page() {
+    if liber_testkit::plain_disk_only() {
+        return;
+    }
     let (dir, _c, s) = vault_with(&[
         ("Notes/P.md", b"# P\n"),
         ("Other.md", b"See [p](Notes/P.md).\n"),
@@ -725,6 +801,9 @@ fn subpages_plain_page_becomes_its_folder_page() {
 
 #[test]
 fn subpages_existing_folder_without_a_page_takes_it() {
+    if liber_testkit::plain_disk_only() {
+        return;
+    }
     let (dir, _c, s) = vault_with(&[("P.md", b""), ("p/child.md", b"")]);
     let (folder, page, _) = s.make_folder_page(&vp("P.md"), true).unwrap();
     if case_insensitive(&dir) {
@@ -739,6 +818,9 @@ fn subpages_existing_folder_without_a_page_takes_it() {
 
 #[test]
 fn subpages_refuses_and_moves_nothing() {
+    if liber_testkit::plain_disk_only() {
+        return;
+    }
     // The folder name is taken by a file.
     let (dir, _c, s) = vault_with(&[("P.md", b""), ("P", b"not a folder")]);
     assert!(s.make_folder_page(&vp("P.md"), true).is_err());
@@ -770,6 +852,9 @@ fn in_tree(s: &VaultSession, path: &str) -> bool {
 /// moves. A case-sensitive disk gets a separate `Projects/`.
 #[test]
 fn subpages_review_moving_into_the_folder_it_is_already_in_moves_nothing() {
+    if liber_testkit::plain_disk_only() {
+        return;
+    }
     let (dir, _c, s) = vault_with(&[("Projects.md", b"# P\n"), ("projects/a.md", b"")]);
     let res = s.move_under_page(&vp("projects/a.md"), &vp("Projects.md"), true);
     if case_insensitive(&dir) {
@@ -787,6 +872,9 @@ fn subpages_review_moving_into_the_folder_it_is_already_in_moves_nothing() {
 /// the page is converted.
 #[test]
 fn subpages_review_a_name_clash_refuses_before_the_page_moves() {
+    if liber_testkit::plain_disk_only() {
+        return;
+    }
     let (dir, _c, s) = vault_with(&[("P.md", b"# P\n"), ("P/a.md", b"old"), ("Art/a.md", b"new")]);
     assert!(
         s.move_under_page(&vp("Art/a.md"), &vp("P.md"), true)
@@ -801,6 +889,9 @@ fn subpages_review_a_name_clash_refuses_before_the_page_moves() {
 /// treats the two names as one folder.
 #[test]
 fn subpages_review_a_folder_onto_its_own_case_variant_page() {
+    if liber_testkit::plain_disk_only() {
+        return;
+    }
     let (dir, _c, s) = vault_with(&[("P.md", b"# P\n"), ("p/c.md", b"")]);
     let res = s.move_under_page(&vp("p"), &vp("P.md"), true);
     if case_insensitive(&dir) {
@@ -816,6 +907,9 @@ fn subpages_review_a_folder_onto_its_own_case_variant_page() {
 /// goes back where it was and the new folder disappears (disk and index).
 #[test]
 fn subpages_review_a_failed_move_rolls_the_conversion_back() {
+    if liber_testkit::plain_disk_only() {
+        return;
+    }
     let (dir, _c, s) = vault_with(&[("P.md", b"# P\n")]);
     // On disk but not indexed: the move refuses only after the conversion.
     std::fs::write(dir.path().join("late.md"), "").unwrap();
@@ -830,6 +924,9 @@ fn subpages_review_a_failed_move_rolls_the_conversion_back() {
 
 #[test]
 fn subpages_review_move_under_page_moves_and_rewrites() {
+    if liber_testkit::plain_disk_only() {
+        return;
+    }
     let (dir, _c, s) = vault_with(&[
         ("P.md", b"# P\n"),
         ("Notes/a.md", b"# A\n"),
@@ -857,6 +954,9 @@ fn subpages_review_move_under_page_moves_and_rewrites() {
 /// again, from disk and from the index, when the page can't move.
 #[test]
 fn subpages_review_a_created_folder_is_removed_again() {
+    if liber_testkit::plain_disk_only() {
+        return;
+    }
     let (dir, _c, s) = vault_with(&[("Keep.md", b"")]);
     std::fs::write(dir.path().join("Late.md"), "").unwrap(); // not indexed
     assert!(s.make_folder_page(&vp("Late.md"), true).is_err());
@@ -867,6 +967,9 @@ fn subpages_review_a_created_folder_is_removed_again() {
 /// Review #2: a page under a hidden folder is refused before anything is made.
 #[test]
 fn subpages_review_hidden_parents_are_refused_first() {
+    if liber_testkit::plain_disk_only() {
+        return;
+    }
     let (dir, _c, s) = vault_with(&[(".trash/x.md", b"")]);
     assert!(s.make_folder_page(&vp(".trash/x.md"), true).is_err());
     assert_eq!(names(&dir, ".trash"), vec!["x.md"]);
@@ -875,6 +978,9 @@ fn subpages_review_hidden_parents_are_refused_first() {
 /// Review #5: `.MD` is a page too, and keeps its own extension.
 #[test]
 fn subpages_review_upper_case_md_is_a_page() {
+    if liber_testkit::plain_disk_only() {
+        return;
+    }
     let (dir, _c, s) = vault_with(&[("Notes.MD", b"# N\n")]);
     let (_f, page, _) = s.make_folder_page(&vp("Notes.MD"), true).unwrap();
     assert_eq!(page, vp("Notes/Notes.MD"));
@@ -884,6 +990,9 @@ fn subpages_review_upper_case_md_is_a_page() {
 /// Review #8: links *from* the converted page follow its new folder.
 #[test]
 fn subpages_review_links_from_the_converted_page_follow() {
+    if liber_testkit::plain_disk_only() {
+        return;
+    }
     let (dir, _c, s) = vault_with(&[("P.md", b"See [o](Other.md).\n"), ("Other.md", b"")]);
     s.make_folder_page(&vp("P.md"), true).unwrap();
     assert_eq!(read(&dir, "P/P.md"), "See [o](../Other.md).\n");

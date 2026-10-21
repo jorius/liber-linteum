@@ -29,6 +29,9 @@ fn legacy_meta_dir_is_pinned() {
 
 #[test]
 fn old_vault_migrates_on_open() {
+    if liber_testkit::plain_disk_only() {
+        return;
+    }
     let dir = tempfile::tempdir().unwrap();
     write(
         dir.path(),
@@ -52,6 +55,9 @@ fn old_vault_migrates_on_open() {
 
 #[test]
 fn fresh_vault_open_creates_nothing() {
+    if liber_testkit::plain_disk_only() {
+        return;
+    }
     let dir = tempfile::tempdir().unwrap();
     write(dir.path(), "A.md", "# A");
     let v = Vault::open(dir.path()).unwrap();
@@ -63,6 +69,9 @@ fn fresh_vault_open_creates_nothing() {
 
 #[test]
 fn both_exist_liber_wins_and_nimw_is_untouched() {
+    if liber_testkit::plain_disk_only() {
+        return;
+    }
     let dir = tempfile::tempdir().unwrap();
     write(
         dir.path(),
@@ -90,6 +99,10 @@ fn both_exist_liber_wins_and_nimw_is_untouched() {
 #[cfg(unix)]
 #[test]
 fn rename_failure_keeps_nimw_and_warns() {
+    // Plaintext folder permissions don't survive sealing.
+    if liber_testkit::plain_disk_only() {
+        return;
+    }
     use std::os::unix::fs::PermissionsExt;
     let dir = tempfile::tempdir().unwrap();
     write(
@@ -110,6 +123,9 @@ fn rename_failure_keeps_nimw_and_warns() {
 
 #[test]
 fn a_file_named_like_the_legacy_folder_is_ignored() {
+    if liber_testkit::plain_disk_only() {
+        return;
+    }
     let dir = tempfile::tempdir().unwrap();
     write(dir.path(), LEGACY_META_DIR, "not a folder");
     Vault::open(dir.path()).unwrap();
@@ -154,6 +170,9 @@ impl Drop for ReadOnly<'_> {
 #[cfg(unix)]
 #[test]
 fn unmoved_legacy_folder_is_read_and_written_in_place() {
+    if liber_testkit::plain_disk_only() {
+        return;
+    }
     let dir = tempfile::tempdir().unwrap();
     write(
         dir.path(),
@@ -223,6 +242,10 @@ fn legacy_folder_moves_through_storage() {
 #[cfg(unix)]
 #[test]
 fn legacy_folder_linked_inside_the_vault_is_moved() {
+    // No symlinks in an encrypted vault (E3).
+    if liber_testkit::plain_disk_only() {
+        return;
+    }
     let dir = tempfile::tempdir().unwrap();
     write(dir.path(), "cfg/vault.json", r#"{"favorites":["A.md"]}"#);
     std::os::unix::fs::symlink(dir.path().join("cfg"), dir.path().join(LEGACY_META_DIR)).unwrap();

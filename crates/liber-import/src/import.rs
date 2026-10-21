@@ -717,6 +717,12 @@ mod tests {
     use crate::Limits;
     use crate::archive::tests::zip_file;
 
+    /// `liber_testkit::plain_disk_only`, without the dev-dependency: these tests
+    /// read the imported plaintext straight from disk.
+    fn plain_disk_only() -> bool {
+        std::env::var("LIBER_TEST_STORAGE").as_deref() == Ok("encrypted")
+    }
+
     const A: &str = "1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d";
     const B: &str = "ffffffffffffffffffffffffffffffff";
     const C: &str = "0123456789abcdef0123456789abcdef";
@@ -825,6 +831,9 @@ mod tests {
 
     #[test]
     fn m7_imports_a_whole_export() {
+        if plain_disk_only() {
+            return;
+        }
         let (dir, report, _) = import(sample().path(), None);
         let report = report.unwrap();
         assert!(!report.cancelled);
@@ -865,6 +874,9 @@ mod tests {
 
     #[test]
     fn r3b_folder_pages_follow_a_numbered_folder() {
+        if plain_disk_only() {
+            return;
+        }
         let first = format!("# Home\n\nSee [the other](Home%20{B}.md).\n");
         let zip = zip_file(&[
             (&format!("Home {A}.md"), first.as_bytes()),
@@ -885,6 +897,9 @@ mod tests {
 
     #[test]
     fn r3b_a_page_without_children_stays_beside() {
+        if plain_disk_only() {
+            return;
+        }
         let zip = zip_file(&[
             (&format!("Solo {A}.md"), b"# Solo\n"),
             (&format!("Home {B}.md"), b"# Home\n"),
@@ -901,6 +916,9 @@ mod tests {
     // the folder's page from the index.
     #[test]
     fn r3b_review_the_index_keeps_its_folder_page_over_a_namesake_row() {
+        if plain_disk_only() {
+            return;
+        }
         let zip = zip_file(&[
             (
                 &format!("Tasks {A}.csv"),
@@ -920,6 +938,9 @@ mod tests {
     // its page a folder page; the attachments stay where Notion put them.
     #[test]
     fn r3b_review_a_page_with_only_images_stays_beside_its_folder() {
+        if plain_disk_only() {
+            return;
+        }
         let page = format!("# Recipe A\n\n![photo](Recipe%20A%20{A}/img.png)\n");
         let zip = zip_file(&[
             (&format!("Recipe A {A}.md"), page.as_bytes()),
@@ -953,6 +974,9 @@ mod tests {
 
     #[test]
     fn m7_cancel_keeps_what_was_written_and_says_so() {
+        if plain_disk_only() {
+            return;
+        }
         let (dir, report, plan) = import(sample().path(), Some(2));
         let report = report.unwrap();
         assert!(report.cancelled);
@@ -963,6 +987,9 @@ mod tests {
 
     #[test]
     fn b6_review_i5_an_attached_csv_stays_a_file() {
+        if plain_disk_only() {
+            return;
+        }
         let home = format!("# Home\n\n[sales.csv](Home%20{A}/sales.csv)\n");
         let zip = zip_file(&[
             (&format!("Home {A}.md"), home.as_bytes()),
@@ -988,6 +1015,9 @@ mod tests {
 
     #[test]
     fn b6_review_i5_a_csv_beside_its_rows_folder_is_a_database() {
+        if plain_disk_only() {
+            return;
+        }
         let zip = zip_file(&[
             ("Tasks.csv", b"Name\nA\n".as_slice()),
             ("Tasks/A.md", b"# A\n".as_slice()),
@@ -1000,6 +1030,9 @@ mod tests {
 
     #[test]
     fn b6_review_m2_a_file_and_a_folder_of_one_name_both_import() {
+        if plain_disk_only() {
+            return;
+        }
         let zip = zip_file(&[
             ("Home", b"plain".as_slice()),
             ("Home/a.md", b"# a\n".as_slice()),
@@ -1012,6 +1045,9 @@ mod tests {
 
     #[test]
     fn b6_review_m2_a_path_too_long_is_skipped_with_a_warning() {
+        if plain_disk_only() {
+            return;
+        }
         let deep = (0..6)
             .map(|_| "d".repeat(190))
             .collect::<Vec<_>>()
@@ -1036,6 +1072,9 @@ mod tests {
 
     #[test]
     fn b6_review_m2_one_file_that_fails_is_a_warning_and_the_rest_imports() {
+        if plain_disk_only() {
+            return;
+        }
         let zip = sample();
         let export = Export::open(zip.path(), &Limits::default()).unwrap();
         let mut plan = plan(&export, &AtomicBool::new(false)).unwrap();
@@ -1110,6 +1149,9 @@ mod tests {
 
     #[test]
     fn b6_review_i8_m3_a_failed_report_is_said_and_the_vault_is_returned() {
+        if plain_disk_only() {
+            return;
+        }
         let zip = sample();
         let export = Export::open(zip.path(), &Limits::default()).unwrap();
         let mut plan = plan(&export, &AtomicBool::new(false)).unwrap();
@@ -1138,6 +1180,9 @@ mod tests {
 
     #[test]
     fn b6_review_m1_a_folder_that_cant_be_made_is_reported() {
+        if plain_disk_only() {
+            return;
+        }
         let zip = sample();
         let export = Export::open(zip.path(), &Limits::default()).unwrap();
         let mut plan = plan(&export, &AtomicBool::new(false)).unwrap();
@@ -1242,6 +1287,10 @@ mod tests {
     /// file ("never leave half a file"); the rest of the export is written.
     #[test]
     fn import_failed_entry_leaves_no_partial_file() {
+        // No symlinks in an encrypted vault (E3).
+        if plain_disk_only() {
+            return;
+        }
         use std::io::{Cursor, Write as _};
         use zip::write::SimpleFileOptions;
         let big_name = format!("Home {A}/Big.bin");
