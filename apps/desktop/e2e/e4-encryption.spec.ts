@@ -60,12 +60,20 @@ test('a damaged rollback memory can be reset, then the vault unlocks', async ({ 
 
 for (const theme of ['light', 'dark']) {
   test(`the Unlock screen is axe-clean (${theme})`, async ({ page }) => {
+    await page.emulateMedia({ colorScheme: theme as 'light' | 'dark' });
     await setup(page, { settings: { theme } });
     await page.goto('/');
     await page.getByRole('button', { name: /^enc Encrypted/ }).click();
     await page.getByLabel('Passphrase').fill('nope');
     await page.getByRole('button', { name: 'Unlock', exact: true }).click();
     await expect(page.getByRole('alert')).toBeVisible();
+    const bg = await page.evaluate(() => getComputedStyle(document.body).backgroundColor);
+    const lum =
+      bg
+        .match(/\d+/g)!
+        .map(Number)
+        .reduce((a, b) => a + b, 0) / 3;
+    expect(lum < 128).toBe(theme === 'dark');
     await page.evaluate(AXE);
     const violations = await page.evaluate(async () => {
       const { axe } = window as unknown as {

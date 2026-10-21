@@ -22,7 +22,7 @@ export function App() {
       ) : (
         <Welcome version={version} />
       )}
-      {status === 'opening' && <OpeningOverlay />}
+      {status === 'opening' && !unlocking && <OpeningOverlay />}
       <ScratchpadHost />
       <NotionHost />
       <Toaster />

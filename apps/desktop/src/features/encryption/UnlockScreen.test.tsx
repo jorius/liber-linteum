@@ -9,6 +9,7 @@ import { usePageStore } from '../../stores/pageStore';
 import { resetVaultStore, useVaultStore } from '../../stores/vaultStore';
 import { useGvStore } from '../global-view/gvStore';
 import { useSearchStore } from '../search/searchStore';
+import { App } from '../../app/App';
 import { UnlockScreen } from './UnlockScreen';
 
 type Handler = (args: Record<string, unknown>) => unknown;
@@ -147,8 +148,10 @@ describe('UnlockScreen', () => {
     render(<UnlockScreen />);
     await userEvent.type(field(), PASS);
     await userEvent.click(screen.getByRole('button', { name: 'Unlock' }));
-    expect(await screen.findByRole('status')).toHaveTextContent(
-      'Unlocking… (this takes a second on purpose)',
+    await waitFor(() =>
+      expect(screen.getByRole('status')).toHaveTextContent(
+        'Unlocking… (this takes a second on purpose)',
+      ),
     );
     expect(screen.getByRole('button', { name: 'Back' })).toBeDisabled();
     release(info);
@@ -170,9 +173,12 @@ describe('UnlockScreen', () => {
     expect(dialog).toHaveTextContent('Liber Linteum remembers each encrypted vault');
     expect(calls.some(([c]) => c === 'security_reset_rollback_memory')).toBe(false);
     await userEvent.click(screen.getByRole('button', { name: 'Reset rollback memory' }));
-    expect(await screen.findByRole('status')).toHaveTextContent(
-      'Rollback memory reset. Try unlocking again.',
+    await waitFor(() =>
+      expect(screen.getByRole('status')).toHaveTextContent(
+        'Rollback memory reset. Try unlocking again.',
+      ),
     );
+    await waitFor(() => expect(field()).toHaveFocus());
     expect(calls.filter(([c]) => c === 'security_reset_rollback_memory')).toHaveLength(1);
     expect(screen.queryByRole('alert')).toBeNull();
   });
@@ -194,6 +200,7 @@ describe('UnlockScreen', () => {
     await waitFor(() =>
       expect(screen.getByRole('alert')).toHaveTextContent("This vault's files are damaged."),
     );
+    await waitFor(() => expect(field()).toHaveFocus());
     expect(screen.queryByRole('button', { name: /Reset this computer/ })).toBeNull();
   });
 
@@ -216,6 +223,8 @@ describe('UnlockScreen', () => {
     useVaultStore.setState({ status: 'closed', lockedPath: null });
     await useVaultStore.getState().open('/v/Secret');
     useSearchStore.setState({ text: 'secret words' });
+    usePageStore.setState({ path: 'a.md' });
+    useGvStore.setState({ expanded: [{ kind: 'folder', path: 'a' } as never] });
     expect(await useVaultStore.getState().lock('menu')).toBe(true);
     render(<UnlockScreen />);
     await userEvent.click(screen.getByRole('button', { name: 'Back' }));
@@ -245,6 +254,19 @@ describe('UnlockScreen', () => {
     expect(
       JSON.stringify({ ...useVaultStore.getState(), children: null, expanded: null }),
     ).not.toContain(PASS);
+  });
+
+  it('through App, the opening overlay does not cover the Unlocking text', async () => {
+    let release: (v: unknown) => void = () => {};
+    backend({ vault_unlock: () => new Promise((r) => (release = r)), vault_tree: () => [] });
+    render(<App />);
+    await userEvent.type(field(), PASS);
+    await userEvent.click(screen.getByRole('button', { name: 'Unlock' }));
+    await waitFor(() => expect(useVaultStore.getState().status).toBe('opening'));
+    expect(screen.getByText('Unlocking… (this takes a second on purpose)')).toBeVisible();
+    expect(screen.getAllByRole('status')).toHaveLength(1);
+    expect(screen.queryByText('Reading the folder…')).toBeNull();
+    release(info);
   });
 
   it('has no axe violations', async () => {

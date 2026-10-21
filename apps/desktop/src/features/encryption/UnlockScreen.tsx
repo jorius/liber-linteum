@@ -68,6 +68,8 @@ export function UnlockScreen() {
   const reset = async () => {
     setConfirmReset(false);
     const res = await securityResetRollbackMemory();
+    // The reset link goes either way: the keyboard returns to the field.
+    setTimeout(() => input.current?.focus());
     if (res.ok) {
       setError(null);
       setResetDone(true);
@@ -116,22 +118,22 @@ export function UnlockScreen() {
             {shown}
           </p>
         )}
-        {resetDone && (
-          <p role="status" className={styles.note}>
-            {t('unlock.resetDone')}
-          </p>
-        )}
         {error?.error.kind === 'damaged' && !filesDamaged && (
           <button type="button" className={styles.link} onClick={() => setConfirmReset(true)}>
             {t('unlock.resetLink')}
           </button>
         )}
-        {unlocking && (
-          <p role="status" className={styles.working}>
-            <span className={styles.spinner} aria-hidden="true" />
-            {t('unlock.working')}
-          </p>
-        )}
+        {/* One live region, always mounted, so its changes are announced. */}
+        <p role="status" className={styles.working}>
+          {unlocking ? (
+            <>
+              <span className={styles.spinner} aria-hidden="true" />
+              {t('unlock.working')}
+            </>
+          ) : resetDone ? (
+            t('unlock.resetDone')
+          ) : null}
+        </p>
         <button type="submit" className="btn btn-primary" disabled={unlocking}>
           {t('unlock.submit')}
         </button>
