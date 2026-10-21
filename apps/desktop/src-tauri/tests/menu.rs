@@ -158,12 +158,14 @@ fn macos_menu_quit_is_ours_and_the_standard_items_stay() {
         .position(|(t, _)| t == "Vault")
         .expect("Vault menu");
     assert!(file_at < vault_at && vault_at < edit_at, "{outline:?}");
-    // E4: New Encrypted Vault… and Lock Vault (⌥⌘L, enabled with an encrypted vault).
+    // E4: Lock Vault (⌥⌘L, enabled with an encrypted vault); UX round: New
+    // Vault… (New Encrypted Vault… is gone) and Encrypt "<name>"….
     assert_eq!(
         texts("Vault"),
         [
+            "New Vault…",
             "Open Vault…",
-            "New Encrypted Vault…",
+            "Encrypt Vault…",
             "Lock Vault",
             "Close Vault"
         ]
@@ -492,6 +494,60 @@ fn quick_note_item_follows_open_and_close() {
     );
 }
 
+/// Encryption UX round §4.1: Vault → Encrypt "<name>"… is off and generic
+/// until the page names an open plain vault, and off again after.
+#[cfg(target_os = "macos")]
+fn encrypt_item_follows_the_page() {
+    let got: Arc<std::sync::Mutex<Vec<(String, bool)>>> = Arc::default();
+    let log = got.clone();
+    build_app("encrypt-item").run_return(move |handle, event| {
+        if let RunEvent::Ready = event {
+            let item = |h: &tauri::AppHandle<MockRuntime>| {
+                let vault = h
+                    .menu()
+                    .unwrap()
+                    .items()
+                    .unwrap()
+                    .into_iter()
+                    .find_map(|i| match i {
+                        MenuItemKind::Submenu(s) if s.text().unwrap() == "Vault" => Some(s),
+                        _ => None,
+                    })
+                    .unwrap();
+                vault
+                    .items()
+                    .unwrap()
+                    .into_iter()
+                    .find_map(|i| match i {
+                        MenuItemKind::MenuItem(m)
+                            if m.id() == liber_desktop::menu::VAULT_ENCRYPT_ID =>
+                        {
+                            Some((m.text().unwrap(), m.is_enabled().unwrap()))
+                        }
+                        _ => None,
+                    })
+                    .unwrap()
+            };
+            log.lock().unwrap().push(item(handle));
+            liber_desktop::menu::menu_set_encrypt_item(handle.clone(), Some("Smartjob".into()));
+            log.lock().unwrap().push(item(handle));
+            liber_desktop::menu::menu_set_encrypt_item(handle.clone(), None);
+            log.lock().unwrap().push(item(handle));
+            for window in handle.webview_windows().into_values() {
+                window.close().unwrap();
+            }
+        }
+    });
+    assert_eq!(
+        *got.lock().unwrap(),
+        [
+            ("Encrypt Vault…".to_string(), false),
+            ("Encrypt “Smartjob”…".to_string(), true),
+            ("Encrypt Vault…".to_string(), false),
+        ]
+    );
+}
+
 /// M7: File → Import from Notion… opens the import in the main window only.
 fn notion_import_item_emits_to_main() {
     use tauri::Listener;
@@ -548,6 +604,8 @@ fn m5b_items_emit_their_events() {
                 liber_desktop::menu::SETTINGS_ID,
                 liber_desktop::menu::VAULT_OPEN_ID,
                 liber_desktop::menu::VAULT_CLOSE_ID,
+                liber_desktop::menu::VAULT_NEW_ID,
+                liber_desktop::menu::VAULT_ENCRYPT_ID,
                 liber_desktop::menu::SAVE_ID,
                 liber_desktop::menu::SIDEBAR_ID,
             ] {
@@ -569,6 +627,8 @@ fn m5b_items_emit_their_events() {
             "main menu:settings null".to_string(),
             "main menu:vault \"open\"".into(),
             "main menu:vault \"close\"".into(),
+            "main menu:vault \"new\"".into(),
+            "main menu:vault \"encrypt\"".into(),
             "main menu:save null".into(),
             "main menu:sidebar null".into(),
         ]
@@ -603,5 +663,7 @@ fn main() {
         println!("test quick_note_item_names_the_open_vault ... ok");
         quick_note_item_follows_open_and_close();
         println!("test quick_note_item_follows_open_and_close ... ok");
+        encrypt_item_follows_the_page();
+        println!("test encrypt_item_follows_the_page ... ok");
     }
 }

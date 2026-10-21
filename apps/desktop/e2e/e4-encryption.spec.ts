@@ -154,16 +154,22 @@ const axeClean = async (page: import('@playwright/test').Page) => {
   expect(violations).toEqual([]);
 };
 
-test('Welcome: encrypt switch, passphrase, recovery code, two groups, shell opens', async ({
+/** Welcome → New vault → Encrypted → Continue (UX round §2): the passphrase step. */
+const newEncrypted = async (page: import('@playwright/test').Page) => {
+  await page.getByRole('button', { name: /^New vault/ }).click();
+  const dialog = page.getByRole('dialog', { name: 'New vault' });
+  await expect(dialog.getByText('/e2e/new-encrypted')).toBeVisible();
+  await dialog.getByRole('radio', { name: 'Encrypted Beta', exact: true }).check();
+  await dialog.getByRole('button', { name: 'Continue' }).click();
+  return dialog;
+};
+
+test('New vault, Encrypted: passphrase, recovery code, two groups, shell opens', async ({
   page,
 }) => {
   await setup(page);
   await page.goto('/');
-  const sw = page.getByRole('switch', { name: /Encrypt this vault/ });
-  await expect(sw).not.toBeChecked();
-  await sw.check();
-  await page.getByRole('button', { name: /^New vault/ }).click();
-  const dialog = page.getByRole('dialog');
+  const dialog = await newEncrypted(page);
   await expect(page.getByLabel('Passphrase', { exact: true })).toBeFocused();
   await axeClean(page);
   await page.getByLabel('Passphrase', { exact: true }).fill(PASSPHRASE);
@@ -197,11 +203,10 @@ test('Welcome: encrypt switch, passphrase, recovery code, two groups, shell open
   await expect(page.locator('[data-vault-menu]')).toBeVisible();
 });
 
-test('a folder that is not empty is refused inline', async ({ page }) => {
+test('a folder that fills up before Create is refused inline', async ({ page }) => {
   await setup(page, {}, { ...encrypted, notEmpty: true });
   await page.goto('/');
-  await page.getByRole('switch', { name: /Encrypt this vault/ }).check();
-  await page.getByRole('button', { name: /^New vault/ }).click();
+  await newEncrypted(page);
   await page.getByLabel('Passphrase', { exact: true }).fill(PASSPHRASE);
   await page.getByLabel('Confirm passphrase').fill(PASSPHRASE);
   await page.getByRole('button', { name: 'Continue' }).click();
@@ -333,9 +338,7 @@ test('journey: create, write, lock, unlock, screen lock, unlock with a lower-cas
 }) => {
   await setup(page);
   await page.goto('/');
-  await page.getByRole('switch', { name: /Encrypt this vault/ }).check();
-  await page.getByRole('button', { name: /^New vault/ }).click();
-  const dialog = page.getByRole('dialog');
+  const dialog = await newEncrypted(page);
   await page.getByLabel('Passphrase', { exact: true }).fill(PASSPHRASE);
   await page.getByLabel('Confirm passphrase').fill(PASSPHRASE);
   await dialog.getByRole('button', { name: 'Continue' }).click();

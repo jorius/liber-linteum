@@ -7,6 +7,7 @@ import { useToastStore } from '../../stores/toastStore';
 import { useUiStore } from '../../stores/uiStore';
 import { resetVaultStore, useVaultStore } from '../../stores/vaultStore';
 import { lastOpened } from './RecentList';
+import { CreateEncryptedHost } from '../encryption/CreateEncryptedHost';
 import { Welcome, welcomeShortcut } from './Welcome';
 
 const info = { name: 'Notes', root: '/v/Notes', report: { pages: 0, warnings: [] } };
@@ -42,17 +43,57 @@ describe('Welcome screen', () => {
     useUiStore.setState({ dialog: null });
   });
 
-  it('VLT-01 create picks a folder and creates the vault', async () => {
+  it('VLT-01 New vault opens the New vault dialog, which picks a folder and creates the vault', async () => {
     const calls = backend({
       vaults_recent: () => [],
       'plugin:dialog|open': () => '/v/Notes',
+      folder_kind: () => 'missing',
       vault_create: () => info,
       vault_tree: () => [],
     });
-    render(<Welcome version={null} />);
+    render(
+      <>
+        <Welcome version={null} />
+        <CreateEncryptedHost />
+      </>,
+    );
     await userEvent.click(screen.getByRole('button', { name: 'New vault' }));
+    const dialog = screen.getByRole('dialog', { name: 'New vault' });
+    await within(dialog).findByText('/v/Notes');
+    const go = within(dialog).getByRole('button', { name: 'Continue' });
+    await waitFor(() => expect(go).toBeEnabled());
+    await userEvent.click(go);
     await waitFor(() => expect(useVaultStore.getState().status).toBe('open'));
     expect(calls.find(([c]) => c === 'vault_create')?.[1]).toEqual({ path: '/v/Notes' });
+  });
+
+  it('UX round §2: no "Encrypt this vault" switch; the choice is in the New vault dialog', () => {
+    backend({ vaults_recent: () => [] });
+    render(<Welcome version={null} />);
+    expect(screen.queryByRole('switch')).toBeNull();
+    expect(screen.queryByText('Encrypt this vault')).toBeNull();
+    expect(screen.queryByText('Beta')).toBeNull();
+  });
+
+  it('UX round §3: an encrypted vault keeps its folder icon and shows an Encrypted chip as real text', async () => {
+    backend({
+      vaults_recent: () => [
+        { path: '/v/Smartjob', name: 'Smartjob', openedAt: '', missing: false, encrypted: true },
+        { path: '/v/Notes', name: 'Notes', openedAt: '', missing: false, encrypted: false },
+      ],
+    });
+    render(<Welcome version={null} />);
+    const list = await screen.findByRole('list', { name: 'Recent vaults' });
+    const row = within(list).getByRole('button', { name: /^Smartjob Encrypted/ });
+    const chip = within(row).getByText('Encrypted');
+    expect(chip).toHaveClass('liber-chip');
+    expect(chip).not.toHaveClass('liber-sr-only');
+    expect(chip.previousElementSibling).toHaveTextContent('Smartjob');
+    expect(row.querySelector('.liber-sr-only')).toBeNull();
+    // The vault's own icon (E3 sends no emoji for an encrypted vault): the folder.
+    const icon = (b: HTMLElement) => b.querySelector('[aria-hidden="true"] svg')?.outerHTML;
+    expect(icon(row)).toBe(icon(within(list).getByRole('button', { name: /^Notes/ })));
+    expect(within(list).getByRole('button', { name: /^Notes/ })).not.toHaveTextContent('Encrypted');
   });
 
   it.each(['Open folder as vault', 'Open an Obsidian vault'])(
@@ -180,20 +221,28 @@ describe('Welcome screen', () => {
       expect(await screen.findByText('No recent vaults yet.')).toBeInTheDocument();
     });
 
-    it.each([
-      [{ key: 'n', ctrlKey: true }, 'vault_create'],
-      [{ key: 'o', ctrlKey: true }, 'vault_open'],
-    ])('the shortcut %o on the Welcome screen runs %s', async (key, command) => {
+    it('⌘N / Ctrl+N on the Welcome screen opens the New vault dialog', async () => {
+      backend({ vaults_recent: () => [] });
+      render(<Welcome version={null} />);
+      window.dispatchEvent(
+        new KeyboardEvent('keydown', { key: 'n', ctrlKey: true, bubbles: true }),
+      );
+      await waitFor(() => expect(useUiStore.getState().dialog).toEqual({ type: 'newVault' }));
+      useUiStore.getState().closeDialog();
+    });
+
+    it('the shortcut Ctrl+O on the Welcome screen runs vault_open', async () => {
       const calls = backend({
         vaults_recent: () => [],
         'plugin:dialog|open': () => '/v/Notes',
-        vault_create: () => info,
         vault_open: () => info,
         vault_tree: () => [],
       });
       render(<Welcome version={null} />);
-      window.dispatchEvent(new KeyboardEvent('keydown', { ...key, bubbles: true }));
-      await waitFor(() => expect(calls.map(([c]) => c)).toContain(command));
+      window.dispatchEvent(
+        new KeyboardEvent('keydown', { key: 'o', ctrlKey: true, bubbles: true }),
+      );
+      await waitFor(() => expect(calls.map(([c]) => c)).toContain('vault_open'));
     });
 
     it('review M8: a held key (repeat) does not open the picker again', async () => {

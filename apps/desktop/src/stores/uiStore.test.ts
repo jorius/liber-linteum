@@ -23,12 +23,12 @@ describe('sticky dialogs', () => {
 
   it('the create dialog is sticky only once creating has started', () => {
     const ui = useUiStore.getState();
-    ui.openDialog({ type: 'createEncrypted', path: '/p' });
+    ui.openDialog({ type: 'newVault' });
     expect(ui.openDialog({ type: 'settings' })).toBe(true);
-    ui.openDialog({ type: 'createEncrypted', path: '/p' });
+    ui.openDialog({ type: 'newVault' });
     useUiStore.getState().hold(true);
     expect(useUiStore.getState().openDialog({ type: 'settings' })).toBe(false);
-    expect(useUiStore.getState().dialog?.type).toBe('createEncrypted');
+    expect(useUiStore.getState().dialog?.type).toBe('newVault');
     useUiStore.getState().closeDialog();
     expect(useUiStore.getState().openDialog({ type: 'settings' })).toBe(true);
   });

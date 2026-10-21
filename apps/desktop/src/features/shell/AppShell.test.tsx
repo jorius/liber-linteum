@@ -233,7 +233,7 @@ describe('AppShell', () => {
       within(menu)
         .getAllByRole('menuitem')
         .map((m) => m.textContent),
-    ).toEqual(['Settings…', 'Open another vault…', 'Close vault']);
+    ).toEqual(['Settings…', 'Open another vault…', 'Encrypt “Digital Brain”…', 'Close vault']);
     expect(within(menu).getByRole('menuitem', { name: 'Settings…' })).toHaveFocus();
     await userEvent.keyboard('{Enter}');
     expect(useUiStore.getState().dialog).toEqual({ type: 'settings' });
@@ -246,6 +246,32 @@ describe('AppShell', () => {
     await userEvent.click(screen.getByRole('menuitem', { name: 'Close vault' }));
     await waitFor(() => expect(useVaultStore.getState().status).toBe('closed'));
     expect(calls.map(([c]) => c)).toContain('vault_close');
+  });
+
+  it('UX round §4.1: the vault menu offers Encrypt only for a plain vault', async () => {
+    backend({});
+    seed();
+    act(() => useVaultStore.setState((s) => ({ info: s.info && { ...s.info, encrypted: true } })));
+    render(<AppShell />);
+    await userEvent.click(screen.getByRole('button', { name: 'Digital Brain' }));
+    const menu = screen.getByRole('menu', { name: 'Digital Brain' });
+    expect(
+      within(menu)
+        .getAllByRole('menuitem')
+        .map((m) => m.textContent),
+    ).toEqual(['Settings…', 'Open another vault…', 'Close vault']);
+  });
+
+  it('UX round §4.1: Encrypt “<name>”… starts encrypting the open plain vault', async () => {
+    backend({});
+    seed();
+    render(<AppShell />);
+    await userEvent.click(screen.getByRole('button', { name: 'Digital Brain' }));
+    await userEvent.click(screen.getByRole('menuitem', { name: 'Encrypt “Digital Brain”…' }));
+    const root = useVaultStore.getState().info!.root;
+    await waitFor(() =>
+      expect(useUiStore.getState().dialog).toEqual({ type: 'encryptInPlace', root }),
+    );
   });
 
   it('M5b §2.5: the sidebar collapses (button, ⌘\\) and the setting remembers it', async () => {

@@ -46,6 +46,29 @@ export type ErrorKind =
   | 'rollback'
   /** E3: an encrypted vault, or a file in it, that can't be read. */
   | 'damaged'
+  /** Encrypt in place (§8.2): another device is converting this folder; nothing touched. */
+  | 'convertingElsewhere'
+  /** Encrypt in place (§8.3): files changed while encrypting (sync), so it was undone. */
+  | 'changedDuringConvert'
+  /** Encrypt in place: Stop and undo; the vault is back as it was. */
+  | 'cancelled'
+  /** Encrypt in place (final review): the backend's own reasons. Those
+   *  carrying a path have it as the message: `convertRefusedFolder` (the
+   *  folder), `convertInsideVault` (the vault), `convertCollision` (what is in
+   *  the way), `convertMismatch` (the file), `convertUndoFailed`,
+   *  `convertFinishFailed`, `convertingElsewhereFinishing`, `convertActive`
+   *  and `convertWindowsOpen` (the folder). */
+  | 'convertingElsewhereFinishing'
+  | 'convertWindowsOpen'
+  | 'convertBusy'
+  | 'convertActive'
+  | 'convertPending'
+  | 'convertRefusedFolder'
+  | 'convertInsideVault'
+  | 'convertCollision'
+  | 'convertMismatch'
+  | 'convertUndoFailed'
+  | 'convertFinishFailed'
   | 'io';
 
 export interface CommandError {
@@ -113,6 +136,10 @@ export interface VaultInfo {
   /** E3: clips `vault_unlock` recovered from takes a lock or a crash left
    *  (`…-recovered.wav`); announce them as the recorder does at Start. */
   recovered?: Attached[];
+  /** Encrypt in place (§8.8): the readable originals couldn't go to the
+   *  Trash and are still in the vault folder. Show the banner with
+   *  `vaultTrashOriginals` and `vaultRevealOriginals`. */
+  originalsPending?: boolean;
 }
 
 export type NodeKind = 'page' | 'folder' | 'attachment';
@@ -355,6 +382,71 @@ export interface VaultLockedPayload {
 /** `vault:lock-request` (E3 Task 7). */
 export interface VaultLockRequestPayload {
   reason: 'sleep' | 'screenLock';
+}
+
+// ---- Encrypt in place (encryption UX spec §4.3, §8): the backend contract ----
+//
+// vault_encrypt_preflight { path } → EncryptPreflight (changes nothing).
+//   `notPermitted`: the folder is refused (Scratchpad, home, Desktop,
+//   Documents, Downloads, a volume root), already encrypted, or part-way
+//   through a conversion; `damaged`: a damaged encrypted vault.
+// vault_encrypt_begin { path, passphrase } → { recovery } (shown and confirmed
+//   BEFORE run, §8.1). Closes the plain session for that folder (save open
+//   pages first). `notPermitted` when preflight blocks; `invalidInput` for a
+//   short passphrase.
+// vault_encrypt_run {} → VaultInfo (the encrypted vault, open and unlocked;
+//   `originalsPending` when the Trash refused the originals). Emits
+//   `vault:encrypt-progress` (EncryptProgressPayload) after each file.
+//   `cancelled` after Stop and undo (rolled back); `changedDuringConvert`
+//   (rolled back); `conflict` when recovery would overwrite something.
+// vault_encrypt_cancel {} → void: Stop and undo during run, or undoes a
+//   begin at the recovery-key step.
+// vault_trash_originals {} → void; vault_reveal_originals {} → void (the
+//   originals-pending banner; an encrypted vault must be open).
+// vault_open / vault_unlock first finish or undo this device's interrupted
+//   conversion and emit `vault:encrypt-recovered` (EncryptRecoveredPayload);
+//   another device's makes them fail with `convertingElsewhere`.
+
+export type EncryptBlockedReason =
+  | 'badChar'
+  | 'twin'
+  | 'symlink'
+  | 'unreadable'
+  | 'special'
+  | 'reserved'
+  | 'git'
+  | 'cloud'
+  | 'longName'
+  | 'notUtf8'
+  /** A vault of its own inside the folder (final review I3). */
+  | 'vault';
+
+export interface EncryptBlocked {
+  /** Vault-relative, `/`-separated. */
+  path: string;
+  reason: EncryptBlockedReason;
+}
+
+export interface EncryptPreflight {
+  files: number;
+  bytes: number;
+  /** Empty when the folder can be encrypted. */
+  blocked: EncryptBlocked[];
+  /** Begin will close the open vault (this folder under any spelling,
+   *  inside it or around it): the UI leaves it first. */
+  closesOpen: boolean;
+}
+
+/** `vault:encrypt-progress`. */
+export interface EncryptProgressPayload {
+  done: number;
+  total: number;
+}
+
+/** `vault:encrypt-recovered`: toast "interrupted; back as it was" or "finished encrypting". */
+export interface EncryptRecoveredPayload {
+  path: string;
+  outcome: 'rolledBack' | 'finished';
 }
 
 export interface SettingsResponse {
@@ -682,6 +774,17 @@ export const vaultLock = () => call<void>('vault_lock');
 /** Vault → Lock Vault is enabled only while an encrypted vault is open. */
 export const menuSetLockEnabled = (enabled: boolean) =>
   call<void>('menu_set_lock_enabled', { enabled });
+/** Vault → Encrypt "<vault>"… (UX round §4.1): named and on for an open plain
+ *  vault, off with `null`. */
+export const menuSetEncryptItem = (vault: string | null) =>
+  call<void>('menu_set_encrypt_item', { vault });
+/** What a folder chosen for a new vault holds (UX round §2): `empty` (OS
+ *  files aside) or `missing` can be created in; `plain` has files;
+ *  `refused`: never encrypted in place (Scratchpad, home, Desktop,
+ *  Documents, Downloads, a volume root; §8.10). Asking finishes or undoes
+ *  this device's interrupted conversion of it first. */
+export type FolderKind = 'empty' | 'missing' | 'plain' | 'encrypted' | 'damaged' | 'refused';
+export const folderKind = (path: string) => call<FolderKind>('folder_kind', { path });
 export const securityChangePassphrase = (current: string, next: string) =>
   call<void>('security_change_passphrase', { current, next });
 export const securityNewRecovery = (passphrase: string) =>
@@ -692,6 +795,18 @@ export const vaultRevealUnreadable = (osPath: string) =>
   call<void>('vault_reveal_unreadable', { osPath });
 export const attachmentOpenDecrypted = (path: string) =>
   call<void>('attachment_open_decrypted', { path });
+// ---- Encrypt in place (encryption UX §4.3, §8) ----
+export const vaultEncryptPreflight = (path: string) =>
+  call<EncryptPreflight>('vault_encrypt_preflight', { path });
+export const vaultEncryptBegin = (path: string, passphrase: string) =>
+  call<{ recovery: string }>('vault_encrypt_begin', { path, passphrase });
+export const vaultEncryptRun = () => call<VaultInfo>('vault_encrypt_run');
+export const vaultEncryptCancel = () => call<void>('vault_encrypt_cancel');
+/** Another device's conversion still copying, undone here (spec §8.11). */
+export const vaultEncryptUndoElsewhere = (path: string) =>
+  call<void>('vault_encrypt_undo_elsewhere', { path });
+export const vaultTrashOriginals = () => call<void>('vault_trash_originals');
+export const vaultRevealOriginals = () => call<void>('vault_reveal_originals');
 export const vaultTree = () => call<TreeNode[]>('vault_tree');
 export const pageGet = (path: string) => call<Page>('page_get', { path });
 export const backlinkCount = (path: string) => call<number>('backlink_count', { path });
@@ -1175,6 +1290,12 @@ export const onLockRequest = (
   cb: (reason: VaultLockRequestPayload['reason']) => void,
 ): Promise<UnlistenFn> =>
   listen<VaultLockRequestPayload>('vault:lock-request', (e) => cb(e.payload.reason), mine());
+/** Encrypt in place: after each file copied and checked. */
+export const onEncryptProgress = (cb: (p: EncryptProgressPayload) => void): Promise<UnlistenFn> =>
+  listen<EncryptProgressPayload>('vault:encrypt-progress', (e) => cb(e.payload), mine());
+/** Encrypt in place: an open finished or undid an interrupted conversion. */
+export const onEncryptRecovered = (cb: (p: EncryptRecoveredPayload) => void): Promise<UnlistenFn> =>
+  listen<EncryptRecoveredPayload>('vault:encrypt-recovered', (e) => cb(e.payload), mine());
 export const onVaultWarning = (cb: (p: WarningPayload) => void): Promise<UnlistenFn> =>
   listen<WarningPayload>('vault:warning', (e) => cb(e.payload));
 

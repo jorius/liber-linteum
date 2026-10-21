@@ -12,6 +12,8 @@ export function installIpcMock({
   filePicks = [],
   folders = [],
   encrypted,
+  folderKinds = {},
+  encryptInPlace = {},
 }: {
   pages: Record<string, string>;
   editorMode: string;
@@ -48,6 +50,17 @@ export function installIpcMock({
     notEmpty?: boolean;
     recoveryVoid?: boolean;
     unreadable?: { osPath: string; reason: string }[];
+  };
+  /** UX round §2: what `folder_kind` says of a picked folder (else `empty`). */
+  folderKinds?: Record<string, string>;
+  /** Encrypt in place (encryption UX §4.3): what preflight blocks, and
+   *  whether the run leaves the originals pending (the Trash refused). */
+  encryptInPlace?: {
+    blocked?: { path: string; reason: string }[];
+    originalsPending?: boolean;
+    /** The run stops after its first file until `__liberFinishEncrypt()`
+     *  (or Stop and undo), so its progress step can be checked. */
+    holdRun?: boolean;
   };
 }) {
   type Args = Record<string, unknown>;
@@ -160,6 +173,8 @@ export function installIpcMock({
   };
   /** E4: the encrypted vault is unlocked; `vault_lock` locks it again. */
   let encUnlocked = false;
+  /** Encrypt in place: the conversion between `vault_encrypt_begin` and `_run`. */
+  let convertJob: { path: string; cancelled: boolean } | null = null;
   const NEW_RECOVERY = `LIBER-${Array.from({ length: 14 }, (_, i) => `K${String(i + 1).padStart(2, '0')}${'ABCDEFGHJKMNPQ'[i]}`).join('-')}`;
   const encInfo = (name: string, root: string) => ({
     name,
@@ -446,6 +461,25 @@ export function installIpcMock({
       return encInfo('enc', '/enc');
     },
     menu_set_lock_enabled: () => null,
+    // UX round: the New vault dialog's folder, and Vault → Encrypt "<name>"….
+    folder_kind: (a) => folderKinds[a.path as string] ?? 'empty',
+    menu_set_encrypt_item: (a) => {
+      w.__liberEncryptItem = a.vault ?? null;
+      return null;
+    },
+    vault_create: (a) => ({
+      name: String(a.path).split('/').pop(),
+      root: a.path,
+      report: {
+        files: 2,
+        pages: 2,
+        parsed: 2,
+        skippedUnchanged: 0,
+        removed: 0,
+        warnings: [],
+        durationMs: 1,
+      },
+    }),
     vault_lock: () => {
       if (!encUnlocked) throw { kind: 'notPermitted', message: 'plain vault' };
       encUnlocked = false;
@@ -478,6 +512,55 @@ export function installIpcMock({
     vault_unreadable: () => encrypted?.unreadable ?? [],
     vault_reveal_unreadable: () => null,
     attachment_open_decrypted: () => null,
+    // Encrypt in place (encryption UX §4.3, §8).
+    vault_encrypt_preflight: () => {
+      const all = [...Object.keys(pages), ...files];
+      return {
+        files: all.length,
+        bytes: Object.values(pages).reduce((n, t) => n + t.length, 0),
+        blocked: encryptInPlace.blocked ?? [],
+        closesOpen: true,
+      };
+    },
+    vault_encrypt_begin: (a) => {
+      if (String(a.passphrase).length < 12) throw { kind: 'invalidInput', message: 'short' };
+      if (encryptInPlace.blocked?.length) throw { kind: 'notPermitted', message: 'blocked' };
+      convertJob = { path: String(a.path), cancelled: false };
+      return { recovery: NEW_RECOVERY };
+    },
+    vault_encrypt_run: async () => {
+      const job = convertJob;
+      if (!job) throw { kind: 'notPermitted', message: 'nothing to encrypt: begin first' };
+      const total = Object.keys(pages).length + files.size;
+      const emit = w.__liberEmit as (e: string, p: unknown) => void;
+      if (encryptInPlace.holdRun) {
+        emit('vault:encrypt-progress', { done: 1, total });
+        await new Promise((resolve) => (w.__liberFinishEncrypt = resolve));
+      }
+      convertJob = null;
+      for (let done = 0; done <= total; done++) {
+        emit('vault:encrypt-progress', { done, total });
+      }
+      if (job.cancelled) throw { kind: 'cancelled', message: 'encrypting was stopped' };
+      encUnlocked = true;
+      const name = job.path.split('/').pop() ?? 'vault';
+      return {
+        ...encInfo(name, job.path),
+        recoveryVoid: false,
+        originalsPending: encryptInPlace.originalsPending ?? false,
+      };
+    },
+    vault_encrypt_cancel: () => {
+      if (convertJob) convertJob.cancelled = true;
+      convertJob = null; // a running run keeps its own `job`
+      (w.__liberFinishEncrypt as (() => void) | undefined)?.();
+      return null;
+    },
+    vault_trash_originals: () => {
+      encryptInPlace.originalsPending = false;
+      return null;
+    },
+    vault_reveal_originals: () => null,
     vault_open: (a) => {
       if (encrypted && a.path === '/enc' && !encUnlocked) {
         throw { kind: 'locked', message: 'locked' };

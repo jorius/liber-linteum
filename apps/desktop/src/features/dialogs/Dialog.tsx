@@ -23,7 +23,8 @@ const FOCUSABLE =
  *  `wide` (Search, M5 §4; the Notion import): 780 px; `bare` (Search): no
  *  padding or gaps, its regions lay themselves out; `panes` (Settings, M5b §18): a menu and
  *  a pane side by side; `hideTitle`: the title names the dialog for screen
- *  readers only. */
+ *  readers only. `badge` (the Beta chip): beside the title, not part of the
+ *  dialog's name. */
 export function Dialog({
   title,
   onClose,
@@ -36,6 +37,7 @@ export function Dialog({
   hideTitle = false,
   alert = false,
   describedBy,
+  badge,
   children,
 }: {
   title: string;
@@ -51,6 +53,7 @@ export function Dialog({
   alert?: boolean;
   /** The id of the text that explains the question. */
   describedBy?: string;
+  badge?: ReactNode;
   children: ReactNode;
 }) {
   const titleId = useId();
@@ -160,9 +163,18 @@ export function Dialog({
         className={`${styles.dialog} ${wide ? styles.wide : ''} ${bare ? styles.bare : ''} ${panes ? styles.panes : ''}`}
         onKeyDown={onKeyDown}
       >
-        <h2 id={titleId} className={hideTitle ? styles.srOnly : styles.title}>
-          {title}
-        </h2>
+        {badge ? (
+          <div className={styles.titleRow}>
+            <h2 id={titleId} className={styles.title}>
+              {title}
+            </h2>
+            {badge}
+          </div>
+        ) : (
+          <h2 id={titleId} className={hideTitle ? styles.srOnly : styles.title}>
+            {title}
+          </h2>
+        )}
         {children}
       </div>
     </div>

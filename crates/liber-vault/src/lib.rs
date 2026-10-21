@@ -38,11 +38,13 @@ pub use page_width::{PageWidth, PageWidths};
 pub use path::VaultPath;
 pub use scan::{Entry, EntryKind, Scan};
 pub use scratch::DEFAULT_SCRATCH_FOLDER;
+pub use storage::convert;
 pub use storage::plain::TMP_MARKER;
 pub use storage::{
     Child, EncryptedStorage, Follow, HEADER_FILE, Kind, Meta, NewFile, OsUse, PlainStorage,
     RECORDING_DIR, RawEvent, Reach, ReadSeek, Reader, Replace, Storage, UnlockReport, VaultKind,
-    WatchGuard, is_encrypted_vault, remove_new_vault, trash_header_copy, vault_kind,
+    WatchGuard, is_empty_for_create, is_encrypted_vault, remove_new_vault, trash_header_copy,
+    vault_kind,
 };
 #[cfg(feature = "test-params")]
 pub use storage::{TEST_PASSPHRASE, seal_in_place};

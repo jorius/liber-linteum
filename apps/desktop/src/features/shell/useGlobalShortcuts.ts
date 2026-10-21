@@ -3,7 +3,7 @@ import { pickFolder } from '../../ipc';
 import { goBack, goForward } from '../../stores/navigate';
 import { dirFor } from '../../stores/tree';
 import { useUiStore } from '../../stores/uiStore';
-import { useVaultStore } from '../../stores/vaultStore';
+import { refuseWhileConverting, useVaultStore } from '../../stores/vaultStore';
 import { useFavoritesStore } from '../favorites/favoritesStore';
 import { openSearch } from '../search/searchMenu';
 import { usePageStore } from '../../stores/pageStore';
@@ -84,6 +84,7 @@ export function useGlobalShortcuts(menuOpen: boolean) {
       } else if (key === ',') {
         useUiStore.getState().openDialog({ type: 'settings' });
       } else if (key === 'o' && !e.shiftKey) {
+        if (refuseWhileConverting()) return;
         void pickFolder()
           .catch(() => null)
           .then((path) => (path ? vault.open(path) : undefined));

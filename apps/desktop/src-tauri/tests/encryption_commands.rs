@@ -220,6 +220,48 @@ fn create_refuses_short_passphrases_and_occupied_folders() {
     assert_eq!(kind(err), "notEmpty");
 }
 
+/// Encryption UX round §2: what the New vault dialog's folder holds, read
+/// without changing it.
+#[test]
+fn folder_kind_tells_the_new_vault_dialog_what_continue_does() {
+    let h = harness();
+    let at = |name: &str| h.disk.path().join(name);
+    let ask = |p: PathBuf| {
+        call(&h.main, "folder_kind", json!({ "path": p }))
+            .unwrap()
+            .as_str()
+            .unwrap()
+            .to_string()
+    };
+    assert_eq!(ask(at("Nowhere")), "missing");
+    assert!(!at("Nowhere").exists(), "nothing created");
+
+    std::fs::create_dir(at("Empty")).unwrap();
+    std::fs::write(at("Empty").join(".DS_Store"), b"x").unwrap();
+    assert_eq!(ask(at("Empty")), "empty", "OS files don't count");
+
+    // What a create that failed before its header leaves: create retries there.
+    std::fs::create_dir_all(at("Leftover").join("d")).unwrap();
+    std::fs::write(
+        at("Leftover").join("README.txt"),
+        "Encrypted Liber Linteum vault. Open it with Liber Linteum.",
+    )
+    .unwrap();
+    assert_eq!(ask(at("Leftover")), "empty");
+
+    std::fs::create_dir(at("Notes")).unwrap();
+    std::fs::write(at("Notes").join("a.md"), "# mine").unwrap();
+    assert_eq!(ask(at("Notes")), "plain");
+    assert_eq!(std::fs::read(at("Notes").join("a.md")).unwrap(), b"# mine");
+
+    let (root, _) = h.create("Enc");
+    assert_eq!(ask(root.clone()), "encrypted");
+
+    h.write("a.md", b"# secret");
+    std::fs::remove_file(header_path(&root)).unwrap();
+    assert_eq!(ask(root), "damaged", "ciphertext without its header");
+}
+
 #[test]
 fn rollback_is_refused() {
     let h = harness();
@@ -722,6 +764,7 @@ fn every_encryption_command_is_main_only() {
         "vault_reveal_unreadable",
         "attachment_open_decrypted",
         "security_reset_rollback_memory",
+        "vault_encrypt_undo_elsewhere",
     ] {
         if let Err(e) = call(&h.main, cmd, json!({})) {
             assert!(!e.to_string().contains("not allowed"), "{cmd}: {e}");

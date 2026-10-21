@@ -28,7 +28,16 @@ function pickTwo(count: number): [number, number] {
 /** Shows the recovery code once, then asks for two of its groups (so it is
  *  known to be written down). The code lives only in props: the dialog
  *  drops it with `onDone`. */
-export function RecoveryCodeStep({ code, onDone }: { code: string; onDone: () => void }) {
+export function RecoveryCodeStep({
+  code,
+  onDone,
+  onCancel,
+}: {
+  code: string;
+  onDone: () => void;
+  /** Encrypt in place: back out before any file is copied. */
+  onCancel?: () => void;
+}) {
   const { t } = useTranslation();
   const id = useId();
   const [confirming, setConfirming] = useState(false);
@@ -36,6 +45,11 @@ export function RecoveryCodeStep({ code, onDone }: { code: string; onDone: () =>
   const [asked] = useState(() => pickTwo(Math.max(groupsOf(code).length, 2)));
   const [typed, setTyped] = useState<[string, string]>(['', '']);
   const groups = groupsOf(code);
+  const cancelButton = onCancel && (
+    <button type="button" className="btn btn-secondary" onClick={onCancel}>
+      {t('dialogs.cancel')}
+    </button>
+  );
 
   const copy = async () => {
     try {
@@ -54,6 +68,7 @@ export function RecoveryCodeStep({ code, onDone }: { code: string; onDone: () =>
           {code}
         </code>
         <div className={dialogs.buttons}>
+          {cancelButton}
           <button type="button" className="btn btn-secondary" autoFocus onClick={() => void copy()}>
             {t('encryption.copy')}
           </button>
@@ -93,6 +108,7 @@ export function RecoveryCodeStep({ code, onDone }: { code: string; onDone: () =>
         {t('encryption.doneHint')}
       </p>
       <div className={dialogs.buttons}>
+        {cancelButton}
         <button type="button" className="btn btn-secondary" onClick={() => setConfirming(false)}>
           {t('encryption.back')}
         </button>

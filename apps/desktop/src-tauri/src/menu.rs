@@ -52,15 +52,12 @@ pub const QUICK_NOTE_ID: &str = "liber-quick-note";
 /// longer than this many characters are cut with "…".
 const VAULT_NAME_MAX: usize = 40;
 
-/// The quick-note item's label: the open vault's name, or the generic label.
-pub fn quick_note_label(vault: Option<&str>) -> String {
-    let Some(name) = vault else {
-        return "Create New Scratchpad in This Vault".into();
-    };
+/// `name` as menus show it: at most `VAULT_NAME_MAX` visible characters
+/// (accents, emoji), then "…", with `&` doubled (menus read a lone `&` as a
+/// mnemonic marker).
+fn menu_name(name: &str) -> String {
     use unicode_normalization::UnicodeNormalization;
     use unicode_segmentation::UnicodeSegmentation;
-    // Counted and cut in whole visible characters (accents, emoji), then `&`
-    // doubled: menus read a lone `&` as a mnemonic marker.
     let name: String = name.nfc().collect();
     let chars: Vec<&str> = name.graphemes(true).collect();
     let short = if chars.len() > VAULT_NAME_MAX {
@@ -68,19 +65,41 @@ pub fn quick_note_label(vault: Option<&str>) -> String {
     } else {
         name
     };
-    format!("Create New Scratchpad for {}", short.replace('&', "&&"))
+    short.replace('&', "&&")
+}
+
+/// The quick-note item's label: the open vault's name, or the generic label.
+pub fn quick_note_label(vault: Option<&str>) -> String {
+    match vault {
+        Some(name) => format!("Create New Scratchpad for {}", menu_name(name)),
+        None => "Create New Scratchpad in This Vault".into(),
+    }
+}
+
+/// Vault → Encrypt "<name>"… (encryption UX round §4.1): the open plain
+/// vault's name, or the generic label while the item is off.
+pub fn encrypt_label(vault: Option<&str>) -> String {
+    match vault {
+        Some(name) => format!("Encrypt “{}”…", menu_name(name)),
+        None => "Encrypt Vault…".into(),
+    }
+}
+
+/// The app menu's item `id`, in any submenu.
+fn find_item<R: Runtime>(app: &AppHandle<R>, id: &str) -> Option<MenuItem<R>> {
+    fn find<R: Runtime>(items: Vec<MenuItemKind<R>>, id: &str) -> Option<MenuItem<R>> {
+        items.into_iter().find_map(|i| match i {
+            MenuItemKind::MenuItem(m) if m.id() == id => Some(m),
+            MenuItemKind::Submenu(s) => find(s.items().ok()?, id),
+            _ => None,
+        })
+    }
+    find(app.menu()?.items().ok()?, id)
 }
 
 /// Renames the quick-note item after the vault that opened or closed.
 pub fn show_vault_in_menu<R: Runtime>(app: &AppHandle<R>, vault: Option<&str>) {
-    fn find<R: Runtime>(items: Vec<MenuItemKind<R>>) -> Option<MenuItem<R>> {
-        items.into_iter().find_map(|i| match i {
-            MenuItemKind::MenuItem(m) if m.id() == QUICK_NOTE_ID => Some(m),
-            MenuItemKind::Submenu(s) => find(s.items().ok()?),
-            _ => None,
-        })
-    }
-    if let Some(item) = app.menu().and_then(|m| find(m.items().ok()?)) {
+    if let Some(item) = find_item(app, QUICK_NOTE_ID) {
         let _ = item.set_text(quick_note_label(vault));
     }
 }
@@ -109,16 +128,20 @@ pub const VAULT_EVENT: &str = "menu:vault";
 /// (`menu_set_lock_enabled`). Plain ⌘⇧L is 1Password's global lock, so ⌥⌘L.
 pub const VAULT_LOCK_ID: &str = "liber-vault-lock";
 pub const VAULT_LOCK_ACCELERATOR: &str = "Alt+CmdOrCtrl+L";
-/// Vault → New Encrypted Vault…
-pub const VAULT_NEW_ENCRYPTED_ID: &str = "liber-vault-new-encrypted";
+/// Vault → New Vault… (encryption UX round §2): the New vault dialog.
+pub const VAULT_NEW_ID: &str = "liber-vault-new";
+/// Vault → Encrypt "<name>"… (encryption UX round §4.1): enabled and named
+/// only while a plain vault is open (`menu_set_encrypt_item`).
+pub const VAULT_ENCRYPT_ID: &str = "liber-vault-encrypt";
 
 /// The `menu:vault` payload of a Vault menu item.
 fn vault_action(id: &str) -> Option<&'static str> {
     match id {
+        VAULT_NEW_ID => Some("new"),
         VAULT_OPEN_ID => Some("open"),
         VAULT_CLOSE_ID => Some("close"),
         VAULT_LOCK_ID => Some("lock"),
-        VAULT_NEW_ENCRYPTED_ID => Some("newEncrypted"),
+        VAULT_ENCRYPT_ID => Some("encrypt"),
         _ => None,
     }
 }
@@ -127,15 +150,18 @@ fn vault_action(id: &str) -> Option<&'static str> {
 /// encrypted vault opens and closes).
 #[tauri::command]
 pub fn menu_set_lock_enabled<R: Runtime>(app: AppHandle<R>, enabled: bool) {
-    fn find<R: Runtime>(items: Vec<MenuItemKind<R>>) -> Option<MenuItem<R>> {
-        items.into_iter().find_map(|i| match i {
-            MenuItemKind::MenuItem(m) if m.id() == VAULT_LOCK_ID => Some(m),
-            MenuItemKind::Submenu(s) => find(s.items().ok()?),
-            _ => None,
-        })
-    }
-    if let Some(item) = app.menu().and_then(|m| find(m.items().ok()?)) {
+    if let Some(item) = find_item(&app, VAULT_LOCK_ID) {
         let _ = item.set_enabled(enabled);
+    }
+}
+
+/// Names and enables Vault → Encrypt "<vault>"…, or turns it off with no
+/// vault (the page calls this as a plain vault opens and goes).
+#[tauri::command]
+pub fn menu_set_encrypt_item<R: Runtime>(app: AppHandle<R>, vault: Option<String>) {
+    if let Some(item) = find_item(&app, VAULT_ENCRYPT_ID) {
+        let _ = item.set_text(encrypt_label(vault.as_deref()));
+        let _ = item.set_enabled(vault.is_some());
     }
 }
 /// File → Save (M5b §6, auto save off): the focused window saves its page.
@@ -248,11 +274,12 @@ pub fn app_menu<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
         false,
         Some(VAULT_LOCK_ACCELERATOR),
     )?;
-    let vault_new_encrypted = MenuItem::with_id(
+    let vault_new = MenuItem::with_id(app, VAULT_NEW_ID, "New Vault…", true, None::<&str>)?;
+    let vault_encrypt = MenuItem::with_id(
         app,
-        VAULT_NEW_ENCRYPTED_ID,
-        "New Encrypted Vault…",
-        true,
+        VAULT_ENCRYPT_ID,
+        encrypt_label(None),
+        false,
         None::<&str>,
     )?;
     let vault = Submenu::with_items(
@@ -260,9 +287,10 @@ pub fn app_menu<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
         "Vault",
         true,
         &[
+            &vault_new,
             &vault_open,
-            &vault_new_encrypted,
             &PredefinedMenuItem::separator(app)?,
+            &vault_encrypt,
             &vault_lock,
             &vault_close,
         ],
@@ -521,10 +549,24 @@ mod lock_tests {
 
     #[test]
     fn vault_menu_items_emit_their_action() {
+        assert_eq!(vault_action(VAULT_NEW_ID), Some("new"));
+        assert_eq!(vault_action(VAULT_ENCRYPT_ID), Some("encrypt"));
         assert_eq!(vault_action(VAULT_LOCK_ID), Some("lock"));
-        assert_eq!(vault_action(VAULT_NEW_ENCRYPTED_ID), Some("newEncrypted"));
         assert_eq!(vault_action(VAULT_OPEN_ID), Some("open"));
         assert_eq!(vault_action(VAULT_CLOSE_ID), Some("close"));
+        // New Encrypted Vault… is gone (UX round §2).
+        assert_eq!(vault_action("liber-vault-new-encrypted"), None);
         assert_eq!(vault_action("liber-quit"), None);
+    }
+
+    #[test]
+    fn encrypt_label_names_the_vault_cut_like_the_scratchpad_item() {
+        assert_eq!(encrypt_label(None), "Encrypt Vault…");
+        assert_eq!(encrypt_label(Some("Smartjob")), "Encrypt “Smartjob”…");
+        assert_eq!(encrypt_label(Some("R&D")), "Encrypt “R&&D”…");
+        assert_eq!(
+            encrypt_label(Some(&"Á".repeat(60))),
+            format!("Encrypt “{}…”…", "Á".repeat(39))
+        );
     }
 }

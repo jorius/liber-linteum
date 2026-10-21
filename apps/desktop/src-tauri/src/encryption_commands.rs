@@ -40,7 +40,7 @@ pub struct SecretArg {
 }
 
 /// A recovery code for the UI to show once; wiped here after sending.
-pub struct RecoveryText(Zeroizing<String>);
+pub struct RecoveryText(pub(crate) Zeroizing<String>);
 
 impl Serialize for RecoveryText {
     fn serialize<S: Serializer>(&self, s: S) -> Result<S::Ok, S::Error> {
@@ -66,7 +66,7 @@ struct LockedPayload {
     path: String,
 }
 
-fn check_passphrase(p: &str) -> CmdResult<()> {
+pub(crate) fn check_passphrase(p: &str) -> CmdResult<()> {
     if p.chars().count() < MIN_PASSPHRASE_CHARS {
         return Err(CommandError::new(
             ErrorKind::InvalidInput,
@@ -91,9 +91,12 @@ fn slot_params() -> Argon2Params {
 
 /// A new vault at `root`: calibrated parameters that must pass the floor
 /// (`VaultHeader::create` checks). Test builds use tiny ones.
-fn create_storage(root: &Path, passphrase: &str) -> CmdResult<(EncryptedStorage, RecoveryCode)> {
+pub(crate) fn create_storage(
+    root: &Path,
+    passphrase: &str,
+) -> liber_vault::Result<(EncryptedStorage, RecoveryCode)> {
     #[cfg(feature = "test-params")]
-    let made = EncryptedStorage::create_insecure(
+    return EncryptedStorage::create_insecure(
         root,
         passphrase,
         Argon2Params {
@@ -103,8 +106,7 @@ fn create_storage(root: &Path, passphrase: &str) -> CmdResult<(EncryptedStorage,
         },
     );
     #[cfg(not(feature = "test-params"))]
-    let made = EncryptedStorage::create(root, passphrase, slot_params());
-    Ok(made?)
+    EncryptedStorage::create(root, passphrase, slot_params())
 }
 
 /// An unlocked vault becomes the open one, its index in memory only.
@@ -159,6 +161,20 @@ pub(crate) fn vault_unlock_impl<R: Runtime>(
     kind: SecretKind,
     value: Zeroizing<String>,
 ) -> CmdResult<VaultInfo> {
+    // An encryption in place this device left unfinished: undone or finished first.
+    let originals_pending = crate::convert_commands::recover_on_open(app, &path)?;
+    unlock_recovered(app, path, kind, value, originals_pending)
+}
+
+/// [`vault_unlock_impl`] once any conversion recovery is done (the convert
+/// run's own end uses it directly).
+pub(crate) fn unlock_recovered<R: Runtime>(
+    app: &AppHandle<R>,
+    path: PathBuf,
+    kind: SecretKind,
+    value: Zeroizing<String>,
+    originals_pending: bool,
+) -> CmdResult<VaultInfo> {
     let code;
     let with = match kind {
         SecretKind::Passphrase => Unlock::Passphrase(&value),
@@ -170,6 +186,8 @@ pub(crate) fn vault_unlock_impl<R: Runtime>(
         }
     };
     let (storage, report) = EncryptedStorage::unlock(&path, with)?;
+    // Plaintext must not linger: an index from when it was plain goes (final round).
+    crate::convert_commands::drop_plain_index(app, &path);
     let state = app.state::<AppState>();
     // Before anything is written (the merge writes the header): a rolled-back
     // vault is neither opened nor written (spec §16 #18).
@@ -183,6 +201,7 @@ pub(crate) fn vault_unlock_impl<R: Runtime>(
     let mut info = open_unlocked(app, storage, void, warning)?;
     // Step 5: takes a lock or a crash left in this vault (spec §4.2).
     info.recovered = crate::audio_commands::recover_at_unlock(app);
+    info.originals_pending = originals_pending;
     Ok(info)
 }
 

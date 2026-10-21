@@ -44,6 +44,39 @@ pub enum ErrorKind {
     /// An encrypted vault that can't be read: a damaged or unparseable
     /// header, a missing `d/`, or ciphertext that fails to decrypt.
     Damaged,
+    /// Encrypt in place (encryption UX §8.2): another device's conversion
+    /// of this folder is under way. Nothing was touched.
+    ConvertingElsewhere,
+    /// Encrypt in place (§8.3): files changed while encrypting, so it was
+    /// undone.
+    ChangedDuringConvert,
+    /// Encrypt in place: Stop and undo.
+    Cancelled,
+    /// Encrypt in place (final review): another device's conversion is past
+    /// the point where it can be undone here; the message is the folder.
+    ConvertingElsewhereFinishing,
+    /// Encrypt in place: a window shows a file from the folder.
+    ConvertWindowsOpen,
+    /// Encrypt in place: another folder is being encrypted.
+    ConvertBusy,
+    /// Encrypt in place: this folder is being encrypted right now.
+    ConvertActive,
+    /// Encrypt in place: the folder is part-way through a conversion.
+    ConvertPending,
+    /// Encrypt in place: a folder never encrypted in place; the message is it.
+    ConvertRefusedFolder,
+    /// Encrypt in place: the folder is inside the encrypted vault in the message.
+    ConvertInsideVault,
+    /// Encrypt in place: recovery stopped rather than overwrite the path in the message.
+    ConvertCollision,
+    /// Encrypt in place: a file didn't read back the same; it was undone.
+    ConvertMismatch,
+    /// Encrypt in place: the undo of a failed run failed too; the message is
+    /// the folder, whose originals are safe in `.liber-plain`.
+    ConvertUndoFailed,
+    /// Encrypt in place: a failed run past `staged` couldn't finish yet; the
+    /// next open of the folder (the message) does.
+    ConvertFinishFailed,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
@@ -139,6 +172,25 @@ impl From<std::io::Error> for CommandError {
             ErrorKind::Io
         };
         CommandError::new(kind, e.to_string())
+    }
+}
+
+impl From<liber_vault::convert::ConvertError> for CommandError {
+    fn from(e: liber_vault::convert::ConvertError) -> CommandError {
+        use liber_vault::convert::ConvertError as C;
+        // The UI's copy names what the path-carrying kinds hold.
+        let (kind, message) = match e {
+            C::Vault(v) => return v.into(),
+            C::Blocked(_) | C::Refused(_) => (ErrorKind::NotPermitted, e.to_string()),
+            C::Cancelled => (ErrorKind::Cancelled, e.to_string()),
+            C::Changed(_) => (ErrorKind::ChangedDuringConvert, e.to_string()),
+            C::Pending => (ErrorKind::ConvertPending, e.to_string()),
+            C::Folder(p) => (ErrorKind::ConvertRefusedFolder, p),
+            C::InsideVault(p) => (ErrorKind::ConvertInsideVault, p),
+            C::Collision(p) => (ErrorKind::ConvertCollision, p),
+            C::Mismatch(p) => (ErrorKind::ConvertMismatch, p),
+        };
+        CommandError::new(kind, message)
     }
 }
 

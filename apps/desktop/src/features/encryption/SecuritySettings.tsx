@@ -67,8 +67,8 @@ export function NewRecoveryDialog({
       title={t('encryption.security.newRecoveryTitle')}
       onClose={() => !code && !busy && onClose()}
       returnFocus={afterCode}
+      badge={<span className="liber-chip">{t('encryption.beta')}</span>}
     >
-      <span className={styles.beta}>{t('encryption.beta')}</span>
       {code ? (
         <RecoveryCodeStep
           code={code}

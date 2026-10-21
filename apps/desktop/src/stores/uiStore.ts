@@ -25,14 +25,20 @@ export type DialogState =
   /** Import from Notion (M7 §3). Rendered by `NotionHost` (it also shows on
    *  the Welcome screen). */
   | { type: 'notionImport' }
-  /** New encrypted vault in the folder just picked (E4); `CreateEncryptedHost`. */
-  | { type: 'createEncrypted'; path: string }
+  /** New vault, plain or encrypted (UX round §2); `CreateEncryptedHost`. */
+  | { type: 'newVault' }
   /** `root`'s recovery key was replaced on another device (E4). */
   | { type: 'recoveryVoid'; root: string }
   /** Settings → Security → New recovery key for `root` (E4), hosted by the
    *  app so the code outlives Settings, lock and Close; `fromVoid`: in place
    *  of the voided-key prompt, which its Cancel goes back to. */
   | { type: 'newRecovery'; root: string; fromVoid?: boolean }
+  /** Encrypt the plain vault at `root` in place (encryption UX §4.2, §8);
+   *  `EncryptInPlaceHost`. Held from its begin until it is done. */
+  | { type: 'encryptInPlace'; root: string }
+  /** Undo another device's conversion of `path` that is still copying
+   *  (spec §8.11), confirmed first; `EncryptInPlaceHost`. */
+  | { type: 'undoElsewhere'; path: string }
   /** Save / Don't Save / Cancel before unsaved text is left (M5b §6, auto
    *  save off). `id` tells two questions apart. */
   | { type: 'unsaved'; id: number; paths: string[]; answer: (c: UnsavedChoice) => void }
@@ -64,18 +70,24 @@ interface UiState {
    *  answer treat a refusal as Cancel. */
   openDialog: (d: Exclude<DialogState, null>) => boolean;
   closeDialog: () => void;
-  /** The create or new-recovery dialog holds the screen while it makes a
-   *  recovery code and shows it. */
+  /** The create, new-recovery or encrypt-in-place dialog holds the screen
+   *  while it makes a recovery code and shows it (and while encrypting). */
   held: boolean;
   hold: (held: boolean) => void;
+  /** A quit came while a folder is being encrypted: the encrypt dialog asks
+   *  "Quit anyway?" inside itself (a toast would sit under its backdrop). */
+  quitAsked: boolean;
 }
 
 /** The voided-key prompt (or the new key made in its place), and a dialog
  *  holding a recovery code: nothing replaces them. */
 function isSticky(d: DialogState, held: boolean): boolean {
   if (d?.type === 'recoveryVoid' || (d?.type === 'newRecovery' && d.fromVoid)) return true;
-  return held && (d?.type === 'createEncrypted' || d?.type === 'newRecovery');
+  return held && HOLDERS.has(d?.type ?? '');
 }
+
+/** The dialogs that can hold the screen (`hold`). */
+export const HOLDERS = new Set(['newVault', 'newRecovery', 'encryptInPlace']);
 
 export const useUiStore = create<UiState>((set, get) => ({
   dialog: null,
@@ -92,4 +104,5 @@ export const useUiStore = create<UiState>((set, get) => ({
   closeDialog: () => set({ dialog: null, held: false }),
   held: false,
   hold: (held) => set({ held }),
+  quitAsked: false,
 }));

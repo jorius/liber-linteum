@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from 'react';
+import { useEffect, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   BrandMark,
@@ -15,12 +15,11 @@ import { SUPPORTED_LANGUAGES, type Language } from '../../i18n';
 import { pickFolder } from '../../ipc';
 import { useSettingsStore } from '../../stores/settingsStore';
 import { useUiStore } from '../../stores/uiStore';
-import { useVaultStore } from '../../stores/vaultStore';
+import { refuseWhileConverting, useVaultStore } from '../../stores/vaultStore';
 import { openNotionImport } from '../notion/NotionHost';
 import { newQuickNote } from '../scratchpad/quickNote';
 import { QuickNoteIcon } from '../scratchpad/QuickNoteIcon';
-import { openCreateEncrypted } from '../encryption/CreateEncryptedHost';
-import encryption from '../encryption/Encryption.module.css';
+import { openNewVault } from '../encryption/CreateEncryptedHost';
 import { RecentList } from './RecentList';
 import styles from './Welcome.module.css';
 
@@ -36,8 +35,9 @@ export function welcomeShortcut(e: KeyboardEvent, mac = MAC): 'n' | 'o' | null {
   return key === 'n' || key === 'o' ? key : null;
 }
 
-/** Native folder picker → open or create (VLT-01). A cancelled picker does nothing. */
+/** Native folder picker → open (VLT-01). A cancelled picker does nothing. */
 async function pickThen(action: (path: string) => Promise<unknown>) {
+  if (refuseWhileConverting()) return;
   const path = await pickFolder().catch(() => null);
   if (path) await action(path);
 }
@@ -74,13 +74,9 @@ export function Welcome({ version }: WelcomeProps) {
   const { t, i18n } = useTranslation();
   const current = i18n.resolvedLanguage;
   const open = useVaultStore((s) => s.open);
-  const create = useVaultStore((s) => s.create);
   // Behind the opening overlay nothing is reachable (M1b §10 b).
   const opening = useVaultStore((s) => s.status === 'opening');
   const updateSettings = useSettingsStore((s) => s.update);
-  // Per visit, never remembered (E4).
-  const [encrypt, setEncrypt] = useState(false);
-  const newVault = encrypt ? async (path: string) => openCreateEncrypted(path) : create;
 
   // R3 §7: ⌘N and ⌘O work here too (the shell's shortcuts aren't mounted
   // yet); ⌘⇧N is ScratchpadHost's everywhere.
@@ -90,12 +86,11 @@ export function Welcome({ version }: WelcomeProps) {
       if (!key) return;
       if (useUiStore.getState().dialog || useVaultStore.getState().status === 'opening') return;
       e.preventDefault();
-      void pickThen(key === 'n' ? newVault : open);
+      void (key === 'n' ? openNewVault() : pickThen(open));
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [create, open, encrypt]);
+  }, [open]);
 
   const chooseLanguage = async (lng: Language) => {
     // Switch immediately; persist when running inside the app.
@@ -121,7 +116,7 @@ export function Welcome({ version }: WelcomeProps) {
             icon={<PlusIcon />}
             label={t('welcome.create')}
             keys="Mod+N"
-            onClick={() => void pickThen(newVault)}
+            onClick={() => void openNewVault()}
           />
           <StartButton
             icon={<FolderIcon />}
@@ -135,16 +130,6 @@ export function Welcome({ version }: WelcomeProps) {
             keys="Mod+Shift+N"
             onClick={() => void newQuickNote()}
           />
-          <label className={encryption.switch}>
-            <input
-              type="checkbox"
-              role="switch"
-              checked={encrypt}
-              onChange={(e) => setEncrypt(e.target.checked)}
-            />
-            {t('encryption.switch')}
-            <span className={encryption.beta}>{t('encryption.beta')}</span>
-          </label>
         </div>
 
         <div className={styles.more} role="group" aria-labelledby="welcome-more">

@@ -2,6 +2,7 @@
 //! `liber-vault.json`, `README.txt`, and every logical entry under `d/` with an
 //! encrypted name.
 
+pub mod convert;
 mod header;
 mod names;
 mod watch;
@@ -101,6 +102,12 @@ fn holds_ciphertext(data: &Path) -> bool {
 /// Whether `root` holds an encrypted vault ([`vault_kind`]).
 pub fn is_encrypted_vault(root: &Path) -> bool {
     vault_kind(root) == VaultKind::Encrypted
+}
+
+/// Whether `create` would take `root` as empty (OS files and a failed
+/// create's leftovers aside): the New vault dialog's "empty folder".
+pub fn is_empty_for_create(root: &Path) -> bool {
+    refuse_non_empty(root).is_ok()
 }
 
 #[derive(Debug)]

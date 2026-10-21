@@ -176,9 +176,12 @@ export function SettingsDialog({ onClose }: { onClose: () => void }) {
       onClick={() => select(c, true)}
     >
       <CategoryIcon category={c} />
-      {t(`settings.categories.${c}.title`)}
-      {c === 'security' && ' '}
-      {c === 'security' && <span className={styles.betaPill}>{t('encryption.beta')}</span>}
+      <span className={styles.navLabel}>
+        {t(`settings.categories.${c}.title`)}
+        {/* Unrendered in the flex row; keeps "Security Beta" two words when read. */}
+        {c === 'security' && ' '}
+        {c === 'security' && <span className="liber-chip">{t('encryption.beta')}</span>}
+      </span>
     </button>
   );
 
@@ -238,7 +241,7 @@ export function SettingsDialog({ onClose }: { onClose: () => void }) {
             <h3 ref={heading} tabIndex={-1} className={styles.paneTitle}>
               {searching ? t('settings.searchResults') : t(`settings.categories.${category}.title`)}
               {!searching && category === 'security' && (
-                <span className={styles.betaPill}>{t('encryption.beta')}</span>
+                <span className="liber-chip">{t('encryption.beta')}</span>
               )}
             </h3>
             {!searching && (

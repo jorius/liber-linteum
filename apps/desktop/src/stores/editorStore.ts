@@ -318,6 +318,14 @@ export function onBeforeClose(run: () => Promise<unknown>): () => void {
   return () => beforeClose.delete(run);
 }
 
+/** Checks run before anything else on close; `false` keeps the window. */
+const quitChecks = new Set<() => boolean>();
+
+export function onQuitCheck(check: () => boolean): () => void {
+  quitChecks.add(check);
+  return () => quitChecks.delete(check);
+}
+
 /** The warning shown by the last refused close, while it is on screen. */
 let closeWarning: number | null = null;
 
@@ -325,6 +333,8 @@ let closeWarning: number | null = null;
  *  still can't be written (failing or orphaned page) keeps the window open
  *  with a warning; closing again while it shows quits anyway (M2a §3.3). */
 export async function mayClose(): Promise<boolean> {
+  // A check that keeps the window says why itself (encrypting in place).
+  if ([...quitChecks].some((check) => !check())) return false;
   // Auto save off (M5b §6): Save / Don't Save / Cancel first, so Cancel also
   // keeps a recording going (batch 6 review M3).
   if (needsUnsavedPrompt() && !(await confirmUnsaved())) return false;

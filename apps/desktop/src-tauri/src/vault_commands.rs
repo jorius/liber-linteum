@@ -31,6 +31,8 @@ fn dir_path(s: &str) -> CmdResult<VaultPath> {
 #[doc(hidden)] // public for the menu test (round 3 review #8)
 pub fn open_session<R: Runtime>(app: &AppHandle<R>, root: &Path) -> CmdResult<VaultInfo> {
     let state = app.state::<AppState>();
+    // An encryption in place this device left unfinished: undone or finished first.
+    crate::convert_commands::recover_on_open(app, root)?;
     // An encrypted folder is `locked` here (`Vault::open`): it opens by unlocking.
     let (session, report) = VaultSession::open(root, &state.cache_dir, session_events(app))?;
     install_session(app, session, &report, false)
@@ -112,6 +114,7 @@ pub(crate) fn install_session<R: Runtime>(
         encrypted,
         recovery_void,
         recovered: Vec::new(),
+        originals_pending: false,
     })
 }
 
@@ -148,6 +151,70 @@ pub async fn vault_create<R: Runtime>(app: AppHandle<R>, path: PathBuf) -> CmdRe
         open_session(&app, &path)
     })
     .await
+}
+
+/// What the folder chosen in the New vault dialog holds (encryption UX round
+/// §2): `missing`, `empty` (as an encrypted create counts it), `plain` (files,
+/// a plain vault or not), `encrypted`, `damaged`, or `refused` (has files,
+/// but is never encrypted in place, §8.10). Reads only, after this device's interrupted
+/// conversion of it is finished or undone: mid-commit it reads as damaged.
+#[tauri::command]
+pub async fn folder_kind<R: Runtime>(app: AppHandle<R>, path: PathBuf) -> CmdResult<&'static str> {
+    blocking(app, move |app| {
+        if !path.exists() {
+            return Ok("missing");
+        }
+        crate::convert_commands::recover_on_open(&app, &path)?;
+        Ok(folder_kind_of(&app, &path))
+    })
+    .await
+}
+
+fn folder_kind_of<R: Runtime>(app: &AppHandle<R>, path: &Path) -> &'static str {
+    match liber_vault::vault_kind(path) {
+        liber_vault::VaultKind::Encrypted => "encrypted",
+        liber_vault::VaultKind::Damaged(_) => "damaged",
+        // Empty first: a new encrypted vault on an empty USB stick is fine (M2).
+        liber_vault::VaultKind::Plain if liber_vault::is_empty_for_create(path) => "empty",
+        _ if is_refused(app, path) => "refused",
+        liber_vault::VaultKind::Plain => "plain",
+    }
+}
+
+/// Never encrypted in place (§8.10): the Scratchpad, home, Desktop,
+/// Documents, Downloads, a volume root. The UI's early answer; the convert
+/// commands refuse them again.
+fn is_refused<R: Runtime>(app: &AppHandle<R>, path: &Path) -> bool {
+    let canon = |p: &Path| dunce::canonicalize(p).ok(); // seam: outside (only compared)
+    let Some(root) = canon(path) else {
+        return false;
+    };
+    let state = app.state::<AppState>();
+    let dirs = app.path();
+    let listed = [
+        dirs.home_dir(),
+        dirs.desktop_dir(),
+        dirs.document_dir(),
+        dirs.download_dir(),
+    ];
+    let volume_root = match root.parent() {
+        None => true,
+        #[cfg(unix)]
+        Some(parent) => {
+            use std::os::unix::fs::MetadataExt; // seam: outside (a volume root: st_dev, compared)
+            let dev = |p: &Path| p.metadata().map(|m| m.dev());
+            matches!((dev(&root), dev(parent)), (Ok(a), Ok(b)) if a != b)
+        }
+        #[cfg(not(unix))]
+        Some(_) => false,
+    };
+    volume_root
+        || state.settings.is_scratchpad(&root)
+        || state.opened_as_scratchpad(&root)
+        || listed
+            .into_iter()
+            .flatten()
+            .any(|d| canon(&d).as_deref() == Some(root.as_path()))
 }
 
 pub(crate) fn vault_close_impl(state: &AppState) {

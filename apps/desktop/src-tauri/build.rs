@@ -126,6 +126,17 @@ const COMMANDS: &[&str] = &[
     "vault_reveal_unreadable",
     "attachment_open_decrypted",
     "security_reset_rollback_memory",
+    // Encryption UX round: the New vault dialog and Vault → Encrypt (main window only).
+    "folder_kind",
+    "menu_set_encrypt_item",
+    // Encrypt in place (encryption UX §4.3, §8; main window only).
+    "vault_encrypt_preflight",
+    "vault_encrypt_begin",
+    "vault_encrypt_run",
+    "vault_encrypt_cancel",
+    "vault_encrypt_undo_elsewhere",
+    "vault_trash_originals",
+    "vault_reveal_originals",
 ];
 
 fn main() {
