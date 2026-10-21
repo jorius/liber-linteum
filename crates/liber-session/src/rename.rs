@@ -380,10 +380,10 @@ impl VaultSession {
     /// Takes a folder this module just made away again, from disk and index.
     fn drop_created_folder(&self, folder: &VaultPath) {
         // Only ever an empty folder; one still holding a page stays indexed.
-        if self.vault.remove_empty_dir(folder).is_ok() {
-            if let Ok(mut index) = self.index() {
-                let _ = index.transaction(|tx| tx.remove(folder.as_str()));
-            }
+        if self.vault.remove_empty_dir(folder).is_ok()
+            && let Ok(mut index) = self.index()
+        {
+            let _ = index.transaction(|tx| tx.remove(folder.as_str()));
         }
     }
 
