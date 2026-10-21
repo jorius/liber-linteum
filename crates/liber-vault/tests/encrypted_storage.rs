@@ -4,8 +4,8 @@
 
 use liber_crypto::{Argon2Params, FolderId, NameCodec, StreamWriter, Unlock, VaultHeader};
 use liber_vault::{
-    Child, EncryptedStorage, Follow, HEADER_FILE, Kind, OsUse, Reach, Replace, Storage, VaultError,
-    VaultPath, is_encrypted_vault,
+    Child, EncryptedStorage, Follow, HEADER_FILE, Kind, OsUse, Reach, Replace, Storage, Vault,
+    VaultError, VaultKind, VaultPath, is_encrypted_vault, vault_kind,
 };
 use std::collections::BTreeMap;
 use std::io::{Read, Seek, SeekFrom, Write};
@@ -862,4 +862,46 @@ fn concurrent_reads_listings_and_renames_stay_consistent() {
         }
     }
     assert_eq!(storage.read(&vp("F/a.md")).unwrap(), b"moving");
+}
+
+/// Fix round 1 (I2): a folder is encrypted only when its header parses and `d/` is a folder.
+#[test]
+fn vault_kind_needs_a_real_header_and_never_opens_a_damaged_vault_plain() {
+    let damaged = |root: &Path| {
+        assert!(
+            matches!(vault_kind(root), VaultKind::Damaged(_)),
+            "{root:?}"
+        );
+        let err = Vault::open(root).unwrap_err();
+        assert!(matches!(err, VaultError::Damaged(_)), "{err:?}");
+    };
+    // A plain vault with a user's own `liber-vault.json` (no `d/` folder).
+    let plain = tempfile::tempdir().unwrap();
+    std::fs::write(plain.path().join(HEADER_FILE), r#"{"theme":"dark"}"#).unwrap();
+    std::fs::write(plain.path().join("n.md"), "# n").unwrap();
+    assert_eq!(vault_kind(plain.path()), VaultKind::Plain);
+    assert!(Vault::open(plain.path()).is_ok());
+    // A plain folder named `d` with notes in it, no header: plain.
+    let d_notes = tempfile::tempdir().unwrap();
+    std::fs::create_dir(d_notes.path().join("d")).unwrap();
+    std::fs::write(d_notes.path().join("d/n.md"), "# n").unwrap();
+    assert_eq!(vault_kind(d_notes.path()), VaultKind::Plain);
+
+    // An encrypted vault whose header was damaged: never plain.
+    let (dir, storage) = new_vault();
+    storage
+        .replace_atomic(&vp("n.md"), &mut &b"secret"[..], Replace::CreateOnly)
+        .unwrap();
+    drop(storage);
+    assert_eq!(vault_kind(dir.path()), VaultKind::Encrypted);
+    std::fs::write(dir.path().join(HEADER_FILE), b"{ torn").unwrap();
+    damaged(dir.path());
+    // Its header gone, `d/` still holding ciphertext: never plain.
+    std::fs::remove_file(dir.path().join(HEADER_FILE)).unwrap();
+    damaged(dir.path());
+    // A real header whose `d/` is gone: damaged too.
+    let (bare, storage) = new_vault();
+    drop(storage);
+    std::fs::remove_dir(bare.path().join("d")).unwrap();
+    damaged(bare.path());
 }

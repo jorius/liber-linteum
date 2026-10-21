@@ -79,7 +79,9 @@ LIBER_TEST_STORAGE=encrypted cargo test -p liber-vault -p liber-session -p liber
   --features liber-vault/test-storage,liber-vault/test-params
 ```
 
-On `encrypted`, a test that reads or writes the plaintext tree on disk after opening (or relies on symlinks, permission bits, mtimes set before opening, or OS paths) starts with `if liber_testkit::plain_disk_only() { return; }`. E3 Task 4 gated 185 tests this way; every other test passes on encrypted storage.
+On `encrypted`, a test that reads or writes the plaintext tree on disk after opening (or relies on symlinks, permission bits, mtimes set before opening, or OS paths) starts with `if liber_testkit::plain_disk_only() { return; }`. E3 Task 4 gated 161 tests this way; every other test passes on encrypted storage.
+
+`vault_kind(root)` decides what a folder is: `Encrypted` when `liber-vault.json` parses as a vault header and `d/` is a folder; `Damaged` when there are signs of an encrypted vault that can't be one (a header that won't parse beside `d/`, a header without `d/`, or `d/` holding `.libere`/`.liberl`/`.libern` files without a header), which never opens as plain (`VaultError::Damaged`); otherwise `Plain`. A user's own `liber-vault.json`, or a folder named `d`, alone leave a vault plain.
 
 Outside the switch, `Vault::open` on an encrypted folder fails with `VaultError::Locked`: an encrypted vault opens only through `EncryptedStorage::unlock` and `VaultSession::open_encrypted`, whose index lives in memory (spec §5.1).
 

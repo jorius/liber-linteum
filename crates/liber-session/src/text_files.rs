@@ -49,7 +49,7 @@ impl VaultSession {
         if !is_text_path(path.as_str()) || is_page_path(path.as_str()) {
             return Err(not_a_text(path));
         }
-        match self.index().stat(path.as_str())? {
+        match self.index()?.stat(path.as_str())? {
             Some(stat) if stat.kind != FileKind::Folder => Ok(()),
             _ => Err(SessionError::NotIndexed(path.to_string())),
         }
@@ -96,7 +96,7 @@ impl VaultSession {
             hash: Some(hash.to_hex()),
         };
         let text = text_of(path.as_str(), bytes);
-        let mut index = self.index();
+        let mut index = self.index()?;
         index.transaction(|tx| {
             tx.upsert_file(&row)?;
             text.as_deref()
@@ -129,7 +129,7 @@ impl VaultSession {
             size: entry.size,
             hash: Some(hash.to_hex()),
         };
-        self.index().transaction(|tx| {
+        self.index()?.transaction(|tx| {
             tx.upsert_file(&row)?;
             tx.upsert_text(&row.path, text)
         })?;

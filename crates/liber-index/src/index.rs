@@ -426,6 +426,14 @@ impl Index {
         Ok(rows.collect::<rusqlite::Result<_>>()?)
     }
 
+    /// The main database's file, as SQLite's `PRAGMA database_list` reports it:
+    /// empty for an in-memory index.
+    pub fn db_file(&self) -> Result<String> {
+        Ok(self
+            .conn
+            .query_row("PRAGMA database_list", [], |r| r.get("file"))?)
+    }
+
     pub fn counts(&self) -> Result<(usize, usize)> {
         let files: i64 = self
             .conn

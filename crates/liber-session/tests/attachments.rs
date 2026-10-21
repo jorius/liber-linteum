@@ -361,7 +361,10 @@ fn m4b3_new_attachments_follow_the_link_format() {
     let absolute = save(Some(LinkFormat::Absolute), "four four.png");
     // An encrypted vault has no OS path: the shortest link and no file URL (E3).
     if liber_testkit::plain_disk_only() {
-        assert_eq!(absolute.url, None);
+        assert_eq!(
+            (absolute.link.as_str(), absolute.url),
+            ("four four.png", None)
+        );
         return;
     }
     let root = dunce::canonicalize(vault.path()).unwrap();

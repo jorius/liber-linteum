@@ -144,7 +144,7 @@ impl VaultSession {
         let own = name_key(path.file_name());
         let mut link_names = HashSet::new();
         let mut siblings = HashSet::new();
-        for (p, stat) in self.index().stats()? {
+        for (p, stat) in self.index()?.stats()? {
             let Ok(p) = VaultPath::new(&p) else { continue };
             if p == *path {
                 continue;

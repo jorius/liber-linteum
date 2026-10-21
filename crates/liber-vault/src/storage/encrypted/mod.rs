@@ -30,9 +30,57 @@ const README_TEXT: &str = "Encrypted Liber Linteum vault. Open it with Liber Lin
 /// Files the OS drops into any folder: `create` still counts the folder as empty.
 const OS_FILES: [&str; 3] = [".DS_Store", "Thumbs.db", "desktop.ini"];
 
-/// Whether `root` holds an encrypted vault (its header file).
+/// What a folder holds, judged from its top level (format §3).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum VaultKind {
+    Plain,
+    /// A header that parses, and its `d/` folder.
+    Encrypted,
+    /// Signs of an encrypted vault that can't be one: never opened as plain.
+    Damaged(String),
+}
+
+/// A user's own `liber-vault.json`, or a folder named `d`, alone leave a vault plain.
+pub fn vault_kind(root: &Path) -> VaultKind {
+    let data = root.join(DATA_DIR);
+    let has_data = data.symlink_metadata().is_ok_and(|m| m.is_dir());
+    let header = root.join(HEADER_FILE);
+    let parsed = header
+        .symlink_metadata()
+        .is_ok_and(|m| m.is_file())
+        .then(|| {
+            std::fs::read(&header)
+                .map_err(|e| e.to_string())
+                .and_then(|b| VaultHeader::parse(&b).map_err(|e| e.to_string()))
+        });
+    match (parsed, has_data) {
+        (Some(Ok(_)), true) => VaultKind::Encrypted,
+        (Some(Ok(_)), false) => VaultKind::Damaged(format!("{DATA_DIR}/ folder missing")),
+        (Some(Err(why)), true) => VaultKind::Damaged(format!("{HEADER_FILE} unreadable: {why}")),
+        (None, true) if holds_ciphertext(&data) => {
+            VaultKind::Damaged(format!("{HEADER_FILE} missing"))
+        }
+        _ => VaultKind::Plain,
+    }
+}
+
+/// Whether `d/` holds encrypted files or long names at its top level (an
+/// encrypted folder's name has no suffix, so a vault of only folders reads as plain).
+fn holds_ciphertext(data: &Path) -> bool {
+    std::fs::read_dir(data).is_ok_and(|items| {
+        items.flatten().any(|i| {
+            let name = i.file_name();
+            let name = name.to_string_lossy();
+            [".libere", ".liberl", ".libern"]
+                .iter()
+                .any(|ext| name.ends_with(ext))
+        })
+    })
+}
+
+/// Whether `root` holds an encrypted vault ([`vault_kind`]).
 pub fn is_encrypted_vault(root: &Path) -> bool {
-    root.join(HEADER_FILE).is_file()
+    vault_kind(root) == VaultKind::Encrypted
 }
 
 #[derive(Debug)]

@@ -196,7 +196,7 @@ impl VaultSession {
         limit: usize,
     ) -> Result<Vec<LinkSuggestion>> {
         let (candidates, files) = {
-            let index = self.index();
+            let index = self.index()?;
             (index.link_candidates()?, index.file_set()?)
         };
         let q = name_key(query.trim());
@@ -247,7 +247,7 @@ impl VaultSession {
         let dir = self.vault.attachment_policy().dir_for(page)?;
         for folder in self.vault.create_dir_all(&dir)? {
             if let Some(entry) = self.vault.stat(&folder)? {
-                self.index()
+                self.index()?
                     .transaction(|tx| tx.upsert_file(&folder_row(&entry)))?;
             }
         }
@@ -302,13 +302,13 @@ impl VaultSession {
                 .then(|| self.vault.read(path).ok())
                 .flatten()
                 .and_then(|(bytes, _)| text_of(path.as_str(), &bytes));
-            self.index().transaction(|tx| {
+            self.index()?.transaction(|tx| {
                 tx.upsert_file(&row)?;
                 text.as_deref()
                     .map_or(Ok(()), |t| tx.upsert_text(&row.path, t))
             })?;
         }
-        let mut index = self.index();
+        let mut index = self.index()?;
         let files = index.file_set()?;
         index.resolve_affected(&files, &[link_key(path.as_str())])?;
         Ok(())
@@ -318,7 +318,7 @@ impl VaultSession {
     /// §8), and the `file:` URL for the absolute format. A full or relative
     /// path that wouldn't find `path` again falls back to the shortest name.
     fn link_to(&self, page: &VaultPath, path: &VaultPath) -> Result<(String, Option<String>)> {
-        let files = self.index().file_set()?;
+        let files = self.index()?.file_set()?;
         let shortest =
             shortest_unique_target(path.as_str(), page.as_str(), &files, LinkKind::Embed, false);
         let finds = |link: &str| {

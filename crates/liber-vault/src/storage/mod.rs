@@ -11,7 +11,9 @@ use crate::error::Result;
 use crate::path::VaultPath;
 use std::path::{Path, PathBuf};
 
-pub use encrypted::{EncryptedStorage, HEADER_FILE, UnlockReport, is_encrypted_vault};
+pub use encrypted::{
+    EncryptedStorage, HEADER_FILE, UnlockReport, VaultKind, is_encrypted_vault, vault_kind,
+};
 pub use plain::PlainStorage;
 
 pub trait ReadSeek: std::io::Read + std::io::Seek + Send {}
@@ -166,12 +168,15 @@ pub(crate) fn open_storage(root: &Path) -> Result<Box<dyn Storage>> {
     open_plain(root).map(|s| Box::new(s) as Box<dyn Storage>)
 }
 
-/// `PlainStorage`; an encrypted vault opens only by unlocking it (E4's Unlock screen).
+/// `PlainStorage`; an encrypted vault opens only by unlocking it (E4's Unlock
+/// screen), and a damaged one never opens as plain.
 fn open_plain(root: &Path) -> Result<PlainStorage> {
-    if is_encrypted_vault(root) {
-        return Err(crate::error::VaultError::Locked);
+    use crate::error::VaultError;
+    match vault_kind(root) {
+        VaultKind::Plain => PlainStorage::open(root),
+        VaultKind::Encrypted => Err(VaultError::Locked),
+        VaultKind::Damaged(why) => Err(VaultError::Damaged(format!("{}: {why}", root.display()))),
     }
-    PlainStorage::open(root)
 }
 
 #[cfg(any(test, feature = "test-storage"))]
@@ -202,8 +207,17 @@ pub const TEST_PASSPHRASE: &str = "liber-test-passphrase";
 pub fn seal_in_place(root: &Path) -> Result<EncryptedStorage> {
     use crate::error::io_err;
     use liber_crypto::{Argon2Params, FolderId, Unlock};
-    if is_encrypted_vault(root) {
-        return Ok(EncryptedStorage::unlock(root, Unlock::Passphrase(TEST_PASSPHRASE))?.0);
+    match vault_kind(root) {
+        VaultKind::Encrypted => {
+            return Ok(EncryptedStorage::unlock(root, Unlock::Passphrase(TEST_PASSPHRASE))?.0);
+        }
+        VaultKind::Damaged(why) => {
+            return Err(crate::error::VaultError::Damaged(format!(
+                "{}: {why}",
+                root.display()
+            )));
+        }
+        VaultKind::Plain => {}
     }
     let canon = plain::canonical_root(root)?;
     let temp = plain::canonical_root(&std::env::temp_dir())?;

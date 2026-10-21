@@ -403,7 +403,9 @@ impl EncryptedStorage {
                 path: path.to_string(),
                 source: std::io::Error::other(err.to_string()),
             };
-            // Neither the keys nor the cache is held here, only the write turn.
+            // Neither the keys nor the cache is held here, only the write turn: it covers
+            // the delete so `forget` lands before another write resolves this name through
+            // a listing that still shows the entry.
             trash::delete(&e.physical).map_err(os_err)?;
             // The entry is gone: forget it whatever happens to the side file, which
             // is harmless if left (as in `remove_side`).

@@ -360,7 +360,9 @@ impl VaultSession {
     /// Takes a folder this module just made away again, from disk and index.
     fn drop_created_folder(&self, folder: &VaultPath) {
         let _ = self.vault.remove_empty_dir(folder); // only ever an empty folder
-        let _ = self.index().transaction(|tx| tx.remove(folder.as_str()));
+        if let Ok(mut index) = self.index() {
+            let _ = index.transaction(|tx| tx.remove(folder.as_str()));
+        }
     }
 
     pub(crate) fn rename_with_hook(
@@ -372,7 +374,7 @@ impl VaultSession {
     ) -> Result<RenameOutcome> {
         check_target(from, to)?;
         let (plan, sources) = {
-            let index = self.index();
+            let index = self.index()?;
             let stats = index.stats()?;
             if !stats.contains_key(from.as_str()) {
                 return Err(SessionError::NotIndexed(from.to_string()));
@@ -417,7 +419,7 @@ impl VaultSession {
         };
 
         self.vault.rename(from, to)?;
-        self.index()
+        self.index()?
             .transaction(|tx| tx.rename(from.as_str(), to.as_str()))?;
         self.retext_renamed(&[(from.to_string(), to.to_string())])?;
         self.follow_layout(&[(from.to_string(), to.to_string())]);
@@ -462,7 +464,7 @@ impl VaultSession {
             }
         }
 
-        let mut index = self.index();
+        let mut index = self.index()?;
         let files = index.file_set()?;
         let keys: Vec<String> = plan
             .moved
@@ -483,7 +485,7 @@ impl VaultSession {
         };
         let mut warnings = Vec::new();
         if let Some(loaded) = self.load(&entry, None, &mut warnings) {
-            self.index().transaction(|tx| write_loaded(tx, &loaded))?;
+            self.index()?.transaction(|tx| write_loaded(tx, &loaded))?;
         }
         Ok(())
     }

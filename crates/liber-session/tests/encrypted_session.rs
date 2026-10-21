@@ -1,9 +1,12 @@
 //! E3: a session over an unlocked encrypted vault keeps its index in memory
 //! (spec §5.1), and `lock` ends every read (spec §6.2).
 
-use liber_session::{SearchQuery, SessionEvent, VaultSession};
-use liber_vault::{Reach, Vault, VaultError, VaultPath, seal_in_place};
+use liber_session::{SearchQuery, SessionError, SessionEvent, VaultSession};
+use liber_vault::{
+    Reach, Replace, Storage, Vault, VaultError, VaultPath, WatchEvent, seal_in_place,
+};
 use std::io::Read;
+use std::time::Duration;
 
 fn sealed(files: &[(&str, &str)]) -> tempfile::TempDir {
     let dir = tempfile::tempdir().unwrap();
@@ -24,7 +27,6 @@ fn open(dir: &tempfile::TempDir) -> VaultSession {
 #[test]
 fn encrypted_session_indexes_in_memory_only() {
     let dir = sealed(&[("Canary.md", "canary-7f3a #tag")]);
-    let cache = tempfile::tempdir().unwrap();
     let s = open(&dir);
     let q = SearchQuery {
         text: "canary".into(),
@@ -38,8 +40,11 @@ fn encrypted_session_indexes_in_memory_only() {
         .map(|h| h.path)
         .collect();
     assert_eq!(hits, vec!["Canary.md"]);
-    // No cache root was given, and nothing was written to one.
-    assert_eq!(std::fs::read_dir(cache.path()).unwrap().count(), 0);
+    assert_eq!(
+        s.index_file().unwrap(),
+        "",
+        "PRAGMA database_list: in memory"
+    );
     // Nothing next to the vault either: only its own files.
     let mut top: Vec<String> = std::fs::read_dir(dir.path())
         .unwrap()
@@ -64,12 +69,46 @@ fn lock_mid_read_returns_locked() {
     // What page_get reads.
     let err = s.vault().read(&path).unwrap_err();
     assert!(matches!(err, VaultError::Locked), "{err:?}");
-    // The index is empty: nothing decrypted stays in memory.
-    let q = SearchQuery {
+    // The index is gone: nothing decrypted stays in memory.
+    assert!(locked(s.search(&canary())));
+}
+
+fn canary() -> SearchQuery {
+    SearchQuery {
         text: "canary".into(),
         ..SearchQuery::default()
-    };
-    assert!(s.search(&q).unwrap().results.is_empty());
+    }
+}
+
+fn locked<T: std::fmt::Debug>(r: Result<T, SessionError>) -> bool {
+    matches!(r, Err(SessionError::Vault(VaultError::Locked)))
+}
+
+#[test]
+fn index_backed_calls_are_locked_after_lock() {
+    let dir = sealed(&[("Canary.md", "canary-7f3a #tag")]);
+    let s = open(&dir);
+    let path = VaultPath::new("Canary.md").unwrap();
+    assert!(s.page(&path).unwrap().is_some());
+    s.lock();
+    assert!(locked(s.search(&canary())));
+    assert!(locked(s.tree()));
+    assert!(locked(s.page(&path)));
+    assert!(locked(s.backlinks(&path)));
+}
+
+#[test]
+fn a_watcher_batch_or_save_after_lock_writes_no_rows() {
+    let dir = sealed(&[("Canary.md", "canary-7f3a #tag")]);
+    let s = open(&dir);
+    let path = VaultPath::new("Canary.md").unwrap();
+    let (_, hash) = s.vault().read(&path).unwrap();
+    s.lock();
+    // A batch the watcher had in flight, and a save, both landing after the lock.
+    assert!(locked(s.apply(vec![WatchEvent::Changed(path.clone())])));
+    assert!(locked(s.apply(vec![WatchEvent::Overflow])));
+    assert!(locked(s.write_page(&path, "canary-7f3a again", hash)));
+    assert!(locked(s.search(&canary())));
 }
 
 #[test]
@@ -81,4 +120,38 @@ fn plain_open_of_encrypted_folder_is_locked() {
     let dir = sealed(&[("Canary.md", "canary-7f3a")]);
     let err = Vault::open(dir.path()).unwrap_err();
     assert!(matches!(err, VaultError::Locked), "{err:?}");
+}
+
+#[test]
+fn a_plain_session_keeps_its_index_in_the_cache_folder() {
+    let dir = tempfile::tempdir().unwrap();
+    let cache = tempfile::tempdir().unwrap();
+    let (s, _) = VaultSession::open(dir.path(), cache.path(), |_: SessionEvent| {}).unwrap();
+    assert!(s.index_file().unwrap().ends_with("index.sqlite"));
+}
+
+/// Another app instance (a second unlock of the same vault) writes a note:
+/// the session's watcher translates it and search finds it.
+#[test]
+fn a_note_written_elsewhere_reaches_search_through_the_watcher() {
+    let dir = sealed(&[("Canary.md", "canary-7f3a")]);
+    let s = std::sync::Arc::new(open(&dir));
+    s.start_watching().unwrap();
+    let elsewhere = seal_in_place(dir.path()).unwrap();
+    elsewhere
+        .replace_atomic(
+            &VaultPath::new("Later.md").unwrap(),
+            &mut &b"zebra-91c"[..],
+            Replace::CreateOnly,
+        )
+        .unwrap();
+    let zebra = SearchQuery {
+        text: "zebra".into(),
+        ..SearchQuery::default()
+    };
+    let found = liber_testkit::wait_until(Duration::from_secs(10), || {
+        s.search(&zebra)
+            .is_ok_and(|p| p.results.iter().any(|h| h.path == "Later.md"))
+    });
+    assert!(found, "the watcher never indexed Later.md");
 }

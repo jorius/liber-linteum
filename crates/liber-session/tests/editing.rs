@@ -19,10 +19,7 @@ fn session(fixture: &str) -> (tempfile::TempDir, tempfile::TempDir, VaultSession
 
 #[test]
 fn ed_08_write_page_is_compare_and_swap_and_reindexes() {
-    if liber_testkit::plain_disk_only() {
-        return;
-    }
-    let (dir, _c, s) = session("obsidian-basic");
+    let (_dir, _c, s) = session("obsidian-basic");
     let path = vp("Welcome.md");
     let (_, hash) = s.vault().read_to_string(&path).unwrap();
     let new_hash = s
@@ -30,7 +27,7 @@ fn ed_08_write_page_is_compare_and_swap_and_reindexes() {
         .unwrap();
     assert_eq!(new_hash, Hash::of(b"# Hello again\n\n[[Sparda]]\n"));
     assert_eq!(
-        std::fs::read_to_string(dir.path().join("Welcome.md")).unwrap(),
+        s.vault().read_to_string(&path).unwrap().0,
         "# Hello again\n\n[[Sparda]]\n"
     );
     let page = s.page(&path).unwrap().unwrap();
@@ -46,7 +43,7 @@ fn ed_08_write_page_is_compare_and_swap_and_reindexes() {
         "{err:?}"
     );
     assert_eq!(
-        std::fs::read_to_string(dir.path().join("Welcome.md")).unwrap(),
+        s.vault().read_to_string(&path).unwrap().0,
         "# Hello again\n\n[[Sparda]]\n"
     );
 }

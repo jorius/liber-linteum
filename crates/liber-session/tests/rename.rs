@@ -1,6 +1,6 @@
 use liber_session::{SessionError, SessionEvent, VaultSession};
 use liber_testkit::{copy_fixture, snapshot};
-use liber_vault::{CoverSide, VaultPath};
+use liber_vault::{CoverSide, Follow, VaultPath};
 
 fn vp(s: &str) -> VaultPath {
     VaultPath::new(s).unwrap()
@@ -13,8 +13,13 @@ fn session(fixture: &str) -> (tempfile::TempDir, tempfile::TempDir, VaultSession
     (vault, cache, s)
 }
 
-fn read(dir: &tempfile::TempDir, p: &str) -> String {
-    std::fs::read_to_string(dir.path().join(p)).unwrap()
+/// Through the vault, so the test runs on the encrypted switch too.
+fn read(s: &VaultSession, p: &str) -> String {
+    String::from_utf8(s.vault().read(&vp(p)).unwrap().0).unwrap()
+}
+
+fn exists(s: &VaultSession, p: &str) -> bool {
+    s.vault().meta(&vp(p), Follow::No).unwrap().is_some()
 }
 
 /// Every resolved link target of every page, as (src, target).
@@ -34,10 +39,7 @@ fn all_targets(s: &VaultSession) -> Vec<(String, Option<String>)> {
 
 #[test]
 fn exp_04_rename_page_rewrites_wikilinks_related_and_markdown_links() {
-    if liber_testkit::plain_disk_only() {
-        return;
-    }
-    let (dir, _c, s) = session("obsidian-basic");
+    let (_dir, _c, s) = session("obsidian-basic");
     let out = s
         .rename(
             &vp("Character Design/DMC/Sparda.md"),
@@ -54,7 +56,7 @@ fn exp_04_rename_page_rewrites_wikilinks_related_and_markdown_links() {
         ]
     );
     assert_eq!(out.updated_links, 4);
-    let mine = read(&dir, "Character Design/My characters.md");
+    let mine = read(&s, "Character Design/My characters.md");
     assert!(
         mine.contains("- [[Sparda the Dark Knight#Coat|the demon knight]]\n"),
         "{mine}"
@@ -63,7 +65,7 @@ fn exp_04_rename_page_rewrites_wikilinks_related_and_markdown_links() {
         mine.contains("- [[Sparda the Dark Knight]]\n"),
         "path form rewritten to shortest: {mine}"
     );
-    let rex = read(&dir, "Character Design/rex-draft.md");
+    let rex = read(&s, "Character Design/rex-draft.md");
     assert!(
         rex.contains("  - \"[[Sparda the Dark Knight]]\"\n"),
         "{rex}"
@@ -87,10 +89,7 @@ fn exp_04_rename_page_rewrites_wikilinks_related_and_markdown_links() {
 
 #[test]
 fn exp_04_rename_attachment_rewrites_cover_and_embeds() {
-    if liber_testkit::plain_disk_only() {
-        return;
-    }
-    let (dir, _c, s) = session("obsidian-basic");
+    let (_dir, _c, s) = session("obsidian-basic");
     s.rename(
         &vp("Character Design/assets/rex-cover.png"),
         &vp("Character Design/assets/cover.png"),
@@ -103,18 +102,15 @@ fn exp_04_rename_attachment_rewrites_cover_and_embeds() {
         true,
     )
     .unwrap();
-    let rex = read(&dir, "Character Design/rex-draft.md");
+    let rex = read(&s, "Character Design/rex-draft.md");
     assert!(rex.contains("cover: assets/cover.png\n"), "{rex}");
     assert!(rex.contains("Turnaround: ![[turn.png]]\n"), "{rex}");
 }
 
 #[test]
 fn exp_02_04_move_folder_rewrites_only_links_that_would_break() {
-    if liber_testkit::plain_disk_only() {
-        return;
-    }
-    let (dir, _c, s) = session("obsidian-basic");
-    let before_mine = read(&dir, "Character Design/My characters.md");
+    let (_dir, _c, s) = session("obsidian-basic");
+    let before_mine = read(&s, "Character Design/My characters.md");
     s.create_folder(&VaultPath::root(), "Archive").unwrap();
     let out = s
         .rename(&vp("Character Design/DMC"), &vp("Archive/DMC"), true)
@@ -127,17 +123,17 @@ fn exp_02_04_move_folder_rewrites_only_links_that_would_break() {
         )]
     );
     assert_eq!(
-        read(&dir, "Character Design/My characters.md"),
+        read(&s, "Character Design/My characters.md"),
         before_mine,
         "[[Sparda]] and [[DMC/Sparda]] still resolve"
     );
-    let rex = read(&dir, "Character Design/rex-draft.md");
+    let rex = read(&s, "Character Design/rex-draft.md");
     assert!(
         rex.contains("[Sparda's page](../Archive/DMC/Sparda.md#Palette)"),
         "{rex}"
     );
     assert!(rex.contains("  - \"[[Sparda]]\"\n"), "{rex}");
-    assert!(dir.path().join("Archive/DMC/Sparda.md").is_file());
+    assert!(exists(&s, "Archive/DMC/Sparda.md"));
     assert_eq!(
         s.page(&vp("Archive/DMC/Sparda.md")).unwrap().unwrap().links[0]
             .target_path
@@ -148,17 +144,14 @@ fn exp_02_04_move_folder_rewrites_only_links_that_would_break() {
 
 #[test]
 fn exp_04_moving_a_page_fixes_its_own_relative_links() {
-    if liber_testkit::plain_disk_only() {
-        return;
-    }
-    let (dir, _c, s) = session("obsidian-basic");
+    let (_dir, _c, s) = session("obsidian-basic");
     s.rename(
         &vp("Character Design/rex-draft.md"),
         &vp("Game Design/rex-draft.md"),
         true,
     )
     .unwrap();
-    let rex = read(&dir, "Game Design/rex-draft.md");
+    let rex = read(&s, "Game Design/rex-draft.md");
     assert!(
         rex.contains("cover: ../Character Design/assets/rex-cover.png\n"),
         "{rex}"
@@ -197,20 +190,17 @@ fn exp_04_moving_a_page_fixes_its_own_relative_links() {
 
 #[test]
 fn exp_04_ambiguity_keeps_every_link_on_its_target() {
-    if liber_testkit::plain_disk_only() {
-        return;
-    }
-    let (dir, _c, s) = session("ambiguous-names");
+    let (_dir, _c, s) = session("ambiguous-names");
     let out = s
         .rename(&vp("Archive/Old/Ideas.md"), &vp("Elsewhere/Ideas.md"), true)
         .unwrap();
     assert!(out.failed.is_empty());
     assert_eq!(
-        read(&dir, "Elsewhere/Note.md"),
+        read(&s, "Elsewhere/Note.md"),
         "# Note\n\n[[/Ideas]]\n",
         "shadowed root file → rooted form"
     );
-    let links = read(&dir, "Links.md");
+    let links = read(&s, "Links.md");
     assert!(
         links.contains(
             "- [[Ideas]]\n- [[Projects/Ideas]]\n- [[Deep/Ideas]]\n- [[Elsewhere/Ideas]]\n"
@@ -310,10 +300,7 @@ fn vault_with(files: &[(&str, &[u8])]) -> (tempfile::TempDir, tempfile::TempDir,
 /// recognise used to produce overlapping edits that corrupted the note.
 #[test]
 fn exp_04_linked_image_and_unrecognised_frontmatter_rewrite_cleanly() {
-    if liber_testkit::plain_disk_only() {
-        return;
-    }
-    let (dir, _c, s) = vault_with(&[
+    let (_dir, _c, s) = vault_with(&[
         ("x.png", b"png"),
         ("A.md", b"# A\n"),
         ("p.md", b"[![alt](x.png)](x.png)\n"),
@@ -322,13 +309,13 @@ fn exp_04_linked_image_and_unrecognised_frontmatter_rewrite_cleanly() {
     let out = s.rename(&vp("x.png"), &vp("new name.png"), true).unwrap();
     assert!(out.failed.is_empty(), "{:?}", out.failed);
     assert_eq!(
-        read(&dir, "p.md"),
+        read(&s, "p.md"),
         "[![alt](new%20name.png)](new%20name.png)\n"
     );
     let out = s.rename(&vp("A.md"), &vp("Longer Name.md"), true).unwrap();
     assert!(out.failed.is_empty(), "{:?}", out.failed);
     assert_eq!(
-        read(&dir, "q.md"),
+        read(&s, "q.md"),
         "---\n\nrelated:\n  - \"[[Longer Name]]\"\n---\n# Q\n"
     );
 }
@@ -336,10 +323,7 @@ fn exp_04_linked_image_and_unrecognised_frontmatter_rewrite_cleanly() {
 /// Final review I1: names that cannot be linked to are refused up front.
 #[test]
 fn exp_02_names_that_would_break_links_are_rejected() {
-    if liber_testkit::plain_disk_only() {
-        return;
-    }
-    let (dir, _c, s) = vault_with(&[("A.md", b"# A\n"), ("p.md", b"[[A]]\n")]);
+    let (_dir, _c, s) = vault_with(&[("A.md", b"# A\n"), ("p.md", b"[[A]]\n")]);
     for bad in [
         "C# basics.md",
         "a|b.md",
@@ -365,24 +349,21 @@ fn exp_02_names_that_would_break_links_are_rejected() {
         s.create_folder(&VaultPath::root(), "a|b"),
         Err(SessionError::InvalidName(_))
     ));
-    assert_eq!(read(&dir, "p.md"), "[[A]]\n");
+    assert_eq!(read(&s, "p.md"), "[[A]]\n");
 }
 
 /// Final review I1: an existing folder whose name needs escaping in a Markdown
 /// destination gets %-encoded, so the link keeps pointing at the file.
 #[test]
 fn exp_04_markdown_destination_into_hash_folder_is_encoded() {
-    if liber_testkit::plain_disk_only() {
-        return;
-    }
-    let (dir, _c, s) = vault_with(&[
+    let (_dir, _c, s) = vault_with(&[
         ("A.md", b"# A\n"),
         ("C#/keep.md", b"x\n"),
         ("p.md", b"[a](A.md)\n"),
     ]);
     let out = s.rename(&vp("A.md"), &vp("C#/A.md"), true).unwrap();
     assert!(out.failed.is_empty(), "{:?}", out.failed);
-    assert_eq!(read(&dir, "p.md"), "[a](C%23/A.md)\n");
+    assert_eq!(read(&s, "p.md"), "[a](C%23/A.md)\n");
     assert_eq!(
         s.page(&vp("p.md")).unwrap().unwrap().links[0]
             .target_path
@@ -396,17 +377,14 @@ fn exp_04_markdown_destination_into_hash_folder_is_encoded() {
 /// reported instead of being rewritten to a link that resolves elsewhere.
 #[test]
 fn exp_04_unlinkable_rewrite_is_reported_not_written() {
-    if liber_testkit::plain_disk_only() {
-        return;
-    }
-    let (dir, _c, s) = vault_with(&[
+    let (_dir, _c, s) = vault_with(&[
         ("A.md", b"# A\n"),
         ("B/A.md", b"# other A\n"),
         ("C#/keep.md", b"x\n"),
         ("Q/p.md", b"[[A]]\n"),
     ]);
     let out = s.rename(&vp("A.md"), &vp("C#/A.md"), true).unwrap();
-    assert_eq!(read(&dir, "Q/p.md"), "[[A]]\n");
+    assert_eq!(read(&s, "Q/p.md"), "[[A]]\n");
     assert_eq!(out.failed.len(), 1, "{out:?}");
     assert_eq!(out.failed[0].0, "Q/p.md");
 }
@@ -431,8 +409,8 @@ fn exp_04_symlinked_notes_stay_symlinks() {
         meta.file_type().is_symlink(),
         "alias.md must stay a symlink"
     );
-    assert_eq!(read(&dir, "real.md"), "[[B]]\n");
-    assert_eq!(read(&dir, "alias.md"), "[[B]]\n");
+    assert_eq!(read(&s, "real.md"), "[[B]]\n");
+    assert_eq!(read(&s, "alias.md"), "[[B]]\n");
 }
 
 /// Cover resize: a page's cover height (`.liber/vault.json` `coverHeights`)
@@ -501,9 +479,6 @@ fn m5b_folder_icons_follow_renames() {
 /// pages too, so they keep working once unarchived.
 #[test]
 fn m5b_r2_review_m1_a_rename_rewrites_links_inside_archived_pages() {
-    if liber_testkit::plain_disk_only() {
-        return;
-    }
     let vault = copy_fixture("obsidian-basic");
     std::fs::create_dir_all(vault.path().join(".archive")).unwrap();
     std::fs::write(
@@ -528,7 +503,7 @@ fn m5b_r2_review_m1_a_rename_rewrites_links_inside_archived_pages() {
         out.updated_files
     );
     assert_eq!(
-        read(&vault, ".archive/Old notes.md"),
+        read(&s, ".archive/Old notes.md"),
         "See [[Sparda the Dark Knight]].\n"
     );
 }
@@ -556,48 +531,39 @@ fn pair(a: &str, b: &str) -> Option<(String, String)> {
 
 #[test]
 fn r3b_renaming_a_folder_renames_its_page() {
-    if liber_testkit::plain_disk_only() {
-        return;
-    }
-    let (dir, _c, s) = lore_session(&[]);
+    let (_dir, _c, s) = lore_session(&[]);
     let out = s.rename(&vp("Lore"), &vp("Myths"), true).unwrap();
-    assert!(dir.path().join("Myths/Myths.md").exists());
-    assert!(!dir.path().join("Myths/Lore.md").exists());
-    assert!(dir.path().join("Myths/Other.md").exists());
+    assert!(exists(&s, "Myths/Myths.md"));
+    assert!(!exists(&s, "Myths/Lore.md"));
+    assert!(exists(&s, "Myths/Other.md"));
     assert_eq!(out.pair, pair("Myths/Lore.md", "Myths/Myths.md"));
     assert!(
-        read(&dir, "Index.md").contains("[[Myths]]"),
+        read(&s, "Index.md").contains("[[Myths]]"),
         "{}",
-        read(&dir, "Index.md")
+        read(&s, "Index.md")
     );
 }
 
 #[test]
 fn r3b_renaming_a_folder_page_renames_its_folder() {
-    if liber_testkit::plain_disk_only() {
-        return;
-    }
-    let (dir, _c, s) = lore_session(&[]);
+    let (_dir, _c, s) = lore_session(&[]);
     let out = s
         .rename(&vp("Lore/Lore.md"), &vp("Lore/Myths.md"), true)
         .unwrap();
-    assert!(dir.path().join("Myths/Myths.md").exists());
-    assert!(dir.path().join("Myths/Other.md").exists());
-    assert!(!dir.path().join("Lore").exists());
+    assert!(exists(&s, "Myths/Myths.md"));
+    assert!(exists(&s, "Myths/Other.md"));
+    assert!(!exists(&s, "Lore"));
     assert_eq!(out.pair, pair("Lore", "Myths"));
     assert!(
-        read(&dir, "Index.md").contains("[[Myths]]"),
+        read(&s, "Index.md").contains("[[Myths]]"),
         "{}",
-        read(&dir, "Index.md")
+        read(&s, "Index.md")
     );
 }
 
 #[test]
 fn r3b_a_taken_pair_name_refuses_the_whole_rename() {
-    if liber_testkit::plain_disk_only() {
-        return;
-    }
-    let (dir, _c, s) = lore_session(&["Myths"]);
+    let (_dir, _c, s) = lore_session(&["Myths"]);
     let err = s
         .rename(&vp("Lore/Lore.md"), &vp("Lore/Myths.md"), true)
         .unwrap_err();
@@ -608,43 +574,34 @@ fn r3b_a_taken_pair_name_refuses_the_whole_rename() {
         ),
         "{err:?}"
     );
-    assert!(dir.path().join("Lore/Lore.md").exists());
-    assert!(!dir.path().join("Lore/Myths.md").exists());
+    assert!(exists(&s, "Lore/Lore.md"));
+    assert!(!exists(&s, "Lore/Myths.md"));
 }
 
 #[test]
 fn r3b_moving_a_page_into_its_namesake_folder_is_a_plain_move() {
-    if liber_testkit::plain_disk_only() {
-        return;
-    }
-    let (dir, _c, s) = lore_session(&["Saga"]);
+    let (_dir, _c, s) = lore_session(&["Saga"]);
     s.create_page(&VaultPath::root(), "Saga").unwrap();
     let out = s.rename(&vp("Saga.md"), &vp("Saga/Saga.md"), true).unwrap();
     assert_eq!(out.pair, None);
-    assert!(dir.path().join("Saga/Saga.md").exists());
+    assert!(exists(&s, "Saga/Saga.md"));
 }
 
 #[test]
 fn r3b_plain_renames_have_no_pair() {
-    if liber_testkit::plain_disk_only() {
-        return;
-    }
-    let (dir, _c, s) = lore_session(&[]);
+    let (_dir, _c, s) = lore_session(&[]);
     let out = s
         .rename(&vp("Lore/Other.md"), &vp("Lore/Else.md"), true)
         .unwrap();
     assert_eq!(out.pair, None);
-    assert!(dir.path().join("Lore/Lore.md").exists());
+    assert!(exists(&s, "Lore/Lore.md"));
 }
 
 // Round 3b final review #1: the pair's second step is checked in post-move
 // coordinates before anything moves.
 #[test]
 fn r3b_review_folder_renamed_onto_a_sibling_page_name_refuses_before_moving() {
-    if liber_testkit::plain_disk_only() {
-        return;
-    }
-    let (dir, _c, s) = lore_session(&[]);
+    let (_dir, _c, s) = lore_session(&[]);
     // `Lore/Other.md` is where the paired page would land as `Other/Other.md`.
     let err = s.rename(&vp("Lore"), &vp("Other"), true).unwrap_err();
     assert!(
@@ -654,32 +611,26 @@ fn r3b_review_folder_renamed_onto_a_sibling_page_name_refuses_before_moving() {
         ),
         "{err:?}"
     );
-    assert!(dir.path().join("Lore/Lore.md").exists());
-    assert!(dir.path().join("Lore/Other.md").exists());
-    assert!(!dir.path().join("Other").exists());
-    assert!(read(&dir, "Index.md").contains("[[Lore]]"));
+    assert!(exists(&s, "Lore/Lore.md"));
+    assert!(exists(&s, "Lore/Other.md"));
+    assert!(!exists(&s, "Other"));
+    assert!(read(&s, "Index.md").contains("[[Lore]]"));
 }
 
 #[test]
 fn r3b_review_a_folder_name_the_vault_refuses_stops_the_page_rename_too() {
-    if liber_testkit::plain_disk_only() {
-        return;
-    }
-    let (dir, _c, s) = lore_session(&[]);
+    let (_dir, _c, s) = lore_session(&[]);
     let err = s.rename(&vp("Lore/Lore.md"), &vp("Lore/Myths .md"), true);
     assert!(err.is_err(), "{err:?}");
-    assert!(dir.path().join("Lore/Lore.md").exists());
-    assert!(!dir.path().join("Lore/Myths .md").exists());
+    assert!(exists(&s, "Lore/Lore.md"));
+    assert!(!exists(&s, "Lore/Myths .md"));
 }
 
 // Round 3b final review #5: files rewritten by the first step are reported
 // at the paths they have after the second.
 #[test]
 fn r3b_review_updated_files_are_reported_where_they_end_up() {
-    if liber_testkit::plain_disk_only() {
-        return;
-    }
-    let (dir, _c, s) = vault_with(&[
+    let (_dir, _c, s) = vault_with(&[
         ("Lore/Lore.md", b"# Lore\n"),
         ("Lore/Other.md", b"# Other\n\nUp: [[Lore]]\n"),
     ]);
@@ -688,13 +639,13 @@ fn r3b_review_updated_files_are_reported_where_they_end_up() {
         .unwrap();
     assert!(!out.updated_files.is_empty());
     for f in &out.updated_files {
-        assert!(dir.path().join(f).exists(), "{f} is not on disk: {out:?}");
+        assert!(exists(&s, f), "{f} is not on disk: {out:?}");
     }
     assert!(
         out.updated_files.contains(&"Myths/Other.md".to_string()),
         "{out:?}"
     );
-    assert!(read(&dir, "Myths/Other.md").contains("[[Myths]]"));
+    assert!(read(&s, "Myths/Other.md").contains("[[Myths]]"));
 }
 
 // Round 3b final review #6: a case-only pair rename is the same entry,
@@ -796,7 +747,7 @@ fn subpages_plain_page_becomes_its_folder_page() {
     assert_eq!((folder, page), (vp("Notes/P"), vp("Notes/P/P.md")));
     assert_eq!(names(&dir, "Notes"), vec!["P"]);
     assert_eq!(names(&dir, "Notes/P"), vec!["P.md"]);
-    assert_eq!(read(&dir, "Other.md"), "See [p](Notes/P/P.md).\n");
+    assert_eq!(read(&s, "Other.md"), "See [p](Notes/P/P.md).\n");
 }
 
 #[test]
@@ -881,8 +832,8 @@ fn subpages_review_a_name_clash_refuses_before_the_page_moves() {
             .is_err()
     );
     assert_eq!(names(&dir, "."), vec!["Art", "P", "P.md"]);
-    assert_eq!(read(&dir, "P/a.md"), "old");
-    assert_eq!(read(&dir, "Art/a.md"), "new");
+    assert_eq!(read(&s, "P/a.md"), "old");
+    assert_eq!(read(&s, "Art/a.md"), "new");
 }
 
 /// Review #1: a folder can't go under its own namesake page when the disk
@@ -939,7 +890,7 @@ fn subpages_review_move_under_page_moves_and_rewrites() {
     assert_eq!(out.page, vp("P/P.md"));
     assert!(out.converted.is_some());
     assert_eq!(names(&dir, "P"), vec!["P.md", "a.md"]);
-    assert_eq!(read(&dir, "Other.md"), "See [a](P/a.md).\n");
+    assert_eq!(read(&s, "Other.md"), "See [a](P/a.md).\n");
     // A second move under the same (now folder) page converts nothing.
     std::fs::write(dir.path().join("Notes/b.md"), "").unwrap();
     s.apply(vec![liber_vault::WatchEvent::Overflow]).unwrap();
@@ -993,9 +944,9 @@ fn subpages_review_links_from_the_converted_page_follow() {
     if liber_testkit::plain_disk_only() {
         return;
     }
-    let (dir, _c, s) = vault_with(&[("P.md", b"See [o](Other.md).\n"), ("Other.md", b"")]);
+    let (_dir, _c, s) = vault_with(&[("P.md", b"See [o](Other.md).\n"), ("Other.md", b"")]);
     s.make_folder_page(&vp("P.md"), true).unwrap();
-    assert_eq!(read(&dir, "P/P.md"), "See [o](../Other.md).\n");
+    assert_eq!(read(&s, "P/P.md"), "See [o](../Other.md).\n");
 }
 
 /// Review #8: on a case-sensitive disk (Linux CI only) `X/X.md` and

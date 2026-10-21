@@ -31,6 +31,10 @@ pub enum VaultError {
     WrongSecret,
     #[error("encryption error: {0}")]
     Crypto(String),
+    /// Signs of an encrypted vault that can't be one (header or `d/` missing or
+    /// unreadable): never opened as plain.
+    #[error("damaged encrypted vault: {0}")]
+    Damaged(String),
     /// Refused by design: an encrypted vault has no plaintext OS path.
     #[error("not permitted: {0}")]
     NotPermitted(String),

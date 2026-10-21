@@ -21,7 +21,8 @@ pub(crate) type Sink = Arc<dyn Fn(SessionEvent) + Send + Sync>;
 /// One open vault: the vault folder, its index cache and (optionally) a watcher.
 pub struct VaultSession {
     pub(crate) vault: Vault,
-    pub(crate) index: Mutex<Index>,
+    /// `None` once an encrypted vault locks: see [`VaultSession::index`].
+    pub(crate) index: Mutex<Option<Index>>,
     pub(crate) sink: Sink,
     pub(crate) watcher: Mutex<Option<Watcher>>,
     /// Network files the user chose to load this session (M4b part 3, final
@@ -36,6 +37,22 @@ impl std::fmt::Debug for VaultSession {
         f.debug_struct("VaultSession")
             .field("root", &self.vault.root())
             .finish()
+    }
+}
+
+/// The open index: [`VaultSession::index`] hands one out only while it is `Some`.
+pub(crate) struct IndexGuard<'a>(MutexGuard<'a, Option<Index>>);
+
+impl std::ops::Deref for IndexGuard<'_> {
+    type Target = Index;
+    fn deref(&self) -> &Index {
+        self.0.as_ref().expect("index() checked it")
+    }
+}
+
+impl std::ops::DerefMut for IndexGuard<'_> {
+    fn deref_mut(&mut self) -> &mut Index {
+        self.0.as_mut().expect("index() checked it")
     }
 }
 
@@ -72,7 +89,7 @@ impl VaultSession {
                 .then(|| self.vault.read(&path).ok())
                 .flatten()
                 .and_then(|(bytes, _)| text_of(new, &bytes));
-            self.index().transaction(|tx| match &text {
+            self.index()?.transaction(|tx| match &text {
                 Some(t) => tx.upsert_text(new, t),
                 None => tx.remove_text(new),
             })?;
@@ -124,13 +141,11 @@ impl VaultSession {
             return;
         };
         self.stop_watching();
-        // Held across the lock, so a re-index that read before it can't write after it.
-        let mut index = self.index();
+        // Both under the index mutex: every later `index()` sees the lock, so
+        // a batch or save that read before it can't write rows after it.
+        let mut index = self.index.lock().unwrap_or_else(|e| e.into_inner());
         storage.lock();
-        // A fresh `:memory:` database: the old one's pages go with its connection.
-        if let Ok(empty) = Index::open_in_memory() {
-            *index = empty;
-        }
+        *index = None;
     }
 
     fn start(
@@ -140,7 +155,7 @@ impl VaultSession {
     ) -> Result<(VaultSession, IndexReport)> {
         let session = VaultSession {
             vault,
-            index: Mutex::new(index),
+            index: Mutex::new(Some(index)),
             sink: Arc::new(sink),
             watcher: Mutex::new(None),
             network_ok: Mutex::new(HashSet::new()),
@@ -167,12 +182,22 @@ impl VaultSession {
         Ok((session, report))
     }
 
+    /// The index's database file; empty when it lives in memory (spec §5.1).
+    pub fn index_file(&self) -> Result<String> {
+        Ok(self.index()?.db_file()?)
+    }
+
     pub fn vault(&self) -> &Vault {
         &self.vault
     }
 
-    pub(crate) fn index(&self) -> MutexGuard<'_, Index> {
-        self.index.lock().unwrap_or_else(|e| e.into_inner())
+    /// The index, or `Locked` once an encrypted vault locked (spec §6.2).
+    pub(crate) fn index(&self) -> Result<IndexGuard<'_>> {
+        let index = self.index.lock().unwrap_or_else(|e| e.into_inner());
+        if index.is_none() || self.vault.encrypted().is_some_and(|s| s.is_locked()) {
+            return Err(VaultError::Locked.into());
+        }
+        Ok(IndexGuard(index))
     }
 
     pub(crate) fn emit(&self, event: SessionEvent) {
@@ -197,7 +222,7 @@ impl VaultSession {
         };
         report.warnings.extend(scan.skipped.iter().cloned());
         report.files = scan.entries.len();
-        let stored = self.index().stats()?;
+        let stored = self.index()?.stats()?;
         let on_disk: HashSet<&str> = scan.entries.iter().map(|e| e.path.as_str()).collect();
         let removed: Vec<String> = stored
             .keys()
@@ -264,11 +289,7 @@ impl VaultSession {
         report.removed = removed.len();
 
         {
-            let mut index = self.index();
-            // Locked since the files were read: their rows must not enter the emptied index.
-            if self.vault.encrypted().is_some_and(|s| s.is_locked()) {
-                return Err(VaultError::Locked.into());
-            }
+            let mut index = self.index()?;
             for chunk in removed.chunks(BATCH_ROWS) {
                 index.transaction(|tx| chunk.iter().try_for_each(|p| tx.remove(p)))?;
             }
@@ -358,7 +379,7 @@ impl VaultSession {
             hash: Some(hash.to_hex()),
         };
         let meta = parse_page(text, path.stem());
-        self.index().transaction(|tx| {
+        self.index()?.transaction(|tx| {
             tx.upsert_file(&row)?;
             tx.upsert_page(&row.path, &meta)
         })?;
@@ -377,7 +398,7 @@ impl VaultSession {
     /// The tree with the Archive (`.archive` and what's in it), which the
     /// sidebar shows as its own read-only folder (M5b round 2).
     pub fn tree_with_archive(&self) -> Result<Vec<liber_index::TreeNode>> {
-        let mut nodes = self.index().tree()?;
+        let mut nodes = self.index()?.tree()?;
         self.order_folders(&mut nodes);
         Ok(nodes)
     }
@@ -428,11 +449,11 @@ impl VaultSession {
     }
 
     pub fn page(&self, path: &VaultPath) -> Result<Option<liber_index::PageRow>> {
-        Ok(self.index().page(path.as_str())?)
+        Ok(self.index()?.page(path.as_str())?)
     }
 
     pub fn backlinks(&self, path: &VaultPath) -> Result<Vec<liber_index::LinkRow>> {
-        Ok(self.index().backlinks(path.as_str())?)
+        Ok(self.index()?.backlinks(path.as_str())?)
     }
 
     /// Links from outside `path` into it: the file itself, or anything inside
@@ -440,7 +461,7 @@ impl VaultSession {
     pub fn backlinks_into(&self, path: &VaultPath) -> Result<Vec<liber_index::LinkRow>> {
         let prefix = format!("{}/", path.as_str());
         Ok(self
-            .index()
+            .index()?
             .links_into(path.as_str())?
             .into_iter()
             .filter(|l| l.src != path.as_str() && !l.src.starts_with(&prefix))
@@ -460,7 +481,7 @@ impl VaultSession {
         let path = dir.join(&file)?;
         let hash = self.vault.write_cas(&path, b"", None)?;
         self.reindex_written(&path, "", hash)?;
-        let mut index = self.index();
+        let mut index = self.index()?;
         let files = index.file_set()?;
         index.resolve_affected(&files, &[link_key(path.as_str())])?;
         Ok(path)
@@ -473,7 +494,7 @@ impl VaultSession {
             .vault
             .stat(&path)?
             .ok_or_else(|| SessionError::NotIndexed(path.to_string()))?;
-        self.index()
+        self.index()?
             .transaction(|tx| tx.upsert_file(&folder_row(&entry)))?;
         Ok(path)
     }
@@ -502,7 +523,7 @@ impl VaultSession {
         os_trash: &dyn Fn(&VaultPath) -> liber_vault::Result<()>,
     ) -> Result<()> {
         let keys: Vec<String> = self
-            .index()
+            .index()?
             .file_set()?
             .iter()
             .filter(|p| VaultPath::new(p).is_ok_and(|vp| vp.starts_with(path)))
@@ -510,7 +531,7 @@ impl VaultSession {
             .collect();
         before_os_call();
         os_trash(path)?;
-        let mut index = self.index();
+        let mut index = self.index()?;
         index.transaction(|tx| tx.remove(path.as_str()))?;
         let files = index.file_set()?;
         index.resolve_affected(&files, &keys)?;
