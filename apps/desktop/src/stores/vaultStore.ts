@@ -405,7 +405,7 @@ export const useVaultStore = create<VaultState>((set, get) => {
       } finally {
         set({ unlocking: false });
       }
-      if (res.ok && res.value.recovered?.length) announceRecovered(res.value.recovered);
+      if (res.ok && res.value.recovered?.length) announceRecovered(res.value.recovered.map((r) => r.path));
       return res;
     },
     createEncrypted: async (path, passphrase) => {

@@ -93,7 +93,7 @@ describe('vaultStore — encrypted vaults (E4)', () => {
 
   it('unlock announces recovered clips like the plain path', async () => {
     backend({
-      vault_unlock: () => ({ ...info, recovered: ['Audio/clip.wav'] }),
+      vault_unlock: () => ({ ...info, recovered: [{ path: 'Audio/clip.wav', link: 'Audio/clip.wav' }] }),
       vault_tree: () => [],
     });
     useVaultStore.setState({ status: 'locked', lockedPath: '/v' });
