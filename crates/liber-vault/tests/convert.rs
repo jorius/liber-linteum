@@ -1018,3 +1018,32 @@ fn another_devices_committed_conversion_opens() {
     assert_eq!(snapshot(&root), before);
     assert_eq!(vault_kind(&root), VaultKind::Encrypted);
 }
+
+/// Final round N1: Finder (or Explorer) writes the root's `.DS_Store`
+/// (`Thumbs.db`) again after it was staged. Both copies are OS junk: the
+/// staged one goes back in its place and the vault is as it was.
+#[test]
+fn rollback_puts_back_os_junk_the_os_wrote_again() {
+    let (dir, root) = vault();
+    std::fs::write(root.join("Thumbs.db"), b"thumbs").unwrap();
+    let original = snapshot(&root);
+    convert::crash_at(Some(CrashPoint::AllMoved));
+    let (mut c, _) = convert::begin(&root, &[], ME, make).unwrap();
+    convert::copy(&mut c, |_, _| {}, &AtomicBool::new(false)).unwrap();
+    assert!(convert::stage_and_commit(c).is_err());
+    convert::crash_at(None);
+    std::fs::write(root.join(".DS_Store"), b"finder again").unwrap();
+    std::fs::write(root.join("Thumbs.db"), b"explorer again").unwrap();
+    let out = convert::recover(&root, ME, &fake_trash(&dir.path().join("bin")), &no_index).unwrap();
+    assert_eq!(out, RecoverOutcome::RolledBack);
+    let mut now = snapshot(&root);
+    // Mtimes of the two junk files aside (one copy was discarded), as it was.
+    for junk in [".DS_Store", "Thumbs.db"] {
+        assert!(now.remove(junk).is_some(), "{junk} kept");
+    }
+    let mut want = original.clone();
+    want.remove(".DS_Store");
+    want.remove("Thumbs.db");
+    assert_eq!(now, want);
+    assert!(convert::read_journal(&root).unwrap().is_none());
+}

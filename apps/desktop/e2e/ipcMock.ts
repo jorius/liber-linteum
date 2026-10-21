@@ -519,6 +519,7 @@ export function installIpcMock({
         files: all.length,
         bytes: Object.values(pages).reduce((n, t) => n + t.length, 0),
         blocked: encryptInPlace.blocked ?? [],
+        closesOpen: true,
       };
     },
     vault_encrypt_begin: (a) => {
@@ -551,6 +552,7 @@ export function installIpcMock({
     },
     vault_encrypt_cancel: () => {
       if (convertJob) convertJob.cancelled = true;
+      convertJob = null; // a running run keeps its own `job`
       (w.__liberFinishEncrypt as (() => void) | undefined)?.();
       return null;
     },

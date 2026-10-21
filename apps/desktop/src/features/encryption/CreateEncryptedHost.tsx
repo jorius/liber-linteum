@@ -1,6 +1,6 @@
 import { useTranslation } from 'react-i18next';
 import { useUiStore } from '../../stores/uiStore';
-import { useVaultStore } from '../../stores/vaultStore';
+import { refuseWhileConverting, useVaultStore } from '../../stores/vaultStore';
 import { Dialog } from '../dialogs/Dialog';
 import dialogs from '../dialogs/Dialogs.module.css';
 import { confirmUnsaved, needsUnsavedPrompt } from '../editor/unsavedPrompt';
@@ -14,6 +14,7 @@ const BUSY = new Set(['unsaved', 'binClash', 'notionImport', 'scratchpadSetup'])
  *  that is waiting for an answer). Unsaved text is asked about first: the
  *  question would replace the dialog, and a recovery code would be lost. */
 export async function openNewVault() {
+  if (refuseWhileConverting()) return;
   if (BUSY.has(useUiStore.getState().dialog?.type ?? '')) return;
   if (needsUnsavedPrompt() && !(await confirmUnsaved())) return;
   useUiStore.getState().openDialog({ type: 'newVault' });

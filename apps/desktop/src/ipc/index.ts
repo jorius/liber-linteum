@@ -413,6 +413,9 @@ export interface EncryptPreflight {
   bytes: number;
   /** Empty when the folder can be encrypted. */
   blocked: EncryptBlocked[];
+  /** Begin will close the open vault (this folder under any spelling,
+   *  inside it or around it): the UI leaves it first. */
+  closesOpen: boolean;
 }
 
 /** `vault:encrypt-progress`. */

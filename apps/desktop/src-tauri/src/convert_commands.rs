@@ -52,6 +52,10 @@ pub struct PreflightDto {
     pub files: u64,
     pub bytes: u64,
     pub blocked: Vec<Blocked>,
+    /// Begin will close the open vault (this folder, inside it or around
+    /// it), so the UI leaves it first.
+    #[serde(rename = "closesOpen")]
+    pub closes_open: bool,
 }
 
 #[derive(Serialize)]
@@ -182,7 +186,30 @@ pub(crate) fn vault_encrypt_preflight_impl<R: Runtime>(
         files: pre.files,
         bytes: pre.bytes,
         blocked: pre.blocked,
+        closes_open: open_overlapping(&app.state::<AppState>(), &root).is_some(),
     })
+}
+
+/// `a` is `b`, inside it or holds it.
+fn overlaps(a: &Path, b: &Path) -> bool {
+    a.starts_with(b) || b.starts_with(a)
+}
+
+/// The open vault's root when it is the folder `root`, inside it or holds it.
+fn open_overlapping(state: &AppState, root: &Path) -> Option<PathBuf> {
+    let open = state.session().ok()?.vault().root().to_path_buf();
+    overlaps(&open, root).then_some(open)
+}
+
+/// Any plaintext index left for the encrypted vault at `root` (another device
+/// converted a folder this one had open as plain): gone at unlock.
+pub(crate) fn drop_plain_index<R: Runtime>(app: &AppHandle<R>, root: &Path) {
+    let _ = drop_index_or_warn(app, root);
+    if let Ok(canon) = canonical(root)
+        && canon != root
+    {
+        let _ = drop_index_or_warn(app, &canon);
+    }
 }
 
 /// Undoes a begin that never ran (a new begin, or Cancel at the key step).
@@ -231,15 +258,19 @@ pub(crate) fn vault_encrypt_begin_impl<R: Runtime>(
     }
     // Nothing else edits the vault meanwhile (§4.2 step 4): the open vault
     // closes when it is this folder, inside it or holds it (review I3).
-    if let Ok(open) = state.session().map(|s| s.vault().root().to_path_buf())
-        && (open.starts_with(&root) || root.starts_with(&open))
-    {
+    if open_overlapping(&state, &root).is_some() {
         // A take in progress is stopped and kept in the vault first (review I2).
         crate::audio_commands::stop_for_lock(app);
         crate::vault_commands::close_session(app);
-        // A vault inside the folder: its plaintext index goes now.
-        if open != root {
-            drop_index_or_warn(app, &open)?;
+    }
+    // Every known vault inside the folder or holding it: its plaintext index
+    // goes now (final round; this folder's own goes when the run finishes).
+    for known in state.settings.recent() {
+        if let Ok(known) = canonical(Path::new(&known.path))
+            && known != root
+            && overlaps(&known, &root)
+        {
+            drop_index_or_warn(app, &known)?;
         }
     }
     let id = epochs::install_id(state.settings.dir())?;
@@ -340,6 +371,13 @@ fn encrypted_root(state: &AppState) -> CmdResult<PathBuf> {
 /// "Move to Trash" on the originals-pending banner (§8.8).
 pub(crate) fn vault_trash_originals_impl(state: &AppState) -> CmdResult<()> {
     let root = encrypted_root(state)?;
+    // Only originals the Trash refused: a conversion still finishing (here or
+    // on another device, final round N3) is that run's to finish.
+    if convert::read_journal(&root)?.is_none_or(|j| j.phase != Phase::TrashPending) {
+        return Err(not_permitted(
+            "no unencrypted originals are waiting for the Trash",
+        ));
+    }
     let trash = state.trasher();
     match convert::finish(&root, &*trash, &|| drop_index(&state.cache_dir, &root))? {
         convert::Finished::Done => Ok(()),

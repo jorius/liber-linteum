@@ -96,7 +96,7 @@ export function EncryptInPlaceDialog({ root, onClose }: { root: string; onClose:
     setError(null);
     setStep('beginning');
     useUiStore.getState().hold(true);
-    const res = await useVaultStore.getState().encryptBegin(root, pass);
+    const res = await useVaultStore.getState().encryptBegin(root, pass, !!pre?.closesOpen);
     // No outcome keeps the passphrase.
     setPass('');
     setConfirm('');
@@ -125,6 +125,16 @@ export function EncryptInPlaceDialog({ root, onClose }: { root: string; onClose:
       setError(errorMessage(res.error));
       setStep('failed');
     }
+  };
+
+  /** Cancel at the recovery-key step: the begin undone before any copy. */
+  const cancel = async () => {
+    setCode(null);
+    setStep('beginning');
+    const res = await useVaultStore.getState().encryptCancel();
+    useUiStore.getState().hold(false);
+    setError(res.ok ? t('errors.cancelled') : errorMessage(res.error));
+    setStep('failed');
   };
 
   const count = progress?.total ?? pre?.files ?? 0;
@@ -212,7 +222,9 @@ export function EncryptInPlaceDialog({ root, onClose }: { root: string; onClose:
             {t('encryption.creating')}
           </p>
         )}
-        {step === 'key' && code && <RecoveryCodeStep code={code} onDone={() => void run()} />}
+        {step === 'key' && code && (
+          <RecoveryCodeStep code={code} onDone={() => void run()} onCancel={() => void cancel()} />
+        )}
         {step === 'encrypting' && (
           <>
             <progress

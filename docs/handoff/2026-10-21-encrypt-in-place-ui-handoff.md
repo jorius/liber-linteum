@@ -70,10 +70,36 @@ Use a throwaway copy of a folder: the originals go to the real Trash as
 - Rust: `tests/convert_commands.rs` →
   `folder_kind_recovers_an_interrupted_conversion_and_names_refused_folders`.
 
+## Final round (after both reviews)
+
+- **Cancel at the recovery-key step** (`RecoveryCodeStep`'s optional
+  `onCancel`): `vaultStore.encryptCancel` → `vault_encrypt_cancel` (abandon →
+  rollback: the staging folder and journal go), the hold is released, the plain
+  vault reopens, and the dialog says "Stopped. The vault is back as it was."
+- **No vault switching while converting** (from begin until the run ends):
+  `refuseWhileConverting()` in `vaultStore` toasts "Wait until encrypting
+  finishes." and refuses `open`, Quick notes, `create`, `unlock`, encrypted
+  create, the Notion import, `close`, Lock from the menu, Back on the Unlock
+  screen, New vault, Open another vault and ⌘O (shell and Welcome). Idle, sleep
+  and screen-lock locks still lock: they are security, and locking another vault
+  doesn't disturb the conversion.
+- **Another spelling of the open vault**: preflight now returns `closesOpen`
+  (begin will close the open vault: this folder however spelled, inside it or
+  around it). The UI drops the shell before begin when it's true, and reopens
+  that vault after a cancel or failure.
+- **Backend**:
+  - rollback puts staged OS junk back over a `.DS_Store`/`Thumbs.db` the OS
+    wrote again (N1);
+  - `vault_trash_originals` requires `trashPending` (N3);
+  - begin drops the plaintext index of every recent vault inside or around the
+    folder;
+  - every unlock drops any plaintext index left for that path.
+- Windows: `cargo xwin check -p liber-desktop --tests` passes (offline, with the
+  `~/.nimw-cross` toolchain).
+
 ## Open ends
 
-- No "Cancel" at the recovery-key step (the backend supports it; the spec holds
-  the dialog there). Stop and undo is offered while encrypting.
-- If the folder picked in New vault is the open vault under a different spelling
-  (symlink, case), the shell isn't dropped at begin; the backend still closes it.
-- `is_refused`'s Windows branch is compile-unchecked here (no `cargo xwin` run).
+- Opening, from the native menu, a vault that doesn't overlap the folder isn't
+  possible during the run (refused), but between the intro and begin it is; a
+  `closesOpen` read at the intro could then be stale. The backend still closes
+  the session it must.

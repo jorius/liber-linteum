@@ -301,6 +301,16 @@ for (const theme of ['light', 'dark'] as const) {
       await dialog.getByRole('button', { name: 'Continue' }).click();
       await confirmKey(dialog);
     };
+    // Cancel at the recovery-key step: nothing was copied, the vault is back.
+    await dialog.getByRole('button', { name: 'Choose a passphrase…' }).click();
+    await dialog.getByLabel('Passphrase', { exact: true }).fill(PASSPHRASE);
+    await dialog.getByLabel('Confirm passphrase').fill(PASSPHRASE);
+    await dialog.getByRole('button', { name: 'Continue' }).click();
+    await dialog.getByRole('button', { name: 'Cancel' }).click();
+    await expect(dialog.getByRole('alert')).toHaveText('Stopped. The vault is back as it was.');
+    await dialog.getByRole('button', { name: 'Close' }).click();
+    await expect(page.locator('[data-vault-menu]')).toBeVisible();
+    dialog = await openPlainVault(page, false);
     await toKey();
     await dialog.getByRole('button', { name: 'Stop and undo' }).click();
     await expect(dialog.getByRole('alert')).toHaveText('Stopped. The vault is back as it was.');

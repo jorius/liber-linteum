@@ -20,6 +20,7 @@ import {
   vaultCreate,
   vaultCreateEncrypted,
   vaultEncryptBegin,
+  vaultEncryptCancel,
   vaultEncryptRun,
   vaultLock,
   vaultOpen,
@@ -108,12 +109,18 @@ interface VaultState {
   createEncrypted: (path: string, passphrase: string) => Promise<IpcResult<CreatedEncryptedVault>>;
   /** Encrypt in place, begin (UX §4.2): every page saved without asking
    *  (`null`: one couldn't be, and a toast says so), then the vault on screen
-   *  left if it is `root` (begin closes its session), then the staging vault
-   *  made. Its recovery code is only returned, for the dialog. */
+   *  left if begin closes it (`closesOpen`, from preflight: this folder under
+   *  any spelling, inside it or around it), then the staging vault made. Its
+   *  recovery code is only returned, for the dialog. From here until the
+   *  conversion ends, nothing switches vaults (`refuseWhileConverting`). */
   encryptBegin: (
     root: string,
     passphrase: string,
+    closesOpen: boolean,
   ) => Promise<IpcResult<{ recovery: string }> | null>;
+  /** Encrypt in place, Cancel at the recovery-key step: the begin undone,
+   *  the plain vault it left back. */
+  encryptCancel: () => Promise<IpcResult<void>>;
   /** Encrypt in place, run: the encrypted vault opens as an unlock does. On
    *  any failure (Stop and undo too; the backend rolled back) the plain vault
    *  left at begin opens again. */
@@ -185,6 +192,16 @@ let voidPending: string | null = null;
 /** The plain vault an encrypt in place left (its begin closed it): opened
  *  again if the conversion fails. */
 let convertLeft: string | null = null;
+/** From an encrypt in place's begin until it ends: no vault switch. */
+let converting = false;
+
+/** While a folder is being encrypted in place, any switch of vault (open,
+ *  New vault, Close, Lock from the menu, Back) says to wait: `true`. */
+export function refuseWhileConverting(): boolean {
+  if (!converting) return false;
+  useToastStore.getState().push({ message: i18next.t('encryptInPlace.wait') });
+  return true;
+}
 let unlisten: (() => void)[] = [];
 let pending: ChangedPayload | null = null;
 let timer: ReturnType<typeof setTimeout> | null = null;
@@ -227,6 +244,7 @@ export async function resetVaultStore() {
   treeSeq++;
   voidPending = null;
   convertLeft = null;
+  converting = false;
   useVaultStore.setState({ ...EMPTY, locking: false, children: new Map(), expanded: new Set() });
 }
 
@@ -425,7 +443,7 @@ export const useVaultStore = create<VaultState>((set, get) => {
   ): Promise<IpcResult<VaultInfo>> {
     const before = get().status;
     // One open at a time (M1b §10 b).
-    if (before === 'opening') return { ok: false, error: BUSY };
+    if (before === 'opening' || refuseWhileConverting()) return { ok: false, error: BUSY };
     if (before === 'open' && !(await savedEverything())) return { ok: false, error: BUSY };
     set({ status: 'opening', progress: null });
     // Progress is a nicety: if it can't be subscribed, open without it.
@@ -452,7 +470,7 @@ export const useVaultStore = create<VaultState>((set, get) => {
     openScratchpad: () => withProgress(() => scratchpadOpen()),
     importNotion: async (name) => {
       const before = get().status;
-      if (before === 'opening') return { ok: false, error: BUSY };
+      if (before === 'opening' || refuseWhileConverting()) return { ok: false, error: BUSY };
       // The import opens the new vault: unsaved text in this one is written first.
       if (before === 'open' && !(await savedEverything())) return { ok: false, error: BUSY };
       const res = await notionImport(name);
@@ -464,7 +482,7 @@ export const useVaultStore = create<VaultState>((set, get) => {
     create: (path) => withProgress(() => vaultCreate(path)),
     unlock: async (secret) => {
       const path = get().lockedPath;
-      if (!path) return { ok: false, error: BUSY };
+      if (!path || refuseWhileConverting()) return { ok: false, error: BUSY };
       // The Unlock screen stays mounted while this runs (`unlocking`).
       set({ unlocking: true });
       let res: IpcResult<VaultInfo>;
@@ -500,20 +518,31 @@ export const useVaultStore = create<VaultState>((set, get) => {
       const made = created as IpcResult<CreatedEncryptedVault> | null;
       return made ?? (res.ok ? { ok: false, error: BUSY } : res);
     },
-    encryptBegin: async (root, passphrase) => {
+    encryptBegin: async (root, passphrase, closesOpen) => {
       const { status, info } = get();
-      if (status === 'opening') return { ok: false, error: BUSY };
+      if (status === 'opening' || converting) return { ok: false, error: BUSY };
       if (status === 'open' && !(await savedEverything({ ask: false }))) return null;
-      if (status === 'open' && info?.root === root) {
+      if (status === 'open' && info && (closesOpen || info.root === root)) {
         dropVault();
-        convertLeft = root;
+        convertLeft = info.root;
       }
+      converting = true;
       const res = await vaultEncryptBegin(root, passphrase);
-      if (!res.ok) await reopenLeft();
+      if (!res.ok) {
+        converting = false;
+        await reopenLeft();
+      }
+      return res;
+    },
+    encryptCancel: async () => {
+      const res = await vaultEncryptCancel();
+      converting = false;
+      await reopenLeft();
       return res;
     },
     encryptRun: async () => {
       const res = await vaultEncryptRun();
+      converting = false;
       if (!res.ok) {
         await reopenLeft();
         return res;
@@ -521,7 +550,9 @@ export const useVaultStore = create<VaultState>((set, get) => {
       convertLeft = null;
       return opened(res, get().status, { path: res.value.root });
     },
-    lock: async () => {
+    lock: async (reason) => {
+      // A lock the user asks for waits; idle, sleep and screen lock still lock.
+      if (reason === 'menu' && refuseWhileConverting()) return false;
       // `locking` also keeps the backend's own `vault:locked` (sent while
       // `vault_lock` runs) from dropping the vault a second time.
       if (get().locking || get().status !== 'open' || !get().info) return false;
@@ -561,10 +592,12 @@ export const useVaultStore = create<VaultState>((set, get) => {
       set({ status: 'locked', lockedPath: path });
     },
     cancelUnlock: () => {
+      if (refuseWhileConverting()) return;
       leaveVaultUi();
       set({ status: 'closed', lockedPath: null });
     },
     close: async () => {
+      if (refuseWhileConverting()) return;
       // Unsaved text is written before the vault goes away (M2a §3.3).
       if (!(await savedEverything())) return;
       // Same order as before: the editor is dropped before the backend closes.

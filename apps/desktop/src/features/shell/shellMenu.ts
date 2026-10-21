@@ -13,7 +13,7 @@ import { openEncryptInPlace } from '../encryption/encryptInPlace';
 import { useEditorStore } from '../../stores/editorStore';
 import { useSettingsStore } from '../../stores/settingsStore';
 import { useUiStore } from '../../stores/uiStore';
-import { useVaultStore } from '../../stores/vaultStore';
+import { refuseWhileConverting, useVaultStore } from '../../stores/vaultStore';
 
 /** Settings shows in the shell: on Welcome or Unlock it would be an unseen
  *  dialog that refuses the next one. A sticky dialog refuses it itself. */
@@ -25,10 +25,12 @@ export const openSettings = () => {
 const openSettingsHere = () => void useUiStore.getState().openDialog({ type: 'settings' });
 
 /** Another vault, through the folder dialog (as ⌘O). */
-export const openAnotherVault = () =>
+export const openAnotherVault = () => {
+  if (refuseWhileConverting()) return;
   void pickFolder()
     .catch(() => null)
     .then((path) => (path ? useVaultStore.getState().open(path) : undefined));
+};
 
 /** Vault → Encrypt "<name>"… (and the sidebar's vault menu): the open plain
  *  vault, where it is. */

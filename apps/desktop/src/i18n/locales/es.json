@@ -1171,6 +1171,7 @@
     "refused": "Cifra una carpeta de bóveda, no {folder}.",
     "interrupted": "Se interrumpió el cifrado de «{name}»; la bóveda está como estaba.",
     "finished": "Terminó el cifrado de «{name}».",
-    "banner": "Los originales sin cifrar de esta bóveda siguen en su carpeta."
+    "banner": "Los originales sin cifrar de esta bóveda siguen en su carpeta.",
+    "wait": "Espera a que termine el cifrado."
   }
 }

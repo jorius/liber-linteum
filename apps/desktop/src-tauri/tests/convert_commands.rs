@@ -578,3 +578,88 @@ fn one_conversion_at_a_time_and_a_new_begin_replaces_an_unrun_one() {
     let refused = refused.lock().unwrap().clone().unwrap();
     assert_eq!(kind(refused), "notPermitted");
 }
+
+/// Final round N3: "Move to Trash" only for originals the Trash refused
+/// (`trashPending`). Another device's committed conversion opens here, but
+/// its finish belongs to that device.
+#[test]
+fn trash_originals_needs_a_pending_trash() {
+    let h = harness();
+    let root = h.plain("Theirs");
+    h.crash(&root, "another-install", CrashPoint::AfterCommitted);
+    h.unlock(&root, "passphrase", PASS).unwrap();
+    let err = call(&h.main, "vault_trash_originals", json!({})).unwrap_err();
+    assert_eq!(kind(err), "notPermitted");
+    assert!(root.join(convert::ORIGINALS).join("Notes.md").exists());
+    let journal = convert::read_journal(&root).unwrap().unwrap();
+    assert_eq!(journal.phase, convert::Phase::Committed);
+}
+
+/// Final round: plaintext must not linger in search indexes. Begin drops the
+/// index of every recent vault inside or around the folder; an unlock drops
+/// any plaintext index left for that path (another device converted it).
+#[test]
+fn plaintext_indexes_are_swept_at_begin_and_at_unlock() {
+    let h = harness();
+    let root = h.plain("Swept");
+    let index = |p: &Path| {
+        liber_session::index_db_path(h.cache.path(), p)
+            .parent()
+            .unwrap()
+            .to_path_buf()
+    };
+    let inner = root.join("Sub");
+    let parent = h.disk.path().canonicalize().unwrap();
+    let elsewhere = h.plain("Elsewhere");
+    for v in [&inner, &parent, &elsewhere] {
+        call(&h.main, "vault_open", json!({ "path": v })).unwrap();
+        assert!(index(v).exists());
+    }
+    // Only the last one is open: the others are on the recent list.
+    begin(&h, &root).unwrap();
+    assert!(!index(&inner).exists(), "a vault inside the folder");
+    assert!(!index(&parent).exists(), "a vault around the folder");
+    assert!(
+        index(&elsewhere).exists(),
+        "an unrelated vault keeps its index"
+    );
+    call(&h.main, "vault_encrypt_cancel", json!({})).unwrap();
+
+    let enc = h.disk.path().join("Enc");
+    call(
+        &h.main,
+        "vault_create_encrypted",
+        json!({ "path": enc, "passphrase": PASS }),
+    )
+    .unwrap();
+    let enc = enc.canonicalize().unwrap();
+    call(&h.main, "vault_lock", json!({})).unwrap();
+    std::fs::create_dir_all(index(&enc)).unwrap();
+    std::fs::write(index(&enc).join("index.sqlite"), b"plain text").unwrap();
+    h.unlock(&enc, "passphrase", PASS).unwrap();
+    assert!(!index(&enc).exists(), "the old plaintext index is gone");
+}
+
+/// Final round: preflight tells the UI whether begin will close the open
+/// vault (this folder under any spelling, inside it or around it).
+#[test]
+fn preflight_says_whether_begin_closes_the_open_vault() {
+    let h = harness();
+    let root = h.plain("Closes");
+    let closes = |p: &Path| {
+        call(&h.main, "vault_encrypt_preflight", json!({ "path": p })).unwrap()["closesOpen"]
+            .clone()
+    };
+    assert_eq!(closes(&root), json!(false), "nothing open");
+    call(&h.main, "vault_open", json!({ "path": root.join("Sub") })).unwrap();
+    assert_eq!(closes(&root), json!(true), "a vault inside");
+    call(&h.main, "vault_open", json!({ "path": root })).unwrap();
+    assert_eq!(
+        closes(&root.join("Sub/..")),
+        json!(true),
+        "another spelling"
+    );
+    let other = h.plain("Other");
+    call(&h.main, "vault_open", json!({ "path": other })).unwrap();
+    assert_eq!(closes(&root), json!(false), "an unrelated vault");
+}

@@ -10,6 +10,8 @@ import { useEditorStore } from '../../stores/editorStore';
 import { useToastStore } from '../../stores/toastStore';
 import { useUiStore } from '../../stores/uiStore';
 import { resetVaultStore, useVaultStore } from '../../stores/vaultStore';
+import { openAnotherVault } from '../shell/shellMenu';
+import { openNewVault } from './CreateEncryptedHost';
 import { EncryptInPlaceHost, OriginalsBanner } from './EncryptInPlaceDialog';
 import { openEncryptInPlace } from './encryptInPlace';
 
@@ -51,6 +53,7 @@ function backend(
     blocked?: { path: string; reason: string }[];
     preflightError?: object;
     beginError?: object;
+    closesOpen?: boolean;
     kind?: string;
     pending?: boolean;
   } = {},
@@ -65,7 +68,12 @@ function backend(
       if (cmd === 'folder_kind') return opts.kind ?? 'plain';
       if (cmd === 'vault_encrypt_preflight') {
         if (opts.preflightError) throw opts.preflightError;
-        return { files: 1204, bytes: 9, blocked: opts.blocked ?? [] };
+        return {
+          files: 1204,
+          bytes: 9,
+          blocked: opts.blocked ?? [],
+          closesOpen: opts.closesOpen ?? false,
+        };
       }
       if (cmd === 'vault_encrypt_begin') {
         if (opts.beginError) throw opts.beginError;
@@ -279,9 +287,79 @@ describe('Encrypt in place: passphrase and recovery key', () => {
     await act(() => useVaultStore.getState().lock('idle'));
     expect(useVaultStore.getState().status).toBe('locked');
     expect(screen.getByTestId('recovery-code')).toBeInTheDocument();
+    // Back from Unlock is a vault switch: refused while converting.
     await act(() => useVaultStore.getState().cancelUnlock());
+    expect(useVaultStore.getState().status).toBe('locked');
     expect(screen.getByTestId('recovery-code')).toBeInTheDocument();
     expect(useUiStore.getState().dialog).toEqual({ type: 'encryptInPlace', root: ROOT });
+  });
+});
+
+describe('Encrypt in place: final round', () => {
+  it('Cancel at the recovery-key step undoes the begin: no copy, the plain vault back', async () => {
+    backend();
+    openPlain();
+    const dialog = await start();
+    await toKey(dialog);
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Cancel' }));
+    expect(await within(dialog).findByRole('alert')).toHaveTextContent(
+      'Stopped. The vault is back as it was.',
+    );
+    expect(sent('vault_encrypt_cancel')).toHaveLength(1);
+    expect(sent('vault_encrypt_run')).toEqual([]);
+    expect(sent('vault_open')).toEqual([{ path: ROOT }]);
+    await waitFor(() => expect(useVaultStore.getState().status).toBe('open'));
+    expect(useUiStore.getState().held).toBe(false);
+    expect(within(dialog).queryByTestId('recovery-code')).toBeNull();
+    expect(secretsKept()).not.toContain(CODE);
+  });
+
+  it('the open vault begin closes under another spelling (preflight says so) is left, and comes back', async () => {
+    backend({ closesOpen: true });
+    useVaultStore.setState({ status: 'open', info: { ...plain, root: '/private/v/Smartjob' } });
+    useEditorStore.setState({ saveAll: async () => [] });
+    const dialog = await start();
+    await toKey(dialog);
+    expect(useVaultStore.getState().status).toBe('closed');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Cancel' }));
+    await waitFor(() => expect(sent('vault_open')).toEqual([{ path: '/private/v/Smartjob' }]));
+  });
+
+  it('from begin until it ends, no entry point switches vaults: it says to wait', async () => {
+    backend();
+    openPlain();
+    const dialog = await start();
+    await toKey(dialog);
+    const wait = 'Wait until encrypting finishes.';
+    const said = () => useToastStore.getState().toasts.at(-1)?.message;
+    for (const [name, attempt] of [
+      ['open', () => useVaultStore.getState().open('/v/Other')],
+      ['Quick notes', () => useVaultStore.getState().openScratchpad()],
+      ['create', () => useVaultStore.getState().create('/v/New')],
+      ['close', () => useVaultStore.getState().close()],
+      ['menu lock', () => useVaultStore.getState().lock('menu')],
+      ['New vault', () => openNewVault()],
+      ['Open another vault', async () => openAnotherVault()],
+    ] as const) {
+      useToastStore.getState().clear();
+      await act(async () => {
+        await attempt();
+      });
+      expect(said(), name).toBe(wait);
+    }
+    expect(sent('vault_open')).toEqual([]);
+    expect(sent('scratchpad_open')).toEqual([]);
+    expect(sent('vault_create')).toEqual([]);
+    expect(sent('plugin:dialog|open')).toEqual([]);
+    expect(useUiStore.getState().dialog).toEqual({ type: 'encryptInPlace', root: ROOT });
+    // Once it ends, switching works again.
+    await confirmKey(dialog);
+    await waitFor(() => expect(runGate).not.toBeNull());
+    await act(async () => runGate!.resolve(encrypted()));
+    await within(dialog).findByRole('button', { name: 'Open' });
+    useToastStore.getState().clear();
+    await act(() => useVaultStore.getState().open('/v/Other'));
+    expect(sent('vault_open')).toEqual([{ path: '/v/Other' }]);
   });
 });
 

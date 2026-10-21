@@ -174,6 +174,8 @@ pub(crate) fn vault_unlock_impl<R: Runtime>(
         }
     };
     let (storage, report) = EncryptedStorage::unlock(&path, with)?;
+    // Plaintext must not linger: an index from when it was plain goes (final round).
+    crate::convert_commands::drop_plain_index(app, &path);
     let state = app.state::<AppState>();
     // Before anything is written (the merge writes the header): a rolled-back
     // vault is neither opened nor written (spec §16 #18).

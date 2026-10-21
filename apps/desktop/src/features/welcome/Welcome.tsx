@@ -15,7 +15,7 @@ import { SUPPORTED_LANGUAGES, type Language } from '../../i18n';
 import { pickFolder } from '../../ipc';
 import { useSettingsStore } from '../../stores/settingsStore';
 import { useUiStore } from '../../stores/uiStore';
-import { useVaultStore } from '../../stores/vaultStore';
+import { refuseWhileConverting, useVaultStore } from '../../stores/vaultStore';
 import { openNotionImport } from '../notion/NotionHost';
 import { newQuickNote } from '../scratchpad/quickNote';
 import { QuickNoteIcon } from '../scratchpad/QuickNoteIcon';
@@ -37,6 +37,7 @@ export function welcomeShortcut(e: KeyboardEvent, mac = MAC): 'n' | 'o' | null {
 
 /** Native folder picker → open (VLT-01). A cancelled picker does nothing. */
 async function pickThen(action: (path: string) => Promise<unknown>) {
+  if (refuseWhileConverting()) return;
   const path = await pickFolder().catch(() => null);
   if (path) await action(path);
 }

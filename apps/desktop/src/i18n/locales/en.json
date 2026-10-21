@@ -1171,6 +1171,7 @@
     "refused": "Encrypt a vault folder, not {folder}.",
     "interrupted": "Encrypting “{name}” was interrupted; the vault is back as it was.",
     "finished": "Finished encrypting “{name}”.",
-    "banner": "The unencrypted originals of this vault are still in its folder."
+    "banner": "The unencrypted originals of this vault are still in its folder.",
+    "wait": "Wait until encrypting finishes."
   }
 }

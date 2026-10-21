@@ -983,12 +983,24 @@ pub fn rollback(root: &Path) -> Result<()> {
             .map(|e| e.map(|e| e.file_name()))
             .collect::<std::io::Result<_>>()
             .map_err(io(ORIGINALS))?;
+        // OS junk the OS wrote again at the root meanwhile (Finder's
+        // `.DS_Store`): both copies are junk, the staged one goes back.
+        let rewritten = |n: &OsString| {
+            n.to_str().is_some_and(|n| JUNK.contains(&n))
+                && std::fs::symlink_metadata(root.join(n)).is_ok_and(|m| m.is_file())
+        };
         // All checked first: a collision moves nothing back.
-        if let Some(n) = names.iter().find(|n| exists(&root.join(n))) {
+        if let Some(n) = names
+            .iter()
+            .find(|n| exists(&root.join(n)) && !rewritten(n))
+        {
             return Err(ConvertError::Collision(root.join(n).display().to_string()));
         }
         crash(CrashPoint::Unstaging(0))?;
         for (i, n) in names.iter().enumerate() {
+            if rewritten(n) {
+                std::fs::remove_file(root.join(n)).map_err(io(ORIGINALS))?;
+            }
             move_new(&plain.join(n), &root.join(n))?;
             crash(CrashPoint::Unstaging(i + 1))?;
         }
