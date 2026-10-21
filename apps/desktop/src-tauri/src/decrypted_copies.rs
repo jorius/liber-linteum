@@ -153,42 +153,94 @@ fn remove_lock_and_folder(folder: &Path) {
     let _ = std::fs::remove_dir(folder);
 }
 
-/// Removes the run folders in `temp` whose run is gone: a real folder (not
-/// a link) named exactly as [`run_pid`] wants, not this process's, holding
-/// a `.lock` that nothing holds, or no `.lock` at all and older than `start`
-/// (a run that died before making it). Anything else is left alone.
+/// The effective uid of this process, read from a probe file it creates in
+/// `temp` (std has no `geteuid`, and src-tauri takes no libc edge). `None`
+/// if the probe can't be made: then nothing is swept.
+#[cfg(unix)]
+fn my_uid(temp: &Path) -> Option<u32> {
+    use std::os::unix::fs::MetadataExt;
+    let random: String = liber_crypto::FolderId::random()
+        .0
+        .iter()
+        .map(|b| format!("{b:02x}"))
+        .collect();
+    let probe = temp.join(format!(".liber-uid-{}-{random}", std::process::id()));
+    let file = OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .open(&probe)
+        .ok()?;
+    let uid = file.metadata().ok().map(|m| m.uid());
+    drop(file);
+    let _ = std::fs::remove_file(&probe);
+    uid
+}
+
+/// Whether `m` (from `lstat`) is owned by `uid`. In a sticky shared temp
+/// folder (`/tmp`) no other user can rename or replace an entry we own.
+#[cfg(unix)]
+fn owned(m: &std::fs::Metadata, uid: Option<u32>) -> bool {
+    use std::os::unix::fs::MetadataExt;
+    uid == Some(m.uid())
+}
+
+/// `%TEMP%` is per user on Windows.
+#[cfg(not(unix))]
+fn owned(_: &std::fs::Metadata, _: Option<u32>) -> bool {
+    true
+}
+
+/// `path` by `lstat` (never through a link, never a cached listing type):
+/// a real directory `uid` owns.
+fn own_dir(path: &Path, uid: Option<u32>) -> Option<std::fs::Metadata> {
+    path.symlink_metadata()
+        .ok()
+        .filter(|m| m.file_type().is_dir() && owned(m, uid))
+}
+
+/// Removes the run folders in `temp` whose run is gone: a real folder (by
+/// `lstat`, not a link) that this user owns, named exactly as [`run_pid`]
+/// wants, not this process's, holding a `.lock` that nothing holds, or no
+/// `.lock` at all and older than `start` (a run that died before making
+/// it). Ownership is checked again right before anything is removed
+/// (review round 2: a link swapped in by another user is never followed).
+/// Anything else is left alone.
 fn sweep(temp: &Path, start: SystemTime) {
     let Ok(items) = std::fs::read_dir(temp) else {
         return;
     };
+    #[cfg(unix)]
+    let uid = my_uid(temp);
+    #[cfg(not(unix))]
+    let uid = None;
     for item in items.flatten() {
         let name = item.file_name();
         let Some(pid) = name.to_str().and_then(run_pid) else {
             continue;
         };
-        if pid == std::process::id() || !item.file_type().is_ok_and(|t| t.is_dir()) {
+        let folder = item.path();
+        if pid == std::process::id() {
             continue;
         }
-        let folder = item.path();
-        match File::open(folder.join(LOCK_FILE)) {
-            Ok(lock) => {
-                if lock.try_lock().is_err() || remove_copies(&folder).is_err() {
+        let Some(meta) = own_dir(&folder, uid) else {
+            continue;
+        };
+        let lock = match File::open(folder.join(LOCK_FILE)) {
+            Ok(lock) if lock.try_lock().is_ok() => Some(lock),
+            Ok(_) => continue,
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
+                if !meta.modified().is_ok_and(|t| t < start) {
                     continue;
                 }
-                drop(lock);
-                remove_lock_and_folder(&folder);
+                None
             }
-            Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
-                let old = item
-                    .metadata()
-                    .and_then(|m| m.modified())
-                    .is_ok_and(|t| t < start);
-                if old && remove_copies(&folder).is_ok() {
-                    remove_lock_and_folder(&folder);
-                }
-            }
-            Err(_) => {}
+            Err(_) => continue,
+        };
+        if own_dir(&folder, uid).is_none() || remove_copies(&folder).is_err() {
+            continue;
         }
+        drop(lock);
+        remove_lock_and_folder(&folder);
     }
 }
 
@@ -262,6 +314,61 @@ mod tests {
             assert!(kept.exists(), "{kept:?} kept");
         }
         drop(held);
+    }
+
+    /// Review round 2: a link named like a gone run's folder is never
+    /// followed, with or without a `.lock` behind it: the target's
+    /// contents stay.
+    #[cfg(unix)]
+    #[test]
+    fn a_link_named_like_a_run_folder_is_never_followed() {
+        let temp = tempfile::tempdir().unwrap();
+        let elsewhere = tempfile::tempdir().unwrap();
+        let with_lock = run_folder(elsewhere.path(), "documents");
+        std::fs::create_dir(with_lock.join("1")).unwrap();
+        std::fs::write(with_lock.join("1/notes.txt"), "mine").unwrap();
+        let without = elsewhere.path().join("photos");
+        std::fs::create_dir(&without).unwrap();
+        std::fs::write(without.join("a.jpg"), "mine").unwrap();
+        std::os::unix::fs::symlink(&with_lock, temp.path().join(format!("liber-4000008-{HEX}")))
+            .unwrap();
+        std::os::unix::fs::symlink(&without, temp.path().join(format!("liber-4000009-{HEX}")))
+            .unwrap();
+        sweep(
+            temp.path(),
+            SystemTime::now() + std::time::Duration::from_secs(3600),
+        );
+        assert!(with_lock.join("copy.pdf").exists());
+        assert!(with_lock.join("1/notes.txt").exists());
+        assert!(with_lock.join(LOCK_FILE).exists());
+        assert!(without.join("a.jpg").exists());
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn only_this_users_folders_count_as_its_own() {
+        let temp = tempfile::tempdir().unwrap();
+        let uid = my_uid(temp.path()).expect("a probe in a temp dir");
+        assert_eq!(
+            std::fs::read_dir(temp.path()).unwrap().count(),
+            0,
+            "probe removed"
+        );
+        let dir = temp.path().join("d");
+        std::fs::create_dir(&dir).unwrap();
+        let meta = dir.symlink_metadata().unwrap();
+        assert!(owned(&meta, Some(uid)));
+        assert!(!owned(&meta, Some(uid.wrapping_add(1))));
+        assert!(!owned(&meta, None), "unknown uid: nothing is ours");
+        assert!(own_dir(&dir, Some(uid)).is_some());
+        let link = temp.path().join("l");
+        std::os::unix::fs::symlink(&dir, &link).unwrap();
+        assert!(
+            own_dir(&link, Some(uid)).is_none(),
+            "a link is never a folder"
+        );
+        std::fs::write(temp.path().join("f"), "").unwrap();
+        assert!(own_dir(&temp.path().join("f"), Some(uid)).is_none());
     }
 
     #[test]
