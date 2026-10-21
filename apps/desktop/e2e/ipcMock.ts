@@ -12,6 +12,7 @@ export function installIpcMock({
   filePicks = [],
   folders = [],
   encrypted,
+  folderKinds = {},
 }: {
   pages: Record<string, string>;
   editorMode: string;
@@ -49,6 +50,8 @@ export function installIpcMock({
     recoveryVoid?: boolean;
     unreadable?: { osPath: string; reason: string }[];
   };
+  /** UX round §2: what `folder_kind` says of a picked folder (else `empty`). */
+  folderKinds?: Record<string, string>;
 }) {
   type Args = Record<string, unknown>;
   const w = window as unknown as Record<string, unknown>;
@@ -446,6 +449,25 @@ export function installIpcMock({
       return encInfo('enc', '/enc');
     },
     menu_set_lock_enabled: () => null,
+    // UX round: the New vault dialog's folder, and Vault → Encrypt "<name>"….
+    folder_kind: (a) => folderKinds[a.path as string] ?? 'empty',
+    menu_set_encrypt_item: (a) => {
+      w.__liberEncryptItem = a.vault ?? null;
+      return null;
+    },
+    vault_create: (a) => ({
+      name: String(a.path).split('/').pop(),
+      root: a.path,
+      report: {
+        files: 2,
+        pages: 2,
+        parsed: 2,
+        skippedUnchanged: 0,
+        removed: 0,
+        warnings: [],
+        durationMs: 1,
+      },
+    }),
     vault_lock: () => {
       if (!encUnlocked) throw { kind: 'notPermitted', message: 'plain vault' };
       encUnlocked = false;

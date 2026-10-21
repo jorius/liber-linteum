@@ -103,6 +103,9 @@ const COMMANDS: &[&str] = &[
     // Custom themes: export/import through the native dialogs.
     "theme_export",
     "theme_import",
+    // Encryption UX round: the New vault dialog and Vault → Encrypt.
+    "folder_kind",
+    "menu_set_encrypt_item",
 ];
 
 struct Harness {

@@ -13,6 +13,7 @@ import { openPage } from '../../stores/navigate';
 import { usePageStore } from '../../stores/pageStore';
 import { DEFAULT_SETTINGS, useSettingsStore } from '../../stores/settingsStore';
 import { childrenByParent } from '../../stores/tree';
+import { useToastStore } from '../../stores/toastStore';
 import { useUiStore } from '../../stores/uiStore';
 import { resetVaultStore, useVaultStore } from '../../stores/vaultStore';
 import { AppShell } from './AppShell';
@@ -233,7 +234,7 @@ describe('AppShell', () => {
       within(menu)
         .getAllByRole('menuitem')
         .map((m) => m.textContent),
-    ).toEqual(['Settings…', 'Open another vault…', 'Close vault']);
+    ).toEqual(['Settings…', 'Open another vault…', 'Encrypt “Digital Brain”…', 'Close vault']);
     expect(within(menu).getByRole('menuitem', { name: 'Settings…' })).toHaveFocus();
     await userEvent.keyboard('{Enter}');
     expect(useUiStore.getState().dialog).toEqual({ type: 'settings' });
@@ -246,6 +247,32 @@ describe('AppShell', () => {
     await userEvent.click(screen.getByRole('menuitem', { name: 'Close vault' }));
     await waitFor(() => expect(useVaultStore.getState().status).toBe('closed'));
     expect(calls.map(([c]) => c)).toContain('vault_close');
+  });
+
+  it('UX round §4.1: the vault menu offers Encrypt only for a plain vault', async () => {
+    backend({});
+    seed();
+    act(() => useVaultStore.setState((s) => ({ info: s.info && { ...s.info, encrypted: true } })));
+    render(<AppShell />);
+    await userEvent.click(screen.getByRole('button', { name: 'Digital Brain' }));
+    const menu = screen.getByRole('menu', { name: 'Digital Brain' });
+    expect(
+      within(menu)
+        .getAllByRole('menuitem')
+        .map((m) => m.textContent),
+    ).toEqual(['Settings…', 'Open another vault…', 'Close vault']);
+  });
+
+  it('UX round §4.1: Encrypt “<name>”… starts encrypting the open plain vault', async () => {
+    backend({});
+    seed();
+    render(<AppShell />);
+    await userEvent.click(screen.getByRole('button', { name: 'Digital Brain' }));
+    await userEvent.click(screen.getByRole('menuitem', { name: 'Encrypt “Digital Brain”…' }));
+    // The stub until the convert flow lands (encryptInPlace.ts).
+    expect(useToastStore.getState().toasts.at(-1)?.message).toBe(
+      'Encrypting in place is coming in the next step.',
+    );
   });
 
   it('M5b §2.5: the sidebar collapses (button, ⌘\\) and the setting remembers it', async () => {

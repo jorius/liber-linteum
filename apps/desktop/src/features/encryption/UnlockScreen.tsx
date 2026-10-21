@@ -98,8 +98,10 @@ export function UnlockScreen() {
       <form className={styles.card} onSubmit={(e) => void submit(e)}>
         <div className={styles.head}>
           <LockIcon />
-          <h1 className={styles.name}>{name}</h1>
-          <span className={styles.beta}>{t('unlock.beta')}</span>
+          <span className={styles.title}>
+            <h1 className={styles.name}>{name}</h1>
+            <span className="liber-chip">{t('unlock.beta')}</span>
+          </span>
         </div>
         <label className={styles.field}>
           {label}

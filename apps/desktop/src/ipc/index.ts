@@ -682,6 +682,14 @@ export const vaultLock = () => call<void>('vault_lock');
 /** Vault → Lock Vault is enabled only while an encrypted vault is open. */
 export const menuSetLockEnabled = (enabled: boolean) =>
   call<void>('menu_set_lock_enabled', { enabled });
+/** Vault → Encrypt "<vault>"… (UX round §4.1): named and on for an open plain
+ *  vault, off with `null`. */
+export const menuSetEncryptItem = (vault: string | null) =>
+  call<void>('menu_set_encrypt_item', { vault });
+/** What a folder chosen for a new vault holds (UX round §2): `empty` (OS
+ *  files aside) or `missing` can be created in; `plain` has files. */
+export type FolderKind = 'empty' | 'missing' | 'plain' | 'encrypted' | 'damaged';
+export const folderKind = (path: string) => call<FolderKind>('folder_kind', { path });
 export const securityChangePassphrase = (current: string, next: string) =>
   call<void>('security_change_passphrase', { current, next });
 export const securityNewRecovery = (passphrase: string) =>

@@ -1,15 +1,17 @@
 import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
 import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
-import { closeVault, openAnotherVault, openSettings } from './shellMenu';
+import { useVaultStore } from '../../stores/vaultStore';
+import { closeVault, encryptThisVault, openAnotherVault, openSettings } from './shellMenu';
 import styles from './Shell.module.css';
 
 /** The vault's name in the sidebar, as a menu button (M5b §11.1): Settings…,
- *  Open another vault…, Close vault — on every platform, where macOS also has
- *  them in its app menu. */
+ *  Open another vault…, Encrypt "<name>"… (a plain vault, UX round §4.1),
+ *  Close vault — on every platform, where macOS also has them in its app menu. */
 export function VaultMenu({ name }: { name: string }) {
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
+  const plain = useVaultStore((s) => !!s.info && !s.info.encrypted && !s.info.scratchpad);
   const button = useRef<HTMLButtonElement>(null);
   const close = (refocus: boolean) => {
     setOpen(false);
@@ -41,6 +43,9 @@ export function VaultMenu({ name }: { name: string }) {
           items={[
             [t('shell.settingsItem'), openSettings],
             [t('shell.openAnother'), openAnotherVault],
+            ...(plain
+              ? [[t('shell.encryptVault', { name }), encryptThisVault] as [string, () => void]]
+              : []),
             [t('shell.closeVault'), closeVault],
           ]}
           onClose={close}

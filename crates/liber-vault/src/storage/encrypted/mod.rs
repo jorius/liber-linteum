@@ -103,6 +103,12 @@ pub fn is_encrypted_vault(root: &Path) -> bool {
     vault_kind(root) == VaultKind::Encrypted
 }
 
+/// Whether `create` would take `root` as empty (OS files and a failed
+/// create's leftovers aside): the New vault dialog's "empty folder".
+pub fn is_empty_for_create(root: &Path) -> bool {
+    refuse_non_empty(root).is_ok()
+}
+
 #[derive(Debug)]
 pub struct UnlockReport {
     pub vault_id: [u8; 16],

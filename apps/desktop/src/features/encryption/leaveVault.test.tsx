@@ -11,7 +11,7 @@ import { DEFAULT_SETTINGS, useSettingsStore } from '../../stores/settingsStore';
 import { useToastStore } from '../../stores/toastStore';
 import { useUiStore, type DialogState } from '../../stores/uiStore';
 import { onLeaveVault } from '../../stores/leaveVault';
-import { openCreateEncrypted } from './CreateEncryptedHost';
+import { openNewVault } from './CreateEncryptedHost';
 import { resetVaultStore, useVaultStore } from '../../stores/vaultStore';
 import { useBinStore } from '../bin/binStore';
 import { confirmUnsaved } from '../editor/unsavedPrompt';
@@ -337,21 +337,21 @@ describe('second pass: the voided-key prompt belongs to its vault', () => {
   });
 });
 
-describe('second pass: New Encrypted Vault never drops a question or an import', () => {
+describe('second pass: New vault never drops a question or an import', () => {
   it.each([
     { type: 'unsaved', id: 1, paths: ['a.md'], answer: () => undefined },
     { type: 'binClash', kind: 'trash', path: 'a.md', answer: () => undefined },
     { type: 'notionImport' },
     { type: 'scratchpadSetup', then: 'quickNote' },
-  ] satisfies Exclude<DialogState, null>[])('is refused over $type', (d) => {
+  ] satisfies Exclude<DialogState, null>[])('is refused over $type', async (d) => {
     useUiStore.getState().openDialog(d);
-    openCreateEncrypted('/n');
+    await openNewVault();
     expect(useUiStore.getState().dialog).toBe(d);
   });
 
-  it('takes the place of Settings', () => {
+  it('takes the place of Settings', async () => {
     useUiStore.getState().openDialog({ type: 'settings' });
-    openCreateEncrypted('/n');
-    expect(useUiStore.getState().dialog).toEqual({ type: 'createEncrypted', path: '/n' });
+    await openNewVault();
+    expect(useUiStore.getState().dialog).toEqual({ type: 'newVault' });
   });
 });

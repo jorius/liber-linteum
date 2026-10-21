@@ -127,7 +127,8 @@
     "resizeSidebarHint": "Drag to resize the sidebar; double-click to reset it",
     "showSidebar": "Show sidebar",
     "settingsItem": "Settings…",
-    "openAnother": "Open another vault…"
+    "openAnother": "Open another vault…",
+    "encryptVault": "Encrypt “{name}”…"
   },
   "page": {
     "region": "Page",
@@ -1085,8 +1086,6 @@
   },
   "encryption": {
     "beta": "Beta",
-    "createTitle": "New encrypted vault",
-    "switch": "Encrypt this vault",
     "passphrase": "Passphrase",
     "confirm": "Confirm passphrase",
     "show": "Show passphrase",
@@ -1095,7 +1094,6 @@
     "mismatch": "The passphrases don't match.",
     "continue": "Continue",
     "creating": "Setting up encryption…",
-    "recoveryTitle": "Your recovery key",
     "recoveryBody": "Write this down or store it in a password manager. It's the only way into this vault if you forget the passphrase. We can't recover it for you.",
     "copy": "Copy",
     "copied": "Copied — clear your clipboard once you've stored it.",
@@ -1129,5 +1127,24 @@
       "title": "Couldn't read",
       "hint": "These files are in the vault folder but their names couldn't be decrypted. They're never deleted. Export arrives in a later version."
     }
+  },
+  "newVault": {
+    "title": "New vault",
+    "where": "Where",
+    "noFolder": "No folder chosen",
+    "choose": "Choose…",
+    "protection": "Protection",
+    "plain": "Plain",
+    "plainHint": "Ordinary Markdown files any app can open.",
+    "encrypted": "Encrypted",
+    "encryptedHint": "Names and contents encrypted. Needs a passphrase to open.",
+    "stepPassphrase": "1 Passphrase",
+    "stepRecovery": "2 Recovery key",
+    "hasNotes": "This folder already has notes. Encrypt it in place?",
+    "encryptInPlace": "Encrypt in place…",
+    "isEncrypted": "This folder is already an encrypted vault.",
+    "openIt": "Open it",
+    "back": "Back",
+    "encryptSoon": "Encrypting in place is coming in the next step."
   }
 }

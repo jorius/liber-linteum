@@ -88,6 +88,31 @@ body {
   background: var(--color-border);
 }
 
+/* The Beta and Encrypted chips (encryption UX round §5): one shape everywhere,
+   8 px after the word it follows, never pushed to the far edge. */
+.liber-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  vertical-align: middle;
+  flex: none;
+  box-sizing: border-box;
+  height: 18px;
+  padding: 0 7px;
+  margin-left: 8px;
+  border-radius: 999px;
+  color: var(--color-accent);
+  background: var(--color-accent-soft);
+  font: 600 11px/1 var(--font-body);
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+
+.liber-chip svg {
+  width: 11px;
+  height: 11px;
+}
+
 /* Text for screen readers only (live regions made outside React). */
 .liber-sr-only {
   position: absolute;

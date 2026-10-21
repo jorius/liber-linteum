@@ -226,7 +226,7 @@ function leaveVaultUi() {
   if (d?.type === 'binClash') d.answer(false);
   const voided = d?.type === 'recoveryVoid' || (d?.type === 'newRecovery' && d.fromVoid);
   if (voided && !ui.held) voidPending = d.root;
-  const held = ui.held && (d?.type === 'createEncrypted' || d?.type === 'newRecovery');
+  const held = ui.held && (d?.type === 'newVault' || d?.type === 'newRecovery');
   if (!held && !APP_DIALOGS.has(d?.type ?? '')) ui.closeDialog();
   useToastStore.getState().clear();
   useBinStore.getState().reset();

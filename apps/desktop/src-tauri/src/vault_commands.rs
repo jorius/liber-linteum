@@ -150,6 +150,26 @@ pub async fn vault_create<R: Runtime>(app: AppHandle<R>, path: PathBuf) -> CmdRe
     .await
 }
 
+/// What the folder chosen in the New vault dialog holds (encryption UX round
+/// §2): `missing`, `empty` (as an encrypted create counts it), `plain` (files,
+/// a plain vault or not), `encrypted` or `damaged`. Reads only.
+#[tauri::command]
+pub async fn folder_kind<R: Runtime>(app: AppHandle<R>, path: PathBuf) -> CmdResult<&'static str> {
+    blocking(app, move |_| Ok(folder_kind_of(&path))).await
+}
+
+fn folder_kind_of(path: &Path) -> &'static str {
+    if !path.exists() {
+        return "missing";
+    }
+    match liber_vault::vault_kind(path) {
+        liber_vault::VaultKind::Encrypted => "encrypted",
+        liber_vault::VaultKind::Damaged(_) => "damaged",
+        liber_vault::VaultKind::Plain if liber_vault::is_empty_for_create(path) => "empty",
+        liber_vault::VaultKind::Plain => "plain",
+    }
+}
+
 pub(crate) fn vault_close_impl(state: &AppState) {
     state.set_session(None);
 }

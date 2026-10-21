@@ -127,7 +127,8 @@
     "resizeSidebarHint": "Arrastra para cambiar el ancho de la barra lateral; doble clic para restablecerlo",
     "showSidebar": "Mostrar la barra lateral",
     "settingsItem": "Ajustes…",
-    "openAnother": "Abrir otra bóveda…"
+    "openAnother": "Abrir otra bóveda…",
+    "encryptVault": "Cifrar «{name}»…"
   },
   "page": {
     "region": "Página",
@@ -1085,8 +1086,6 @@
   },
   "encryption": {
     "beta": "Beta",
-    "createTitle": "Nueva bóveda cifrada",
-    "switch": "Cifrar esta bóveda",
     "passphrase": "Frase de contraseña",
     "confirm": "Confirmar frase de contraseña",
     "show": "Mostrar frase de contraseña",
@@ -1095,7 +1094,6 @@
     "mismatch": "Las frases de contraseña no coinciden.",
     "continue": "Continuar",
     "creating": "Configurando el cifrado…",
-    "recoveryTitle": "Tu clave de recuperación",
     "recoveryBody": "Anótala o guárdala en un gestor de contraseñas. Es la única forma de entrar en esta bóveda si olvidas la frase de contraseña. No podemos recuperarla por ti.",
     "copy": "Copiar",
     "copied": "Copiado: borra el portapapeles cuando la hayas guardado.",
@@ -1129,5 +1127,24 @@
       "title": "No se pudo leer",
       "hint": "Estos archivos están en la carpeta de la bóveda, pero no se pudo descifrar su nombre. Nunca se borran. La exportación llegará en una versión futura."
     }
+  },
+  "newVault": {
+    "title": "Bóveda nueva",
+    "where": "Dónde",
+    "noFolder": "Ninguna carpeta elegida",
+    "choose": "Elegir…",
+    "protection": "Protección",
+    "plain": "Normal",
+    "plainHint": "Archivos Markdown corrientes que cualquier aplicación puede abrir.",
+    "encrypted": "Cifrada",
+    "encryptedHint": "Nombres y contenido cifrados. Se necesita una frase de contraseña para abrirla.",
+    "stepPassphrase": "1 Frase de contraseña",
+    "stepRecovery": "2 Clave de recuperación",
+    "hasNotes": "Esta carpeta ya tiene notas. ¿Cifrarla donde está?",
+    "encryptInPlace": "Cifrar donde está…",
+    "isEncrypted": "Esta carpeta ya es una bóveda cifrada.",
+    "openIt": "Abrirla",
+    "back": "Atrás",
+    "encryptSoon": "Cifrar una bóveda donde está llega en el siguiente paso."
   }
 }

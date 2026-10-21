@@ -136,8 +136,6 @@ export function RecentList() {
                         <span data-quick-note-icon>
                           <QuickNoteIcon />
                         </span>
-                      ) : item.encrypted ? (
-                        <LockIcon />
                       ) : item.icon ? (
                         <ItemIcon icon={item.icon} />
                       ) : (
@@ -145,10 +143,17 @@ export function RecentList() {
                       )}
                     </span>
                     <span className={styles.recentText}>
-                      <span className={styles.recentName}>{item.name}</span>
-                      {item.encrypted && (
-                        <span className="liber-sr-only">{t('unlock.encryptedBadge')}</span>
-                      )}
+                      <span className={styles.recentTitle}>
+                        <span className={styles.recentName}>{item.name}</span>
+                        {/* Unrendered in the flex row; read as "Smartjob Encrypted". */}
+                        {item.encrypted && ' '}
+                        {item.encrypted && (
+                          <span className="liber-chip">
+                            <LockIcon />
+                            {t('unlock.encryptedBadge')}
+                          </span>
+                        )}
+                      </span>
                       <span className={styles.recentPath}>{middle(item.path)}</span>
                     </span>
                     <span className={styles.recentMeta}>

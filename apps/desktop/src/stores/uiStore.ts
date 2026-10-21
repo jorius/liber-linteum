@@ -25,8 +25,8 @@ export type DialogState =
   /** Import from Notion (M7 §3). Rendered by `NotionHost` (it also shows on
    *  the Welcome screen). */
   | { type: 'notionImport' }
-  /** New encrypted vault in the folder just picked (E4); `CreateEncryptedHost`. */
-  | { type: 'createEncrypted'; path: string }
+  /** New vault, plain or encrypted (UX round §2); `CreateEncryptedHost`. */
+  | { type: 'newVault' }
   /** `root`'s recovery key was replaced on another device (E4). */
   | { type: 'recoveryVoid'; root: string }
   /** Settings → Security → New recovery key for `root` (E4), hosted by the
@@ -74,7 +74,7 @@ interface UiState {
  *  holding a recovery code: nothing replaces them. */
 function isSticky(d: DialogState, held: boolean): boolean {
   if (d?.type === 'recoveryVoid' || (d?.type === 'newRecovery' && d.fromVoid)) return true;
-  return held && (d?.type === 'createEncrypted' || d?.type === 'newRecovery');
+  return held && (d?.type === 'newVault' || d?.type === 'newRecovery');
 }
 
 export const useUiStore = create<UiState>((set, get) => ({

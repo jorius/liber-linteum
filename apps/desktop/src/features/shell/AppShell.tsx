@@ -7,6 +7,7 @@ import { useVaultStore } from '../../stores/vaultStore';
 import { BinView } from '../bin/BinView';
 import { DialogHost } from '../dialogs/DialogHost';
 import { useAutoLock } from '../encryption/autoLock';
+import { useEncryptMenuItem } from '../encryption/encryptInPlace';
 import { ContextMenu, type MenuState } from '../explorer/ContextMenu';
 import { requestTrash } from '../explorer/trashAction';
 import { GlobalView } from '../global-view/GlobalView';
@@ -34,6 +35,7 @@ export function AppShell() {
   useGlobalShortcuts(menu !== null);
   useWindowTitle();
   useAutoLock();
+  useEncryptMenuItem();
   const current = useUiStore((s) => s.screen);
   const collapsed = useSettingsStore((s) => s.settings.sidebarCollapsed);
   // Keys typed while the lock runs would be dropped with the vault: none are taken.

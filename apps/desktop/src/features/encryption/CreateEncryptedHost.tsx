@@ -3,17 +3,20 @@ import { useUiStore } from '../../stores/uiStore';
 import { useVaultStore } from '../../stores/vaultStore';
 import { Dialog } from '../dialogs/Dialog';
 import dialogs from '../dialogs/Dialogs.module.css';
-import { CreateEncryptedDialog } from './CreateEncryptedDialog';
+import { confirmUnsaved, needsUnsavedPrompt } from '../editor/unsavedPrompt';
+import { NewVaultDialog } from './NewVaultDialog';
 import { NewRecoveryDialog } from './SecuritySettings';
 
 /** Dialogs waiting for an answer or running an import: never replaced. */
 const BUSY = new Set(['unsaved', 'binClash', 'notionImport', 'scratchpadSetup']);
 
-/** Opens the create dialog for the folder just picked (refused while a
- *  sticky dialog shows, or one that is waiting for an answer). */
-export function openCreateEncrypted(path: string) {
+/** Opens the New vault dialog (refused while a sticky dialog shows, or one
+ *  that is waiting for an answer). Unsaved text is asked about first: the
+ *  question would replace the dialog, and a recovery code would be lost. */
+export async function openNewVault() {
   if (BUSY.has(useUiStore.getState().dialog?.type ?? '')) return;
-  useUiStore.getState().openDialog({ type: 'createEncrypted', path });
+  if (needsUnsavedPrompt() && !(await confirmUnsaved())) return;
+  useUiStore.getState().openDialog({ type: 'newVault' });
 }
 
 /** The voided-key prompt: no way out but a new recovery key. */
@@ -39,7 +42,7 @@ function RecoveryVoidDialog({ root }: { root: string }) {
   );
 }
 
-/** The dialogs, on every screen: the create dialog stays mounted when Welcome
+/** The dialogs, on every screen: the New vault dialog stays mounted when Welcome
  *  gives way to the shell, and a recovery code stays over the Unlock screen
  *  after a lock, so neither code is lost with the screen. */
 export function CreateEncryptedHost() {
@@ -60,6 +63,6 @@ export function CreateEncryptedHost() {
       : close;
     return <NewRecoveryDialog onClose={back} onDone={done} />;
   }
-  if (dialog?.type !== 'createEncrypted') return null;
-  return <CreateEncryptedDialog path={dialog.path} onClose={close} />;
+  if (dialog?.type !== 'newVault') return null;
+  return <NewVaultDialog onClose={close} />;
 }

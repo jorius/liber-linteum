@@ -8,8 +8,8 @@ import {
   onMenuVault,
   pickFolder,
 } from '../../ipc';
-import { confirmUnsaved, needsUnsavedPrompt } from '../editor/unsavedPrompt';
-import { openCreateEncrypted } from '../encryption/CreateEncryptedHost';
+import { openNewVault } from '../encryption/CreateEncryptedHost';
+import { openEncryptInPlace } from '../encryption/encryptInPlace';
 import { useEditorStore } from '../../stores/editorStore';
 import { useSettingsStore } from '../../stores/settingsStore';
 import { useUiStore } from '../../stores/uiStore';
@@ -30,13 +30,12 @@ export const openAnotherVault = () =>
     .catch(() => null)
     .then((path) => (path ? useVaultStore.getState().open(path) : undefined));
 
-/** Vault → New Encrypted Vault…: pick a folder, then the passphrase dialog. */
-export const newEncryptedVault = async () => {
-  // Unsaved text is asked about before the dialog exists: the question would
-  // replace it, and the recovery code would be lost.
-  if (needsUnsavedPrompt() && !(await confirmUnsaved())) return;
-  const path = await pickFolder().catch(() => null);
-  if (path) openCreateEncrypted(path);
+/** Vault → Encrypt "<name>"… (and the sidebar's vault menu): the open plain
+ *  vault, where it is. */
+export const encryptThisVault = () => {
+  const { status, info } = useVaultStore.getState();
+  if (status === 'open' && info && !info.encrypted && !info.scratchpad)
+    openEncryptInPlace(info.root);
 };
 
 export const closeVault = () => void useVaultStore.getState().close();
@@ -72,7 +71,8 @@ export async function installShellMenu({ main }: { main: boolean }): Promise<() 
           onMenuVault((what) => {
             if (what === 'open') openAnotherVault();
             else if (what === 'close') closeVault();
-            else if (what === 'newEncrypted') void newEncryptedVault();
+            else if (what === 'new') void openNewVault();
+            else if (what === 'encrypt') encryptThisVault();
             else if (what === 'lock') void useVaultStore.getState().lock('menu');
           }),
           onMenuSidebar(toggleSidebar),
