@@ -2,12 +2,14 @@ import { useRef, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import type { TreeNode } from '../../ipc';
+import { onLeaveVault } from '../../stores/leaveVault';
 import { useVaultStore } from '../../stores/vaultStore';
 import { EmojiPicker } from './EmojiPicker';
 import styles from './Icons.module.css';
 import { setIcon, type IconTarget } from './setIcon';
 
 let cache: { nodes: TreeNode[]; icons: Map<string, string> } | null = null;
+onLeaveVault(() => (cache = null));
 export function iconsOf(nodes: TreeNode[]): Map<string, string> {
   if (cache?.nodes !== nodes) {
     const icons = new Map<string, string>();

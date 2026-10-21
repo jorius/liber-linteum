@@ -13,10 +13,10 @@ describe('sticky dialogs', () => {
 
   it('the voided-key prompt refuses every other dialog, until it closes', () => {
     const ui = useUiStore.getState();
-    ui.openDialog({ type: 'recoveryVoid' });
+    ui.openDialog({ type: 'recoveryVoid', root: '/v' });
     expect(ui.openDialog({ type: 'settings' })).toBe(false);
     expect(ui.openDialog({ type: 'openFile', path: 'a.md' })).toBe(false);
-    expect(useUiStore.getState().dialog).toEqual({ type: 'recoveryVoid' });
+    expect(useUiStore.getState().dialog).toEqual({ type: 'recoveryVoid', root: '/v' });
     ui.closeDialog();
     expect(ui.openDialog({ type: 'settings' })).toBe(true);
   });
@@ -35,13 +35,13 @@ describe('sticky dialogs', () => {
 
   it('a new recovery key is sticky once its code is held, or while it stands in for the voided prompt', () => {
     const ui = useUiStore.getState();
-    ui.openDialog({ type: 'newRecovery' });
+    ui.openDialog({ type: 'newRecovery', root: '/v' });
     expect(ui.openDialog({ type: 'search' })).toBe(true);
-    ui.openDialog({ type: 'newRecovery' });
+    ui.openDialog({ type: 'newRecovery', root: '/v' });
     useUiStore.getState().hold(true);
     expect(useUiStore.getState().openDialog({ type: 'settings' })).toBe(false);
     useUiStore.getState().closeDialog();
-    useUiStore.setState({ dialog: { type: 'newRecovery', fromVoid: true } });
+    useUiStore.setState({ dialog: { type: 'newRecovery', root: '/v', fromVoid: true } });
     expect(useUiStore.getState().openDialog({ type: 'settings' })).toBe(false);
   });
 });

@@ -6,11 +6,13 @@ import type { EditorState } from '@codemirror/state';
 import { reparse } from '../../markdown/incremental';
 import { parsePage } from '../../markdown/parse';
 import type { ParsedPage } from '../../markdown/types';
+import { onLeaveVault } from '../../stores/leaveVault';
 import { livePreviewPage } from './livePreview';
 
 /** This module's own model (never Live Preview's: `reparse` takes over the
  *  page it starts from). */
 let last: { text: string; page: ParsedPage } | null = null;
+onLeaveVault(() => (last = null));
 
 export function parsedFor(text: string, state?: EditorState): ParsedPage {
   const shared = state && livePreviewPage(state, text);

@@ -212,18 +212,22 @@ export async function resetVaultStore() {
   useVaultStore.setState({ ...EMPTY, locking: false, children: new Map(), expanded: new Set() });
 }
 
-/** Leaving a vault's UI (lock, Close, Back; E4 final review C1/I2): nothing
- *  of it stays on screen or in memory but a recovery code still to be
- *  confirmed. A pending question is answered Cancel; the voided-key prompt
- *  is parked for `root`'s next open. */
-function leaveVaultUi(root: string | null) {
+/** Dialogs of the app, not of a vault (shown on Welcome too): they stay. */
+const APP_DIALOGS = new Set(['notionImport', 'scratchpadSetup']);
+
+/** Leaving a vault's UI (lock, Close, Back, another vault; E4 final review
+ *  C1/I2): nothing of it stays on screen or in memory but a recovery code
+ *  still to be confirmed. A pending question is answered Cancel; the
+ *  voided-key prompt is parked for its own vault's next open. */
+function leaveVaultUi() {
   const ui = useUiStore.getState();
   const d = ui.dialog;
   if (d?.type === 'unsaved') d.answer('cancel');
   if (d?.type === 'binClash') d.answer(false);
   const voided = d?.type === 'recoveryVoid' || (d?.type === 'newRecovery' && d.fromVoid);
-  if (voided && !ui.held && root) voidPending = root;
-  if (!(ui.held && (d?.type === 'createEncrypted' || d?.type === 'newRecovery'))) ui.closeDialog();
+  if (voided && !ui.held) voidPending = d.root;
+  const held = ui.held && (d?.type === 'createEncrypted' || d?.type === 'newRecovery');
+  if (!held && !APP_DIALOGS.has(d?.type ?? '')) ui.closeDialog();
   useToastStore.getState().clear();
   useBinStore.getState().reset();
   clearVaultCaches();
@@ -310,7 +314,7 @@ export const useVaultStore = create<VaultState>((set, get) => {
 
   /** Drops everything of the vault on screen (close and lock share it). */
   function dropVault() {
-    leaveVaultUi(get().info?.root ?? null);
+    leaveVaultUi();
     useEditorStore.getState().reset();
     stopListening();
     useTrailStore.getState().reset();
@@ -351,6 +355,10 @@ export const useVaultStore = create<VaultState>((set, get) => {
       failed(before, opts, errorMessage(res.error));
       return res;
     }
+    // Another vault replaces the one on screen or at the door (plain or
+    // encrypted): nothing of that one carries over.
+    const previous = get().info?.root ?? get().lockedPath;
+    if (previous && previous !== res.value.root) leaveVaultUi();
     // The global Scratchpad reads as "Quick notes" wherever the vault's
     // name shows (M4c §7.19).
     const info = res.value.scratchpad
@@ -366,10 +374,16 @@ export const useVaultStore = create<VaultState>((set, get) => {
     set({ status: 'open', progress: null });
     // Another vault: its own words and dictionaries (spell checking).
     useSpellStore.getState().bump();
-    if (res.value.recoveryVoid || voidPending === info.root) {
-      // Refused (a recovery code still on screen): asked again on the next open.
-      voidPending = useUiStore.getState().openDialog({ type: 'recoveryVoid' }) ? null : info.root;
-    }
+    const ui = useUiStore.getState();
+    const d = ui.dialog;
+    // Already up: a Cancel after a lock left it waiting for this vault.
+    const showing = d?.type === 'recoveryVoid' && d.root === info.root;
+    const parked = voidPending === info.root;
+    if (parked) voidPending = null;
+    const wanted = !showing && (res.value.recoveryVoid || parked);
+    // Refused (a recovery code still on screen): asked again on the next open.
+    if (wanted && !ui.openDialog({ type: 'recoveryVoid', root: info.root }))
+      voidPending = info.root;
     const warnings = res.value.report.warnings ?? [];
     if (warnings.length) {
       toast().push({
@@ -465,6 +479,9 @@ export const useVaultStore = create<VaultState>((set, get) => {
       // `locking` also keeps the backend's own `vault:locked` (sent while
       // `vault_lock` runs) from dropping the vault a second time.
       if (get().locking || get().status !== 'open' || !get().info) return false;
+      // The shell turns inert: an aborted lock gives the keyboard back.
+      const had = document.activeElement as HTMLElement | null;
+      let locked = false;
       set({ locking: true });
       try {
         const root = get().info!.root;
@@ -485,9 +502,11 @@ export const useVaultStore = create<VaultState>((set, get) => {
         // Search and the Global View reset with `info` going away.
         dropVault();
         set({ status: 'locked', lockedPath: root });
+        locked = true;
         return true;
       } finally {
         set({ locking: false });
+        if (!locked && had?.isConnected) setTimeout(() => had.focus());
       }
     },
     lockedByBackend: (path) => {
@@ -496,7 +515,7 @@ export const useVaultStore = create<VaultState>((set, get) => {
       set({ status: 'locked', lockedPath: path });
     },
     cancelUnlock: () => {
-      leaveVaultUi(null);
+      leaveVaultUi();
       set({ status: 'closed', lockedPath: null });
     },
     close: async () => {

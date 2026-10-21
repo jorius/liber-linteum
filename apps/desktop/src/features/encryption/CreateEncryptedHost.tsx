@@ -6,14 +6,18 @@ import dialogs from '../dialogs/Dialogs.module.css';
 import { CreateEncryptedDialog } from './CreateEncryptedDialog';
 import { NewRecoveryDialog } from './SecuritySettings';
 
+/** Dialogs waiting for an answer or running an import: never replaced. */
+const BUSY = new Set(['unsaved', 'binClash', 'notionImport', 'scratchpadSetup']);
+
 /** Opens the create dialog for the folder just picked (refused while a
- *  sticky dialog shows). */
+ *  sticky dialog shows, or one that is waiting for an answer). */
 export function openCreateEncrypted(path: string) {
+  if (BUSY.has(useUiStore.getState().dialog?.type ?? '')) return;
   useUiStore.getState().openDialog({ type: 'createEncrypted', path });
 }
 
 /** The voided-key prompt: no way out but a new recovery key. */
-function RecoveryVoidDialog() {
+function RecoveryVoidDialog({ root }: { root: string }) {
   const { t } = useTranslation();
   return (
     <Dialog title={t('encryption.security.voidTitle')} onClose={() => undefined} alert>
@@ -24,7 +28,9 @@ function RecoveryVoidDialog() {
           className="btn btn-primary"
           data-autofocus
           // The sticky prompt hands over to its own flow (openDialog would refuse).
-          onClick={() => useUiStore.setState({ dialog: { type: 'newRecovery', fromVoid: true } })}
+          onClick={() =>
+            useUiStore.setState({ dialog: { type: 'newRecovery', root, fromVoid: true } })
+          }
         >
           {t('encryption.security.voidAction')}
         </button>
@@ -38,10 +44,11 @@ function RecoveryVoidDialog() {
  *  after a lock, so neither code is lost with the screen. */
 export function CreateEncryptedHost() {
   const dialog = useUiStore((s) => s.dialog);
-  const open = useVaultStore((s) => s.status === 'open');
+  const openRoot = useVaultStore((s) => (s.status === 'open' ? s.info?.root : null));
   const close = useUiStore((s) => s.closeDialog);
-  // Its only action needs an unlocked vault (a lock parks it, vaultStore).
-  if (dialog?.type === 'recoveryVoid') return open ? <RecoveryVoidDialog /> : null;
+  // Its only action needs its own vault unlocked (leaving parks it, vaultStore).
+  if (dialog?.type === 'recoveryVoid')
+    return openRoot === dialog.root ? <RecoveryVoidDialog root={dialog.root} /> : null;
   if (dialog?.type === 'newRecovery') {
     const done = () => {
       // The vault now has a working key: it is no longer void.
@@ -49,7 +56,7 @@ export function CreateEncryptedHost() {
       close();
     };
     const back = dialog.fromVoid
-      ? () => useUiStore.setState({ dialog: { type: 'recoveryVoid' } })
+      ? () => useUiStore.setState({ dialog: { type: 'recoveryVoid', root: dialog.root } })
       : close;
     return <NewRecoveryDialog onClose={back} onDone={done} />;
   }

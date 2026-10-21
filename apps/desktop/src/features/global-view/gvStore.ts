@@ -16,6 +16,7 @@ import {
   type GvLevelRef,
   type IpcResult,
 } from '../../ipc';
+import { onLeaveVault } from '../../stores/leaveVault';
 import { errorMessage } from '../../stores/messages';
 import { relate } from '../../stores/relations';
 import { useSettingsStore } from '../../stores/settingsStore';
@@ -211,6 +212,7 @@ function reportSave(res: IpcResult<void>) {
 
 /** The drill stack and expansions of the canvas shown. */
 let shownAt: { stack: GvLevelRef[]; expanded: GvLevelRef[] } | null = null;
+onLeaveVault(() => (shownAt = null));
 
 /** Sends the waiting drag now. */
 function flushPins() {

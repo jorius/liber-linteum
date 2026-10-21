@@ -231,7 +231,12 @@ export function SecuritySettings() {
                 type="button"
                 className="btn btn-secondary"
                 // In place of Settings, hosted by the app: the code outlives Settings and a lock.
-                onClick={() => useUiStore.getState().openDialog({ type: 'newRecovery' })}
+                onClick={() =>
+                  useUiStore.getState().openDialog({
+                    type: 'newRecovery',
+                    root: useVaultStore.getState().info!.root,
+                  })
+                }
               >
                 {t('encryption.security.newRecoveryButton')}
               </button>

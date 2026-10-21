@@ -27,12 +27,12 @@ export type DialogState =
   | { type: 'notionImport' }
   /** New encrypted vault in the folder just picked (E4); `CreateEncryptedHost`. */
   | { type: 'createEncrypted'; path: string }
-  /** The vault's recovery key was replaced on another device (E4). */
-  | { type: 'recoveryVoid' }
-  /** Settings → Security → New recovery key (E4), hosted by the app so the
-   *  code outlives Settings, lock and Close; `fromVoid`: in place of the
-   *  voided-key prompt, which its Cancel goes back to. */
-  | { type: 'newRecovery'; fromVoid?: boolean }
+  /** `root`'s recovery key was replaced on another device (E4). */
+  | { type: 'recoveryVoid'; root: string }
+  /** Settings → Security → New recovery key for `root` (E4), hosted by the
+   *  app so the code outlives Settings, lock and Close; `fromVoid`: in place
+   *  of the voided-key prompt, which its Cancel goes back to. */
+  | { type: 'newRecovery'; root: string; fromVoid?: boolean }
   /** Save / Don't Save / Cancel before unsaved text is left (M5b §6, auto
    *  save off). `id` tells two questions apart. */
   | { type: 'unsaved'; id: number; paths: string[]; answer: (c: UnsavedChoice) => void }

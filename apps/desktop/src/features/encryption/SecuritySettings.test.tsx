@@ -136,7 +136,7 @@ describe('Settings → Security', () => {
     expect(screen.getByText('Your old recovery key stops working.')).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'New recovery key…' }));
     // The app hosts it, so closing Settings can't take the code with it.
-    expect(useUiStore.getState().dialog).toEqual({ type: 'newRecovery' });
+    expect(useUiStore.getState().dialog).toEqual({ type: 'newRecovery', root: '/enc' });
     const dialog = screen.getByRole('dialog', { name: 'New recovery key' });
     await userEvent.type(within(dialog).getByLabelText('Current passphrase'), OLD);
     await userEvent.click(within(dialog).getByRole('button', { name: 'Continue' }));
@@ -163,7 +163,7 @@ describe('Settings → Security', () => {
 describe('the voided recovery key prompt', () => {
   it('opens after the vault opens, cannot be dismissed, and leads to the new-code flow', async () => {
     useVaultStore.setState({ info: { ...info, recoveryVoid: true } as never, status: 'open' });
-    useUiStore.getState().openDialog({ type: 'recoveryVoid' });
+    useUiStore.getState().openDialog({ type: 'recoveryVoid', root: '/enc' });
     render(<CreateEncryptedHost />);
     const dialog = screen.getByRole('alertdialog');
     expect(dialog).toHaveTextContent(
@@ -187,7 +187,7 @@ describe('the voided recovery key prompt', () => {
       return null;
     });
     await useVaultStore.getState().open('/enc');
-    expect(useUiStore.getState().dialog).toEqual({ type: 'recoveryVoid' });
+    expect(useUiStore.getState().dialog).toEqual({ type: 'recoveryVoid', root: '/enc' });
   });
 });
 
@@ -198,16 +198,16 @@ describe('a refused dialog', () => {
     useSettingsStore.setState({ settings: { ...DEFAULT_SETTINGS, autoSave: false } });
     vi.spyOn(useEditorStore.getState(), 'askPaths').mockReturnValue(['a.md']);
     useVaultStore.setState({ status: 'open' });
-    useUiStore.getState().openDialog({ type: 'recoveryVoid' });
+    useUiStore.getState().openDialog({ type: 'recoveryVoid', root: '/enc' });
     // Settings from the native menu leaves the prompt in place.
     const { openSettings } = await import('../shell/shellMenu');
     openSettings();
-    expect(useUiStore.getState().dialog).toEqual({ type: 'recoveryVoid' });
+    expect(useUiStore.getState().dialog).toEqual({ type: 'recoveryVoid', root: '/enc' });
     const answered = await Promise.race([
       confirmUnsaved(),
       new Promise((r) => setTimeout(() => r('hung'), 200)),
     ]);
     expect(answered).toBe(false);
-    expect(useUiStore.getState().dialog).toEqual({ type: 'recoveryVoid' });
+    expect(useUiStore.getState().dialog).toEqual({ type: 'recoveryVoid', root: '/enc' });
   });
 });

@@ -158,10 +158,10 @@ describe('vaultStore — encrypted vaults (E4)', () => {
 
   it('a lock keeps a recovery code still to be confirmed', async () => {
     await openEncrypted();
-    useUiStore.getState().openDialog({ type: 'newRecovery' });
+    useUiStore.getState().openDialog({ type: 'newRecovery', root: '/v' });
     useUiStore.getState().hold(true);
     expect(await useVaultStore.getState().lock('idle')).toBe(true);
-    expect(useUiStore.getState().dialog).toEqual({ type: 'newRecovery' });
+    expect(useUiStore.getState().dialog).toEqual({ type: 'newRecovery', root: '/v' });
     useUiStore.getState().closeDialog();
   });
 
@@ -176,6 +176,23 @@ describe('vaultStore — encrypted vaults (E4)', () => {
     const res = await useVaultStore.getState().createEncrypted('/n', 'x'.repeat(12));
     expect(res).toEqual({ ok: false, error: { kind: 'io', message: 'disk full' } });
     expect(useVaultStore.getState().creating).toBe(false);
+  });
+
+  it('an aborted lock gives the keyboard back to where it was', async () => {
+    await openEncrypted();
+    const field = document.createElement('input');
+    document.body.append(field);
+    field.focus();
+    useEditorStore.setState({
+      saveAll: async () => {
+        // What the browser does once the shell turns inert.
+        (document.activeElement as HTMLElement | null)?.blur();
+        return ['a.md'];
+      },
+    });
+    expect(await useVaultStore.getState().lock('idle')).toBe(false);
+    await waitFor(() => expect(field).toHaveFocus());
+    field.remove();
   });
 
   it('lock_aborts_when_a_save_fails', async () => {

@@ -9,8 +9,9 @@ import { App } from '../../app/App';
 import { clearMocks, mockIPC } from '../../ipc/testing';
 import { DEFAULT_SETTINGS, useSettingsStore } from '../../stores/settingsStore';
 import { useToastStore } from '../../stores/toastStore';
-import { useUiStore } from '../../stores/uiStore';
+import { useUiStore, type DialogState } from '../../stores/uiStore';
 import { onLeaveVault } from '../../stores/leaveVault';
+import { openCreateEncrypted } from './CreateEncryptedHost';
 import { resetVaultStore, useVaultStore } from '../../stores/vaultStore';
 import { useBinStore } from '../bin/binStore';
 import { confirmUnsaved } from '../editor/unsavedPrompt';
@@ -30,10 +31,12 @@ const info = (root: string, extra: object = {}) => ({
 let voidOnce: Set<string>;
 let release: (() => void) | null;
 let calls: string[];
+let failRecovery: boolean;
 
 beforeEach(() => {
   voidOnce = new Set(['/v']);
   release = null;
+  failRecovery = false;
   calls = [];
   useSettingsStore.setState({ settings: DEFAULT_SETTINGS });
   useToastStore.getState().clear();
@@ -47,13 +50,17 @@ beforeEach(() => {
         const voided = voidOnce.delete(root);
         return info(root, voided ? { recoveryVoid: true } : {});
       }
+      if (cmd === 'vault_open') return info(args.path as string, { encrypted: false });
       if (cmd === 'vault_tree') return [];
       if (cmd === 'vault_lock' || cmd === 'vault_close') return null;
       if (cmd === 'bin_list')
         return { trash: [{ path: '.trash/a.md', from: 'a.md' }], archive: [] };
       if (cmd === 'security_new_recovery') {
         if (!release) return CODE;
-        return new Promise((r) => (release = () => r(CODE)));
+        return new Promise(
+          (r, no) =>
+            (release = () => (failRecovery ? no({ kind: 'io', message: 'gone' }) : r(CODE))),
+        );
       }
       if (cmd === 'settings_set') return { ...DEFAULT_SETTINGS, ...(args.patch as object) };
       return null;
@@ -90,7 +97,7 @@ async function confirmCode() {
 
 /** Settings → Security → New recovery key, up to the code. */
 async function newRecoveryCode() {
-  act(() => void useUiStore.getState().openDialog({ type: 'newRecovery' }));
+  act(() => void useUiStore.getState().openDialog({ type: 'newRecovery', root: '/other' }));
   const dialog = screen.getByRole('dialog', { name: 'New recovery key' });
   await userEvent.type(within(dialog).getByLabelText('Current passphrase'), PASS);
   await userEvent.click(within(dialog).getByRole('button', { name: 'Continue' }));
@@ -137,7 +144,7 @@ describe('C1: the voided-key prompt and a lock', () => {
     render(<App />);
     act(() => {
       useVaultStore.setState({ status: 'locked', lockedPath: '/v' });
-      useUiStore.setState({ dialog: { type: 'recoveryVoid' } });
+      useUiStore.setState({ dialog: { type: 'recoveryVoid', root: '/v' } });
     });
     expect(screen.queryByRole('alertdialog')).toBeNull();
   });
@@ -151,7 +158,7 @@ describe('I1: a new recovery key outlives Settings, lock and Close', () => {
     const settings = screen.getByRole('dialog', { name: 'Settings' });
     await userEvent.click(within(settings).getByRole('button', { name: /^Security/ }));
     await userEvent.click(within(settings).getByRole('button', { name: 'New recovery key…' }));
-    expect(useUiStore.getState().dialog).toEqual({ type: 'newRecovery' });
+    expect(useUiStore.getState().dialog).toEqual({ type: 'newRecovery', root: '/other' });
     expect(screen.queryByRole('dialog', { name: 'Settings' })).toBeNull();
     expect(screen.getByRole('dialog', { name: 'New recovery key' })).toBeInTheDocument();
   });
@@ -177,7 +184,7 @@ describe('I1: a new recovery key outlives Settings, lock and Close', () => {
     render(<App />);
     await unlock('/other');
     release = () => undefined; // the backend answers later
-    act(() => void useUiStore.getState().openDialog({ type: 'newRecovery' }));
+    act(() => void useUiStore.getState().openDialog({ type: 'newRecovery', root: '/other' }));
     await userEvent.type(screen.getByLabelText('Current passphrase'), PASS);
     await userEvent.click(screen.getByRole('button', { name: 'Continue' }));
     // Escape can't drop it while the backend is replacing the key.
@@ -204,7 +211,7 @@ describe('I1: a new recovery key outlives Settings, lock and Close', () => {
     useSettingsStore.setState({ settings: { ...DEFAULT_SETTINGS, autoSave: false } });
     vi.spyOn(useEditorStore.getState(), 'askPaths').mockReturnValue(['a.md']);
     expect(await confirmUnsaved()).toBe(false);
-    expect(useUiStore.getState().dialog).toEqual({ type: 'newRecovery' });
+    expect(useUiStore.getState().dialog).toEqual({ type: 'newRecovery', root: '/other' });
   });
 });
 
@@ -273,5 +280,78 @@ describe('I2: leaving a vault leaves nothing of it behind', () => {
       await locked;
     });
     expect(container.querySelector('[inert]')).toBeNull();
+  });
+});
+
+describe('second pass: the voided-key prompt belongs to its vault', () => {
+  it('opening a plain vault parks it under its own vault, never the plain one', async () => {
+    render(<App />);
+    await unlock('/v');
+    expect(await screen.findByRole('alertdialog')).toBeInTheDocument();
+    // ⌘O to a plain vault (auto save on): the prompt doesn't follow.
+    await act(() => useVaultStore.getState().open('/p'));
+    expect(useVaultStore.getState().info?.root).toBe('/p');
+    expect(screen.queryByRole('alertdialog')).toBeNull();
+    expect(useUiStore.getState().dialog).toBeNull();
+    // Closing and reopening the plain vault: still nothing.
+    await act(() => useVaultStore.getState().close());
+    await act(() => useVaultStore.getState().open('/p'));
+    expect(screen.queryByRole('alertdialog')).toBeNull();
+    await act(() => useVaultStore.getState().close());
+    // The voided vault: back.
+    await unlock('/v');
+    expect(await screen.findByRole('alertdialog')).toHaveTextContent('replaced on another device');
+  });
+
+  it('switching from an encrypted vault to a plain one leaves nothing of it', async () => {
+    const clear = vi.fn();
+    onLeaveVault(clear);
+    await unlock('/other');
+    await act(() => useBinStore.getState().refresh());
+    useToastStore.getState().push({ message: 'Recovered clip', detail: ['/other/Audio/a.wav'] });
+    useUiStore.getState().openDialog({ type: 'move', path: 'secret/plan.md' });
+    await useVaultStore.getState().open('/p');
+    expect(useUiStore.getState().dialog).toBeNull();
+    expect(useToastStore.getState().toasts).toEqual([]);
+    expect(clear).toHaveBeenCalled();
+  });
+
+  it('a failed new key after a lock, then Cancel and Back, keeps the reminder for its vault', async () => {
+    render(<App />);
+    await unlock('/v');
+    await userEvent.click(await screen.findByRole('button', { name: 'Make a new recovery key' }));
+    release = () => undefined; // the backend answers later
+    failRecovery = true;
+    await userEvent.type(screen.getByLabelText('Current passphrase'), PASS);
+    await userEvent.click(screen.getByRole('button', { name: 'Continue' }));
+    await act(() => useVaultStore.getState().lock('idle'));
+    await act(async () => release!());
+    const dialog = await screen.findByRole('dialog', { name: 'New recovery key' });
+    await within(dialog).findByRole('alert');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Cancel' }));
+    expect(screen.queryByRole('alertdialog')).toBeNull();
+    await userEvent.click(screen.getByRole('button', { name: 'Back' }));
+    expect(useUiStore.getState().dialog).toBeNull();
+    await unlock('/v');
+    expect(await screen.findByRole('alertdialog')).toBeInTheDocument();
+  });
+});
+
+describe('second pass: New Encrypted Vault never drops a question or an import', () => {
+  it.each([
+    { type: 'unsaved', id: 1, paths: ['a.md'], answer: () => undefined },
+    { type: 'binClash', kind: 'trash', path: 'a.md', answer: () => undefined },
+    { type: 'notionImport' },
+    { type: 'scratchpadSetup', then: 'quickNote' },
+  ] satisfies Exclude<DialogState, null>[])('is refused over $type', (d) => {
+    useUiStore.getState().openDialog(d);
+    openCreateEncrypted('/n');
+    expect(useUiStore.getState().dialog).toBe(d);
+  });
+
+  it('takes the place of Settings', () => {
+    useUiStore.getState().openDialog({ type: 'settings' });
+    openCreateEncrypted('/n');
+    expect(useUiStore.getState().dialog).toEqual({ type: 'createEncrypted', path: '/n' });
   });
 });
