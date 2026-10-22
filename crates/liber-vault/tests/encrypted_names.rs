@@ -236,6 +236,9 @@ fn watcher_translates_and_overflows_unknown() {
         .watch(true, Box::new(move |ev| sink.lock().unwrap().push(ev)))
         .unwrap();
     std::thread::sleep(Duration::from_millis(300)); // let the backend arm
+    // FSEvents can still deliver the vault's own creation (`d/` itself: an
+    // Overflow) once armed; only what follows the write is checked.
+    seen.lock().unwrap().clear();
     write(&storage, "w.md", b"w");
     let saw = |ev: RawEvent| {
         wait_until(Duration::from_secs(2), || {

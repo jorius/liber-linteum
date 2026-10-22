@@ -397,6 +397,10 @@ describe('Search dialog (M5 §4)', () => {
     });
     const field = openDialog();
     await userEvent.type(field, 'p');
+    // Opening searches at once, so Show more is there before the typed text's
+    // debounced search, which would replace the page loaded here (CI).
+    await waitFor(() => expect(lastQuery().text).toBe('p'));
+    await waitFor(() => expect(useSearchStore.getState().stale()).toBe(false));
     await userEvent.click(await screen.findByRole('button', { name: 'Show more' }));
     expect(lastQuery().offset).toBe(1);
     // Queried inside waitFor: the list re-renders as the page arrives, and an
