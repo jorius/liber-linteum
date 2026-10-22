@@ -211,6 +211,54 @@
   padding: 0 3px;
 }
 
+/* The Table button's size picker and menu: a grid of cells that light up to
+   the one pointed at, and the size under it. */
+.tablePicker {
+  z-index: 40;
+  min-width: 0;
+  padding: 10px;
+}
+
+.tableGrid {
+  display: grid;
+  grid-template-columns: repeat(8, 18px);
+  gap: 3px;
+}
+
+.tableCell {
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border: 1px solid var(--color-border-strong);
+  border-radius: 3px;
+  background: var(--color-surface);
+  cursor: pointer;
+}
+
+.tableCell[data-lit] {
+  background: var(--color-accent-soft);
+  border-color: var(--color-accent);
+}
+
+.tableCell:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 1px;
+}
+
+.tableSize {
+  margin: 8px 0 0;
+  text-align: center;
+  font: 500 12.5px var(--font-body);
+  color: var(--color-text-muted);
+}
+
+.tableCheck {
+  display: inline-flex;
+  align-items: center;
+  width: 20px;
+  vertical-align: middle;
+}
+
 /* "Link to…" picker (M2c §6.3), anchored under the selection. */
 .linkPicker {
   position: fixed;

@@ -4,6 +4,8 @@ import axe from 'axe-core';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { SearchHit, SearchPage, SearchQuery } from '../../ipc';
 import { clearMocks, mockIPC } from '../../ipc/testing';
+import { usePageStore } from '../../stores/pageStore';
+import { DEFAULT_SETTINGS, useSettingsStore } from '../../stores/settingsStore';
 import { useUiStore } from '../../stores/uiStore';
 import { useVaultStore } from '../../stores/vaultStore';
 import { useGvStore } from '../global-view/gvStore';
@@ -129,6 +131,31 @@ describe('Search dialog (M5 §4)', () => {
     expect(box(plain).querySelector('svg')).not.toBeNull();
   });
 
+  it('Show file extensions: a hit’s file name shows its extension either way, its title never', async () => {
+    // The path line already named the file in full before the setting
+    // (`Lore › Smaug.md`, a text file's title is its name): off stays exactly
+    // so, and on has nothing to add; the page title keeps no extension.
+    for (const on of [false, true]) {
+      useSettingsStore.setState({ settings: { ...DEFAULT_SETTINGS, showExtensions: on } });
+      reply = () => ({
+        results: [hit('Lore/Smaug.md'), hit('Lore/notes.txt', { title: 'notes.txt' })],
+        total: 2,
+        facets: FACETS,
+        recent: true,
+        indexing: false,
+      });
+      const { unmount } = render(<DialogHost />);
+      act(() => useUiStore.getState().openDialog({ type: 'search' }));
+      const page = await screen.findByRole('option', { name: /Smaug/ });
+      expect(titleOf(page).textContent).toBe('Smaug');
+      expect(page).toHaveTextContent('Lore › Smaug.md');
+      expect(screen.getByRole('option', { name: /notes/ })).toHaveTextContent('Lore › notes.txt');
+      act(() => useUiStore.getState().closeDialog());
+      unmount();
+    }
+    useSettingsStore.setState({ settings: DEFAULT_SETTINGS });
+  });
+
   it('opens with the keyboard in the field and shows Recent', async () => {
     const field = openDialog();
     expect(field).toHaveFocus();
@@ -152,6 +179,26 @@ describe('Search dialog (M5 §4)', () => {
     await userEvent.keyboard('{Enter}');
     expect(opened).toEqual(['Lore/Canción del dragón.md']);
     expect(useUiStore.getState().dialog).toBeNull();
+  });
+
+  it('opens a result at the word its snippet matched; without a snippet, at the top', async () => {
+    usePageStore.setState({ jump: null });
+    const field = openDialog();
+    await userEvent.type(field, 'drag');
+    await screen.findByRole('option', { name: /Canción del dragón/ });
+    await userEvent.keyboard('{Enter}');
+    await waitFor(() =>
+      expect(usePageStore.getState().jump).toMatchObject({
+        path: 'Lore/Canción del dragón.md',
+        find: 'dragon',
+      }),
+    );
+
+    usePageStore.setState({ jump: null });
+    await act(() => openSearch());
+    await userEvent.click(await screen.findByRole('option', { name: /Dragon run/ }));
+    await waitFor(() => expect(opened).toContain('Game/Dragon run.md'));
+    expect(usePageStore.getState().jump).toBeNull();
   });
 
   it('Enter right after typing opens a hit of the text typed, never an older one (final review I2)', async () => {
@@ -350,10 +397,17 @@ describe('Search dialog (M5 §4)', () => {
     });
     const field = openDialog();
     await userEvent.type(field, 'p');
+    // Opening searches at once, so Show more is there before the typed text's
+    // debounced search, which would replace the page loaded here (CI).
+    await waitFor(() => expect(lastQuery().text).toBe('p'));
+    await waitFor(() => expect(useSearchStore.getState().stale()).toBe(false));
     await userEvent.click(await screen.findByRole('button', { name: 'Show more' }));
     expect(lastQuery().offset).toBe(1);
-    expect(await screen.findByRole('option', { name: /More/ })).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Show more' })).toBeNull();
+    // Queried inside waitFor: the list re-renders as the page arrives, and an
+    // element found before that is detached by the time it's checked (CI).
+    await waitFor(() => expect(screen.getByRole('option', { name: /More/ })).toBeInTheDocument());
+    // The button can go a render after the page shows (seen on CI).
+    await waitFor(() => expect(screen.queryByRole('button', { name: 'Show more' })).toBeNull());
   });
 
   it('has no axe violations, light or dark', async () => {
@@ -383,7 +437,7 @@ describe('opening Search (M5 §4)', () => {
     expect(key({ metaKey: true, shiftKey: true, key: 'F', code: 'KeyF' })).toBe(true);
     expect(key({ ctrlKey: true, shiftKey: true, key: 'f', code: 'KeyF' })).toBe(true);
     expect(key({ metaKey: true, shiftKey: true, key: 'А', code: 'KeyF' })).toBe(true);
-    // ⌘F too (M5b §7.3): there is no find-in-note to displace.
+    // ⌘F too (M5b §7.3): Search where no editor shows (find in page routes it).
     expect(key({ metaKey: true, key: 'f', code: 'KeyF' })).toBe(true);
     expect(key({ ctrlKey: true, key: 'f', code: 'KeyF' })).toBe(true);
     expect(key({ metaKey: true, key: 'g', code: 'KeyG' })).toBe(false);
@@ -419,7 +473,7 @@ describe('opening Search (M5 §4)', () => {
     mac();
   });
 
-  it('⌘F in the editor opens Search with a short one-line selection as its text (M5b §7.3)', () => {
+  it('⌘⇧F in the editor opens Search with a short one-line selection as its text (M5b §7.3)', () => {
     useVaultStore.setState({ status: 'open' });
     render(
       <>
@@ -439,7 +493,8 @@ describe('opening Search (M5 §4)', () => {
     };
     content.focus();
     select(8, 12);
-    fireEvent.keyDown(content, { metaKey: true, key: 'f', code: 'KeyF' });
+    // ⌘F finds in the page (find in page): Search is ⌘⇧F there.
+    fireEvent.keyDown(content, { metaKey: true, shiftKey: true, key: 'f', code: 'KeyF' });
     expect(useUiStore.getState().dialog).toEqual({ type: 'search' });
     expect(useSearchStore.getState().text).toBe('wyrm');
   });
@@ -461,7 +516,8 @@ describe('opening Search (M5 §4)', () => {
     render(<ActionButton />);
     await userEvent.click(screen.getByRole('button', { name: 'Actions' }));
     const button = screen.getByRole('button', { name: 'Search' });
-    expect(button).toHaveAttribute('aria-keyshortcuts', 'Meta+F Control+F');
+    // ⌘F finds in the page while the editor shows one; ⌘⇧F is always Search.
+    expect(button).toHaveAttribute('aria-keyshortcuts', 'Meta+Shift+F Control+Shift+F');
     await userEvent.click(button);
     expect(useUiStore.getState().dialog).toEqual({ type: 'search' });
   });

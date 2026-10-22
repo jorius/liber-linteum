@@ -1,0 +1,126 @@
+name: Release
+
+# A tag `vX.Y.Z` builds the installers on each OS and drafts a GitHub release
+# with them, the sample vault, SHA256SUMS and VirusTotal reports. Nothing is
+# code-signed yet (macOS gets an ad-hoc signature so Apple silicon runs it).
+# Publishing the draft (by hand) redeploys the site, which reads the release
+# to write its release.json.
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Tag to build (must exist), e.g. v0.1.0
+        required: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.event.inputs.tag || github.ref_name }}
+  cancel-in-progress: false
+
+env:
+  TAG: ${{ github.event.inputs.tag || github.ref_name }}
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # 22.04: the oldest glibc we build on, so the .deb and AppImage run on
+          # 22.04 and newer (WebKitGTK 4.1 starts there).
+          - os: ubuntu-22.04
+            name: linux
+            args: --bundles deb,appimage
+          - os: windows-latest
+            name: windows
+            args: --bundles nsis,msi
+          - os: macos-latest
+            name: macos
+            args: --target universal-apple-darwin --bundles dmg
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ env.TAG }}
+      - name: Linux system deps
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libxdo-dev libssl-dev \
+            libayatana-appindicator3-dev librsvg2-dev libasound2-dev patchelf file libfuse2
+      - uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          target: ${{ matrix.name == 'macos' && 'aarch64-apple-darwin,x86_64-apple-darwin' || '' }}
+          cache-key: release-${{ matrix.name }}
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v5
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: The tag matches the app version
+        shell: bash
+        run: |
+          version=$(node -p "require('./apps/desktop/src-tauri/tauri.conf.json').version")
+          test "v$version" = "$TAG" || { echo "::error::tag $TAG but tauri.conf.json says $version"; exit 1; }
+      - name: Build
+        working-directory: apps/desktop
+        run: pnpm tauri build ${{ matrix.args }}
+      - name: Collect installers under stable names
+        shell: bash
+        run: |
+          mkdir -p out
+          b=target/release/bundle
+          case "${{ matrix.name }}" in
+            linux)
+              cp "$(ls $b/deb/*.deb | head -1)" out/Liber-Linteum_amd64.deb
+              cp "$(ls $b/appimage/*.AppImage | head -1)" out/Liber-Linteum_amd64.AppImage ;;
+            windows)
+              cp "$(ls $b/nsis/*-setup.exe | head -1)" out/Liber-Linteum_x64-setup.exe
+              cp "$(ls $b/msi/*.msi | head -1)" out/Liber-Linteum_x64.msi ;;
+            macos)
+              cp "$(ls target/universal-apple-darwin/release/bundle/dmg/*.dmg | head -1)" out/Liber-Linteum_universal.dmg ;;
+          esac
+          ls -la out
+      - uses: actions/upload-artifact@v4
+        with:
+          name: installers-${{ matrix.name }}
+          path: out/*
+          if-no-files-found: error
+
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ env.TAG }}
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: installers-*
+          path: out
+          merge-multiple: true
+      - name: Sample vault and Notion sample
+        run: |
+          (cd examples && zip -qr -X ../out/The-Moons-of-Kessari.zip the-moons-of-kessari -x '*/.DS_Store')
+          cp examples/notion-sample-export.zip out/Notion-Sample-Export.zip
+      - name: Checksums
+        working-directory: out
+        run: sha256sum * > SHA256SUMS && cat SHA256SUMS
+      - name: VirusTotal
+        env:
+          VT_API_KEY: ${{ secrets.VT_API_KEY }}
+        working-directory: out
+        run: python3 ../.github/scripts/virustotal.py SHA256SUMS > virustotal.json
+      - name: Draft the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python3 .github/scripts/release_notes.py "$TAG" out/SHA256SUMS out/virustotal.json > notes.md
+          gh release create "$TAG" out/* --draft --title "Liber Linteum ${TAG#v}" --notes-file notes.md

@@ -1,7 +1,7 @@
 # Hand-off: M1b App Integration — Liber Linteum
 
 > **Date:** 2026-10-12 · **Merged into `main`** (branch `feat/m1b-app-integration` from `323740e`, deleted) · not pushed, no remote configured
-> **Audience:** Jose, or anyone continuing by hand.
+> **Audience:** the maintainer, or anyone continuing by hand.
 > **Read first if new:** `docs/handoff/2026-10-12-m0-scaffold-handoff.md` (setup, commands, privacy layers) and `docs/handoff/2026-10-12-m1a-vault-core-handoff.md` (the engine). This document covers what M1b adds: the app you can actually use.
 
 ---
@@ -14,7 +14,7 @@
 |---|---|
 | Requirements | VLT-01, VLT-02, VLT-04, VLT-05, EXP-01…EXP-05, Q-I18N-1, Q-UI-1, NFR-04, NFR-10 (app level) |
 | Tests | **140 Vitest** (frontend) + **159 Rust** — all green; `cargo deny check` ok |
-| Real window (Jose, macOS) | Opening the test vault, browsing, page view: **"So far, so good"** (2026-10-12). Stuck-opening bug found and fixed (§9 #1). Full checklist results beyond that were not itemised. |
+| Real window (the maintainer, macOS) | Opening the test vault, browsing, page view: **worked as expected** (2026-10-12). Stuck-opening bug found and fixed (§9 #1). Full checklist results beyond that were not itemised. |
 | Real window (agent) | App builds and launches; native folder picker opens; screenshots taken (no synthetic input, by your rule) |
 | Not verified | Pointer/keyboard drag-and-drop gestures and the real OS-trash prompt only by your quick pass; Windows/Linux; CI |
 | Not done (by design) | Editing and rendered preview (**M2**), Global View (M3), block moving inside a page (M4), search (M5), audio (M6), Notion import (M7) |

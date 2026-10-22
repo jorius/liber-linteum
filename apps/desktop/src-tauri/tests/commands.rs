@@ -82,6 +82,9 @@ const COMMANDS: &[&str] = &[
     // M5b §19: Favorites.
     "favorites_get",
     "favorites_set",
+    // A vault's home.
+    "home_get",
+    "home_set",
     // M6: audio clips.
     "audio_devices",
     "audio_record_start",
@@ -168,6 +171,11 @@ fn m1b_every_command_is_allowed_from_main_and_denied_elsewhere() {
     let other = WebviewWindowBuilder::new(&h.app, "other", Default::default())
         .build()
         .unwrap();
+    // Commands that pick a file with no argument (spell_import) would open a
+    // real dialog, which blocks the mock runtime on Linux: none is picked.
+    h.app
+        .state::<liber_desktop::state::AppState>()
+        .set_cover_picker(Some(Arc::new(|| None)));
     for cmd in COMMANDS {
         if let Err(e) = call(&h.main, cmd, json!({})) {
             assert!(
@@ -175,6 +183,41 @@ fn m1b_every_command_is_allowed_from_main_and_denied_elsewhere() {
                 "{cmd} must be allowed from main: {e}"
             );
         }
+        let err = call(&other, cmd, json!({})).expect_err(cmd);
+        assert!(err.to_string().contains("not allowed"), "{cmd}: {err}");
+    }
+}
+
+/// Custom title bar §4: the window commands and `menu_activate` are the
+/// main window's (and file windows'), never another window's.
+#[test]
+fn titlebar_commands_are_allowed_from_main_and_denied_elsewhere() {
+    let h = harness();
+    let other = WebviewWindowBuilder::new(&h.app, "other", Default::default())
+        .build()
+        .unwrap();
+    // The harmless ones run; dragging and closing would act on the window.
+    for (cmd, body) in [
+        ("window_maximized", json!({})),
+        ("window_minimize", json!({})),
+        ("window_toggle_maximize", json!({})),
+        ("window_toggle_fullscreen", json!({})),
+        ("menu_activate", json!({ "id": "not-an-item" })),
+    ] {
+        if let Err(e) = call(&h.main, cmd, body) {
+            assert!(!e.to_string().contains("not allowed"), "{cmd}: {e}");
+        }
+    }
+    for cmd in [
+        "window_minimize",
+        "window_toggle_maximize",
+        "window_maximized",
+        "window_toggle_fullscreen",
+        "window_start_drag",
+        "window_close_request",
+        "window_paste",
+        "menu_activate",
+    ] {
         let err = call(&other, cmd, json!({})).expect_err(cmd);
         assert!(err.to_string().contains("not allowed"), "{cmd}: {err}");
     }
@@ -2433,6 +2476,107 @@ fn m5b_favorites_over_ipc() {
     );
 }
 
+/// A vault's home over IPC: a page, a text file or the Global View; what the
+/// vault can't open to is refused; `vault_open` sends it; it follows a folder's
+/// rename and goes with the Trash.
+#[test]
+fn the_vaults_home_over_ipc() {
+    let h = harness();
+    let vault = open_fixture(&h, "obsidian-basic");
+    assert_eq!(call(&h.main, "home_get", json!({})).unwrap(), Value::Null);
+    let page = |p: &str| json!({ "kind": "page", "path": p });
+    assert_eq!(
+        call(
+            &h.main,
+            "home_set",
+            json!({ "home": page("Game Design/Game 1.md") })
+        )
+        .unwrap(),
+        page("Game Design/Game 1.md")
+    );
+    assert_eq!(
+        call(
+            &h.main,
+            "home_set",
+            json!({ "home": page("Game Design/notes.txt") })
+        )
+        .unwrap(),
+        page("Game Design/notes.txt")
+    );
+    // Escaping, hidden, missing, a folder, an image.
+    for bad in [
+        "../x.md",
+        "/abs.md",
+        ".trash/old.md",
+        ".obsidian/app.json",
+        "Missing.md",
+        "Game Design",
+        "Character Design/assets/rex-cover.png",
+    ] {
+        assert!(
+            call(&h.main, "home_set", json!({ "home": page(bad) })).is_err(),
+            "{bad}"
+        );
+    }
+    // A refusal keeps what was set.
+    assert_eq!(
+        call(&h.main, "home_get", json!({})).unwrap(),
+        page("Game Design/notes.txt")
+    );
+    call(
+        &h.main,
+        "home_set",
+        json!({ "home": page("Game Design/Game 1.md") }),
+    )
+    .unwrap();
+    call(
+        &h.main,
+        "entry_rename",
+        json!({ "from": "Game Design", "to": "Design" }),
+    )
+    .unwrap();
+    assert_eq!(
+        call(&h.main, "home_get", json!({})).unwrap(),
+        page("Design/Game 1.md")
+    );
+    // Opening the vault again sends it with the vault.
+    call(&h.main, "vault_close", json!({})).unwrap();
+    let info = call(&h.main, "vault_open", json!({ "path": vault.path() })).unwrap();
+    assert_eq!(info["home"], page("Design/Game 1.md"));
+    // An archived page can't be the home; archiving the home clears it.
+    call(
+        &h.main,
+        "entry_archive",
+        json!({ "path": "Design/Game 1.md" }),
+    )
+    .unwrap();
+    assert_eq!(call(&h.main, "home_get", json!({})).unwrap(), Value::Null);
+    assert!(
+        call(
+            &h.main,
+            "home_set",
+            json!({ "home": page(".archive/Design/Game 1.md") })
+        )
+        .is_err()
+    );
+    // The Global View, then nothing.
+    let gv = json!({ "kind": "globalView" });
+    assert_eq!(
+        call(&h.main, "home_set", json!({ "home": gv })).unwrap(),
+        gv
+    );
+    call(&h.main, "entry_trash", json!({ "path": "Welcome.md" })).unwrap();
+    assert_eq!(call(&h.main, "home_get", json!({})).unwrap(), gv);
+    assert_eq!(
+        call(&h.main, "home_set", json!({ "home": null })).unwrap(),
+        Value::Null
+    );
+    let stored: Value =
+        serde_json::from_slice(&std::fs::read(vault.path().join(".liber/vault.json")).unwrap())
+            .unwrap();
+    assert!(stored.get("home").is_none());
+}
+
 /// Round-2 review M3: the Archive's write guard ignores letter case — on a
 /// case-insensitive disk `.ARCHIVE/x.md` is the archived file.
 #[test]
@@ -2501,7 +2645,12 @@ fn m6_a_take_becomes_an_attachment_of_its_page() {
     )
     .unwrap_err();
     assert_eq!(kind(busy), "alreadyExists");
-    std::thread::sleep(std::time::Duration::from_millis(250));
+    // Until the take has a few level readings (about 20 a second), not a
+    // fixed sleep: a loaded CI runner starts the synthetic device late.
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
+    while levels.lock().unwrap().len() < 5 && std::time::Instant::now() < deadline {
+        std::thread::sleep(std::time::Duration::from_millis(20));
+    }
     let id = started["recordingId"].clone();
     let clip = call(&h.main, "audio_record_stop", json!({ "recordingId": id })).unwrap();
     let path = clip["path"].as_str().unwrap();

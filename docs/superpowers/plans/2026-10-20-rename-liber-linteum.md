@@ -17,7 +17,7 @@
 
 **Tech stack:** Rust workspace (Tauri 2), React/TS, pnpm, Playwright. No new dependencies.
 
-**Spec:** Jose's decisions of 2026-10-20, as recorded in this session and restated here:
+**Spec:** the maintainer's decisions of 2026-10-20, as recorded in this session and restated here:
 - the display name is "Liber Linteum", exactly;
 - the code prefix is `liber`;
 - `.nimw/` → `.liber/` with migration;
@@ -273,7 +273,7 @@ The icons hold no text and `BrandMark` has no letter, so they stay unchanged.
   - the outline width, dismissed hints, collapsed Favorites and recent icons reset;
   - each vault's index rebuilds once;
   - callers of `$SP/check.sh` now pass `LIBER_E2E_PORT`;
-  - Jose renames the repo on GitHub and locally himself.
+  - The maintainer renames the repo on GitHub and locally himself.
 
   Commit: `docs: rename hand-off`.
 

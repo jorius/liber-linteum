@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-vault-decrypt-cancel"
+description = "Enables the vault_decrypt_cancel command without any pre-configured scope."
+commands.allow = ["vault_decrypt_cancel"]
+
+[[permission]]
+identifier = "deny-vault-decrypt-cancel"
+description = "Denies the vault_decrypt_cancel command without any pre-configured scope."
+commands.deny = ["vault_decrypt_cancel"]

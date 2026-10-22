@@ -255,7 +255,8 @@ export function ExplorerTree({
         if (e.key.length === 1 && !e.metaKey && !e.ctrlKey && !e.altKey) {
           const ch = e.key.toLowerCase();
           const order = [...rows.slice(index + 1), ...rows.slice(0, index + 1)];
-          const hit = order.find((r) => displayName(r.node).toLowerCase().startsWith(ch));
+          // A name starts the same with or without its extension.
+          const hit = order.find((r) => displayName(r.node, false).toLowerCase().startsWith(ch));
           moveFocus(hit?.node.path);
           break;
         }

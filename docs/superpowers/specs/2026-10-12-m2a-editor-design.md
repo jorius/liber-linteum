@@ -1,7 +1,7 @@
 # M2a — Editor: Design
 
 > **Status:** Approved in design review · **Date:** 2026-10-12
-> **Roles:** Jose — tech lead (decisions below are DECIDED)
+> **Roles:** tech lead: the maintainer (decisions below are DECIDED)
 > **Parent docs:** product spec `docs/product-spec.md` (ED-*, PG-*, §5.1 syntax & HTML rules) · architecture `docs/superpowers/specs/2026-10-12-architecture-design.md` (§3.4 Tier B, §4.2 editor, §6.2 HTML) · M1a/M1b designs and hand-offs in `docs/`
 > **Scope:** the Markdown editor and renderer. Page extras (covers editing, subtitle editing, paste/drop attachments, `[[` autocomplete) are **M2b**.
 
@@ -19,7 +19,7 @@ Success means:
 5. **External changes (VLT-04):** clean reload when no unsaved edits; 3-way merge when there are; conflict copy when edits overlap.
 6. **Rendering:** CommonMark + GFM + Obsidian (wikilinks, embeds, callouts incl. foldable, tags, highlights, comments, frontmatter hidden) + Tier B (columns, colored text, toggles = foldable callouts, dividers); embedded notes transcluded one level; images and audio from the vault.
 7. **Privacy (P1, P4, §5.1):** embedded HTML sanitized (no scripts, handlers, `javascript:`, `style`, iframes, forms); **no remote resource is ever loaded** (placeholder instead) — proven by an end-to-end test; the asset protocol only serves the open vault.
-8. **Breadcrumb** (Jose's request) in the page header.
+8. **Breadcrumb** (the maintainer's request) in the page header.
 9. **M1b polish** items listed in §6 are fixed.
 10. Obsidian compatibility: the parser agrees with the Rust indexer on links and tags over shared fixtures.
 
@@ -146,7 +146,7 @@ a. A failed ⌘O switch keeps the current vault (`status` restored to `open`). b
 - **Pane:** every node type; embeds (image size syntax, audio, note, heading section, nested, cycle, missing, other file); remote placeholder; columns; axe; light/dark tokens.
 - **Rust:** `page_read`, `page_write` incl. conflict payload, `page_create_conflict_copy` naming, `links_resolve`, asset scope set to the vault on open and revoked on close; ACL tests for new commands and `opener` scope.
 - **Zero network (NFR-04, arch §6.1 layer 3):** Playwright (Chromium) renders the built UI with the exact production CSP and a mocked IPC serving a fixture page full of remote references (img, audio, video, srcset, CSS-looking attributes, HTML `<img>`, Markdown images, embeds); a request interceptor asserts **zero** non-local requests.
-- **Real window:** agent screenshots (launch only); Jose checks typing feel, modes, Split scroll sync, an external edit while typing, breadcrumb, a link click, the remote-image placeholder.
+- **Real window:** agent screenshots (launch only); the maintainer checks typing feel, modes, Split scroll sync, an external edit while typing, breadcrumb, a link click, the remote-image placeholder.
 
 ## 8. Dependencies (all GPL-3.0-compatible, no network code)
 `@codemirror/state` 6.7, `@codemirror/view` 6.43, `@codemirror/commands` 6.11, `@codemirror/language` 6.13, `@codemirror/lang-markdown` 6.5 (MIT); `unified` 11, `remark-parse` 11, `remark-gfm` 4, `remark-frontmatter` 5, `mdast-util-*`, `micromark-*` (MIT); `dompurify` 3.4 (MPL-2.0 OR Apache-2.0); `node-diff3` 3.2 (MIT); `tauri-plugin-opener` 2.7 + `@tauri-apps/plugin-opener` 2.7 (MIT/Apache-2.0); dev: `@playwright/test` (Apache-2.0) for the zero-network test.

@@ -1,6 +1,6 @@
 # M6 — Audio clips: Design
 
-**Status:** written on 2026-10-14 without Jose's review. He asked to "carry on with everything that's missing" and review features in bulk later.
+**Status:** written on 2026-10-14 without the maintainer's review. The request was to build the remaining features and review them in bulk later.
 - **Grounding:** product spec §9.1 (AUD-01–AUD-07, Q-AUD-1, all DECIDED), architecture §5.1–§5.2 (cpal capture, hound WAV, LAME MP3, `audio:level` events, a custom player over `<audio>`), and the prototype's recorder bar (`design/prototype/Main.dc.html`: Record clip / Upload clip header buttons; a bar with Microphone select, Format WAV|MP3, Start recording → "● Recording 0:01", a level meter, **Stop & insert**, Cancel).
 - **Builds on:** M5 (`feat/m5-search`).
 - **Judgement calls** are listed in §9.
@@ -124,7 +124,7 @@
   - upload through the mocked picker;
   - the player plays a fixture WAV served by the e2e server (play, pause, seek);
   - zero-network.
-- **Real window (Jose):**
+- **Real window (the maintainer):**
   - record with the built-in and an external microphone, in WAV and in MP3;
   - permission prompt and denial guidance;
   - unplugging a USB microphone mid-take;
@@ -141,7 +141,7 @@
 - input gain control;
 - M4A recording (M4A is upload-only, per AUD-03).
 
-## 9. Decisions taken for Jose (to review in bulk)
+## 9. Decisions taken for the maintainer (to review in bulk)
 
 1. **The clip goes where the cursor was when recording started**, mapped through edits, into the page recording started on.
 2. **Escape while recording asks before discarding.** Cancel discards without asking, because it's an explicit button.
@@ -154,7 +154,7 @@
 
 ## 10. Amendments (batch 6, 2026-10-18)
 
-Jose confirmed the spec on 2026-10-18 ("Keep as written"). It predates M4b part 2/3, M4c, M5 and M5b; these rulings bring it up to date and override §1–§9 where they conflict.
+The maintainer confirmed the spec as written on 2026-10-18. It predates M4b part 2/3, M4c, M5 and M5b; these rulings bring it up to date and override §1–§9 where they conflict.
 
 1. **WAV only for now; MP3 is deferred.**
    - `mp3lame-encoder` (LGPL-3.0, LAME 3.100) builds on macOS, but its `mp3lame-sys` build runs LAME's autotools `configure`, which can't target MSVC from the Mac. Windows builds are cross-compiled with cargo-xwin. Three tries failed: as is ("cannot run C compiled programs"), with `MP3LAME_SYS_OVERRIDE_HOST=x86_64-w64-mingw32` ("/lib/cpp fails sanity check"), and with `CPP="clang-cl -E"`.

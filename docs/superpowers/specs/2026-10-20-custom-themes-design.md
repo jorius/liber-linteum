@@ -1,10 +1,10 @@
 # Custom themes: design
 
-Status: **draft for Jose's approval** (2026-10-20). Mock: option A, "Gallery + full editor", which Jose picked. The mock lives in the brainstorm companion (`.superpowers/brainstorm/54734-1792525893/content/appearance.html`, first card) and is not committed.
+Status: **draft for the maintainer's approval** (2026-10-20). Mock: option A, "Gallery + full editor", which the maintainer picked. The mock lives in the brainstorm companion (`.superpowers/brainstorm/54734-1792525893/content/appearance.html`, first card) and is not committed.
 
 ## 0. Intent
 
-Jose: "'Custom accent' isn't that easy to identify and the user is only choosing the accent. I would like the user to choose whatever they like: primary, secondary colours, the whole palette."
+Requirement: "Custom accent" is hard to find, and it only lets the user choose the accent. The user should be able to choose whatever they like: primary and secondary colours, the whole palette.
 
 Today, Settings → Appearance offers 8 built-in palettes plus "Custom accent". Custom accent takes one colour and derives the other 14 tokens per mode in OKLCH (`theme/derive.ts`). A palette is 15 colours per mode (`theme/palettes.ts`, `PaletteTokens`).
 
@@ -32,7 +32,7 @@ Today, Settings → Appearance offers 8 built-in palettes plus "Custom accent". 
 ## 2. The model
 
 - **A new token, `secondary` (per mode), so a palette has 16 colours.**
-  - *My call (Jose didn't specify):* secondary colours `#tags`, the manual relationship lines in Global View (today a hard-coded orange, `--color-edge-manual`) and the filled favourite ★.
+  - *My call (the maintainer didn't specify):* secondary colours `#tags`, the manual relationship lines in Global View (today a hard-coded orange, `--color-edge-manual`) and the filled favourite ★.
   - Every built-in palette gets a hand-picked secondary that passes contrast in both modes.
 - **The theme record:**
   `CustomTheme { id: string, name: string, light: PaletteTokens, dark: PaletteTokens, derived: { light: TokenKey[], dark: TokenKey[] } }`.
@@ -96,7 +96,7 @@ Today, Settings → Appearance offers 8 built-in palettes plus "Custom accent". 
   - axe-clean in light and dark.
 - The existing palette and contrast tests stay green.
 
-## 6. Open for Jose
+## 6. Open for the maintainer
 
 - **Secondary's uses:** tags, manual relationship lines and the favourite ★. This is my call; say if you'd rather it colour something else, e.g. callouts or the Global View cards.
 

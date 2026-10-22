@@ -16,6 +16,9 @@
         "rank": "Alternate",
         "contentTypes": ["public.plain-text"]
       }
-    ]
+    ],
+    "macOS": {
+      "signingIdentity": "-"
+    }
   }
 }

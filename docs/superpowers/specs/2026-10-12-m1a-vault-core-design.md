@@ -1,7 +1,7 @@
 # M1a — Vault Core: Design
 
 > **Status:** Approved in design review · **Date:** 2026-10-12
-> **Roles:** Jose — tech lead (decisions below are DECIDED)
+> **Roles:** tech lead: the maintainer (decisions below are DECIDED)
 > **Parent docs:** product spec `docs/product-spec.md` (v0.2) · architecture `docs/superpowers/specs/2026-10-12-architecture-design.md` · M0 hand-off `docs/handoff/2026-10-12-m0-scaffold-handoff.md`
 > **Scope:** the headless Rust core of milestone M1. The app integration (Tauri commands, settings store, welcome actions, explorer UI) is **M1b** and gets its own short design.
 

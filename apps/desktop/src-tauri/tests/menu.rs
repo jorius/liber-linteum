@@ -11,7 +11,9 @@ use std::rc::Rc;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Duration;
-use tauri::menu::{Menu, MenuEvent, MenuId, MenuItemKind};
+#[cfg(target_os = "macos")]
+use tauri::menu::{Menu, MenuItemKind};
+use tauri::menu::{MenuEvent, MenuId};
 use tauri::test::{MockRuntime, mock_builder};
 use tauri::{App, Manager, RunEvent, WindowEvent};
 
@@ -33,9 +35,12 @@ fn main_window(handle: &tauri::AppHandle<MockRuntime>) -> tauri::WebviewWindow<M
     handle.get_webview_window("main").expect("the main window")
 }
 
+#[cfg(target_os = "macos")]
 type Entry = (&'static str, String, String);
 
-/// (submenu text, [(item kind, id, text)]) for every top-level submenu.
+/// (submenu text, [(item kind, id, text)]) for every top-level submenu
+/// (only macOS has an app menu).
+#[cfg(target_os = "macos")]
 fn outline(menu: &Menu<MockRuntime>) -> Vec<(String, Vec<Entry>)> {
     menu.items()
         .unwrap()
@@ -111,10 +116,20 @@ fn macos_menu_quit_is_ours_and_the_standard_items_stay() {
             .filter(|t| !t.is_empty())
             .collect()
     };
-    // Text editing shortcuts (⌘Z, ⌘C, ⌘V, …) come from the Edit menu on macOS.
+    // Text editing shortcuts (⌘Z, ⌘C, ⌘V, …) come from the Edit menu on
+    // macOS; Find… (⌘F) finds in the page, View → Search… is ⌘⇧F.
     assert_eq!(
         texts("Edit"),
-        ["Undo", "Redo", "Cut", "Copy", "Paste", "Select All"]
+        [
+            "Undo",
+            "Redo",
+            "Cut",
+            "Copy",
+            "Paste",
+            "Select All",
+            "Find…",
+            "Go to Line…"
+        ]
     );
     // M2b §3: Back / Forward along the link trail (⌘[ / ⌘] are handled by the
     // page itself, so the items carry no accelerator).
@@ -166,6 +181,7 @@ fn macos_menu_quit_is_ours_and_the_standard_items_stay() {
             "New Vault…",
             "Open Vault…",
             "Encrypt Vault…",
+            "Decrypt Vault…",
             "Lock Vault",
             "Close Vault"
         ]
@@ -186,7 +202,12 @@ fn menu_events_reach_one_window_only() {
                 .build()
                 .unwrap();
             for (window, name) in [(main_window(handle), "main"), (file, "file-1")] {
-                for event in ["menu:open-file", "menu:toggle"] {
+                for event in [
+                    "menu:open-file",
+                    "menu:toggle",
+                    "menu:find",
+                    "menu:goto-line",
+                ] {
                     let log = log.clone();
                     window.listen(event, move |e| {
                         log.lock()
@@ -198,6 +219,8 @@ fn menu_events_reach_one_window_only() {
             for id in [
                 liber_desktop::menu::OPEN_FILE_ID,
                 liber_desktop::menu::TOOLBAR_ID,
+                liber_desktop::menu::FIND_ID,
+                liber_desktop::menu::GOTO_LINE_ID,
             ] {
                 liber_desktop::menu::on_menu_event(
                     handle,
@@ -215,7 +238,9 @@ fn menu_events_reach_one_window_only() {
         *got.lock().unwrap(),
         [
             "main menu:open-file null".to_string(),
-            "main menu:toggle \"toolbar\"".into()
+            "main menu:toggle \"toolbar\"".into(),
+            "main menu:find null".into(),
+            "main menu:goto-line null".into()
         ]
     );
 }
@@ -426,7 +451,7 @@ fn quick_note_item_names_the_open_vault() {
                     .map(|(_, _, t)| t)
                     .unwrap()
             };
-            liber_desktop::menu::show_vault_in_menu(handle, Some("Smartjob"));
+            liber_desktop::menu::show_vault_in_menu(handle, Some("Myproject"));
             log.lock().unwrap().push(text(handle));
             liber_desktop::menu::show_vault_in_menu(handle, None);
             log.lock().unwrap().push(text(handle));
@@ -438,7 +463,7 @@ fn quick_note_item_names_the_open_vault() {
     assert_eq!(
         *texts.lock().unwrap(),
         [
-            "Create New Scratchpad for Smartjob".to_string(),
+            "Create New Scratchpad for Myproject".to_string(),
             "Create New Scratchpad in This Vault".to_string()
         ]
     );
@@ -495,14 +520,15 @@ fn quick_note_item_follows_open_and_close() {
 }
 
 /// Encryption UX round §4.1: Vault → Encrypt "<name>"… is off and generic
-/// until the page names an open plain vault, and off again after.
+/// until the page names an open plain vault, and off again after; §10.1:
+/// Decrypt "<name>"… the same for an encrypted vault.
 #[cfg(target_os = "macos")]
 fn encrypt_item_follows_the_page() {
     let got: Arc<std::sync::Mutex<Vec<(String, bool)>>> = Arc::default();
     let log = got.clone();
     build_app("encrypt-item").run_return(move |handle, event| {
         if let RunEvent::Ready = event {
-            let item = |h: &tauri::AppHandle<MockRuntime>| {
+            let item = |h: &tauri::AppHandle<MockRuntime>, id: &str| {
                 let vault = h
                     .menu()
                     .unwrap()
@@ -519,20 +545,24 @@ fn encrypt_item_follows_the_page() {
                     .unwrap()
                     .into_iter()
                     .find_map(|i| match i {
-                        MenuItemKind::MenuItem(m)
-                            if m.id() == liber_desktop::menu::VAULT_ENCRYPT_ID =>
-                        {
+                        MenuItemKind::MenuItem(m) if m.id() == id => {
                             Some((m.text().unwrap(), m.is_enabled().unwrap()))
                         }
                         _ => None,
                     })
                     .unwrap()
             };
-            log.lock().unwrap().push(item(handle));
-            liber_desktop::menu::menu_set_encrypt_item(handle.clone(), Some("Smartjob".into()));
-            log.lock().unwrap().push(item(handle));
+            use liber_desktop::menu::{VAULT_DECRYPT_ID, VAULT_ENCRYPT_ID};
+            log.lock().unwrap().push(item(handle, VAULT_ENCRYPT_ID));
+            liber_desktop::menu::menu_set_encrypt_item(handle.clone(), Some("Myproject".into()));
+            log.lock().unwrap().push(item(handle, VAULT_ENCRYPT_ID));
             liber_desktop::menu::menu_set_encrypt_item(handle.clone(), None);
-            log.lock().unwrap().push(item(handle));
+            log.lock().unwrap().push(item(handle, VAULT_ENCRYPT_ID));
+            log.lock().unwrap().push(item(handle, VAULT_DECRYPT_ID));
+            liber_desktop::menu::menu_set_decrypt_item(handle.clone(), Some("Myproject".into()));
+            log.lock().unwrap().push(item(handle, VAULT_DECRYPT_ID));
+            liber_desktop::menu::menu_set_decrypt_item(handle.clone(), None);
+            log.lock().unwrap().push(item(handle, VAULT_DECRYPT_ID));
             for window in handle.webview_windows().into_values() {
                 window.close().unwrap();
             }
@@ -542,8 +572,11 @@ fn encrypt_item_follows_the_page() {
         *got.lock().unwrap(),
         [
             ("Encrypt Vault…".to_string(), false),
-            ("Encrypt “Smartjob”…".to_string(), true),
+            ("Encrypt “Myproject”…".to_string(), true),
             ("Encrypt Vault…".to_string(), false),
+            ("Decrypt Vault…".to_string(), false),
+            ("Decrypt “Myproject”…".to_string(), true),
+            ("Decrypt Vault…".to_string(), false),
         ]
     );
 }
@@ -606,6 +639,7 @@ fn m5b_items_emit_their_events() {
                 liber_desktop::menu::VAULT_CLOSE_ID,
                 liber_desktop::menu::VAULT_NEW_ID,
                 liber_desktop::menu::VAULT_ENCRYPT_ID,
+                liber_desktop::menu::VAULT_DECRYPT_ID,
                 liber_desktop::menu::SAVE_ID,
                 liber_desktop::menu::SIDEBAR_ID,
             ] {
@@ -629,6 +663,7 @@ fn m5b_items_emit_their_events() {
             "main menu:vault \"close\"".into(),
             "main menu:vault \"new\"".into(),
             "main menu:vault \"encrypt\"".into(),
+            "main menu:vault \"decrypt\"".into(),
             "main menu:save null".into(),
             "main menu:sidebar null".into(),
         ]

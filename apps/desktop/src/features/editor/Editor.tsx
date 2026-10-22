@@ -8,7 +8,7 @@ import {
   syntaxHighlighting,
   syntaxTree,
 } from '@codemirror/language';
-import { Compartment, EditorState, Transaction, type Extension } from '@codemirror/state';
+import { Compartment, EditorState, Prec, Transaction, type Extension } from '@codemirror/state';
 import { drawSelection, EditorView, keymap, lineNumbers } from '@codemirror/view';
 import { tagHighlighter, tags } from '@lezer/highlight';
 import { diffIndices } from 'node-diff3';
@@ -25,11 +25,15 @@ import { Preview } from '../preview/Preview';
 import styles from './Editor.module.css';
 import { followLinkAtCursor, livePreview, pagePath } from './livePreview';
 import { attachmentHandlers } from './attachments';
+import { autoClose, autoCloseSlot } from './autoClose';
+import { findInPage, findPhrases, phrasesSlot } from './findInPage';
+import { matchRange } from '../search/matchRange';
 import { flash, jumpTo } from './flash';
 import { BlockGutter, type Shown } from './BlockGutter';
 import { SplitHint } from './SplitHint';
 import { activeFormats, editorKeymap, type ActiveFormat } from './format';
 import { coverSideHistory } from './coverSideHistory';
+import { tableKeymap } from './tableEdit';
 import { linkCompletion } from './linkComplete';
 import { LanguagePicker } from './LanguagePicker';
 import { setLanguagePickerOpener } from './languagePickerOpen';
@@ -300,6 +304,9 @@ function createTextState(d: PageDoc, label: string): EditorState {
       languageSlot.of([]),
       syntaxHighlighting(codeHighlighter),
       keymap.of([...defaultKeymap, ...historyKeymap]),
+      // ⌘F / Ctrl+F: find (and replace) in the file.
+      findInPage(),
+      autoCloseSlot.of(autoClose(autoCloseOn())),
       theme,
       labelSlot.of(labelled(label)),
       modeSlot.of(modeExtensions('source')),
@@ -321,12 +328,19 @@ function createState(d: PageDoc, mode: EditorMode, label: string, numbers: boole
       history(),
       drawSelection(),
       EditorView.lineWrapping,
+      // In a table, Tab / Enter move between cells; before Markdown's own
+      // Enter (list continuation), which runs at the same precedence.
+      Prec.high(keymap.of(tableKeymap)),
       // GFM syntax tree: Source highlighting and the toolbar's pressed state.
       // Picker ids (`mssql`, `angulartemplate`) resolve as in the rendered pane.
       markdown({ base: markdownLanguage, codeLanguages: languageFor }),
       // Syntax colours inside fenced code (M4b part 2 §2), in every mode.
       syntaxHighlighting(codeHighlighter),
       keymap.of([{ key: 'Mod-Enter', run: followLinkAtCursor }, ...editorKeymap, ...historyKeymap]),
+      // ⌘F / Ctrl+F: find (and replace) in the page.
+      findInPage(),
+      // Brackets and quotes close themselves (Settings → Editor).
+      autoCloseSlot.of(autoClose(autoCloseOn())),
       pagePath.of(() => d.path),
       theme,
       labelSlot.of(labelled(label)),
@@ -349,6 +363,7 @@ function createState(d: PageDoc, mode: EditorMode, label: string, numbers: boole
  *  to keep added words in, and its capability has no spell commands. */
 const MAIN_WINDOW = windowLabel() === 'main';
 const spellOn = () => MAIN_WINDOW && useSettingsStore.getState().settings.spellcheck;
+const autoCloseOn = () => useSettingsStore.getState().settings.autoCloseBrackets !== false;
 
 export interface EditorProps {
   doc: PageDoc;
@@ -362,7 +377,7 @@ export function Editor({ doc, mode, label }: EditorProps) {
   const width = usePageWidth(doc.path);
   const wideKinds = useWideElements();
   const textFile = isTextPath(doc.path);
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const host = useRef<HTMLDivElement>(null);
   const pane = useRef<HTMLDivElement>(null);
   const view = useRef<EditorView | null>(null);
@@ -448,6 +463,9 @@ export function Editor({ doc, mode, label }: EditorProps) {
         modeSlot.reconfigure(modeExtensions(mode)),
         labelSlot.reconfigure(labelled(label)),
         gutterSlot.reconfigure(gutter(showNumbers || isTextPath(doc.path))),
+        // Its find panel's words, in case the language changed since.
+        phrasesSlot.reconfigure(findPhrases()),
+        autoCloseSlot.reconfigure(autoClose(autoCloseOn())),
         // A page's stored state may predate a change to the setting.
         ...(isTextPath(doc.path) ? [] : [spellSlot.reconfigure(spellOn() ? spellcheck() : [])]),
       ],
@@ -462,6 +480,12 @@ export function Editor({ doc, mode, label }: EditorProps) {
     });
   }, [mode, label]);
 
+  // The find panel speaks the app's language (it shows the new words when
+  // it next opens).
+  useLayoutEffect(() => {
+    view.current?.dispatch({ effects: phrasesSlot.reconfigure(findPhrases()) });
+  }, [i18n.language]);
+
   // Unarchived (or archived) while open: the same doc, a new place.
   useLayoutEffect(() => {
     view.current?.dispatch({ effects: readOnlySlot.reconfigure(readOnlyFor(doc.path)) });
@@ -472,6 +496,11 @@ export function Editor({ doc, mode, label }: EditorProps) {
       effects: gutterSlot.reconfigure(gutter(showNumbers || isTextPath(current.current.path))),
     });
   }, [showNumbers]);
+
+  const autoCloseEnabled = useSettingsStore((s) => s.settings.autoCloseBrackets !== false);
+  useLayoutEffect(() => {
+    view.current?.dispatch({ effects: autoCloseSlot.reconfigure(autoClose(autoCloseEnabled)) });
+  }, [autoCloseEnabled]);
 
   const spellEnabled = useSettingsStore((s) => MAIN_WINDOW && s.settings.spellcheck);
   useLayoutEffect(() => {
@@ -494,13 +523,16 @@ export function Editor({ doc, mode, label }: EditorProps) {
   }, [wantsFocus, screen]);
 
   // See atoms (M4b part 3 §6): an atom clicked in the Global View puts the
-  // cursor on its block, once its page shows here.
+  // cursor on its block, once its page shows here. A search result does the
+  // same with the word it matched (the page opens at the top without one).
   const jump = usePageStore((s) => s.jump);
   useEffect(() => {
     const v = view.current;
     if (!jump || !v || screen !== 'edit' || current.current.path !== jump.path) return;
     usePageStore.getState().clearJump();
-    jumpTo(v, jump.from, jump.to);
+    const range = jump.find === undefined ? jump : matchRange(v.state.doc.toString(), jump.find);
+    if (!range) return;
+    jumpTo(v, range.from, range.to);
     v.focus();
   }, [jump, screen, doc]);
 

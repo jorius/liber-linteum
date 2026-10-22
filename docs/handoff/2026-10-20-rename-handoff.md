@@ -1,6 +1,6 @@
 # Rename hand-off: Notes In My Way → Liber Linteum (2026-10-20)
 
-Branch `feat/rename`, cut from `feat/r3` at 690ca04 (round 3, round 3b, spell checking and their review fixes). Plan: `docs/superpowers/plans/2026-10-20-rename-liber-linteum.md`. The repository and its folder (`notes-in-my-way`) are **not** renamed: Jose does that on GitHub and locally.
+Branch `feat/rename`, cut from `feat/r3` at 690ca04 (round 3, round 3b, spell checking and their review fixes). Plan: `docs/superpowers/plans/2026-10-20-rename-liber-linteum.md`. The repository and its folder (`notes-in-my-way`) are **not** renamed: the maintainer does that on GitHub and locally.
 
 ## 1. What changed
 
@@ -29,7 +29,7 @@ Docs say Liber Linteum everywhere, historical specs and plans included. `README.
 - **App settings** (`apps/desktop/src-tauri/src/legacy_dirs.rs`). On launch, if the new config folder has no `settings.json`, the one from the sibling `app.notesinmyway.desktop` folder is copied in (temp file, then rename). That brings the recent vaults, the Scratchpad path, the language and the palette. If the new cache has no audio takes, leftover takes from the old cache's `audio/` are copied too. The old folders are only read; errors are logged and never block launch.
 - **Not carried over:** each vault's search index rebuilds once; WebView conveniences reset (the outline width, dismissed hints, collapsed Favorites); imported spelling dictionaries would need re-importing (none exist yet).
 
-## 3. What Jose will notice
+## 3. What the maintainer will notice
 
 - macOS asks for microphone permission again, because the permission belongs to the bundle id.
 - The old app (`Notes In My Way.app`) and the old Windows install stay installed until you remove them. Their settings folders are never touched.
@@ -65,7 +65,7 @@ The final grep (`nimw`, `notes in my way`, `notesinmyway`, case-insensitive) fin
 | **M5.** Using the old app after the new one splits settings between the two folders. | Documented in the README note and in §3 below. | — |
 | **M6.** The doc comment said opening never writes. Migration warnings were English-only. File windows and the importer migrate silently. | The comment is fixed. The warnings are now codes (`metaDir.both`, `metaDir.unmoved:<error>`) that the UI translates (en, es). File windows: the warning repeats when the folder next opens as a vault. Importer: it opens a folder it just created, so there is nothing to move. | `rename review M6: the settings-folder warnings arrive as codes and are translated` (stores.test.ts) |
 
-**Also for Jose (M5):** once Liber Linteum has opened a vault, don't use Notes In My Way on it again. The old app would recreate its settings folder. Liber Linteum keeps using its own and warns that the vault has both. Whatever the old app wrote is left on disk but not used.
+**Also for the maintainer (M5):** once Liber Linteum has opened a vault, don't use Notes In My Way on it again. The old app would recreate its settings folder. Liber Linteum keeps using its own and warns that the vault has both. Whatever the old app wrote is left on disk but not used.
 
 
 ## 8. Open minors after the re-review (not fixed, tracked)

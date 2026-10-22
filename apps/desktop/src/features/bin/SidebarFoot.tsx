@@ -1,5 +1,5 @@
 import { useTranslation } from 'react-i18next';
-import { ArchiveIcon, LockIcon, TrashIcon } from '../../app/icons';
+import { ArchiveIcon, TrashIcon } from '../../app/icons';
 import { useUiStore } from '../../stores/uiStore';
 import { useVaultStore } from '../../stores/vaultStore';
 import { ExplorerTree, type ExplorerTreeProps } from '../explorer/ExplorerTree';
@@ -8,9 +8,8 @@ import styles from './Bin.module.css';
 
 const ARCHIVE = '.archive';
 
-/** The sidebar's foot (M5b §5.2–§5.3): Archived above Trash, then the
- *  privacy line. Archived opens like a folder, read-only (round 2); Trash
- *  opens its view. */
+/** The sidebar's foot (M5b §5.2–§5.3): Archived above Trash, nothing else.
+ *  Archived opens like a folder, read-only (round 2); Trash opens its view. */
 export function SidebarFoot({ onRequestDelete, onRequestMenu }: ExplorerTreeProps) {
   const { t } = useTranslation();
   const screen = useUiStore((s) => s.screen);
@@ -51,10 +50,6 @@ export function SidebarFoot({ onRequestDelete, onRequestMenu }: ExplorerTreeProp
         <span className={styles.footName}>{t('bin.trash')}</span>
         {trash > 0 && <span className={styles.footCount}>{trash}</span>}
       </button>
-      <p className={styles.privacy}>
-        <LockIcon />
-        {t('privacy.localOnly')}
-      </p>
     </div>
   );
 }

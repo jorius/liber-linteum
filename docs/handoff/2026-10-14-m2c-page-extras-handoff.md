@@ -1,11 +1,11 @@
 # M2c — Page extras: Hand-off
 
-**Spec:** `docs/superpowers/specs/2026-10-14-m2c-page-extras-design.md` (§12: decisions taken for Jose without review; §13: amendments from planning) · **Plan:** `docs/superpowers/plans/2026-10-14-m2c-page-extras.md` (replayed end to end on a scratch clone before execution)
+**Spec:** `docs/superpowers/specs/2026-10-14-m2c-page-extras-design.md` (§12: decisions taken for the maintainer without review; §13: amendments from planning) · **Plan:** `docs/superpowers/plans/2026-10-14-m2c-page-extras.md` (replayed end to end on a scratch clone before execution)
 **Branch:** `feat/m2c-page-extras` (from `main` `2de6d7b`). Previous hand-off: `docs/handoff/2026-10-13-m2b-editor-ux-handoff.md`.
 
 **How this milestone was made.**
-1. Jose agreed the scope, the extras and part 1 of the design (UI and behaviour) on 2026-10-13.
-2. He then asked to "carry on with everything that's missing" and review features in bulk later.
+1. The maintainer agreed the scope, the extras and part 1 of the design (UI and behaviour) on 2026-10-13.
+2. The request was then to build the remaining features and review them in bulk later.
 3. Everything from the backend design onward was decided on his behalf:
    - each decision is listed in spec §12 and §13, and summarised in §8 below;
    - nothing is merged into `main` until he has checked it in the real window (§9).

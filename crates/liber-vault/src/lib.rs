@@ -10,6 +10,7 @@ mod favorite;
 mod folder_sort;
 mod fsops;
 mod hash;
+mod home;
 mod icon;
 mod layout;
 mod link_format;
@@ -30,6 +31,7 @@ pub use cover_side::{CoverSide, MAX_COVER_WIDTH, MIN_COVER_WIDTH};
 pub use error::{Result, VaultError};
 pub use folder_sort::FolderSort;
 pub use hash::Hash;
+pub use home::Home;
 pub use icon::vault_icon_at;
 pub use layout::CardPosition;
 pub use link_format::{LinkFormat, LinkFormats};
@@ -38,7 +40,6 @@ pub use page_width::{PageWidth, PageWidths};
 pub use path::VaultPath;
 pub use scan::{Entry, EntryKind, Scan};
 pub use scratch::DEFAULT_SCRATCH_FOLDER;
-pub use storage::convert;
 pub use storage::plain::TMP_MARKER;
 pub use storage::{
     Child, EncryptedStorage, Follow, HEADER_FILE, Kind, Meta, NewFile, OsUse, PlainStorage,
@@ -48,6 +49,7 @@ pub use storage::{
 };
 #[cfg(feature = "test-params")]
 pub use storage::{TEST_PASSPHRASE, seal_in_place};
+pub use storage::{convert, decrypt};
 pub use vault::Vault;
 pub use watch::{DEBOUNCE, WatchEvent, Watcher};
 

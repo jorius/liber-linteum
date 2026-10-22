@@ -4,6 +4,15 @@ const COMMANDS: &[&str] = &[
     "app_info",
     "window_close_self",
     "window_title_set",
+    // Custom title bar (Linux, Windows): the window buttons and the menu bar.
+    "window_minimize",
+    "window_toggle_maximize",
+    "window_maximized",
+    "window_toggle_fullscreen",
+    "window_start_drag",
+    "window_close_request",
+    "window_paste",
+    "menu_activate",
     "vault_open",
     "vault_create",
     "vault_close",
@@ -87,6 +96,9 @@ const COMMANDS: &[&str] = &[
     // M5b §19: Favorites.
     "favorites_get",
     "favorites_set",
+    // A vault's home page (or the Global View).
+    "home_get",
+    "home_set",
     // M6: audio clips (main window only).
     "audio_devices",
     "audio_record_start",
@@ -137,9 +149,33 @@ const COMMANDS: &[&str] = &[
     "vault_encrypt_undo_elsewhere",
     "vault_trash_originals",
     "vault_reveal_originals",
+    // Encrypt in place: the readable backup (encryption UX §9; main window only).
+    "vault_encrypt_pick_backup",
+    "vault_encrypt_backup",
+    "vault_reveal_backup",
+    // Decrypt in place (encryption UX §10; main window only).
+    "menu_set_decrypt_item",
+    "vault_decrypt_preflight",
+    "vault_decrypt_begin",
+    "vault_decrypt_run",
+    "vault_decrypt_cancel",
 ];
 
 fn main() {
+    // The integration tests link Tauri, which needs Windows' Common Controls
+    // v6; tauri-build's manifest only goes into the app, so without this the
+    // test binaries don't start (STATUS_ENTRYPOINT_NOT_FOUND).
+    let target = |key: &str| std::env::var(key).unwrap_or_default();
+    if target("CARGO_CFG_TARGET_OS") == "windows" && target("CARGO_CFG_TARGET_ENV") == "msvc" {
+        let manifest =
+            std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("windows-test-manifest.xml");
+        println!("cargo:rerun-if-changed=windows-test-manifest.xml");
+        println!("cargo:rustc-link-arg-tests=/MANIFEST:EMBED");
+        println!(
+            "cargo:rustc-link-arg-tests=/MANIFESTINPUT:{}",
+            manifest.display()
+        );
+    }
     tauri_build::try_build(
         tauri_build::Attributes::new()
             .app_manifest(tauri_build::AppManifest::new().commands(COMMANDS)),

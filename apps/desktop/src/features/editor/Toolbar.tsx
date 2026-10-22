@@ -6,6 +6,7 @@ import { fileWindowName } from '../../ipc';
 import styles from './Editor.module.css';
 import { openAttach } from './attachOpen';
 import { openLinkPicker } from './linkPickerOpen';
+import { TableTool } from './TableTool';
 import {
   insertDivider,
   insertLink,
@@ -184,6 +185,17 @@ export function Toolbar({ view, active }: { view: EditorView; active: Set<Active
       })()}
       <span className={styles.toolSep} aria-hidden="true" />
       {BLOCK.map(button)}
+      {(() => {
+        const i = index;
+        return (
+          <TableTool
+            view={view}
+            inTable={active.has('table')}
+            tabIndex={tab()}
+            onFocus={() => setFocusIndex(i)}
+          />
+        );
+      })()}
     </div>
   );
 }

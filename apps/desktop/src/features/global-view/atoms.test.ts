@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { atomsLayout, buildAtoms, ATOM_H, ATOM_W, SECTION_H, type AtomsModel } from './atoms';
 import { CARD_H, CARD_W } from './layout';
 
-// The friend's note (M4b part 3): text, a link, then headings far down.
+// A tester's note (M4b part 3): text, a link, then headings far down.
 const COMISIONES = [
   '---',
   'tags: [freelance]',

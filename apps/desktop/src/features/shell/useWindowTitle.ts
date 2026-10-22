@@ -27,7 +27,15 @@ export function useWindowTitle() {
   useEffect(() => {
     // Outside the app the call simply fails (ipcCall answers an error).
     if (title) void windowTitleSet(title);
+    // The drawn title bar shows the page's title (custom title bar §2).
+    if (title) document.title = title;
   }, [title]);
   // Closing the vault (the Welcome screen) names the app again (final review M10).
-  useEffect(() => () => void windowTitleSet(t('app.name')), [t]);
+  useEffect(
+    () => () => {
+      void windowTitleSet(t('app.name'));
+      document.title = t('app.name');
+    },
+    [t],
+  );
 }

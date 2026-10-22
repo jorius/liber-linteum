@@ -11,7 +11,7 @@ import {
 import { useTranslation } from 'react-i18next';
 import { filterLanguages, setFenceLanguage } from './codeLanguages';
 import styles from './Editor.module.css';
-import { placePopup } from './placePopup';
+import { placePopup, windowViewport } from './placePopup';
 
 const MAX = 40;
 
@@ -44,10 +44,7 @@ export function LanguagePicker({
     const el = box.current;
     const at2 = { top: r.top, bottom: r.bottom, left: r.left };
     const size = { width: el?.offsetWidth ?? 0, height: el?.offsetHeight ?? 0 };
-    const { top, left } = placePopup(at2, size, {
-      width: window.innerWidth,
-      height: window.innerHeight,
-    });
+    const { top, left } = placePopup(at2, size, windowViewport());
     setPlace({ top, left });
   }, [anchor]);
   useLayoutEffect(reposition, [reposition, options.length]);

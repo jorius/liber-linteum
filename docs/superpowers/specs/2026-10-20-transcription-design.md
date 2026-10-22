@@ -1,14 +1,14 @@
 # Local voice-note transcription: decision spec
 
-Status: **for Jose's go / no-go** (2026-10-20). Nothing is built yet.
+Status: **for the maintainer's go / no-go** (2026-10-20). Nothing is built yet.
 
 Facts, with sources for every claim: `docs/research/2026-10-20-transcription-facts.md`. Section numbers below like "facts §1" point there.
 
 ## 0. The question
 
-Jose asked: "Is there any way that we can upload or record a clip and get a text transcription without using any third party or cloud tool?"
+The question: can a recorded or uploaded clip be transcribed to text without any third-party or cloud service?
 
-**Yes.** Speech recognition can run entirely on the machine, with no account and no network at transcription time. This spec describes what it would take, what it costs, and what could go wrong, so Jose can decide whether to build it or drop it.
+**Yes.** Speech recognition can run entirely on the machine, with no account and no network at transcription time. This spec describes what it would take, what it costs, and what could go wrong, so the maintainer can decide whether to build it or drop it.
 
 M6 deliberately left transcription out. This would be a new milestone, independent of encryption.
 
@@ -63,8 +63,8 @@ M6 deliberately left transcription out. This would be a new milestone, independe
   - segment timestamps.
 - **Windows cross-build (the main risk).** It is a plain CMake project, unlike LAME, and another Tauri app ships it to Windows from a Mac with cargo-xwin. That needs one workaround: an empty `ggml-blas.lib`, because whisper-rs-sys's build script checks the build machine instead of the target. That app's installer was never tested on real Windows. **So step 1 of any go decision is a throwaway spike:**
   1. Build whisper-rs for `x86_64-pc-windows-msvc` with our toolchain.
-  2. Transcribe a real clip on Jose's Mac and time it.
-  3. Have Jose's friend run the Windows test build.
+  2. Transcribe a real clip on the maintainer's Mac and time it.
+  3. Have the Windows tester run the Windows test build.
 
   If the cross-build fails, the fallback is §5's plan B.
 - **Audio prep:** our recorder writes at the device's native rate and channel count. Whisper needs 16 kHz mono, so clips are resampled with `rubato` (pure Rust, MIT OR Apache-2.0; facts §6).
@@ -104,7 +104,7 @@ Every engine needs a model file of 190 MB to 1+ GB that we don't ship. Three way
 
 ## 7. Shape of the work, if it's a go
 
-1. **Spike:** cross-build plus a speed check on Jose's Mac and on Windows. Throwaway, with a go/no-go on the engine.
+1. **Spike:** cross-build plus a speed check on the maintainer's Mac and on Windows. Throwaway, with a go/no-go on the engine.
 2. **`liber-transcribe` crate:** loads the model, resamples, runs VAD, transcribes with progress and cancel, and returns segments.
 3. **Model management:** Settings → Transcription. Add, remove and checksum models, and pick a default model and language.
 4. **Editor action:**
@@ -117,7 +117,7 @@ Every engine needs a model file of 190 MB to 1+ GB that we don't ship. Three way
    - snapshot tests on segments with a tiny model, run only when the model is present;
    - UI e2e tests against an IPC mock.
 
-## 8. Decisions for Jose
+## 8. Decisions for the maintainer
 
 1. **Go or drop?** If go, the spike runs first and decides the engine.
 2. **Model delivery:** import from disk (recommended), an opt-in in-app download (a P1 exception), or bundled.

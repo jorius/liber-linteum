@@ -117,7 +117,7 @@ mod tests {
         assert_eq!(extract_title("\u{FEFF}Body\n\n# Later", "draft"), "draft");
     }
 
-    /// The friend's note "Tipos de comisiones" (Windows test, Mind_PC vault):
+    /// A tester's note "Tipos de comisiones" (Windows test):
     /// paragraphs and a link, then `# WIP (Work In Progress):` halfway down.
     #[test]
     fn pg_01_a_section_heading_halfway_down_is_not_the_title() {

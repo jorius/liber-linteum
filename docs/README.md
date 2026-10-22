@@ -6,6 +6,7 @@ Where to start, depending on what you need.
 
 | You want | Read |
 |---|---|
+| To **run, build, test or release** it, and how the code is organised | [`DEVELOPMENT.md`](DEVELOPMENT.md) |
 | **What** the app does and why | [`product-spec.md`](product-spec.md): requirements with IDs (`GV-04`, `SR-02`…), personas, decision log |
 | **How** it is built | [`superpowers/specs/2026-10-12-architecture-design.md`](superpowers/specs/2026-10-12-architecture-design.md): start at §0 "As built" for where the code differs from the v1 design |
 | The index, its SQLite database and how indexing works | [`architecture/index-and-database.md`](architecture/index-and-database.md) |
@@ -32,6 +33,6 @@ Where to start, depending on what you need.
 | M7 Notion import | `2026-10-18-m7-notion-import-design.md` | `2026-10-18-batch6-handoff.md` |
 | Batch 6 (main merge, text-file search, docs review, M6, M7) | M5 spec §12, M6 and M7 specs | `2026-10-18-batch6-handoff.md` |
 | E2 storage seam | `2026-10-20-encryption-design.md` §8, §13; plan `2026-10-20-enc-e2-storage-seam.md` | `2026-10-20-e2-handoff.md` |
-| M8 packaging | — | — |
+| M8 packaging and release | — (`.github/workflows/release.yml`, [`DEVELOPMENT.md`](DEVELOPMENT.md) §8) | `2026-10-22-overnight-handoff.md` |
 
 All of M0–M5b is merged on `main` (2026-10-18).

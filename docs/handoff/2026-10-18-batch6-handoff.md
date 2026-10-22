@@ -1,13 +1,13 @@
 # Batch 6 — the `main` merge, text-file search, the docs review, M6 audio clips, M7 Notion import: Hand-off
 
-**What batch 6 is for:** Jose asked on 2026-10-18 to merge everything locally into `main` (no push), make `.txt` files searchable, review the documentation and add a detailed reference for the SQLite database and the indexing process, and build M6 (audio clips) and M7 (the Notion importer).
+**What batch 6 is for:** the maintainer asked on 2026-10-18 to merge everything locally into `main` (no push), make `.txt` files searchable, review the documentation and add a detailed reference for the SQLite database and the indexing process, and build M6 (audio clips) and M7 (the Notion importer).
 
-**Branch:** `feat/batch6`, cut from `main` at `de2378e`. **Not merged into `main`**: Jose checks first. Nothing is pushed; there is no remote.
+**Branch:** `feat/batch6`, cut from `main` at `de2378e`. **Not merged into `main`**: the maintainer checks first. Nothing is pushed; there is no remote.
 
 **Specs:**
-- M6: `docs/superpowers/specs/2026-10-14-m6-audio-design.md`. §10 holds the batch 6 amendments (Jose: "Keep as written"); §11 holds the batch 6 review.
+- M6: `docs/superpowers/specs/2026-10-14-m6-audio-design.md`. §10 holds the batch 6 amendments (the maintainer kept the spec as written); §11 holds the batch 6 review.
 - Text-file search: `docs/superpowers/specs/2026-10-14-m5-search-design.md` §12, including its review subsection.
-- M7: `docs/superpowers/specs/2026-10-18-m7-notion-import-design.md` (new). §2 holds Jose's answers, §12 the rulings, §15 the amendments from building it, §16 the batch 6 review.
+- M7: `docs/superpowers/specs/2026-10-18-m7-notion-import-design.md` (new). §2 holds the maintainer's answers, §12 the rulings, §15 the amendments from building it, §16 the batch 6 review.
 
 **Plans (as run):**
 - `docs/superpowers/plans/2026-10-18-m6-audio.md`
@@ -15,7 +15,7 @@
 
 **How it was built:**
 1. **The merge.** Nine signed `--no-ff` merges into local `main`, one per milestone (M2c → M3a → M3b → M4 → M4b → M4b part 3 → M4c → M5 → M5b). `main` ends at `de2378e`, whose tree is identical to `feat/m5b-feedback`.
-2. **Jose's answers before building.** M7: the Notion **Markdown & CSV** zip only; imports **always go into a new vault**; databases become an **index page plus one page per row** (CSV columns as frontmatter). M6: keep the spec as written (WAV/MP3, clips in the page's attachments folder, microphone only while recording, no transcription).
+2. **The maintainer's answers before building.** M7: the Notion **Markdown & CSV** zip only; imports **always go into a new vault**; databases become an **index page plus one page per row** (CSV columns as frontmatter). M6: keep the spec as written (WAV/MP3, clips in the page's attachments folder, microphone only while recording, no transcription).
 3. **Four streams in parallel**, each in its own worktree with its own full gate: `feat/batch6-docs`, `feat/batch6-txt-search`, `feat/m6-audio`, `feat/m7-import`.
 4. **Integration** by cherry-pick in that order. One performance fix came out of it (`5ac7f4b`, see §1.6).
 5. **Two fresh-context Opus reviews:** the Notion importer with a security focus, and audio, text search and the pragmas. One Critical and 15 Important findings in total, plus minors.
@@ -114,7 +114,7 @@ Three advisories published on 2026-10-18 — RUSTSEC-2026-0370, -0371, -0372 —
 
 ## 3. Needs the real window
 
-### Jose, on the Mac (the built `.app`, see §5)
+### The maintainer, on the Mac (the built `.app`, see §5)
 
 The index rebuilds once on first open of each vault (schema 5).
 
@@ -146,7 +146,7 @@ The index rebuilds once on first open of each vault (schema 5).
 19. Put a `.txt` or `.log` with a distinctive word in a vault; ⌘F, type the word: it's found with a `TXT` badge and a snippet; Enter opens it in the text view; the **Text files** chip narrows to text files.
 20. Rename `notes.txt` to `notes.pdf` in Finder: it stops showing as a text hit.
 
-### The friend, on Windows (the `.exe`, see §5)
+### The Windows tester (the `.exe`, see §5)
 
 1. Recording through WASAPI with the default and another input device: level meter, Stop & insert, Cancel, Upload clip….
 2. Quit (or close the window) mid-take: the clip is kept and inserted.
@@ -175,7 +175,7 @@ Fixed, each with a test that failed first except where noted:
 - **MP3 recording** (§1.4).
 - **Linux:** building needs `libasound2-dev` (CI and M8).
 
-### Rulings to confirm (taken on Jose's behalf)
+### Rulings to confirm (taken on the maintainer's behalf)
 
 **Audio (M6 spec §10–§11)**
 1. WAV only for now; MP3 deferred (why in §1.4).
@@ -251,7 +251,7 @@ Also open from earlier rounds: the older `vault_open(path)` gap (a compromised p
 
 ## 7. Next
 
-**M8, packaging:** signed and notarized macOS builds (with the hardened runtime and the audio-input entitlement), signed Windows installers, Linux packages (with `libasound2-dev` at build time), the accessibility audit, the dark-theme polish and the performance budgets in CI. Needs Jose's answers first (signing identities, which Linux formats).
+**M8, packaging:** signed and notarized macOS builds (with the hardened runtime and the audio-input entitlement), signed Windows installers, Linux packages (with `libasound2-dev` at build time), the accessibility audit, the dark-theme polish and the performance budgets in CI. Needs the maintainer's answers first (signing identities, which Linux formats).
 
 ## 8. Troubleshooting
 

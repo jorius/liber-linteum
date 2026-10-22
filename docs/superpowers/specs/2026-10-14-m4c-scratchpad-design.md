@@ -1,6 +1,6 @@
 # M4c — Scratchpad and single files: Design
 
-**Status:** agreed with Jose on 2026-10-14:
+**Status:** agreed with the maintainer on 2026-10-14:
 - **Scratchpad location:** chosen on first use.
 - **Opened files:** each in its own lightweight window.
 - **Quick-note names:** from the first line.
@@ -101,7 +101,7 @@ Take a note without setting anything up, and open any single Markdown or text fi
 
 These override §2, §4 and §5 where they conflict. Plan: `docs/superpowers/plans/2026-10-15-m4c-scratchpad.md`.
 
-### Jose, 2026-10-15: a scratch folder in every vault
+### The maintainer, 2026-10-15: a scratch folder in every vault
 
 1. **Each vault has its own scratch place**, besides the global Scratchpad:
    - a folder inside the vault, `Scratchpad/` by default;
@@ -115,7 +115,7 @@ These override §2, §4 and §5 where they conflict. Plan: `docs/superpowers/pla
 4. **Naming from the first line** works the same in both places: `autoNamed` in that vault's `.liber/vault.json`, with vault-relative paths.
 5. **One creation path:** the session creates a quick note in a folder it is given (`create_quick_note(dir, base)`). The command picks the folder; no folder comes from the page.
 
-### Rulings taken on Jose's behalf
+### Rulings taken on the maintainer's behalf
 
 6. **The global Scratchpad's scratch place is its root.** It shows no pinned folder and no "Quick notes folder" row in Settings → This vault.
 7. **The scratch folder is a single top-level name.** It follows a rename to another top-level name (in the app or in Finder); a move into another folder, or a delete, leaves the setting, and the next quick note creates the folder again.

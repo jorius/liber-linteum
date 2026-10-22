@@ -14,6 +14,7 @@ export function installIpcMock({
   encrypted,
   folderKinds = {},
   encryptInPlace = {},
+  decryptInPlace = {},
 }: {
   pages: Record<string, string>;
   editorMode: string;
@@ -60,6 +61,18 @@ export function installIpcMock({
     originalsPending?: boolean;
     /** The run stops after its first file until `__liberFinishEncrypt()`
      *  (or Stop and undo), so its progress step can be checked. */
+    holdRun?: boolean;
+    /** §9: the folder the backup dialog picks (default `/e2e/backup`), or
+     *  the refusal of the pick. */
+    backupPick?: string;
+    backupRefusal?: { kind: string; message: string };
+    /** The backup stops after its first file until `__liberFinishBackup()`. */
+    holdBackup?: boolean;
+  };
+  /** Decrypt in place (§10) of the encrypted vault at `/enc`. */
+  decryptInPlace?: {
+    blocked?: { path: string; reason: string }[];
+    /** The run stops after its first file until `__liberFinishDecrypt()`. */
     holdRun?: boolean;
   };
 }) {
@@ -171,16 +184,39 @@ export function installIpcMock({
       relation,
     };
   };
+  /** The vault's home (`.liber/vault.json`'s `home`), kept in sessionStorage
+   *  like favorites so a reload still has it. It follows renames and is
+   *  cleared by the Trash and the Archive, as Rust does. */
+  type Home = { kind: 'page'; path: string } | { kind: 'globalView' };
+  const home = (): Home | null =>
+    JSON.parse(sessionStorage.getItem('liberMockHome') ?? 'null') as Home | null;
+  const setHome = (next: Home | null) =>
+    sessionStorage.setItem('liberMockHome', JSON.stringify(next));
+  const within = (path: string, dir: string) => path === dir || path.startsWith(`${dir}/`);
+  /** `from` moved to `to`: a page home inside it follows (or, into a bin, goes). */
+  const homeMoved = (from: string, to: string | null) => {
+    const h = home();
+    if (h?.kind !== 'page' || !within(h.path, from)) return;
+    const next = to === null ? null : to + h.path.slice(from.length);
+    const binned = !next || /^\.(trash|archive)(\/|$)/.test(next);
+    setHome(binned ? null : { kind: 'page', path: next });
+  };
   /** E4: the encrypted vault is unlocked; `vault_lock` locks it again. */
   let encUnlocked = false;
   /** Encrypt in place: the conversion between `vault_encrypt_begin` and `_run`. */
   let convertJob: { path: string; cancelled: boolean } | null = null;
+  /** Decrypt in place: between `vault_decrypt_begin` and its run's end. */
+  let decryptJob: { cancelled: boolean } | null = null;
+  /** `/enc` was decrypted: a plain vault from then on. */
+  let encDecrypted = false;
+  const plainEnc = () => ({ ...encInfo('enc', '/enc'), encrypted: false });
   const NEW_RECOVERY = `LIBER-${Array.from({ length: 14 }, (_, i) => `K${String(i + 1).padStart(2, '0')}${'ABCDEFGHJKMNPQ'[i]}`).join('-')}`;
   const encInfo = (name: string, root: string) => ({
     name,
     root,
     encrypted: true,
     recoveryVoid: encrypted?.recoveryVoid ?? false,
+    home: home(),
     report: {
       files: 2,
       pages: 2,
@@ -315,6 +351,7 @@ export function installIpcMock({
       const to = a.to as string;
       pages[to] = pages[from];
       delete pages[from];
+      homeMoved(from, to);
       ((w.__liberRenames ??= []) as unknown[]).push({ from, to });
       return { moved: [[from, to]], updatedFiles: [], updatedLinks: 0, failed: [] };
     },
@@ -381,6 +418,7 @@ export function installIpcMock({
       const inner = `.trash/${from.split('/').pop()}`;
       trashed[inner] = { text: pages[from], from, at: Date.now() };
       delete pages[from];
+      homeMoved(from, null);
       return inner;
     },
     trash_restore: (a) => {
@@ -402,6 +440,7 @@ export function installIpcMock({
       const to = `.archive/${from}`;
       pages[to] = pages[from];
       delete pages[from];
+      homeMoved(from, null);
       return { moved: [[from, to]], updatedFiles: [], updatedLinks: 0, failed: [] };
     },
     archive_restore: (a) => {
@@ -431,7 +470,15 @@ export function installIpcMock({
     vaults_recent: () => [
       { path: '/vault', name: 'vault', openedAt: '', missing: false, encrypted: false },
       ...(encrypted
-        ? [{ path: '/enc', name: 'enc', openedAt: '', missing: false, encrypted: true }]
+        ? [
+            {
+              path: '/enc',
+              name: 'enc',
+              openedAt: '',
+              missing: false,
+              encrypted: !encDecrypted,
+            },
+          ]
         : []),
     ],
     // The folder picker of Welcome and the Vault menu.
@@ -465,6 +512,10 @@ export function installIpcMock({
     folder_kind: (a) => folderKinds[a.path as string] ?? 'empty',
     menu_set_encrypt_item: (a) => {
       w.__liberEncryptItem = a.vault ?? null;
+      return null;
+    },
+    menu_set_decrypt_item: (a) => {
+      w.__liberDecryptItem = a.vault ?? null;
       return null;
     },
     vault_create: (a) => ({
@@ -554,6 +605,66 @@ export function installIpcMock({
       if (convertJob) convertJob.cancelled = true;
       convertJob = null; // a running run keeps its own `job`
       (w.__liberFinishEncrypt as (() => void) | undefined)?.();
+      (w.__liberFinishBackup as (() => void) | undefined)?.();
+      return null;
+    },
+    // The readable backup (encryption UX §9).
+    vault_encrypt_pick_backup: () => {
+      if (encryptInPlace.backupRefusal) throw encryptInPlace.backupRefusal;
+      return encryptInPlace.backupPick ?? '/e2e/backup';
+    },
+    vault_encrypt_backup: async () => {
+      const job = convertJob;
+      if (!job) throw { kind: 'notPermitted', message: 'nothing to back up: begin first' };
+      const total = Object.keys(pages).length + files.size;
+      const emit = w.__liberEmit as (e: string, p: unknown) => void;
+      emit('vault:encrypt-progress', { done: 1, total });
+      if (encryptInPlace.holdBackup) {
+        await new Promise((resolve) => (w.__liberFinishBackup = resolve));
+      }
+      if (job.cancelled) throw { kind: 'cancelled', message: 'encrypting was stopped' };
+      emit('vault:encrypt-progress', { done: total, total });
+      return null;
+    },
+    vault_reveal_backup: () => {
+      ((w.__liberReveals ??= []) as unknown[]).push('backup');
+      return null;
+    },
+    // Decrypt in place (encryption UX §10).
+    vault_decrypt_preflight: () => ({
+      files: 2,
+      bytes: 9,
+      blocked: decryptInPlace.blocked ?? [],
+      archives: [],
+    }),
+    vault_decrypt_begin: (a) => {
+      const pass = a.passphrase === encrypted?.passphrase;
+      const code = String(a.recovery).replace(/\s/g, '').toUpperCase() === encrypted?.recovery;
+      if (!pass || !code) {
+        const which = !pass && !code ? 'both' : !pass ? 'passphrase' : 'recovery';
+        throw { kind: 'decryptWrongSecret', message: which };
+      }
+      encUnlocked = false; // the session closed
+      decryptJob = { cancelled: false };
+      return null;
+    },
+    vault_decrypt_run: async () => {
+      const job = decryptJob;
+      if (!job) throw { kind: 'notPermitted', message: 'nothing to decrypt: begin first' };
+      const emit = w.__liberEmit as (e: string, p: unknown) => void;
+      emit('vault:decrypt-progress', { done: 1, total: 2 });
+      if (decryptInPlace.holdRun) {
+        await new Promise((resolve) => (w.__liberFinishDecrypt = resolve));
+      }
+      decryptJob = null;
+      if (job.cancelled) throw { kind: 'cancelled', message: 'decrypting was stopped' };
+      emit('vault:decrypt-progress', { done: 2, total: 2 });
+      encDecrypted = true;
+      return plainEnc();
+    },
+    vault_decrypt_cancel: () => {
+      if (decryptJob) decryptJob.cancelled = true;
+      (w.__liberFinishDecrypt as (() => void) | undefined)?.();
       return null;
     },
     vault_trash_originals: () => {
@@ -562,6 +673,7 @@ export function installIpcMock({
     },
     vault_reveal_originals: () => null,
     vault_open: (a) => {
+      if (encrypted && a.path === '/enc' && encDecrypted) return plainEnc();
       if (encrypted && a.path === '/enc' && !encUnlocked) {
         throw { kind: 'locked', message: 'locked' };
       }
@@ -569,6 +681,7 @@ export function installIpcMock({
       return {
         name: 'vault',
         root: '/vault',
+        home: home(),
         report: {
           files: 2,
           pages: 2,
@@ -613,6 +726,21 @@ export function installIpcMock({
     favorites_set: (a) => {
       const next = (a.paths as string[]).filter((p, i, all) => all.indexOf(p) === i);
       sessionStorage.setItem('liberMockFavorites', JSON.stringify(next));
+      return next;
+    },
+    // The window's title (M5b §2.3), kept so tests can read it.
+    window_title_set: (a) => {
+      w.__liberWindowTitle = a.title;
+      return null;
+    },
+    // The vault's home: a page of the vault (not a bin's) or the Global View.
+    home_get: () => home(),
+    home_set: (a) => {
+      const next = (a.home as Home | null) ?? null;
+      if (next?.kind === 'page' && (!(next.path in pages) || /^\./.test(next.path))) {
+        throw { kind: 'notFound', message: `not in the vault: ${next.path}` };
+      }
+      setHome(next);
       return next;
     },
     // ---- spell checking: a tiny dictionary that knows one misspelling ----
@@ -1097,6 +1225,39 @@ export function installIpcMock({
       };
     },
     notion_cancel: () => null,
+    // Custom title bar (Linux, Windows): the window buttons, and the menu
+    // items as Rust's `menu::activate` answers them (the ones e2e uses).
+    window_minimize: () => null,
+    window_maximized: () => false,
+    window_toggle_maximize: () => true,
+    window_toggle_fullscreen: () => null,
+    window_start_drag: () => null,
+    window_close_request: () => null,
+    window_paste: () => null,
+    menu_activate: (a) => {
+      const id = a.id as string;
+      ((w.__liberMenu ??= []) as string[]).push(id);
+      const emit = w.__liberEmit as (e: string, p: unknown) => void;
+      const toggles: Record<string, string> = {
+        'liber-toggle-toolbar': 'toolbar',
+        'liber-toggle-line-numbers': 'lineNumbers',
+        'liber-toggle-outline': 'outline',
+      };
+      const vault: Record<string, string> = {
+        'liber-vault-new': 'new',
+        'liber-vault-open': 'open',
+        'liber-vault-close': 'close',
+        'liber-vault-lock': 'lock',
+        'liber-vault-encrypt': 'encrypt',
+      };
+      if (id === 'liber-settings') emit('menu:settings', null);
+      else if (id === 'liber-screen-global') emit('menu:screen', 'global');
+      else if (id === 'liber-screen-edit') emit('menu:screen', 'edit');
+      else if (id === 'liber-toggle-sidebar') emit('menu:sidebar', null);
+      else if (toggles[id]) emit('menu:toggle', toggles[id]);
+      else if (vault[id]) emit('menu:vault', vault[id]);
+      return null;
+    },
     quick_notes_state: () => ({
       folder: inScratchpad ? null : 'Scratchpad',
       autoNamed: [...autoNamed],

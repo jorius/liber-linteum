@@ -27,6 +27,8 @@
   align-items: center;
   justify-content: space-between;
   gap: 8px 16px;
+  /* The home toggle gives its room back in a narrow page (below). */
+  container: page-bar / inline-size;
 }
 
 .controls {
@@ -123,6 +125,29 @@
 .count {
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
+}
+
+/* The cursor position: reads like the word count, and is a button (Go to
+   line). Over a cover it keeps the pill's veil (.bandCover .pill). */
+.cursorPos {
+  margin: 0;
+  border: 0;
+  padding: 2px 4px;
+  border-radius: var(--radius-sm);
+  background: none;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.cursorPos:hover {
+  color: var(--color-text);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.cursorPos:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 2px;
 }
 
 .modes {
@@ -685,6 +710,15 @@
   color: var(--color-text-strong);
 }
 
+/* The house (set as home page) is the first control to go when the bar is
+   narrow: it would wrap the controls onto another row and make the band
+   taller (final review M9). The tree's row menu and Settings still offer it. */
+@container page-bar (max-width: 600px) {
+  .homeToggle {
+    display: none;
+  }
+}
+
 /* The page width menu (M4b part 3 wide elements §2): a tick column. */
 .widthMenu {
   z-index: 40;
@@ -869,7 +903,7 @@ span.relatedOpen {
 /* The title and subtitle at the top of the page (M5b §2.3), over the text's
    measure. */
 /* The title and subtitle head the band, above the breadcrumb, at the size
-   they had in the top bar (Jose, M5b): one line each, ellipsis when long. */
+   they had in the top bar (M5b feedback): one line each, ellipsis when long. */
 .heading {
   box-sizing: border-box;
   width: fit-content;

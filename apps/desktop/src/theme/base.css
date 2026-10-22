@@ -19,6 +19,17 @@ body,
   height: 100%;
 }
 
+/* Custom title bar §2 (outside macOS): every screen sits below the bar. */
+html[data-titlebar] {
+  --titlebar-height: 38px;
+}
+
+/* On #root, not body: dnd-kit measures drops against the body's box, and a
+   padded body put every drop target the bar's height off. */
+html[data-titlebar] #root {
+  padding-top: var(--titlebar-height);
+}
+
 body {
   margin: 0;
   background: var(--color-bg);

@@ -11,13 +11,14 @@ import {
   type DragStartEvent,
 } from '@dnd-kit/core';
 import { useEffect, useMemo, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { nameOf } from '../../stores/tree';
 import { useVaultStore } from '../../stores/vaultStore';
 import { announcements, createSpringLoad, dropFeedback, type DropFeedback } from './dragFeedback';
 import { dropEntry, ROOT_DROP_ID } from './drop';
 import { ExplorerTree, type ExplorerTreeProps } from './ExplorerTree';
 import styles from './Explorer.module.css';
-import { displayName, Icon } from './TreeRow';
+import { displayName, Icon, useShowExtensions } from './TreeRow';
 
 const targetOf = (id: string | number | undefined) =>
   id === undefined ? null : id === ROOT_DROP_ID ? '' : String(id);
@@ -33,6 +34,7 @@ export function ExplorerDnd(props: ExplorerTreeProps) {
   const [feedback, setFeedback] = useState<DropFeedback>('none');
   const nodes = useVaultStore((s) => s.nodes);
   const vaultName = useVaultStore((s) => s.info?.name ?? '');
+  const extensions = useShowExtensions();
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
     useSensor(KeyboardSensor, {
@@ -49,7 +51,7 @@ export function ExplorerDnd(props: ExplorerTreeProps) {
   const nameFor = (path: string) => {
     if (path === '') return vaultName;
     const node = nodeOf(path);
-    return node ? displayName(node) : nameOf(path);
+    return node ? displayName(node, extensions) : nameOf(path);
   };
 
   // The pointer cursor follows the drop state while dragging.
@@ -102,18 +104,25 @@ export function ExplorerDnd(props: ExplorerTreeProps) {
       >
         <ExplorerTree {...props} dragging={active !== null} dropTarget={over} />
       </div>
-      <DragOverlay dropAnimation={null}>
-        {dragged ? (
-          <div
-            className={
-              feedback === 'forbidden' ? `${styles.ghost} ${styles.ghostForbidden}` : styles.ghost
-            }
-          >
-            <Icon node={dragged} expanded={false} />
-            <span>{displayName(dragged)}</span>
-          </div>
-        ) : null}
-      </DragOverlay>
+      {/* In <body>: the sidebar slides in with a transform, and a fixed
+          overlay under a transformed ancestor is placed (and measured for
+          drops) against it, not the window; with the title bar above it a
+          drag started during the slide aimed the bar's height off. */}
+      {createPortal(
+        <DragOverlay dropAnimation={null}>
+          {dragged ? (
+            <div
+              className={
+                feedback === 'forbidden' ? `${styles.ghost} ${styles.ghostForbidden}` : styles.ghost
+              }
+            >
+              <Icon node={dragged} expanded={false} />
+              <span>{displayName(dragged, extensions)}</span>
+            </div>
+          ) : null}
+        </DragOverlay>,
+        document.body,
+      )}
     </DndContext>
   );
 }

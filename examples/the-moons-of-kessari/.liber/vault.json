@@ -1,0 +1,19 @@
+{
+  "version": 1,
+  "icon": "🌘",
+  "folderIcons": {
+    "The Story": "📜",
+    "World": "🏜️",
+    "World/Moons": "🌗",
+    "World/Places": "🗺️",
+    "World/Factions": "🏛️",
+    "World/People": "👥",
+    "Field Notes": "📓",
+    "Screening Room": "🎬",
+    "attachments": "🖼️"
+  },
+  "favorites": [
+    "Welcome.md",
+    "The Story/01 The Linen-Keeper's Daughter.md"
+  ]
+}

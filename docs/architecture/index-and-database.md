@@ -43,7 +43,7 @@ Who owns what:
 An encrypted vault's index is **never on disk** (encryption spec §5.1). `VaultSession::open_encrypted(storage, sink)` (`crates/liber-session/src/session.rs`) opens `Index::open_in_memory()` (`:memory:`) instead of a file under the cache dir, then runs the same `reindex_all` as a plain vault. Nothing is written under `<app cache dir>/liber/` for it.
 
 - **Same schema, same pragmas.** `temp_store = MEMORY` keeps search's temp tables in RAM, and a `:memory:` database's journal is in memory too, so SQLite writes no temp file. `PRAGMA database_list` reports an empty file name (`VaultSession::index_file()` returns `""`; `encrypted_session_indexes_in_memory_only` asserts it).
-- **Every unlock is a full index.** There is nothing to diff against, so the first open after each unlock parses every page. On the 10,000-note reference vault, unlock to the first successful search takes **1.75 s** in release (budget 3 s, spec §10; `crates/liber-session/tests/encrypted_perf.rs`, 2026-10-20, on Jose's Mac while other builds ran), measured warm: right after sealing, with the ciphertext in the OS file cache. A cold-cache unlock (after a reboot, or after sync brought the files) is slower. The breakdown: about 1.71 s of indexing, 34 ms for the first search, and well under 1 ms of unlock with the test's tiny Argon2 parameters. The real Argon2id run (calibrated per device by `Argon2Params::calibrate()`) comes on top, by design. If this ever exceeds 3 s, phase E3b adds an encrypted snapshot (spec §5.1).
+- **Every unlock is a full index.** There is nothing to diff against, so the first open after each unlock parses every page. On the 10,000-note reference vault, unlock to the first successful search takes **1.75 s** in release (budget 3 s, spec §10; `crates/liber-session/tests/encrypted_perf.rs`, 2026-10-20, on the maintainer's Mac while other builds ran), measured warm: right after sealing, with the ciphertext in the OS file cache. A cold-cache unlock (after a reboot, or after sync brought the files) is slower. The breakdown: about 1.71 s of indexing, 34 ms for the first search, and well under 1 ms of unlock with the test's tiny Argon2 parameters. The real Argon2id run (calibrated per device by `Argon2Params::calibrate()`) comes on top, by design. If this ever exceeds 3 s, phase E3b adds an encrypted snapshot (spec §5.1).
 - **Lock drops it.** `VaultSession::lock()` stops the watcher, locks the storage and sets the session's index to `None` under the index mutex, which frees the whole database. Every index-backed call after that returns `VaultError::Locked`, so a watcher batch or a save that read before the lock can't write rows after it. Unlocking builds a fresh session.
 - **Residual.** The decrypted rows live in the process's memory while the vault is unlocked. The OS may page that memory to swap or include it in a crash dump; that is outside what the app controls.
 
@@ -198,6 +198,7 @@ These live in files, not SQLite:
 | 3 | M5 | `page_text` and `fts` (search) |
 | 4 | M5b | `pages.icon` |
 | 5 | Batch 6 | Text and code files get a `page_text` row (name, title = file name, folders, body), so search finds them; no tags or links |
+| 6 | 2026-10-22 | Excerpts leave out callout markers (`[!quote] Title` reads "Title"); no table changes, a bump re-parses every page |
 
 (Source: the comment at `schema.rs:1-7`.)
 

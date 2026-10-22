@@ -19,7 +19,7 @@ const MAX_PASSPHRASE_SLOTS: usize = 4;
 
 /// A sync client's copy of the header: `liber-vault (conflicted copy).json`,
 /// `liber-vault 2.json`, `liber-vault.sync-conflict-<…>.json`.
-fn is_header_copy(name: &str) -> bool {
+pub(super) fn is_header_copy(name: &str) -> bool {
     name != HEADER_FILE
         && name.starts_with("liber-vault")
         && (name.ends_with(".json") || name.contains(".sync-conflict-"))

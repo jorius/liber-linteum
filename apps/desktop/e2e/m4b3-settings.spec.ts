@@ -45,7 +45,10 @@ test('a click outside closes Settings and saves a theme colour typed but not con
   const box = (await dialog.boundingBox())!;
   await page.mouse.move(box.x + box.width / 2, box.y + 20);
   await page.mouse.down();
-  await page.mouse.move(4, 4);
+  // The bottom-left corner: the backdrop (the top-left one is the title bar
+  // outside macOS).
+  const corner = { x: 4, y: page.viewportSize()!.height - 4 };
+  await page.mouse.move(corner.x, corner.y);
   await page.mouse.up();
   await expect(dialog).toBeVisible();
 
@@ -53,7 +56,7 @@ test('a click outside closes Settings and saves a theme colour typed but not con
   await dialog.getByRole('button', { name: 'New theme' }).click();
   const hex = dialog.getByRole('textbox', { name: 'Primary colour (hex)', exact: true });
   await hex.fill('#123456');
-  await page.mouse.click(4, 4);
+  await page.mouse.click(corner.x, corner.y);
   await expect(dialog).toBeHidden();
 
   await openSettings(page, 'Appearance');

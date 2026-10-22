@@ -14,6 +14,7 @@ import { Editor } from '../editor/Editor';
 import { ModeToggle } from '../page/ModeToggle';
 import { PageSubtitle } from '../page/PageSubtitle';
 import { PageTitle } from '../page/PageTitle';
+import { CursorPosition } from '../page/CursorPosition';
 import { TextStats } from '../page/TextView';
 import { WidthMenu } from '../page/WidthMenu';
 import { WordCount } from '../page/WordCount';
@@ -167,6 +168,10 @@ function FileView({ info }: { info: FileInfo }) {
   const outline = useSettingsStore((s) => s.settings.outline);
   const text = info.kind === 'text';
   const handingOff = useSingleFileStore((s) => s.handingOff);
+  // The drawn title bar shows the file's name (custom title bar §2).
+  useEffect(() => {
+    document.title = info.name;
+  }, [info.name]);
   return (
     <main className={shell.content} inert={handingOff}>
       <section className={page.page} aria-label={t('page.region')}>
@@ -189,6 +194,7 @@ function FileView({ info }: { info: FileInfo }) {
                     {t(`editor.${status}`)}
                   </span>
                   {text ? <TextStats /> : <WordCount />}
+                  <CursorPosition />
                   {!text && (
                     <button
                       type="button"

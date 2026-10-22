@@ -77,7 +77,7 @@ fn read_and_write_text_with_compare_and_swap() {
 fn only_eligible_text_files() {
     let big = vec![b'a'; TEXT_MAX_BYTES + 1];
     let (_d, _c, s) = session_with(&[
-        ("nul.txt", b"a\0b"),
+        ("zero-byte.txt", b"a\0b"),
         ("latin1.txt", b"caf\xe9"),
         ("big.log", &big),
         ("page.md", b"# Page\n"),
@@ -85,7 +85,13 @@ fn only_eligible_text_files() {
         ("ok.txt", b"fine\n"),
         (".hidden/x.txt", b"hidden\n"),
     ]);
-    for path in ["nul.txt", "latin1.txt", "big.log", "page.md", "pic.png"] {
+    for path in [
+        "zero-byte.txt",
+        "latin1.txt",
+        "big.log",
+        "page.md",
+        "pic.png",
+    ] {
         let err = s.read_text(&vp(path)).unwrap_err();
         assert!(matches!(err, SessionError::NotAText(_)), "{path}: {err:?}");
     }

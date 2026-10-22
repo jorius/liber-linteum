@@ -83,6 +83,50 @@ pub fn check_and_record(config_dir: &Path, vault_id: &[u8; 16], epoch: u32) -> C
     save(config_dir, &store)
 }
 
+/// Removes `vault_id` (hex) from the store (decrypt in place, encryption UX
+/// §10.3: no header carries that id any more). Absent is fine.
+pub fn forget(config_dir: &Path, vault_id: &str) -> CmdResult<()> {
+    let _one = hold();
+    let path = config_dir.join(FILE_NAME);
+    let mut store = load(&path)?;
+    if store.remove(vault_id).is_none() {
+        return Ok(());
+    }
+    save(config_dir, &store)
+}
+
+/// Vault ids (hex) this device decrypted in place (`vault-retired.json`): a
+/// header of one that comes back at a plain folder's root is a leftover
+/// (encryption UX §10.3, review 6f). Ids only, nothing of the content.
+const RETIRED_FILE: &str = "vault-retired.json";
+
+fn retired_list(config_dir: &Path) -> CmdResult<Vec<String>> {
+    match std::fs::read(config_dir.join(RETIRED_FILE)) {
+        Ok(bytes) => serde_json::from_slice(&bytes).map_err(io),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(Vec::new()),
+        Err(e) => Err(io(e)),
+    }
+}
+
+/// Records `vault_id` (hex) as decrypted in place on this device.
+pub fn retire(config_dir: &Path, vault_id: &str) -> CmdResult<()> {
+    let _one = hold();
+    let mut list = retired_list(config_dir)?;
+    if list.iter().any(|v| v == vault_id) {
+        return Ok(());
+    }
+    list.push(vault_id.to_string());
+    let json = serde_json::to_vec_pretty(&list).map_err(io)?;
+    write_atomic(config_dir, RETIRED_FILE, &json).map_err(io)
+}
+
+/// Whether this device decrypted the vault `vault_id` (hex) in place. A
+/// list that can't be read counts as no (nothing is deleted on a guess).
+pub fn is_retired(config_dir: &Path, vault_id: &str) -> bool {
+    let _one = hold();
+    retired_list(config_dir).is_ok_and(|l| l.iter().any(|v| v == vault_id))
+}
+
 /// Atomic: a temp file unique to this write → fsync → rename → fsync the folder.
 fn save(config_dir: &Path, store: &Store) -> CmdResult<()> {
     let json = serde_json::to_vec_pretty(store).map_err(io)?;
@@ -209,6 +253,36 @@ mod tests {
             "kept aside, unchanged"
         );
         check_and_record(dir.path(), &a, 1).unwrap();
+    }
+
+    #[test]
+    fn a_forgotten_vault_leaves_the_others() {
+        let dir = tempfile::tempdir().unwrap();
+        let (a, b) = ([1u8; 16], [2u8; 16]);
+        check_and_record(dir.path(), &a, 3).unwrap();
+        check_and_record(dir.path(), &b, 1).unwrap();
+        forget(dir.path(), &hex(&a)).unwrap();
+        forget(dir.path(), &hex(&[9u8; 16])).unwrap();
+        let store: Store =
+            serde_json::from_slice(&std::fs::read(dir.path().join(FILE_NAME)).unwrap()).unwrap();
+        assert_eq!(store.len(), 1);
+        assert_eq!(store[&hex(&b)], 1);
+        // A vault with that id would start from scratch: any epoch opens.
+        check_and_record(dir.path(), &a, 1).unwrap();
+    }
+
+    #[test]
+    fn retired_vaults_are_remembered() {
+        let dir = tempfile::tempdir().unwrap();
+        assert!(!is_retired(dir.path(), "aa"));
+        retire(dir.path(), "aa").unwrap();
+        retire(dir.path(), "aa").unwrap();
+        retire(dir.path(), "bb").unwrap();
+        assert!(is_retired(dir.path(), "aa") && is_retired(dir.path(), "bb"));
+        assert!(!is_retired(dir.path(), "cc"));
+        let list: Vec<String> =
+            serde_json::from_slice(&std::fs::read(dir.path().join(RETIRED_FILE)).unwrap()).unwrap();
+        assert_eq!(list, ["aa", "bb"]);
     }
 
     #[test]

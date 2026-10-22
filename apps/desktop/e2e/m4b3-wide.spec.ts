@@ -8,7 +8,7 @@ import { installIpcMock } from './ipcMock';
 
 const AXE = readFileSync(new URL('../node_modules/axe-core/axe.min.js', import.meta.url), 'utf8');
 
-// Jose's "Military Ranks" table (seven columns), squeezed into the measure.
+// A worldbuilding "Military Ranks" table (seven columns), squeezed into the measure.
 const RANKS = [
   '| Category | Rank | Stars | Typical Color | Conceptual Insignia | Command Role | Authorized Ship Classes |',
   '| --- | --- | --- | --- | --- | --- | --- |',
@@ -173,13 +173,14 @@ test('Wide elements: the table spans the editor while the text keeps the measure
   expect(g.widgetLeft).toBeGreaterThanOrEqual(g.scrollerLeft);
   expect(g.widgetRight).toBeLessThanOrEqual(g.scrollerRight);
   expect(await brokenWords(page)).toEqual([]);
-  // Clicking into the table shows its source in the same wide box; typing works.
+  // Clicking into a cell shows the table's source in the same wide box, the
+  // cursor at the end of that cell; typing works.
   await page.locator('.cm-liber-widget td').first().click();
   const raw = page.locator('.cm-line[data-wide-src="tables"]').first();
   await expect(raw).toBeVisible();
   expect(await raw.evaluate((el) => el.getBoundingClientRect().width)).toBeGreaterThan(g.text + 50);
   await page.keyboard.type('Z');
-  await expect(page.locator('.cm-content')).toContainText('Z| Category');
+  await expect(page.locator('.cm-content')).toContainText('Pre-CommissionedZ | Cadet');
   expect(errors).toEqual([]);
 });
 

@@ -7,7 +7,7 @@ import { useTrailStore } from '../../stores/trailStore';
 import { useUiStore } from '../../stores/uiStore';
 import { useVaultStore } from '../../stores/vaultStore';
 import explorer from '../explorer/Explorer.module.css';
-import { displayName, Icon } from '../explorer/TreeRow';
+import { displayName, Icon, useShowExtensions } from '../explorer/TreeRow';
 import { ItemIcon } from '../icons/ItemIcon';
 import { shownFavorites, useFavoritesStore } from './favoritesStore';
 import styles from './Favorites.module.css';
@@ -238,7 +238,7 @@ function FavoriteRow({
   onRequestMenu,
 }: RowProps) {
   const { t } = useTranslation();
-  const name = displayName(node);
+  const name = displayName(node, useShowExtensions());
   const selected = useVaultStore((s) => s.selected === node.path);
   const kids = useVaultStore((s) =>
     node.kind === 'folder' ? s.children.get(node.path) : undefined,

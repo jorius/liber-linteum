@@ -3,7 +3,7 @@
 **Spec:** `docs/superpowers/specs/2026-10-13-m2b-editor-ux-design.md` · **Plan:** `docs/superpowers/plans/2026-10-13-m2b-editor-ux.md` · **Palette reference:** `docs/design/2026-10-13-m2b-palettes.html`
 **Branch:** `feat/m2b-editor-ux` (from `main` `1c9d0b1`). Previous hand-off: `docs/handoff/2026-10-12-m2a-editor-handoff.md`.
 
-This milestone is Jose's real-window feedback on M2a: rename from the title, a back arrow for followed links, more palettes plus a custom accent, legible fonts with per-mode pickers, and an optional formatting toolbar. The former M2b scope (covers, attachments, `[[` autocomplete) is now **M2c**.
+This milestone is the maintainer's real-window feedback on M2a: rename from the title, a back arrow for followed links, more palettes plus a custom accent, legible fonts with per-mode pickers, and an optional formatting toolbar. The former M2b scope (covers, attachments, `[[` autocomplete) is now **M2c**.
 
 ## 1. Status at a glance
 
@@ -183,9 +183,9 @@ Reviewer (opus, fresh context) on `2fa7ab1..7473d1f`: **0 Critical, 3 Important,
 
 `src/test/setup.ts` stubs `document.hasFocus()` → true (jsdom returns false mid-blur). Deferred minors: §10 g–k.
 
-## 14. Feedback round (Jose's real-window check, 2026-10-13)
+## 14. Feedback round (the maintainer's real-window check, 2026-10-13)
 
-Jose's notes after running the branch, and what changed. Spec: M2b §12 (it also supersedes M2a ED-04's ⌘-click).
+The maintainer's notes after running the branch, and what changed. Spec: M2b §12 (it also supersedes M2a ED-04's ⌘-click).
 
 | Feedback | Root cause / decision | Change | Test(s) |
 |---|---|---|---|

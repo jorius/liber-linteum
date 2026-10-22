@@ -47,16 +47,6 @@
   opacity: 0.75;
 }
 
-.privacy {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 12px;
-  color: var(--color-text-faint);
-  padding: 8px 8px 0;
-  margin: 0;
-}
-
 /* The Trash view (M5b round 2 design): app tokens only, so every palette,
    light and dark, follows. */
 .view {

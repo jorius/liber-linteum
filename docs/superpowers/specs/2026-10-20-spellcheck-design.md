@@ -1,6 +1,6 @@
 # Spell checking: design
 
-Status: written from Jose's answers (2026-10-20); plan to follow.
+Status: written from the maintainer's answers (2026-10-20); plan to follow.
 
 ## 0. Intent
 
@@ -12,7 +12,7 @@ Spell checking in the editor, with **full privacy**:
 
 The user picks one or more dictionaries.
 
-**Jose decided:**
+**The maintainer decided:**
 
 - Ship three dictionaries: **Spanish (Colombia)**, **Spanish (generic)** and **English (US)**.
 - Other dictionaries can be added from disk.
@@ -79,7 +79,7 @@ The user picks one or more dictionaries.
   - **Check spelling:** on by default.
   - **Dictionaries:** a list of checkboxes. The three bundled dictionaries come first, then imported ones, each with Remove.
   - **Add dictionary from disk…**
-  - **Default selection:** the dictionary matching the app language. English selects `en_US`; Spanish selects `es`, the generic Spanish (_my call_: `es` covers every region, and Jose can switch to `es_CO`).
+  - **Default selection:** the dictionary matching the app language. English selects `en_US`; Spanish selects `es`, the generic Spanish (_my call_: `es` covers every region, and the maintainer can switch to `es_CO`).
 - **"This vault"** gains a "Spelling" control with two choices: "Use the app's dictionaries", or a custom set (the same checkbox list). The choice is stored in `.liber/vault.json` as `spelling: { dictionaries: [ids] } | absent`.
 
 ## 5. What gets checked

@@ -3,7 +3,7 @@
 **What M4c is for:** taking a note without setting anything up, and opening any single Markdown or text file with no vault. Persona: quick note-takers (product spec §1.2).
 
 **Spec:** `docs/superpowers/specs/2026-10-14-m4c-scratchpad-design.md`. It holds §1–§6, plus:
-- **§7:** amendments from planning, Scratchpad. This includes Jose's 2026-10-15 addition of a scratch folder in every vault, and the rulings taken on his behalf.
+- **§7:** amendments from planning, Scratchpad. This includes the maintainer's 2026-10-15 addition of a scratch folder in every vault, and the rulings taken on his behalf.
 - **§8:** amendments from planning, single-file windows.
 - **§9:** final review of the single-file windows: what was fixed and what is deferred.
 - **§10:** final review of the Scratchpad: what was fixed and what is deferred.
@@ -15,7 +15,7 @@
 **Branch:** `feat/m4c-scratchpad`, stacked on `feat/m4b3-feedback` (ba67c0a). Merge order for the whole stack: M2c → M3a → M3b → M4 → M4b → M4b part 3 → **M4c** → M5.
 
 **How it was built:**
-1. **Jose's decisions.** The spec was agreed with Jose on 2026-10-14: the location is chosen on first use, opened files get their own windows, and names come from the first line. On 2026-10-15 he added a scratch place inside every vault and chose **a folder of quick notes**, over a single scratch page or both.
+1. **The maintainer's decisions.** The spec was agreed with the maintainer on 2026-10-14: the location is chosen on first use, opened files get their own windows, and names come from the first line. On 2026-10-15 he added a scratch place inside every vault and chose **a folder of quick notes**, over a single scratch page or both.
 2. **Two streams in parallel**, each with its own plan, worktree and full gate:
 
    | Stream | Covers | Branch |
@@ -40,7 +40,7 @@
 | Moving it | **Settings → Files → Quick notes folder (no vault open) → Change…** points to another folder. Existing notes stay where they are. |
 | A missing folder | Created again on open. If that fails (an unplugged drive), the error shows with the first-use dialog so you can choose another folder. |
 
-### A scratch folder in every vault (Jose, 2026-10-15)
+### A scratch folder in every vault (the maintainer, 2026-10-15)
 
 | What | How it behaves |
 |---|---|
@@ -124,7 +124,7 @@ The dev server was also booted in Chromium and WebKit after each stream and afte
 
 Finder "Open With", dropping on the Dock and several windows only work in a **built app**, not in `pnpm dev`. Use the `.app` from §5.
 
-### Jose, on the Mac (the built `.app`)
+### The maintainer, on the Mac (the built `.app`)
 
 1. **Quick note from Welcome.**
    - With no vault open, click **Take a quick note**. The first-use dialog appears; keep the default and click Create.
@@ -162,7 +162,7 @@ Finder "Open With", dropping on the Dock and several windows only work in a **bu
 13. **Settings in every window.** Change the theme or editor mode from a file window: the main window follows.
 14. **Hidden files.** A file window can't show `![](.secret/x.png)` or a symlink into a hidden folder. A missing-image card shows instead.
 
-### The friend, on Windows (the `.exe`)
+### The Windows tester (the `.exe`)
 
 1. **Quick notes.**
    - **Take a quick note** on Welcome, then Ctrl+Shift+N with a vault open: one note per press, in the pinned Scratchpad folder.

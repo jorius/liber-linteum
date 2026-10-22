@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { folderPageOf, joinPath, nameOf, parentOf } from '../../stores/tree';
 import { useUiStore } from '../../stores/uiStore';
@@ -9,14 +9,17 @@ import { archiveItem, restoreItem } from '../bin/binActions';
 import { isArchived } from '../../stores/tree';
 import { openPage } from '../../stores/navigate';
 import { SortMenu } from './SortMenu';
+import { placePopup, windowViewport } from '../editor/placePopup';
 import { requestTrash } from './trashAction';
 import { nudgeFavorite, shownFavorites, useFavoritesStore } from '../favorites/favoritesStore';
-import { displayName } from './TreeRow';
+import { displayName, useShowExtensions } from './TreeRow';
 import { entryReveal } from '../../ipc';
 import { errorMessage } from '../../stores/messages';
 import { useToastStore } from '../../stores/toastStore';
 import { revealKey } from './reveal';
 import { newQuickNote } from '../scratchpad/quickNote';
+import { homeOffered, homePageOf, toggleHomePage, useHomeStore } from '../home/homeStore';
+import { isTextPath } from '../../stores/textFiles';
 
 export interface MenuState {
   path: string;
@@ -26,11 +29,14 @@ export interface MenuState {
 /** Explorer actions for one item (right-click, "…" or Shift+F10). */
 export function ContextMenu({ menu, onClose }: { menu: MenuState; onClose: () => void }) {
   const { t } = useTranslation();
+  const extensions = useShowExtensions();
   // From its folder's rows, which also hold the Archive's (M5b round 2).
   const node = useVaultStore((s) =>
     s.children.get(parentOf(menu.path))?.find((n) => n.path === menu.path),
   );
   const favorites = useFavoritesStore((s) => s.paths);
+  const homePage = useHomeStore((s) => homePageOf(s.home));
+  const offersHome = useVaultStore((s) => homeOffered(s.info));
   const [active, setActive] = useState(0);
   // Icon… swaps the menu for the emoji picker at the same place (M5b §4).
   const [picking, setPicking] = useState(false);
@@ -38,6 +44,18 @@ export function ContextMenu({ menu, onClose }: { menu: MenuState; onClose: () =>
   const [sorting, setSorting] = useState(false);
   const items = useRef<(HTMLButtonElement | null)[]>([]);
   const box = useRef<HTMLDivElement>(null);
+
+  // Inside the window, below the title bar: a row near the bottom opens the
+  // menu upwards instead of hiding its last items off screen.
+  const [place, setPlace] = useState({ top: menu.anchor.y, left: menu.anchor.x });
+  useLayoutEffect(() => {
+    const el = box.current;
+    if (!el) return;
+    const at = { top: menu.anchor.y, bottom: menu.anchor.y, left: menu.anchor.x };
+    const size = { width: el.offsetWidth, height: el.offsetHeight };
+    const { top, left } = placePopup(at, size, windowViewport());
+    setPlace((p) => (p.top === top && p.left === left ? p : { top, left }));
+  }, [menu.anchor.x, menu.anchor.y, picking, sorting]);
 
   useEffect(() => {
     items.current[active]?.focus();
@@ -128,6 +146,16 @@ export function ContextMenu({ menu, onClose }: { menu: MenuState; onClose: () =>
         [t('menu.sortBy'), () => setSorting(true)],
         [t('menu.archive'), () => void archiveItem(node.path)],
         [t('menu.delete'), () => requestTrash(node.path)],
+        // The vault's home: a page (a folder's own page) or a text file.
+        ...(offersHome &&
+        (page || node.kind === 'page' || (node.kind === 'attachment' && isTextPath(node.path)))
+          ? [
+              [
+                t(homePage === target ? 'home.removePage' : 'home.setPage'),
+                () => void toggleHomePage(target),
+              ] as [string, () => void],
+            ]
+          : []),
         // Favorites (M5b §19): pages and folders; a favorite also moves in the list.
         ...favoriteActions(target, page ? 'page' : node.kind, favorites, t),
       ];
@@ -140,7 +168,7 @@ export function ContextMenu({ menu, onClose }: { menu: MenuState; onClose: () =>
       dir === '.archive'
         ? t('bin.archived')
         : folder && dir
-          ? displayName(folder)
+          ? displayName(folder, extensions)
           : (vault.info?.name ?? '');
     return (
       <SortMenu
@@ -162,7 +190,7 @@ export function ContextMenu({ menu, onClose }: { menu: MenuState; onClose: () =>
     return (
       <EmojiPicker
         anchor={() => ({ top: menu.anchor.y, bottom: menu.anchor.y, left: menu.anchor.x })}
-        label={t('icons.pickFor', { name: displayName(node) })}
+        label={t('icons.pickFor', { name: displayName(node, extensions) })}
         hasIcon={!!iconOf}
         onClose={onClose}
         onPick={(emoji) => {
@@ -191,9 +219,9 @@ export function ContextMenu({ menu, onClose }: { menu: MenuState; onClose: () =>
     <div
       ref={box}
       role="menu"
-      aria-label={t('menu.label', { name: displayName(node) })}
+      aria-label={t('menu.label', { name: displayName(node, extensions) })}
       className="liber-menu"
-      style={{ position: 'fixed', left: menu.anchor.x, top: menu.anchor.y }}
+      style={{ position: 'fixed', left: place.left, top: place.top }}
       onKeyDown={onKeyDown}
     >
       {actions.map(([label, run], i) => (

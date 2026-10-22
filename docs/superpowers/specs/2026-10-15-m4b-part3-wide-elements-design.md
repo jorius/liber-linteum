@@ -1,13 +1,13 @@
 # M4b, part 3 — Wide elements (tables and friends at full width): Design
 
-**Status:** agreed with Jose on 2026-10-15, one answer.
+**Status:** agreed with the maintainer on 2026-10-15, one answer.
 - Added to the second feedback round (`docs/superpowers/specs/2026-10-15-m4b-part3-design.md`) as **Stream D**.
 - Same branch: `feat/m4b3-feedback`.
 - Builds on M4b part 2 §1 (page width: app, vault, page).
 
 ## 1. The feedback
 
-**What Jose saw:** a worldbuilding table ("Military Ranks", seven columns) squeezed into the 760 px readable measure. Cells break words mid-word ("Typic al", "Bronz e", "Lieutena nt").
+**What the maintainer saw:** a worldbuilding table ("Military Ranks", seven columns) squeezed into the 760 px readable measure. Cells break words mid-word ("Typic al", "Bronz e", "Lieutena nt").
 
 **What he asked for:** let tables, and other elements he picks, use the full width while the text stays at the readable measure.
 

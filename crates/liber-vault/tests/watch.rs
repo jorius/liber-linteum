@@ -77,10 +77,14 @@ fn vlt_05_hidden_and_excluded_changes_are_dropped() {
     std::fs::write(dir.path().join("Archive/Old/x.md"), "x").unwrap();
     std::fs::write(dir.path().join("visible.md"), "v").unwrap();
     assert!(saw(&seen, WatchEvent::Changed(vp("visible.md"))));
+    // `Archive` itself is visible (the glob is its contents), and Windows
+    // reports it changed when something inside it is written.
     let all = seen.lock().unwrap().clone();
     assert!(
-        all.iter()
-            .all(|e| !format!("{e:?}").contains(".liber") && !format!("{e:?}").contains("Archive")),
+        all.iter().all(|e| {
+            let e = format!("{e:?}");
+            !e.contains(".liber") && !e.contains("Archive/")
+        }),
         "{all:?}"
     );
 }

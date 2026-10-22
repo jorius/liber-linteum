@@ -78,17 +78,17 @@ describe('Welcome screen', () => {
   it('UX round §3: an encrypted vault keeps its folder icon and shows an Encrypted chip as real text', async () => {
     backend({
       vaults_recent: () => [
-        { path: '/v/Smartjob', name: 'Smartjob', openedAt: '', missing: false, encrypted: true },
+        { path: '/v/Myproject', name: 'Myproject', openedAt: '', missing: false, encrypted: true },
         { path: '/v/Notes', name: 'Notes', openedAt: '', missing: false, encrypted: false },
       ],
     });
     render(<Welcome version={null} />);
     const list = await screen.findByRole('list', { name: 'Recent vaults' });
-    const row = within(list).getByRole('button', { name: /^Smartjob Encrypted/ });
+    const row = within(list).getByRole('button', { name: /^Myproject Encrypted/ });
     const chip = within(row).getByText('Encrypted');
     expect(chip).toHaveClass('liber-chip');
     expect(chip).not.toHaveClass('liber-sr-only');
-    expect(chip.previousElementSibling).toHaveTextContent('Smartjob');
+    expect(chip.previousElementSibling).toHaveTextContent('Myproject');
     expect(row.querySelector('.liber-sr-only')).toBeNull();
     // The vault's own icon (E3 sends no emoji for an encrypted vault): the folder.
     const icon = (b: HTMLElement) => b.querySelector('[aria-hidden="true"] svg')?.outerHTML;
@@ -145,6 +145,12 @@ describe('Welcome screen', () => {
     await userEvent.click(within(list).getByRole('button', { name: /^Notes/ }));
     await waitFor(() => expect(useVaultStore.getState().status).toBe('open'));
     expect(calls.find(([c]) => c === 'vault_open')?.[1]).toEqual({ path: '/v/Notes' });
+  });
+
+  it('has no "Local only" line under the language switch', () => {
+    backend({ vaults_recent: () => [] });
+    render(<Welcome version="0.1.0" />);
+    expect(screen.queryByText(/Local only/)).not.toBeInTheDocument();
   });
 
   it('Q-I18N-1 language toggle switches to Spanish and saves the choice', async () => {

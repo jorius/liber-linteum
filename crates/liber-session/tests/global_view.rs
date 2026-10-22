@@ -867,6 +867,7 @@ fn m3b_relationships_of_folder_cards_index_notes_are_direct_edges() {
 /// (`'[[say "hi"]]'`, as the app writes it); liber-markdown indexes it, and
 /// the relationship resolves to the page: a direct manual edge.
 #[test]
+#[cfg(unix)] // Windows names can't hold `"`.
 fn m3b_a_single_quoted_link_with_double_quotes_is_indexed_and_resolves() {
     let dir = tempfile::tempdir().unwrap();
     let r = dir.path();

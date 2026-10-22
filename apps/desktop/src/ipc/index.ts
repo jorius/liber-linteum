@@ -69,6 +69,27 @@ export type ErrorKind =
   | 'convertMismatch'
   | 'convertUndoFailed'
   | 'convertFinishFailed'
+  /** The readable backup (encryption UX §9): the folder (the message) is in
+   *  the vault, in another vault (the message: that vault), or not empty;
+   *  `backupFailed`: writing or checking it failed (the message: the file and
+   *  why), nothing was encrypted. */
+  | 'backupInVault'
+  | 'backupInOtherVault'
+  | 'backupNotEmpty'
+  | 'backupFailed'
+  /** Decrypt in place (§10): the message says which secret opens no slot:
+   *  `passphrase`, `recovery` or `both`. */
+  | 'decryptWrongSecret'
+  /** Decrypt in place: the backend's own reasons, as the convert ones. */
+  | 'decryptingElsewhere'
+  | 'decryptingElsewhereFinishing'
+  | 'changedDuringDecrypt'
+  | 'decryptActive'
+  | 'decryptPending'
+  | 'decryptMismatch'
+  | 'decryptCollision'
+  | 'decryptUndoFailed'
+  | 'decryptFinishFailed'
   | 'io';
 
 export interface CommandError {
@@ -140,7 +161,16 @@ export interface VaultInfo {
    *  Trash and are still in the vault folder. Show the banner with
    *  `vaultTrashOriginals` and `vaultRevealOriginals`. */
   originalsPending?: boolean;
+  /** What the vault opens to (`.liber/vault.json`); none: nothing chosen. */
+  home?: Home | null;
+  /** Decrypt in place (§10.5): cleaning up didn't finish; the old keys and
+   *  ciphertext are still in this folder (the next open deletes them). */
+  keysLeft?: string;
 }
+
+/** A vault's home: a page (or text file) opened in the editor, or the
+ *  Global View. */
+export type Home = { kind: 'page'; path: string } | { kind: 'globalView' };
 
 export type NodeKind = 'page' | 'folder' | 'attachment';
 
@@ -251,6 +281,12 @@ export interface Settings {
   coverHeight: number;
   /** A caption with each attachment's place on disk (M4b part 3 §8). */
   showAttachmentPaths: boolean;
+  /** File names show their extension (`Chapter 1.md`, `notes.txt`) where
+   *  the UI names a file; off: pages without `.md`. Never a page's title. */
+  showExtensions: boolean;
+  /** `(`, `[`, `{`, `"` and backticks close themselves; a selection is
+   *  wrapped (editor). */
+  autoCloseBrackets: boolean;
   /** The global Scratchpad's folder (M4c §2); `null` until the first quick
    *  note. Changed only through `scratchpadSet`, never a settings patch. */
   scratchpadPath?: string | null;
@@ -323,6 +359,8 @@ export interface SettingsPatch {
   outline?: boolean;
   coverHeight?: number;
   showAttachmentPaths?: boolean;
+  showExtensions?: boolean;
+  autoCloseBrackets?: boolean;
   autoSave?: boolean;
   sidebarCollapsed?: boolean;
   sidebarWidth?: number;
@@ -406,6 +444,27 @@ export interface VaultLockRequestPayload {
 // vault_open / vault_unlock first finish or undo this device's interrupted
 //   conversion and emit `vault:encrypt-recovered` (EncryptRecoveredPayload);
 //   another device's makes them fail with `convertingElsewhere`.
+//
+// The readable backup (§9): vault_encrypt_pick_backup { path } → string |
+//   null (the folder dialog; the folder, checked, or `null` when cancelled;
+//   `backupInVault` / `backupInOtherVault` / `backupNotEmpty`). Rust keeps
+//   it: vault_encrypt_begin { path, passphrase, backup: true } uses it, then
+//   vault_encrypt_backup {} writes and verifies the copy (progress on
+//   `vault:encrypt-progress`; `backupFailed`, `cancelled`: undone, nothing
+//   encrypted) BEFORE the recovery key shows. vault_reveal_backup {} shows it.
+//
+// Decrypt in place (§10), the open encrypted vault:
+// vault_decrypt_preflight {} → DecryptPreflight (changes nothing).
+// vault_decrypt_begin { passphrase, recovery } → void: each checked on its
+//   own (`decryptWrongSecret`, message `passphrase` | `recovery` | `both`);
+//   then the session closes (save open pages first).
+// vault_decrypt_run {} → VaultInfo (the folder open as a plain vault). Emits
+//   `vault:decrypt-progress` after each file. `cancelled` (rolled back: the
+//   vault is encrypted and closed), `changedDuringDecrypt`, `damaged`.
+// vault_decrypt_cancel {} → void: Stop and undo, or undoes a begin not run.
+// Opens recover an interrupted decryption first (`vault:decrypt-recovered`);
+//   another device's fails with `decryptingElsewhere` (undo it with
+//   vault_encrypt_undo_elsewhere) or `decryptingElsewhereFinishing`.
 
 export type EncryptBlockedReason =
   | 'badChar'
@@ -419,7 +478,13 @@ export type EncryptBlockedReason =
   | 'longName'
   | 'notUtf8'
   /** A vault of its own inside the folder (final review I3). */
-  | 'vault';
+  | 'vault'
+  /** Decrypt in place: a readable entry beside the vault has this name. */
+  | 'taken'
+  /** Decrypt in place: an unfinished write under `d/` (a hidden temp file). */
+  | 'unfinished'
+  /** Decrypt in place: a recording not yet saved as a clip. */
+  | 'recording';
 
 export interface EncryptBlocked {
   /** Vault-relative, `/`-separated. */
@@ -435,6 +500,16 @@ export interface EncryptPreflight {
   /** Begin will close the open vault (this folder under any spelling,
    *  inside it or around it): the UI leaves it first. */
   closesOpen: boolean;
+}
+
+/** Decrypt in place (§10.2): what blocks it, read from the open vault. */
+export interface DecryptPreflight {
+  files: number;
+  bytes: number;
+  blocked: EncryptBlocked[];
+  /** Sync archives at the root (`.stversions`, `.sync`): they may keep old
+   *  encrypted files and keys; decrypting never touches them. */
+  archives: string[];
 }
 
 /** `vault:encrypt-progress`. */
@@ -504,7 +579,7 @@ export type LinkFormat = 'shortest' | 'vault' | 'relative' | 'absolute';
 
 /** A file outside the vault that a link names (M4b part 3 §9). */
 export interface ExternalFile {
-  /** Absolute, in its OS's form (`D:\Docs\x.pdf`, `/Users/jose/x.png`). */
+  /** Absolute, in its OS's form (`D:\Docs\x.pdf`, `/Users/me/x.png`). */
   path: string;
   /** A regular, visible file on this computer. */
   exists: boolean;
@@ -761,6 +836,24 @@ export const destroyWindow = () => call<void>('window_close_self');
 /** Names this window (M5b §2.3: "Page — Vault"). */
 export const windowTitleSet = (title: string) => call<void>('window_title_set', { title });
 
+// ---- custom title bar (Linux, Windows): this window's frame and menus ----
+export const windowMinimize = () => call<void>('window_minimize');
+/** Answers whether the window is now maximized. */
+export const windowToggleMaximize = () => call<boolean>('window_toggle_maximize');
+export const windowMaximized = () => call<boolean>('window_maximized');
+export const windowToggleFullscreen = () => call<void>('window_toggle_fullscreen');
+/** Moves the window with the pointer (a press on the title bar). */
+export const windowStartDrag = () => call<void>('window_start_drag');
+/** A close request, as the system's close button sends: the page saves first. */
+export const windowCloseRequest = () => call<void>('window_close_request');
+/** Edit → Paste where the page can't read the clipboard (Linux). */
+export const windowPaste = () => call<void>('window_paste');
+/** Runs the macOS menu item `id` (`liber-…`, src-tauri/src/menu.rs) for this window. */
+export const menuActivate = (id: string) => call<void>('menu_activate', { id });
+/** The window was resized, maximized or restored. */
+export const onWindowResized = (cb: () => void): Promise<UnlistenFn> =>
+  getCurrentWindow().onResized(() => cb());
+
 export const vaultOpen = (path: string) => call<VaultInfo>('vault_open', { path });
 export const vaultCreate = (path: string) => call<VaultInfo>('vault_create', { path });
 export const vaultClose = () => call<void>('vault_close');
@@ -778,6 +871,10 @@ export const menuSetLockEnabled = (enabled: boolean) =>
  *  vault, off with `null`. */
 export const menuSetEncryptItem = (vault: string | null) =>
   call<void>('menu_set_encrypt_item', { vault });
+/** Vault → Decrypt "<vault>"… (§10.1): named and on for an open encrypted
+ *  vault, off with `null`. */
+export const menuSetDecryptItem = (vault: string | null) =>
+  call<void>('menu_set_decrypt_item', { vault });
 /** What a folder chosen for a new vault holds (UX round §2): `empty` (OS
  *  files aside) or `missing` can be created in; `plain` has files;
  *  `refused`: never encrypted in place (Scratchpad, home, Desktop,
@@ -798,8 +895,19 @@ export const attachmentOpenDecrypted = (path: string) =>
 // ---- Encrypt in place (encryption UX §4.3, §8) ----
 export const vaultEncryptPreflight = (path: string) =>
   call<EncryptPreflight>('vault_encrypt_preflight', { path });
-export const vaultEncryptBegin = (path: string, passphrase: string) =>
-  call<{ recovery: string }>('vault_encrypt_begin', { path, passphrase });
+export const vaultEncryptBegin = (path: string, passphrase: string, backup = false) =>
+  call<{ recovery: string }>('vault_encrypt_begin', { path, passphrase, backup });
+/** The readable backup's folder (§9.1): the native dialog, then the checks. */
+export const vaultEncryptPickBackup = (path: string) =>
+  call<string | null>('vault_encrypt_pick_backup', { path });
+export const vaultEncryptBackup = () => call<void>('vault_encrypt_backup');
+export const vaultRevealBackup = () => call<void>('vault_reveal_backup');
+// ---- Decrypt in place (encryption UX §10) ----
+export const vaultDecryptPreflight = () => call<DecryptPreflight>('vault_decrypt_preflight');
+export const vaultDecryptBegin = (passphrase: string, recovery: string) =>
+  call<void>('vault_decrypt_begin', { passphrase, recovery });
+export const vaultDecryptRun = () => call<VaultInfo>('vault_decrypt_run');
+export const vaultDecryptCancel = () => call<void>('vault_decrypt_cancel');
 export const vaultEncryptRun = () => call<VaultInfo>('vault_encrypt_run');
 export const vaultEncryptCancel = () => call<void>('vault_encrypt_cancel');
 /** Another device's conversion still copying, undone here (spec §8.11). */
@@ -1026,6 +1134,13 @@ export const favoritesGet = () => call<string[]>('favorites_get');
 /** Replaces the favorites; Rust drops missing entries and repeats and
  *  returns what it stored. */
 export const favoritesSet = (paths: string[]) => call<string[]>('favorites_set', { paths });
+
+/** The vault's home, as `.liber/vault.json` holds it now (renames move it). */
+export const homeGet = () => call<Home | null>('home_get');
+/** Sets the home (`null`: nothing chosen); Rust refuses what the vault can't
+ *  open to (a folder, an image, the Trash or the Archive) and returns what it
+ *  stored. */
+export const homeSet = (home: Home | null) => call<Home | null>('home_set', { home });
 
 // ---- quick notes (M4c §2, §7) ----
 
@@ -1272,6 +1387,12 @@ export const onNotionProgress = (
 /** View → Search… in the app menu (M5 §4). */
 export const onMenuSearch = (cb: () => void): Promise<UnlistenFn> =>
   listen<null>('menu:search', () => cb(), mine());
+/** Edit → Find… in the app menu: find in the page (find in page). */
+export const onMenuFind = (cb: () => void): Promise<UnlistenFn> =>
+  listen<null>('menu:find', () => cb(), mine());
+/** Edit → Go to Line… in the app menu (Ctrl+G). */
+export const onMenuGoToLine = (cb: () => void): Promise<UnlistenFn> =>
+  listen<null>('menu:goto-line', () => cb(), mine());
 /** Liber Linteum → Settings… (M5b §2.1). */
 export const onMenuSettings = (cb: () => void): Promise<UnlistenFn> =>
   listen<null>('menu:settings', () => cb(), mine());
@@ -1296,6 +1417,12 @@ export const onEncryptProgress = (cb: (p: EncryptProgressPayload) => void): Prom
 /** Encrypt in place: an open finished or undid an interrupted conversion. */
 export const onEncryptRecovered = (cb: (p: EncryptRecoveredPayload) => void): Promise<UnlistenFn> =>
   listen<EncryptRecoveredPayload>('vault:encrypt-recovered', (e) => cb(e.payload), mine());
+/** Decrypt in place: after each file written and checked. */
+export const onDecryptProgress = (cb: (p: EncryptProgressPayload) => void): Promise<UnlistenFn> =>
+  listen<EncryptProgressPayload>('vault:decrypt-progress', (e) => cb(e.payload), mine());
+/** Decrypt in place: an open finished or undid an interrupted decryption. */
+export const onDecryptRecovered = (cb: (p: EncryptRecoveredPayload) => void): Promise<UnlistenFn> =>
+  listen<EncryptRecoveredPayload>('vault:decrypt-recovered', (e) => cb(e.payload), mine());
 export const onVaultWarning = (cb: (p: WarningPayload) => void): Promise<UnlistenFn> =>
   listen<WarningPayload>('vault:warning', (e) => cb(e.payload));
 

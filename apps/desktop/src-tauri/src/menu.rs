@@ -43,6 +43,19 @@ pub const ATOMS_ID: &str = "liber-see-atoms";
 /// Id of View → Search… (M5 §4); the page answers `menu:search`.
 pub const SEARCH_ID: &str = "liber-search";
 pub const SEARCH_EVENT: &str = "menu:search";
+/// ⌘⇧F: ⌘F is Edit → Find… (find in page).
+pub const SEARCH_ACCELERATOR: &str = "CmdOrCtrl+Shift+F";
+/// Id of Edit → Find… (find in page): the focused window answers
+/// `menu:find`, finding in its page (the main window opens Search when no
+/// editor shows, as the key does).
+pub const FIND_ID: &str = "liber-find";
+pub const FIND_EVENT: &str = "menu:find";
+pub const FIND_ACCELERATOR: &str = "CmdOrCtrl+F";
+/// Id of Edit → Go to Line…: the focused window answers `menu:goto-line`.
+/// Ctrl+G on every platform, macOS included (⌘G is find next there).
+pub const GOTO_LINE_ID: &str = "liber-goto-line";
+pub const GOTO_LINE_EVENT: &str = "menu:goto-line";
+pub const GOTO_LINE_ACCELERATOR: &str = "Ctrl+G";
 /// Event telling the page which screen to show; payload `"edit"`,
 /// `"global"`, or `"atoms"` (the open page's atoms in the Global View).
 pub const SCREEN_EVENT: &str = "menu:screen";
@@ -82,6 +95,15 @@ pub fn encrypt_label(vault: Option<&str>) -> String {
     match vault {
         Some(name) => format!("Encrypt “{}”…", menu_name(name)),
         None => "Encrypt Vault…".into(),
+    }
+}
+
+/// Vault → Decrypt "<name>"… (encryption UX §10.1): the open encrypted
+/// vault's name, or the generic label while the item is off.
+pub fn decrypt_label(vault: Option<&str>) -> String {
+    match vault {
+        Some(name) => format!("Decrypt “{}”…", menu_name(name)),
+        None => "Decrypt Vault…".into(),
     }
 }
 
@@ -133,6 +155,11 @@ pub const VAULT_NEW_ID: &str = "liber-vault-new";
 /// Vault → Encrypt "<name>"… (encryption UX round §4.1): enabled and named
 /// only while a plain vault is open (`menu_set_encrypt_item`).
 pub const VAULT_ENCRYPT_ID: &str = "liber-vault-encrypt";
+/// Vault → Decrypt "<name>"… (encryption UX §10.1): enabled and named only
+/// while an encrypted vault is open (`menu_set_decrypt_item`); `menu:vault`
+/// payload `"decrypt"`. The in-app menu bar of Linux and Windows uses the
+/// same id.
+pub const VAULT_DECRYPT_ID: &str = "liber-vault-decrypt";
 
 /// The `menu:vault` payload of a Vault menu item.
 fn vault_action(id: &str) -> Option<&'static str> {
@@ -142,6 +169,7 @@ fn vault_action(id: &str) -> Option<&'static str> {
         VAULT_CLOSE_ID => Some("close"),
         VAULT_LOCK_ID => Some("lock"),
         VAULT_ENCRYPT_ID => Some("encrypt"),
+        VAULT_DECRYPT_ID => Some("decrypt"),
         _ => None,
     }
 }
@@ -164,6 +192,16 @@ pub fn menu_set_encrypt_item<R: Runtime>(app: AppHandle<R>, vault: Option<String
         let _ = item.set_enabled(vault.is_some());
     }
 }
+
+/// Names and enables Vault → Decrypt "<vault>"…, or turns it off with no
+/// vault (the page calls this as an encrypted vault opens and goes).
+#[tauri::command]
+pub fn menu_set_decrypt_item<R: Runtime>(app: AppHandle<R>, vault: Option<String>) {
+    if let Some(item) = find_item(&app, VAULT_DECRYPT_ID) {
+        let _ = item.set_text(decrypt_label(vault.as_deref()));
+        let _ = item.set_enabled(vault.is_some());
+    }
+}
 /// File → Save (M5b §6, auto save off): the focused window saves its page.
 pub const SAVE_ID: &str = "liber-save";
 pub const SAVE_EVENT: &str = "menu:save";
@@ -176,7 +214,7 @@ pub const SIDEBAR_EVENT: &str = "menu:sidebar";
 /// File (New Quick Note, ⌘⇧N: from any window, so it carries the
 /// accelerator; the page also answers ⌘⇧N where there is no app menu and
 /// ignores a second trigger within a second, M4c §7.10); Edit (Undo, Redo, Cut, Copy, Paste, Select All: macOS routes the text
-/// editing shortcuts through it); View (Editor, Global View — no
+/// editing shortcuts through it; Find… ⌘F, find in page; Go to Line… Ctrl+G); View (Search… ⌘⇧F; Editor, Global View — no
 /// accelerators: the page handles ⌘1 / ⌘2; Back, Forward along the link trail —
 /// no accelerators: the page handles ⌘[ / ⌘] itself, which also works where
 /// there is no app menu; the formatting toolbar, line-number and outline toggles —
@@ -282,6 +320,13 @@ pub fn app_menu<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
         false,
         None::<&str>,
     )?;
+    let vault_decrypt = MenuItem::with_id(
+        app,
+        VAULT_DECRYPT_ID,
+        decrypt_label(None),
+        false,
+        None::<&str>,
+    )?;
     let vault = Submenu::with_items(
         app,
         "Vault",
@@ -291,9 +336,21 @@ pub fn app_menu<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
             &vault_open,
             &PredefinedMenuItem::separator(app)?,
             &vault_encrypt,
+            &vault_decrypt,
             &vault_lock,
             &vault_close,
         ],
+    )?;
+    // ⌘F here and on the page: opening find a second time only gives its
+    // field the keyboard again, so either may win.
+    let find = MenuItem::with_id(app, FIND_ID, "Find…", true, Some(FIND_ACCELERATOR))?;
+    // Ctrl+G here and on the page: a second open only selects its field.
+    let goto_line = MenuItem::with_id(
+        app,
+        GOTO_LINE_ID,
+        "Go to Line…",
+        true,
+        Some(GOTO_LINE_ACCELERATOR),
     )?;
     let edit = Submenu::with_items(
         app,
@@ -307,6 +364,9 @@ pub fn app_menu<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
             &PredefinedMenuItem::copy(app, None)?,
             &PredefinedMenuItem::paste(app, None)?,
             &PredefinedMenuItem::select_all(app, None)?,
+            &PredefinedMenuItem::separator(app)?,
+            &find,
+            &goto_line,
         ],
     )?;
     let back = MenuItem::with_id(app, BACK_ID, "Back", true, None::<&str>)?;
@@ -314,9 +374,9 @@ pub fn app_menu<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
     // No accelerators: the page handles ⌘1 / ⌘2 itself (as ⌘[ / ⌘]).
     let editor = MenuItem::with_id(app, EDITOR_ID, "Editor", true, None::<&str>)?;
     let global_view = MenuItem::with_id(app, GLOBAL_VIEW_ID, "Global View", true, None::<&str>)?;
-    // ⌘F shows on the item (M5b §7.3); the page answers it too, and opening
-    // Search a second time does nothing, so either may win.
-    let search = MenuItem::with_id(app, SEARCH_ID, "Search…", true, Some("CmdOrCtrl+F"))?;
+    // ⌘⇧F shows on the item (M5b §7.3; ⌘F is Edit → Find…); the page answers
+    // it too, and opening Search a second time does nothing, so either may win.
+    let search = MenuItem::with_id(app, SEARCH_ID, "Search…", true, Some(SEARCH_ACCELERATOR))?;
     let atoms = MenuItem::with_id(app, ATOMS_ID, "See Atoms of This Page", true, None::<&str>)?;
     let toolbar = MenuItem::with_id(
         app,
@@ -382,19 +442,32 @@ pub fn with_app_menu<R: Runtime>(builder: tauri::Builder<R>) -> tauri::Builder<R
 
 /// Menu events (registered by `configure`).
 pub fn on_menu_event<R: Runtime>(app: &AppHandle<R>, event: MenuEvent) {
-    let id = event.id().0.as_str();
+    activate(app, event.id().0.as_str(), menu_target(app));
+}
+
+/// An item of the menu bar the app draws itself (custom title bar §3: Linux
+/// and Windows have no app menu): runs exactly as the macOS item with that id,
+/// for the window it was chosen in. Unknown ids do nothing.
+#[tauri::command]
+pub fn menu_activate<R: Runtime>(window: tauri::WebviewWindow<R>, id: String) {
+    activate(window.app_handle(), &id, Some(window.label().to_string()));
+}
+
+/// Runs the menu item `id`; `target` is the window that answers the items
+/// acting on one window (Settings, Save, the toggles, Back and Forward).
+fn activate<R: Runtime>(app: &AppHandle<R>, id: &str, target: Option<String>) {
     if id == QUIT_ID {
         request_quit(app);
     } else if id == BACK_ID || id == FORWARD_ID {
         let direction = if id == BACK_ID { "back" } else { "forward" };
-        emit_focused(app, NAVIGATE_EVENT, direction);
+        emit_to(app, &target, NAVIGATE_EVENT, direction);
     } else if id == EDITOR_ID || id == GLOBAL_VIEW_ID || id == ATOMS_ID {
         let screen = match id {
             EDITOR_ID => "edit",
             GLOBAL_VIEW_ID => "global",
             _ => "atoms",
         };
-        emit_focused(app, SCREEN_EVENT, screen);
+        emit_to(app, &target, SCREEN_EVENT, screen);
     } else if id == SEARCH_ID {
         // Search lives in the main window only (file windows have no vault).
         if let Some(main) = app.get_webview_window("main") {
@@ -402,12 +475,17 @@ pub fn on_menu_event<R: Runtime>(app: &AppHandle<R>, event: MenuEvent) {
             let _ = main.set_focus();
         }
         let _ = app.emit_to("main", SEARCH_EVENT, ());
+    } else if id == FIND_ID {
+        // Find in the focused window's page: file windows have one too.
+        emit_to(app, &target, FIND_EVENT, ());
+    } else if id == GOTO_LINE_ID {
+        emit_to(app, &target, GOTO_LINE_EVENT, ());
     } else if id == TOOLBAR_ID {
-        emit_focused(app, TOGGLE_EVENT, "toolbar");
+        emit_to(app, &target, TOGGLE_EVENT, "toolbar");
     } else if id == LINE_NUMBERS_ID {
-        emit_focused(app, TOGGLE_EVENT, "lineNumbers");
+        emit_to(app, &target, TOGGLE_EVENT, "lineNumbers");
     } else if id == OUTLINE_ID {
-        emit_focused(app, TOGGLE_EVENT, "outline");
+        emit_to(app, &target, TOGGLE_EVENT, "outline");
     } else if id == QUICK_NOTE_ID {
         // Quick notes are taken in the main window, wherever ⌘⇧N was pressed.
         if let Some(main) = app.get_webview_window("main") {
@@ -425,11 +503,11 @@ pub fn on_menu_event<R: Runtime>(app: &AppHandle<R>, event: MenuEvent) {
         }
         let _ = app.emit_to("main", NOTION_IMPORT_EVENT, ());
     } else if id == OPEN_FILE_ID {
-        emit_focused(app, OPEN_FILE_EVENT, ());
+        emit_to(app, &target, OPEN_FILE_EVENT, ());
     } else if id == SETTINGS_ID {
-        emit_focused(app, SETTINGS_EVENT, ());
+        emit_to(app, &target, SETTINGS_EVENT, ());
     } else if id == SAVE_ID {
-        emit_focused(app, SAVE_EVENT, ());
+        emit_to(app, &target, SAVE_EVENT, ());
     } else if let Some(what) = vault_action(id) {
         emit_main(app, VAULT_EVENT, what);
     } else if id == SIDEBAR_ID {
@@ -459,12 +537,14 @@ fn emit_main<R: Runtime, S: serde::Serialize + Clone>(app: &AppHandle<R>, event:
     let _ = app.emit_to("main", event, payload);
 }
 
-fn emit_focused<R: Runtime, S: serde::Serialize + Clone>(
+/// Tells the window a menu item acts on (`target`, see [`activate`]).
+fn emit_to<R: Runtime, S: serde::Serialize + Clone>(
     app: &AppHandle<R>,
+    target: &Option<String>,
     event: &str,
     payload: S,
 ) {
-    if let Some(label) = menu_target(app) {
+    if let Some(label) = target {
         let _ = app.emit_to(label.as_str(), event, payload);
     }
 }
@@ -493,8 +573,8 @@ mod label_tests {
             "Create New Scratchpad in This Vault"
         );
         assert_eq!(
-            quick_note_label(Some("Smartjob")),
-            "Create New Scratchpad for Smartjob"
+            quick_note_label(Some("Myproject")),
+            "Create New Scratchpad for Myproject"
         );
         let long = "Á".repeat(60);
         let label = quick_note_label(Some(&long));
@@ -551,6 +631,8 @@ mod lock_tests {
     fn vault_menu_items_emit_their_action() {
         assert_eq!(vault_action(VAULT_NEW_ID), Some("new"));
         assert_eq!(vault_action(VAULT_ENCRYPT_ID), Some("encrypt"));
+        assert_eq!(VAULT_DECRYPT_ID, "liber-vault-decrypt");
+        assert_eq!(vault_action(VAULT_DECRYPT_ID), Some("decrypt"));
         assert_eq!(vault_action(VAULT_LOCK_ID), Some("lock"));
         assert_eq!(vault_action(VAULT_OPEN_ID), Some("open"));
         assert_eq!(vault_action(VAULT_CLOSE_ID), Some("close"));
@@ -562,11 +644,22 @@ mod lock_tests {
     #[test]
     fn encrypt_label_names_the_vault_cut_like_the_scratchpad_item() {
         assert_eq!(encrypt_label(None), "Encrypt Vault…");
-        assert_eq!(encrypt_label(Some("Smartjob")), "Encrypt “Smartjob”…");
+        assert_eq!(encrypt_label(Some("Myproject")), "Encrypt “Myproject”…");
         assert_eq!(encrypt_label(Some("R&D")), "Encrypt “R&&D”…");
         assert_eq!(
             encrypt_label(Some(&"Á".repeat(60))),
             format!("Encrypt “{}…”…", "Á".repeat(39))
+        );
+    }
+
+    #[test]
+    fn decrypt_label_names_the_vault_cut_like_encrypt() {
+        assert_eq!(decrypt_label(None), "Decrypt Vault…");
+        assert_eq!(decrypt_label(Some("Myproject")), "Decrypt “Myproject”…");
+        assert_eq!(decrypt_label(Some("R&D")), "Decrypt “R&&D”…");
+        assert_eq!(
+            decrypt_label(Some(&"Á".repeat(60))),
+            format!("Decrypt “{}…”…", "Á".repeat(39))
         );
     }
 }

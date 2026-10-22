@@ -5,7 +5,7 @@
 import { expect, test, type Page } from '@playwright/test';
 import { installIpcMock } from './ipcMock';
 
-// Jose's "Military Ranks" table (seven columns).
+// A worldbuilding "Military Ranks" table (seven columns).
 const RANKS = [
   '| Category | Rank | Stars | Typical Color | Conceptual Insignia | Command Role | Authorized Ship Classes |',
   '| --- | --- | --- | --- | --- | --- | --- |',

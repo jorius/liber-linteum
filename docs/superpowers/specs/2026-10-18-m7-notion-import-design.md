@@ -1,6 +1,6 @@
 # M7 — Notion importer: Design
 
-**Status:** Jose answered the three open questions on 2026-10-18. Everything else below is a ruling taken for him; they are listed in §12 for him to confirm.
+**Status:** the maintainer answered the three open questions on 2026-10-18. Everything else below is a ruling taken for him; they are listed in §12 for him to confirm.
 - **Grounding:** product spec §9.3 (IMP-01–IMP-04, Q-IMP-1 and Q-IMP-2, all DECIDED). `crates/liber-import` (`strip_notion_id`) exists since M0.
 - **Branch:** `feat/m7-import`, from `feat/batch6` (`de2378e`, the same as `main`).
 
@@ -14,7 +14,7 @@ Turn a Notion workspace export into a vault the user can open at once, with:
 
 Nothing is written before the user has seen what will happen.
 
-## 2. Jose's answers
+## 2. The maintainer's answers
 
 1. **Input:** Notion's **Markdown & CSV** export zip only, including the nested part zips that large exports contain. The HTML export is out of scope.
 2. **Target:** **always a new vault.** Its parent folder is chosen in a dialog and its name typed by the user. Importing into an open vault isn't offered.
@@ -192,9 +192,9 @@ The page never names a path. A test hook replaces each dialog, as `ScratchpadSta
   - a file window is refused.
 - **TS:** the dialog's steps, validation, progress, cancel, the result and errors; axe; i18n.
 - **E2E** (Chromium and WebKit, mocked IPC): Welcome → Import from Notion → pick → preview → import → the vault opens at the report.
-- **Real window:** a real Notion export from Jose (§13).
+- **Real window:** a real Notion export from the maintainer (§13).
 
-## 12. Rulings to confirm (taken for Jose)
+## 12. Rulings to confirm (taken for the maintainer)
 
 1. Only the multi-part shape expands nested zips. Any other `.zip` in an export is an attachment.
 2. An `Export-<id>` top folder is dropped, so the vault's root is the workspace's top level.
@@ -209,7 +209,7 @@ The page never names a path. A test hook replaces each dialog, as `ScratchpadSta
 
 ## 13. Needs a real export
 
-- **The real shapes:** CSV date formats in Jose's Notion locale, and the relation format in CSVs.
+- **The real shapes:** CSV date formats in the maintainer's Notion locale, and the relation format in CSVs.
 - **Differences in the actual export:** callouts with colours, nested toggles inside lists, inline databases, and long-name truncation.
 - **Performance** on a real multi-part export.
 

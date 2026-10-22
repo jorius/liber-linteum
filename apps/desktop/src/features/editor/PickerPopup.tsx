@@ -12,7 +12,7 @@ import { linkSuggest, type LinkSuggestion } from '../../ipc';
 import { Icon } from '../explorer/TreeRow';
 import { useIcons } from '../icons/ItemIcon';
 import styles from './Editor.module.css';
-import { placePopup, type Anchor } from './placePopup';
+import { placePopup, windowViewport, type Anchor } from './placePopup';
 
 const URL_RE = /^(?:https?:\/\/|mailto:)\S+$/i;
 const MAX_PAGES = 8;
@@ -30,6 +30,8 @@ export interface PickerPopupProps {
   label: string;
   placeholder: string;
   onPick: (option: PickerOption) => void;
+  /** Pages it may offer (default: every page). */
+  filter?: (page: LinkSuggestion) => boolean;
   /** `refocus`: give the keyboard back to where the picker was opened. */
   onClose: (refocus: boolean) => void;
 }
@@ -44,6 +46,7 @@ export function PickerPopup({
   label,
   placeholder,
   onPick,
+  filter,
   onClose,
 }: PickerPopupProps) {
   const { t } = useTranslation();
@@ -59,13 +62,15 @@ export function PickerPopup({
     let live = true;
     void linkSuggest(source, query.trim(), false).then((res) => {
       if (!live || !res.ok) return;
-      setPages(res.value.filter((s) => s.kind === 'page').slice(0, MAX_PAGES));
+      setPages(
+        res.value.filter((s) => s.kind === 'page' && (!filter || filter(s))).slice(0, MAX_PAGES),
+      );
       setActive(0);
     });
     return () => {
       live = false;
     };
-  }, [query, source]);
+  }, [query, source, filter]);
 
   const reposition = useCallback(() => {
     const at = anchor();
@@ -75,10 +80,7 @@ export function PickerPopup({
     }
     const el = box.current;
     const size = { width: el?.offsetWidth ?? 0, height: el?.offsetHeight ?? 0 };
-    const { top, left } = placePopup(at, size, {
-      width: window.innerWidth,
-      height: window.innerHeight,
-    });
+    const { top, left } = placePopup(at, size, windowViewport());
     setPlace((p) => (p && p.top === top && p.left === left ? p : { top, left }));
   }, [anchor]);
 

@@ -77,6 +77,41 @@ pub enum ErrorKind {
     /// Encrypt in place: a failed run past `staged` couldn't finish yet; the
     /// next open of the folder (the message) does.
     ConvertFinishFailed,
+    /// Readable backup (encryption UX §9): the folder (the message) is the
+    /// vault being encrypted, inside it or around it.
+    BackupInVault,
+    /// Readable backup: the folder is inside the vault in the message.
+    BackupInOtherVault,
+    /// Readable backup: the folder in the message isn't empty.
+    BackupNotEmpty,
+    /// Readable backup: writing or checking it failed (the message: the file
+    /// and why). Nothing was encrypted.
+    BackupFailed,
+    /// Decrypt in place (§10.2): the message says which secret opens no
+    /// slot: `passphrase`, `recovery` or `both`.
+    DecryptWrongSecret,
+    /// Decrypt in place: another device is decrypting this folder (still
+    /// copying: undoable here); nothing touched.
+    DecryptingElsewhere,
+    /// Decrypt in place: another device's decryption is past `staged`; the
+    /// message is the folder.
+    DecryptingElsewhereFinishing,
+    /// Decrypt in place: files changed while decrypting, so it was undone.
+    ChangedDuringDecrypt,
+    /// Decrypt in place: the folder (the message) is being decrypted right now.
+    DecryptActive,
+    /// Decrypt in place: the folder is part-way through a conversion either way.
+    DecryptPending,
+    /// Decrypt in place: a file (the message) didn't read back the same; undone.
+    DecryptMismatch,
+    /// Decrypt in place: recovery stopped rather than overwrite the path in the message.
+    DecryptCollision,
+    /// Decrypt in place: the undo of a failed run failed too; the message is
+    /// the folder, whose encrypted entries are safe in `.liber-encrypted`.
+    DecryptUndoFailed,
+    /// Decrypt in place: a failed run past `staged` couldn't finish yet; the
+    /// next open of the folder (the message) does.
+    DecryptFinishFailed,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
@@ -189,8 +224,27 @@ impl From<liber_vault::convert::ConvertError> for CommandError {
             C::InsideVault(p) => (ErrorKind::ConvertInsideVault, p),
             C::Collision(p) => (ErrorKind::ConvertCollision, p),
             C::Mismatch(p) => (ErrorKind::ConvertMismatch, p),
+            C::BackupInVault(p) => (ErrorKind::BackupInVault, p),
+            C::BackupInOtherVault(p) => (ErrorKind::BackupInOtherVault, p),
+            C::BackupNotEmpty(p) => (ErrorKind::BackupNotEmpty, p),
+            C::BackupFailed(why) => (ErrorKind::BackupFailed, why),
+            C::WrongSecrets { .. } => (ErrorKind::DecryptWrongSecret, e.to_string()),
         };
         CommandError::new(kind, message)
+    }
+}
+
+/// A decrypt in place's refusal (§10): the kinds whose copy says
+/// "encrypting" get their decrypting twins.
+pub fn decrypt_error(e: liber_vault::convert::ConvertError) -> CommandError {
+    use liber_vault::convert::ConvertError as C;
+    match e {
+        C::Changed(_) => CommandError::new(ErrorKind::ChangedDuringDecrypt, e.to_string()),
+        C::Pending => CommandError::new(ErrorKind::DecryptPending, e.to_string()),
+        C::Collision(p) => CommandError::new(ErrorKind::DecryptCollision, p),
+        C::Mismatch(p) => CommandError::new(ErrorKind::DecryptMismatch, p),
+        C::Cancelled => CommandError::new(ErrorKind::Cancelled, "decrypting was stopped"),
+        e => e.into(),
     }
 }
 

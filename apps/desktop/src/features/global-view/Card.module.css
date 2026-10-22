@@ -246,8 +246,10 @@
 
 .title {
   margin: 0;
-  padding: 10px 12px 2px;
-  font: 700 19px/1.15 var(--font-display);
+  /* Room below the second line: FreeType (Linux) gives Bricolage's
+     descenders more depth than CoreText, and at 1.15 they met the subtitle. */
+  padding: 10px 12px 4px;
+  font: 700 19px/1.2 var(--font-display);
   color: var(--color-accent);
   display: -webkit-box;
   -webkit-line-clamp: 2;

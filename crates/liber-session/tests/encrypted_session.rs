@@ -155,3 +155,30 @@ fn a_note_written_elsewhere_reaches_search_through_the_watcher() {
     });
     assert!(found, "the watcher never indexed Later.md");
 }
+
+/// The vault's home lives in the encrypted `.liber/vault.json`: it follows a
+/// folder's rename, goes with the Trash, and is there again after a re-unlock.
+#[test]
+fn an_encrypted_vaults_home_follows_renames_and_the_trash() {
+    use liber_vault::Home;
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::create_dir_all(dir.path().join("Lore")).unwrap();
+    std::fs::write(dir.path().join("Lore/Start.md"), "# Start").unwrap();
+    std::fs::write(dir.path().join("Other.md"), "# Other").unwrap();
+    drop(seal_in_place(dir.path()).unwrap());
+    let page = |p: &str| Some(Home::Page { path: p.into() });
+    let vp = |p: &str| VaultPath::new(p).unwrap();
+    {
+        let s = open(&dir);
+        s.vault().set_home(page("Lore/Start.md").as_ref()).unwrap();
+        s.rename(&vp("Lore"), &vp("World"), true).unwrap();
+        assert_eq!(s.vault().home(), page("World/Start.md"));
+    }
+    let s = open(&dir);
+    assert_eq!(s.vault().home(), page("World/Start.md"));
+    s.trash(&vp("World/Start.md")).unwrap();
+    assert_eq!(s.vault().home(), None);
+    s.vault().set_home(Some(&Home::GlobalView)).unwrap();
+    drop(s);
+    assert_eq!(open(&dir).vault().home(), Some(Home::GlobalView));
+}

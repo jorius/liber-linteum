@@ -1,8 +1,8 @@
-# M4b — Feedback round (Jose's real-window check of M2c–M4): Design
+# M4b — Feedback round (the maintainer's real-window check of M2c–M4): Design
 
-**Status:** design agreed with Jose on 2026-10-14 (four answers and "Go on"). **Builds on:** M4 (`feat/m4-block-moves`). **Roadmap:** inserted before M5 (search), as M2b was after M2a.
+**Status:** design agreed with the maintainer on 2026-10-14 (four answers and an approval). **Builds on:** M4 (`feat/m4-block-moves`). **Roadmap:** inserted before M5 (search), as M2b was after M2a.
 
-Jose's feedback, item by item. Each item cites the feedback it answers.
+The maintainer's feedback, item by item. Each item cites the feedback it answers.
 
 ---
 
@@ -129,7 +129,7 @@ The macOS Dock icon is drawn edge to edge on its 1024 canvas, so it looks bigger
   - Related chip add and remove;
   - Connect cards;
   - zero-network.
-- **Real window (Jose):**
+- **Real window (the maintainer):**
   - the overall look with real covers and palettes;
   - the Dock icon size next to other apps;
   - screenshot paste after switching to clipboard;

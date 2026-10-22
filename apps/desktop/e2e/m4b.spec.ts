@@ -106,7 +106,7 @@ for (const px of [200, 132]) {
       const height = await band.evaluate((el) => el.clientHeight); // without its border
       if (px === 200) expect(`${width}: ${height}`).toBe(`${width}: ${px}`);
       // The smallest choice can't hold the title, breadcrumb and facts rows
-      // (Jose, M5b: the title heads the band): it grows just enough.
+      // (M5b feedback: the title heads the band): it grows just enough.
       else expect(height).toBeGreaterThanOrEqual(px);
       const foot = (await page.getByText(/links? · \d+ backlinks?/).boundingBox())!;
       const box = (await band.boundingBox())!;
@@ -183,9 +183,10 @@ test('M4b §4: the ⌘K picker follows the text as it scrolls, and stays in the 
   await expect.poll(async () => (await line.boundingBox())!.y).toBeLessThan(before - 100);
   await expect.poll(attached).toBe(true);
   // Far away: it stays inside the window, open.
-  // CodeMirror keeps the selected line drawn, now far above the window.
+  // CodeMirror keeps the selected line drawn, now far above the window (the
+  // page's end stops WebKit short of -500).
   await page.mouse.wheel(0, 6000);
-  await expect.poll(async () => (await line.boundingBox())?.y ?? 0).toBeLessThan(-500);
+  await expect.poll(async () => (await line.boundingBox())?.y ?? 0).toBeLessThan(-300);
   await expect
     .poll(async () => {
       const b = await box();

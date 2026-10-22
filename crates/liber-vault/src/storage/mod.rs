@@ -11,11 +11,11 @@ use crate::error::Result;
 use crate::path::VaultPath;
 use std::path::{Path, PathBuf};
 
-pub use encrypted::convert;
 pub use encrypted::{
     EncryptedStorage, HEADER_FILE, RECORDING_DIR, UnlockReport, VaultKind, is_empty_for_create,
     is_encrypted_vault, remove_new_vault, trash_header_copy, vault_kind,
 };
+pub use encrypted::{convert, decrypt};
 pub use plain::PlainStorage;
 
 pub trait ReadSeek: std::io::Read + std::io::Seek + Send {}
@@ -346,6 +346,16 @@ impl Storage for PassThrough {
     fn watch(&self, recursive: bool, sink: Box<dyn Fn(RawEvent) + Send>) -> Result<WatchGuard> {
         self.0.watch(recursive, sink)
     }
+}
+
+/// Whether a backend event only says something was read: opened, read, or
+/// closed without writing. Linux's backend reports opens (`IN_OPEN`), which
+/// FSEvents never did; treating them as changes indexed a note again every
+/// time anything (the app included) read it. A file closed after writing is
+/// a change.
+pub(crate) fn only_read(kind: &notify::EventKind) -> bool {
+    use notify::event::{AccessKind, AccessMode};
+    matches!(kind, notify::EventKind::Access(a) if !matches!(a, AccessKind::Close(AccessMode::Write)))
 }
 
 #[cfg(test)]

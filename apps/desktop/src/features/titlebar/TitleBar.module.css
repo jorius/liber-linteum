@@ -1,0 +1,188 @@
+/* The title bar the app draws outside macOS (custom title bar §2): one row in
+   the sidebar's colours, so it reads as the sidebar's top edge, over every
+   screen (Welcome and Unlock included) and above dialogs. */
+.bar {
+  position: fixed;
+  z-index: 50;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: var(--titlebar-height);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-left: 6px;
+  background: var(--color-sidebar-bg);
+  color: var(--color-sidebar-text);
+  border-bottom: 1px solid var(--color-sidebar-divider);
+  font: 500 13px var(--font-body);
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.menubar {
+  display: flex;
+  align-items: center;
+  gap: 1px;
+  flex: none;
+}
+
+.slot {
+  position: relative;
+}
+
+.top {
+  height: 28px;
+  padding: 0 9px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: none;
+  color: inherit;
+  font: inherit;
+  cursor: default;
+}
+
+.top:hover,
+.top[aria-expanded='true'] {
+  background: var(--color-sidebar-hover);
+  color: #fff;
+}
+
+.appName {
+  font-weight: 700;
+  color: #fff;
+}
+
+/* A menu hangs from its name; its items look like every other menu's. */
+.menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  min-width: 260px;
+  z-index: 1;
+}
+
+/* Every item, toggles (`menuitemcheckbox`) included, as the base
+   `.liber-menu [role]` rule draws menu items; plus a check column and keys. */
+.menu .entry[role] {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 6px 10px 6px 6px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: none;
+  color: var(--color-text);
+  font: 500 13.5px var(--font-body);
+  text-align: left;
+  cursor: pointer;
+}
+
+.menu .entry[data-active] {
+  background: var(--color-accent-soft);
+}
+
+.menu .entry[aria-disabled='true'] {
+  color: var(--color-text-muted);
+  cursor: default;
+}
+
+.check {
+  flex: none;
+  width: 14px;
+  text-align: center;
+  color: var(--color-accent);
+}
+
+.label {
+  flex: 1;
+  white-space: nowrap;
+}
+
+.keys {
+  font: 500 12px var(--font-body);
+  color: var(--color-text-muted);
+  white-space: nowrap;
+}
+
+/* The page's title, centred in the space left between menus and buttons. */
+.title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: center;
+  font-weight: 600;
+  opacity: 0.85;
+}
+
+.controls {
+  flex: none;
+  display: flex;
+  align-items: center;
+  height: 100%;
+}
+
+.control {
+  display: grid;
+  place-items: center;
+  border: 0;
+  background: none;
+  color: inherit;
+  cursor: default;
+}
+
+.control svg {
+  width: 14px;
+  height: 14px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.3;
+}
+
+/* GNOME: round buttons with a little room around them. */
+[data-platform='linux'] .controls {
+  gap: 10px;
+  padding-right: 10px;
+}
+
+[data-platform='linux'] .control {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--color-sidebar-hover);
+}
+
+[data-platform='linux'] .control:hover {
+  background: var(--color-sidebar-active);
+  color: #fff;
+}
+
+/* Windows: flat buttons the bar's full height; Close turns red. */
+[data-platform='windows'] .control {
+  width: 46px;
+  height: 100%;
+}
+
+[data-platform='windows'] .control:hover {
+  background: var(--color-sidebar-hover);
+  color: #fff;
+}
+
+[data-platform='windows'] .close:hover {
+  background: #c42b1c;
+  color: #fff;
+}
+
+.aboutName {
+  margin: 0;
+  font: 700 22px var(--font-display);
+  color: var(--color-text-strong);
+}
+
+.aboutMuted {
+  margin: 0;
+  color: var(--color-text-muted);
+}

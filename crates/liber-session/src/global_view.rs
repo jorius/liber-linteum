@@ -529,6 +529,8 @@ impl VaultSession {
         let sorts = self.vault.remap_folder_sorts_many(renames);
         // And favorites, keeping their place (M5b §19).
         let favorites = self.vault.remap_favorites_many(renames);
+        // And the vault's home page; into the Trash or the Archive clears it.
+        let home = self.vault.remap_home_many(renames);
         // Quick notes (M4c §7): a rename that isn't the auto-name's own ends
         // naming from the first line, and the scratch folder follows a
         // top-level rename.
@@ -546,6 +548,7 @@ impl VaultSession {
             .and(icons)
             .and(sorts)
             .and(favorites)
+            .and(home)
             .and(quick)
             .and(scratch)
         {

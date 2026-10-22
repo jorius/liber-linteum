@@ -2,7 +2,8 @@ import { useEffect, useId, useMemo, useState, type KeyboardEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { FolderIcon, ImageIcon, RestoreIcon, TrashIcon } from '../../app/icons';
 import { assetUrl, type BinItem } from '../../ipc';
-import { nameOf, parentOf } from '../../stores/tree';
+import { nameOf, parentOf, shownName } from '../../stores/tree';
+import { useShowExtensions } from '../explorer/TreeRow';
 import { Dialog } from '../dialogs/Dialog';
 import dialogStyles from '../dialogs/Dialogs.module.css';
 import { deleteItems, emptyTrash, restoreItem } from './binActions';
@@ -12,9 +13,11 @@ import styles from './Bin.module.css';
 type Ask = { type: 'delete'; items: BinItem[] } | { type: 'empty' };
 type Sort = 'newest' | 'oldest' | 'name' | 'folder';
 
-/** A page's name without `.md`; a folder's or attachment's as is. */
-export const binLabel = (path: string) => nameOf(path).replace(/\.md$/i, '');
-const label = (item: BinItem) => (item.folder ? nameOf(item.path) : binLabel(item.path));
+/** A page's name without `.md` (with it when extensions show); a folder's
+ *  or attachment's as is. */
+export const binLabel = (path: string, extensions = false) => shownName(path, extensions);
+const label = (item: BinItem, extensions: boolean) =>
+  item.folder ? nameOf(item.path) : binLabel(item.path, extensions);
 const isImage = (path: string) => /\.(png|jpe?g|gif|webp|avif|bmp|svg)$/i.test(path);
 const kindOf = (item: BinItem) =>
   item.folder
@@ -55,6 +58,7 @@ export function formatSize(bytes: number, lang: string) {
 export function BinView() {
   const { t, i18n } = useTranslation();
   const items = useBinStore((s) => s.trash);
+  const extensions = useShowExtensions();
   const [ask, setAsk] = useState<Ask | null>(null);
   const [filter, setFilter] = useState('');
   const [sort, setSort] = useState<Sort>(sessionSort);
@@ -90,9 +94,13 @@ export function BinView() {
   const groups = useMemo(() => {
     const q = filter.trim().toLowerCase();
     const shown = items.filter(
-      (i) => !q || label(i).toLowerCase().includes(q) || (i.from ?? '').toLowerCase().includes(q),
+      (i) =>
+        !q ||
+        label(i, extensions).toLowerCase().includes(q) ||
+        (i.from ?? '').toLowerCase().includes(q),
     );
-    const byName = (a: BinItem, b: BinItem) => label(a).localeCompare(label(b), lang);
+    const byName = (a: BinItem, b: BinItem) =>
+      label(a, extensions).localeCompare(label(b, extensions), lang);
     const byAt = (a: BinItem, b: BinItem) => (b.at ?? 0) - (a.at ?? 0);
     const sorted = [...shown].sort(
       sort === 'newest'
@@ -118,7 +126,7 @@ export function BinView() {
     }
     return out;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [items, filter, sort, lang]);
+  }, [items, filter, sort, lang, extensions]);
 
   const total = items.reduce((sum, i) => sum + (i.size ?? 0), 0);
   const chosen = items.filter((i) => picked.has(i.path));
@@ -269,7 +277,7 @@ export function BinView() {
               </h2>
               <ul className={styles.list} aria-label={heading}>
                 {list.map((item) => {
-                  const name = label(item);
+                  const name = label(item, extensions);
                   const from = fromFolder(item);
                   return (
                     <li

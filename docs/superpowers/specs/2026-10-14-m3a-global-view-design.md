@@ -1,6 +1,6 @@
 # M3a — Global View (browse, layout, edges): Design
 
-**Status:** written on 2026-10-14 without Jose's review. He asked to "carry on with everything that's missing" and review features in bulk later.
+**Status:** written on 2026-10-14 without the maintainer's review. The request was to build the remaining features and review them in bulk later.
 - **Grounding:** product spec §6 (all GV items DECIDED), architecture §3.1 and §4.4, and the clickable prototype (`design/prototype/Main.dc.html`, screen `global`). All three are binding.
 - **Judgement calls** where none of them settles a question are listed in §12, for review.
 
@@ -272,7 +272,7 @@ Values come from the prototype (`.card`, lines 64-79 and 291-312), expressed as 
 - dragging cards into folders (moving files);
 - multi-select.
 
-## 12. Decisions taken for Jose (to review in bulk)
+## 12. Decisions taken for the maintainer (to review in bulk)
 
 1. **No elkjs:** deterministic grid, column and neighbourhood layouts matching the prototype replace the architecture's elkjs worker. They avoid a large GWT-compiled dependency under `freezePrototype` and the CSP, and they give predictable, testable layouts. A layered auto-layout could still be added later behind the same `layout.ts` interface.
 2. **Edit and Global View share one window:** the editor stays mounted while the Global View shows, so switching never loses undo or selection. Shortcuts are ⌘1 and ⌘2, plus View-menu items.

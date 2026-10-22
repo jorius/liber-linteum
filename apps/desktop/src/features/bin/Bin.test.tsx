@@ -102,6 +102,13 @@ describe('SidebarFoot (M5b §5.2, §5.3)', () => {
     expect(useUiStore.getState().screen).toBe('trash');
     expect(archived).toHaveAttribute('aria-expanded', 'true');
   });
+
+  it('holds only Archived and Trash: no privacy line', async () => {
+    backend();
+    render(<SidebarFoot />);
+    await act(() => useBinStore.getState().refresh());
+    expect(screen.queryByText('Local only · zero network requests')).not.toBeInTheDocument();
+  });
 });
 
 describe('BinView: the Trash (M5b round 2 design)', () => {

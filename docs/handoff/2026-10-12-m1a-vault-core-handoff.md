@@ -1,7 +1,7 @@
 # Hand-off: M1a Vault Core — Liber Linteum
 
 > **Date:** 2026-10-12 · **Merged into `main`** (merge `1c3e30c`; branch `feat/m1a-vault-core` from `cc07e13`, deleted) · not pushed, no remote configured
-> **Audience:** Jose (tech lead), or anyone continuing by hand without an AI agent.
+> **Audience:** the maintainer (tech lead), or anyone continuing by hand without an AI agent.
 > **Goal of this file:** everything needed to understand, run, change and build on the M1a vault engine — what exists, why, every decision taken on your behalf, what is not verified, and how M1b plugs in.
 > **Read first if new:** `docs/handoff/2026-10-12-m0-scaffold-handoff.md` (setup, commands, privacy layers). This document only covers what M1a adds.
 

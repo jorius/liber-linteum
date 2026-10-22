@@ -1,9 +1,9 @@
 # M2c — Page extras: Design
 
 **Status:**
-- **Agreed with Jose on 2026-10-13:** scope, extras and part 1 of the design (UI and behaviour, §2–§6).
+- **Agreed with the maintainer on 2026-10-13:** scope, extras and part 1 of the design (UI and behaviour, §2–§6).
 - **Choices:** cover picker "Upload only"; for attachments, Obsidian's setting wins when the vault has one.
-- **Part 2** (backend, data flow, security, §7–§9) was written after Jose asked to "carry on with everything that's missing" and review features in bulk later. The decisions taken for him are listed in §12 so they can be reviewed together.
+- **Part 2** (backend, data flow, security, §7–§9) was written after the maintainer asked for the remaining features to be built and reviewed in bulk later. The decisions taken for him are listed in §12 so they can be reviewed together.
 
 **Scope sources:** product spec PG-02, PG-03, PG-05, ED-03, ED-05, ED-06; architecture §3.1, §3.3, §5.3; deferred items M2a hand-off §10 a and k, and M2b hand-off §10 a.
 
@@ -114,7 +114,7 @@ Make a page feel finished: a cover, a subtitle, pasted screenshots, dropped file
 
 ### 5.3 Where files go (`liber-vault` `AttachmentPolicy`)
 
-- **Precedence:** Jose's choice, which reverses the M1a order.
+- **Precedence:** the maintainer's choice, which reverses the M1a order.
   1. Obsidian's `attachmentFolderPath` in `.obsidian/app.json`, when the key is present.
   2. `.liber/vault.json` `attachments`.
   3. The default `attachments/` subfolder next to the page.
@@ -295,7 +295,7 @@ Make a page feel finished: a cover, a subtitle, pasted screenshots, dropped file
   - `[[` completion inserting an alias;
   - ⌘K picker → `[[Page|text]]`;
   - zero-network across all of these.
-- **Real window (Jose):**
+- **Real window (the maintainer):**
   - dropping from Finder (coordinates with Retina scaling);
   - pasting a screenshot (⌘⇧⌃4);
   - the cover dialog;
@@ -326,7 +326,7 @@ Make a page feel finished: a cover, a subtitle, pasted screenshots, dropped file
 7. `[[New folder/New page]]` → Create page.
 8. Open the vault in Obsidian and check that links, embeds and covers resolve.
 
-## 12. Decisions taken for Jose (part 2, to review in bulk)
+## 12. Decisions taken for the maintainer (part 2, to review in bulk)
 
 1. **Drop security:** drops are honoured only for paths Rust saw in the native drop event (grants valid 2 min). Covers come from a Rust-opened dialog; the page never names an outside path.
 2. **Autocomplete source:** matching, ranking and shortest-link computation run in Rust (`link_suggest`, ≤ 50 rows per query) rather than in a TS cache of every file. That gives one source of truth for resolution, with nothing to invalidate.

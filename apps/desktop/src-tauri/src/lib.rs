@@ -4,6 +4,7 @@ pub mod audio_commands;
 pub mod bin_commands;
 pub mod commands;
 pub mod convert_commands;
+pub mod decrypt_commands;
 pub mod decrypted_copies;
 pub mod drops;
 pub mod dto;
@@ -17,6 +18,7 @@ pub mod file_commands;
 pub mod file_windows;
 pub mod fonts;
 pub mod gv_commands;
+pub mod home_commands;
 pub mod icon_commands;
 pub mod legacy_dirs;
 pub mod lock_signals;
@@ -153,6 +155,14 @@ pub fn configure<R: tauri::Runtime>(
         commands::app_info,
         commands::window_close_self,
         commands::window_title_set,
+        commands::window_minimize,
+        commands::window_toggle_maximize,
+        commands::window_maximized,
+        commands::window_toggle_fullscreen,
+        commands::window_start_drag,
+        commands::window_close_request,
+        commands::window_paste,
+        menu::menu_activate,
         vault_commands::vault_open,
         bin_commands::bin_list,
         bin_commands::trash_restore,
@@ -235,6 +245,8 @@ pub fn configure<R: tauri::Runtime>(
         icon_commands::vault_icon_set,
         favorite_commands::favorites_get,
         favorite_commands::favorites_set,
+        home_commands::home_get,
+        home_commands::home_set,
         audio_commands::audio_devices,
         audio_commands::audio_record_start,
         audio_commands::audio_record_stop,
@@ -281,6 +293,16 @@ pub fn configure<R: tauri::Runtime>(
         convert_commands::vault_encrypt_undo_elsewhere,
         convert_commands::vault_trash_originals,
         convert_commands::vault_reveal_originals,
+        // Encrypt in place: the readable backup (encryption UX §9).
+        convert_commands::vault_encrypt_pick_backup,
+        convert_commands::vault_encrypt_backup,
+        convert_commands::vault_reveal_backup,
+        // Decrypt in place (encryption UX §10).
+        menu::menu_set_decrypt_item,
+        decrypt_commands::vault_decrypt_preflight,
+        decrypt_commands::vault_decrypt_begin,
+        decrypt_commands::vault_decrypt_run,
+        decrypt_commands::vault_decrypt_cancel,
     ])
 }
 

@@ -415,11 +415,12 @@ fn rollback_never_overwrites_a_colliding_entry() {
     convert::copy(&mut c, |_, _| {}, &AtomicBool::new(false)).unwrap();
     assert!(convert::stage_and_commit(c).is_err());
     convert::crash_at(None);
-    // A sync puts something back under a moved name.
+    // A sync puts something back under a moved name: not OS junk, which a
+    // rollback rightly replaces (`.DS_Store` may be listed first).
     let moved = std::fs::read_dir(root.join(convert::ORIGINALS))
         .unwrap()
         .map(|e| e.unwrap().file_name())
-        .next()
+        .find(|n| n != ".DS_Store")
         .unwrap();
     let theirs = root.join(&moved);
     let before_plain = snapshot(&root.join(convert::ORIGINALS));
@@ -1106,4 +1107,180 @@ fn a_staged_run_whose_staging_vanished_rolls_back() {
     let out = convert::recover(&root, ME, &fake_trash(&dir.path().join("bin")), &no_index).unwrap();
     assert_eq!(out, RecoverOutcome::RolledBack);
     assert_eq!(snapshot(&root), original);
+}
+
+// ---- the readable backup (encryption UX §9) ----
+
+#[test]
+fn a_backup_is_a_verified_plain_copy_written_before_any_encryption() {
+    let (dir, root) = vault();
+    let original = snapshot(&root);
+    let dest = dir.path().join("Backup");
+    let (mut c, _) = convert::begin(&root, &[], ME, make).unwrap();
+    let mut seen = Vec::new();
+    convert::backup(
+        &mut c,
+        &dest,
+        |d, t| seen.push((d, t)),
+        &AtomicBool::new(false),
+    )
+    .unwrap();
+    // Every file the conversion encrypts, with its mtime, and every folder.
+    assert_eq!(snapshot(&dest), content(&original));
+    let files = seen.last().unwrap().1;
+    assert_eq!(seen.last(), Some(&(files, files)));
+    // Nothing of the vault was touched by it.
+    let now = snapshot(&root);
+    for (rel, node) in &original {
+        assert_eq!(now.get(rel), Some(node), "{rel}");
+    }
+    convert::copy(&mut c, |_, _| {}, &AtomicBool::new(false)).unwrap();
+    convert::stage_and_commit(c).unwrap();
+    convert::finish(&root, &fake_trash(&dir.path().join("bin")), &no_index).unwrap();
+    assert_encrypted(&root, &content(&original));
+    assert_eq!(snapshot(&dest), content(&original), "the backup stays");
+}
+
+#[test]
+fn a_backup_folder_must_be_outside_any_vault_and_empty() {
+    let (dir, root) = vault();
+    let check = |p: &Path| convert::check_backup(&root, p);
+    let refused = |p: &Path| check(p).err().unwrap();
+    assert!(matches!(
+        refused(&root.join("inside")),
+        ConvertError::BackupInVault(_)
+    ));
+    assert!(matches!(refused(&root), ConvertError::BackupInVault(_)));
+    assert!(
+        matches!(refused(dir.path()), ConvertError::BackupInVault(_)),
+        "around it"
+    );
+    // Inside an encrypted vault.
+    let enc = dir.path().join("Enc");
+    std::fs::create_dir(&enc).unwrap();
+    make(&enc).unwrap();
+    assert!(matches!(
+        refused(&enc.join("x")),
+        ConvertError::BackupInOtherVault(_)
+    ));
+    // Inside a plain vault the app opened (it holds `.liber/`).
+    let other = dir.path().join("Other");
+    std::fs::create_dir_all(other.join(".liber")).unwrap();
+    assert!(matches!(
+        refused(&other.join("x")),
+        ConvertError::BackupInOtherVault(_)
+    ));
+    // Not empty; OS junk alone counts as empty.
+    let full = dir.path().join("Full");
+    put(&full, "a.md", b"a", 1);
+    assert!(matches!(refused(&full), ConvertError::BackupNotEmpty(_)));
+    let junk = dir.path().join("Junk");
+    put(&junk, ".DS_Store", b"x", 1);
+    check(&junk).unwrap();
+    // New with a parent; not with a missing parent. Checking creates nothing.
+    let fresh = check(&dir.path().join("Fresh")).unwrap();
+    assert!(!fresh.exists());
+    assert!(check(&dir.path().join("no/such/parent")).is_err());
+    // The backup itself checks again.
+    let (mut c, _) = convert::begin(&root, &[], ME, make).unwrap();
+    let err = convert::backup(&mut c, &full, |_, _| {}, &AtomicBool::new(false))
+        .err()
+        .unwrap();
+    assert!(matches!(err, ConvertError::BackupNotEmpty(_)), "{err:?}");
+    drop(c);
+    convert::rollback(&root).unwrap();
+}
+
+#[test]
+fn a_stopped_backup_leaves_nothing_of_itself_and_nothing_encrypted() {
+    for existing in [false, true] {
+        let (dir, root) = vault();
+        let original = snapshot(&root);
+        let dest = dir.path().join("Backup");
+        if existing {
+            std::fs::create_dir(&dest).unwrap();
+        }
+        let (mut c, _) = convert::begin(&root, &[], ME, make).unwrap();
+        let cancel = AtomicBool::new(false);
+        let err = convert::backup(
+            &mut c,
+            &dest,
+            |d, _| {
+                if d == 3 {
+                    cancel.store(true, Ordering::Relaxed);
+                }
+            },
+            &cancel,
+        )
+        .err()
+        .unwrap();
+        assert!(matches!(err, ConvertError::Cancelled), "{err:?}");
+        if existing {
+            assert!(snapshot(&dest).is_empty(), "the folder is empty again");
+        } else {
+            assert!(!dest.exists(), "the folder it made is gone");
+        }
+        drop(c);
+        convert::rollback(&root).unwrap();
+        assert_eq!(snapshot(&root), original);
+    }
+}
+
+#[test]
+fn a_change_after_the_backup_stops_the_conversion_and_the_backup_stays() {
+    let (dir, root) = vault();
+    let original = snapshot(&root);
+    let dest = dir.path().join("Backup");
+    let (mut c, _) = convert::begin(&root, &[], ME, make).unwrap();
+    convert::backup(&mut c, &dest, |_, _| {}, &AtomicBool::new(false)).unwrap();
+    // A sync while the recovery key shows.
+    put(&root, "Notes.md", b"# Notes\n\nchanged\n", 1_000_000_000);
+    let err = convert::copy(&mut c, |_, _| {}, &AtomicBool::new(false))
+        .err()
+        .unwrap();
+    assert!(
+        matches!(err, ConvertError::Changed(ref p) if p == "Notes.md"),
+        "{err:?}"
+    );
+    drop(c);
+    assert_eq!(
+        convert::recover(&root, ME, &no_trash, &no_index).unwrap(),
+        RecoverOutcome::RolledBack
+    );
+    assert_eq!(
+        snapshot(&dest),
+        content(&original),
+        "the backup is the user's"
+    );
+}
+
+/// Review M3: a backup that fails removes only what it created: entries a
+/// sync put in the chosen folder meanwhile (one in the way of the copy, one
+/// inside a folder the copy made) stay.
+#[test]
+fn a_failed_backup_never_removes_what_it_did_not_create() {
+    let (dir, root) = vault();
+    let dest = dir.path().join("Backup");
+    std::fs::create_dir(&dest).unwrap();
+    let (mut c, _) = convert::begin(&root, &[], ME, make).unwrap();
+    let err = convert::backup(
+        &mut c,
+        &dest,
+        |d, _| {
+            if d == 1 {
+                // A sync, still downloading into the folder.
+                std::fs::write(dest.join("Notes.md"), b"theirs").unwrap();
+                std::fs::write(dest.join("Projects/theirs.md"), b"theirs too").unwrap();
+            }
+        },
+        &AtomicBool::new(false),
+    )
+    .err()
+    .unwrap();
+    assert!(matches!(err, ConvertError::BackupFailed(_)), "{err:?}");
+    let left: Vec<String> = snapshot(&dest).into_keys().collect();
+    assert_eq!(left, vec!["Notes.md", "Projects", "Projects/theirs.md"]);
+    assert_eq!(std::fs::read(dest.join("Notes.md")).unwrap(), b"theirs");
+    drop(c);
+    convert::rollback(&root).unwrap();
 }

@@ -121,8 +121,12 @@ test('final review M9: "+N more" is a collapsed disclosure; from the keyboard it
   const more = links.getByRole('button', { name: /^\+\d+ more$/ });
   await expect(more).toHaveAttribute('aria-expanded', 'false');
   const shown = (await links.getByRole('button').count()) - 1;
-  await more.focus();
-  await page.keyboard.press('Enter');
-  await expect(more).toHaveCount(0);
+  // The row measures again when its ResizeObserver first reports, which
+  // replaces the button (and drops its focus): retried until it has settled.
+  await expect(async () => {
+    await more.focus();
+    await page.keyboard.press('Enter');
+    await expect(more).toHaveCount(0, { timeout: 1000 });
+  }).toPass();
   await expect(links.getByRole('button').nth(shown)).toBeFocused();
 });

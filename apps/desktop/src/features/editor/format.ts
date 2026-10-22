@@ -17,7 +17,7 @@ import { openLinkPicker } from './linkPickerOpen';
 export type InlineFormat = 'bold' | 'italic' | 'strike' | 'highlight' | 'code';
 export type BlockFormat = 'bullet' | 'numbered' | 'task' | 'quote';
 /** What the toolbar can show as pressed. */
-export type ActiveFormat = InlineFormat | BlockFormat | `h${1 | 2 | 3 | 4 | 5 | 6}`;
+export type ActiveFormat = InlineFormat | BlockFormat | 'table' | `h${1 | 2 | 3 | 4 | 5 | 6}`;
 
 export const MARKERS: Record<InlineFormat, string> = {
   bold: '**',
@@ -421,6 +421,7 @@ export function activeFormats(state: EditorState): Set<ActiveFormat> {
     const name = node.name;
     if (name in INLINE_NODES) out.add(INLINE_NODES[name]);
     else if (name in HEADINGS) out.add(HEADINGS[name as keyof typeof HEADINGS]);
+    else if (name === 'Table') out.add('table');
     else if (name === 'ListItem') {
       const list = node.parent?.name;
       const task = node.getChild('Task');

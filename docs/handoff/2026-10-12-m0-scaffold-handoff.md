@@ -1,7 +1,7 @@
 # Hand-off: M0 Scaffold — Liber Linteum
 
 > **Date:** 2026-10-12 · **Branch:** merged into `main` (merge commit `b7532b4`; the 20 M0 commits sat on `feat/m0-scaffold` on top of `9c47e19`; branch deleted). Not pushed; no remote configured.
-> **Audience:** Jose (tech lead), or anyone continuing this work by hand without an AI agent.
+> **Audience:** the maintainer (tech lead), or anyone continuing this work by hand without an AI agent.
 > **Goal of this file:** everything you need to understand, run, verify, change and continue the M0 scaffold: what exists, why it is that way, every decision made on your behalf, what is *not* verified, and where M1 starts.
 
 ---
@@ -63,7 +63,7 @@ Requirement IDs are referenced in commit messages, test names and code comments 
 
 ## 3. Decisions already taken
 
-### 3.1 Product decisions (spec §10, all DECIDED 2026-10-12 by Jose)
+### 3.1 Product decisions (spec §10, all DECIDED 2026-10-12 by the maintainer)
 
 | ID | Decision |
 |---|---|

@@ -1,6 +1,6 @@
 # M5 — Search: Design
 
-**Status:** written on 2026-10-14 without Jose's review. He asked to "carry on with everything that's missing" and review features in bulk later.
+**Status:** written on 2026-10-14 without the maintainer's review. The request was to build the remaining features and review them in bulk later.
 - **Grounding:** product spec §9.2 (SR-01–SR-06, Q-SR-1, all DECIDED), NFR-03 (search p95 < 50 ms at 10k notes), architecture §3.2 (FTS5 `unicode61 remove_diacritics 2`, bm25 weights) and §4.5 (`search(query, filters)`, 80 ms debounce), and the prototype's search modal (`design/prototype/Main.dc.html`: a field, filter-chip rows PROJECT / TAGS / LINKS TO / MEDIA, a result count, compact results with a cover thumbnail, title, path, tags and media icons).
 - **Builds on:** M4 (`feat/m4-block-moves`).
 - **Judgement calls** are listed in §9.
@@ -141,7 +141,7 @@ The non-negotiables are as before.
 - fuzzy (typo-tolerant) matching beyond prefixes;
 - searching the Global View canvas.
 
-## 9. Decisions taken for Jose (to review in bulk)
+## 9. Decisions taken for the maintainer (to review in bulk)
 
 1. **⌘⇧F, not the prototype's Ctrl K:** ⌘K is the editor's Link picker (M2b/M2c). ⌘⇧F is Obsidian's "Search in all files".
 2. **Results are pages.** Project and folder names make their pages findable, and the PROJECT filter row narrows them; folders aren't separate results.
@@ -153,7 +153,7 @@ The non-negotiables are as before.
 
 ## 10. Amendments from planning (2026-10-15)
 
-Jose, 2026-10-15: "let's go with the scratchpad feature … then the search filters". M5 is built next to M4c, and **the filters get the most attention**. These amendments override §1–§9 where they conflict.
+The maintainer, 2026-10-15: the scratchpad feature first, then the search filters. M5 is built next to M4c, and **the filters get the most attention**. These amendments override §1–§9 where they conflict.
 
 ### Base and index
 
@@ -259,7 +259,7 @@ A fresh-context review of `ba67c0a..73f909c` found no Critical issues. Its findi
 
 ## 12. Text files (batch 6)
 
-Jose asked for `.txt` files to be searchable (2026-10-18). This reverses ruling 5 of §10, which left text and code files out.
+The maintainer asked for `.txt` files to be searchable (2026-10-18). This reverses ruling 5 of §10, which left text and code files out.
 
 **Which files.** A file counts when the text view opens it (M4b part 2 §6). That means `liber_session::is_text_path` (the same extension and name list) plus `is_text_content` (UTF-8, no NUL byte, at most `TEXT_MAX_BYTES`, 2 MB). There is no second list. A `.txt` that isn't UTF-8, or that is larger than the cap, stays an ordinary attachment, with no warning and no error.
 

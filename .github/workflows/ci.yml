@@ -57,7 +57,7 @@ jobs:
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update
-          sudo apt-get install -y libwebkit2gtk-4.1-dev libdbus-1-dev pkg-config build-essential
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libdbus-1-dev libasound2-dev pkg-config build-essential
       - uses: actions-rust-lang/setup-rust-toolchain@v1
       - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v5
@@ -71,7 +71,13 @@ jobs:
         if: runner.os == 'Linux'
         run: cargo fmt --all --check
       - run: cargo clippy --workspace --all-targets --locked -- -D warnings
-      - run: cargo test --workspace --locked
+      # On Windows tauri-build leaves a stand-in msvcrt.lib (static runtime) on
+      # the search path, which other crates' doctests then link against: those
+      # run in their own step, without the app.
+      - run: cargo test --workspace --locked --no-fail-fast ${{ runner.os == 'Windows' && '--lib --bins --tests' || '' }}
+      - name: doctests (Windows)
+        if: runner.os == 'Windows'
+        run: cargo test --workspace --exclude liber-desktop --locked --no-fail-fast --doc
 
   deny:
     runs-on: ubuntu-latest

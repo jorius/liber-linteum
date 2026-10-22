@@ -65,7 +65,7 @@ describe('PageView (M2a §5)', () => {
     );
     // M2b §2: the title is the file name; the note's own title is shown under it.
     const title = screen.getByRole('heading', { level: 1, name: 'rex' });
-    // Jose (M5b): the title heads the cover band, above the breadcrumb.
+    // M5b feedback: the title heads the cover band, above the breadcrumb.
     const crumbs = screen.getByRole('navigation', { name: 'Breadcrumb' });
     expect(title.compareDocumentPosition(crumbs) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(title.closest('[data-band]')).toBe(crumbs.closest('[data-band]'));

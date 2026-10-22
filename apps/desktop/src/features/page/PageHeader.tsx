@@ -5,6 +5,7 @@ import { fileWindowName, type EditorMode, type Page } from '../../ipc';
 import { useEditorStore } from '../../stores/editorStore';
 import { useSettingsStore } from '../../stores/settingsStore';
 import { FavoriteToggle } from '../favorites/FavoriteToggle';
+import { HomeToggle } from '../home/HomeToggle';
 import { useRecorderStore } from '../audio/recorderStore';
 import { viewOf } from '../editor/views';
 import { BackArrow } from './BackArrow';
@@ -16,6 +17,7 @@ import { PageHeading } from './PageHeading';
 import { RelatedChips } from './RelatedChips';
 import { WidthMenu } from './WidthMenu';
 import { isArchived } from '../../stores/tree';
+import { CursorPosition } from './CursorPosition';
 import { WordCount } from './WordCount';
 import styles from './PageView.module.css';
 
@@ -49,7 +51,7 @@ export function PageHeader({
     <Cover page={page} editable={editable} body={children}>
       {({ addCover, controls }) => (
         <>
-          {/* The title and subtitle, on the cover above the breadcrumb (Jose, M5b). */}
+          {/* The title and subtitle, on the cover above the breadcrumb (M5b feedback). */}
           <div className={`${styles.heading} ${styles.pill}`}>
             <PageHeading />
           </div>
@@ -71,6 +73,7 @@ export function PageHeader({
                 </span>
               )}
               {hasDoc && <WordCount />}
+              {hasDoc && <CursorPosition />}
               {hasDoc && (
                 <button
                   type="button"
@@ -114,6 +117,7 @@ export function PageHeader({
                   <OutlineIcon />
                 </button>
               )}
+              {!archived && <HomeToggle path={page.path} />}
               {!archived && <FavoriteToggle path={page.path} />}
               <ModeToggle mode={mode} />
             </div>

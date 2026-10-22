@@ -199,6 +199,15 @@ export function NewPageIcon() {
 }
 
 /** Connect / relationships (the prototype's chain link). */
+/** A house: a vault's home page, or the Global View as its home. */
+export function HomeIcon({ size = 16 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" aria-hidden="true" {...stroke}>
+      <path d="M4 11l8-7 8 7M6 9.5V20h4.5v-5.5h3V20H18V9.5" />
+    </svg>
+  );
+}
+
 export function LinkIcon() {
   return (
     <svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true" {...stroke}>

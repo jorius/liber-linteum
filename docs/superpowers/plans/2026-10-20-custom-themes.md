@@ -12,7 +12,7 @@
 
 **Tech Stack:** React 19, TypeScript, the existing OKLCH helpers (`theme/color.ts`, `theme/derive.ts`), Rust (serde), tauri-plugin-dialog.
 
-**Spec:** `docs/superpowers/specs/2026-10-20-custom-themes-design.md`. Approved by Jose, §6 included.
+**Spec:** `docs/superpowers/specs/2026-10-20-custom-themes-design.md`. Approved by the maintainer, §6 included.
 
 ## Global Constraints
 

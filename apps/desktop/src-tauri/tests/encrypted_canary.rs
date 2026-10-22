@@ -42,6 +42,23 @@ fn call(w: &WebviewWindow<MockRuntime>, cmd: &str, body: Value) -> Result<Value,
     get_ipc_response(w, request).map(|r| r.deserialize::<Value>().unwrap())
 }
 
+/// A file's bytes. Windows' byte-range locks are mandatory: the decrypted
+/// copies' `.lock`, held while a copy exists, can't be read, but it is empty.
+fn read(path: &Path) -> Vec<u8> {
+    match std::fs::read(path) {
+        Err(e) if cfg!(windows) && e.raw_os_error() == Some(33) => {
+            assert_eq!(
+                std::fs::metadata(path).unwrap().len(),
+                0,
+                "{}",
+                path.display()
+            );
+            Vec::new()
+        }
+        r => r.unwrap(),
+    }
+}
+
 /// Every file and folder under `root` whose name or bytes hold the canary,
 /// ASCII case-insensitively. Links are listed, never followed.
 fn canary_hits(root: &Path) -> Vec<PathBuf> {
@@ -62,7 +79,7 @@ fn canary_hits(root: &Path) -> Vec<PathBuf> {
             }
             if kind.is_dir() {
                 stack.push(path);
-            } else if kind.is_file() && has(&std::fs::read(&path).unwrap()) {
+            } else if kind.is_file() && has(&read(&path)) {
                 hits.push(path);
             }
         }

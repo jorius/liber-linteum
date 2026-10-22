@@ -50,9 +50,11 @@ impl World {
         }
     }
 
-    /// The outside dir, as the OS spells it (canonical: `/private/var/…` on macOS).
+    /// The outside dir, as the OS spells it (canonical: `/private/var/…` on
+    /// macOS), `rel` joined a component at a time (`\\` on Windows).
     fn outside(&self, rel: &str) -> PathBuf {
-        dunce::canonicalize(self.base.path()).unwrap().join(rel)
+        let base = dunce::canonicalize(self.base.path()).unwrap();
+        rel.split('/').fold(base, |p, c| p.join(c))
     }
 
     fn write(&self, text: &str) {
@@ -214,7 +216,7 @@ fn dot_dot_is_resolved_in_the_link_and_refused_in_a_request() {
 fn paths_of_the_other_os_are_never_read() {
     let w = World::new();
     let (target, other) = if cfg!(windows) {
-        ("file:///Users/jose/x.png", "/Users/jose/x.png")
+        ("file:///Users/me/x.png", "/Users/me/x.png")
     } else {
         (r"C:\Pics\x.png", r"C:\Pics\x.png")
     };
@@ -269,11 +271,11 @@ fn file_urls_for_every_form() {
         "file://server/share/x%20%231.pdf"
     );
     assert_eq!(
-        file_url("/Users/jose/100% (final)?.png"),
-        "file:///Users/jose/100%25%20%28final%29%3F.png"
+        file_url("/Users/me/100% (final)?.png"),
+        "file:///Users/me/100%25%20%28final%29%3F.png"
     );
     assert_eq!(
-        file_url("/Users/jose/café.png"),
-        "file:///Users/jose/caf%C3%A9.png"
+        file_url("/Users/me/café.png"),
+        "file:///Users/me/caf%C3%A9.png"
     );
 }

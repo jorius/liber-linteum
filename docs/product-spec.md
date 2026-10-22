@@ -1,7 +1,7 @@
 # Liber Linteum — Product Spec (v0.2)
 
 > **Status:** v0.2 — all open questions closed · **Date:** 2026-10-12
-> **Roles:** Jose — tech lead · PO — product owner (owns the idea and final say on behavior)
+> **Roles:** tech lead: the maintainer · PO — product owner (owns the idea and final say on behavior)
 > **Purpose of this file:** the single source of truth for *what* we build and *why*, written to be handed to Claude Code.
 > **Not in this file:** architecture, stack, libraries, storage engines. Those live in `docs/superpowers/specs/2026-10-12-architecture-design.md`.
 
@@ -377,3 +377,4 @@ The view is opened from the floating top toggle **[Edit | Global view]** (see re
 | 2026-10-14 | Personas added (§1.2). Roadmap: **M4b** feedback round (header band with cover background, title in the top bar, palette buttons, picker and autocomplete fixes, attachments override, related chips, Dock icon; part 2: full page width at app, vault and page level, syntax highlighting with a language picker, LaTeX, Mermaid, outline panel and word count, plain-text and code files) → **M4c** scratchpad and single files → M5 search → M6 audio → M7 Notion import → M8 packaging. **Version control** (page history) is planned for a later batch, not now. |
 | 2026-10-15 | PG-01 revised: the title is an H1 only when it is the body's first block, else the file name (M4b part 3). EXP-03 revised: delete goes to the vault's own Trash, with an Archive beside it (M5b). Third feedback round (M5b): no top bar, Vault menu, floating action button, collapsible sidebar, Auto save setting, optional emoji for pages/folders/vault, Favorites, per-folder sort, Settings by category. |
 | 2026-10-18 | M2c–M5b merged into `main` locally. Next batch: `.txt` files searchable, the M6 (audio) and M7 (Notion import) specs. |
+| 2026-10-21 | A vault's **home**: what shows when it opens, a page (or text file) or the Global View, kept per vault in `.liber/vault.json` (`home`; encrypted vaults too). Set from the tree's row menu, the page header's house, the Global View toolbar's "Use as home", or Settings → This vault → Home. A page home follows renames and moves and is cleared when deleted, trashed or archived. Each open goes home (after Unlock too), unless the open was for a page of its own (a file from outside, a Notion import's report); the global Scratchpad keeps opening to its notes. No home: unchanged. |

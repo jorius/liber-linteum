@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** From the app, Jose can create an encrypted vault from Welcome, unlock it with a passphrase or a recovery key, and use it normally. The vault locks on demand, after idle time, on sleep, on screen lock and on quit, and can be unlocked again. Settings → Security covers auto-lock, changing the passphrase and creating a new recovery key.
+**Goal:** From the app, the maintainer can create an encrypted vault from Welcome, unlock it with a passphrase or a recovery key, and use it normally. The vault locks on demand, after idle time, on sleep, on screen lock and on quit, and can be unlocked again. Settings → Security covers auto-lock, changing the passphrase and creating a new recovery key.
 
 **Architecture:**
 - **UI only, on the React app.** It sits on E3's Tauri commands and events, pinned in `docs/superpowers/plans/2026-10-20-enc-e3-encrypted-storage.md` Task 5.

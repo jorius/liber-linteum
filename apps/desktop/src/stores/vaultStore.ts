@@ -19,6 +19,10 @@ import {
   vaultClose,
   vaultCreate,
   vaultCreateEncrypted,
+  vaultDecryptBegin,
+  vaultDecryptCancel,
+  vaultDecryptRun,
+  vaultEncryptBackup,
   vaultEncryptBegin,
   vaultEncryptCancel,
   vaultEncryptRun,
@@ -67,6 +71,9 @@ interface OpenOpts {
   path?: string;
   /** An unlock: its failure is shown by the Unlock screen, not toasted. */
   quiet?: boolean;
+  /** `false`: the caller shows a page of its own right after (a file opened
+   *  from outside, a Notion import's report), so the vault's home isn't. */
+  home?: boolean;
 }
 
 export type VaultStatus = 'closed' | 'opening' | 'open' | 'locked';
@@ -94,7 +101,8 @@ interface VaultState {
   /** Breadcrumb (M2a §5): a folder is expanded with its ancestors and focused;
    *  `''` (the vault) collapses the tree and focuses its first row. */
   revealFolder: (path: string) => void;
-  open: (path: string) => Promise<IpcResult<VaultInfo>>;
+  /** `home: false`: the caller opens a page of its own next (see `OpenOpts`). */
+  open: (path: string, opts?: { home?: boolean }) => Promise<IpcResult<VaultInfo>>;
   /** Opens the global Scratchpad (M4c §2): Rust knows its folder. */
   openScratchpad: () => Promise<IpcResult<VaultInfo>>;
   /** Imports a Notion export into a new vault `name` (M7) and opens it. The
@@ -117,7 +125,12 @@ interface VaultState {
     root: string,
     passphrase: string,
     closesOpen: boolean,
+    backup?: boolean,
   ) => Promise<IpcResult<{ recovery: string }> | null>;
+  /** Encrypt in place with a readable backup (§9): writes and verifies the
+   *  copy, after begin and before the recovery key. On any failure (Stop and
+   *  undo too) the backend undid the begin, and the plain vault opens again. */
+  encryptBackup: () => Promise<IpcResult<void>>;
   /** Encrypt in place, Cancel at the recovery-key step: the begin undone,
    *  the plain vault it left back. */
   encryptCancel: () => Promise<IpcResult<void>>;
@@ -125,6 +138,17 @@ interface VaultState {
    *  any failure (Stop and undo too; the backend rolled back) the plain vault
    *  left at begin opens again. */
   encryptRun: () => Promise<IpcResult<VaultInfo>>;
+  /** Decrypt in place, begin (§10.2): every page saved without asking
+   *  (`null`: one couldn't be), then both secrets checked by the backend. A
+   *  wrong one keeps the vault open; on success the backend closed it, and
+   *  the Unlock screen waits behind the dialog. From here until the run
+   *  ends, nothing switches vaults. */
+  decryptBegin: (passphrase: string, recovery: string) => Promise<IpcResult<void> | null>;
+  /** Decrypt in place, run: the folder opens as a plain vault. On a failure
+   *  (Stop and undo too) it is encrypted as it was: the Unlock screen. */
+  decryptRun: () => Promise<IpcResult<VaultInfo>>;
+  /** Decrypt in place, Stop and undo before or during the run. */
+  decryptCancel: () => Promise<IpcResult<void>>;
   /** Saves every page (never asking), then locks (spec §6.2). `false`: a save
    *  failed and nothing was locked. */
   lock: (reason: 'menu' | 'idle' | 'sleep' | 'screenLock') => Promise<boolean>;
@@ -182,6 +206,17 @@ export function onBeforeVaultSwitch(run: () => Promise<unknown>): () => void {
   return () => beforeSwitch.delete(run);
 }
 
+/** What runs once a vault is open and on screen (plain, or unlocked):
+ *  `home` is false when the open's caller shows a page of its own next. The
+ *  vault's home registers here, so this store doesn't depend on it. */
+type OpenedHook = (info: VaultInfo, opts: { home: boolean }) => Promise<unknown> | void;
+const afterOpen = new Set<OpenedHook>();
+
+export function onVaultOpened(run: OpenedHook): () => void {
+  afterOpen.add(run);
+  return () => afterOpen.delete(run);
+}
+
 const toast = () => useToastStore.getState();
 const BUSY: CommandError = { kind: 'io', message: 'the vault is busy' };
 let treeSeq = 0;
@@ -192,18 +227,29 @@ let voidPending: string | null = null;
 /** The plain vault an encrypt in place left (its begin closed it): opened
  *  again if the conversion fails. */
 let convertLeft: string | null = null;
-/** The folder from an encrypt in place's begin until it ends: no vault switch. */
+/** The folder from an encrypt (or decrypt) in place's begin until it ends:
+ *  no vault switch. */
 let converting: string | null = null;
+/** The conversion running decrypts (§10): "Wait until decrypting finishes." */
+let decrypting = false;
 /** An idle, sleep or screen lock came while converting: the converted vault
  *  locks as soon as it opens (final review I2). */
 let lockAfterConvert = false;
 
 /** "Undo it on this device…" on another device's conversion that is still
  *  copying (spec §8.11): asks first. */
-export const undoElsewhereAction = (path: string): ToastAction => ({
+export const undoElsewhereAction = (path: string, decrypt = false): ToastAction => ({
   label: i18next.t('encryptInPlace.undoElsewhere'),
-  run: () => void useUiStore.getState().openDialog({ type: 'undoElsewhere', path }),
+  run: () => void useUiStore.getState().openDialog({ type: 'undoElsewhere', path, decrypt }),
 });
+
+/** The toast action for an open another device's conversion refused. */
+export const elsewhereAction = (kind: string, path: string): ToastAction | undefined =>
+  kind === 'convertingElsewhere'
+    ? undoElsewhereAction(path)
+    : kind === 'decryptingElsewhere'
+      ? undoElsewhereAction(path, true)
+      : undefined;
 
 /** Quitting mid-run asks first (final review M7): the next open finishes or
  *  undoes it. Registered at the first begin (editorStore loads after this). */
@@ -218,7 +264,8 @@ const convertingQuitCheck = () => {
  *  New vault, Close, Lock from the menu, Back) says to wait: `true`. */
 export function refuseWhileConverting(): boolean {
   if (!converting) return false;
-  useToastStore.getState().push({ message: i18next.t('encryptInPlace.wait') });
+  const key = decrypting ? 'decryptInPlace.wait' : 'encryptInPlace.wait';
+  useToastStore.getState().push({ message: i18next.t(key) });
   return true;
 }
 let unlisten: (() => void)[] = [];
@@ -264,6 +311,7 @@ export async function resetVaultStore() {
   voidPending = null;
   convertLeft = null;
   converting = null;
+  decrypting = false;
   lockAfterConvert = false;
   useUiStore.setState({ quitAsked: false });
   useVaultStore.setState({ ...EMPTY, locking: false, children: new Map(), expanded: new Set() });
@@ -414,8 +462,7 @@ export const useVaultStore = create<VaultState>((set, get) => {
         set({ status: 'locked', lockedPath: path, progress: null });
         return res;
       }
-      const undo =
-        res.error.kind === 'convertingElsewhere' && path ? undoElsewhereAction(path) : undefined;
+      const undo = path ? elsewhereAction(res.error.kind, path) : undefined;
       failed(before, opts, errorMessage(res.error), undo);
       return res;
     }
@@ -454,6 +501,14 @@ export const useVaultStore = create<VaultState>((set, get) => {
         message: i18next.t('toasts.openedWithWarnings', { count: warnings.length }),
         detail: warnings.map(warningText),
       });
+    }
+    const home = opts?.home !== false;
+    for (const run of [...afterOpen]) {
+      try {
+        await run(info, { home });
+      } catch {
+        // A feature's own failure never fails the open.
+      }
     }
     return res;
   }
@@ -494,7 +549,7 @@ export const useVaultStore = create<VaultState>((set, get) => {
   return {
     ...EMPTY,
     locking: false,
-    open: (path) => withProgress(() => vaultOpen(path), { path }),
+    open: (path, o) => withProgress(() => vaultOpen(path), { path, home: o?.home }),
     openScratchpad: () => withProgress(() => scratchpadOpen()),
     importNotion: async (name) => {
       const before = get().status;
@@ -503,10 +558,12 @@ export const useVaultStore = create<VaultState>((set, get) => {
       if (before === 'open' && !(await savedEverything())) return { ok: false, error: BUSY };
       const res = await notionImport(name);
       // A failed import isn't opened: the dialog offers to open it anyway.
-      if (res.ok && res.value.vault) await opened({ ok: true, value: res.value.vault }, before);
+      // Its report page opens next (the dialog), not the vault's home.
+      if (res.ok && res.value.vault)
+        await opened({ ok: true, value: res.value.vault }, before, { home: false });
       return res;
     },
-    openPartialImport: () => withProgress(() => notionOpenPartial()),
+    openPartialImport: () => withProgress(() => notionOpenPartial(), { home: false }),
     create: (path) => withProgress(() => vaultCreate(path)),
     unlock: async (secret) => {
       const path = get().lockedPath;
@@ -546,7 +603,7 @@ export const useVaultStore = create<VaultState>((set, get) => {
       const made = created as IpcResult<CreatedEncryptedVault> | null;
       return made ?? (res.ok ? { ok: false, error: BUSY } : res);
     },
-    encryptBegin: async (root, passphrase, closesOpen) => {
+    encryptBegin: async (root, passphrase, closesOpen, backup = false) => {
       const { status, info } = get();
       if (status === 'opening' || converting) return { ok: false, error: BUSY };
       lockAfterConvert = false;
@@ -556,8 +613,19 @@ export const useVaultStore = create<VaultState>((set, get) => {
         convertLeft = info.root;
       }
       converting = root;
+      decrypting = false;
       quitCheck ??= onQuitCheck(convertingQuitCheck);
-      const res = await vaultEncryptBegin(root, passphrase);
+      const res = await vaultEncryptBegin(root, passphrase, backup);
+      if (!res.ok) {
+        converting = null;
+        useUiStore.setState({ quitAsked: false });
+        lockAfterConvert = false;
+        await reopenLeft();
+      }
+      return res;
+    },
+    encryptBackup: async () => {
+      const res = await vaultEncryptBackup();
       if (!res.ok) {
         converting = null;
         useUiStore.setState({ quitAsked: false });
@@ -588,6 +656,56 @@ export const useVaultStore = create<VaultState>((set, get) => {
       const out = await opened(res, get().status, { path: res.value.root });
       if (lockNow) await get().lock('idle');
       return out;
+    },
+    decryptBegin: async (passphrase, recovery) => {
+      const { status, info } = get();
+      if (status !== 'open' || !info?.encrypted || converting) return { ok: false, error: BUSY };
+      if (!(await savedEverything({ ask: false }))) return null;
+      const root = info.root;
+      converting = root;
+      decrypting = true;
+      quitCheck ??= onQuitCheck(convertingQuitCheck);
+      const res = await vaultDecryptBegin(passphrase, recovery);
+      if (!res.ok) {
+        converting = null;
+        decrypting = false;
+        useUiStore.setState({ quitAsked: false });
+        // Refused before the session closed: the vault is still open. If it
+        // closed anyway (a disk error after), it waits at the Unlock screen.
+        const still = await vaultTree();
+        if (!still.ok && still.error.kind === 'noVault') {
+          dropVault();
+          set({ status: 'locked', lockedPath: root });
+        }
+        return res;
+      }
+      // The backend closed the encrypted session: what was on screen goes.
+      dropVault();
+      set({ status: 'locked', lockedPath: root });
+      return res;
+    },
+    decryptRun: async () => {
+      const root = converting;
+      const res = await vaultDecryptRun();
+      converting = null;
+      decrypting = false;
+      lockAfterConvert = false; // a plain vault has nothing to lock
+      useUiStore.setState({ quitAsked: false });
+      if (!res.ok) {
+        // Past `staged` the folder is plain already (review L8): opening it
+        // finishes the decryption; there is nothing to unlock.
+        if (root && res.error.kind === 'decryptFinishFailed') await get().open(root);
+        return res;
+      }
+      return opened(res, get().status, { path: res.value.root });
+    },
+    decryptCancel: async () => {
+      const res = await vaultDecryptCancel();
+      converting = null;
+      decrypting = false;
+      lockAfterConvert = false;
+      useUiStore.setState({ quitAsked: false });
+      return res;
     },
     lock: async (reason) => {
       // A lock the user asks for waits; idle, sleep and screen lock still lock

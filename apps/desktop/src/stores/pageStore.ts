@@ -21,6 +21,9 @@ export interface Jump {
   path: string;
   from: number;
   to: number;
+  /** A search result opened at its match: the word to find in the body,
+   *  in place of `from`/`to`. */
+  find?: string;
   nonce: number;
 }
 
@@ -45,6 +48,8 @@ interface PageState {
   /** Consumed once by the editor showing `path`. */
   jump: Jump | null;
   requestJump: (path: string, from: number, to: number) => void;
+  /** Puts the cursor on the first body match of `word` in `path`. */
+  requestFind: (path: string, word: string) => void;
   clearJump: () => void;
   /** Opens `path` (header data + editor). */
   load: (path: string) => Promise<void>;
@@ -91,6 +96,8 @@ export const usePageStore = create<PageState>((set, get) => ({
   jump: null,
   requestJump: (path, from, to) =>
     set({ jump: { path, from, to, nonce: (get().jump?.nonce ?? 0) + 1 } }),
+  requestFind: (path, word) =>
+    set({ jump: { path, from: 0, to: 0, find: word, nonce: (get().jump?.nonce ?? 0) + 1 } }),
   clearJump: () => set({ jump: null }),
   load: async (path) => {
     // Auto save off (M5b §6): leaving unsaved text asks first; Cancel stays.

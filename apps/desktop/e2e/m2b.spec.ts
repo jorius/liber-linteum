@@ -36,6 +36,42 @@ test('the toolbar formats the word at the cursor and sets a heading', async ({ p
     .toContainEqual(expect.stringMatching(/^## \*\*hello\*\* world/));
 });
 
+test('a table from the toolbar: pick a size, fill it with Tab and Enter, click a cell', async ({
+  page,
+}) => {
+  await open(page, 'A');
+  await page.locator('.cm-line', { hasText: 'hello world' }).click();
+  await page.keyboard.press('End');
+  const bar = page.getByRole('toolbar', { name: 'Formatting' });
+  await bar.getByRole('button', { name: 'Table' }).click();
+  const picker = page.getByRole('dialog', { name: 'Insert a table' });
+  await picker.getByRole('button', { name: '2 by 2 table' }).click();
+  await page.keyboard.type('Moon');
+  await page.keyboard.press('Tab');
+  await page.keyboard.type('Days');
+  await page.keyboard.press('Enter');
+  await page.keyboard.type('13.5');
+  await page.keyboard.press('Shift+Tab');
+  await page.keyboard.type('Dusk');
+  // Each Tab and Enter lines the table up; the last word typed isn't padded yet.
+  await expect
+    .poll(() => writes(page))
+    .toContainEqual(
+      expect.stringMatching(
+        /^hello world\n\n\| Moon \| Days \|\n\| ---- \| ---- \|\n\| Dusk +\| 13\.5 \|\n\nSee/,
+      ),
+    );
+  // Away from it, the table renders; a click on a cell edits that cell.
+  await page.locator('.cm-line', { hasText: 'See' }).click();
+  const cell = page.locator('.cm-liber-widget td', { hasText: 'Dusk' });
+  await expect(cell).toBeVisible();
+  await cell.click();
+  await page.keyboard.type(' Closing');
+  await expect
+    .poll(() => writes(page))
+    .toContainEqual(expect.stringMatching(/\| Dusk Closing +\| 13\.5 \|/));
+});
+
 test('renaming from the title renames the file', async ({ page }) => {
   await open(page, 'A');
   const title = page.getByRole('textbox', { name: 'Page title' });

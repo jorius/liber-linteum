@@ -1,6 +1,6 @@
 # M5b — Third feedback round (UI overhaul, icons, Trash and Archive): Design
 
-**Status:** Jose gave the feedback on 2026-10-15 after testing the M4c + M5 build. He answered four questions; the remaining choices are rulings, listed in §10 for him to confirm.
+**Status:** the maintainer gave the feedback on 2026-10-15 after testing the M4c + M5 build. He answered four questions; the remaining choices are rulings, listed in §10 for him to confirm.
 - **Branch:** `feat/m5b-feedback`, stacked on `feat/m5-search` (5a0cc35).
 - **Index:** no schema bump is planned. If a stream needs one, it is 4.
 
@@ -8,7 +8,7 @@
 
 ## 1. The feedback, item by item
 
-| # | Jose said | Section |
+| # | Feedback | Section |
 |---|---|---|
 | 1 | Quick actions on files and folders in the sidebar | §3 |
 | 2 | An optional emoji at the start of pages, as in Notion | §4 |
@@ -48,7 +48,7 @@
   - The stack closes on Escape, on a click outside, or once an action has run.
   - Keyboard: Tab reaches the button; Enter or Space opens the stack; ↑ and ↓ move through it; Escape returns focus to the button. Its ARIA is a menu button with `aria-expanded`.
 - **Shortcuts:** the actions keep their shortcuts whether or not the stack is open. ⌘1 is Edit, ⌘2 is Global View, and ⌘F / ⌘⇧F is Search (§7.3). **⌘J** toggles the stack itself, as Notion uses ⌘J for its floating button.
-- **Position:** a Settings → Appearance row, **Action button**, offers Bottom right (default), Bottom left (beside the sidebar) and Top right. This keeps Jose's first idea, that the user chooses the place, as an option.
+- **Position:** a Settings → Appearance row, **Action button**, offers Bottom right (default), Bottom left (beside the sidebar) and Top right. This keeps the maintainer's first idea, that the user chooses the place, as an option.
 - **Overlap:** the button must never cover the last line of text.
   - The editor and Global View get bottom padding equal to the button's height plus a gap.
   - In Global View, the button sits above React Flow's controls, which move left if they would collide.
@@ -181,7 +181,7 @@
 ## 7. Fixes (Stream D)
 
 ### 7.1 Search filter rows overlap the results
-- **The bug:** the filter rows have a fixed height, so wrapped chip rows (LINKS TO in Jose's screenshot) spill over the RECENT heading and the list.
+- **The bug:** the filter rows have a fixed height, so wrapped chip rows (LINKS TO in the maintainer's screenshot) spill over the RECENT heading and the list.
 - **The fix:**
   - the filter area grows with its content, and the result list takes the rest of the dialog's height;
   - every chip row is limited to two lines, with a **+N more** chip that expands the row;
@@ -189,7 +189,7 @@
 - The orange ⇪ badge in the screenshot is the macOS Caps Lock indicator, not the app.
 
 ### 7.2 Wide tables take the editor's full width
-Jose chose full editor width, centred.
+The maintainer chose full editor width, centred.
 - **Which tables:** in a page whose width is **Wide elements**, a table wider than the text measure spans the editor from its left padding to its right padding. Narrow tables stay with the text.
 - **Text:** keeps the readable measure, centred.
 - **Line numbers:** with line numbers on, the line numbers of those rows sit at the far left edge of the editor, outside the table. This replaces part 3's "keep the text's left edge, grow to the right" ruling (wide spec §6.6) for tables. Code, maths and diagrams follow the same full-width rule.
@@ -200,7 +200,7 @@ Jose chose full editor width, centred.
 - **Shortcuts:** **⌘F** (Ctrl+F) opens the search dialog from every view, as ⌘⇧F does. There's no find-in-note today, so nothing is displaced.
 - **When the editor has focus:** ⌘F opens the search dialog prefilled with the current selection, if the selection is short and on one line.
 - **Hints:** the button and menu hints show ⌘F. View → Search… gets ⌘F as its accelerator, now that the top-bar button is gone.
-- **In-note find (⌘F inside the note, as Obsidian does)** is a later item; when it lands, ⌘F becomes find-in-note and search keeps ⌘⇧F. Jose to confirm.
+- **In-note find (⌘F inside the note, as Obsidian does)** is a later item; when it lands, ⌘F becomes find-in-note and search keeps ⌘⇧F. The maintainer to confirm.
 
 ## 8. Streams and shared files
 
@@ -233,9 +233,9 @@ Jose chose full editor width, centred.
 - **Floors:** the Safari 15 floor and `freezePrototype`-safe; no network.
 - **`LIBER_TRASH_TESTS` stays off:** tests that would empty to the real OS trash use the existing gated path.
 
-## 10. Rulings to confirm (taken for Jose)
+## 10. Rulings to confirm (taken for the maintainer)
 
-1. **Floating button:** Jose asked for one button at the bottom right. Settings also offers bottom left and top right, from his first message. ⌘J toggles it.
+1. **Floating button:** the maintainer asked for one button at the bottom right. Settings also offers bottom left and top right, from his first message. ⌘J toggles it.
 2. **Vault menu:** Open Vault… ⌘O, Open Recent, Close Vault ⌥⌘W. Encryption isn't listed until it exists.
 3. **Settings on Windows and Linux:** under File, since there is no app menu.
 4. **Deleting now goes to the vault's `.trash`**, not the OS trash. Deleting from the Trash sends files to the OS trash, never destroying them.
@@ -370,7 +370,7 @@ These override §5 where they conflict.
 ## 14. Amendments — Stream D
 
 ### 7.1 Search filter rows
-1. **Root cause.** The search box was a scrolling flex column (`overflow: auto`, `max-height`). Everything in it shrinks toward its automatic minimum height, and the filter rows (a column of row flexboxes whose chips wrap) depend on the engine's intrinsic sizing to keep their height. Jose's WKWebView shrank the filters under the result list.
+1. **Root cause.** The search box was a scrolling flex column (`overflow: auto`, `max-height`). Everything in it shrinks toward its automatic minimum height, and the filter rows (a column of row flexboxes whose chips wrap) depend on the engine's intrinsic sizing to keep their height. The maintainer's WKWebView shrank the filters under the result list.
    - Playwright's WebKit and Chromium computed the minimum correctly, so the overlap itself doesn't reproduce in the e2e. An e2e pins it anyway, at 1000 and 700 px.
 2. **Fix.** The box no longer scrolls:
    - every region keeps its height (`flex: none`);
@@ -383,7 +383,7 @@ These override §5 where they conflict.
    - The words: "+N more" / "+N más".
 
 ### 7.2 Wide tables
-4. **Root cause.** With line numbers on, the number column sat beside the measure, so there was no room on the left (`m` was 0). Wide blocks only grew to the right (wide spec §6.6), and the table in Jose's screenshot kept the text's left edge.
+4. **Root cause.** With line numbers on, the number column sat beside the measure, so there was no room on the left (`m` was 0). Wide blocks only grew to the right (wide spec §6.6), and the table in the maintainer's screenshot kept the text's left edge.
 5. **Fix, whole column.** On a Wide-elements page, the text's auto margins take all the free room, so the line-number column moves to the editor's left edge and the room beside the text is even on both sides.
    - This moves the whole column, not only the wide rows' numbers as §7.2 said. Per-row numbers would need a CodeMirror gutter-class extension, and a column that jumps between rows reads worse.
    - Cost: on wide pages the numbers sit further from the text.
@@ -465,9 +465,9 @@ The fresh review of `855c6ea..5f961aa` found no Critical issues. Each fix below 
 - **M13 (rest):** the Vault menu items aren't disabled while a file window is focused (they bring the main window forward); the native ⌘, opens Settings over another dialog.
 - Windows shutdown/logout with Auto save off (see I2).
 
-## 17. Round 2 (Jose, 2026-10-15 evening)
+## 17. Round 2 (the maintainer, 2026-10-15 evening)
 
-Jose's second look at the M5b build produced six items:
+The maintainer's second look at the M5b build produced six items:
 - items 1–5 below;
 - item 6, the Trash redesign, built from his approved mock (`Trash.dc.html`).
 
@@ -529,7 +529,7 @@ Settings categories are being mocked separately and aren't part of this round.
 - **Still allowed:** Unarchive (`archive_restore`), Move to Trash (`entry_trash`) and `folder_sort_set`.
 - **Ruling:** the toolbar is hidden on archived pages rather than shown disabled. A disabled toolbar would still say "edit me".
 
-### 17.6 The Trash, redesigned (Jose's approved mock)
+### 17.6 The Trash, redesigned (the maintainer's approved mock)
 - **Rust:** Trash items carry:
   - `size` (a file's bytes, or a folder's whole contents);
   - `pages` (a folder's pages, however deep);
@@ -581,7 +581,7 @@ Settings categories are being mocked separately and aren't part of this round.
 
 ## 18. Settings with categories
 
-Jose, on the evening of 2026-10-15: the single long Settings page becomes a menu of categories, styled like the file explorer. He approved the mock: the "Settings with categories" artboard on the M5b mocks canvas.
+The maintainer, on the evening of 2026-10-15: the single long Settings page becomes a menu of categories, styled like the file explorer. He approved the mock: the "Settings with categories" artboard on the M5b mocks canvas.
 
 **Layout**
 - The dialog is 960 × 680 px. It shrinks with the window, down to 720 × 520 px.
@@ -617,7 +617,7 @@ Jose, on the evening of 2026-10-15: the single long Settings page becomes a menu
 
 ## 19. Favorites
 
-Jose, 2026-10-15: "add a Favorites section right below the Scratchpad section."
+Requirement (2026-10-15): a Favorites section right below the Scratchpad section.
 
 **What it is:**
 - A **Favorites** section in the sidebar under the pinned Scratchpad, or first when the vault has no scratch folder yet.

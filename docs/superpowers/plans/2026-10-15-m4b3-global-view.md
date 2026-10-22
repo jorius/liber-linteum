@@ -45,7 +45,7 @@ This plan records what ran: every task was implemented test-first in the Stream 
 1. **A cover image that hasn't loaded yet, or is very tall or very wide**, in WebView2. The frame must still crop at the stored focus, never show the image's top or overflow the card (e2e with 120 × 600 and 600 × 120 PNGs, chromium with WebView2's UA).
 2. **Thousands of edges with focus mode on.** Hovering must not re-render the edge layer: attributes only, re-applied when the drawn edges change. The perf probe was re-run after the chips (one `<rect>` each) were added.
 3. **A page whose text changed between the map's read and the click** (unsaved edits, an external write). The jump's offsets are clamped; the map reads the live text (`editorStore.liveText`) and re-reads on saves and vault changes.
-4. **A page with hundreds of blocks**, or a paragraph that is a run of image embeds (the friend's "Line art" section). The map shows at most 400 atom cards and "+N more" per section; a run of embeds is one image card each. The layout never overlaps (pairwise test).
+4. **A page with hundreds of blocks**, or a paragraph that is a run of image embeds (the tester's "Line art" section). The map shows at most 400 atom cards and "+N more" per section; a run of embeds is one image card each. The layout never overlaps (pairwise test).
 5. **Keyboard-only use of the atoms map:**
    - it arrives on the page's card;
    - arrows move between cards of different sizes (by centre);
@@ -70,7 +70,7 @@ This plan records what ran: every task was implemented test-first in the Stream 
   - `bandsPng(w, h)` writes a red/green/blue-banded PNG with `node:zlib`, routed at `http://liber-asset.localhost/**` (the Windows UA makes `assetUrl` use it).
   - A page with `cover: tall.png`, `cover-y: 100`.
   - The test asserts that the card image's box equals its frame (96 px tall), with `object-position: 50% 100%`.
-- [x] **Step 2: Run it. Failed as the friend saw it:** `img` 238 × **1190** in a 96 px frame in Chromium (WebKit passed).
+- [x] **Step 2: Run it. Failed as the tester saw it:** `img` 238 × **1190** in a 96 px frame in Chromium (WebKit passed).
   - `pnpm build:ui && playwright test m4b3-gv --project=chromium`
 - [x] **Step 3: Fix.**
   - `.cover` is `position: relative`.
@@ -190,7 +190,7 @@ This plan records what ran: every task was implemented test-first in the Stream 
   - Rust `menu::ATOMS_ID = "liber-see-atoms"`, emitting `menu:screen` with `"atoms"`.
 
 - [x] **Step 1: Model and layout tests** (`atoms.test.ts`, 7 tests).
-  - **The friend's note:** the sections are the two `#` headings far down. The intro is two paragraphs hanging from the page. A run of `![[…]]` lines is one image atom each, and the offsets slice back to the source.
+  - **The tester's note:** the sections are the two `#` headings far down. The intro is two paragraphs hanging from the page. A run of `![[…]]` lines is one image atom each, and the offsets slice back to the source.
   - **Links:** a paragraph with text and an embed stays a paragraph and lists its links.
   - **Nesting** by level, with block counts.
   - **Every block kind**, with its preview data: list, tasks, quote, callout, code (4 lines), diagram (Mermaid), formula, table, audio, file, embedded page, markdown image, html.

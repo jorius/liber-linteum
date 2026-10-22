@@ -90,6 +90,8 @@ fn physical_files(root: &Path) -> Vec<PathBuf> {
     out
 }
 
+/// Only the Unix symlink test uses it.
+#[cfg(unix)]
 fn unreadable(storage: &EncryptedStorage, dir: &str) -> Vec<String> {
     storage
         .children(&vp(dir))

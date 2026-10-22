@@ -4,13 +4,14 @@ import { backlinkCount } from '../../ipc';
 import { useSettingsStore } from '../../stores/settingsStore';
 import { folderPageOf, nameOf } from '../../stores/tree';
 import { useVaultStore } from '../../stores/vaultStore';
-import { displayName } from '../explorer/TreeRow';
+import { displayName, useShowExtensions } from '../explorer/TreeRow';
 import { Dialog } from './Dialog';
 import styles from './Dialogs.module.css';
 
 /** "Move X to Trash?" with the links that will break (spec §4.2). */
 export function ConfirmDeleteDialog({ path, onClose }: { path: string; onClose: () => void }) {
   const { t } = useTranslation();
+  const extensions = useShowExtensions();
   const node = useVaultStore((s) => s.nodes.find((n) => n.path === path));
   const items = useVaultStore((s) => s.nodes.filter((n) => n.path.startsWith(`${path}/`)).length);
   const page = useVaultStore((s) => folderPageOf(path, s.children));
@@ -36,7 +37,7 @@ export function ConfirmDeleteDialog({ path, onClose }: { path: string; onClose: 
 
   return (
     <Dialog
-      title={t('dialogs.delete.title', { name: displayName(node) })}
+      title={t('dialogs.delete.title', { name: displayName(node, extensions) })}
       onClose={onClose}
       onConfirm={() => void confirm()}
     >

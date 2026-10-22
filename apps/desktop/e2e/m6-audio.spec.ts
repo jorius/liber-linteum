@@ -74,9 +74,11 @@ const level = (page: Page, elapsedMs: number) =>
 
 test('Record clip: Stop & insert puts the clip where the cursor was', async ({ page }) => {
   const { errors, outside } = await open(page, { 'Notes.md': 'Before after\n' });
-  const content = page.locator('.cm-content');
-  await content.click();
-  await page.keyboard.press('ControlOrMeta+ArrowUp');
+  // The first line itself: the editor's middle can be its empty last line.
+  await page.locator('.cm-line', { hasText: 'Before after' }).click();
+  // Home, not Mod+ArrowUp: WebKit on a Linux runner wears a Mac user agent,
+  // so the editor binds Mac keys while ControlOrMeta sends Ctrl (CI).
+  await page.keyboard.press('Home');
   for (let i = 0; i < 'Before'.length; i++) await page.keyboard.press('ArrowRight');
   await page.getByRole('button', { name: 'Record clip' }).click();
   const bar = page.getByRole('region', { name: 'Recorder' });

@@ -1,8 +1,10 @@
 import type { TFunction } from 'i18next';
 import { useTranslation } from 'react-i18next';
 import type { GlobalViewEdges, GvLevelRef } from '../../ipc';
-import { LinkIcon } from '../../app/icons';
+import { HomeIcon, LinkIcon } from '../../app/icons';
 import { useSettingsStore } from '../../stores/settingsStore';
+import { useVaultStore } from '../../stores/vaultStore';
+import { homeOffered, toggleGlobalViewHome, useHomeStore } from '../home/homeStore';
 import { nameOf } from '../../stores/tree';
 import { strokeOf, type GvEdgeKind } from './edges';
 import { levelKey, useGvStore } from './gvStore';
@@ -35,6 +37,8 @@ export function Toolbar() {
   const update = useSettingsStore((s) => s.update);
   const mode = settings.globalViewMode;
   const toggles = settings.globalViewEdges;
+  const isHome = useHomeStore((s) => s.home?.kind === 'globalView');
+  const offersHome = useVaultStore((s) => homeOffered(s.info));
 
   const crumbLabel = (ref: GvLevelRef) => levelLabel(ref, titles, t);
   // Expand canvases show only their root level in the breadcrumb (M3a §5).
@@ -146,6 +150,20 @@ export function Toolbar() {
         >
           <LinkIcon />
           {t('gv.relations.connectCards')}
+        </button>
+      )}
+      {/* The vault's home: open on the Global View (a pressed toggle). */}
+      {offersHome && (
+        <button
+          type="button"
+          className={styles.connect}
+          data-gv-home=""
+          aria-pressed={isHome}
+          title={t(isHome ? 'home.globalViewRemoveHint' : 'home.globalViewSetHint')}
+          onClick={() => void toggleGlobalViewHome()}
+        >
+          <HomeIcon />
+          {t('home.globalViewToggle')}
         </button>
       )}
       <button

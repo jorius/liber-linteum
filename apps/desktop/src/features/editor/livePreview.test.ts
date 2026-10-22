@@ -380,6 +380,8 @@ describe('wide elements (M4b part 3): what may escape the measure', () => {
     const rows = [...v.contentDOM.querySelectorAll<HTMLElement>('[data-wide-src="tables"]')];
     expect(rows.map((l) => l.textContent)).toEqual(['| a | b |', '| - | - |', '| one | two |']);
     expect(rows[0].style.getPropertyValue('--liber-ch')).toBe('13');
+    // Monospaced, so the columns the table tools line up look lined up.
+    expect(rows.every((l) => l.classList.contains('cm-liber-tablesrc'))).toBe(true);
   });
 
   it('a Mermaid block being edited follows the diagrams choice', async () => {

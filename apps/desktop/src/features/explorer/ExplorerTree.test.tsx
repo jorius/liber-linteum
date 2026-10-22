@@ -671,17 +671,17 @@ describe('sub-pages and case-insensitive folder pages (round 3 §9)', () => {
   it('a case-variant page is the folder’s page; "Match the page name" renames it', async () => {
     const calls = backend({ entry_rename: () => outcome, vault_tree: () => [] });
     seed([
-      { path: 'SmartJob', kind: 'folder' },
-      { path: 'SmartJob/Smartjob.md', kind: 'page' },
+      { path: 'MyProject', kind: 'folder' },
+      { path: 'MyProject/Myproject.md', kind: 'page' },
     ]);
-    render(<ContextMenu menu={{ path: 'SmartJob', anchor: { x: 0, y: 0 } }} onClose={() => {}} />);
+    render(<ContextMenu menu={{ path: 'MyProject', anchor: { x: 0, y: 0 } }} onClose={() => {}} />);
     expect(labels()).not.toContain('Add a page to this folder');
     await userEvent.click(
       screen.getByRole('menuitem', { name: 'Match the page name to the folder' }),
     );
     expect(calls).toContainEqual([
       'entry_rename',
-      { from: 'SmartJob/Smartjob.md', to: 'SmartJob/SmartJob.md' },
+      { from: 'MyProject/Myproject.md', to: 'MyProject/MyProject.md' },
     ]);
   });
 

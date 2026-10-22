@@ -23,8 +23,8 @@ describe('targets outside the vault (M4b part 3 §9)', () => {
 
   it('shows a vault file where it is on disk, with the OS separators', () => {
     expect(diskPathOf('/Users/j/Vault', 'Assets/x.png', false)).toBe('/Users/j/Vault/Assets/x.png');
-    expect(diskPathOf('D:\\Mind_PC', 'Assets/Com/x.png', true)).toBe(
-      'D:\\Mind_PC\\Assets\\Com\\x.png',
+    expect(diskPathOf('D:\\Notes_PC', 'Assets/Com/x.png', true)).toBe(
+      'D:\\Notes_PC\\Assets\\Com\\x.png',
     );
     expect(diskPathOf('D:\\', 'x.png', true)).toBe('D:\\x.png');
   });

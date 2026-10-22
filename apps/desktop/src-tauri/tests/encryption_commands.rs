@@ -166,7 +166,7 @@ fn create_unlock_lock_cycle() {
     h.lock();
     let got = locked.lock().unwrap().clone();
     assert_eq!(got.len(), 1, "{got:?}");
-    let canonical = std::fs::canonicalize(&root).unwrap();
+    let canonical = dunce::canonicalize(&root).unwrap();
     assert_eq!(got[0]["path"], canonical.to_string_lossy().as_ref());
     let err = call(&h.main, "page_get", json!({ "path": "Diary.md" })).unwrap_err();
     assert_eq!(kind(err), "noVault");
@@ -689,7 +689,7 @@ fn recent_list_marks_encrypted() {
     call(&h.main, "vault_create", json!({ "path": plain })).unwrap();
     let recent = call(&h.main, "vaults_recent", json!({})).unwrap();
     let find = |p: &Path| {
-        let p = std::fs::canonicalize(p).unwrap();
+        let p = dunce::canonicalize(p).unwrap();
         recent
             .as_array()
             .unwrap()
@@ -898,8 +898,8 @@ fn lock_during_recording_keeps_the_take() {
     assert_eq!(channels, 1);
     // Lock finishes the stream, so no chunk is lost: about 0.5 s, all in the
     // last (partial) 64 KiB chunk, which a lost chunk would leave empty. The
-    // real-time fake host's 10 ms sleeps run long on a loaded machine (0.39 s
-    // seen at load 10), hence 0.25 s at least.
+    // real-time fake host keeps up with the clock; 0.25 s at least leaves room
+    // for a thread that starts late on a loaded machine.
     assert!((12_000..=48_000 * 2).contains(&samples), "{samples}");
     assert_eq!(
         h.takes_left(),

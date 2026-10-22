@@ -1,9 +1,9 @@
 # M5 — Search with filters: Hand-off
 
-**What M5 does:** find any page fast, by what it's called, where it lives, how it's tagged or linked, or what it says. On 2026-10-15 Jose said "let's go with the scratchpad feature … then the search filters", so **the filters** got the most attention.
+**What M5 does:** find any page fast, by what it's called, where it lives, how it's tagged or linked, or what it says. On 2026-10-15 the maintainer set the order: the scratchpad feature first, then the search filters, so **the filters** got the most attention.
 
 **Spec:** `docs/superpowers/specs/2026-10-14-m5-search-design.md`.
-- §1–§9: the design, written on 2026-10-14 without Jose's review. It includes the 7 judgement calls in §9.
+- §1–§9: the design, written on 2026-10-14 without the maintainer's review. It includes the 7 judgement calls in §9.
 - §10: amendments from planning, covering schema 3, external-content FTS, each filter in detail, the facets rules, the UI and performance.
 - §11: the final review, with what was fixed and what was deferred.
 
@@ -133,7 +133,7 @@ The first working version measured a p95 of about 450 ms. Three changes brought 
 
 ## 3. Needs the real window
 
-### Jose, on the Mac (the built `.app` or `pnpm dev`)
+### The maintainer, on the Mac (the built `.app` or `pnpm dev`)
 
 1. **Rebuild.** Open your vault; the index rebuilds once (schema 3). The vault should open normally.
 2. **Feel.** Press ⌘⇧F and type a few letters of a page name. Results update as you type with no lag in the field.
@@ -152,10 +152,10 @@ The first working version measured a p95 of about 450 ms. Three changes brought 
 10. **View → Search…** opens it too, including from a file window, where it opens in the main window.
 11. **Quick notes.** After a quick note renames itself from its first line, search finds it by that name.
 
-### The friend, on Windows (the `.exe`)
+### The Windows tester (the `.exe`)
 
 1. Ctrl+Shift+F opens search; the Search button is in the top bar.
-2. Search the real Obsidian vault ("Mind_PC"):
+2. Search the tester's real Obsidian vault:
    - accented words;
    - tags with `#`;
    - a folder with `in:`.

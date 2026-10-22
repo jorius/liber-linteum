@@ -547,7 +547,14 @@ pub(crate) fn audio_record_start_impl<R: Runtime>(
     };
     // The first reading means the microphone opened; an error ends the thread
     // first. A silent stream still reads (zero), so this never waits long.
-    if first.recv_timeout(Duration::from_secs(3)).is_err() && thread.is_finished() {
+    // Disconnected means the thread dropped its sender, i.e. it has ended,
+    // though `is_finished` may not say so yet.
+    let ended = match first.recv_timeout(Duration::from_secs(3)) {
+        Ok(()) => false,
+        Err(mpsc::RecvTimeoutError::Disconnected) => true,
+        Err(mpsc::RecvTimeoutError::Timeout) => thread.is_finished(),
+    };
+    if ended {
         at.remove(&session);
         return match thread.join() {
             Ok(Err(e)) => Err(e.into()),

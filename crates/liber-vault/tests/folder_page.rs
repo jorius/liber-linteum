@@ -27,10 +27,10 @@ fn subpages_exact_folder_page() {
 
 #[test]
 fn subpages_case_variant_folder_page() {
-    let (_d, v) = vault_with(&["SmartJob/Smartjob.md", "Árbol/árbol.md"]);
+    let (_d, v) = vault_with(&["MyProject/Myproject.md", "Árbol/árbol.md"]);
     assert_eq!(
-        v.folder_page_of(&vp("SmartJob")),
-        Some(vp("SmartJob/Smartjob.md"))
+        v.folder_page_of(&vp("MyProject")),
+        Some(vp("MyProject/Myproject.md"))
     );
     assert_eq!(v.folder_page_of(&vp("Árbol")), Some(vp("Árbol/árbol.md")));
 }

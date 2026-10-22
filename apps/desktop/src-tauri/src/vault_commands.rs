@@ -99,6 +99,7 @@ pub(crate) fn install_session<R: Runtime>(
         .vault_icon()
         .filter(|i| liber_markdown::is_icon(i));
     let encrypted = session.vault().encrypted().is_some();
+    let home = session.vault().home();
     leave_encrypted(app);
     state.set_session(Some(session));
     let scratchpad = state.settings.is_scratchpad(&root);
@@ -115,6 +116,8 @@ pub(crate) fn install_session<R: Runtime>(
         recovery_void,
         recovered: Vec::new(),
         originals_pending: false,
+        home,
+        keys_left: None,
     })
 }
 

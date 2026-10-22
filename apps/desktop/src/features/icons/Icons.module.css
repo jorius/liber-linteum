@@ -89,10 +89,13 @@
   font: 400 13px var(--font-body);
 }
 
-/* An icon before a name: the emoji at the text's size. */
+/* An icon before a name: the emoji at the text's size. Inline, not
+   inline-block: WebKit miscounted a line-clamped title holding an
+   inline-block, so a Global View card's second title line ran over its
+   subtitle (WebKitGTK). In flex rows it's a flex item either way. */
 .icon {
   flex: none;
-  display: inline-block;
+  display: inline;
   font-style: normal;
   line-height: 1;
 }

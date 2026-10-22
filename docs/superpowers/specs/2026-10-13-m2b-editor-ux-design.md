@@ -1,6 +1,6 @@
 # M2b — Editor UX iteration: Design
 
-**Status:** approved in conversation 2026-10-13 (Jose), from his real-window feedback on M2a (M2a hand-off §14).
+**Status:** approved in conversation 2026-10-13 (the maintainer), from his real-window feedback on M2a (M2a hand-off §14).
 **Visual reference:** `docs/design/2026-10-13-m2b-palettes.html` (also published privately as https://claude.ai/artifact/2qEG27CumXPUF1j15uxfcm) — palettes in an app mock, the custom-accent derivation code, toolbar/back-arrow/title mock.
 **Roadmap change:** this is **M2b**. The former M2b scope (covers/subtitle editing, paste/drop attachments, `[[` autocomplete, Create-page folders) moves to **M2c**.
 
@@ -90,7 +90,7 @@ New fields with defaults: `palette: "lavender"` (unknown id → default + warnin
 - Rust: `fonts_list` (non-empty on CI hosts, no dot-families, sorted, async guard, ACL); settings leniency for each new field.
 - Component: Toolbar (pressed states, roving focus, axe), Settings sections (axe), PageTitle (Enter/Escape/blur/errors, axe), back arrow visibility.
 - e2e (Chromium + WebKit): toolbar bold/heading/task on a page; title rename via header; follow a link then ← back and ⌘[; palette switch changes `--color-accent`; zero-network test runs with every palette and with a system font selected.
-- Real window (Jose): typing feel with Atkinson; each palette in light/dark; custom accent; toolbar in all modes; title rename with backlinks; back arrow over a few hops.
+- Real window (the maintainer): typing feel with Atkinson; each palette in light/dark; custom accent; toolbar in all modes; title rename with backlinks; back arrow over a few hops.
 
 ## 9. Out of scope (→ M2c and later)
 
@@ -154,7 +154,7 @@ These override the sections above where they conflict.
 11. **Explorer selection** uses each palette's `sideSel`.
 12. **Versions:** `fontdb` 0.24.0; @fontsource atkinson-hyperlegible 5.3.0, literata 5.3.0, source-serif-4 5.3.1, ibm-plex-sans 5.3.0, ibm-plex-mono 5.3.0, source-code-pro 5.3.1. CI installs Playwright `chromium webkit`.
 
-## 12. Amendments from Jose's real-window check (2026-10-13)
+## 12. Amendments from the maintainer's real-window check (2026-10-13)
 These override the sections above (and M2a §3.2 / ED-04) where they conflict.
 
 1. **Links in Live Preview follow on a plain click**, as in Obsidian: a click on a link shown rendered (its line is not touched by the selection) opens it — resolved page, `#heading`, "Create page" for an unresolved target, confirmation for a web link. On the cursor line the link shows its source and a click places the cursor (that is how a link is edited; arrow keys work too). Shift-click extends the selection; ⌘/Ctrl-click and ⌘↩ still follow any link.

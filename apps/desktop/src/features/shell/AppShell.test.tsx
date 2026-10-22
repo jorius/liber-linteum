@@ -36,12 +36,21 @@ function seed(selected: string | null = null) {
   );
 }
 
+/** A save still in flight when a test ends lands in the next test's mock:
+ *  it gets a written file's answer, as from the real backend, not nothing
+ *  (an unhandled `hash` of undefined, seen on CI). */
+const WRITES: Record<string, (a: Record<string, unknown>) => unknown> = {
+  page_write: () => ({ hash: 'written' }),
+  text_write: () => ({ hash: 'written' }),
+};
+
 function backend(handlers: Record<string, (a: Record<string, unknown>) => unknown>) {
   const calls: [string, Record<string, unknown>][] = [];
+  const all = { ...WRITES, ...handlers };
   mockIPC((cmd, args) => {
     const a = (args ?? {}) as Record<string, unknown>;
     calls.push([cmd, a]);
-    return handlers[cmd]?.(a);
+    return all[cmd]?.(a);
   });
   return calls;
 }
@@ -255,7 +264,7 @@ describe('AppShell', () => {
     expect(calls.map(([c]) => c)).toContain('vault_close');
   });
 
-  it('UX round §4.1: the vault menu offers Encrypt only for a plain vault', async () => {
+  it('UX round §4.1, §10.1: the vault menu offers Encrypt for a plain vault, Decrypt for an encrypted one', async () => {
     backend({});
     seed();
     act(() => useVaultStore.setState((s) => ({ info: s.info && { ...s.info, encrypted: true } })));
@@ -270,6 +279,7 @@ describe('AppShell', () => {
       'New vault…',
       'Open another vault…',
       'Create new scratchpad for “Digital Brain”',
+      'Decrypt “Digital Brain”…',
       'Lock vault',
       'Settings…',
       'Close vault',
@@ -278,22 +288,38 @@ describe('AppShell', () => {
     await userEvent.click(within(menu).getByRole('menuitem', { name: 'Lock vault' }));
     expect(lock).toHaveBeenCalledWith('menu');
     lock.mockRestore();
+    await userEvent.click(screen.getByRole('button', { name: 'Digital Brain' }));
+    await userEvent.click(screen.getByRole('menuitem', { name: 'Decrypt “Digital Brain”…' }));
+    expect(useUiStore.getState().dialog).toEqual({
+      type: 'decryptInPlace',
+      root: useVaultStore.getState().info!.root,
+    });
   });
 
   it('Windows and Linux have no app menu: the vault menu makes a scratchpad note', async () => {
-    const calls = backend({});
     seed();
+    // The whole quick note runs (create, tree, open) and the test waits for
+    // its end: an unanswered vault_tree crashed it after the test (CI).
+    const note = 'Scratchpad/Quick note.md';
+    const disk = fakeDisk(
+      { [note]: '' },
+      {
+        quick_notes_state: () => ({ folder: 'Scratchpad', autoNamed: [] }),
+        quick_note_create: () => note,
+        vault_tree: () => [
+          ...nodes,
+          { path: 'Scratchpad', kind: 'folder' },
+          { path: note, kind: 'page' },
+        ],
+      },
+    );
     render(<AppShell />);
     await userEvent.click(screen.getByRole('button', { name: 'Digital Brain' }));
     await userEvent.click(
       screen.getByRole('menuitem', { name: 'Create new scratchpad for “Digital Brain”' }),
     );
-    await waitFor(() =>
-      expect(
-        calls.some(([c]) => c === 'quick_note_create') ||
-          useUiStore.getState().dialog?.type === 'scratchpadSetup',
-      ).toBe(true),
-    );
+    await waitFor(() => expect(usePageStore.getState().path).toBe(note));
+    expect(disk.calls.some(([c]) => c === 'quick_note_create')).toBe(true);
   });
 
   it('UX round §4.1: Encrypt “<name>”… starts encrypting the open plain vault', async () => {
@@ -454,7 +480,7 @@ describe('AppShell', () => {
     expect(actions).toHaveAttribute('aria-expanded', 'true');
     const search = screen.getByRole('button', { name: /^Search/ });
     expect(search).toHaveFocus();
-    expect(search).toHaveAttribute('aria-keyshortcuts', 'Meta+F Control+F');
+    expect(search).toHaveAttribute('aria-keyshortcuts', 'Meta+Shift+F Control+Shift+F');
     await userEvent.keyboard('{ArrowDown}');
     expect(screen.getByRole('button', { name: /^Global view/ })).toHaveFocus();
     await userEvent.keyboard('{ArrowUp}{ArrowUp}');

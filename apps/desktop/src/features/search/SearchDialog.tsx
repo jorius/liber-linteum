@@ -21,6 +21,7 @@ import {
 } from '../../app/icons';
 import { assetUrl, type SearchHit } from '../../ipc';
 import { openPage } from '../../stores/navigate';
+import { usePageStore } from '../../stores/pageStore';
 import { isTextPath } from '../../stores/textFiles';
 import { useUiStore } from '../../stores/uiStore';
 import { Dialog } from '../dialogs/Dialog';
@@ -227,7 +228,13 @@ export function SearchDialog({ onClose }: { onClose: () => void }) {
     if (global && !isTextPath(hit.path)) {
       useUiStore.getState().setScreen('global');
       void useGvStore.getState().showPage(hit.path, hit.title);
-    } else void openPage(hit.path);
+    } else {
+      // At the match the snippet shows, where there is one.
+      const word = hit.snippet?.find((part) => part.hit)?.text;
+      void openPage(hit.path).then(() => {
+        if (word) usePageStore.getState().requestFind(hit.path, word);
+      });
+    }
   };
 
   const onKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
