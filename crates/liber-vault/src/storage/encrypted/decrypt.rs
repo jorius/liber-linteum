@@ -511,7 +511,11 @@ pub fn preflight(s: &EncryptedStorage, refused: &[PathBuf]) -> Result<Preflight>
 /// Preflight, then the journal (`copying`), then the empty readable staging
 /// folder. `storage` is the vault, unlocked (by [`open_with_both`]). On
 /// error, the caller calls [`rollback`].
-pub fn begin(storage: EncryptedStorage, refused: &[PathBuf], install_id: &str) -> Result<Decrypting> {
+pub fn begin(
+    storage: EncryptedStorage,
+    refused: &[PathBuf],
+    install_id: &str,
+) -> Result<Decrypting> {
     let pre = preflight(&storage, refused)?;
     if !pre.blocked.is_empty() {
         return Err(ConvertError::Blocked(pre.blocked));
@@ -636,7 +640,10 @@ pub fn stage_and_commit(d: Decrypting) -> Result<()> {
     } = d;
     drop(storage);
     let not_copied = || ConvertError::Refused("nothing was decrypted yet: copy first".into());
-    let (cipher, plain) = (cipher.ok_or_else(not_copied)?, plain.ok_or_else(not_copied)?);
+    let (cipher, plain) = (
+        cipher.ok_or_else(not_copied)?,
+        plain.ok_or_else(not_copied)?,
+    );
     check_same(&physical(&root, &ours(&root)?), &cipher, false)?;
     check_same(&everything(&root.join(STAGING))?, &plain, false)?;
     newcomers(&root, &before)?;
@@ -844,4 +851,3 @@ pub fn holds_a_header(dir: &Path) -> bool {
         .ok()
         .is_some_and(|b| VaultHeader::parse(&b).is_ok())
 }
-

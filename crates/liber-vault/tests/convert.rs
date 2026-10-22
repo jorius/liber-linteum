@@ -1145,7 +1145,10 @@ fn a_backup_folder_must_be_outside_any_vault_and_empty() {
     let (dir, root) = vault();
     let check = |p: &Path| convert::check_backup(&root, p);
     let refused = |p: &Path| check(p).err().unwrap();
-    assert!(matches!(refused(&root.join("inside")), ConvertError::BackupInVault(_)));
+    assert!(matches!(
+        refused(&root.join("inside")),
+        ConvertError::BackupInVault(_)
+    ));
     assert!(matches!(refused(&root), ConvertError::BackupInVault(_)));
     assert!(
         matches!(refused(dir.path()), ConvertError::BackupInVault(_)),
@@ -1155,11 +1158,17 @@ fn a_backup_folder_must_be_outside_any_vault_and_empty() {
     let enc = dir.path().join("Enc");
     std::fs::create_dir(&enc).unwrap();
     make(&enc).unwrap();
-    assert!(matches!(refused(&enc.join("x")), ConvertError::BackupInOtherVault(_)));
+    assert!(matches!(
+        refused(&enc.join("x")),
+        ConvertError::BackupInOtherVault(_)
+    ));
     // Inside a plain vault the app opened (it holds `.liber/`).
     let other = dir.path().join("Other");
     std::fs::create_dir_all(other.join(".liber")).unwrap();
-    assert!(matches!(refused(&other.join("x")), ConvertError::BackupInOtherVault(_)));
+    assert!(matches!(
+        refused(&other.join("x")),
+        ConvertError::BackupInOtherVault(_)
+    ));
     // Not empty; OS junk alone counts as empty.
     let full = dir.path().join("Full");
     put(&full, "a.md", b"a", 1);
@@ -1237,5 +1246,9 @@ fn a_change_after_the_backup_stops_the_conversion_and_the_backup_stays() {
         convert::recover(&root, ME, &no_trash, &no_index).unwrap(),
         RecoverOutcome::RolledBack
     );
-    assert_eq!(snapshot(&dest), content(&original), "the backup is the user's");
+    assert_eq!(
+        snapshot(&dest),
+        content(&original),
+        "the backup is the user's"
+    );
 }

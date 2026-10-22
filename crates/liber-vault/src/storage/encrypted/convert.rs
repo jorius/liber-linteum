@@ -1177,8 +1177,14 @@ pub fn check_backup(root: &Path, dest: &Path) -> Result<PathBuf> {
     if dest.starts_with(&root) || root.starts_with(&dest) {
         return Err(ConvertError::BackupInVault(shown()));
     }
-    if let Some(vault) = dest.ancestors().filter(|a| exists(a)).find(|a| is_a_vault(a)) {
-        return Err(ConvertError::BackupInOtherVault(vault.display().to_string()));
+    if let Some(vault) = dest
+        .ancestors()
+        .filter(|a| exists(a))
+        .find(|a| is_a_vault(a))
+    {
+        return Err(ConvertError::BackupInOtherVault(
+            vault.display().to_string(),
+        ));
     }
     match dest.symlink_metadata() {
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(dest),
@@ -1186,7 +1192,8 @@ pub fn check_backup(root: &Path, dest: &Path) -> Result<PathBuf> {
         Ok(m) if !m.is_dir() => Err(ConvertError::BackupNotEmpty(shown())),
         Ok(_) => {
             let items = std::fs::read_dir(&dest).map_err(io(shown()))?;
-            let junk = |i: &std::fs::DirEntry| i.file_name().to_str().is_some_and(|n| JUNK.contains(&n));
+            let junk =
+                |i: &std::fs::DirEntry| i.file_name().to_str().is_some_and(|n| JUNK.contains(&n));
             for item in items {
                 if !junk(&item.map_err(io(shown()))?) {
                     return Err(ConvertError::BackupNotEmpty(shown()));

@@ -232,8 +232,8 @@ pub fn vault_decrypt_run_impl<R: Runtime>(app: &AppHandle<R>) -> CmdResult<Vault
         let _ = emitter.emit_to("main", PROGRESS_EVENT, ProgressPayload { done, total });
     };
     let forget = |vault: &str| forget_or_warn(app, vault);
-    let copied = decrypt::copy(&mut job, progress, &cs.cancel)
-        .and_then(|()| decrypt::stage_and_commit(job));
+    let copied =
+        decrypt::copy(&mut job, progress, &cs.cancel).and_then(|()| decrypt::stage_and_commit(job));
     let done: CmdResult<()> = match copied {
         // Committed: a cleanup that fails is a warning; the next open finishes it.
         Ok(()) => {

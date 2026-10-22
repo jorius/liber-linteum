@@ -190,8 +190,10 @@ fn storage(f: &Fixture) -> EncryptedStorage {
 }
 
 /// Records each id the finish forgets.
-fn forgetter() -> (std::sync::Arc<Mutex<Vec<String>>>, impl Fn(&str) -> std::io::Result<()>) {
-    let got: std::sync::Arc<Mutex<Vec<String>>> = Default::default();
+type Forgotten = std::sync::Arc<Mutex<Vec<String>>>;
+
+fn forgetter() -> (Forgotten, impl Fn(&str) -> std::io::Result<()>) {
+    let got: Forgotten = Default::default();
     let sink = got.clone();
     (got, move |id: &str| {
         sink.lock().unwrap().push(id.to_string());
@@ -243,30 +245,44 @@ fn encrypt_then_decrypt_is_the_original_tree_byte_for_byte() {
     assert_eq!(journal.vault_id, f.vault_id);
     let mut seen = Vec::new();
     decrypt::copy(&mut d, |a, b| seen.push((a, b)), &AtomicBool::new(false)).unwrap();
-    assert_eq!(seen.last(), Some(&(files, files)), "progress ends at the total");
+    assert_eq!(
+        seen.last(),
+        Some(&(files, files)),
+        "progress ends at the total"
+    );
     decrypt::stage_and_commit(d).unwrap();
     let (forgotten, forget) = forgetter();
     decrypt::finish(&f.root, &forget).unwrap();
-    same_tree(&snapshot(&f.root), &f.plain, "the tree as it was before encrypting");
+    same_tree(
+        &snapshot(&f.root),
+        &f.plain,
+        "the tree as it was before encrypting",
+    );
     assert_no_keys_left(&f.root);
     assert_eq!(*forgotten.lock().unwrap(), vec![f.vault_id.clone()]);
     // Neither secret opens anything any more: there is no header.
     let err = EncryptedStorage::unlock(&f.root, Unlock::Recovery(&f.code)).unwrap_err();
-    assert!(!matches!(err, liber_vault::VaultError::WrongSecret), "{err:?}");
+    assert!(
+        !matches!(err, liber_vault::VaultError::WrongSecret),
+        "{err:?}"
+    );
 }
 
 #[test]
 fn each_secret_is_checked_on_its_own() {
     let f = fixture();
     let other = RecoveryCode::generate();
-    let wrong = |pass: &str, code: Option<&RecoveryCode>| {
-        match decrypt::open_with_both(&f.root, pass, code).err().unwrap() {
-            ConvertError::WrongSecrets {
-                passphrase,
-                recovery,
-            } => (passphrase, recovery),
-            e => panic!("{e:?}"),
-        }
+    let wrong = |pass: &str, code: Option<&RecoveryCode>| match decrypt::open_with_both(
+        &f.root, pass, code,
+    )
+    .err()
+    .unwrap()
+    {
+        ConvertError::WrongSecrets {
+            passphrase,
+            recovery,
+        } => (passphrase, recovery),
+        e => panic!("{e:?}"),
     };
     assert_eq!(wrong("not the passphrase", Some(&f.code)), (true, false));
     assert_eq!(wrong(PASS, Some(&other)), (false, true));
@@ -304,8 +320,16 @@ fn a_crash_before_staged_rolls_back_to_the_encrypted_vault() {
         CrashPoint::AllRetired,
     ] {
         let f = fixture();
-        assert_eq!(crash_then_recover(&f, at), RecoverOutcome::RolledBack, "{at:?}");
-        same_tree(&snapshot(&f.root), &f.encrypted, &format!("{at:?}: byte for byte as it was"));
+        assert_eq!(
+            crash_then_recover(&f, at),
+            RecoverOutcome::RolledBack,
+            "{at:?}"
+        );
+        same_tree(
+            &snapshot(&f.root),
+            &f.encrypted,
+            &format!("{at:?}: byte for byte as it was"),
+        );
         // And it still opens with both secrets.
         decrypt::open_with_both(&f.root, PASS, Some(&f.code)).unwrap();
     }
@@ -325,7 +349,11 @@ fn a_crash_from_staged_on_finishes() {
         CrashPoint::AfterStagingRemoved,
     ] {
         let f = fixture();
-        assert_eq!(crash_then_recover(&f, at), RecoverOutcome::Finished, "{at:?}");
+        assert_eq!(
+            crash_then_recover(&f, at),
+            RecoverOutcome::Finished,
+            "{at:?}"
+        );
         same_tree(&snapshot(&f.root), &f.plain, &format!("{at:?}"));
         assert_no_keys_left(&f.root);
     }
@@ -343,7 +371,10 @@ fn a_crash_during_the_rollback_is_rolled_back_next_time() {
         decrypt::stage_and_commit(d)
     })();
     assert!(run.is_err());
-    assert!(decrypt::recover(&f.root, ME, &|_| Ok(())).is_err(), "died mid-undo");
+    assert!(
+        decrypt::recover(&f.root, ME, &|_| Ok(())).is_err(),
+        "died mid-undo"
+    );
     decrypt::crash_at(None);
     assert_eq!(
         decrypt::recover(&f.root, ME, &|_| Ok(())).unwrap(),
@@ -385,7 +416,8 @@ fn a_sync_change_mid_copy_rolls_back() {
         |done, _| {
             if done == 1 {
                 let f = std::fs::File::options().write(true).open(&victim).unwrap();
-                f.set_modified(UNIX_EPOCH + Duration::from_secs(77)).unwrap();
+                f.set_modified(UNIX_EPOCH + Duration::from_secs(77))
+                    .unwrap();
             }
         },
         &AtomicBool::new(false),
@@ -397,7 +429,10 @@ fn a_sync_change_mid_copy_rolls_back() {
         decrypt::recover(&f.root, ME, &|_| Ok(())).unwrap(),
         RecoverOutcome::RolledBack
     );
-    assert!(!f.root.join(decrypt::STAGING).exists(), "the readable copy is gone");
+    assert!(
+        !f.root.join(decrypt::STAGING).exists(),
+        "the readable copy is gone"
+    );
     assert_eq!(vault_kind(&f.root), VaultKind::Encrypted);
 }
 
@@ -408,7 +443,10 @@ fn a_newcomer_at_the_root_rolls_back() {
     decrypt::copy(&mut d, |_, _| {}, &AtomicBool::new(false)).unwrap();
     put(&f.root, "from-sync.md", b"new", 9);
     let err = decrypt::stage_and_commit(d).err().unwrap();
-    assert!(matches!(err, ConvertError::Changed(ref n) if n == "from-sync.md"), "{err:?}");
+    assert!(
+        matches!(err, ConvertError::Changed(ref n) if n == "from-sync.md"),
+        "{err:?}"
+    );
     decrypt::recover(&f.root, ME, &|_| Ok(())).unwrap();
     std::fs::remove_file(f.root.join("from-sync.md")).unwrap();
     same_tree(&snapshot(&f.root), &f.encrypted, "as it was");
@@ -427,8 +465,14 @@ fn rollback_never_overwrites_a_colliding_entry() {
     std::fs::create_dir(f.root.join("d")).unwrap();
     let err = decrypt::recover(&f.root, ME, &|_| Ok(())).err().unwrap();
     assert!(matches!(err, ConvertError::Collision(_)), "{err:?}");
-    assert!(f.root.join(decrypt::RETIRED).join("d").exists(), "nothing moved back");
-    assert!(decrypt::read_journal(&f.root).unwrap().is_some(), "journal kept");
+    assert!(
+        f.root.join(decrypt::RETIRED).join("d").exists(),
+        "nothing moved back"
+    );
+    assert!(
+        decrypt::read_journal(&f.root).unwrap().is_some(),
+        "journal kept"
+    );
 }
 
 #[test]
@@ -477,7 +521,10 @@ fn preflight_blocks_what_decrypting_would_lose_or_break() {
     assert!(has("Inner", Reason::Vault), "{blocked:?}");
     assert!(has("Notes.md", Reason::Taken), "{blocked:?}");
     assert!(has(decrypt::STAGING, Reason::Reserved), "{blocked:?}");
-    assert!(has("garbage-name.libere", Reason::Unreadable), "{blocked:?}");
+    assert!(
+        has("garbage-name.libere", Reason::Unreadable),
+        "{blocked:?}"
+    );
     let before = snapshot(&f.root);
     let err = decrypt::begin(s, &[], ME).err().unwrap();
     assert!(matches!(err, ConvertError::Blocked(_)), "{err:?}");
@@ -489,7 +536,9 @@ fn preflight_refuses_whole_folders() {
     let f = fixture();
     let s = storage(&f);
     // A refused folder (home, Desktop, …).
-    let err = decrypt::preflight(&s, &[f.root.clone()]).err().unwrap();
+    let err = decrypt::preflight(&s, std::slice::from_ref(&f.root))
+        .err()
+        .unwrap();
     assert!(matches!(err, ConvertError::Folder(_)), "{err:?}");
     // Part-way through a conversion either way.
     std::fs::write(f.root.join(convert::JOURNAL), b"{}").unwrap();

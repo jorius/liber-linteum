@@ -889,7 +889,11 @@ fn encrypts_with_a_verified_readable_backup_first() {
     .unwrap();
     assert_eq!(
         picked,
-        json!(dunce::canonicalize(h.disk.path()).unwrap().join("Smartjob backup"))
+        json!(
+            dunce::canonicalize(h.disk.path())
+                .unwrap()
+                .join("Smartjob backup")
+        )
     );
     call(
         &h.main,
@@ -1085,7 +1089,11 @@ fn decrypt_stop_and_undo_keeps_the_vault_encrypted() {
     });
     let err = call(&h.main, "vault_decrypt_run", json!({})).unwrap_err();
     assert_eq!(kind(err), "cancelled");
-    assert_eq!(snapshot(&root), encrypted, "back as it was, still encrypted");
+    assert_eq!(
+        snapshot(&root),
+        encrypted,
+        "back as it was, still encrypted"
+    );
     h.unlock(&root, "passphrase", PASS).unwrap();
 }
 
@@ -1114,7 +1122,10 @@ fn an_interrupted_decrypt_recovers_on_open() {
     crash(&a, &code, &me, decrypt::CrashPoint::Copied(2));
     let err = call(&h.main, "vault_open", json!({ "path": a })).unwrap_err();
     assert_eq!(kind(err), "locked");
-    assert!(!a.join(decrypt::STAGING).exists(), "the readable copy is gone");
+    assert!(
+        !a.join(decrypt::STAGING).exists(),
+        "the readable copy is gone"
+    );
     h.unlock(&a, "passphrase", PASS).unwrap();
     // From `staged` on: finished, it opens as plain.
     let b = h.plain("B");
@@ -1140,7 +1151,12 @@ fn an_interrupted_decrypt_recovers_on_open() {
     crash(&c, &code, "another-install", decrypt::CrashPoint::Copied(1));
     let err = call(&h.main, "vault_open", json!({ "path": c })).unwrap_err();
     assert_eq!(kind(err), "decryptingElsewhere");
-    call(&h.main, "vault_encrypt_undo_elsewhere", json!({ "path": c })).unwrap();
+    call(
+        &h.main,
+        "vault_encrypt_undo_elsewhere",
+        json!({ "path": c }),
+    )
+    .unwrap();
     assert_eq!(snapshot(&c), encrypted);
 }
 

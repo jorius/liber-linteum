@@ -384,7 +384,10 @@ pub fn vault_encrypt_run_impl<R: Runtime>(app: &AppHandle<R>) -> CmdResult<Vault
     let cs = app.state::<ConvertState>();
     let mut job = lock(&cs.job);
     // Nothing is encrypted before the readable copy asked for is verified (§9).
-    if job.as_ref().is_some_and(|j| j.backup.is_some() && !j.backed_up) {
+    if job
+        .as_ref()
+        .is_some_and(|j| j.backup.is_some() && !j.backed_up)
+    {
         return Err(not_permitted("the readable copy isn't made yet"));
     }
     let Some(Job {

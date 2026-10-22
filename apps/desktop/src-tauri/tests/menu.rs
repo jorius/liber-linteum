@@ -11,7 +11,9 @@ use std::rc::Rc;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Duration;
-use tauri::menu::{Menu, MenuEvent, MenuId, MenuItemKind};
+#[cfg(target_os = "macos")]
+use tauri::menu::{Menu, MenuItemKind};
+use tauri::menu::{MenuEvent, MenuId};
 use tauri::test::{MockRuntime, mock_builder};
 use tauri::{App, Manager, RunEvent, WindowEvent};
 
@@ -33,9 +35,11 @@ fn main_window(handle: &tauri::AppHandle<MockRuntime>) -> tauri::WebviewWindow<M
     handle.get_webview_window("main").expect("the main window")
 }
 
+#[cfg(target_os = "macos")]
 type Entry = (&'static str, String, String);
 
 /// (submenu text, [(item kind, id, text)]) for every top-level submenu.
+#[cfg(target_os = "macos")]
 fn outline(menu: &Menu<MockRuntime>) -> Vec<(String, Vec<Entry>)> {
     menu.items()
         .unwrap()
