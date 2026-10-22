@@ -5,7 +5,7 @@ import { spellAddWord, spellIgnore, spellSuggest, type IpcResult } from '../../i
 import { errorMessage } from '../../stores/messages';
 import { useSpellStore } from '../../stores/spellStore';
 import { useToastStore } from '../../stores/toastStore';
-import { placePopup } from './placePopup';
+import { placePopup, windowViewport } from './placePopup';
 import type { WordRange } from './spell';
 
 /** The menu for a misspelled word (spell checking spec §6): suggestions,
@@ -44,10 +44,7 @@ export function SpellMenu({
     const el = box.current;
     const size = { width: el?.offsetWidth ?? 0, height: el?.offsetHeight ?? 0 };
     const at = { top: anchor.y, bottom: anchor.y, left: anchor.x };
-    const { top, left } = placePopup(at, size, {
-      width: window.innerWidth,
-      height: window.innerHeight,
-    });
+    const { top, left } = placePopup(at, size, windowViewport());
     setPlace((p) => (p.top === top && p.left === left ? p : { top, left }));
   }, [anchor.x, anchor.y, suggestions]);
   useEffect(() => {

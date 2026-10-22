@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { folderPageOf, joinPath, nameOf, parentOf } from '../../stores/tree';
 import { useUiStore } from '../../stores/uiStore';
@@ -9,6 +9,7 @@ import { archiveItem, restoreItem } from '../bin/binActions';
 import { isArchived } from '../../stores/tree';
 import { openPage } from '../../stores/navigate';
 import { SortMenu } from './SortMenu';
+import { placePopup, windowViewport } from '../editor/placePopup';
 import { requestTrash } from './trashAction';
 import { nudgeFavorite, shownFavorites, useFavoritesStore } from '../favorites/favoritesStore';
 import { displayName, useShowExtensions } from './TreeRow';
@@ -43,6 +44,18 @@ export function ContextMenu({ menu, onClose }: { menu: MenuState; onClose: () =>
   const [sorting, setSorting] = useState(false);
   const items = useRef<(HTMLButtonElement | null)[]>([]);
   const box = useRef<HTMLDivElement>(null);
+
+  // Inside the window, below the title bar: a row near the bottom opens the
+  // menu upwards instead of hiding its last items off screen.
+  const [place, setPlace] = useState({ top: menu.anchor.y, left: menu.anchor.x });
+  useLayoutEffect(() => {
+    const el = box.current;
+    if (!el) return;
+    const at = { top: menu.anchor.y, bottom: menu.anchor.y, left: menu.anchor.x };
+    const size = { width: el.offsetWidth, height: el.offsetHeight };
+    const { top, left } = placePopup(at, size, windowViewport());
+    setPlace((p) => (p.top === top && p.left === left ? p : { top, left }));
+  }, [menu.anchor.x, menu.anchor.y, picking, sorting]);
 
   useEffect(() => {
     items.current[active]?.focus();
@@ -208,7 +221,7 @@ export function ContextMenu({ menu, onClose }: { menu: MenuState; onClose: () =>
       role="menu"
       aria-label={t('menu.label', { name: displayName(node, extensions) })}
       className="liber-menu"
-      style={{ position: 'fixed', left: menu.anchor.x, top: menu.anchor.y }}
+      style={{ position: 'fixed', left: place.left, top: place.top }}
       onKeyDown={onKeyDown}
     >
       {actions.map(([label, run], i) => (

@@ -7,7 +7,7 @@ import {
   type KeyboardEvent,
 } from 'react';
 import { useTranslation } from 'react-i18next';
-import { placePopup, type Anchor } from '../editor/placePopup';
+import { placePopup, windowViewport, type Anchor } from '../editor/placePopup';
 import {
   emojiName,
   loadEmoji,
@@ -80,7 +80,7 @@ export function EmojiPicker({ anchor, label, hasIcon, onPick, onClose }: EmojiPi
     const { top, left } = placePopup(
       at,
       { width: el.offsetWidth, height: el.offsetHeight },
-      { width: window.innerWidth, height: window.innerHeight },
+      windowViewport(),
     );
     setPlace((p) => (p && p.top === top && p.left === left ? p : { top, left }));
   }, [anchor]);

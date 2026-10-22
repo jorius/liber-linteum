@@ -12,7 +12,7 @@ import { useTranslation } from 'react-i18next';
 import type { PickedFile } from '../../ipc';
 import { attachPaths, fileLinkFor, insertAtCursor } from './attachments';
 import styles from './Editor.module.css';
-import { placePopup } from './placePopup';
+import { placePopup, windowViewport } from './placePopup';
 
 const SHOWN = 3;
 
@@ -39,10 +39,7 @@ export function AttachChoice({
     if (!at) return;
     const el = box.current;
     const size = { width: el?.offsetWidth ?? 0, height: el?.offsetHeight ?? 0 };
-    const { top, left } = placePopup(at, size, {
-      width: window.innerWidth,
-      height: window.innerHeight,
-    });
+    const { top, left } = placePopup(at, size, windowViewport());
     setPlace((p) => (p && p.top === top && p.left === left ? p : { top, left }));
   }, [view]);
   useLayoutEffect(reposition, [reposition]);

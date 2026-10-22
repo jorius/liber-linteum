@@ -39,4 +39,14 @@ describe('placePopup (M4b §4: the ⌘K picker stays in the window)', () => {
     expect(p.top + size.height).toBeLessThanOrEqual(400 - 8 + 0.5);
     expect(p.left).toBe(8);
   });
+
+  it('never goes under the drawn title bar (custom title bar §2)', () => {
+    const withBar = { ...viewport, top: 38 };
+    const above = placePopup({ top: -400, bottom: -380, left: 200 }, size, withBar);
+    expect(above.top).toBe(38 + 8);
+    // A menu at a low row opens upwards, below the bar.
+    const low = placePopup({ top: 700, bottom: 700, left: 200 }, size, withBar);
+    expect(low.above).toBe(true);
+    expect(low.top).toBeGreaterThanOrEqual(38 + 8);
+  });
 });

@@ -12,7 +12,7 @@ import { linkSuggest, type LinkSuggestion } from '../../ipc';
 import { Icon } from '../explorer/TreeRow';
 import { useIcons } from '../icons/ItemIcon';
 import styles from './Editor.module.css';
-import { placePopup, type Anchor } from './placePopup';
+import { placePopup, windowViewport, type Anchor } from './placePopup';
 
 const URL_RE = /^(?:https?:\/\/|mailto:)\S+$/i;
 const MAX_PAGES = 8;
@@ -80,10 +80,7 @@ export function PickerPopup({
     }
     const el = box.current;
     const size = { width: el?.offsetWidth ?? 0, height: el?.offsetHeight ?? 0 };
-    const { top, left } = placePopup(at, size, {
-      width: window.innerWidth,
-      height: window.innerHeight,
-    });
+    const { top, left } = placePopup(at, size, windowViewport());
     setPlace((p) => (p && p.top === top && p.left === left ? p : { top, left }));
   }, [anchor]);
 
