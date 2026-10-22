@@ -1177,3 +1177,123 @@ fn decrypt_refusals() {
     assert_eq!(kind(err), "convertBusy", "one conversion at a time");
     call(&h.main, "vault_decrypt_cancel", json!({})).unwrap();
 }
+
+// ---- Decrypt in place: review fixes ----
+
+/// A decryption of `root` (open with `code`) by `install` stopped at `at`.
+fn crash_decrypt(root: &Path, code: &str, install: &str, at: decrypt::CrashPoint) {
+    let code = liber_crypto::RecoveryCode::parse(code).unwrap();
+    decrypt::crash_at(Some(at));
+    let run = (|| -> convert::Result<()> {
+        let s = decrypt::open_with_both(root, PASS, Some(&code))?;
+        let mut d = decrypt::begin(s, &[], install)?;
+        decrypt::copy(&mut d, |_, _| {}, &AtomicBool::new(false))?;
+        decrypt::stage_and_commit(d)?;
+        decrypt::finish(root, &|_| Ok(()))
+    })();
+    decrypt::crash_at(None);
+    assert!(run.is_err(), "{at:?}");
+}
+
+/// Review M4: a take in progress at begin is saved as a clip next to its
+/// page before the session closes, so it is in the decrypted vault.
+#[test]
+fn a_take_in_progress_at_decrypt_is_saved_as_a_clip() {
+    let h = harness();
+    let root = h.plain("Rec");
+    let code = h.encrypted(&root);
+    call(
+        &h.main,
+        "audio_record_start",
+        json!({ "page": "Notes.md", "device": null, "name": "clip-20261021-130000" }),
+    )
+    .unwrap();
+    std::thread::sleep(std::time::Duration::from_millis(250));
+    h.decrypt_begin(PASS, &code).unwrap();
+    call(&h.main, "vault_decrypt_run", json!({})).unwrap();
+    let wavs: Vec<String> = snapshot(&root)
+        .into_keys()
+        .filter(|k| k.ends_with(".wav"))
+        .collect();
+    assert_eq!(
+        wavs,
+        ["attachments/clip-20261021-130000.wav"],
+        "saved as a clip of its page, readable"
+    );
+}
+
+/// Review L7: a begin refused because the folder is part-way through
+/// another device's decryption never undoes that one.
+#[test]
+fn a_refused_decrypt_begin_never_undoes_another_journal() {
+    let h = harness();
+    let root = h.plain("Other");
+    let code = h.encrypted(&root);
+    crash_decrypt(
+        &root,
+        &code,
+        "another-install",
+        decrypt::CrashPoint::Copied(1),
+    );
+    let before = snapshot(&root);
+    let err = h.decrypt_begin(PASS, &code).unwrap_err();
+    assert_eq!(kind(err), "decryptPending");
+    assert_eq!(snapshot(&root), before, "untouched");
+}
+
+/// Review L8: a decryption past `staged`, finished by the recovery at
+/// unlock, opens the folder as the plain vault it now is.
+#[test]
+fn unlock_opens_a_folder_its_recovery_just_decrypted() {
+    let h = harness();
+    let me = h.install_id();
+    let root = h.plain("Late");
+    let code = h.encrypted(&root);
+    call(&h.main, "vault_close", json!({})).unwrap();
+    crash_decrypt(&root, &code, &me, decrypt::CrashPoint::AfterStaged);
+    let info = h.unlock(&root, "passphrase", PASS).unwrap();
+    assert_eq!(info["encrypted"], false);
+    assert!(!root.join(decrypt::RETIRED).exists());
+}
+
+/// Review 6e: when the finish fails, the vault still opens and says where
+/// the old keys and ciphertext still are; the next open deletes them.
+#[test]
+fn a_failed_finish_says_the_keys_are_still_there() {
+    let h = harness();
+    let root = h.plain("Left");
+    let code = h.encrypted(&root);
+    h.decrypt_begin(PASS, &code).unwrap();
+    decrypt::crash_when(Some(Box::new(|p| {
+        matches!(p, decrypt::CrashPoint::AfterKeys)
+    })));
+    let run = liber_desktop::decrypt_commands::vault_decrypt_run_impl(h.app.handle());
+    decrypt::crash_when(None);
+    let info = run.expect("the vault opens");
+    assert!(!info.encrypted);
+    let left = info.keys_left.expect("says what is left");
+    assert!(left.ends_with(decrypt::RETIRED), "{left}");
+    call(&h.main, "vault_close", json!({})).unwrap();
+    call(&h.main, "vault_open", json!({ "path": root })).unwrap();
+    assert!(
+        !root.join(decrypt::RETIRED).exists(),
+        "finished on the next open"
+    );
+}
+
+/// Review 6f: a retired vault's header a sync puts back is deleted at open,
+/// and the folder opens as plain.
+#[test]
+fn a_retired_header_put_back_is_dropped_at_open() {
+    let h = harness();
+    let root = h.plain("Back");
+    let code = h.encrypted(&root);
+    let header = std::fs::read(root.join("liber-vault.json")).unwrap();
+    h.decrypt_begin(PASS, &code).unwrap();
+    call(&h.main, "vault_decrypt_run", json!({})).unwrap();
+    call(&h.main, "vault_close", json!({})).unwrap();
+    std::fs::write(root.join("liber-vault.json"), header).unwrap();
+    let info = call(&h.main, "vault_open", json!({ "path": root })).unwrap();
+    assert_eq!(info["encrypted"], false);
+    assert!(!root.join("liber-vault.json").exists());
+}

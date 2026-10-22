@@ -37,6 +37,8 @@ pub struct DecryptPreflightDto {
     pub files: u64,
     pub bytes: u64,
     pub blocked: Vec<Blocked>,
+    /// Sync archives at the root that may keep old encrypted files and keys.
+    pub archives: Vec<String>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -53,10 +55,34 @@ fn not_permitted(msg: impl Into<String>) -> CommandError {
 /// warning (the vault is plain already, and no header carries that id).
 fn forget_or_warn<R: Runtime>(app: &AppHandle<R>, id: &str) -> std::io::Result<()> {
     let state = app.state::<AppState>();
-    if let Err(e) = epochs::forget(state.settings.dir(), id) {
+    // Retired first: a header a sync puts back later is then known as a
+    // leftover (review 6f).
+    let done = epochs::retire(state.settings.dir(), id)
+        .and_then(|()| epochs::forget(state.settings.dir(), id));
+    if let Err(e) = done {
         let message = format!(
             "The vault is decrypted, but this device's rollback memory couldn't forget it ({}).",
             e.message
+        );
+        let _ = app.emit_to("main", "vault:warning", WarningPayload { message });
+    }
+    Ok(())
+}
+
+/// A retired vault's header a sync put back at the root of what is now a
+/// plain folder: deleted, so the folder opens (review 6f).
+fn drop_retired_header<R: Runtime>(app: &AppHandle<R>, root: &Path) -> CmdResult<()> {
+    let header = root.join(liber_vault::HEADER_FILE);
+    if !header.symlink_metadata().is_ok_and(|m| m.is_file()) {
+        return Ok(());
+    }
+    let dir = app.state::<AppState>().settings.dir().to_path_buf();
+    let retired = move |id: &str| epochs::is_retired(&dir, id);
+    if decrypt::drop_retired_header(root, &retired).map_err(decrypt_error)? {
+        let message = format!(
+            "An old key file of {} came back (probably from a sync) and was deleted: the vault \
+             was decrypted on this device.",
+            root.display()
         );
         let _ = app.emit_to("main", "vault:warning", WarningPayload { message });
     }
@@ -71,7 +97,7 @@ pub(crate) fn recover_decrypt_on_open<R: Runtime>(
     root: &Path,
 ) -> CmdResult<()> {
     if decrypt::read_journal(root)?.is_none() {
-        return Ok(());
+        return drop_retired_header(app, root);
     }
     let root = canonical(root)?;
     let cs = app.state::<ConvertState>();
@@ -130,6 +156,7 @@ pub(crate) fn vault_decrypt_preflight_impl<R: Runtime>(
         files: pre.files,
         bytes: pre.bytes,
         blocked: pre.blocked,
+        archives: pre.archives,
     })
 }
 
@@ -185,15 +212,19 @@ pub(crate) fn vault_decrypt_begin_impl<R: Runtime>(
         ));
     }
     epochs::check_and_record(state.settings.dir(), &fresh.vault_id(), fresh.epoch())?;
+    // A take in progress is stopped and saved as a clip next to its page
+    // while the vault is still open (review M4): kept for "the next unlock",
+    // it would be lost, since a decrypted vault never unlocks again. One that
+    // couldn't be saved blocks below.
+    crate::audio_commands::stop_orphaned(app);
     let refused = refused_folders(app);
     let pre = decrypt::preflight(&fresh, &refused).map_err(decrypt_error)?;
     if !pre.blocked.is_empty() {
         return Err(ConvertError::Blocked(pre.blocked).into());
     }
-    // Nothing else reads or edits the vault meanwhile: its session closes
-    // (a take in progress is kept first), and its decrypted copies go.
+    // Nothing else reads or edits the vault meanwhile: its session closes,
+    // and its decrypted copies go.
     drop(session);
-    crate::audio_commands::stop_for_lock(app);
     crate::vault_commands::close_session(app);
     state.copies.wipe();
     let id = epochs::install_id(state.settings.dir())?;
@@ -208,8 +239,21 @@ pub(crate) fn vault_decrypt_begin_impl<R: Runtime>(
         Err(e) => {
             *lock(&cs.active) = None;
             cs.decrypting.store(false, Ordering::Relaxed);
-            // A journal this begin wrote is undone (`copying` rolls back).
-            if !matches!(e, ConvertError::Blocked(_) | ConvertError::Refused(_)) {
+            // Only a journal this begin wrote is undone (review L7): a refusal
+            // came before any, and another one's is never touched.
+            let refusal = matches!(
+                e,
+                ConvertError::Blocked(_)
+                    | ConvertError::Refused(_)
+                    | ConvertError::Pending
+                    | ConvertError::Folder(_)
+                    | ConvertError::InsideVault(_)
+            );
+            let ours = decrypt::read_journal(&root)
+                .ok()
+                .flatten()
+                .is_some_and(|j| j.install_id == id && j.phase == Phase::Copying);
+            if !refusal && ours {
                 let _ = decrypt::rollback(&root);
             }
             Err(decrypt_error(e))
@@ -234,6 +278,9 @@ pub fn vault_decrypt_run_impl<R: Runtime>(app: &AppHandle<R>) -> CmdResult<Vault
     let forget = |vault: &str| forget_or_warn(app, vault);
     let copied =
         decrypt::copy(&mut job, progress, &cs.cancel).and_then(|()| decrypt::stage_and_commit(job));
+    // Where the old keys and ciphertext still are, when the finish failed:
+    // the done screen says so instead of "no longer work" (review 6e).
+    let mut keys_left = None;
     let done: CmdResult<()> = match copied {
         // Committed: a cleanup that fails is a warning; the next open finishes it.
         Ok(()) => {
@@ -244,6 +291,7 @@ pub fn vault_decrypt_run_impl<R: Runtime>(app: &AppHandle<R>) -> CmdResult<Vault
                     root.display()
                 );
                 let _ = app.emit_to("main", "vault:warning", WarningPayload { message });
+                keys_left = Some(root.join(decrypt::RETIRED).to_string_lossy().into_owned());
             }
             Ok(())
         }
@@ -275,7 +323,9 @@ pub fn vault_decrypt_run_impl<R: Runtime>(app: &AppHandle<R>) -> CmdResult<Vault
     // As an open, without running the recovery again: a cleanup that just
     // failed would fail the open (the next open retries it).
     let (session, report) = VaultSession::open(&root, &state.cache_dir, session_events(app))?;
-    install_session(app, session, &report, false)
+    let mut info = install_session(app, session, &report, false)?;
+    info.keys_left = keys_left;
+    Ok(info)
 }
 
 /// Stop and undo: during the copy, the run stops and undoes it

@@ -115,6 +115,7 @@ pub(crate) fn install_session<R: Runtime>(
         recovery_void,
         recovered: Vec::new(),
         originals_pending: false,
+        keys_left: None,
     })
 }
 

@@ -52,6 +52,11 @@ pub struct VaultInfo {
     /// couldn't go to the Trash and are still in the vault folder. The UI
     /// offers `vault_trash_originals` and `vault_reveal_originals`.
     pub originals_pending: bool,
+    /// Decrypt in place (encryption UX §10.5): the finish didn't complete,
+    /// so the old keys and ciphertext are still in this folder; the next
+    /// open deletes them.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub keys_left: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize)]

@@ -163,6 +163,11 @@ pub(crate) fn vault_unlock_impl<R: Runtime>(
 ) -> CmdResult<VaultInfo> {
     // An encryption in place this device left unfinished: undone or finished first.
     let originals_pending = crate::convert_commands::recover_on_open(app, &path)?;
+    // A decrypt in place the recovery just finished (review L8): the folder
+    // is plain now, so it opens as one; there is nothing to unlock.
+    if liber_vault::vault_kind(&path) == liber_vault::VaultKind::Plain {
+        return crate::vault_commands::open_session(app, &path);
+    }
     unlock_recovered(app, path, kind, value, originals_pending)
 }
 
