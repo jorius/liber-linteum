@@ -1097,6 +1097,39 @@ export function installIpcMock({
       };
     },
     notion_cancel: () => null,
+    // Custom title bar (Linux, Windows): the window buttons, and the menu
+    // items as Rust's `menu::activate` answers them (the ones e2e uses).
+    window_minimize: () => null,
+    window_maximized: () => false,
+    window_toggle_maximize: () => true,
+    window_toggle_fullscreen: () => null,
+    window_start_drag: () => null,
+    window_close_request: () => null,
+    window_paste: () => null,
+    menu_activate: (a) => {
+      const id = a.id as string;
+      ((w.__liberMenu ??= []) as string[]).push(id);
+      const emit = w.__liberEmit as (e: string, p: unknown) => void;
+      const toggles: Record<string, string> = {
+        'liber-toggle-toolbar': 'toolbar',
+        'liber-toggle-line-numbers': 'lineNumbers',
+        'liber-toggle-outline': 'outline',
+      };
+      const vault: Record<string, string> = {
+        'liber-vault-new': 'new',
+        'liber-vault-open': 'open',
+        'liber-vault-close': 'close',
+        'liber-vault-lock': 'lock',
+        'liber-vault-encrypt': 'encrypt',
+      };
+      if (id === 'liber-settings') emit('menu:settings', null);
+      else if (id === 'liber-screen-global') emit('menu:screen', 'global');
+      else if (id === 'liber-screen-edit') emit('menu:screen', 'edit');
+      else if (id === 'liber-toggle-sidebar') emit('menu:sidebar', null);
+      else if (toggles[id]) emit('menu:toggle', toggles[id]);
+      else if (vault[id]) emit('menu:vault', vault[id]);
+      return null;
+    },
     quick_notes_state: () => ({
       folder: inScratchpad ? null : 'Scratchpad',
       autoNamed: [...autoNamed],

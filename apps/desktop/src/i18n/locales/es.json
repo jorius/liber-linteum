@@ -1192,5 +1192,57 @@
     "quitWhile": "Cifrando «{name}»… ¿Salir de todos modos? Terminará o se deshará sola la próxima vez que la abras.",
     "quitAnyway": "Salir de todos modos",
     "keepEncrypting": "Seguir cifrando"
+  },
+  "titlebar": {
+    "menubar": "Menús",
+    "menus": {
+      "file": "Archivo",
+      "vault": "Bóveda",
+      "edit": "Editar",
+      "view": "Ver",
+      "window": "Ventana"
+    },
+    "items": {
+      "about": "Acerca de Liber Linteum",
+      "settings": "Ajustes…",
+      "quit": "Salir de Liber Linteum",
+      "quickNote": "Crear una nota rápida nueva en esta bóveda",
+      "quickNoteIn": "Crear una nota rápida nueva para {name}",
+      "openFile": "Abrir archivo…",
+      "importNotion": "Importar desde Notion…",
+      "save": "Guardar",
+      "newVault": "Bóveda nueva…",
+      "openVault": "Abrir bóveda…",
+      "encrypt": "Cifrar bóveda…",
+      "encryptNamed": "Cifrar «{name}»…",
+      "lock": "Bloquear bóveda",
+      "closeVault": "Cerrar bóveda",
+      "undo": "Deshacer",
+      "redo": "Rehacer",
+      "cut": "Cortar",
+      "copy": "Copiar",
+      "paste": "Pegar",
+      "selectAll": "Seleccionar todo",
+      "search": "Buscar…",
+      "editor": "Editor",
+      "globalView": "Vista global",
+      "atoms": "Ver los átomos de esta página",
+      "back": "Atrás",
+      "forward": "Adelante",
+      "sidebar": "Barra lateral",
+      "toolbar": "Barra de formato",
+      "lineNumbers": "Números de línea",
+      "outline": "Esquema",
+      "fullscreen": "Pantalla completa",
+      "minimize": "Minimizar",
+      "maximize": "Maximizar",
+      "restore": "Restaurar",
+      "closeWindow": "Cerrar ventana"
+    },
+    "about": {
+      "title": "Acerca de Liber Linteum",
+      "license": "Software libre bajo la GNU GPL, versión 3 o posterior."
+    },
+    "region": "Barra de título"
   }
 }

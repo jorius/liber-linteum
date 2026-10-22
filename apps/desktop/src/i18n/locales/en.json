@@ -1192,5 +1192,57 @@
     "quitWhile": "Encrypting “{name}”… Quit anyway? It will finish or undo itself next time you open it.",
     "quitAnyway": "Quit anyway",
     "keepEncrypting": "Keep encrypting"
+  },
+  "titlebar": {
+    "menubar": "Menus",
+    "menus": {
+      "file": "File",
+      "vault": "Vault",
+      "edit": "Edit",
+      "view": "View",
+      "window": "Window"
+    },
+    "items": {
+      "about": "About Liber Linteum",
+      "settings": "Settings…",
+      "quit": "Quit Liber Linteum",
+      "quickNote": "Create new scratchpad in this vault",
+      "quickNoteIn": "Create new scratchpad for {name}",
+      "openFile": "Open file…",
+      "importNotion": "Import from Notion…",
+      "save": "Save",
+      "newVault": "New vault…",
+      "openVault": "Open vault…",
+      "encrypt": "Encrypt vault…",
+      "encryptNamed": "Encrypt “{name}”…",
+      "lock": "Lock vault",
+      "closeVault": "Close vault",
+      "undo": "Undo",
+      "redo": "Redo",
+      "cut": "Cut",
+      "copy": "Copy",
+      "paste": "Paste",
+      "selectAll": "Select all",
+      "search": "Search…",
+      "editor": "Editor",
+      "globalView": "Global View",
+      "atoms": "See atoms of this page",
+      "back": "Back",
+      "forward": "Forward",
+      "sidebar": "Sidebar",
+      "toolbar": "Formatting toolbar",
+      "lineNumbers": "Line numbers",
+      "outline": "Outline",
+      "fullscreen": "Full screen",
+      "minimize": "Minimize",
+      "maximize": "Maximize",
+      "restore": "Restore",
+      "closeWindow": "Close window"
+    },
+    "about": {
+      "title": "About Liber Linteum",
+      "license": "Free software under the GNU GPL, version 3 or later."
+    },
+    "region": "Title bar"
   }
 }

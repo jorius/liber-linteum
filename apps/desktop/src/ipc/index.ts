@@ -761,6 +761,24 @@ export const destroyWindow = () => call<void>('window_close_self');
 /** Names this window (M5b §2.3: "Page — Vault"). */
 export const windowTitleSet = (title: string) => call<void>('window_title_set', { title });
 
+// ---- custom title bar (Linux, Windows): this window's frame and menus ----
+export const windowMinimize = () => call<void>('window_minimize');
+/** Answers whether the window is now maximized. */
+export const windowToggleMaximize = () => call<boolean>('window_toggle_maximize');
+export const windowMaximized = () => call<boolean>('window_maximized');
+export const windowToggleFullscreen = () => call<void>('window_toggle_fullscreen');
+/** Moves the window with the pointer (a press on the title bar). */
+export const windowStartDrag = () => call<void>('window_start_drag');
+/** A close request, as the system's close button sends: the page saves first. */
+export const windowCloseRequest = () => call<void>('window_close_request');
+/** Edit → Paste where the page can't read the clipboard (Linux). */
+export const windowPaste = () => call<void>('window_paste');
+/** Runs the macOS menu item `id` (`liber-…`, src-tauri/src/menu.rs) for this window. */
+export const menuActivate = (id: string) => call<void>('menu_activate', { id });
+/** The window was resized, maximized or restored. */
+export const onWindowResized = (cb: () => void): Promise<UnlistenFn> =>
+  getCurrentWindow().onResized(() => cb());
+
 export const vaultOpen = (path: string) => call<VaultInfo>('vault_open', { path });
 export const vaultCreate = (path: string) => call<VaultInfo>('vault_create', { path });
 export const vaultClose = () => call<void>('vault_close');

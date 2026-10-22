@@ -335,6 +335,8 @@ pub fn open_file_window<R: Runtime>(app: &AppHandle<R>, path: &Path) -> CmdResul
         .title(grant.name().file_name())
         .inner_size(900.0, 700.0)
         .min_inner_size(480.0, 360.0)
+        // Custom title bar §2: the page draws the frame outside macOS.
+        .decorations(cfg!(target_os = "macos"))
         .build();
     match built {
         Ok(window) => {

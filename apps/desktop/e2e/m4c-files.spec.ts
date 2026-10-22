@@ -42,9 +42,11 @@ test('a Markdown file: its name, subtitle and band; typing saves to it', async (
     .toContain('More.');
   const commands = (await calls(page)).map(([c]) => c);
   // Nothing but the window's own commands (the backend would refuse others).
-  expect(commands.filter((c) => !/^(file_|settings_|plugin:|app_info|fonts_list)/.test(c))).toEqual(
-    [],
-  );
+  expect(
+    commands.filter(
+      (c) => !/^(file_|settings_|plugin:|app_info|fonts_list|window_|menu_activate)/.test(c),
+    ),
+  ).toEqual([]);
   expect(errors).toEqual([]);
 });
 

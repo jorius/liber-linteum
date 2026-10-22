@@ -382,19 +382,32 @@ pub fn with_app_menu<R: Runtime>(builder: tauri::Builder<R>) -> tauri::Builder<R
 
 /// Menu events (registered by `configure`).
 pub fn on_menu_event<R: Runtime>(app: &AppHandle<R>, event: MenuEvent) {
-    let id = event.id().0.as_str();
+    activate(app, event.id().0.as_str(), menu_target(app));
+}
+
+/// An item of the menu bar the app draws itself (custom title bar §3: Linux
+/// and Windows have no app menu): runs exactly as the macOS item with that id,
+/// for the window it was chosen in. Unknown ids do nothing.
+#[tauri::command]
+pub fn menu_activate<R: Runtime>(window: tauri::WebviewWindow<R>, id: String) {
+    activate(window.app_handle(), &id, Some(window.label().to_string()));
+}
+
+/// Runs the menu item `id`; `target` is the window that answers the items
+/// acting on one window (Settings, Save, the toggles, Back and Forward).
+fn activate<R: Runtime>(app: &AppHandle<R>, id: &str, target: Option<String>) {
     if id == QUIT_ID {
         request_quit(app);
     } else if id == BACK_ID || id == FORWARD_ID {
         let direction = if id == BACK_ID { "back" } else { "forward" };
-        emit_focused(app, NAVIGATE_EVENT, direction);
+        emit_to(app, &target, NAVIGATE_EVENT, direction);
     } else if id == EDITOR_ID || id == GLOBAL_VIEW_ID || id == ATOMS_ID {
         let screen = match id {
             EDITOR_ID => "edit",
             GLOBAL_VIEW_ID => "global",
             _ => "atoms",
         };
-        emit_focused(app, SCREEN_EVENT, screen);
+        emit_to(app, &target, SCREEN_EVENT, screen);
     } else if id == SEARCH_ID {
         // Search lives in the main window only (file windows have no vault).
         if let Some(main) = app.get_webview_window("main") {
@@ -403,11 +416,11 @@ pub fn on_menu_event<R: Runtime>(app: &AppHandle<R>, event: MenuEvent) {
         }
         let _ = app.emit_to("main", SEARCH_EVENT, ());
     } else if id == TOOLBAR_ID {
-        emit_focused(app, TOGGLE_EVENT, "toolbar");
+        emit_to(app, &target, TOGGLE_EVENT, "toolbar");
     } else if id == LINE_NUMBERS_ID {
-        emit_focused(app, TOGGLE_EVENT, "lineNumbers");
+        emit_to(app, &target, TOGGLE_EVENT, "lineNumbers");
     } else if id == OUTLINE_ID {
-        emit_focused(app, TOGGLE_EVENT, "outline");
+        emit_to(app, &target, TOGGLE_EVENT, "outline");
     } else if id == QUICK_NOTE_ID {
         // Quick notes are taken in the main window, wherever ⌘⇧N was pressed.
         if let Some(main) = app.get_webview_window("main") {
@@ -425,11 +438,11 @@ pub fn on_menu_event<R: Runtime>(app: &AppHandle<R>, event: MenuEvent) {
         }
         let _ = app.emit_to("main", NOTION_IMPORT_EVENT, ());
     } else if id == OPEN_FILE_ID {
-        emit_focused(app, OPEN_FILE_EVENT, ());
+        emit_to(app, &target, OPEN_FILE_EVENT, ());
     } else if id == SETTINGS_ID {
-        emit_focused(app, SETTINGS_EVENT, ());
+        emit_to(app, &target, SETTINGS_EVENT, ());
     } else if id == SAVE_ID {
-        emit_focused(app, SAVE_EVENT, ());
+        emit_to(app, &target, SAVE_EVENT, ());
     } else if let Some(what) = vault_action(id) {
         emit_main(app, VAULT_EVENT, what);
     } else if id == SIDEBAR_ID {
@@ -459,12 +472,14 @@ fn emit_main<R: Runtime, S: serde::Serialize + Clone>(app: &AppHandle<R>, event:
     let _ = app.emit_to("main", event, payload);
 }
 
-fn emit_focused<R: Runtime, S: serde::Serialize + Clone>(
+/// Tells the window a menu item acts on (`target`, see [`activate`]).
+fn emit_to<R: Runtime, S: serde::Serialize + Clone>(
     app: &AppHandle<R>,
+    target: &Option<String>,
     event: &str,
     payload: S,
 ) {
-    if let Some(label) = menu_target(app) {
+    if let Some(label) = target {
         let _ = app.emit_to(label.as_str(), event, payload);
     }
 }

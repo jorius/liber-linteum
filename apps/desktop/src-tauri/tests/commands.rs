@@ -168,6 +168,11 @@ fn m1b_every_command_is_allowed_from_main_and_denied_elsewhere() {
     let other = WebviewWindowBuilder::new(&h.app, "other", Default::default())
         .build()
         .unwrap();
+    // Commands that pick a file with no argument (spell_import) would open a
+    // real dialog, which blocks the mock runtime on Linux: none is picked.
+    h.app
+        .state::<liber_desktop::state::AppState>()
+        .set_cover_picker(Some(Arc::new(|| None)));
     for cmd in COMMANDS {
         if let Err(e) = call(&h.main, cmd, json!({})) {
             assert!(
@@ -175,6 +180,41 @@ fn m1b_every_command_is_allowed_from_main_and_denied_elsewhere() {
                 "{cmd} must be allowed from main: {e}"
             );
         }
+        let err = call(&other, cmd, json!({})).expect_err(cmd);
+        assert!(err.to_string().contains("not allowed"), "{cmd}: {err}");
+    }
+}
+
+/// Custom title bar §4: the window commands and `menu_activate` are the
+/// main window's (and file windows'), never another window's.
+#[test]
+fn titlebar_commands_are_allowed_from_main_and_denied_elsewhere() {
+    let h = harness();
+    let other = WebviewWindowBuilder::new(&h.app, "other", Default::default())
+        .build()
+        .unwrap();
+    // The harmless ones run; dragging and closing would act on the window.
+    for (cmd, body) in [
+        ("window_maximized", json!({})),
+        ("window_minimize", json!({})),
+        ("window_toggle_maximize", json!({})),
+        ("window_toggle_fullscreen", json!({})),
+        ("menu_activate", json!({ "id": "not-an-item" })),
+    ] {
+        if let Err(e) = call(&h.main, cmd, body) {
+            assert!(!e.to_string().contains("not allowed"), "{cmd}: {e}");
+        }
+    }
+    for cmd in [
+        "window_minimize",
+        "window_toggle_maximize",
+        "window_maximized",
+        "window_toggle_fullscreen",
+        "window_start_drag",
+        "window_close_request",
+        "window_paste",
+        "menu_activate",
+    ] {
         let err = call(&other, cmd, json!({})).expect_err(cmd);
         assert!(err.to_string().contains("not allowed"), "{cmd}: {err}");
     }

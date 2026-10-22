@@ -167,6 +167,10 @@ function FileView({ info }: { info: FileInfo }) {
   const outline = useSettingsStore((s) => s.settings.outline);
   const text = info.kind === 'text';
   const handingOff = useSingleFileStore((s) => s.handingOff);
+  // The drawn title bar shows the file's name (custom title bar §2).
+  useEffect(() => {
+    document.title = info.name;
+  }, [info.name]);
   return (
     <main className={shell.content} inert={handingOff}>
       <section className={page.page} aria-label={t('page.region')}>

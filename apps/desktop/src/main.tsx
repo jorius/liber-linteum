@@ -14,6 +14,7 @@ import { installFileDropIfTauri } from './features/editor/attachments';
 import { installSeeAtomsMenuIfTauri } from './features/global-view/seeAtomsMenu';
 import { installOpenFile, installOpenInVault } from './features/singleFile/openFile';
 import { SingleFileApp } from './features/singleFile/SingleFileApp';
+import { ownTitleBar, TitleBar } from './features/titlebar/TitleBar';
 import { installFileWatch } from './features/singleFile/singleFileStore';
 import { installSearchMenuIfTauri } from './features/search/searchMenu';
 import { installSaveKey, installShellMenuIfTauri } from './features/shell/shellMenu';
@@ -28,6 +29,10 @@ applyTheme('system');
 
 // A window showing one file opened on its own (M4c §3): no vault.
 const singleFile = isFileWindowLabel();
+
+// Outside macOS the page draws the window's frame (custom title bar §1).
+const titleBar = ownTitleBar();
+if (titleBar) document.documentElement.dataset.titlebar = '';
 
 // Saved settings (theme, language) apply before the first render.
 void initI18n(detectLanguage(navigator.languages))
@@ -51,6 +56,9 @@ void initI18n(detectLanguage(navigator.languages))
       installOpenInVault();
     }
     createRoot(document.getElementById('root')!).render(
-      <StrictMode>{singleFile ? <SingleFileApp /> : <App />}</StrictMode>,
+      <StrictMode>
+        {titleBar && <TitleBar main={!singleFile} />}
+        {singleFile ? <SingleFileApp /> : <App />}
+      </StrictMode>,
     );
   });

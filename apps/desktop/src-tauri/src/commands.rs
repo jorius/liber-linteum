@@ -62,6 +62,96 @@ pub async fn window_title_set<R: tauri::Runtime>(
         .map_err(|e| crate::error::CommandError::new(crate::error::ErrorKind::Io, e.to_string()))
 }
 
+fn window_error(e: tauri::Error) -> crate::error::CommandError {
+    crate::error::CommandError::new(crate::error::ErrorKind::Io, e.to_string())
+}
+
+/// The title bar the app draws itself where the system's is off (Linux and
+/// Windows, custom title bar §2): its window buttons, dragging and the Window
+/// menu. Each acts on the calling window only, as `window_close_self` (the
+/// window plugin isn't granted, M4c review I2).
+#[tauri::command]
+pub async fn window_minimize<R: tauri::Runtime>(
+    window: tauri::WebviewWindow<R>,
+) -> crate::error::CmdResult<()> {
+    window.minimize().map_err(window_error)
+}
+
+/// Maximizes the calling window, or restores it; answers whether it is now
+/// maximized (the title bar swaps its button).
+#[tauri::command]
+pub async fn window_toggle_maximize<R: tauri::Runtime>(
+    window: tauri::WebviewWindow<R>,
+) -> crate::error::CmdResult<bool> {
+    let maximized = window.is_maximized().map_err(window_error)?;
+    if maximized {
+        window.unmaximize().map_err(window_error)?;
+    } else {
+        window.maximize().map_err(window_error)?;
+    }
+    Ok(!maximized)
+}
+
+/// Whether the calling window is maximized.
+#[tauri::command]
+pub async fn window_maximized<R: tauri::Runtime>(
+    window: tauri::WebviewWindow<R>,
+) -> crate::error::CmdResult<bool> {
+    window.is_maximized().map_err(window_error)
+}
+
+/// View → Full Screen (F11).
+#[tauri::command]
+pub async fn window_toggle_fullscreen<R: tauri::Runtime>(
+    window: tauri::WebviewWindow<R>,
+) -> crate::error::CmdResult<()> {
+    let full = window.is_fullscreen().map_err(window_error)?;
+    window.set_fullscreen(!full).map_err(window_error)
+}
+
+/// Moves the calling window with the pointer (a press on the title bar).
+#[tauri::command]
+pub async fn window_start_drag<R: tauri::Runtime>(
+    window: tauri::WebviewWindow<R>,
+) -> crate::error::CmdResult<()> {
+    window.start_dragging().map_err(window_error)
+}
+
+/// The title bar's close button and Window → Close Window: a close request,
+/// as the system's button sends, so the page saves first (or keeps the window).
+#[tauri::command]
+pub async fn window_close_request<R: tauri::Runtime>(
+    window: tauri::WebviewWindow<R>,
+) -> crate::error::CmdResult<()> {
+    window.close().map_err(window_error)
+}
+
+/// Edit → Paste on Linux: WebKitGTK's own Paste into the focused field, as a
+/// GTK menu would run it (a page can't read the clipboard there). Elsewhere
+/// the page pastes itself, so this answers `notPermitted`.
+#[tauri::command]
+pub async fn window_paste<R: tauri::Runtime>(
+    window: tauri::WebviewWindow<R>,
+) -> crate::error::CmdResult<()> {
+    #[cfg(target_os = "linux")]
+    {
+        window
+            .with_webview(|webview| {
+                use webkit2gtk::WebViewExt;
+                webview.inner().execute_editing_command("Paste");
+            })
+            .map_err(window_error)
+    }
+    #[cfg(not(target_os = "linux"))]
+    {
+        let _ = window;
+        Err(crate::error::CommandError::new(
+            crate::error::ErrorKind::NotPermitted,
+            "paste",
+        ))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::build_app_info;

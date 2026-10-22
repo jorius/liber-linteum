@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-menu-activate"
+description = "Enables the menu_activate command without any pre-configured scope."
+commands.allow = ["menu_activate"]
+
+[[permission]]
+identifier = "deny-menu-activate"
+description = "Denies the menu_activate command without any pre-configured scope."
+commands.deny = ["menu_activate"]
