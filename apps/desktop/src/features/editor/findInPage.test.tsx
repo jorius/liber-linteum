@@ -8,7 +8,7 @@ import { fakeDisk } from '../../test/fakeDisk';
 import { useUiStore } from '../../stores/uiStore';
 import { useVaultStore } from '../../stores/vaultStore';
 import {
-  installFindKey,
+  installEditorKeys,
   installNoFindBar,
   searchKeyTarget,
   useGlobalShortcuts,
@@ -206,7 +206,7 @@ describe('find in page', () => {
     fakeDisk({ 'notes.txt': 'plain text\n' });
     const doc = await load('notes.txt');
     render(<Editor doc={doc} mode="source" label="notes.txt" />);
-    const stop = installFindKey(false);
+    const stop = installEditorKeys(false);
     const view = viewOf();
     const e = new KeyboardEvent('keydown', {
       ctrlKey: true,

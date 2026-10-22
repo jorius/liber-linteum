@@ -127,7 +127,8 @@ fn macos_menu_quit_is_ours_and_the_standard_items_stay() {
             "Copy",
             "Paste",
             "Select All",
-            "Find…"
+            "Find…",
+            "Go to Line…"
         ]
     );
     // M2b §3: Back / Forward along the link trail (⌘[ / ⌘] are handled by the
@@ -200,7 +201,12 @@ fn menu_events_reach_one_window_only() {
                 .build()
                 .unwrap();
             for (window, name) in [(main_window(handle), "main"), (file, "file-1")] {
-                for event in ["menu:open-file", "menu:toggle", "menu:find"] {
+                for event in [
+                    "menu:open-file",
+                    "menu:toggle",
+                    "menu:find",
+                    "menu:goto-line",
+                ] {
                     let log = log.clone();
                     window.listen(event, move |e| {
                         log.lock()
@@ -213,6 +219,7 @@ fn menu_events_reach_one_window_only() {
                 liber_desktop::menu::OPEN_FILE_ID,
                 liber_desktop::menu::TOOLBAR_ID,
                 liber_desktop::menu::FIND_ID,
+                liber_desktop::menu::GOTO_LINE_ID,
             ] {
                 liber_desktop::menu::on_menu_event(
                     handle,
@@ -231,7 +238,8 @@ fn menu_events_reach_one_window_only() {
         [
             "main menu:open-file null".to_string(),
             "main menu:toggle \"toolbar\"".into(),
-            "main menu:find null".into()
+            "main menu:find null".into(),
+            "main menu:goto-line null".into()
         ]
     );
 }

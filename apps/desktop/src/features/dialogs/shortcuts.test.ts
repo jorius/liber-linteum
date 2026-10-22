@@ -45,6 +45,18 @@ describe('Settings → Keyboard shortcuts (M5b §18)', () => {
     expect(keyLabel('Shift+F3', false)).toBe('Shift+F3');
   });
 
+  it('Go to line is Ctrl+G on every platform, in the menu (Ctrl, not ⌘) and the table', () => {
+    const menu = readFileSync(new URL('../../../src-tauri/src/menu.rs', import.meta.url), 'utf8');
+    expect(menu).toMatch(/GOTO_LINE_ID: &str = "liber-goto-line"/);
+    expect(menu).toMatch(/GOTO_LINE_ACCELERATOR: &str = "Ctrl\+G"/);
+    // Every plain-Ctrl accelerator of the menus is listed too.
+    const ctrl = [...menu.matchAll(/"((?:Alt\+|Shift\+)*Ctrl\+[^"]+)"/g)].map((m) => m[1]);
+    expect(ctrl).toContain('Ctrl+G');
+    for (const a of ctrl) expect(listed, a).toContain(a);
+    expect(keyLabel('Ctrl+G', true)).toBe('⌃G');
+    expect(keyLabel('Ctrl+G', false)).toBe('Ctrl+G');
+  });
+
   it('writes keys the way each platform does', () => {
     expect(keyLabel('Alt+Mod+W', true)).toBe('⌥⌘W');
     expect(keyLabel('Mod+Shift+F', false)).toBe('Ctrl+Shift+F');

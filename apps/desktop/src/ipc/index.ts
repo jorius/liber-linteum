@@ -1283,6 +1283,9 @@ export const onMenuSearch = (cb: () => void): Promise<UnlistenFn> =>
 /** Edit → Find… in the app menu: find in the page (find in page). */
 export const onMenuFind = (cb: () => void): Promise<UnlistenFn> =>
   listen<null>('menu:find', () => cb(), mine());
+/** Edit → Go to Line… in the app menu (Ctrl+G). */
+export const onMenuGoToLine = (cb: () => void): Promise<UnlistenFn> =>
+  listen<null>('menu:goto-line', () => cb(), mine());
 /** Liber Linteum → Settings… (M5b §2.1). */
 export const onMenuSettings = (cb: () => void): Promise<UnlistenFn> =>
   listen<null>('menu:settings', () => cb(), mine());

@@ -48,8 +48,95 @@ export function findPhrases(t: (key: string) => string = i18next.t.bind(i18next)
 /** The phrases of each editor state, swapped when the language changes. */
 export const phrasesSlot = new Compartment();
 
-/** The panel and its matches, drawn like the app's fields and buttons in
- *  every palette, light and dark (`.cm-panels` is CodeMirror's own grey). */
+/** A panel's fields, buttons, checkboxes and close button (`close`), drawn
+ *  like the app's in every palette, light and dark: find in page's and Go to
+ *  line's. `:focus-visible` rules stand alone (Safari 15, cssCompat.test). */
+function panelRules(panel: string, close: string): Record<string, Record<string, string>> {
+  return {
+    [panel]: { padding: '8px 48px 6px 12px', fontSize: '13px', lineHeight: '1.3' },
+    [`${panel} input, ${panel} button, ${panel} label`]: {
+      margin: '0 6px 4px 0',
+      verticalAlign: 'middle',
+    },
+    [`${panel} .cm-textfield`]: {
+      boxSizing: 'border-box',
+      width: '220px',
+      maxWidth: 'calc(100% - 12px)',
+      height: '30px',
+      padding: '0 10px',
+      border: '1px solid var(--color-border-strong)',
+      borderRadius: 'var(--radius-sm)',
+      backgroundColor: 'var(--color-surface-subtle)',
+      color: 'var(--color-text)',
+      font: '400 13px var(--font-body)',
+    },
+    [`${panel} .cm-textfield::placeholder`]: { color: 'var(--color-text-faint)' },
+    [`${panel} .cm-textfield:focus`]: {
+      outline: '2px solid var(--color-focus)',
+      outlineOffset: '1px',
+      borderColor: 'var(--color-accent)',
+    },
+    [`${panel} .cm-textfield[aria-invalid=true]`]: { borderColor: 'var(--color-warn-border)' },
+    [`${panel} .cm-button`]: {
+      boxSizing: 'border-box',
+      height: '30px',
+      padding: '0 10px',
+      border: '1px solid var(--color-border-strong)',
+      borderRadius: 'var(--radius-sm)',
+      backgroundColor: 'var(--color-surface)',
+      backgroundImage: 'none',
+      color: 'var(--color-text)',
+      font: '600 12.5px var(--font-body)',
+      textTransform: 'none',
+      cursor: 'pointer',
+    },
+    [`${panel} .cm-button:hover`]: { borderColor: 'var(--color-accent)' },
+    [`${panel} .cm-button:active`]: {
+      backgroundImage: 'none',
+      backgroundColor: 'var(--color-accent-soft)',
+    },
+    [`${panel} .cm-button:focus-visible`]: {
+      outline: '2px solid var(--color-focus)',
+      outlineOffset: '1px',
+    },
+    [`${panel} label`]: {
+      display: 'inline-flex',
+      alignItems: 'center',
+      gap: '4px',
+      height: '30px',
+      fontSize: '12.5px',
+      color: 'var(--color-text-body)',
+      cursor: 'pointer',
+    },
+    [`${panel} input[type=checkbox]`]: { margin: '0', accentColor: 'var(--color-accent)' },
+    [`${panel} ${close}`]: {
+      top: '8px',
+      right: '10px',
+      width: '30px',
+      height: '30px',
+      margin: '0',
+      padding: '0',
+      border: 'none',
+      backgroundColor: 'transparent',
+      borderRadius: 'var(--radius-sm)',
+      color: 'var(--color-text-muted)',
+      fontSize: '20px',
+      lineHeight: '1',
+      cursor: 'pointer',
+    },
+    [`${panel} ${close}:hover`]: {
+      backgroundColor: 'var(--color-accent-soft)',
+      color: 'var(--color-text)',
+    },
+    [`${panel} ${close}:focus-visible`]: {
+      outline: '2px solid var(--color-focus)',
+      outlineOffset: '1px',
+    },
+  };
+}
+
+/** The panels and the matches, in the app's colours (`.cm-panels` is
+ *  CodeMirror's own grey). */
 const findTheme = EditorView.theme({
   '.cm-panels': {
     backgroundColor: 'var(--color-surface)',
@@ -61,88 +148,12 @@ const findTheme = EditorView.theme({
     margin: '2px 2px 0',
     borderBottom: '1px solid var(--color-border)',
   },
-  '.cm-panel.cm-search': {
-    padding: '8px 48px 6px 12px',
-    fontSize: '13px',
-    lineHeight: '1.3',
-  },
-  '.cm-panel.cm-search input, .cm-panel.cm-search button, .cm-panel.cm-search label': {
-    margin: '0 6px 4px 0',
-    verticalAlign: 'middle',
-  },
-  '.cm-panel.cm-search .cm-textfield': {
-    boxSizing: 'border-box',
-    width: '220px',
-    maxWidth: 'calc(100% - 12px)',
-    height: '30px',
-    padding: '0 10px',
-    border: '1px solid var(--color-border-strong)',
-    borderRadius: 'var(--radius-sm)',
-    backgroundColor: 'var(--color-surface-subtle)',
-    color: 'var(--color-text)',
-    font: '400 13px var(--font-body)',
-  },
-  '.cm-panel.cm-search .cm-textfield::placeholder': { color: 'var(--color-text-faint)' },
-  '.cm-panel.cm-search .cm-textfield:focus': {
-    outline: '2px solid var(--color-focus)',
-    outlineOffset: '1px',
-    borderColor: 'var(--color-accent)',
-  },
-  '.cm-panel.cm-search .cm-button': {
-    boxSizing: 'border-box',
-    height: '30px',
-    padding: '0 10px',
-    border: '1px solid var(--color-border-strong)',
-    borderRadius: 'var(--radius-sm)',
-    backgroundColor: 'var(--color-surface)',
-    backgroundImage: 'none',
-    color: 'var(--color-text)',
-    font: '600 12.5px var(--font-body)',
-    textTransform: 'none',
-    cursor: 'pointer',
-  },
-  '.cm-panel.cm-search .cm-button:hover': { borderColor: 'var(--color-accent)' },
-  '.cm-panel.cm-search .cm-button:active': {
-    backgroundImage: 'none',
-    backgroundColor: 'var(--color-accent-soft)',
-  },
-  '.cm-panel.cm-search .cm-button:focus-visible': {
-    outline: '2px solid var(--color-focus)',
-    outlineOffset: '1px',
-  },
-  '.cm-panel.cm-search label': {
-    display: 'inline-flex',
-    alignItems: 'center',
-    gap: '4px',
-    height: '30px',
-    fontSize: '12.5px',
-    color: 'var(--color-text-body)',
-    cursor: 'pointer',
-  },
-  '.cm-panel.cm-search input[type=checkbox]': {
-    margin: '0',
-    accentColor: 'var(--color-accent)',
-  },
-  '.cm-panel.cm-search [name=close]': {
-    top: '8px',
-    right: '10px',
-    width: '30px',
-    height: '30px',
-    margin: '0',
-    borderRadius: 'var(--radius-sm)',
-    color: 'var(--color-text-muted)',
-    fontSize: '20px',
-    lineHeight: '1',
-    cursor: 'pointer',
-  },
-  '.cm-panel.cm-search [name=close]:hover': {
-    backgroundColor: 'var(--color-accent-soft)',
-    color: 'var(--color-text)',
-  },
-  '.cm-panel.cm-search [name=close]:focus-visible': {
-    outline: '2px solid var(--color-focus)',
-    outlineOffset: '1px',
-  },
+  ...panelRules('.cm-panel.cm-search', '[name=close]'),
+  // Go to line (goToLine.ts): CodeMirror's dialog, holding our own fields.
+  ...panelRules('.cm-dialog.cm-liber-goto', '.cm-dialog-close'),
+  '.cm-dialog.cm-liber-goto label': { cursor: 'default' },
+  '.cm-dialog.cm-liber-goto .cm-textfield': { width: '140px' },
+  '.cm-liber-goto-hint': { fontSize: '12.5px', color: 'var(--color-text-muted)' },
   '.cm-searchMatch': {
     backgroundColor: 'var(--color-highlight-bg)',
     borderRadius: '2px',
@@ -154,7 +165,7 @@ const findTheme = EditorView.theme({
 });
 
 /** Find (and, unless the state is read-only, replace) in the page: the panel
- *  at the top of the editor; Enter / ⇧Enter and F3 / ⇧F3 (⌘G / ⇧⌘G) step
+ *  at the top of the editor; Enter / ⇧Enter and F3 / ⇧F3 (⌘G / ⇧⌘G on macOS) step
  *  through the matches, Escape closes it and gives the text back the
  *  keyboard. ⌘F / Ctrl+F itself is the page's shortcut (`openFindInPage`,
  *  from useGlobalShortcuts), so it isn't bound here. */
@@ -169,8 +180,9 @@ export function findInPage(): Extension {
         scope: 'editor search-panel',
         preventDefault: true,
       },
+      // ⌘G / ⇧⌘G on macOS only: Ctrl+G is Go to line everywhere (goToLine.ts).
       {
-        key: 'Mod-g',
+        mac: 'Mod-g',
         run: findNext,
         shift: findPrevious,
         scope: 'editor search-panel',

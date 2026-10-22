@@ -476,6 +476,7 @@
         "findInPage": "Buscar en la página (fuera del editor: Buscar)",
         "findNext": "Siguiente coincidencia",
         "findPrevious": "Coincidencia anterior",
+        "goToLine": "Ir a la línea",
         "search": "Buscar en la bóveda",
         "files": "Ir a los archivos",
         "newPage": "Nueva página",
@@ -1210,10 +1211,17 @@
     "byWord": "Palabra completa",
     "replace": "Reemplazar",
     "replaceAll": "Reemplazar todas",
-    "close": "Cerrar la búsqueda",
+    "close": "Cerrar",
     "currentMatch": "Coincidencia actual",
     "onLine": "en la línea",
     "replacedMatches": "Se reemplazaron $ coincidencias",
     "replacedOnLine": "Se reemplazó la coincidencia de la línea $"
+  },
+  "goToLine": {
+    "label": "Ir a la línea",
+    "placeholder": "42, 42:7, +5",
+    "go": "Ir",
+    "hint": "Línea {line} de {lines}",
+    "invalid": "Escribe una línea, línea:columna o +/− líneas"
   }
 }

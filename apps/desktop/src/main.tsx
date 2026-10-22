@@ -12,13 +12,14 @@ import { isFileWindowLabel } from './ipc';
 import { installRecorderEvents } from './features/audio/recorderStore';
 import { installFileDropIfTauri } from './features/editor/attachments';
 import { installFindMenuIfTauri } from './features/editor/findInPage';
+import { installGoToLineMenuIfTauri } from './features/editor/goToLine';
 import { installSeeAtomsMenuIfTauri } from './features/global-view/seeAtomsMenu';
 import { installOpenFile, installOpenInVault } from './features/singleFile/openFile';
 import { SingleFileApp } from './features/singleFile/SingleFileApp';
 import { installFileWatch } from './features/singleFile/singleFileStore';
 import { installSearchMenuIfTauri } from './features/search/searchMenu';
 import { installSaveKey, installShellMenuIfTauri } from './features/shell/shellMenu';
-import { installFindKey, installNoFindBar } from './features/shell/useGlobalShortcuts';
+import { installEditorKeys, installNoFindBar } from './features/shell/useGlobalShortcuts';
 import { installQuitGuardIfTauri } from './stores/editorStore';
 import { installMenuTogglesIfTauri } from './stores/menuToggles';
 import { installMenuNavigationIfTauri } from './stores/navigate';
@@ -40,12 +41,13 @@ void initI18n(detectLanguage(navigator.languages))
     installSaveKey();
     installNoFindBar();
     installFindMenuIfTauri(!singleFile);
+    installGoToLineMenuIfTauri();
     installSettingsSync();
     installOpenFile();
     if (singleFile) {
       void installFileWatch().catch(() => undefined);
-      // The main window's ⌘F is in its global shortcuts.
-      installFindKey();
+      // The main window's ⌘F and Ctrl+G are in its global shortcuts.
+      installEditorKeys();
     } else {
       installMenuNavigationIfTauri();
       installSeeAtomsMenuIfTauri();

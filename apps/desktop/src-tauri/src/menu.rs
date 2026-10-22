@@ -51,6 +51,11 @@ pub const SEARCH_ACCELERATOR: &str = "CmdOrCtrl+Shift+F";
 pub const FIND_ID: &str = "liber-find";
 pub const FIND_EVENT: &str = "menu:find";
 pub const FIND_ACCELERATOR: &str = "CmdOrCtrl+F";
+/// Id of Edit → Go to Line…: the focused window answers `menu:goto-line`.
+/// Ctrl+G on every platform, macOS included (⌘G is find next there).
+pub const GOTO_LINE_ID: &str = "liber-goto-line";
+pub const GOTO_LINE_EVENT: &str = "menu:goto-line";
+pub const GOTO_LINE_ACCELERATOR: &str = "Ctrl+G";
 /// Event telling the page which screen to show; payload `"edit"`,
 /// `"global"`, or `"atoms"` (the open page's atoms in the Global View).
 pub const SCREEN_EVENT: &str = "menu:screen";
@@ -184,7 +189,7 @@ pub const SIDEBAR_EVENT: &str = "menu:sidebar";
 /// File (New Quick Note, ⌘⇧N: from any window, so it carries the
 /// accelerator; the page also answers ⌘⇧N where there is no app menu and
 /// ignores a second trigger within a second, M4c §7.10); Edit (Undo, Redo, Cut, Copy, Paste, Select All: macOS routes the text
-/// editing shortcuts through it; Find… ⌘F, find in page); View (Search… ⌘⇧F; Editor, Global View — no
+/// editing shortcuts through it; Find… ⌘F, find in page; Go to Line… Ctrl+G); View (Search… ⌘⇧F; Editor, Global View — no
 /// accelerators: the page handles ⌘1 / ⌘2; Back, Forward along the link trail —
 /// no accelerators: the page handles ⌘[ / ⌘] itself, which also works where
 /// there is no app menu; the formatting toolbar, line-number and outline toggles —
@@ -306,6 +311,14 @@ pub fn app_menu<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
     // ⌘F here and on the page: opening find a second time only gives its
     // field the keyboard again, so either may win.
     let find = MenuItem::with_id(app, FIND_ID, "Find…", true, Some(FIND_ACCELERATOR))?;
+    // Ctrl+G here and on the page: a second open only selects its field.
+    let goto_line = MenuItem::with_id(
+        app,
+        GOTO_LINE_ID,
+        "Go to Line…",
+        true,
+        Some(GOTO_LINE_ACCELERATOR),
+    )?;
     let edit = Submenu::with_items(
         app,
         "Edit",
@@ -320,6 +333,7 @@ pub fn app_menu<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
             &PredefinedMenuItem::select_all(app, None)?,
             &PredefinedMenuItem::separator(app)?,
             &find,
+            &goto_line,
         ],
     )?;
     let back = MenuItem::with_id(app, BACK_ID, "Back", true, None::<&str>)?;
@@ -418,6 +432,8 @@ pub fn on_menu_event<R: Runtime>(app: &AppHandle<R>, event: MenuEvent) {
     } else if id == FIND_ID {
         // Find in the focused window's page: file windows have one too.
         emit_focused(app, FIND_EVENT, ());
+    } else if id == GOTO_LINE_ID {
+        emit_focused(app, GOTO_LINE_EVENT, ());
     } else if id == TOOLBAR_ID {
         emit_focused(app, TOGGLE_EVENT, "toolbar");
     } else if id == LINE_NUMBERS_ID {

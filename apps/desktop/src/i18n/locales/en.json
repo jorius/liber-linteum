@@ -476,6 +476,7 @@
         "findInPage": "Find in the page (outside the editor: Search)",
         "findNext": "Next match",
         "findPrevious": "Previous match",
+        "goToLine": "Go to line",
         "search": "Search the vault",
         "files": "Go to the files",
         "newPage": "New page",
@@ -1210,10 +1211,17 @@
     "byWord": "Whole word",
     "replace": "Replace",
     "replaceAll": "Replace all",
-    "close": "Close find",
+    "close": "Close",
     "currentMatch": "Current match",
     "onLine": "on line",
     "replacedMatches": "Replaced $ matches",
     "replacedOnLine": "Replaced the match on line $"
+  },
+  "goToLine": {
+    "label": "Go to line",
+    "placeholder": "42, 42:7, +5",
+    "go": "Go",
+    "hint": "Line {line} of {lines}",
+    "invalid": "Type a line, line:column, or +/− lines"
   }
 }

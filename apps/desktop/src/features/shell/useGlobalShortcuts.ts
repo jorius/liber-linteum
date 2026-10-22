@@ -5,6 +5,7 @@ import { dirFor } from '../../stores/tree';
 import { useUiStore } from '../../stores/uiStore';
 import { refuseWhileConverting, useVaultStore } from '../../stores/vaultStore';
 import { findableView, openFindInPage } from '../editor/findInPage';
+import { isGoToLineKey, openGoToLine } from '../editor/goToLine';
 import { useFavoritesStore } from '../favorites/favoritesStore';
 import { openSearch } from '../search/searchMenu';
 import { usePageStore } from '../../stores/pageStore';
@@ -73,10 +74,14 @@ export function searchKeyTarget(
   return editorShowing && !e.shiftKey ? 'find' : 'search';
 }
 
-/** ⌘F / Ctrl+F in a single-file window (no vault, no Search, no global
- *  shortcuts): find in the file. Returns the uninstall. */
-export function installFindKey(mac = MAC): () => void {
+/** ⌘F / Ctrl+F and Ctrl+G in a single-file window (no vault, no Search, no
+ *  global shortcuts): find in the file, go to a line. Returns the uninstall. */
+export function installEditorKeys(mac = MAC): () => void {
   const onKeyDown = (e: KeyboardEvent) => {
+    if (isGoToLineKey(e)) {
+      if (openGoToLine()) e.preventDefault();
+      return;
+    }
     if (searchKeyTarget(e, findableView() !== null, mac) !== 'find') return;
     e.preventDefault();
     openFindInPage();
@@ -86,7 +91,7 @@ export function installFindKey(mac = MAC): () => void {
 }
 
 /** ⌘ (macOS) / Ctrl shortcuts (spec §3.5): F find in page (Search outside
- * the editor) or ⇧F search, ⇧E explorer, O open vault,
+ * the editor) or ⇧F search, Ctrl+G go to line (Ctrl on macOS too), ⇧E explorer, O open vault,
  * J the floating button's actions and \ the sidebar (M5b §2.2, §2.5),
  * ⇧D Favorites (M5b §19), , settings, N new page ( ⇧N is New Quick Note since M4c §7.9, handled by
  * `ScratchpadHost`), [ / ] back and forward along the
@@ -113,6 +118,9 @@ export function useGlobalShortcuts(menuOpen: boolean) {
       } else if (find) {
         if (find === 'find') openFindInPage();
         else openSearch();
+      } else if (isGoToLineKey(e)) {
+        // Ctrl+G everywhere, ⌘G being find next on macOS; nothing without a page.
+        if (!openGoToLine()) return;
       } else if (key === ',') {
         useUiStore.getState().openDialog({ type: 'settings' });
       } else if (key === 'o' && !e.shiftKey) {

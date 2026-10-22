@@ -1,5 +1,6 @@
 /** Settings → Keyboard shortcuts (M5b §18): what the app answers, as one
- *  read-only table. `Mod` is ⌘ on macOS and Ctrl elsewhere. The menu's
+ *  read-only table. `Mod` is ⌘ on macOS and Ctrl elsewhere; `Ctrl` is Ctrl
+ *  (⌃) everywhere. The menu's
  *  accelerators are checked against it by `shortcuts.test.ts`. */
 export const SHORTCUT_GROUPS = [
   {
@@ -13,6 +14,8 @@ export const SHORTCUT_GROUPS = [
       { keys: 'Mod+F', label: 'findInPage' },
       { keys: 'F3', label: 'findNext' },
       { keys: 'Shift+F3', label: 'findPrevious' },
+      // Ctrl on macOS too: ⌘G is find next there.
+      { keys: 'Ctrl+G', label: 'goToLine' },
       { keys: 'Mod+Shift+F', label: 'search' },
       { keys: 'Mod+Shift+E', label: 'files' },
     ],
@@ -56,8 +59,13 @@ export const SHORTCUT_GROUPS = [
   },
 ] as const;
 
-const MAC_NAMES: Record<string, string> = { Mod: '⌘', Shift: '⇧', Alt: '⌥' };
-const OTHER_NAMES: Record<string, string> = { Mod: 'Ctrl', Shift: 'Shift', Alt: 'Alt' };
+const MAC_NAMES: Record<string, string> = { Mod: '⌘', Ctrl: '⌃', Shift: '⇧', Alt: '⌥' };
+const OTHER_NAMES: Record<string, string> = {
+  Mod: 'Ctrl',
+  Ctrl: 'Ctrl',
+  Shift: 'Shift',
+  Alt: 'Alt',
+};
 
 /** `Alt+Mod+W` as the platform writes it: `⌥⌘W` on macOS, `Alt+Ctrl+W` elsewhere. */
 export function keyLabel(keys: string, mac: boolean): string {
