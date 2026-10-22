@@ -82,6 +82,9 @@ const COMMANDS: &[&str] = &[
     // M5b §19: Favorites.
     "favorites_get",
     "favorites_set",
+    // A vault's home.
+    "home_get",
+    "home_set",
     // M6: audio clips.
     "audio_devices",
     "audio_record_start",
@@ -2431,6 +2434,107 @@ fn m5b_favorites_over_ipc() {
         call(&h.main, "favorites_get", json!({})).unwrap(),
         json!(["Welcome.md", "Design"])
     );
+}
+
+/// A vault's home over IPC: a page, a text file or the Global View; what the
+/// vault can't open to is refused; `vault_open` sends it; it follows a folder's
+/// rename and goes with the Trash.
+#[test]
+fn the_vaults_home_over_ipc() {
+    let h = harness();
+    let vault = open_fixture(&h, "obsidian-basic");
+    assert_eq!(call(&h.main, "home_get", json!({})).unwrap(), Value::Null);
+    let page = |p: &str| json!({ "kind": "page", "path": p });
+    assert_eq!(
+        call(
+            &h.main,
+            "home_set",
+            json!({ "home": page("Game Design/Game 1.md") })
+        )
+        .unwrap(),
+        page("Game Design/Game 1.md")
+    );
+    assert_eq!(
+        call(
+            &h.main,
+            "home_set",
+            json!({ "home": page("Game Design/notes.txt") })
+        )
+        .unwrap(),
+        page("Game Design/notes.txt")
+    );
+    // Escaping, hidden, missing, a folder, an image.
+    for bad in [
+        "../x.md",
+        "/abs.md",
+        ".trash/old.md",
+        ".obsidian/app.json",
+        "Missing.md",
+        "Game Design",
+        "Character Design/assets/rex-cover.png",
+    ] {
+        assert!(
+            call(&h.main, "home_set", json!({ "home": page(bad) })).is_err(),
+            "{bad}"
+        );
+    }
+    // A refusal keeps what was set.
+    assert_eq!(
+        call(&h.main, "home_get", json!({})).unwrap(),
+        page("Game Design/notes.txt")
+    );
+    call(
+        &h.main,
+        "home_set",
+        json!({ "home": page("Game Design/Game 1.md") }),
+    )
+    .unwrap();
+    call(
+        &h.main,
+        "entry_rename",
+        json!({ "from": "Game Design", "to": "Design" }),
+    )
+    .unwrap();
+    assert_eq!(
+        call(&h.main, "home_get", json!({})).unwrap(),
+        page("Design/Game 1.md")
+    );
+    // Opening the vault again sends it with the vault.
+    call(&h.main, "vault_close", json!({})).unwrap();
+    let info = call(&h.main, "vault_open", json!({ "path": vault.path() })).unwrap();
+    assert_eq!(info["home"], page("Design/Game 1.md"));
+    // An archived page can't be the home; archiving the home clears it.
+    call(
+        &h.main,
+        "entry_archive",
+        json!({ "path": "Design/Game 1.md" }),
+    )
+    .unwrap();
+    assert_eq!(call(&h.main, "home_get", json!({})).unwrap(), Value::Null);
+    assert!(
+        call(
+            &h.main,
+            "home_set",
+            json!({ "home": page(".archive/Design/Game 1.md") })
+        )
+        .is_err()
+    );
+    // The Global View, then nothing.
+    let gv = json!({ "kind": "globalView" });
+    assert_eq!(
+        call(&h.main, "home_set", json!({ "home": gv })).unwrap(),
+        gv
+    );
+    call(&h.main, "entry_trash", json!({ "path": "Welcome.md" })).unwrap();
+    assert_eq!(call(&h.main, "home_get", json!({})).unwrap(), gv);
+    assert_eq!(
+        call(&h.main, "home_set", json!({ "home": null })).unwrap(),
+        Value::Null
+    );
+    let stored: Value =
+        serde_json::from_slice(&std::fs::read(vault.path().join(".liber/vault.json")).unwrap())
+            .unwrap();
+    assert!(stored.get("home").is_none());
 }
 
 /// Round-2 review M3: the Archive's write guard ignores letter case — on a

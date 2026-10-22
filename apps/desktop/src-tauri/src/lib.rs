@@ -17,6 +17,7 @@ pub mod file_commands;
 pub mod file_windows;
 pub mod fonts;
 pub mod gv_commands;
+pub mod home_commands;
 pub mod icon_commands;
 pub mod legacy_dirs;
 pub mod lock_signals;
@@ -235,6 +236,8 @@ pub fn configure<R: tauri::Runtime>(
         icon_commands::vault_icon_set,
         favorite_commands::favorites_get,
         favorite_commands::favorites_set,
+        home_commands::home_get,
+        home_commands::home_set,
         audio_commands::audio_devices,
         audio_commands::audio_record_start,
         audio_commands::audio_record_stop,

@@ -78,6 +78,8 @@
     "allow-archive-restore",
     "allow-favorites-get",
     "allow-favorites-set",
+    "allow-home-get",
+    "allow-home-set",
     "allow-audio-devices",
     "allow-audio-record-start",
     "allow-audio-record-stop",
