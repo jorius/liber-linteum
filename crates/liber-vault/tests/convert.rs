@@ -1252,3 +1252,34 @@ fn a_change_after_the_backup_stops_the_conversion_and_the_backup_stays() {
         "the backup is the user's"
     );
 }
+
+/// Review M3: a backup that fails removes only what it created: entries a
+/// sync put in the chosen folder meanwhile (one in the way of the copy, one
+/// inside a folder the copy made) stay.
+#[test]
+fn a_failed_backup_never_removes_what_it_did_not_create() {
+    let (dir, root) = vault();
+    let dest = dir.path().join("Backup");
+    std::fs::create_dir(&dest).unwrap();
+    let (mut c, _) = convert::begin(&root, &[], ME, make).unwrap();
+    let err = convert::backup(
+        &mut c,
+        &dest,
+        |d, _| {
+            if d == 1 {
+                // A sync, still downloading into the folder.
+                std::fs::write(dest.join("Notes.md"), b"theirs").unwrap();
+                std::fs::write(dest.join("Projects/theirs.md"), b"theirs too").unwrap();
+            }
+        },
+        &AtomicBool::new(false),
+    )
+    .err()
+    .unwrap();
+    assert!(matches!(err, ConvertError::BackupFailed(_)), "{err:?}");
+    let left: Vec<String> = snapshot(&dest).into_keys().collect();
+    assert_eq!(left, vec!["Notes.md", "Projects", "Projects/theirs.md"]);
+    assert_eq!(std::fs::read(dest.join("Notes.md")).unwrap(), b"theirs");
+    drop(c);
+    convert::rollback(&root).unwrap();
+}

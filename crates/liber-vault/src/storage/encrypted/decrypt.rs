@@ -7,12 +7,15 @@
 //! ```text
 //!   preflight ─ nothing changed; a blocking list
 //!   begin     ─ journal {copying} → <root>/.liber-decrypting/
-//!   copy      ─ stamps recorded → each file streamed out, synced, read back, SHA-256 compared, mtime set
+//!   copy      ─ stamps recorded → the logical walk → each file streamed out, synced, read back,
+//!               SHA-256 compared, mtime set → the walk again: exactly what was copied
 //!   stage     ─ re-check → d/, README.txt, header copies, liber-vault.json (last) into .liber-encrypted/
-//!               → re-check → {staged}
-//!   commit    ─ {committing} → each entry of .liber-decrypting/ up → {committed} (the root reads plain)
-//!   finish    ─ delete the header and its copies (the keys) → delete .liber-encrypted/ (the ciphertext)
-//!               → forget the vault id (rollback memory) → remove .liber-decrypting/ → remove the journal, last
+//!               → re-check → {staged, the manifest of the readable tree}
+//!   commit    ─ {committing} → each entry of .liber-decrypting/ up (one in the way is kept as
+//!               "<name> (conflict)") → the root holds the manifest → {committed}
+//!   finish    ─ delete the header and every copy of it (the keys, temp copies at the root too)
+//!               → delete .liber-encrypted/ (the ciphertext) → forget the vault id
+//!               → remove .liber-decrypting/ → remove the journal, last
 //! ```
 //!
 //! A crash anywhere is recovered by [`recover`] on the next open, following
@@ -28,12 +31,12 @@ use super::convert::{
 use super::header::is_header_copy;
 use super::names::fold;
 use super::{
-    DATA_DIR, EncryptedStorage, HEADER_FILE, README_FILE, VaultKind, content_err, read_header,
-    vault_kind,
+    DATA_DIR, EncryptedStorage, HEADER_FILE, README_FILE, RECORDING_DIR, VaultKind, content_err,
+    read_header, vault_kind,
 };
 use crate::error::VaultError;
 use crate::path::VaultPath;
-use crate::storage::plain::{canonical_root, sync_dir};
+use crate::storage::plain::{TMP_MARKER, canonical_root, sync_dir};
 use crate::storage::{Child, Follow, Kind, Reach, Storage};
 use liber_crypto::{RecoveryCode, Unlock, VaultHeader};
 use serde::{Deserialize, Serialize};
@@ -84,6 +87,20 @@ pub struct Journal {
     /// This run created `.liber-encrypted/` (only then are its entries moved back).
     #[serde(default)]
     pub retired_created: bool,
+    /// The readable tree as staged: the commit checks the root holds it
+    /// before anything encrypted may be deleted (review M5).
+    #[serde(default)]
+    pub manifest: Option<Manifest>,
+}
+
+/// The readable tree's top-level names, and a digest of every path (and
+/// each file's length) under them.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Manifest {
+    pub top: Vec<String>,
+    pub entries: u64,
+    pub digest: String,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -92,8 +109,9 @@ pub enum RecoverOutcome {
     Nothing,
     /// Another install's decryption, before its commit: nothing touched.
     OtherDevice,
-    /// Another install's decryption, committed: the vault opens as plain;
-    /// that device finishes. Nothing touched.
+    /// Another install's decryption, committed, its readable tree not (or no
+    /// longer) as it staged it: the vault opens as plain; that device
+    /// finishes. Nothing touched.
     FinishingElsewhere,
     /// Interrupted before `staged`: the vault is encrypted as it was.
     RolledBack,
@@ -105,6 +123,8 @@ pub enum RecoverOutcome {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum CrashPoint {
     AfterJournal,
+    /// The encrypted entries' stamps recorded, the logical walk not yet done.
+    AfterRecord,
     /// `.liber-decrypting/` made, the journal not yet saying so.
     AfterStagingDir,
     /// After this many files written and checked.
@@ -247,9 +267,25 @@ impl Decrypting {
     }
 }
 
-/// The encrypted vault's own entries in `dir` (its root, or `.liber-encrypted/`):
-/// `d/`, `README.txt`, the header's sync-conflict copies, and the header, last.
-fn ours(dir: &Path) -> Result<Vec<OsString>> {
+/// The vault id (hex) of the header file at `path`, if it is one: a file
+/// (never a link or a folder), at most the format's size, that parses.
+fn header_id(path: &Path) -> Option<String> {
+    let small = path
+        .symlink_metadata()
+        .is_ok_and(|m| m.is_file() && m.len() <= liber_crypto::MAX_HEADER_BYTES as u64);
+    if !small {
+        return None;
+    }
+    let bytes = read_header(path).ok()?;
+    let header = VaultHeader::parse(&bytes).ok()?;
+    Some(hex(&header.vault_id().0))
+}
+
+/// The encrypted vault `id`'s own entries in `dir` (its root, or
+/// `.liber-encrypted/`): `d/`, `README.txt`, sync-conflict copies of its
+/// header (files that parse as a header of this vault: review M2, a user's
+/// `liber-vault-export.json` is an extra), and the header, last.
+fn ours(dir: &Path, id: &str) -> Result<Vec<OsString>> {
     let mut names = Vec::new();
     let mut header = false;
     for item in std::fs::read_dir(dir).map_err(io(dir.display()))? {
@@ -257,7 +293,9 @@ fn ours(dir: &Path) -> Result<Vec<OsString>> {
         match name.to_str() {
             Some(HEADER_FILE) => header = true,
             Some(DATA_DIR | README_FILE) => names.push(name),
-            Some(n) if is_header_copy(n) => names.push(name),
+            Some(n) if is_header_copy(n) && header_id(&dir.join(n)).as_deref() == Some(id) => {
+                names.push(name)
+            }
             _ => {}
         }
     }
@@ -266,6 +304,31 @@ fn ours(dir: &Path) -> Result<Vec<OsString>> {
         names.push(HEADER_FILE.into());
     }
     Ok(names)
+}
+
+/// Files in `dir` that are a header of the vault `id` under a header's name:
+/// the header, a sync-conflict copy, or the temp file of an atomic write a
+/// crash left (`.liber-vault.json.liber-tmp-…`). Each holds the keys' slots.
+fn key_files(dir: &Path, id: &str) -> Result<Vec<PathBuf>> {
+    let mut out = Vec::new();
+    for item in std::fs::read_dir(dir).map_err(io(dir.display()))? {
+        let name = item.map_err(io(dir.display()))?.file_name();
+        let Some(n) = name.to_str() else { continue };
+        let named = n == HEADER_FILE
+            || is_header_copy(n)
+            || (n.starts_with(&format!(".{HEADER_FILE}")) && n.contains(TMP_MARKER));
+        if named && header_id(&dir.join(n)).as_deref() == Some(id) {
+            out.push(dir.join(n));
+        }
+    }
+    Ok(out)
+}
+
+fn remove_if_there(p: &Path) -> Result<()> {
+    match std::fs::remove_file(p) {
+        Err(e) if e.kind() != std::io::ErrorKind::NotFound => Err(io(p.display())(e)),
+        _ => Ok(()),
+    }
 }
 
 /// Every physical entry under `base/<name>` for each of `names`, with stamps.
@@ -317,8 +380,8 @@ fn everything(dir: &Path) -> Result<Tree> {
 }
 
 /// The root's entries that are neither the vault's own nor decrypt's names.
-fn extras(root: &Path) -> Result<BTreeSet<OsString>> {
-    let ours: BTreeSet<OsString> = ours(root)?.into_iter().collect();
+fn extras(root: &Path, id: &str) -> Result<BTreeSet<OsString>> {
+    let ours: BTreeSet<OsString> = ours(root, id)?.into_iter().collect();
     let mut out = BTreeSet::new();
     for item in std::fs::read_dir(root).map_err(io(root.display()))? {
         let name = item.map_err(io(root.display()))?.file_name();
@@ -331,9 +394,9 @@ fn extras(root: &Path) -> Result<BTreeSet<OsString>> {
 }
 
 /// `Changed` for a newcomer at the root since `before` (OS junk aside).
-fn newcomers(root: &Path, before: &BTreeSet<OsString>) -> Result<()> {
+fn newcomers(root: &Path, id: &str, before: &BTreeSet<OsString>) -> Result<()> {
     let junk = |n: &OsString| n.to_str().is_some_and(|n| convert::JUNK.contains(&n));
-    match extras(root)?
+    match extras(root, id)?
         .into_iter()
         .find(|n| !before.contains(n) && !junk(n))
     {
@@ -353,7 +416,7 @@ struct Logical {
 
 fn logical(s: &EncryptedStorage, root: &Path) -> Result<Logical> {
     let mut out = Logical::default();
-    walk_logical(s, root, "", &mut out)?;
+    walk_logical(s, root, &hex(&s.vault_id()), "", &mut out)?;
     // Names that couldn't be decrypted would be lost with the ciphertext.
     for (p, _) in s.unreadable() {
         let rel = p.strip_prefix(root).unwrap_or(&p);
@@ -365,7 +428,13 @@ fn logical(s: &EncryptedStorage, root: &Path) -> Result<Logical> {
     Ok(out)
 }
 
-fn walk_logical(s: &EncryptedStorage, root: &Path, rel: &str, out: &mut Logical) -> Result<()> {
+fn walk_logical(
+    s: &EncryptedStorage,
+    root: &Path,
+    id: &str,
+    rel: &str,
+    out: &mut Logical,
+) -> Result<()> {
     let vp = if rel.is_empty() {
         VaultPath::root()
     } else {
@@ -378,6 +447,14 @@ fn walk_logical(s: &EncryptedStorage, root: &Path, rel: &str, out: &mut Logical)
             continue; // listed by `unreadable`
         };
         let path = join(rel, &name);
+        // A take not saved as a clip yet (review M4): readable, it could no
+        // longer be salvaged, and no unlock would come to save it.
+        if rel == RECORDING_DIR {
+            out.blocked.push(Blocked {
+                path: path.clone(),
+                reason: Reason::Recording,
+            });
+        }
         match meta.kind {
             Kind::Dir => subdirs.push(path),
             Kind::File => out.files.push((path, meta.len)),
@@ -393,12 +470,12 @@ fn walk_logical(s: &EncryptedStorage, root: &Path, rel: &str, out: &mut Logical)
         });
     }
     if rel.is_empty() {
-        top_level(root, &names, out)?;
+        top_level(root, id, &names, out)?;
     }
     subdirs.sort();
     for sub in subdirs {
         out.dirs.push(sub.clone());
-        walk_logical(s, root, &sub, out)?;
+        walk_logical(s, root, id, &sub, out)?;
     }
     Ok(())
 }
@@ -433,8 +510,8 @@ fn would_be_vault(s: &EncryptedStorage, rel: &str, names: &[(String, Kind)]) -> 
 
 /// A top-level readable name that is one of the conversions' own (`reserved`)
 /// or already used by a readable entry beside the vault (`taken`).
-fn top_level(root: &Path, names: &[(String, Kind)], out: &mut Logical) -> Result<()> {
-    let ours: BTreeSet<OsString> = ours(root)?.into_iter().collect();
+fn top_level(root: &Path, id: &str, names: &[(String, Kind)], out: &mut Logical) -> Result<()> {
+    let ours: BTreeSet<OsString> = ours(root, id)?.into_iter().collect();
     let beside: Vec<String> = std::fs::read_dir(root)
         .map_err(io(root.display()))?
         .flatten()
@@ -490,23 +567,45 @@ pub fn preflight(s: &EncryptedStorage, refused: &[PathBuf]) -> Result<Preflight>
     }
     let tree = logical(s, &root)?;
     let mut blocked = tree.blocked;
+    // In-flight writes (a salvage stream, a write a crash cut short): the
+    // listing skips them, so the finish would delete them (review M4).
+    let under = physical(&root, &[OsString::from(DATA_DIR)]);
+    for rel in under.files.keys() {
+        let name = rel.rsplit('/').next().unwrap_or(rel);
+        if name.starts_with('.') && name.ends_with(".liber-tmp") {
+            blocked.push(Blocked {
+                path: rel.clone(),
+                reason: Reason::Unfinished,
+            });
+        }
+    }
+    let mut archives = Vec::new();
     // Leftovers under the conversions' names at the root, with no journal.
     for item in std::fs::read_dir(&root).map_err(io(root.display()))? {
         let name = item.map_err(io(root.display()))?.file_name();
         let name = name.to_string_lossy();
         if reserved_like(&name) {
             blocked.push(Blocked {
-                path: name.into_owned(),
+                path: name.to_string(),
                 reason: Reason::Reserved,
             });
         }
+        if SYNC_ARCHIVES.contains(&name.as_ref()) {
+            archives.push(name.into_owned());
+        }
     }
+    archives.sort();
     Ok(Preflight {
         files: tree.files.len() as u64,
         bytes: tree.files.iter().map(|(_, len)| len).sum(),
         blocked,
+        archives,
     })
 }
+
+/// Sync tools' version archives at the root: they may keep old ciphertext
+/// and old headers. Never touched; the UI warns (review 6c).
+const SYNC_ARCHIVES: [&str; 2] = [".stversions", ".sync"];
 
 /// Preflight, then the journal (`copying`), then the empty readable staging
 /// folder. `storage` is the vault, unlocked (by [`open_with_both`]). On
@@ -529,6 +628,7 @@ pub fn begin(
         vault_id: hex(&storage.vault_id()),
         staging_created: false,
         retired_created: false,
+        manifest: None,
     };
     write_journal(&root, &journal)?;
     crash(CrashPoint::AfterJournal)?;
@@ -550,23 +650,30 @@ pub fn begin(
 /// Writes every folder and file into `.liber-decrypting/`: each file streamed
 /// out, synced, read back and compared by SHA-256, its mtime kept.
 /// `progress(done, total)` after each file; `cancel` is checked between
-/// files (`Cancelled`). On error, the caller calls [`recover`].
+/// files and once more at the end (`Cancelled`). On error, the caller calls
+/// [`recover`].
+///
+/// The encrypted entries' stamps are recorded BEFORE the logical walk (review
+/// H1): a file a sync delivers after the recording fails the stage's
+/// re-check, and the walk is repeated after the copy, so a file listed then
+/// but not copied stops it too. Nothing the finish deletes went uncopied.
 pub fn copy(
     d: &mut Decrypting,
     mut progress: impl FnMut(u64, u64),
     cancel: &AtomicBool,
 ) -> Result<()> {
-    let tree = logical(&d.storage, &d.root)?;
-    if !tree.blocked.is_empty() {
-        return Err(ConvertError::Blocked(tree.blocked));
-    }
-    // Recorded first: a sync that changes them while this runs stops the stage.
-    let cipher = physical(&d.root, &ours(&d.root)?);
+    let id = d.journal.vault_id.clone();
+    let cipher = physical(&d.root, &ours(&d.root, &id)?);
     if let Some(b) = cipher.blocked.first() {
         return Err(ConvertError::Changed(b.path.clone()));
     }
     d.cipher = Some(cipher);
-    d.extras = extras(&d.root)?;
+    d.extras = extras(&d.root, &id)?;
+    crash(CrashPoint::AfterRecord)?;
+    let tree = logical(&d.storage, &d.root)?;
+    if !tree.blocked.is_empty() {
+        return Err(ConvertError::Blocked(tree.blocked));
+    }
     let staging = d.root.join(STAGING);
     for dir in &tree.dirs {
         std::fs::create_dir(staging.join(dir)).map_err(io(dir))?;
@@ -582,8 +689,95 @@ pub fn copy(
         crash(CrashPoint::Copied(done + 1))?;
     }
     sync_dir(&staging);
+    // The vault as it is now holds exactly what was copied.
+    let again = logical(&d.storage, &d.root)?;
+    if let Some(b) = again.blocked.first() {
+        return Err(ConvertError::Changed(b.path.clone()));
+    }
+    let names = |l: &Logical| -> (BTreeSet<String>, BTreeSet<String>) {
+        (
+            l.files.iter().map(|(p, _)| p.clone()).collect(),
+            l.dirs.iter().cloned().collect(),
+        )
+    };
+    let (copied, now) = (names(&tree), names(&again));
+    if copied != now {
+        let first = (now.0.symmetric_difference(&copied.0))
+            .chain(now.1.symmetric_difference(&copied.1))
+            .next()
+            .cloned()
+            .unwrap_or_default();
+        return Err(ConvertError::Changed(first));
+    }
+    if cancel.load(Ordering::Relaxed) {
+        return Err(ConvertError::Cancelled);
+    }
     d.plain = Some(everything(&staging)?);
     Ok(())
+}
+
+/// The digest of a tree's paths and file lengths: (entries, hex SHA-256).
+fn digest(tree: &Tree) -> (u64, String) {
+    let mut h = Sha256::new();
+    for dir in &tree.dirs {
+        h.update(b"d\0");
+        h.update(dir.as_bytes());
+        h.update(b"\n");
+    }
+    for (path, s) in &tree.files {
+        h.update(b"f\0");
+        h.update(path.as_bytes());
+        h.update(b"\0");
+        h.update(s.len.to_le_bytes());
+        h.update(b"\n");
+    }
+    let out: [u8; 32] = h.finalize().into();
+    ((tree.dirs.len() + tree.files.len()) as u64, hex(&out))
+}
+
+/// The manifest of the readable tree in `dir` (the staging folder).
+fn manifest_of(dir: &Path) -> Result<Manifest> {
+    let tree = everything(dir)?;
+    if let Some(b) = tree.blocked.first() {
+        return Err(ConvertError::Changed(b.path.clone()));
+    }
+    let mut top: Vec<String> = std::fs::read_dir(dir)
+        .map_err(io(dir.display()))?
+        .flatten()
+        .map(|i| i.file_name().to_string_lossy().into_owned())
+        .collect();
+    top.sort();
+    let (entries, digest) = digest(&tree);
+    Ok(Manifest {
+        top,
+        entries,
+        digest,
+    })
+}
+
+/// Whether `root` holds the readable tree `m` describes, every path and length.
+fn holds(root: &Path, m: &Manifest) -> bool {
+    let names: Vec<OsString> = m.top.iter().map(OsString::from).collect();
+    let tree = physical(root, &names);
+    tree.blocked.is_empty() && digest(&tree) == (m.entries, m.digest.clone())
+}
+
+/// A free name for an entry a sync put where the readable tree goes:
+/// `Notes (conflict).md`, `Notes (conflict 2).md`, … (review L10).
+fn conflict_name(dir: &Path, name: &str) -> Option<PathBuf> {
+    let (stem, ext) = match name.rfind('.') {
+        Some(i) if i > 0 => (&name[..i], &name[i..]),
+        _ => (name, ""),
+    };
+    (1..1000).find_map(|n| {
+        let tag = if n == 1 {
+            " (conflict)".to_string()
+        } else {
+            format!(" (conflict {n})")
+        };
+        let p = dir.join(format!("{stem}{tag}{ext}"));
+        (!exists(&p)).then_some(p)
+    })
 }
 
 fn copy_out(s: &EncryptedStorage, staging: &Path, rel: &str) -> Result<()> {
@@ -639,49 +833,59 @@ pub fn stage_and_commit(d: Decrypting) -> Result<()> {
         plain,
     } = d;
     drop(storage);
+    let id = journal.vault_id.clone();
     let not_copied = || ConvertError::Refused("nothing was decrypted yet: copy first".into());
     let (cipher, plain) = (
         cipher.ok_or_else(not_copied)?,
         plain.ok_or_else(not_copied)?,
     );
-    check_same(&physical(&root, &ours(&root)?), &cipher, false)?;
+    check_same(&physical(&root, &ours(&root, &id)?), &cipher, false)?;
     check_same(&everything(&root.join(STAGING))?, &plain, false)?;
-    newcomers(&root, &before)?;
+    newcomers(&root, &id, &before)?;
+    let manifest = manifest_of(&root.join(STAGING))?;
     let retired = root.join(RETIRED);
     // Fails on anything already there, a lookalike name included.
     std::fs::create_dir(&retired).map_err(io(RETIRED))?;
     journal.retired_created = true;
     write_journal(&root, &journal)?;
-    for (n, name) in ours(&root)?.iter().enumerate() {
+    for (n, name) in ours(&root, &id)?.iter().enumerate() {
         move_new(&root.join(name), &retired.join(name))?;
         crash(CrashPoint::Retiring(n + 1))?;
     }
     sync_dir(&retired);
     sync_dir(&root);
     // A sync that wrote between the check and a move, or a newcomer.
-    check_same(&physical(&retired, &ours(&retired)?), &cipher, true)?;
-    newcomers(&root, &before)?;
-    if let Some(left) = ours(&root)?.first() {
+    check_same(&physical(&retired, &ours(&retired, &id)?), &cipher, true)?;
+    newcomers(&root, &id, &before)?;
+    if let Some(left) = ours(&root, &id)?.first() {
         return Err(ConvertError::Changed(left.to_string_lossy().into_owned()));
     }
     crash(CrashPoint::AllRetired)?;
     journal.phase = Phase::Staged;
+    journal.manifest = Some(manifest);
     write_journal(&root, &journal)?;
     crash(CrashPoint::AfterStaged)?;
     commit(&root, &mut journal)
 }
 
-/// Moves the readable tree up, skipping what a crash already moved; then
-/// `committed` once the root reads as a plain vault.
+/// Moves the readable tree up, skipping what a crash already moved (an entry
+/// a sync put in the way is kept as `<name> (conflict)`); then `committed`
+/// once the root holds the whole manifest and reads as a plain vault.
 fn commit(root: &Path, journal: &mut Journal) -> Result<()> {
     let staging = root.join(STAGING);
-    // Never roll forward into deleting the ciphertext without the readable copy.
-    if journal.phase == Phase::Staged && !listed(root, STAGING) {
-        return Err(VaultError::Damaged(format!(
-            "{STAGING} is missing from {}: nothing was deleted",
+    let missing = || -> ConvertError {
+        VaultError::Damaged(format!(
+            "the readable copy isn't all in {}: nothing encrypted was deleted",
             root.display()
         ))
-        .into());
+        .into()
+    };
+    // Never roll forward into deleting the ciphertext without the readable copy.
+    let Some(manifest) = journal.manifest.clone() else {
+        return Err(missing());
+    };
+    if journal.phase == Phase::Staged && !listed(root, STAGING) {
+        return Err(missing());
     }
     if journal.phase != Phase::Committing {
         journal.phase = Phase::Committing;
@@ -696,11 +900,21 @@ fn commit(root: &Path, journal: &mut Journal) -> Result<()> {
             .map_err(io(STAGING))?;
         names.sort();
         for (i, name) in names.iter().enumerate() {
-            move_new(&staging.join(name), &root.join(name))?;
+            let to = root.join(name);
+            // Still in staging, so not ours at the root: a sync's. Kept aside.
+            if exists(&to) {
+                let aside = conflict_name(root, &name.to_string_lossy())
+                    .ok_or_else(|| ConvertError::Collision(to.display().to_string()))?;
+                std::fs::rename(&to, &aside).map_err(io(to.display()))?;
+            }
+            move_new(&staging.join(name), &to)?;
             crash(CrashPoint::Committing(i + 1))?;
         }
     }
     sync_dir(root);
+    if !holds(root, &manifest) {
+        return Err(missing());
+    }
     if vault_kind(root) != VaultKind::Plain {
         return Err(VaultError::Damaged(format!(
             "{} still reads as an encrypted vault",
@@ -713,9 +927,11 @@ fn commit(root: &Path, journal: &mut Journal) -> Result<()> {
     crash(CrashPoint::AfterCommitted)
 }
 
-/// The finish steps (§10.3): the keys (the header and its copies) deleted
-/// first, then the ciphertext, then the vault id forgotten, the empty
-/// staging folder removed, and the journal last.
+/// The finish steps (§10.3): the keys deleted first (the header and every
+/// copy of it in `.liber-encrypted/`, and any file at the root that is this
+/// vault's header: a sync-conflict copy that came after the stage, a temp
+/// file a crashed header write left), then the ciphertext, then the vault id
+/// forgotten, the empty staging folder removed, and the journal last.
 pub fn finish(root: &Path, forget: Forget<'_>) -> Result<()> {
     let root = canonical_root(root)?;
     let journal = read_journal(&root)?
@@ -727,23 +943,23 @@ pub fn finish(root: &Path, forget: Forget<'_>) -> Result<()> {
         )));
     }
     let retired = root.join(RETIRED);
-    if listed(&root, RETIRED) && journal.retired_created {
-        for name in ours(&retired)? {
-            let key = name
-                .to_str()
-                .is_some_and(|n| n == HEADER_FILE || is_header_copy(n));
-            if key {
-                match std::fs::remove_file(retired.join(&name)) {
-                    Err(e) if e.kind() != std::io::ErrorKind::NotFound => {
-                        return Err(io(RETIRED)(e));
-                    }
-                    _ => {}
-                }
-            }
+    let ours_retired = listed(&root, RETIRED) && journal.retired_created;
+    if ours_retired {
+        for key in key_files(&retired, &journal.vault_id)? {
+            remove_if_there(&key)?;
         }
         sync_dir(&retired);
-        crash(CrashPoint::AfterKeys)?;
-        std::fs::remove_dir_all(&retired).map_err(io(RETIRED))?;
+    }
+    for key in key_files(&root, &journal.vault_id)? {
+        remove_if_there(&key)?;
+    }
+    sync_dir(&root);
+    crash(CrashPoint::AfterKeys)?;
+    if ours_retired {
+        match std::fs::remove_dir_all(&retired) {
+            Err(e) if e.kind() != std::io::ErrorKind::NotFound => return Err(io(RETIRED)(e)),
+            _ => {}
+        }
         sync_dir(&root);
         crash(CrashPoint::AfterCiphertext)?;
     }
@@ -757,9 +973,33 @@ pub fn finish(root: &Path, forget: Forget<'_>) -> Result<()> {
     if listed(&root, JOURNAL_TMP) {
         let _ = std::fs::remove_file(root.join(JOURNAL_TMP));
     }
-    std::fs::remove_file(root.join(JOURNAL)).map_err(io(JOURNAL))?;
+    // Another device may have finished it at the same time (review 6d).
+    remove_if_there(&root.join(JOURNAL))?;
     sync_dir(&root);
     Ok(())
+}
+
+/// A header of a vault this device decrypted (`retired`: its id, hex), back
+/// at the root of what is now a plain folder (a sync put it back, review
+/// 6f): it would make the folder read as an encrypted or damaged vault. It
+/// and every copy of it are deleted; `true` if one was. Never with a
+/// conversion under way: that one's header is a new vault's.
+pub fn drop_retired_header(root: &Path, retired: &dyn Fn(&str) -> bool) -> Result<bool> {
+    let root = canonical_root(root)?;
+    if read_journal(&root)?.is_some() || convert::read_journal(&root)?.is_some() {
+        return Ok(false);
+    }
+    let Some(id) = header_id(&root.join(HEADER_FILE)) else {
+        return Ok(false);
+    };
+    if !retired(&id) {
+        return Ok(false);
+    }
+    for key in key_files(&root, &id)? {
+        remove_if_there(&key)?;
+    }
+    sync_dir(&root);
+    Ok(true)
 }
 
 /// Undoes a decryption before `staged`: every encrypted entry back from
@@ -826,11 +1066,16 @@ pub fn recover(root: &Path, install_id: &str, forget: Forget<'_>) -> Result<Reco
     };
     if journal.install_id != install_id {
         let committed = journal.phase == Phase::Committed && vault_kind(&root) == VaultKind::Plain;
-        return Ok(if committed {
-            RecoverOutcome::FinishingElsewhere
-        } else {
-            RecoverOutcome::OtherDevice
-        });
+        if !committed {
+            return Ok(RecoverOutcome::OtherDevice);
+        }
+        // Committed there with the readable tree in place here: the keys and
+        // the ciphertext can go from this device too (review 6d).
+        if journal.manifest.as_ref().is_some_and(|m| holds(&root, m)) {
+            finish(&root, forget)?;
+            return Ok(RecoverOutcome::Finished);
+        }
+        return Ok(RecoverOutcome::FinishingElsewhere);
     }
     match journal.phase {
         Phase::Copying => {
@@ -842,12 +1087,4 @@ pub fn recover(root: &Path, install_id: &str, forget: Forget<'_>) -> Result<Reco
     }
     finish(&root, forget)?;
     Ok(RecoverOutcome::Finished)
-}
-
-/// The header at `root` parses (a test helper's check that keys remain).
-#[doc(hidden)]
-pub fn holds_a_header(dir: &Path) -> bool {
-    read_header(&dir.join(HEADER_FILE))
-        .ok()
-        .is_some_and(|b| VaultHeader::parse(&b).is_ok())
 }

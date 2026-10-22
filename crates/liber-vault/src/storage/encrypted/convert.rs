@@ -155,6 +155,11 @@ pub enum Reason {
     Vault,
     /// Decrypt in place (§10.2): a readable entry beside the vault already has this name.
     Taken,
+    /// Decrypt in place: an unfinished write (a hidden temp file under `d/`,
+    /// a salvage stream): open the vault and let it finish first.
+    Unfinished,
+    /// Decrypt in place: a recording that hasn't been saved as a clip yet.
+    Recording,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
@@ -169,6 +174,9 @@ pub struct Preflight {
     pub files: u64,
     pub bytes: u64,
     pub blocked: Vec<Blocked>,
+    /// Decrypt in place (§10.2): sync archives at the root (`.stversions`,
+    /// `.sync`) that may hold old encrypted files and keys; never touched.
+    pub archives: Vec<String>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -302,7 +310,7 @@ pub type DropIndex<'a> = &'a dyn Fn() -> std::io::Result<()>;
 /// no stable file id in std: size and mtime only there.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(super) struct Stamp {
-    len: u64,
+    pub(super) len: u64,
     mtime: Option<SystemTime>,
     ino: u64,
     ctime_ns: i128,
@@ -624,6 +632,7 @@ pub fn preflight(root: &Path, refused: &[PathBuf]) -> Result<Preflight> {
         files: tree.files.len() as u64,
         bytes: tree.files.values().map(|s| s.len).sum(),
         blocked: tree.blocked,
+        archives: Vec::new(),
     })
 }
 
@@ -1229,13 +1238,14 @@ pub fn backup(
     if made {
         std::fs::create_dir(&dest).map_err(failed(&dest.display().to_string()))?;
     }
-    // Top-level names this backup wrote: only those are removed on failure.
-    let mut written: BTreeSet<String> = BTreeSet::new();
-    let top = |rel: &str| rel.split('/').next().unwrap_or(rel).to_string();
+    // Exactly what this backup created, in order, each only once its
+    // creation succeeded: on failure only those go (review: never anything a
+    // sync put in the folder meanwhile).
+    let mut created: Vec<Created> = Vec::new();
     let run = (|| {
         for dir in &tree.dirs {
-            written.insert(top(dir));
             std::fs::create_dir(dest.join(dir)).map_err(failed(dir))?;
+            created.push(Created::Dir(dest.join(dir)));
         }
         let total = tree.files.len() as u64;
         progress(0, total);
@@ -1243,20 +1253,19 @@ pub fn backup(
             if cancel.load(Ordering::Relaxed) {
                 return Err(ConvertError::Cancelled);
             }
-            written.insert(top(rel));
-            backup_file(&c.root, &dest, rel, recorded)?;
+            backup_file(&c.root, &dest, rel, recorded, &mut created)?;
             progress(done as u64 + 1, total);
         }
         sync_dir(&dest);
         Ok(())
     })();
     if let Err(e) = run {
-        for name in &written {
-            let p = dest.join(name);
-            let _ = match p.symlink_metadata() {
-                Ok(m) if m.is_dir() => std::fs::remove_dir_all(&p),
-                Ok(_) => std::fs::remove_file(&p),
-                Err(_) => Ok(()),
+        // Newest first: a folder is empty of ours by the time it is reached,
+        // and one still holding something else stays.
+        for item in created.iter().rev() {
+            let _ = match item {
+                Created::File(p) => std::fs::remove_file(p),
+                Created::Dir(p) => std::fs::remove_dir(p),
             };
         }
         if made {
@@ -1268,7 +1277,19 @@ pub fn backup(
     Ok(())
 }
 
-fn backup_file(root: &Path, dest: &Path, rel: &str, recorded: &Stamp) -> Result<()> {
+/// An entry the backup made (removed again if the backup fails).
+enum Created {
+    File(PathBuf),
+    Dir(PathBuf),
+}
+
+fn backup_file(
+    root: &Path,
+    dest: &Path,
+    rel: &str,
+    recorded: &Stamp,
+    created: &mut Vec<Created>,
+) -> Result<()> {
     let (src, to) = (root.join(rel), dest.join(rel));
     let failed = |e: std::io::Error| ConvertError::BackupFailed(format!("{rel}: {e}"));
     let changed = || ConvertError::Changed(rel.to_string());
@@ -1281,6 +1302,7 @@ fn backup_file(root: &Path, dest: &Path, rel: &str, recorded: &Stamp) -> Result<
         .create_new(true)
         .open(&to)
         .map_err(failed)?;
+    created.push(Created::File(to.clone()));
     let mut write_err = None;
     let wrote = sha256(from, |b| {
         out.write_all(b).inspect_err(|e| {

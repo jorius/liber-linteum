@@ -582,3 +582,233 @@ fn encrypting_again_makes_a_new_vault_with_new_keys() {
     );
     assert_ne!(code.to_display().as_str(), f.code.to_display().as_str());
 }
+
+// ---- Review fixes ----
+
+/// Writes `late.md` into the encrypted vault through a second handle, as a
+/// sync delivering a new encrypted file would.
+fn deliver_late(root: &Path) {
+    let (s, _) = EncryptedStorage::unlock(root, Unlock::Passphrase(PASS)).unwrap();
+    s.replace_atomic(
+        &VaultPath::new("late.md").unwrap(),
+        &mut &b"late"[..],
+        liber_vault::Replace::CreateOnly,
+    )
+    .unwrap();
+}
+
+/// Review H1: an encrypted file a sync delivers while decrypting is never
+/// deleted uncopied, whether it comes before the walk or during the copy.
+#[test]
+fn a_file_a_sync_delivers_mid_run_is_never_lost() {
+    for at in [CrashPoint::AfterRecord, CrashPoint::Copied(1)] {
+        let f = fixture();
+        let root = f.root.clone();
+        let mut once = true;
+        decrypt::crash_when(Some(Box::new(move |p| {
+            if p == at && once {
+                once = false;
+                deliver_late(&root);
+            }
+            false
+        })));
+        let run = (|| -> convert::Result<()> {
+            let mut d = decrypt::begin(storage(&f), &[], ME)?;
+            decrypt::copy(&mut d, |_, _| {}, &AtomicBool::new(false))?;
+            decrypt::stage_and_commit(d)
+        })();
+        decrypt::crash_at(None);
+        let err = run
+            .err()
+            .unwrap_or_else(|| panic!("{at:?}: the run went on"));
+        assert!(matches!(err, ConvertError::Changed(_)), "{at:?}: {err:?}");
+        assert_eq!(
+            decrypt::recover(&f.root, ME, &|_| Ok(())).unwrap(),
+            RecoverOutcome::RolledBack
+        );
+        let s = storage(&f);
+        assert_eq!(
+            s.read(&VaultPath::new("late.md").unwrap()).unwrap(),
+            b"late"
+        );
+    }
+}
+
+/// Review M2: only files that are this vault's header count as its copies:
+/// a user's `liber-vault-export.json`, or a folder with a header-copy name,
+/// stays.
+#[test]
+fn a_users_file_named_like_a_header_copy_is_kept() {
+    let f = fixture();
+    put(&f.root, "liber-vault-export.json", b"{\"mine\":true}", 5);
+    put(&f.root, "liber-vault 3.json/inside.md", b"a folder", 6);
+    full_run(&f, &|_| Ok(()));
+    assert_eq!(
+        std::fs::read(f.root.join("liber-vault-export.json")).unwrap(),
+        b"{\"mine\":true}"
+    );
+    assert_eq!(
+        std::fs::read(f.root.join("liber-vault 3.json/inside.md")).unwrap(),
+        b"a folder"
+    );
+    assert_no_keys_left(&f.root);
+}
+
+/// Review M5: a readable copy that went missing part-way through the commit
+/// stops it before anything encrypted is deleted.
+#[test]
+fn a_readable_copy_missing_mid_commit_deletes_nothing() {
+    let f = fixture();
+    decrypt::crash_at(Some(CrashPoint::Committing(1)));
+    let mut d = decrypt::begin(storage(&f), &[], ME).unwrap();
+    decrypt::copy(&mut d, |_, _| {}, &AtomicBool::new(false)).unwrap();
+    assert!(decrypt::stage_and_commit(d).is_err());
+    decrypt::crash_at(None);
+    std::fs::remove_dir_all(f.root.join(decrypt::STAGING)).unwrap();
+    assert!(decrypt::recover(&f.root, ME, &|_| Ok(())).is_err());
+    let retired = f.root.join(decrypt::RETIRED);
+    assert!(retired.join(HEADER_FILE).exists(), "the keys stay");
+    assert!(retired.join("d").exists(), "the ciphertext stays");
+}
+
+/// Review 6a, 6b: copies of the header that reach the root after the stage
+/// (a sync conflict) or that a crashed header write left (its temp file) go
+/// with the keys.
+#[test]
+fn every_copy_of_the_header_at_the_root_goes_with_the_keys() {
+    let f = fixture();
+    let header = std::fs::read(f.root.join(HEADER_FILE)).unwrap();
+    std::fs::write(f.root.join(".liber-vault.json.liber-tmp-77-0"), &header).unwrap();
+    decrypt::crash_at(Some(CrashPoint::AfterStaged));
+    let mut d = decrypt::begin(storage(&f), &[], ME).unwrap();
+    decrypt::copy(&mut d, |_, _| {}, &AtomicBool::new(false)).unwrap();
+    assert!(decrypt::stage_and_commit(d).is_err());
+    decrypt::crash_at(None);
+    std::fs::write(f.root.join("liber-vault (conflicted copy).json"), &header).unwrap();
+    assert_eq!(
+        decrypt::recover(&f.root, ME, &|_| Ok(())).unwrap(),
+        RecoverOutcome::Finished
+    );
+    for name in [
+        ".liber-vault.json.liber-tmp-77-0",
+        "liber-vault (conflicted copy).json",
+    ] {
+        assert!(!f.root.join(name).exists(), "{name} left behind");
+    }
+    assert_no_keys_left(&f.root);
+}
+
+/// Review 6d: another device's decryption, committed, with its readable tree
+/// in place here: this device deletes the keys and the ciphertext too. One
+/// whose tree changed since is left for that device.
+#[test]
+fn another_devices_committed_decryption_is_finished_here_when_the_tree_is_in_place() {
+    for edited in [false, true] {
+        let f = fixture();
+        decrypt::crash_at(Some(CrashPoint::AfterCommitted));
+        let mut d = decrypt::begin(storage(&f), &[], "install-other").unwrap();
+        decrypt::copy(&mut d, |_, _| {}, &AtomicBool::new(false)).unwrap();
+        assert!(decrypt::stage_and_commit(d).is_err());
+        decrypt::crash_at(None);
+        if edited {
+            put(&f.root, "Notes.md", b"edited since, longer than before", 9);
+        }
+        let out = decrypt::recover(&f.root, ME, &|_| Ok(())).unwrap();
+        if edited {
+            assert_eq!(out, RecoverOutcome::FinishingElsewhere);
+            assert!(
+                f.root.join(decrypt::RETIRED).exists(),
+                "left for that device"
+            );
+        } else {
+            assert_eq!(out, RecoverOutcome::Finished);
+            assert_no_keys_left(&f.root);
+            same_tree(&snapshot(&f.root), &f.plain, "the readable tree");
+        }
+    }
+}
+
+/// Review 6f: a retired vault's header a sync puts back would make the
+/// folder read as an encrypted (or damaged) vault: it goes.
+#[test]
+fn a_retired_header_put_back_by_a_sync_is_dropped() {
+    let f = fixture();
+    let header = std::fs::read(f.root.join(HEADER_FILE)).unwrap();
+    full_run(&f, &|_| Ok(()));
+    std::fs::write(f.root.join(HEADER_FILE), &header).unwrap();
+    assert_ne!(vault_kind(&f.root), VaultKind::Plain);
+    assert!(!decrypt::drop_retired_header(&f.root, &|_| false).unwrap());
+    assert!(f.root.join(HEADER_FILE).exists(), "not retired: untouched");
+    let id = f.vault_id.clone();
+    assert!(decrypt::drop_retired_header(&f.root, &move |v| v == id).unwrap());
+    assert_eq!(vault_kind(&f.root), VaultKind::Plain);
+    same_tree(&snapshot(&f.root), &f.plain, "the readable tree");
+}
+
+/// Review L10: something a sync puts where the readable tree goes, after the
+/// stage, is kept as `<name> (conflict)`: the commit goes on.
+#[test]
+fn an_entry_in_the_way_of_the_commit_is_kept_aside() {
+    let f = fixture();
+    decrypt::crash_at(Some(CrashPoint::AfterStaged));
+    let mut d = decrypt::begin(storage(&f), &[], ME).unwrap();
+    decrypt::copy(&mut d, |_, _| {}, &AtomicBool::new(false)).unwrap();
+    assert!(decrypt::stage_and_commit(d).is_err());
+    decrypt::crash_at(None);
+    put(&f.root, "Notes.md", b"theirs", 11);
+    assert_eq!(
+        decrypt::recover(&f.root, ME, &|_| Ok(())).unwrap(),
+        RecoverOutcome::Finished
+    );
+    assert_eq!(
+        std::fs::read(f.root.join("Notes (conflict).md")).unwrap(),
+        b"theirs"
+    );
+    let mut want = f.plain.clone();
+    want.insert(
+        "Notes (conflict).md".into(),
+        Node::File(b"theirs".to_vec(), UNIX_EPOCH + Duration::from_secs(11)),
+    );
+    same_tree(&snapshot(&f.root), &want, "ours in place, theirs aside");
+    assert_no_keys_left(&f.root);
+}
+
+/// Review M4: a take not yet saved as a clip, and an unfinished write under
+/// `d/`, block decrypting: neither would survive it.
+#[test]
+fn preflight_blocks_unsaved_takes_and_unfinished_writes() {
+    let f = fixture();
+    let s = storage(&f);
+    s.create_dir(&VaultPath::new(".liber/recording").unwrap())
+        .unwrap();
+    s.create_dir(&VaultPath::new(".liber/recording/clip-1").unwrap())
+        .unwrap();
+    put(&f.root, "d/.0123abcd.liber-tmp", b"LIBER", 4);
+    let blocked = decrypt::preflight(&s, &[]).unwrap().blocked;
+    assert!(
+        blocked
+            .iter()
+            .any(|b| b.reason == Reason::Recording && b.path == ".liber/recording/clip-1"),
+        "{blocked:?}"
+    );
+    assert!(
+        blocked
+            .iter()
+            .any(|b| b.reason == Reason::Unfinished && b.path == "d/.0123abcd.liber-tmp"),
+        "{blocked:?}"
+    );
+}
+
+/// Review 6c: sync archives at the root are named, never touched.
+#[test]
+fn preflight_names_sync_archives() {
+    let f = fixture();
+    put(&f.root, ".stversions/old.libere", b"old", 3);
+    let pre = decrypt::preflight(&storage(&f), &[]).unwrap();
+    assert_eq!(pre.archives, vec![".stversions".to_string()]);
+    full_run(&f, &|_| Ok(()));
+    assert_eq!(
+        std::fs::read(f.root.join(".stversions/old.libere")).unwrap(),
+        b"old"
+    );
+}
