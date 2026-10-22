@@ -1,0 +1,46 @@
+name: Showcase site
+
+# Publishes site/ to GitHub Pages (https://jorius.github.io/liber-linteum/).
+# The release workflow may add release.json next to index.html before upload.
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'site/**'
+      - '.github/workflows/pages.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Stage the site (without its tests and tools)
+        run: |
+          mkdir -p _site
+          rsync -a --exclude 'tests/' --exclude 'tools/' --exclude 'playwright.config.ts' \
+            --exclude 'test-results/' site/ _site/
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v4
+        with:
+          path: _site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

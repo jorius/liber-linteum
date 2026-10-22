@@ -1,0 +1,227 @@
+<style>
+  .pg { --sand:#f3e6c9; --ink:#2a1c10; --ink2:#5b4128; --spice:#9c4a17; --paper:#fbf5e8;
+        font-family: 'Avenir Next','Segoe UI',system-ui,sans-serif; color: var(--ink); background: var(--paper); border-radius: 10px; overflow: hidden; border: 1px solid #e3d5bd; }
+  .pg * { box-sizing: border-box; }
+  .pg svg.i { width: 18px; height: 18px; flex: none; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+  .pg svg.g { width: 16px; height: 16px; flex: none; fill: currentColor; }
+  .mono { font: 600 11px/1.4 ui-monospace,Menlo,monospace; letter-spacing: .22em; text-transform: uppercase; color: var(--spice); }
+  .sec { position: relative; padding: 56px 48px; border-top: 1px solid #eadcc2; }
+  .sec h2 { margin: 8px 0 10px; font: 300 26px 'Futura','Avenir Next',sans-serif; letter-spacing: .22em; text-transform: uppercase; }
+  .lead { max-width: 640px; font-size: 15px; line-height: 1.6; color: var(--ink2); margin: 0 0 26px; }
+  .btn { display: inline-flex; align-items: center; gap: 9px; padding: 11px 16px; border-radius: 4px; font: 600 13px system-ui,sans-serif; white-space: nowrap; }
+  .dark { background: var(--ink); color: var(--sand); } .line { border: 1px solid var(--ink); color: var(--ink); }
+  .textlink { color: var(--spice); font: 600 13px system-ui; text-decoration: underline; text-underline-offset: 3px; }
+  .tag { display: inline-block; font: 600 10px ui-monospace,monospace; letter-spacing: .1em; padding: 3px 8px; border-radius: 999px; background: #fff3dc; color: var(--spice); border: 1px solid #ecd2a8; margin-left: 6px; vertical-align: middle; }
+  .callout { position: absolute; right: 12px; top: 12px; background: #2d6cdf; color: #fff; font: 600 11px system-ui; padding: 4px 8px; border-radius: 6px; z-index: 5; max-width: 360px; }
+  .new { position: absolute; left: 12px; top: 12px; background: #1f9d55; color: #fff; font: 700 10px system-ui; padding: 3px 7px; border-radius: 6px; z-index: 5; letter-spacing: .04em; }
+  /* top */
+  .top { display: flex; align-items: center; gap: 22px; padding: 14px 48px; background: rgba(243,230,201,.92); border-bottom: 1px solid #e6d3ad; font-size: 13px; }
+  .top .brand { font: 500 13px 'Futura','Avenir Next',sans-serif; letter-spacing: .3em; }
+  .top nav { display: flex; gap: 18px; color: var(--ink2); }
+  .top .right { margin-left: auto; display: flex; gap: 14px; align-items: center; color: var(--ink2); }
+  .lang { border: 1px solid #cdb68e; border-radius: 999px; padding: 2px; display: inline-flex; font-size: 11px; } .lang span { padding: 2px 8px; border-radius: 999px; } .lang .on { background: var(--ink); color: var(--sand); }
+  /* hero */
+  .hero { position: relative; overflow: hidden; padding: 60px 48px 0; display: grid; grid-template-columns: 480px minmax(0,1fr); gap: 28px; background: linear-gradient(180deg,#f3e6c9 0%,#e9d3a6 55%,#d9b67c 100%); min-height: 520px; }
+  .hero > svg.d { position: absolute; inset: 0; width: 100%; height: 100%; }
+  .sun { position: absolute; left: -30px; top: 70px; width: 300px; height: 300px; border-radius: 50%; background: radial-gradient(circle,#fffaf0 0%,#fbf1dc 55%,rgba(250,238,214,.0) 71%); }
+  .rel { position: relative; z-index: 2; padding-bottom: 46px; }
+  .title { display: block; width: 100%; max-width: 440px; height: 150px; margin: 12px 0 6px; }
+  .title text { font: 300 64px 'Futura','Avenir Next','Trebuchet MS',sans-serif; letter-spacing: .3em; fill: #2a1c10; fill-opacity: 0; stroke: #2a1c10; stroke-width: 1.1; stroke-dasharray: 340; stroke-dashoffset: 340; animation: draw 2.4s cubic-bezier(.45,.05,.25,1) forwards, ink 1s ease 2.1s forwards; }
+  .title text.l2 { animation-delay: .7s, 2.7s; }
+  @keyframes draw { to { stroke-dashoffset: 0; } }
+  @keyframes ink { to { fill-opacity: 1; stroke-width: 0; } }
+  .hero p { max-width: 430px; font-size: 16px; line-height: 1.6; margin: 0 0 20px; }
+  .btns { display: flex; gap: 8px; flex-wrap: nowrap; } .btns .btn { padding: 11px 13px; }
+  .also { margin-top: 14px; display: flex; gap: 16px; align-items: center; font-size: 13px; }
+  .pledge { margin-top: 18px; font: 500 11.5px ui-monospace,monospace; letter-spacing: .1em; color: var(--ink2); }
+  .frame { position: relative; z-index: 1; align-self: end; background: #fffaf0; border-radius: 10px 10px 0 0; overflow: hidden; box-shadow: 0 34px 70px rgba(60,35,10,.32); height: 420px; }
+  .frame .tb { height: 22px; background: #1f1a14; color: #e9d3a6; font: 600 9.5px system-ui; display: flex; align-items: center; gap: 10px; padding: 0 10px; }
+  .ph { display: grid; place-items: center; color: #9b8462; font: 600 11px ui-monospace,monospace; letter-spacing: .12em; text-transform: uppercase; background: repeating-linear-gradient(135deg,#f6efe2 0 12px,#f1e7d4 12px 24px); height: 100%; text-align: center; }
+  .replay { position: absolute; z-index: 6; left: 48px; bottom: 14px; background: #2d6cdf; color: #fff; border: 0; font: 600 11px system-ui; padding: 5px 10px; border-radius: 6px; cursor: pointer; }
+  /* pillars */
+  .pillars { display: grid; grid-template-columns: repeat(3,1fr); gap: 1px; background: #e6d3ad; border: 1px solid #e6d3ad; }
+  .pillar { background: var(--paper); padding: 24px 22px; } .pillar .ic { color: var(--ink); } .pillar .ic svg { width: 26px; height: 26px; }
+  .pillar h3 { margin: 12px 0 6px; font-size: 15px; } .pillar p { margin: 0; font-size: 13.5px; line-height: 1.55; color: var(--ink2); }
+  /* bring */
+  .bring { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .bcard { border: 1px solid #e3d5bd; border-radius: 12px; background: #fffaf0; overflow: hidden; }
+  .bcard .vid { height: 200px; border-bottom: 1px solid #e3d5bd; }
+  .bcard .body { padding: 20px 22px; } .bcard h3 { margin: 6px 0 8px; font-size: 18px; display: flex; gap: 10px; align-items: center; }
+  .bcard h3 svg { width: 24px; height: 24px; } .bcard p { margin: 0 0 10px; font-size: 14px; line-height: 1.6; color: var(--ink2); }
+  .bcard ul { margin: 0; padding-left: 18px; font-size: 13px; line-height: 1.75; color: var(--ink2); }
+  .strip { margin-top: 16px; display: flex; gap: 10px; align-items: center; padding: 14px 18px; border-radius: 10px; background: var(--ink); color: var(--sand); font-size: 14px; }
+  /* tour */
+  .row { display: grid; grid-template-columns: 1fr 1.35fr; gap: 36px; align-items: center; padding: 22px 0; }
+  .row.flip { grid-template-columns: 1.35fr 1fr; } .row.flip .txt { order: 2; }
+  .row h3 { margin: 6px 0 8px; font-size: 19px; } .row p { margin: 0 0 8px; font-size: 14px; line-height: 1.6; color: var(--ink2); }
+  .row ul { margin: 6px 0 0; padding-left: 18px; font-size: 13px; color: var(--ink2); line-height: 1.7; }
+  .video { position: relative; height: 270px; border-radius: 10px; overflow: hidden; border: 1px solid #e3d5bd; box-shadow: 0 14px 30px rgba(60,35,10,.14); }
+  .video .ctl { position: absolute; left: 10px; bottom: 10px; width: 28px; height: 28px; border-radius: 50%; background: rgba(42,28,16,.75); color: #f3e6c9; display: grid; place-items: center; }
+  .video .ctl svg { width: 12px; height: 12px; }
+  .video .bar { position: absolute; left: 0; right: 0; bottom: 0; height: 3px; background: rgba(42,28,16,.12); } .video .bar i { display: block; height: 100%; width: 0; background: var(--spice); animation: prog 6s linear infinite; }
+  @keyframes prog { to { width: 100%; } }
+  .minis { display: grid; grid-template-columns: repeat(4,1fr); gap: 14px; margin-top: 18px; }
+  .mini { border: 1px solid #e6d3ad; border-radius: 8px; padding: 14px; background: #fffaf0; font-size: 12.5px; color: var(--ink2); line-height: 1.5; }
+  .mini b { display: flex; gap: 8px; align-items: center; color: var(--ink); font-size: 13.5px; margin-bottom: 4px; }
+  /* privacy */
+  .priv { background: var(--ink); color: var(--sand); } .priv h2 { color: var(--sand); } .priv .lead { color: #cdb894; }
+  .nots { display: grid; grid-template-columns: repeat(3,1fr); gap: 14px; }
+  .not { border: 1px solid #4a3622; border-radius: 8px; padding: 16px; font-size: 13px; color: #cdb894; line-height: 1.55; }
+  .not b { display: flex; gap: 8px; align-items: center; color: var(--sand); font-size: 14px; margin-bottom: 6px; }
+  /* download */
+  .dl { display: grid; grid-template-columns: repeat(3,1fr); gap: 14px; }
+  .plat { border: 1px solid #e3d5bd; border-radius: 10px; padding: 20px; background: #fffaf0; }
+  .plat h3 { margin: 0 0 4px; font-size: 17px; display: flex; gap: 10px; align-items: center; } .plat h3 svg { width: 22px; height: 22px; }
+  .plat .files { font: 500 12px ui-monospace,monospace; color: var(--ink2); margin: 8px 0 14px; line-height: 1.8; }
+  .plat .meta { font: 500 11px ui-monospace,monospace; color: #8a7154; margin-top: 12px; line-height: 1.7; } .plat .meta u { color: var(--spice); }
+  .warn { margin-top: 14px; padding: 12px 14px; border-radius: 8px; background: #fff3dc; border: 1px solid #ecd2a8; font-size: 12.5px; color: #6b4a22; line-height: 1.55; display: flex; gap: 10px; }
+  /* vault */
+  .vault { display: grid; grid-template-columns: 1.05fr 1fr; gap: 32px; align-items: center; }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 12px 0 18px; } .chips span { font-size: 11.5px; padding: 3px 9px; border-radius: 999px; border: 1px solid #e3cfa8; background: #fff8ea; color: var(--ink2); }
+  .support { text-align: center; background: linear-gradient(180deg,var(--paper),#efdcb6); } .support .lead { margin: 0 auto 18px; }
+  .credit { margin-top: 22px; font-size: 13px; color: var(--ink2); }
+  .foot { padding: 24px 48px; display: flex; gap: 20px; justify-content: space-between; font-size: 12px; color: #8a7154; border-top: 1px solid #e6d3ad; background: #f3e6c9; }
+</style>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <symbol id="win" viewBox="0 0 24 24"><path d="M3 5.3 10.4 4.3v7.2H3zM11.4 4.1 21 2.8v8.7h-9.6zM3 12.5h7.4v7.2L3 18.7zM11.4 12.5H21v8.7l-9.6-1.3z"/></symbol>
+    <symbol id="apple" viewBox="0 0 24 24"><path d="M16.4 12.7c0-2.4 2-3.6 2.1-3.7-1.1-1.7-2.9-1.9-3.5-1.9-1.5-.2-2.9.9-3.7.9-.8 0-1.9-.9-3.1-.8-1.6 0-3.1.9-3.9 2.4-1.7 2.9-.4 7.2 1.2 9.6.8 1.2 1.7 2.5 3 2.4 1.2 0 1.7-.8 3.1-.8 1.5 0 1.9.8 3.2.8 1.3 0 2.2-1.2 2.9-2.4.9-1.4 1.3-2.7 1.3-2.8-.1 0-2.6-1-2.6-3.7zM14 5.5c.7-.8 1.1-1.9 1-3-.9 0-2.1.6-2.8 1.4-.6.7-1.2 1.9-1 3 1.1.1 2.2-.6 2.8-1.4z"/></symbol>
+    <symbol id="tux" viewBox="0 0 24 24"><path d="M12 2.2c-2.4 0-3.7 1.9-3.7 4.3 0 1.2.2 2-.4 3.1C6.8 11.4 5 13.6 5 16.3c0 .8.2 1.5.5 2.1-.7.4-1.6.6-1.7 1.4-.1.9 1.3 1.4 3 2 1.5.5 2.4.2 3.1-.5.6.1 1.4.2 2.1.2s1.5-.1 2.1-.2c.7.7 1.6 1 3.1.5 1.7-.6 3.1-1.1 3-2-.1-.8-1-1-1.7-1.4.3-.6.5-1.3.5-2.1 0-2.7-1.8-4.9-2.9-6.7-.6-1.1-.4-1.9-.4-3.1 0-2.4-1.3-4.3-3.7-4.3zm-1.4 3.4c.5 0 .8.5.8 1.1s-.3 1-.8 1-.8-.4-.8-1 .3-1.1.8-1.1zm2.8 0c.5 0 .8.5.8 1.1s-.3 1-.8 1-.8-.4-.8-1 .3-1.1.8-1.1zM12 8.4c.9 0 1.9.5 1.9 1s-1 1.3-1.9 1.3-1.9-.8-1.9-1.3 1-1 1.9-1zm0 3.4c2 0 3.3 2.1 3.3 4.4 0 1.5-.6 2.6-1.4 3.2-.6.1-1.2.2-1.9.2s-1.3-.1-1.9-.2c-.8-.6-1.4-1.7-1.4-3.2 0-2.3 1.3-4.4 3.3-4.4z"/></symbol>
+    <symbol id="gh" viewBox="0 0 24 24"><path d="M12 2.5a9.6 9.6 0 0 0-3 18.7c.5.1.7-.2.7-.5v-1.7c-2.7.6-3.3-1.2-3.3-1.2-.4-1.1-1.1-1.4-1.1-1.4-.9-.6.1-.6.1-.6 1 .1 1.5 1 1.5 1 .9 1.5 2.3 1.1 2.9.8.1-.6.3-1.1.6-1.3-2.1-.2-4.4-1.1-4.4-4.8 0-1.1.4-1.9 1-2.6-.1-.2-.4-1.2.1-2.6 0 0 .8-.3 2.6 1a9 9 0 0 1 4.8 0c1.8-1.3 2.6-1 2.6-1 .5 1.4.2 2.4.1 2.6.6.7 1 1.5 1 2.6 0 3.7-2.3 4.6-4.4 4.8.3.3.7.9.7 1.8v2.7c0 .3.2.6.7.5A9.6 9.6 0 0 0 12 2.5z"/></symbol>
+  </defs>
+</svg>
+
+<h2>Showcase page, round 2</h2>
+<p class="subtitle">Your feedback applied. Green labels mark what changed; blue labels are notes to you. The title draws itself when the page loads (use "Replay" to watch it again).</p>
+
+<div class="pg">
+  <div class="top">
+    <span class="brand">LIBER LINTEUM</span>
+    <nav><span>Features</span><span>Bring your notes</span><span>Privacy</span><span>Download</span><span>Sample vault</span><span>Support</span></nav>
+    <div class="right"><span class="lang"><span class="on">EN</span><span>ES</span></span><span style="display:inline-flex;gap:6px;align-items:center"><svg class="g"><use href="#gh"/></svg>GitHub</span></div>
+  </div>
+
+  <div class="hero" id="hero">
+    <span class="new">SUN LEFT · TITLE DRAWS ITSELF · BIGGER SHOWCASE · OS BUTTONS</span>
+    <svg class="d" viewBox="0 0 900 520" preserveAspectRatio="none"><path d="M0 400 C 160 360, 260 370, 420 390 S 720 350, 900 370 L900 520 L0 520Z" fill="#cf9f5d" opacity=".55"/><path d="M0 450 C 200 410, 380 440, 560 430 S 800 410, 900 425 L900 520 L0 520Z" fill="#b97f3f" opacity=".55"/></svg>
+    <div class="sun"></div>
+    <div class="rel">
+      <div class="mono">Private notes · free and open source</div>
+      <svg class="title" viewBox="0 0 440 150" aria-label="Liber Linteum"><text x="0" y="62">LIBER</text><text class="l2" x="0" y="138">LINTEUM</text></svg>
+      <p>Your notes are plain Markdown files in a folder you own. A canvas of cards shows how they connect. Nothing leaves your machine.</p>
+      <div class="btns">
+        <span class="btn dark"><svg class="g"><use href="#tux"/></svg>Download for Linux</span>
+        <span class="btn line"><svg class="g"><use href="#win"/></svg>Windows</span>
+        <span class="btn line"><svg class="g"><use href="#apple"/></svg>macOS</span>
+      </div>
+      <div class="also"><span class="textlink">Try the sample vault</span><span style="color:#5b4128">Opens Obsidian vaults · Imports from Notion</span></div>
+      <div class="pledge">NO CLOUD · NO ACCOUNTS · NO TELEMETRY · 0 NETWORK REQUESTS</div>
+    </div>
+    <div class="frame"><div class="tb"><span>Liber Linteum</span><span>File</span><span>Vault</span><span>Edit</span><span>View</span><span>Window</span></div><div class="ph" style="height:398px">Global View · looping video</div></div>
+    <button class="replay" onclick="event.stopPropagation();document.querySelectorAll('.title text').forEach(t=>{t.style.animation='none';t.getBBox();t.style.animation='';})">Replay title</button>
+  </div>
+
+  <div class="sec">
+    <span class="new">MONOCHROME ICONS</span>
+    <div class="mono">What it is</div>
+    <h2>A notebook that stays yours</h2>
+    <div class="pillars">
+      <div class="pillar"><div class="ic"><svg class="i" viewBox="0 0 24 24"><path d="M7 3h7l4 4v14H7z"/><path d="M14 3v4h4M9.5 12v5M9.5 12l2 2.5 2-2.5v5M16 13v4m-1.5-1.5L16 17l1.5-1.5"/></svg></div><h3>Plain Markdown, your folders</h3><p>Every note is a .md file you can open anywhere. Wikilinks, frontmatter and folders, exactly as you left them.</p></div>
+      <div class="pillar"><div class="ic"><svg class="i" viewBox="0 0 24 24"><rect x="3" y="4" width="7" height="6" rx="1"/><rect x="14" y="4" width="7" height="6" rx="1"/><rect x="8.5" y="14" width="7" height="6" rx="1"/><path d="M6.5 10v2h11v-2M12 12v2"/></svg></div><h3>See it as a map</h3><p>The Global View shows projects, folders and pages as cards with covers, linked by what they reference. Drill in, or expand in place.</p></div>
+      <div class="pillar"><div class="ic"><svg class="i" viewBox="0 0 24 24"><rect x="5" y="10.5" width="14" height="10" rx="2"/><path d="M8 10.5V7.5a4 4 0 0 1 8 0v3M12 14.5v2.5"/></svg></div><h3>Private by design</h3><p>No servers to trust: the app makes no network requests at all. Optional encrypted vaults for what should stay sealed.</p></div>
+    </div>
+  </div>
+
+  <div class="sec" id="bring">
+    <span class="new">NEW SECTION · OBSIDIAN + NOTION</span>
+    <div class="mono">Bring your notes</div>
+    <h2>Leave the cloud, keep your notes</h2>
+    <p class="lead">Moving to something private shouldn't mean starting over. Point Liber Linteum at the notes you already have, and they stay where they are: on your disk.</p>
+    <div class="bring">
+      <div class="bcard"><div class="vid"><div class="ph">Opening an Obsidian vault · looping video</div></div><div class="body">
+        <div class="mono">Obsidian</div>
+        <h3><svg class="i" viewBox="0 0 24 24"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>Open your vault as it is</h3>
+        <p>Choose the folder and you're in. Nothing is converted, copied or moved; Obsidian and Liber Linteum can share the same vault.</p>
+        <ul><li>[[Wikilinks]], embeds, callouts, tags and frontmatter</li><li>Your attachment folder settings are respected</li><li>Its settings folder is left untouched</li></ul>
+      </div></div>
+      <div class="bcard"><div class="vid"><div class="ph">Importing a Notion export · looping video</div></div><div class="body">
+        <div class="mono">Notion</div>
+        <h3><svg class="i" viewBox="0 0 24 24"><path d="M12 3v11m0 0-4-4m4 4 4-4M5 15v3a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-3"/></svg>Import your workspace</h3>
+        <p>Export from Notion as Markdown &amp; CSV, then give Liber Linteum the zip. It's read on your machine; nothing is uploaded anywhere.</p>
+        <ul><li>Pages and nested pages keep their structure and links</li><li>Databases become a page with a table, one note per row</li><li>Callouts and toggles become their Markdown equivalents</li></ul>
+      </div></div>
+    </div>
+    <div class="strip"><svg class="i" viewBox="0 0 24 24"><path d="M12 3l7 3v5c0 4.5-3 8.3-7 10-4-1.7-7-5.5-7-10V6z"/><path d="m9 12 2 2 4-4"/></svg>Your notes move from a service you rent to a folder you own. Try it with the sample Notion export in the repo.</div>
+  </div>
+
+  <div class="sec" id="features">
+    <span class="new">LOOPING VIDEOS INSTEAD OF STILLS</span>
+    <span class="callout">MP4/WebM loops instead of GIFs: sharp at 1440p, a tenth of the size, silent, autoplay, a pause button; still images for "reduce motion"</span>
+    <div class="mono">Features</div>
+    <h2>A tour</h2>
+    <div class="row"><div class="txt"><div class="mono">Global View</div><h3>Your notes as a canvas of cards</h3><p>Covers, titles and excerpts on every card; lines for links, folders and the relationships you draw by dragging card to card.</p><ul><li>Drill into a folder or expand it in place</li><li>Positions you set are remembered</li></ul></div><div class="video"><div class="ph">Global View · 8 s loop</div><span class="ctl"><svg viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="5" width="4" height="14"/><rect x="14" y="5" width="4" height="14"/></svg></span><div class="bar"><i></i></div></div></div>
+    <div class="row flip"><div class="txt"><div class="mono">Editor</div><h3>Write in Live Preview</h3><p>Markdown that formats as you type, or the raw source, or both side by side. Drag blocks to reorder them.</p><ul><li>Code with highlighting, Mermaid diagrams, LaTeX maths</li><li>Callouts, toggles, columns, highlights, coloured text</li><li>Covers, icons and subtitles for every page</li></ul></div><div class="video"><div class="ph">Editor · 8 s loop</div><span class="ctl"><svg viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="5" width="4" height="14"/><rect x="14" y="5" width="4" height="14"/></svg></span><div class="bar"><i></i></div></div></div>
+    <div class="row"><div class="txt"><div class="mono">Encryption <span class="tag">BETA</span></div><h3>Vaults sealed with a passphrase</h3><p>Create an encrypted vault, or encrypt an existing one where it is. A recovery key comes first, before anything is touched. Locks on idle, sleep and quit.</p></div><div class="video"><div class="ph">Lock and unlock · 6 s loop</div><span class="ctl"><svg viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="5" width="4" height="14"/><rect x="14" y="5" width="4" height="14"/></svg></span><div class="bar"><i></i></div></div></div>
+    <div class="row flip"><div class="txt"><div class="mono">Search</div><h3>Find anything, instantly</h3><p>Full-text search with filters by folder, tag, links and attachments, on your machine, over thousands of notes.</p></div><div class="video"><div class="ph">Search · 6 s loop</div><span class="ctl"><svg viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="5" width="4" height="14"/><rect x="14" y="5" width="4" height="14"/></svg></span><div class="bar"><i></i></div></div></div>
+    <div class="minis">
+      <div class="mini"><b><svg class="i" viewBox="0 0 24 24"><path d="M4 20h4L19 9l-4-4L4 16z"/></svg>Quick notes</b>Ctrl+Shift+N from anywhere; a scratchpad in every vault.</div>
+      <div class="mini"><b><svg class="i" viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21"/></svg>Voice clips</b>Record audio straight into a note, played inline.</div>
+      <div class="mini"><b><svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M12 3.5a8.5 8.5 0 0 0 0 17z" fill="currentColor"/></svg>Your colours</b>Palettes, light and dark, or build your own theme.</div>
+      <div class="mini"><b><svg class="i" viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></svg>Trash &amp; Archive</b>Nothing is lost by a slip; archive what's done.</div>
+      <div class="mini"><b><svg class="i" viewBox="0 0 24 24"><path d="M4 18 8.5 6h1L14 18M5.5 14h7M15 15l2.5 2.5L21 12"/></svg>Spell check</b>English and Spanish dictionaries, offline.</div>
+      <div class="mini"><b><svg class="i" viewBox="0 0 24 24"><path d="M7 3h7l4 4v14H7z"/><path d="M14 3v4h4"/></svg>Single files</b>Open any .md or .txt in a window of its own.</div>
+      <div class="mini"><b><svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M3.5 12h17M12 3.5c2.5 2.4 3.5 5.3 3.5 8.5s-1 6.1-3.5 8.5c-2.5-2.4-3.5-5.3-3.5-8.5s1-6.1 3.5-8.5z"/></svg>English · Español</b>The whole app, in both languages.</div>
+      <div class="mini"><b><svg class="i" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18M8 4v5"/></svg>Your own window</b>The same menus on Linux, Windows and macOS.</div>
+    </div>
+  </div>
+
+  <div class="sec priv" id="privacy">
+    <div class="mono" style="color:#e9a45f">Privacy</div>
+    <h2>What it will never do</h2>
+    <p class="lead">These aren't settings. The app is built so it can't: network access is blocked by its security policy, refused by its permissions, banned in its code and kept out of its dependencies.</p>
+    <div class="nots">
+      <div class="not"><b><svg class="i" viewBox="0 0 24 24"><path d="M7 18h10a4 4 0 0 0 .5-8A6 6 0 0 0 6 9.5 4.3 4.3 0 0 0 7 18zM4 4l16 16"/></svg>No cloud</b>Your notes live in a folder on your disk. Sync them with whatever you already trust, or don't.</div>
+      <div class="not"><b><svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4.5 20a7.5 7.5 0 0 1 15 0M4 4l16 16"/></svg>No accounts</b>Nothing to sign up for, nothing to log into, nothing to lose access to.</div>
+      <div class="not"><b><svg class="i" viewBox="0 0 24 24"><path d="M4 19V5M4 19h16M8 15l3-4 3 2 4-6M4 4l16 16"/></svg>No telemetry</b>No analytics, no crash reports, no "anonymous usage data". Zero requests, checked by tests.</div>
+    </div>
+  </div>
+
+  <div class="sec" id="download">
+    <span class="new">OS GLYPHS · NO ARROWS</span>
+    <div class="mono">Download</div>
+    <h2>Get Liber Linteum <span class="tag">v0.1.0</span></h2>
+    <div class="dl">
+      <div class="plat"><h3><svg class="g"><use href="#tux"/></svg>Linux</h3><div class="files">.deb (Ubuntu, Debian)<br>.AppImage (any distro)</div><span class="btn dark"><svg class="g"><use href="#tux"/></svg>Download .deb</span><div class="meta">SHA-256 3f9a…c21e · <u>VirusTotal report</u></div></div>
+      <div class="plat"><h3><svg class="g"><use href="#win"/></svg>Windows</h3><div class="files">.exe installer<br>.msi package</div><span class="btn dark"><svg class="g"><use href="#win"/></svg>Download .exe</span><div class="meta">SHA-256 a17b…09d4 · <u>VirusTotal report</u></div></div>
+      <div class="plat"><h3><svg class="g"><use href="#apple"/></svg>macOS</h3><div class="files">.dmg (Apple silicon and Intel)<br>macOS 12 or later</div><span class="btn dark"><svg class="g"><use href="#apple"/></svg>Download .dmg</span><div class="meta">SHA-256 77c0…e5f2 · <u>VirusTotal report</u></div></div>
+    </div>
+    <div class="warn"><svg class="i" viewBox="0 0 24 24"><path d="M12 3 2 20h20zM12 10v4M12 17v.5"/></svg><span><b>The installers aren't code-signed yet.</b> Windows may show "Windows protected your PC": choose More info, then Run anyway. On macOS, right-click the app and choose Open the first time. Every file has a checksum and a VirusTotal scan above so you can check it yourself.</span></div>
+  </div>
+
+  <div class="sec" id="vault">
+    <div class="vault">
+      <div>
+        <div class="mono">Sample vault</div>
+        <h2>The Moons of Kessari</h2>
+        <p class="lead">A vault to explore before you bring your own: a short science-fiction story about a desert world, its factions, places and people, written for this app; plus a shelf of essays on the Dune films. Every feature is used somewhere in it.</p>
+        <div class="chips"><span>covers &amp; icons</span><span>wikilinks</span><span>relationships</span><span>Mermaid</span><span>LaTeX</span><span>code</span><span>callouts</span><span>voice clip</span><span>Notion export to import</span></div>
+        <span class="btn dark"><svg class="i" viewBox="0 0 24 24"><path d="M12 3v11m0 0-4-4m4 4 4-4M5 15v3a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-3"/></svg>Download the sample vault (.zip)</span>
+        <div style="margin-top:10px;font-size:12.5px;color:#8a7154">Unzip it, then Open folder as vault.</div>
+      </div>
+      <div class="video" style="height:300px"><div class="ph">Sample vault in the Global View · loop</div><span class="ctl"><svg viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="5" width="4" height="14"/><rect x="14" y="5" width="4" height="14"/></svg></span><div class="bar"><i></i></div></div>
+    </div>
+  </div>
+
+  <div class="sec support" id="support">
+    <span class="new">CREDITS</span>
+    <span class="callout">platforms still to choose: GitHub Sponsors + Ko-fi suggested</span>
+    <div class="mono">Support</div>
+    <h2>Free, and staying that way</h2>
+    <p class="lead">Liber Linteum is free software under the GPL. If it earns a place on your disk, you can help keep it growing.</p>
+    <div style="display:inline-flex;gap:10px"><span class="btn dark"><svg class="i" viewBox="0 0 24 24"><path d="M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.6-7 10-7 10z"/></svg>Sponsor on GitHub</span><span class="btn line"><svg class="i" viewBox="0 0 24 24"><path d="M5 9h11v5a5 5 0 0 1-5 5h-1a5 5 0 0 1-5-5zM16 10h1.5a2.5 2.5 0 0 1 0 5H16M8 3v3M11 3v3"/></svg>Buy a coffee on Ko-fi</span></div>
+    <div class="credit">An idea by <b>José Meza</b>, built by <b>Jose Ríos</b>.</div>
+  </div>
+
+  <div class="foot"><span>GPL-3.0-or-later · Source on GitHub · Global View made with React Flow (MIT)</span><span>Idea by José Meza · Built by Jose Ríos · jorius.github.io</span></div>
+</div>
