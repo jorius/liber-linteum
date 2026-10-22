@@ -55,7 +55,8 @@ pub trait Host: Send + Sync {
 }
 
 /// A deterministic source for tests: a 440 Hz tone at half scale, in 10 ms
-/// chunks, as fast as it is read (or at the pace of real time).
+/// chunks, as fast as it is read (or at the pace of real time, keeping up
+/// with the clock as a real device does).
 #[derive(Debug, Clone)]
 pub struct SyntheticHost {
     pub format: StreamFormat,
@@ -134,6 +135,7 @@ impl Host for SyntheticHost {
         let chunk = (sample_rate / 100) as usize; // 10 ms per channel
         let mut t = 0u64;
         let mut buf = Vec::with_capacity(chunk * channels as usize);
+        let start = std::time::Instant::now();
         while !stop.load(std::sync::atomic::Ordering::SeqCst) {
             if self
                 .lose_after
@@ -150,7 +152,13 @@ impl Host for SyntheticHost {
             t += chunk as u64;
             sink.frames(&buf)?;
             if self.realtime {
-                std::thread::sleep(Duration::from_millis(10));
+                // Waits until the sound made so far is due. A sleep that runs
+                // long (a loaded machine, macOS timer coalescing) is caught up
+                // by the next chunks instead of losing that time's sound.
+                let due = Duration::from_secs_f64(t as f64 / f64::from(sample_rate));
+                if let Some(wait) = due.checked_sub(start.elapsed()) {
+                    std::thread::sleep(wait);
+                }
             }
         }
         Ok(Ended::Stopped)

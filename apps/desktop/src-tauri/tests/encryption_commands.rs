@@ -898,8 +898,8 @@ fn lock_during_recording_keeps_the_take() {
     assert_eq!(channels, 1);
     // Lock finishes the stream, so no chunk is lost: about 0.5 s, all in the
     // last (partial) 64 KiB chunk, which a lost chunk would leave empty. The
-    // real-time fake host's 10 ms sleeps run long on a loaded machine (0.39 s
-    // seen at load 10), hence 0.25 s at least.
+    // real-time fake host keeps up with the clock; 0.25 s at least leaves room
+    // for a thread that starts late on a loaded machine.
     assert!((12_000..=48_000 * 2).contains(&samples), "{samples}");
     assert_eq!(
         h.takes_left(),

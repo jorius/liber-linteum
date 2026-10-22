@@ -415,11 +415,12 @@ fn rollback_never_overwrites_a_colliding_entry() {
     convert::copy(&mut c, |_, _| {}, &AtomicBool::new(false)).unwrap();
     assert!(convert::stage_and_commit(c).is_err());
     convert::crash_at(None);
-    // A sync puts something back under a moved name.
+    // A sync puts something back under a moved name: not OS junk, which a
+    // rollback rightly replaces (`.DS_Store` may be listed first).
     let moved = std::fs::read_dir(root.join(convert::ORIGINALS))
         .unwrap()
         .map(|e| e.unwrap().file_name())
-        .next()
+        .find(|n| n != ".DS_Store")
         .unwrap();
     let theirs = root.join(&moved);
     let before_plain = snapshot(&root.join(convert::ORIGINALS));
