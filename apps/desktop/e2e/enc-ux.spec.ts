@@ -151,7 +151,7 @@ test('New vault, Encrypted, on a folder with notes: the in-place offer', async (
   await dialog.getByRole('button', { name: 'Encrypt in place…' }).click();
   const encrypt = page.getByRole('dialog', { name: 'Encrypt “new-encrypted”' });
   await expect(encrypt.getByText(/will be encrypted where it is\. 1 file\./)).toBeVisible();
-  await expect(encrypt.getByRole('button', { name: 'Choose a passphrase…' })).toBeFocused();
+  await expect(encrypt.getByRole('button', { name: 'Continue' })).toBeFocused();
 });
 
 for (const theme of ['light', 'dark'] as const) {
@@ -213,6 +213,13 @@ async function confirmKey(dialog: Locator) {
   await dialog.getByRole('button', { name: 'Done' }).click();
 }
 
+/** Intro → "Don't keep a copy" (§9) → the passphrase step. */
+async function toPassphrase(dialog: Locator) {
+  await dialog.getByRole('button', { name: 'Continue' }).click();
+  await dialog.getByRole('radio', { name: "Don't keep a copy" }).check();
+  await dialog.getByRole('button', { name: 'Choose a passphrase…' }).click();
+}
+
 /** Vault menu → Encrypt "vault"… (from Welcome, `fromWelcome`, opening it first). */
 const openPlainVault = async (page: Page, fromWelcome = true) => {
   if (fromWelcome) await page.getByRole('button', { name: /^vault/ }).click();
@@ -233,6 +240,9 @@ for (const theme of ['light', 'dark'] as const) {
     await expect(dialog.getByText(/Pause Dropbox, iCloud or other sync/)).toBeVisible();
     await chipFits(dialog.locator('.liber-chip'));
     await axeClean(page, '[role="dialog"]');
+    await dialog.getByRole('button', { name: 'Continue' }).click();
+    await axeClean(page, '[role="dialog"]');
+    await dialog.getByRole('radio', { name: "Don't keep a copy" }).check();
     await dialog.getByRole('button', { name: 'Choose a passphrase…' }).click();
     await expect(dialog.getByLabel('Passphrase', { exact: true })).toBeFocused();
     await dialog.getByLabel('Passphrase', { exact: true }).fill(PASSPHRASE);
@@ -295,14 +305,14 @@ for (const theme of ['light', 'dark'] as const) {
     await page.goto('/');
     let dialog = await openPlainVault(page);
     const toKey = async () => {
-      await dialog.getByRole('button', { name: 'Choose a passphrase…' }).click();
+      await toPassphrase(dialog);
       await dialog.getByLabel('Passphrase', { exact: true }).fill(PASSPHRASE);
       await dialog.getByLabel('Confirm passphrase').fill(PASSPHRASE);
       await dialog.getByRole('button', { name: 'Continue' }).click();
       await confirmKey(dialog);
     };
     // Cancel at the recovery-key step: nothing was copied, the vault is back.
-    await dialog.getByRole('button', { name: 'Choose a passphrase…' }).click();
+    await toPassphrase(dialog);
     await dialog.getByLabel('Passphrase', { exact: true }).fill(PASSPHRASE);
     await dialog.getByLabel('Confirm passphrase').fill(PASSPHRASE);
     await dialog.getByRole('button', { name: 'Continue' }).click();
