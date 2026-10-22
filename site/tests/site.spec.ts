@@ -91,9 +91,18 @@ test.describe('privacy', () => {
     await walk(page);
     expect(net.urls.length).toBeGreaterThan(5);
     expect(net.urls.filter((u) => new URL(u).origin !== origin)).toEqual([]);
-    // Before the first release only release.json is missing; no video is asked for yet.
-    expect(net.failed).toEqual(['404 /liber-linteum/release.json']);
-    expect(net.urls.filter((u) => /\.(webm|mp4)$/.test(u))).toEqual([]);
+    // Before the first release only release.json is missing. A clip's download
+    // the browser cancels when it scrolls away isn't a failure; a 404 would be.
+    const media = /\/media\/[\w-]+\.(webm|mp4)$/;
+    expect(net.failed.filter((f) => !(f.startsWith('failed ') && media.test(f)))).toEqual([
+      '404 /liber-linteum/release.json',
+    ]);
+    // Only the clips the config lists are fetched, from this site.
+    for (const u of net.urls.filter((u) => media.test(u))) {
+      expect(new URL(u).pathname).toMatch(
+        /\/media\/(hero|obsidian|notion|global-view|editor|encryption|search|sample-vault)\./,
+      );
+    }
     expect(net.console.filter((m) => /Content Security Policy|pageerror|i18n/.test(m))).toEqual([]);
   });
 
@@ -107,7 +116,14 @@ test.describe('privacy', () => {
     expect(csp).not.toContain('unsafe-inline');
     expect(csp).not.toMatch(/https?:/);
     expect(await page.locator('script:not([src])').count()).toBe(0);
-    expect(await page.locator('[style]').count()).toBe(0);
+    // Only the clip progress bars' width, set by script (CSSOM, which the
+    // CSP allows); no style written into the markup.
+    expect(
+      await page.evaluate(
+        () =>
+          [...document.querySelectorAll('[style]')].filter((e) => !e.closest('.clip-bar')).length,
+      ),
+    ).toBe(0);
   });
 
   test('every URL in the HTML is relative or an outbound link', async ({ page }) => {
@@ -446,7 +462,11 @@ test.describe('clips', () => {
   async function withVideos(page: Page, webm: Buffer, videos: string[]) {
     await page.route('**/js/config.js', async (route) => {
       const res = await route.fetch();
-      const body = (await res.text()).replace('videos: []', `videos: ${JSON.stringify(videos)}`);
+      // The setting itself, not the example in the comment above it.
+      const body = (await res.text()).replace(
+        /^ {2}videos: \[[^\]]*\]/m,
+        `  videos: ${JSON.stringify(videos)}`,
+      );
       await route.fulfill({ response: res, body });
     });
     await page.route(/\/media\/[\w-]+\.webm$/, (route) =>

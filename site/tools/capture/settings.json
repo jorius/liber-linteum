@@ -1,0 +1,48 @@
+{
+  "version": 1,
+  "language": "en",
+  "theme": "light",
+  "rewriteLinks": true,
+  "confirmDelete": true,
+  "editorMode": "livePreview",
+  "palette": "saffron",
+  "fontLivePreview": "atkinson-hyperlegible",
+  "fontSource": "jetbrains-mono",
+  "fontSize": 15,
+  "toolbar": true,
+  "lineNumbers": false,
+  "globalViewMode": "drill",
+  "globalViewEdges": {
+    "links": true,
+    "tree": true,
+    "manual": true,
+    "aggregated": true
+  },
+  "pageWidth": "readable",
+  "wideElements": {
+    "tables": true,
+    "code": true,
+    "diagrams": true,
+    "images": true,
+    "maths": true
+  },
+  "outline": false,
+  "coverHeight": 200,
+  "showAttachmentPaths": true,
+  "scratchpadPath": null,
+  "autoSave": true,
+  "sidebarCollapsed": false,
+  "sidebarWidth": 250,
+  "autoLockMinutes": 15,
+  "actionButton": "bottomRight",
+  "spellcheck": false,
+  "spellDictionaries": [
+    "en_US",
+    "es",
+    "es_CO"
+  ],
+  "customThemes": [],
+  "customTheme": null,
+  "importedDictionaries": [],
+  "recentVaults": []
+}
