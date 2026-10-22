@@ -137,15 +137,10 @@ test.describe('privacy', () => {
   });
 
   test('every outbound link opens in a new tab; in-page anchors stay put', async ({ browser }) => {
-    // With a release, an OS and the donate buttons, so every link main.js makes exists too.
+    // With a release, an OS and the donate button, so every link main.js makes exists too.
     const ctx = await browser.newContext({ userAgent: UA.linux, locale: 'en-US' });
     const page = await ctx.newPage();
     await withRelease(page, RELEASE);
-    await page.route('**/js/config.js', async (route) => {
-      const res = await route.fetch();
-      const body = (await res.text()).replace('enabled: false', 'enabled: true');
-      await route.fulfill({ response: res, body });
-    });
     await page.goto('./');
     await expect(page.locator('html')).toHaveAttribute('data-release', 'ready');
     await expect(page.locator('[data-donate]')).toBeVisible();
@@ -273,7 +268,9 @@ test.describe('languages', () => {
     const page = await ctx.newPage();
     await page.goto('./');
     await expect(page.locator('html')).toHaveAttribute('lang', 'es');
-    await expect(page.getByRole('heading', { level: 2, name: 'Lo que nunca hará' })).toBeVisible();
+    await expect(
+      page.getByRole('heading', { level: 2, name: 'Una libreta que sigue siendo tuya' }),
+    ).toBeVisible();
     await page.getByRole('button', { name: 'English' }).click();
     await expect(page.getByRole('button', { name: 'English' })).toHaveAttribute(
       'aria-pressed',
@@ -764,6 +761,52 @@ test.describe('page content', () => {
     const minis = page.locator('.minis h3');
     await expect(minis).toContainText(['Find in the page']);
     await expect(minis.filter({ hasText: 'Voice clips' })).toHaveCount(0);
+    await expect(minis.filter({ hasText: 'Your own window' })).toHaveCount(0);
+  });
+
+  test('the tour title is a display heading, larger than any other section title', async ({
+    page,
+  }) => {
+    await page.goto('./');
+    const size = (sel: string) =>
+      page.locator(sel).evaluate((e) => parseFloat(getComputedStyle(e).fontSize));
+    const tour = await size('#features-title');
+    expect(tour).toBeGreaterThan((await size('#what-title')) * 1.8);
+    expect(tour).toBeGreaterThan(await size('#features .row h3 >> nth=0'));
+  });
+
+  test('what it is and what it will never do are one section, first after the hero', async ({
+    page,
+  }) => {
+    await page.goto('./');
+    const order = await page.evaluate(() =>
+      [...document.querySelectorAll('main > section[id]')].map((s) => s.id),
+    );
+    expect(order[0]).toBe('privacy');
+    const section = page.locator('section#privacy');
+    await expect(section.getByRole('heading', { level: 2 })).toHaveText(
+      'A notebook that stays yours',
+    );
+    await expect(section.locator('.pillar h3')).toHaveText([
+      'Plain Markdown, your folders',
+      'See it as a map',
+      'Sealed when you want',
+      'No cloud',
+      'No accounts',
+      'No telemetry',
+    ]);
+    await expect(page.getByRole('heading', { name: 'What it will never do' })).toHaveCount(0);
+    await expect(page.getByRole('navigation').getByRole('link').first()).toHaveText('Privacy');
+  });
+
+  test('the favicon is the app icon, and the footer has no note about loading', async ({
+    page,
+    request,
+  }) => {
+    await page.goto('./');
+    const href = await page.locator('link[rel=icon]').getAttribute('href');
+    expect(await (await request.get(href!)).text()).toContain('Liber Linteum');
+    await expect(page.getByRole('contentinfo')).not.toContainText('loads nothing');
   });
 });
 
@@ -773,18 +816,23 @@ test.describe('roadmap', () => {
       nav: 'Roadmap',
       kicker: 'What’s next',
       planned: 'Planned',
-      titles: ['Version history', 'Slash menu', 'Focus mode'],
+      titles: ['Version history', 'Slash menu', 'Focus mode', 'Offline transcription'],
     },
     es: {
       nav: 'Hoja de ruta',
       kicker: 'Lo que viene',
       planned: 'Planeado',
-      titles: ['Historial de versiones', 'Menú de barra (/)', 'Modo concentración'],
+      titles: [
+        'Historial de versiones',
+        'Menú de barra (/)',
+        'Modo concentración',
+        'Transcripción sin conexión',
+      ],
     },
   };
 
   for (const lang of ['en', 'es'] as const) {
-    test(`${lang}: three planned features, and the nav link scrolls to them`, async ({
+    test(`${lang}: four planned features, and the nav link scrolls to them`, async ({
       browser,
     }) => {
       const ctx = await browser.newContext({ locale: lang === 'es' ? 'es-CO' : 'en-US' });
@@ -798,7 +846,7 @@ test.describe('roadmap', () => {
       await expect(section.getByRole('heading', { level: 2 })).toBeInViewport();
       await expect(section.locator('.kicker').first()).toHaveText(c.kicker);
       await expect(section.getByRole('heading', { level: 3 })).toHaveText(c.titles);
-      await expect(section.locator('.plan .tag')).toHaveText([c.planned, c.planned, c.planned]);
+      await expect(section.locator('.plan .tag')).toHaveText(Array(4).fill(c.planned));
       await expect(section.getByRole('link')).toHaveAttribute(
         'href',
         'https://github.com/jorius/liber-linteum/issues',
@@ -815,28 +863,32 @@ test.describe('roadmap', () => {
 });
 
 test.describe('donations', () => {
-  test('hidden until the config enables them', async ({ page }) => {
-    await page.goto('./');
-    await expect(page.locator('[data-donate]')).toBeHidden();
-    await expect(page.locator('[data-donate-fallback]')).toBeVisible();
-  });
-
-  test('shown, with their links, when enabled', async ({ page }) => {
+  test('hidden while the config disables them', async ({ page }) => {
     await page.route('**/js/config.js', async (route) => {
       const res = await route.fetch();
-      const body = (await res.text())
-        .replace('enabled: false', 'enabled: true')
-        .replace('https://ko-fi.com/REPLACE-ME', 'https://ko-fi.com/example');
+      const body = (await res.text()).replace('enabled: true', 'enabled: false');
       await route.fulfill({ response: res, body });
     });
     await page.goto('./');
+    await expect(page.locator('[data-donate]')).toBeHidden();
+    await expect(page.locator('.sponsor')).toBeHidden();
+    await expect(page.locator('[data-donate-fallback]')).toBeVisible();
+  });
+
+  test('GitHub Sponsors, the only way to donate, is shown', async ({ page }) => {
+    await page.goto('./');
+    await expect(page.locator('[data-donate] a')).toHaveCount(1);
     await expect(page.getByRole('link', { name: 'Sponsor on GitHub' })).toHaveAttribute(
       'href',
       'https://github.com/sponsors/jorius',
     );
-    await expect(page.getByRole('link', { name: 'Buy a coffee on Ko-fi' })).toHaveAttribute(
+    // And in the header, right beside the GitHub link.
+    const header = page.getByRole('banner');
+    const links = header.locator('.top-right a');
+    await expect(links).toHaveText(['GitHub', 'Sponsor']);
+    await expect(header.getByRole('link', { name: 'Sponsor' })).toHaveAttribute(
       'href',
-      'https://ko-fi.com/example',
+      'https://github.com/sponsors/jorius',
     );
     await expect(page.locator('[data-donate-fallback]')).toBeHidden();
   });
@@ -913,7 +965,7 @@ test.describe('layout and accessibility', () => {
     const page = await ctx.newPage();
     await page.goto('./');
     await expect(
-      page.getByRole('heading', { level: 2, name: 'What it will never do' }),
+      page.getByRole('heading', { level: 2, name: 'A notebook that stays yours' }),
     ).toBeVisible();
     await expect(page.locator('.os-buttons a')).toHaveCount(3);
     await expect(page.locator('.title-art')).toBeVisible();

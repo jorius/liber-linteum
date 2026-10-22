@@ -55,8 +55,6 @@
   --rule-3: #e6d3ad;
   --tag-bg: #fff3dc;
   --tag-rule: #ecd2a8;
-  --night-text: #d6c29d;
-  --night-rule: #4a3622;
 
   --font-sans: 'Plus Jakarta Sans', 'Avenir Next', 'Segoe UI', system-ui, sans-serif;
   --font-mono: 'JetBrains Mono', ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace;
@@ -356,6 +354,12 @@ svg.g {
   display: inline-flex;
   align-items: center;
   gap: 7px;
+}
+
+.sponsor svg {
+  width: 15px;
+  height: 15px;
+  color: var(--spice);
 }
 
 .lang {
@@ -934,12 +938,33 @@ svg.g {
   text-decoration-color: var(--spice-glow);
 }
 
-.strip :focus-visible,
-.priv :focus-visible {
+.strip :focus-visible {
   outline-color: var(--spice-glow);
 }
 
 /* ---------- feature tour ---------- */
+
+/* The tour is the showcase: its title is a display heading, centred over the clips. */
+#features > .kicker,
+#features > h2,
+#features > .lead {
+  text-align: center;
+}
+
+#features > h2 {
+  margin-top: 14px;
+  margin-bottom: 18px;
+  font-size: clamp(34px, 7.5vw, 92px);
+  line-height: 1.05;
+  letter-spacing: 0.22em;
+  /* The tracking after the last letter would push it off centre. */
+  padding-left: 0.22em;
+}
+
+#features > .lead {
+  margin-inline: auto;
+  margin-bottom: clamp(16px, 3vw, 36px);
+}
 
 .row {
   display: grid;
@@ -997,56 +1022,6 @@ svg.g {
   font-size: 15px;
   font-weight: 600;
   color: var(--ink);
-}
-
-/* ---------- privacy ---------- */
-
-.priv {
-  background: var(--ink);
-  color: var(--sand);
-  border-top-color: var(--ink);
-}
-
-.priv .kicker {
-  color: var(--spice-glow);
-}
-
-.priv h2 {
-  color: var(--sand);
-}
-
-.priv .lead {
-  color: var(--night-text);
-}
-
-.nots {
-  list-style: none;
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 16px;
-}
-
-.not {
-  padding: 22px;
-  border: 1px solid var(--night-rule);
-  border-radius: 9px;
-  font-size: 14.5px;
-  line-height: 1.6;
-  color: var(--night-text);
-}
-
-.not h3 {
-  display: flex;
-  align-items: center;
-  gap: 9px;
-  margin-bottom: 8px;
-  font-size: 16px;
-  font-weight: 600;
-  color: var(--sand);
-}
-
-.not svg {
-  color: var(--spice-glow);
 }
 
 /* ---------- download ---------- */
@@ -1267,7 +1242,7 @@ svg.g {
 .plans {
   list-style: none;
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr));
   gap: 16px;
 }
 
@@ -1399,11 +1374,6 @@ svg.g {
   color: var(--ink-2);
 }
 
-.foot-note {
-  max-width: var(--max);
-  margin: 10px auto 0;
-}
-
 /* ---------- 404 ---------- */
 
 .lost {
@@ -1478,8 +1448,6 @@ svg.g {
   }
 
   .pillars,
-  .plans,
-  .nots,
   .dl,
   .bring {
     grid-template-columns: minmax(0, 1fr);

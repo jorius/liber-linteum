@@ -54,9 +54,9 @@
         >Liber Linteum</a
       >
       <nav class="top-nav" aria-label="Sections" data-i18n-attr="aria-label:nav.label">
+        <a href="#privacy" data-i18n="nav.privacy">Privacy</a>
         <a href="#bring" data-i18n="nav.bring">Bring your notes</a>
         <a href="#features" data-i18n="nav.features">Features</a>
-        <a href="#privacy" data-i18n="nav.privacy">Privacy</a>
         <a href="#download" data-i18n="nav.download">Download</a>
         <a href="#vault" data-i18n="nav.vault">Sample vault</a>
         <a href="#roadmap" data-i18n="nav.roadmap">Roadmap</a>
@@ -85,6 +85,10 @@
         >
           <svg class="g" aria-hidden="true"><use href="img/icons.svg#gh" /></svg>
           <span>GitHub</span>
+        </a>
+        <a class="gh sponsor" data-donate-link="github" href="#support" hidden>
+          <svg class="i" aria-hidden="true"><use href="img/icons.svg#i-heart" /></svg>
+          <span data-i18n="nav.sponsor">Sponsor</span>
         </a>
       </div>
     </header>
@@ -266,9 +270,14 @@
         </div>
       </section>
 
-      <section class="sec" id="what" aria-labelledby="what-title">
+      <section class="sec" id="privacy" aria-labelledby="what-title">
         <p class="kicker" data-i18n="what.kicker">What it is</p>
         <h2 id="what-title" data-i18n="what.title">A notebook that stays yours</h2>
+        <p class="lead" data-i18n="privacy.lead">
+          No cloud, no accounts, no telemetry, and they aren't settings. The app is built so it
+          can't: network access is blocked by its security policy, refused by its permissions,
+          banned in its code and kept out of its dependencies.
+        </p>
         <ul class="pillars">
           <li class="pillar">
             <svg class="i ic" aria-hidden="true"><use href="img/icons.svg#i-md" /></svg>
@@ -288,10 +297,32 @@
           </li>
           <li class="pillar">
             <svg class="i ic" aria-hidden="true"><use href="img/icons.svg#i-lock" /></svg>
-            <h3 data-i18n="what.p3.title">Private by design</h3>
+            <h3 data-i18n="what.p3.title">Sealed when you want</h3>
             <p data-i18n="what.p3.body">
-              No servers to trust: the app makes no network requests at all. Optional encrypted
-              vaults for what should stay sealed.
+              Encrypt a vault with a passphrase, and keep a recovery key in case you forget it.
+            </p>
+          </li>
+          <li class="pillar">
+            <svg class="i ic" aria-hidden="true"><use href="img/icons.svg#i-cloud-off" /></svg>
+            <h3 data-i18n="privacy.cloud.title">No cloud</h3>
+            <p data-i18n="privacy.cloud.body">
+              Your notes live in a folder on your disk. Sync them with whatever you already trust,
+              or don't.
+            </p>
+          </li>
+          <li class="pillar">
+            <svg class="i ic" aria-hidden="true"><use href="img/icons.svg#i-user-off" /></svg>
+            <h3 data-i18n="privacy.accounts.title">No accounts</h3>
+            <p data-i18n="privacy.accounts.body">
+              Nothing to sign up for, nothing to log into, nothing to lose access to.
+            </p>
+          </li>
+          <li class="pillar">
+            <svg class="i ic" aria-hidden="true"><use href="img/icons.svg#i-chart-off" /></svg>
+            <h3 data-i18n="privacy.telemetry.title">No telemetry</h3>
+            <p data-i18n="privacy.telemetry.body">
+              No analytics, no crash reports, no “anonymous usage data”. Zero requests, checked by
+              tests.
             </p>
           </li>
         </ul>
@@ -390,6 +421,9 @@
       <section class="sec" id="features" aria-labelledby="features-title">
         <p class="kicker" data-i18n="features.kicker">Features</p>
         <h2 id="features-title" data-i18n="features.title">A tour</h2>
+        <p class="lead" data-i18n="features.lead">
+          Recorded from the app itself, on the sample vault. Click any clip to watch it large.
+        </p>
 
         <div class="row">
           <div class="row-text">
@@ -648,54 +682,6 @@
             </h3>
             <p data-i18n="features.mini.lang.body">The whole app, in both languages.</p>
           </li>
-          <li class="mini">
-            <h3>
-              <svg class="i" aria-hidden="true"><use href="img/icons.svg#i-window" /></svg>
-              <span data-i18n="features.mini.window.title">Your own window</span>
-            </h3>
-            <p data-i18n="features.mini.window.body">The same menus on Linux, Windows and macOS.</p>
-          </li>
-        </ul>
-      </section>
-
-      <section class="sec priv" id="privacy" aria-labelledby="privacy-title">
-        <p class="kicker" data-i18n="privacy.kicker">Privacy</p>
-        <h2 id="privacy-title" data-i18n="privacy.title">What it will never do</h2>
-        <p class="lead" data-i18n="privacy.lead">
-          These aren't settings. The app is built so it can't: network access is blocked by its
-          security policy, refused by its permissions, banned in its code and kept out of its
-          dependencies.
-        </p>
-        <ul class="nots">
-          <li class="not">
-            <h3>
-              <svg class="i" aria-hidden="true"><use href="img/icons.svg#i-cloud-off" /></svg>
-              <span data-i18n="privacy.cloud.title">No cloud</span>
-            </h3>
-            <p data-i18n="privacy.cloud.body">
-              Your notes live in a folder on your disk. Sync them with whatever you already trust,
-              or don't.
-            </p>
-          </li>
-          <li class="not">
-            <h3>
-              <svg class="i" aria-hidden="true"><use href="img/icons.svg#i-user-off" /></svg>
-              <span data-i18n="privacy.accounts.title">No accounts</span>
-            </h3>
-            <p data-i18n="privacy.accounts.body">
-              Nothing to sign up for, nothing to log into, nothing to lose access to.
-            </p>
-          </li>
-          <li class="not">
-            <h3>
-              <svg class="i" aria-hidden="true"><use href="img/icons.svg#i-chart-off" /></svg>
-              <span data-i18n="privacy.telemetry.title">No telemetry</span>
-            </h3>
-            <p data-i18n="privacy.telemetry.body">
-              No analytics, no crash reports, no “anonymous usage data”. Zero requests, checked by
-              tests.
-            </p>
-          </li>
         </ul>
       </section>
 
@@ -907,6 +893,17 @@
               focus.
             </p>
           </li>
+          <li class="plan">
+            <div class="plan-head">
+              <svg class="i" aria-hidden="true"><use href="img/icons.svg#i-transcribe" /></svg>
+              <span class="tag" data-i18n="roadmap.planned">Planned</span>
+            </div>
+            <h3 data-i18n="roadmap.transcribe.title">Offline transcription</h3>
+            <p data-i18n="roadmap.transcribe.body">
+              Turn a voice clip into text with a speech model that runs on your machine: the audio
+              never leaves it.
+            </p>
+          </li>
         </ul>
         <p class="ideas">
           <svg class="i" aria-hidden="true"><use href="img/icons.svg#i-bulb" /></svg>
@@ -935,10 +932,6 @@
           <a class="btn dark" data-donate-link="github" href="#support">
             <svg class="i" aria-hidden="true"><use href="img/icons.svg#i-heart" /></svg>
             <span data-i18n="support.github">Sponsor on GitHub</span>
-          </a>
-          <a class="btn line" data-donate-link="kofi" href="#support">
-            <svg class="i" aria-hidden="true"><use href="img/icons.svg#i-coffee" /></svg>
-            <span data-i18n="support.kofi">Buy a coffee on Ko-fi</span>
           </a>
         </div>
         <p class="support-alt" data-donate-fallback>
@@ -979,9 +972,6 @@
           >
         </p>
       </div>
-      <p class="foot-note" data-i18n="footer.note">
-        This page loads nothing from any other site: no analytics, no outside fonts, no trackers.
-      </p>
     </footer>
   </body>
 </html>

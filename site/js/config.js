@@ -8,12 +8,11 @@ export const config = {
   releaseJson: 'release.json',
   assetBase: 'https://github.com/jorius/liber-linteum/releases/latest/download/',
 
-  // Donations (docs/research/2026-10-21-donation-platforms.md). The buttons stay hidden until
-  // `enabled` is true; the URLs below are placeholders until the accounts exist.
+  // Donations: GitHub Sponsors (docs/research/2026-10-21-donation-platforms.md). The button
+  // stays hidden while `enabled` is false.
   donate: {
-    enabled: false,
+    enabled: true,
     github: 'https://github.com/sponsors/jorius',
-    kofi: 'https://ko-fi.com/REPLACE-ME',
   },
 
   // Looping clips present in media/ (see media/README.md). A slot not listed here shows its

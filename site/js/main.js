@@ -251,11 +251,12 @@ function initDonate() {
   if (!donate?.enabled) return;
   const box = document.querySelector('[data-donate]');
   let shown = 0;
-  for (const link of box.querySelectorAll('[data-donate-link]')) {
+  for (const link of document.querySelectorAll('[data-donate-link]')) {
     const url = donate[link.dataset.donateLink];
     if (typeof url === 'string' && url.startsWith('https://')) {
       setHref(link, url);
-      shown += 1;
+      link.hidden = false;
+      if (box.contains(link)) shown += 1;
     } else {
       link.hidden = true;
     }

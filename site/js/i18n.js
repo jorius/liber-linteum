@@ -21,6 +21,7 @@ export const dict = {
     'nav.vault': 'Sample vault',
     'nav.roadmap': 'Roadmap',
     'nav.support': 'Support',
+    'nav.sponsor': 'Sponsor',
     'lang.label': 'Language',
 
     'hero.kicker': 'Private notes · free and open source',
@@ -65,9 +66,9 @@ export const dict = {
     'what.p2.title': 'See it as a map',
     'what.p2.body':
       'The Global View shows projects, folders and pages as cards with covers, linked by what they reference. Drill in, or expand in place.',
-    'what.p3.title': 'Private by design',
+    'what.p3.title': 'Sealed when you want',
     'what.p3.body':
-      'No servers to trust: the app makes no network requests at all. Optional encrypted vaults for what should stay sealed.',
+      'Encrypt a vault with a passphrase, and keep a recovery key in case you forget it.',
 
     'bring.kicker': 'Bring your notes',
     'bring.title': 'Leave the cloud, keep your notes',
@@ -90,6 +91,8 @@ export const dict = {
 
     'features.kicker': 'Features',
     'features.title': 'A tour',
+    'features.lead':
+      'Recorded from the app itself, on the sample vault. Click any clip to watch it large.',
     'features.gv.kicker': 'Global View',
     'features.gv.title': 'Your notes as a canvas of cards',
     'features.gv.body':
@@ -143,13 +146,9 @@ export const dict = {
     'features.mini.single.body': 'Open any .md or .txt file in a window of its own.',
     'features.mini.lang.title': 'English · Español',
     'features.mini.lang.body': 'The whole app, in both languages.',
-    'features.mini.window.title': 'Your own window',
-    'features.mini.window.body': 'The same menus on Linux, Windows and macOS.',
 
-    'privacy.kicker': 'Privacy',
-    'privacy.title': 'What it will never do',
     'privacy.lead':
-      'These aren’t settings. The app is built so it can’t: network access is blocked by its security policy, refused by its permissions, banned in its code and kept out of its dependencies.',
+      'No cloud, no accounts, no telemetry, and they aren’t settings. The app is built so it can’t: network access is blocked by its security policy, refused by its permissions, banned in its code and kept out of its dependencies.',
     'privacy.cloud.title': 'No cloud',
     'privacy.cloud.body':
       'Your notes live in a folder on your disk. Sync them with whatever you already trust, or don’t.',
@@ -215,6 +214,9 @@ export const dict = {
     'roadmap.focus.title': 'Focus mode',
     'roadmap.focus.body':
       'Hide everything but the text: no sidebar, no toolbar, and the paragraph you’re on in focus.',
+    'roadmap.transcribe.title': 'Offline transcription',
+    'roadmap.transcribe.body':
+      'Turn a voice clip into text with a speech model that runs on your machine: the audio never leaves it.',
     'roadmap.ideas': 'Have an idea for what comes next?',
     'roadmap.ideasLink': 'Suggest it in the GitHub issues',
 
@@ -223,15 +225,12 @@ export const dict = {
     'support.lead':
       'Liber Linteum is free software under the GPL. If it earns a place on your disk, you can help keep it growing.',
     'support.github': 'Sponsor on GitHub',
-    'support.kofi': 'Buy a coffee on Ko-fi',
     'support.fallback':
       'Ways to donate are on their way. For now, a star on GitHub or telling a friend helps just as much.',
     credit: 'An idea by <b>José Meza</b>, built by <b>Jose Ríos</b>.',
 
     'footer.source': 'Source on GitHub',
     'footer.reactflow': 'Global View made with React Flow (MIT)',
-    'footer.note':
-      'This page loads nothing from any other site: no analytics, no outside fonts, no trackers.',
   },
 
   es: {
@@ -246,6 +245,7 @@ export const dict = {
     'nav.bring': 'Trae tus notas',
     'nav.features': 'Funciones',
     'nav.privacy': 'Privacidad',
+    'nav.sponsor': 'Patrocinar',
     'nav.download': 'Descargar',
     'nav.vault': 'Bóveda de ejemplo',
     'nav.roadmap': 'Hoja de ruta',
@@ -297,9 +297,9 @@ export const dict = {
     'what.p2.title': 'Míralo como un mapa',
     'what.p2.body':
       'La Vista global muestra proyectos, carpetas y páginas como tarjetas con portada, unidas por lo que enlazan. Entra en ellas o despliégalas en el sitio.',
-    'what.p3.title': 'Privada por diseño',
+    'what.p3.title': 'Sellada cuando quieras',
     'what.p3.body':
-      'No hay servidores en los que confiar: la app no se conecta a internet para nada. Y bóvedas cifradas, si quieres, para lo que debe quedar sellado.',
+      'Cifra una bóveda con una frase de contraseña y guarda una clave de recuperación por si la olvidas.',
 
     'bring.kicker': 'Trae tus notas',
     'bring.title': 'Deja la nube, quédate con tus notas',
@@ -323,6 +323,8 @@ export const dict = {
 
     'features.kicker': 'Funciones',
     'features.title': 'Un recorrido',
+    'features.lead':
+      'Grabado en la propia app, con la bóveda de ejemplo. Haz clic en cualquier clip para verlo en grande.',
     'features.gv.kicker': 'Vista global',
     'features.gv.title': 'Tus notas como un lienzo de tarjetas',
     'features.gv.body':
@@ -377,13 +379,9 @@ export const dict = {
     'features.mini.single.body': 'Abre cualquier .md o .txt en su propia ventana.',
     'features.mini.lang.title': 'English · Español',
     'features.mini.lang.body': 'Toda la app, en los dos idiomas.',
-    'features.mini.window.title': 'Una ventana propia',
-    'features.mini.window.body': 'Los mismos menús en Linux, Windows y macOS.',
 
-    'privacy.kicker': 'Privacidad',
-    'privacy.title': 'Lo que nunca hará',
     'privacy.lead':
-      'No son ajustes. La app está hecha para que no pueda: su política de seguridad bloquea la red, sus permisos la niegan, su código la prohíbe y sus dependencias no la incluyen.',
+      'Sin nube, sin cuentas, sin telemetría, y no son ajustes. La app está hecha para que no pueda: su política de seguridad bloquea la red, sus permisos la niegan, su código la prohíbe y sus dependencias no la incluyen.',
     'privacy.cloud.title': 'Sin nube',
     'privacy.cloud.body':
       'Tus notas viven en una carpeta de tu disco. Sincronízalas con lo que ya uses y te dé confianza, o no las sincronices.',
@@ -449,6 +447,9 @@ export const dict = {
     'roadmap.focus.title': 'Modo concentración',
     'roadmap.focus.body':
       'Oculta todo menos el texto: sin barra lateral, sin barra de herramientas, y el párrafo en el que estás en primer plano.',
+    'roadmap.transcribe.title': 'Transcripción sin conexión',
+    'roadmap.transcribe.body':
+      'Convierte un clip de voz en texto con un modelo de voz que corre en tu equipo: el audio nunca sale de él.',
     'roadmap.ideas': '¿Tienes una idea para lo que sigue?',
     'roadmap.ideasLink': 'Cuéntala en los issues de GitHub',
 
@@ -457,14 +458,11 @@ export const dict = {
     'support.lead':
       'Liber Linteum es software libre bajo la GPL. Si se gana un lugar en tu disco, puedes ayudar a que siga creciendo.',
     'support.github': 'Patrocinar en GitHub',
-    'support.kofi': 'Invitar un café en Ko-fi',
     'support.fallback':
       'Pronto habrá formas de donar. Por ahora, una estrella en GitHub o recomendarla a alguien ayuda igual.',
     credit: 'Una idea de <b>José Meza</b>, construida por <b>Jose Ríos</b>.',
 
     'footer.source': 'Código fuente en GitHub',
     'footer.reactflow': 'Vista global hecha con React Flow (MIT)',
-    'footer.note':
-      'Esta página no carga nada de ningún otro sitio: ni analítica, ni fuentes externas, ni rastreadores.',
   },
 };
