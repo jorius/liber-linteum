@@ -15,3 +15,6 @@ apps/desktop/src/theme/palettes.css
 apps/desktop/src/features/icons/emoji.json
 # Frozen crypto test vectors are byte-exact.
 crates/liber-crypto/tests/vectors
+
+# The sample vault is content, written as a user would write it.
+examples/

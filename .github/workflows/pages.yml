@@ -8,6 +8,9 @@ on:
     paths:
       - 'site/**'
       - '.github/workflows/pages.yml'
+  # A published release brings its downloads, checksums and scans to the page.
+  release:
+    types: [published]
   workflow_dispatch:
 
 permissions:
@@ -27,6 +30,10 @@ jobs:
           mkdir -p _site
           rsync -a --exclude 'tests/' --exclude 'tools/' --exclude 'playwright.config.ts' \
             --exclude 'test-results/' site/ _site/
+      - name: release.json from the latest published release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 .github/scripts/release_json.py _site/release.json
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v4
         with:
