@@ -126,6 +126,9 @@ const theme = EditorView.theme({
   '.cm-liber-code-punct': { color: 'var(--code-punct)' },
   '&': { height: '100%', color: 'var(--color-text)', backgroundColor: 'transparent' },
   '&.cm-focused': { outline: 'none' },
+  // The caret shows where the keyboard is: no ring around the whole page when
+  // focus comes back from the toolbar or a dialog by keyboard.
+  '.cm-content:focus-visible': { outline: 'none' },
   '.cm-liber-misspelled': {
     textDecoration: 'underline wavy var(--color-danger)',
     textDecorationSkipInk: 'none',

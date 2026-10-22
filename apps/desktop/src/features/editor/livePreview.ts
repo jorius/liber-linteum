@@ -223,8 +223,10 @@ function build(state: EditorState, page: ParsedPage, active: Set<number>): Decor
         blockWidget(node, embedKind(node as Parent));
         return;
       }
-      // M4b part 3: a table or maths block being edited keeps its wide box.
-      if (type === 'table' || type === 'math') wideLines(from, to, WIDE_KIND[type]);
+      // M4b part 3: a table or maths block being edited keeps its wide box. A
+      // table's source is monospaced, so its lined-up columns line up.
+      if (type === 'table') wideLines(from, to, 'tables', 'cm-liber-tablesrc');
+      if (type === 'math') wideLines(from, to, 'maths');
     }
     switch (type) {
       case 'heading': {
@@ -606,6 +608,7 @@ const theme = EditorView.baseTheme({
   '.cm-liber-bullet': { color: 'var(--color-text-muted)', fontWeight: '700' },
   '.cm-liber-listnum': { color: 'var(--color-text-muted)', fontVariantNumeric: 'tabular-nums' },
   '.cm-liber-frontmatter': { color: 'var(--color-text-muted)', fontFamily: 'var(--font-source)' },
+  '.cm-liber-tablesrc': { fontFamily: 'var(--font-source)' },
   '.cm-liber-muted': {
     color: 'var(--color-text-muted)',
     fontFamily: 'var(--font-source)',
