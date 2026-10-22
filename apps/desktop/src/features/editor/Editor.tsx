@@ -27,6 +27,7 @@ import { followLinkAtCursor, livePreview, pagePath } from './livePreview';
 import { attachmentHandlers } from './attachments';
 import { autoClose, autoCloseSlot } from './autoClose';
 import { findInPage, findPhrases, phrasesSlot } from './findInPage';
+import { matchRange } from '../search/matchRange';
 import { flash, jumpTo } from './flash';
 import { BlockGutter, type Shown } from './BlockGutter';
 import { SplitHint } from './SplitHint';
@@ -518,13 +519,16 @@ export function Editor({ doc, mode, label }: EditorProps) {
   }, [wantsFocus, screen]);
 
   // See atoms (M4b part 3 §6): an atom clicked in the Global View puts the
-  // cursor on its block, once its page shows here.
+  // cursor on its block, once its page shows here. A search result does the
+  // same with the word it matched (the page opens at the top without one).
   const jump = usePageStore((s) => s.jump);
   useEffect(() => {
     const v = view.current;
     if (!jump || !v || screen !== 'edit' || current.current.path !== jump.path) return;
     usePageStore.getState().clearJump();
-    jumpTo(v, jump.from, jump.to);
+    const range = jump.find === undefined ? jump : matchRange(v.state.doc.toString(), jump.find);
+    if (!range) return;
+    jumpTo(v, range.from, range.to);
     v.focus();
   }, [jump, screen, doc]);
 

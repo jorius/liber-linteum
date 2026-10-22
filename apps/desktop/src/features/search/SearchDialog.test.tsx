@@ -4,6 +4,7 @@ import axe from 'axe-core';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { SearchHit, SearchPage, SearchQuery } from '../../ipc';
 import { clearMocks, mockIPC } from '../../ipc/testing';
+import { usePageStore } from '../../stores/pageStore';
 import { DEFAULT_SETTINGS, useSettingsStore } from '../../stores/settingsStore';
 import { useUiStore } from '../../stores/uiStore';
 import { useVaultStore } from '../../stores/vaultStore';
@@ -178,6 +179,26 @@ describe('Search dialog (M5 §4)', () => {
     await userEvent.keyboard('{Enter}');
     expect(opened).toEqual(['Lore/Canción del dragón.md']);
     expect(useUiStore.getState().dialog).toBeNull();
+  });
+
+  it('opens a result at the word its snippet matched; without a snippet, at the top', async () => {
+    usePageStore.setState({ jump: null });
+    const field = openDialog();
+    await userEvent.type(field, 'drag');
+    await screen.findByRole('option', { name: /Canción del dragón/ });
+    await userEvent.keyboard('{Enter}');
+    await waitFor(() =>
+      expect(usePageStore.getState().jump).toMatchObject({
+        path: 'Lore/Canción del dragón.md',
+        find: 'dragon',
+      }),
+    );
+
+    usePageStore.setState({ jump: null });
+    await act(() => openSearch());
+    await userEvent.click(await screen.findByRole('option', { name: /Dragon run/ }));
+    await waitFor(() => expect(opened).toContain('Game/Dragon run.md'));
+    expect(usePageStore.getState().jump).toBeNull();
   });
 
   it('Enter right after typing opens a hit of the text typed, never an older one (final review I2)', async () => {
