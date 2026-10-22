@@ -183,9 +183,10 @@ test('M4b §4: the ⌘K picker follows the text as it scrolls, and stays in the 
   await expect.poll(async () => (await line.boundingBox())!.y).toBeLessThan(before - 100);
   await expect.poll(attached).toBe(true);
   // Far away: it stays inside the window, open.
-  // CodeMirror keeps the selected line drawn, now far above the window.
+  // CodeMirror keeps the selected line drawn, now far above the window (the
+  // page's end stops WebKit short of -500).
   await page.mouse.wheel(0, 6000);
-  await expect.poll(async () => (await line.boundingBox())?.y ?? 0).toBeLessThan(-500);
+  await expect.poll(async () => (await line.boundingBox())?.y ?? 0).toBeLessThan(-300);
   await expect
     .poll(async () => {
       const b = await box();

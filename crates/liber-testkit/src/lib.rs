@@ -79,7 +79,9 @@ pub fn snapshot(root: &Path) -> BTreeMap<PathBuf, (Vec<u8>, SystemTime)> {
     while let Some(dir) = stack.pop() {
         for item in std::fs::read_dir(&dir).expect("read dir") {
             let item = item.expect("dir entry");
-            let meta = item.metadata().expect("metadata");
+            // Not `item.metadata()`: on Windows that is the parent folder's
+            // copy, which NTFS updates lazily (a folder's mtime lags).
+            let meta = std::fs::symlink_metadata(item.path()).expect("metadata");
             let rel = item.path().strip_prefix(root).unwrap().to_path_buf();
             let bytes = if meta.is_dir() {
                 stack.push(item.path());

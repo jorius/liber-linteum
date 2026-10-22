@@ -448,7 +448,9 @@ pub(crate) mod tests {
         let url = file_url(outside.to_str().unwrap());
         let got = ext(&w, LinkKind::Embed, &url).unwrap();
         assert!(!got.listed && !got.exists && !got.network, "{got:?}");
-        // A leading `/` (vault root first) isn't looked up either.
+        // A leading `/` (vault root first) isn't looked up either; on Windows
+        // the path is a drive's, an outside file like the URL (not probed).
+        #[cfg(unix)]
         assert_eq!(ext(&w, LinkKind::Embed, outside.to_str().unwrap()), None);
         assert_eq!(probes(), before);
     }

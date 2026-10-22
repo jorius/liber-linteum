@@ -42,8 +42,9 @@ pub fn adopt(config_dir: &Path, cache_dir: &Path) -> std::io::Result<Adopted> {
         let tmp = config_dir.join("settings.json.tmp");
         fs::copy(&old, &tmp)?;
         // Durable before it's visible: a power cut must not leave an empty
-        // settings.json that is never adopted again.
-        fs::File::open(&tmp)?.sync_all()?;
+        // settings.json that is never adopted again. Windows flushes only a
+        // handle opened for writing.
+        fs::OpenOptions::new().write(true).open(&tmp)?.sync_all()?;
         fs::rename(&tmp, &new_settings)?;
         #[cfg(unix)]
         fs::File::open(config_dir)?.sync_all()?;

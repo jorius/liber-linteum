@@ -50,9 +50,11 @@ impl World {
         }
     }
 
-    /// The outside dir, as the OS spells it (canonical: `/private/var/…` on macOS).
+    /// The outside dir, as the OS spells it (canonical: `/private/var/…` on
+    /// macOS), `rel` joined a component at a time (`\\` on Windows).
     fn outside(&self, rel: &str) -> PathBuf {
-        dunce::canonicalize(self.base.path()).unwrap().join(rel)
+        let base = dunce::canonicalize(self.base.path()).unwrap();
+        rel.split('/').fold(base, |p, c| p.join(c))
     }
 
     fn write(&self, text: &str) {
