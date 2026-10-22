@@ -1,10 +1,10 @@
 # M4 — Block moves: Hand-off
 
-**Spec:** `docs/superpowers/specs/2026-10-14-m4-block-moves-design.md` (§9: decisions taken for Jose without review; §10: amendments from planning; §11: amendments from the final review) · **Plan:** `docs/superpowers/plans/2026-10-14-m4-block-moves.md` (replayed end to end on a scratch clone)
+**Spec:** `docs/superpowers/specs/2026-10-14-m4-block-moves-design.md` (§9: decisions taken for the maintainer without review; §10: amendments from planning; §11: amendments from the final review) · **Plan:** `docs/superpowers/plans/2026-10-14-m4-block-moves.md` (replayed end to end on a scratch clone)
 **Branch:** `feat/m4-block-moves`, stacked on `feat/m3b-relationships` ← `feat/m3a-global-view` ← `feat/m2c-page-extras`. Merge in order: M2c → M3a → M3b → M4. Previous hand-off: `docs/handoff/2026-10-14-m3b-relationships-handoff.md`.
 
 **How this milestone was made:**
-- **Designed and built in bulk:** the design, the plan and the build all happened after Jose asked to "carry on with everything that's missing" and review in bulk later. The grounding was the product spec §8 (DND-01–08, all DECIDED), architecture §4.3, and the prototype's Split-pane gutter.
+- **Designed and built in bulk:** the design, the plan and the build all happened after the maintainer asked for the remaining features to be built and reviewed in bulk later. The grounding was the product spec §8 (DND-01–08, all DECIDED), architecture §4.3, and the prototype's Split-pane gutter.
 - **Fixes landed late:** 1Password locked partway through the final-review fix pass. The fixes were kept as verified patch series and landed as signed commits once it was unlocked; the landed tree is byte-identical to the combined tree tested beforehand.
 
 ## 1. Status at a glance

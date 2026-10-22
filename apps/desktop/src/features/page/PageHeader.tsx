@@ -51,7 +51,7 @@ export function PageHeader({
     <Cover page={page} editable={editable} body={children}>
       {({ addCover, controls }) => (
         <>
-          {/* The title and subtitle, on the cover above the breadcrumb (Jose, M5b). */}
+          {/* The title and subtitle, on the cover above the breadcrumb (M5b feedback). */}
           <div className={`${styles.heading} ${styles.pill}`}>
             <PageHeading />
           </div>

@@ -1,16 +1,16 @@
 # Encryption UX round: design
 
-Status: **approved by Jose** (2026-10-21, "Everything looks fine, continue"). Mocks: brainstorm companion, `.superpowers/brainstorm/4810-1792595455/content/encryption-ux.html` (not committed).
+Status: **approved by the maintainer** (2026-10-21). Mocks: brainstorm companion, `.superpowers/brainstorm/4810-1792595455/content/encryption-ux.html` (not committed).
 
 Builds on the encryption spec (`2026-10-20-encryption-design.md`), E3 (encrypted storage) and E4 (encrypted-vault UI), all merged to `main`.
 
 ## 0. Why
 
-Jose tested E4 and found the encryption UX didn't make sense:
+The maintainer tested E4 and found the encryption UX didn't make sense:
 
 1. When creating a vault, the user should choose plain or encrypted as part of creating it.
 2. Welcome's "Encrypt this vault" checkbox sits apart from any action and can't apply to the recent vaults list, so it reads as meaningless.
-3. Vault → "New Encrypted Vault…" with Smartjob open, picking the Smartjob folder, did nothing visible: E4's create refuses a non-empty folder with a small inline line ("Pick an empty or new folder."), and encrypting an existing vault didn't exist yet.
+3. Vault → "New Encrypted Vault…" with a vault open, picking that vault's own folder, did nothing visible: E4's create refuses a non-empty folder with a small inline line ("Pick an empty or new folder."), and encrypting an existing vault didn't exist yet.
 4. The recent vaults list doesn't show which vaults are encrypted (E4 only swapped the icon for a lock glyph).
 5. The vault menu should offer "Encrypt "<vault name>"…".
 6. The Beta chip's margins and padding are off everywhere.
@@ -19,9 +19,9 @@ Jose tested E4 and found the encryption UX didn't make sense:
 
 | # | Decision | Source |
 |---|---|---|
-| D1 | **Encrypting an existing vault happens in place.** The folder keeps its path and its place in Recent. This reverses the encryption spec's call 6 ("converting always makes a copy"). | Jose |
-| D2 | The plain-or-encrypted choice lives **inside one "New vault" dialog**, reached from Welcome's "New vault" and Vault → "New Vault…". The Welcome checkbox and "New Encrypted Vault…" go away. | Jose |
-| D3 | Recent list: an **"🔒 Encrypted" chip after the vault name**; the vault keeps its own icon (mock option A). | My call: Jose approved the mocks without picking; A was first and simplest |
+| D1 | **Encrypting an existing vault happens in place.** The folder keeps its path and its place in Recent. This reverses the encryption spec's call 6 ("converting always makes a copy"). | The maintainer |
+| D2 | The plain-or-encrypted choice lives **inside one "New vault" dialog**, reached from Welcome's "New vault" and Vault → "New Vault…". The Welcome checkbox and "New Encrypted Vault…" go away. | The maintainer |
+| D3 | Recent list: an **"🔒 Encrypted" chip after the vault name**; the vault keeps its own icon (mock option A). | My call: the maintainer approved the mocks without picking; A was first and simplest |
 | D4 | After in-place encryption, the **readable originals go to the OS Trash** (recoverable; the user empties it), never deleted outright (mock option 3b A). | My call, same reason; it is also the safer default |
 | D5 | Encryption is per vault. Folders inside an encrypted vault are encrypted with it; there is no per-folder choice. | Encryption spec |
 
@@ -39,7 +39,7 @@ Jose tested E4 and found the encryption UX didn't make sense:
 
 ## 3. Recent vaults (D3)
 
-- An encrypted vault's row shows its own icon (emoji or folder), then the name followed by an **"🔒 Encrypted" chip** (accent text on the accent-soft background, the same chip family as Beta, §5). The chip is real text, so screen readers read "Smartjob, Encrypted"; the E4 sr-only suffix goes.
+- An encrypted vault's row shows its own icon (emoji or folder), then the name followed by an **"🔒 Encrypted" chip** (accent text on the accent-soft background, the same chip family as Beta, §5). The chip is real text, so screen readers read "<vault name>, Encrypted"; the E4 sr-only suffix goes.
 - `RecentVaultDto.encrypted` already exists (E3). Its icon stays as E3 left it: an encrypted vault's emoji lives inside the encrypted vault, so the recent row shows the plain folder icon.
 
 ## 4. Encrypt an existing vault, in place (D1, D4)

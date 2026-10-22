@@ -1,10 +1,10 @@
 # M3a — Global View (browse, layout, edges): Hand-off
 
-**Spec:** `docs/superpowers/specs/2026-10-14-m3a-global-view-design.md` (§12: decisions taken for Jose without review; §13: amendments from planning; §14: amendments from the final review) · **Plan:** `docs/superpowers/plans/2026-10-14-m3a-global-view.md` (replayed end to end on a scratch clone before execution)
+**Spec:** `docs/superpowers/specs/2026-10-14-m3a-global-view-design.md` (§12: decisions taken for the maintainer without review; §13: amendments from planning; §14: amendments from the final review) · **Plan:** `docs/superpowers/plans/2026-10-14-m3a-global-view.md` (replayed end to end on a scratch clone before execution)
 **Branch:** `feat/m3a-global-view`, **stacked on `feat/m2c-page-extras`**. Merge M2c first, then this. Previous hand-off: `docs/handoff/2026-10-14-m2c-page-extras-handoff.md`.
 
 **How this milestone was made.**
-- The whole of M3a was designed after Jose asked to "carry on with everything that's missing" and review in bulk later.
+- The whole of M3a was designed after the maintainer asked for the remaining features to be built and reviewed in bulk later.
 - **The design rests on:**
   - the product spec §6 (every GV item was already DECIDED);
   - the architecture §4.4;

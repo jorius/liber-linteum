@@ -573,8 +573,8 @@ mod label_tests {
             "Create New Scratchpad in This Vault"
         );
         assert_eq!(
-            quick_note_label(Some("Smartjob")),
-            "Create New Scratchpad for Smartjob"
+            quick_note_label(Some("Myproject")),
+            "Create New Scratchpad for Myproject"
         );
         let long = "Á".repeat(60);
         let label = quick_note_label(Some(&long));
@@ -644,7 +644,7 @@ mod lock_tests {
     #[test]
     fn encrypt_label_names_the_vault_cut_like_the_scratchpad_item() {
         assert_eq!(encrypt_label(None), "Encrypt Vault…");
-        assert_eq!(encrypt_label(Some("Smartjob")), "Encrypt “Smartjob”…");
+        assert_eq!(encrypt_label(Some("Myproject")), "Encrypt “Myproject”…");
         assert_eq!(encrypt_label(Some("R&D")), "Encrypt “R&&D”…");
         assert_eq!(
             encrypt_label(Some(&"Á".repeat(60))),
@@ -655,7 +655,7 @@ mod lock_tests {
     #[test]
     fn decrypt_label_names_the_vault_cut_like_encrypt() {
         assert_eq!(decrypt_label(None), "Decrypt Vault…");
-        assert_eq!(decrypt_label(Some("Smartjob")), "Decrypt “Smartjob”…");
+        assert_eq!(decrypt_label(Some("Myproject")), "Decrypt “Myproject”…");
         assert_eq!(decrypt_label(Some("R&D")), "Decrypt “R&&D”…");
         assert_eq!(
             decrypt_label(Some(&"Á".repeat(60))),

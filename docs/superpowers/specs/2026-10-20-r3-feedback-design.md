@@ -1,14 +1,14 @@
 # Round 3 feedback (2026-10-20)
 
-Jose's first real-window pass over batch 6 (the Cybersecurity and Hacking Notion import). This spec covers the items that are already clear. Two items wait on Jose and are listed at the end: the welcome page (mocks shown) and Notion page icons (needs a decision about the export format).
+The maintainer's first real-window pass over batch 6 (a real Notion import). This spec covers the items that are already clear. Two items wait on the maintainer and are listed at the end: the welcome page (mocks shown) and Notion page icons (needs a decision about the export format).
 
-Base: `main` at e0763b3 (batch 6, fast-forwarded by Jose). Branch: `feat/r3`.
+Base: `main` at e0763b3 (batch 6, fast-forwarded by the maintainer). Branch: `feat/r3`.
 
 ## 1. Live Preview renders the whole page (stream A, editor)
 
 **Problem.** In Live Preview, code blocks show their ``` fences, with the language and Shell/Copy pills placed inline on the fence line. List items show a raw `- `. The page reads as half-source.
 
-**Wanted (Jose).** "Live preview should show the page totally rendered. Only when you click on the elements should they change to source, so they're editable." This is Obsidian's Live Preview behaviour.
+**Wanted.** Live Preview should show the page fully rendered; an element turns to source only when it is clicked, so it can be edited. This is Obsidian's Live Preview behaviour.
 
 **Rule.** A construct's Markdown syntax is shown only while the selection (any cursor or range) touches that construct. Otherwise the construct renders. For a block construct, "touches" means any selection head or anchor falls on one of the block's lines. For an inline construct, the cursor is inside the marked range or at its edges.
 
@@ -30,7 +30,7 @@ The Source and Split modes are unchanged. Large-note limits (`LARGE_NOTE_CHARS`)
 
 ### 1a. As built (stream A rulings)
 
-1. **Fence lines stay as lines.** Off the cursor, the opening fence's text becomes the header row: the language badge and Copy, floated right. The closing fence becomes an empty line, which acts as the block's bottom padding. Revealing the source swaps text inside the same lines, so nothing below the block moves (tested in e2e). An unclosed fence keeps its last line. _Cost if wrong:_ if Jose wants the block tighter, about one line of height per block.
+1. **Fence lines stay as lines.** Off the cursor, the opening fence's text becomes the header row: the language badge and Copy, floated right. The closing fence becomes an empty line, which acts as the block's bottom padding. Revealing the source swaps text inside the same lines, so nothing below the block moves (tested in e2e). An unclosed fence keeps its last line. _Cost if wrong:_ if the maintainer wants the block tighter, about one line of height per block.
 2. **A list marker reveals only on its own line.** Editing a nested child doesn't flip its parent's bullet. A task hides its `- ` too, leaving only the checkbox. _Cost if wrong:_ if he expects the whole item to reveal, a one-line change.
 3. **Inline marks keep the existing line-based reveal** (§1.5 says keep it). This is not the "inside or at the edges" rule. _Cost if wrong:_ a cursor-range check in `wrapped` and the link click.
 4. **Decorations are still built for the whole document**, as before, and large notes still get the reduced set. The perf tests stay green. _Cost if wrong:_ a visible-ranges rewrite if 10k-line notes lag.
@@ -52,13 +52,13 @@ The Source and Split modes are unchanged. Large-note limits (`LARGE_NOTE_CHARS`)
    - icon (a new, full-contrast "add emoji" glyph; the current faded smiley goes);
    - trash (unchanged, with its confirmation).
 
-   The "…" button goes, and right-click keeps the context menu. _My call:_ "+" (new page in this folder) also goes from the row because Jose listed only three. It stays in the context menu. Archived rows show no trash, as today.
+   The "…" button goes, and right-click keeps the context menu. _My call:_ "+" (new page in this folder) also goes from the row because the maintainer listed only three. It stays in the context menu. Archived rows show no trash, as today.
 
 4. **Context menu label.** "New quick note" becomes "Create new scratchpad in this vault" (es: same meaning, using the existing Spanish terms for scratchpad and vault). The behaviour and the ⌘⇧N shortcut are unchanged.
 
 ### §2 amendments (stream B, as built)
 
-- **The "New quick note" label is in the File menu.** The context menu never had a quick-note item; Jose's "file context menu" is the macOS **File** menu. It now reads **Create New Scratchpad in This Vault** (Title Case, like the other menu items; the native menu is English-only). The Settings → Shortcuts row for ⌘⇧N reads "Create new scratchpad in this vault" (es: "Crear una nota rápida nueva en esta bóveda"). The behaviour is unchanged: on the Welcome screen it still goes to the global Scratchpad. _Cost if wrong:_ if he meant another menu, it's a one-string move.
+- **The "New quick note" label is in the File menu.** The context menu never had a quick-note item; the maintainer's "file context menu" is the macOS **File** menu. It now reads **Create New Scratchpad in This Vault** (Title Case, like the other menu items; the native menu is English-only). The Settings → Shortcuts row for ⌘⇧N reads "Create new scratchpad in this vault" (es: "Crear una nota rápida nueva en esta bóveda"). The behaviour is unchanged: on the Welcome screen it still goes to the global Scratchpad. _Cost if wrong:_ if he meant another menu, it's a one-string move.
 - **Width.** `sidebarWidth` is app-wide in `settings.json`, 270 px by default, and clamped to 200–560. An out-of-range number is clamped; a non-number resets on its own with the usual warning.
   - Keys save on each press: ←/→ by 16 px, Shift ×4, Home/End to the limits.
   - A drag saves once, on release. A double-click resets.
@@ -119,10 +119,10 @@ The Source and Split modes are unchanged. Large-note limits (`LARGE_NOTE_CHARS`)
 - Each item gets a test that fails first: vitest for the logic and components, Playwright e2e for the sidebar drag, the Move dialog keyboard, and Live Preview reveal/hide.
 - The full gate (`check.sh all`) must pass on each stream and again after integration.
 
-## 5. Jose's decisions (2026-10-20)
+## 5. The maintainer's decisions (2026-10-20)
 
-- **Welcome page overhaul.** Three mocks are in the brainstorm companion: A launcher, B start page with vault cards, C vault switcher. We build once he picks.
-- **Notion page icons.** The "Markdown & CSV" export carries no page icons. I checked his zip: every page starts with `# Title`, and "📚 Resources" only has an icon because the emoji is part of its title. Notion's HTML export has a `page-header-icon` and a cover image for each page. **Decision:** the importer will accept HTML exports, _after_ the round 3 feedback items are done (round 3b).
+- **Welcome page overhaul.** Three mocks are in the brainstorm companion: A launcher, B start page with vault cards, C vault switcher. We build once the maintainer picks.
+- **Notion page icons.** The "Markdown & CSV" export carries no page icons. I checked the sample export: every page starts with `# Title`, and "📚 Resources" only has an icon because the emoji is part of its title. Notion's HTML export has a `page-header-icon` and a cover image for each page. **Decision:** the importer will accept HTML exports, _after_ the round 3 feedback items are done (round 3b).
 - **Folder pages.** **Decision: merge.** A folder and its same-name page become one row (§6).
 
 ## 6. Folder pages (stream D, after A–C land)
@@ -148,7 +148,7 @@ A Notion page with sub-pages becomes a page plus a folder of the same name, so t
 
 ## 7. Welcome page, option A "Launcher" (stream E)
 
-Jose picked mock A: "clean, pretty, perfect". The mock is `.superpowers/brainstorm/12538-1792502930/content/welcome.html`, first card, and is not committed. The page has two columns that fill the window.
+The maintainer picked mock A. The mock is `.superpowers/brainstorm/12538-1792502930/content/welcome.html`, first card, and is not committed. The page has two columns that fill the window.
 
 - **Left: start (≈330 px, surface background, right border), top to bottom:**
   1. The brand mark, the app name and the version under it.
@@ -193,7 +193,7 @@ Jose picked mock A: "clean, pretty, perfect". The mock is `.superpowers/brainsto
 
    The old `welcome.*` strings change in both languages. The language toggle keeps its accessible name, "Language", but loses its visible label, as in the mock.
 
-## 8. Round 3b: Jose's notes after testing the round 3 build (2026-10-20)
+## 8. Round 3b: the maintainer's notes after testing the round 3 build (2026-10-20)
 
 1. **Double-click on a sidebar page.**
    - **When the editor isn't showing that page** (another page, the Global View, the Trash page, or the search dialog over it): open the page in the editor in the user's current editor mode, and focus the text.
@@ -245,7 +245,7 @@ A fresh-context review of round 3b plus spell checking found 4 Important and 8 M
 
 ## 9. Sub-pages and case-insensitive folder pages (2026-10-20)
 
-Jose, after testing his vault: a folder `SmartJob/` holding `Smartjob.md` didn't merge into one row, and he wants sub-pages: "I don't see how to attach a current page to another page."
+Found while testing a real vault: a folder `MyProject/` holding `Myproject.md` didn't merge into one row. Also requested: sub-pages, a way to attach an existing page to another page.
 
 ### 9.1 Case-insensitive folder pages
 
@@ -254,7 +254,7 @@ Jose, after testing his vault: a folder `SmartJob/` holding `Smartjob.md` didn't
   - Rust: `Vault::folder_page_of` and `Vault::child_named` (`liber-vault/src/fsops.rs`).
   - UI: `folderPageOf` (`stores/tree.ts`), used by the tree, the breadcrumb, the delete dialog and the menus.
   - `isFolderPage` (name-only) is gone. The breadcrumb now asks the tree.
-- **Paired renames** (`paired_rename`) find the page through `folder_page_of`, so `SmartJob → Work` takes `Smartjob.md` along as `Work/Work.md`.
+- **Paired renames** (`paired_rename`) find the page through `folder_page_of`, so `MyProject → Work` takes `Myproject.md` along as `Work/Work.md`.
 - **"Match the page name to the folder"** (es: "Igualar el nombre de la página al de la carpeta") appears on a folder whose page differs only in case. It renames `X/x.md` to `X/X.md` through the ordinary rename. That rename leaves the folder where it is: the pair's second step is skipped when it would rename the folder to its own name.
 
 ### 9.2 Add sub-page

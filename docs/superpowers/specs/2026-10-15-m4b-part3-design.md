@@ -1,7 +1,7 @@
 # M4b, part 3 — Second feedback round (Windows test, Obsidian vault): Design
 
-**Status:** agreed with Jose on 2026-10-15.
-- **Where the feedback came from:** Jose's Mac check and a friend's test on Windows with a real Obsidian vault ("Mind_PC").
+**Status:** agreed with the maintainer on 2026-10-15.
+- **Where the feedback came from:** the maintainer's Mac check and a tester's check on Windows with a real Obsidian vault.
 - **Decisions:** six answers settled the open questions (titles, side covers, link formats, picked files, atoms, the Windows cover).
 - **Base:** builds on M4b parts 1 and 2. Branch `feat/m4b3-feedback`, stacked on `feat/m4b-feedback`.
 
@@ -21,12 +21,12 @@
 
 ## 1. Titles: a first-line H1, else the file name
 
-**The problem.** PG-01 took the first H1 *anywhere* in a note as its title. In the friend's note "Tipos de comisiones":
+**The problem.** PG-01 took the first H1 *anywhere* in a note as its title. In the tester's note "Tipos de comisiones":
 - The first H1 is a section heading halfway down: `# WIP (Work In Progress):`.
 - The card, the lists and the "Title in the note" label therefore showed "WIP (Work In Progress):".
 - Obsidian shows the file name.
 
-**The rule, from Jose:**
+**The rule, from the maintainer:**
 - A page's title is the text of an H1 only when that H1 is the **first block of the body**:
   - after the frontmatter;
   - leading blank lines don't count;
@@ -49,7 +49,7 @@
   - frontmatter followed by an H1;
   - blank lines followed by an H1;
   - a paragraph followed by an H1 (gives the stem);
-  - the friend's shape: paragraphs, a link, then `# WIP (Work In Progress):` (gives "Tipos de comisiones");
+  - the tester's shape: paragraphs, a link, then `# WIP (Work In Progress):` (gives "Tipos de comisiones");
   - a setext H1 at the top.
 
 ## 2. Global View card covers on Windows (WebView2)
@@ -230,7 +230,7 @@ A page broken into its components and shown with the same graph tools.
 | Shortest name (default) | `![[x.png]]` |
 | Full path in the vault | `![[Assets/Comisiones/x.png]]` |
 | Relative to the note | `![[../Assets/x.png]]` |
-| Absolute path on disk | `![](file:///D:/Mind_PC/Assets/x.png)` |
+| Absolute path on disk | `![](file:///D:/Notes/Assets/x.png)` |
 
 - **Storage:** `.liber/vault.json` `attachmentLinkFormat: "shortest" | "vault" | "relative" | "absolute"`.
 - **When it's unset:**
@@ -242,7 +242,7 @@ A page broken into its components and shown with the same graph tools.
 **Settings → Editor → Show where attachments are on disk** (app setting `showAttachmentPaths`, default off):
 - **What it adds:** a caption under each embedded image, audio player and file card, in the preview pane and in Live Preview widgets.
 - **What the caption shows:**
-  - the file's absolute location with the OS's separators (`D:\Mind_PC\Assets\x.png` on Windows, `/Users/…` on macOS);
+  - the file's absolute location with the OS's separators (`D:\Notes\Assets\x.png` on Windows, `/Users/…` on macOS);
   - the text is selectable;
   - a **Copy** button announces "Copied".
 - **Which files:** vault files and external files (§9) alike.
@@ -252,7 +252,7 @@ A page broken into its components and shown with the same graph tools.
 
 **Targets recognised** in `![[…]]`, `[[…]]`, `![](…)` and `[](…)`:
 - Windows absolute paths: `D:\Docs\my-file.pdf`, `D:/Docs/x.pdf` and UNC `\\server\share\x.pdf`.
-- `file:` URLs: `file:///D:/Docs/x.pdf` and `file:///Users/jose/x.png`, percent-decoded.
+- `file:` URLs: `file:///D:/Docs/x.pdf` and `file:///Users/me/x.png`, percent-decoded.
 - A leading `/`:
   - Obsidian treats it as vault-root-relative, so that is tried first;
   - if no vault file matches and an absolute file exists on disk at that path, the disk file is used.
@@ -328,7 +328,7 @@ Built in three streams in parallel, each with its own plan, worktree and signed 
 - **After integration:**
   - one final review, then one fix pass;
   - the hand-off `docs/handoff/2026-10-15-m4b-part3-handoff.md`;
-  - the Windows installer for the friend and the Mac app for Jose.
+  - the Windows installer for the tester and the Mac app for the maintainer.
 
 ## 13. Amendments from planning (Stream B: §1, §2 editor side, §3)
 
@@ -414,7 +414,7 @@ Built in three streams in parallel, each with its own plan, worktree and signed 
   - does nothing without an open Markdown page.
 
 **Atoms:**
-- A paragraph made only of embeds or images gives one image atom per embed (the friend's runs of `![[Pasted image …]]`).
+- A paragraph made only of embeds or images gives one image atom per embed (the tester's runs of `![[Pasted image …]]`).
 - `::::columns` containers are flattened. HTML blocks get an atom. Frontmatter, rules and definitions are skipped. Audio also covers `ogg` and `flac`.
 - Lists and tables are named by their first items or column names.
 
@@ -562,7 +562,7 @@ Windows and GTK select the first filter, so "All files" now comes first (then Im
 
 ### Ruling: no index schema bump for §9 (I3)
 
-The reviewer asked for schema 3 in case a schema-2 build had reached the tester. None has: the tester's Windows build and Jose's dev runs used schema 1, so the next build rebuilds every index once anyway. Schema 2 covers §1, §3 and §9 together. Cost if wrong: one stale index on a machine that ran an unreleased build, fixed by editing the affected notes or deleting the index cache.
+The reviewer asked for schema 3 in case a schema-2 build had reached the tester. None has: the tester's Windows build and the maintainer's dev runs used schema 1, so the next build rebuilds every index once anyway. Schema 2 covers §1, §3 and §9 together. Cost if wrong: one stale index on a machine that ran an unreleased build, fixed by editing the affected notes or deleting the index cache.
 
 ### Deferred (Minor)
 

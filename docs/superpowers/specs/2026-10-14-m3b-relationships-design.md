@@ -1,6 +1,6 @@
 # M3b — Global View: relationships and index notes: Design
 
-**Status:** written on 2026-10-14 without Jose's review. He asked to "carry on with everything that's missing" and review features in bulk later.
+**Status:** written on 2026-10-14 without the maintainer's review. The request was to build the remaining features and review them in bulk later.
 - **Grounding:** product spec GV-02, GV-22–GV-24 and Q-GV-4/5 (all DECIDED); architecture §3.3 and §4.4; the prototype's connect flow (`design/prototype/Main.dc.html` `.relbar`; strings `relBanner`, `relMade`, `directed`, `remove`).
 - **Builds on:** M3a (`feat/m3a-global-view`, after its final-review fix pass).
 - **Edges are drawn by an `EdgeLayer`:** one SVG under the cards (`features/global-view/edges.tsx`), not by React Flow, and aggregated edges are capped at the 500 strongest. M3b's edge clicks are handled on that layer: manual-edge strokes and labels get `pointer-events` and the `nopan` class.
@@ -131,7 +131,7 @@ The non-negotiables are as in M3a.
   - zero-network.
 - **Real window:** a trackpad drag-to-connect in WKWebView; the popover position near window edges; an Obsidian read of the written `related:` maps.
 
-## 9. Decisions taken for Jose (to review in bulk)
+## 9. Decisions taken for the maintainer (to review in bulk)
 
 1. **Two ways to connect:** dragging from the connect handle (the product spec) and a click/keyboard flow (accessibility, and the prototype's flow). React Flow's own click-connect stays off because of `structuredClone` on Safari 15.
 2. **A folder card stands for its index note** in a relationship; a folder without one can't be connected, and the user is offered **Pick index note…**.

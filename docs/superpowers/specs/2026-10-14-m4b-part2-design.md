@@ -1,6 +1,6 @@
 # M4b, part 2 — Page width, code, maths, diagrams, outline, text files: Design
 
-**Status:** agreed with Jose on 2026-10-14 (four answers). Part 2 of the M4b feedback round; it builds on part 1 (`docs/superpowers/specs/2026-10-14-m4b-feedback-design.md`) on the same branch, `feat/m4b-feedback`. Personas behind it are in product spec §1.2.
+**Status:** agreed with the maintainer on 2026-10-14 (four answers). Part 2 of the M4b feedback round; it builds on part 1 (`docs/superpowers/specs/2026-10-14-m4b-feedback-design.md`) on the same branch, `feat/m4b-feedback`. Personas behind it are in product spec §1.2.
 
 ---
 

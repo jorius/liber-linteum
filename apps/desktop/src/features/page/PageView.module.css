@@ -903,7 +903,7 @@ span.relatedOpen {
 /* The title and subtitle at the top of the page (M5b §2.3), over the text's
    measure. */
 /* The title and subtitle head the band, above the breadcrumb, at the size
-   they had in the top bar (Jose, M5b): one line each, ellipsis when long. */
+   they had in the top bar (M5b feedback): one line each, ellipsis when long. */
 .heading {
   box-sizing: border-box;
   width: fit-content;

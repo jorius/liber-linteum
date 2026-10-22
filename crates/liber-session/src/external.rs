@@ -17,7 +17,7 @@ use std::path::{Component, Path, PathBuf};
 /// What a link to a file outside the vault leads to.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ExternalFile {
-    /// Absolute, in its OS's form (`D:\Docs\x.pdf`, `/Users/jose/x.png`).
+    /// Absolute, in its OS's form (`D:\Docs\x.pdf`, `/Users/me/x.png`).
     pub path: String,
     /// A regular, visible file on this computer. Only ever looked up for a
     /// listed path the app may reach (no existence oracle; final review C1).
@@ -506,7 +506,7 @@ pub(crate) mod tests {
     #[test]
     fn the_vaults_own_server_is_not_another_computer() {
         assert!(foreign_network(r"C:\Vault", r"\\nas\share\x.pdf"));
-        assert!(foreign_network("/Users/jose/Vault", "/net/host/x.png"));
+        assert!(foreign_network("/Users/me/Vault", "/net/host/x.png"));
         assert!(!foreign_network(r"\\NAS\notes\Vault", r"\\nas\other\x.pdf"));
         assert!(!foreign_network(
             r"\\?\UNC\nas\notes\Vault",

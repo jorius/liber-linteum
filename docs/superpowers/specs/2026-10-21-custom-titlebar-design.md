@@ -1,7 +1,7 @@
 # Custom title bar (Linux and Windows) — design
 
 > **Status:** built on `feat/custom-titlebar` · **Date:** 2026-10-21
-> **Why:** on macOS the app has a native menu bar (Liber Linteum, File, Vault, Edit, View, Window). Linux and Windows had none: only the vault-name button in the sidebar reached Settings, Open, Encrypt and Close. Jose picked option B of three mockups (a strip under the system title bar; the app drawing its own title bar with the menus in it; a ☰ button in the sidebar).
+> **Why:** on macOS the app has a native menu bar (Liber Linteum, File, Vault, Edit, View, Window). Linux and Windows had none: only the vault-name button in the sidebar reached Settings, Open, Encrypt and Close. The maintainer picked option B of three mockups (a strip under the system title bar; the app drawing its own title bar with the menus in it; a ☰ button in the sidebar).
 
 ## 1. Where it applies
 

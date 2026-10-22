@@ -145,7 +145,7 @@ export function RecentList() {
                     <span className={styles.recentText}>
                       <span className={styles.recentTitle}>
                         <span className={styles.recentName}>{item.name}</span>
-                        {/* Unrendered in the flex row; read as "Smartjob Encrypted". */}
+                        {/* Unrendered in the flex row; read as "Myproject Encrypted". */}
                         {item.encrypted && ' '}
                         {item.encrypted && (
                           <span className="liber-chip">

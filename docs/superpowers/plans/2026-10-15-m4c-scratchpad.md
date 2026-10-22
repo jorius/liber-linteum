@@ -8,7 +8,7 @@
 
 **Tech Stack:** Rust (liber-markdown, liber-vault, liber-session, Tauri 2 desktop crate, tauri-plugin-dialog), React 19 + zustand, Vitest + Testing Library + axe, Playwright (Chromium + WebKit).
 
-**Spec:** `docs/superpowers/specs/2026-10-14-m4c-scratchpad-design.md` §2, §4 "Picked folders", §5 (Scratchpad parts). Amendments from this planning are §7 of the same file, including Jose's 2026-10-15 addition: a scratch folder in every vault.
+**Spec:** `docs/superpowers/specs/2026-10-14-m4c-scratchpad-design.md` §2, §4 "Picked folders", §5 (Scratchpad parts). Amendments from this planning are §7 of the same file, including the maintainer's 2026-10-15 addition: a scratch folder in every vault.
 
 ## Global Constraints
 

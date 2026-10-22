@@ -1,13 +1,13 @@
 # Encrypted vaults — design
 
-Status: **draft for Jose's review** (2026-10-20). Nothing here is built yet.
+Status: **draft for the maintainer's review** (2026-10-20). Nothing here is built yet.
 Facts (versions, licences, audits, prior art) with sources: `docs/research/2026-10-20-encryption-facts.md`. Every claim in this spec about a library or a product traces to that sheet.
 
 ## 0. Intent
 
-Jose wants "heavy cryptography", very well documented, so that a vault can hold notes he would not want anyone else to read: security research, personal matters, client work. Today a vault is a folder of plain Markdown. Anyone with the disk, a backup, a sync account or a minute at the unlocked Mac can read all of it.
+Requirement: strong, well-documented cryptography, so that a vault can hold notes that must stay private. Today a vault is a folder of plain Markdown. Anyone with the disk, a backup, a sync account or a minute at the unlocked Mac can read all of it.
 
-Jose's decisions (2026-10-20):
+The maintainer's decisions (2026-10-20):
 
 - **Protect against all four threats.** A lost or stolen laptop; cloud sync and backups (file names included); someone at the unlocked Mac; and, later, sharing with specific people.
 - **No PGP for now.** The format must leave room for a future "share" feature that encrypts to other people's public keys (OpenPGP or similar).
@@ -106,7 +106,7 @@ Slot types in v1:
   - **Another machine with the vault open** sees the header's epoch change. It locks that vault, flushing its saves under the old epoch, which the rotation then picks up, and asks to unlock again.
   - **K_name changes**, so every entry is renamed. Sync clients see a full delete plus create. The progress dialog says so (*my call*, after the builder check).
 
-### 3.3 The keyring (Jose's "master key")
+### 3.3 The keyring (the maintainer's "master key")
 
 The keyring is an app-level identity that holds one **hybrid keypair**: X25519 plus ML-KEM-768 (FIPS 203).
 
@@ -159,7 +159,7 @@ Header (48 bytes), which is also the AAD of every chunk:
   - Chunks spliced in from another file fail, because that file has a different key.
   - An empty file is one empty last chunk.
 - **Random access.** Chunk *i* starts at `48 + i·(65536+16)`. The asset protocol serves an HTTP range by decrypting only the chunks it covers, so audio seeking works.
-- **Why AES-256-GCM.** Jose asked for AES. The crate is the audited RustCrypto `aes-gcm` (NCC Group 2020), and it is hardware-accelerated on Apple Silicon and x86. A unique key per write removes GCM's nonce-reuse risk.
+- **Why AES-256-GCM.** the maintainer asked for AES. The crate is the audited RustCrypto `aes-gcm` (NCC Group 2020), and it is hardware-accelerated on Apple Silicon and x86. A unique key per write removes GCM's nonce-reuse risk.
 - **Writes** go through the existing atomic path: write a temp file, then rename.
 - **Writers only append; a chunk is written once.** The encrypted writer never seeks. It emits a chunk only when the chunk is complete, plus the final short chunk with the last-flag at close. Re-encrypting a chunk under the same K_f and nonce would be GCM nonce reuse, which leaks the XOR of the plaintexts and the authentication key. Any in-place fix-up is therefore a **new file with a fresh salt**.
 - **Recordings.** Today's recorder rewrites the WAV header every 2 s through `hound`'s seek. That would be exactly the nonce reuse above (builder check, flaw 1). For an encrypted vault:
@@ -195,7 +195,7 @@ The rule is that **nothing derived from an encrypted vault's content is written 
 1. **Search index.**
    - For encrypted vaults the SQLite index is opened in memory (`:memory:`), filled at unlock, and dropped at lock.
    - SQLCipher is rejected. Its Windows cross-build from macOS is the biggest build risk found (facts §4).
-   - If unlock-to-searchable on 10 000 notes exceeds 3 s on Jose's Mac, phase E3b adds an **encrypted snapshot**: serialize the DB, encrypt it with K_index, store it in the cache dir, and reindex by mtime and size after loading.
+   - If unlock-to-searchable on 10 000 notes exceeds 3 s on the maintainer's Mac, phase E3b adds an **encrypted snapshot**: serialize the DB, encrypt it with K_index, store it in the cache dir, and reindex by mtime and size after loading.
 2. **App data.** The recent vaults list shows an encrypted vault by folder name with a lock icon. Its emoji and name live inside the vault. Session state, Global View positions, cover positions, favourites and icons all live in the vault's own (encrypted) `.liber/`. Anything app-side keyed by vault path is audited and moved, or keyed by `vault_id` and holds no content.
 3. **WebView.**
    - The asset protocol keeps `Cache-Control: no-store`.
@@ -290,7 +290,7 @@ The rule is that **nothing derived from an encrypted vault's content is written 
   3. Scan the vault dir, app data, the cache, temp and the WebView data dirs byte by byte for the canary.
 
   It must be absent outside decrypted views, both on macOS and in the Windows build.
-- **Performance budgets** (Jose's Mac, 10 000 notes):
+- **Performance budgets** (the maintainer's Mac, 10 000 notes):
   - unlock to searchable ≤ 3 s, excluding the deliberate Argon2id time;
   - page open overhead ≤ 5 ms;
   - range reads ≥ 200 MB/s;
@@ -323,7 +323,7 @@ The rule is that **nothing derived from an encrypted vault's content is written 
 | E7 | device slot: Touch ID and Windows Hello | M8 signing |
 | later | share (`recipient` slots; OpenPGP export via rPGP, pure Rust and MIT/Apache per facts §2), per-page encryption, Notion import into encrypted vaults, the encrypted index snapshot if needed | — |
 
-## 14. Calls I made (Jose to check)
+## 14. Calls I made (the maintainer to check)
 
 1. AES-256-GCM chunked STREAM for content; AES-SIV for names; Argon2id for passphrases; HKDF everywhere else. No PGP inside the vault format. OpenPGP is a message format with no random access (facts §2).
 2. Keep the folder tree visible (names hidden) rather than Cryptomator's flattened tree. It is simpler, and it syncs and recovers by hand better. The cost is that the shape leaks (§9).
@@ -433,7 +433,7 @@ python3 -m venv ~/.liber-xcheck && ~/.liber-xcheck/bin/pip install 'cryptography
 LIBER_XCHECK_PY=~/.liber-xcheck/bin/python cargo test -p liber-vault --test encrypted_xcheck -- --nocapture
 ```
 
-**Performance** (§10): unlock to the first successful search on the sealed 10,000-note reference vault is **1.75 s** (budget 3 s) in release on Jose's Mac, 2026-10-20: about 1.71 s indexing, 34 ms for the first search, under 1 ms of unlock with tiny Argon2 parameters (`crates/liber-session/tests/encrypted_perf.rs`, opt-in with `LIBER_PERF=1`). Measured warm: right after sealing, the ciphertext is in the OS file cache. A cold-cache unlock (after a reboot, or after sync brought the files) reads them from disk and is slower. The encrypted snapshot of §5.1 isn't needed.
+**Performance** (§10): unlock to the first successful search on the sealed 10,000-note reference vault is **1.75 s** (budget 3 s) in release on the maintainer's Mac, 2026-10-20: about 1.71 s indexing, 34 ms for the first search, under 1 ms of unlock with tiny Argon2 parameters (`crates/liber-session/tests/encrypted_perf.rs`, opt-in with `LIBER_PERF=1`). Measured warm: right after sealing, the ciphertext is in the OS file cache. A cold-cache unlock (after a reboot, or after sync brought the files) reads them from disk and is slower. The encrypted snapshot of §5.1 isn't needed.
 
 **Residuals** (documented, accepted):
 - **JS-side passphrase strings.** Rust holds passphrases and recovery codes in `Zeroizing<String>` from the moment they arrive, but the WebView's own copies (the input's value, the IPC message, JS strings) can't be wiped and live until garbage collection.
@@ -452,4 +452,4 @@ LIBER_XCHECK_PY=~/.liber-xcheck/bin/python cargo test -p liber-vault --test encr
 - Decrypted-copy sweep: a race between creating the folder and taking its lock; it assumes a sticky temp dir (a non-sticky world-writable `TMPDIR` reopens the swap window); a FIFO named `.lock` in a loose-mode folder we own could block it.
 - The rollback error could name the higher-epoch header copy; `Crypto` errors map to `damaged`, so a slot-limit error reads unclearly.
 - Unlock waits for recording recovery (could run in the background); if removing a take folder fails, the next unlock may recover the clip twice (the plain path does the same).
-- Lock signals: no real sleep, screen-lock or Windows lock was exercised in tests (the pure `slept` and `newly_locked` functions are unit-tested; the macOS observer is registered only on the real runtime). Jose's manual check: open an encrypted vault, put another app in front, lock the screen, wait, unlock: the vault is locked.
+- Lock signals: no real sleep, screen-lock or Windows lock was exercised in tests (the pure `slept` and `newly_locked` functions are unit-tested; the macOS observer is registered only on the real runtime). The maintainer's manual check: open an encrypted vault, put another app in front, lock the screen, wait, unlock: the vault is locked.

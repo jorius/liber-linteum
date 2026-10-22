@@ -451,7 +451,7 @@ fn quick_note_item_names_the_open_vault() {
                     .map(|(_, _, t)| t)
                     .unwrap()
             };
-            liber_desktop::menu::show_vault_in_menu(handle, Some("Smartjob"));
+            liber_desktop::menu::show_vault_in_menu(handle, Some("Myproject"));
             log.lock().unwrap().push(text(handle));
             liber_desktop::menu::show_vault_in_menu(handle, None);
             log.lock().unwrap().push(text(handle));
@@ -463,7 +463,7 @@ fn quick_note_item_names_the_open_vault() {
     assert_eq!(
         *texts.lock().unwrap(),
         [
-            "Create New Scratchpad for Smartjob".to_string(),
+            "Create New Scratchpad for Myproject".to_string(),
             "Create New Scratchpad in This Vault".to_string()
         ]
     );
@@ -554,12 +554,12 @@ fn encrypt_item_follows_the_page() {
             };
             use liber_desktop::menu::{VAULT_DECRYPT_ID, VAULT_ENCRYPT_ID};
             log.lock().unwrap().push(item(handle, VAULT_ENCRYPT_ID));
-            liber_desktop::menu::menu_set_encrypt_item(handle.clone(), Some("Smartjob".into()));
+            liber_desktop::menu::menu_set_encrypt_item(handle.clone(), Some("Myproject".into()));
             log.lock().unwrap().push(item(handle, VAULT_ENCRYPT_ID));
             liber_desktop::menu::menu_set_encrypt_item(handle.clone(), None);
             log.lock().unwrap().push(item(handle, VAULT_ENCRYPT_ID));
             log.lock().unwrap().push(item(handle, VAULT_DECRYPT_ID));
-            liber_desktop::menu::menu_set_decrypt_item(handle.clone(), Some("Smartjob".into()));
+            liber_desktop::menu::menu_set_decrypt_item(handle.clone(), Some("Myproject".into()));
             log.lock().unwrap().push(item(handle, VAULT_DECRYPT_ID));
             liber_desktop::menu::menu_set_decrypt_item(handle.clone(), None);
             log.lock().unwrap().push(item(handle, VAULT_DECRYPT_ID));
@@ -572,10 +572,10 @@ fn encrypt_item_follows_the_page() {
         *got.lock().unwrap(),
         [
             ("Encrypt Vault…".to_string(), false),
-            ("Encrypt “Smartjob”…".to_string(), true),
+            ("Encrypt “Myproject”…".to_string(), true),
             ("Encrypt Vault…".to_string(), false),
             ("Decrypt Vault…".to_string(), false),
-            ("Decrypt “Smartjob”…".to_string(), true),
+            ("Decrypt “Myproject”…".to_string(), true),
             ("Decrypt Vault…".to_string(), false),
         ]
     );

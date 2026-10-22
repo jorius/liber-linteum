@@ -12,7 +12,7 @@ use percent_encoding::percent_decode_str;
 pub enum DiskPath {
     /// `D:\Docs\x.pdf` or `\\server\share\x.pdf` (backslashes, `.`/`..` resolved).
     Windows(String),
-    /// `/Users/jose/x.png` (`.`/`..` resolved).
+    /// `/Users/me/x.png` (`.`/`..` resolved).
     Posix(String),
 }
 
@@ -292,38 +292,38 @@ mod tests {
             win(r"D:\Docs\my file.pdf")
         );
         assert_eq!(
-            external_target(Markdown, "FILE:///Users/jose/x.png", "a.md"),
-            posix("/Users/jose/x.png")
+            external_target(Markdown, "FILE:///Users/me/x.png", "a.md"),
+            posix("/Users/me/x.png")
         );
         assert_eq!(
-            external_target(Markdown, "file://localhost/Users/jose/x.png", "a.md"),
-            posix("/Users/jose/x.png")
+            external_target(Markdown, "file://localhost/Users/me/x.png", "a.md"),
+            posix("/Users/me/x.png")
         );
         assert_eq!(
             external_target(Markdown, "file://server/share/x.pdf", "a.md"),
             win(r"\\server\share\x.pdf")
         );
         assert_eq!(
-            external_target(Markdown, "file:/Users/jose/x.png", "a.md"),
-            posix("/Users/jose/x.png")
+            external_target(Markdown, "file:/Users/me/x.png", "a.md"),
+            posix("/Users/me/x.png")
         );
         // Wiki targets are as written: their `file:` URLs are decoded here
         // (Markdown destinations arrive decoded already, so `%25` stays `%`).
         assert_eq!(
-            external_target(Embed, "file:///Users/jose/a%20b.png", "a.md"),
-            posix("/Users/jose/a b.png")
+            external_target(Embed, "file:///Users/me/a%20b.png", "a.md"),
+            posix("/Users/me/a b.png")
         );
         assert_eq!(
-            external_target(Markdown, "file:///Users/jose/100%25.png", "a.md"),
-            posix("/Users/jose/100%25.png")
+            external_target(Markdown, "file:///Users/me/100%25.png", "a.md"),
+            posix("/Users/me/100%25.png")
         );
     }
 
     #[test]
     fn posix_absolute_paths() {
         assert_eq!(
-            external_target(Embed, "/Users/jose/Pictures/../x.png", "a.md"),
-            posix("/Users/jose/x.png")
+            external_target(Embed, "/Users/me/Pictures/../x.png", "a.md"),
+            posix("/Users/me/x.png")
         );
         assert_eq!(
             external_target(Markdown, "/../../etc/x", "a.md"),
@@ -405,7 +405,7 @@ mod tests {
         assert_eq!(network_server("/net/host/x.png"), Some("host"));
         assert_eq!(network_server("/NET/host/x.png"), Some("host"));
         assert_eq!(network_server(r"D:\Docs\x.pdf"), None);
-        assert_eq!(network_server("/Users/jose/x.png"), None);
+        assert_eq!(network_server("/Users/me/x.png"), None);
         assert_eq!(network_server("/net"), None);
         assert_eq!(network_server("/network/x"), None);
     }

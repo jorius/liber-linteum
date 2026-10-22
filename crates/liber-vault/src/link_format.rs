@@ -19,7 +19,7 @@ pub enum LinkFormat {
     Vault,
     /// `![[../Assets/x.png]]`: relative to the note's folder.
     Relative,
-    /// `![](file:///D:/Mind_PC/Assets/x.png)`: the absolute path on disk.
+    /// `![](file:///D:/Notes_PC/Assets/x.png)`: the absolute path on disk.
     Absolute,
 }
 

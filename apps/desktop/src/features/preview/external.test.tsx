@@ -264,13 +264,15 @@ describe('where attachments are on disk (M4b part 3 §8)', () => {
 
   it('on Windows with backslashes; outside files show their own path', async () => {
     vi.stubGlobal('navigator', { ...navigator, userAgent: 'Mozilla/5.0 (Windows NT 10.0)' });
-    useVaultStore.setState({ info: { name: 'Mind_PC', root: 'D:\\Mind_PC', report: {} as never } });
+    useVaultStore.setState({
+      info: { name: 'Notes_PC', root: 'D:\\Notes_PC', report: {} as never },
+    });
     act(() =>
       useSettingsStore.setState({ settings: { ...DEFAULT_SETTINGS, showAttachmentPaths: true } }),
     );
     outside['E:\\Pics\\a.png'] = file('E:\\Pics\\a.png');
     show('![[rex cover.png]]\n\n![[E:\\Pics\\a.png]]\n');
-    expect(await screen.findByText('D:\\Mind_PC\\assets\\rex cover.png')).toBeInTheDocument();
+    expect(await screen.findByText('D:\\Notes_PC\\assets\\rex cover.png')).toBeInTheDocument();
     expect(await screen.findByText('E:\\Pics\\a.png')).toBeInTheDocument();
   });
 });

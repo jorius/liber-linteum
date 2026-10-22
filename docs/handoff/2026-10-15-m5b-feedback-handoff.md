@@ -1,6 +1,6 @@
 # M5b — Third feedback round (layout overhaul, icons, Trash and Archive, Auto save, fixes): Hand-off
 
-**What this round is:** Jose's feedback of 2026-10-15 after testing the M4c + M5 build, 13 points in all. He answered four questions:
+**What this round is:** the maintainer's feedback of 2026-10-15 after testing the M4c + M5 build, 13 points in all. He answered four questions:
 - **Trash:** both an in-app Trash and a 🗑 on every row, plus an **Archived** row above Trash.
 - **Row actions:** + new page, ☺ icon, 🗑, and ….
 - **Wide tables:** full editor width, centred.
@@ -8,8 +8,8 @@
 - **Archive** hides an item and keeps it working.
 
 **Spec:** `docs/superpowers/specs/2026-10-15-m5b-feedback-design.md`.
-- **§1–§9:** the design. §1 is the table of Jose's 13 points.
-- **§10:** the rulings taken for Jose at design time.
+- **§1–§9:** the design. §1 is the table of the maintainer's 13 points.
+- **§10:** the rulings taken for the maintainer at design time.
 - **§11–§14:** the amendments from each stream (A shell, B icons, C Trash and Archive, D fixes).
 - **§15–§16:** the two final reviews, with what was fixed and what was deferred.
 
@@ -31,9 +31,9 @@
 
 ---
 
-## 1. What changed, by Jose's points
+## 1. What changed, by the maintainer's points
 
-| # | Jose said | What it is now |
+| # | Feedback | What it is now |
 |---|---|---|
 | 1 | Quick actions on files and folders | Hovering or focusing a sidebar row shows **+** (folders: a new page inside), **☺** (pick an emoji), **🗑** (move to Trash, after the confirmation) and **…** (the row's menu, which right-click still opens). Attachments get 🗑 and … only. Delete / ⌘⌫ / Backspace on a focused row trash it, after the confirmation. The row menu gains **Icon…** and **Archive**. |
 | 2 | Optional emoji, as in Notion | Pages, folders and the vault can each have one. It shows in the sidebar, before the page title, in breadcrumbs, on Global View cards, in search results, in the `[[` list and in the recent-vault list. The picker searches in English and Spanish names, keeps recent picks and has **Remove**. Its data is bundled (offline, 1,812 emoji up to Emoji 13.1, no skin tones). |
@@ -79,7 +79,7 @@
 
 ## 3. Needs the real window
 
-### Jose, on the Mac (the built `.app`, not `pnpm dev`)
+### The maintainer, on the Mac (the built `.app`, not `pnpm dev`)
 
 The Dock Quit and native-menu checks only mean something in the bundle.
 
@@ -127,7 +127,7 @@ The Dock Quit and native-menu checks only mean something in the bundle.
 11. **Window title:** "Page — Vault" in the editor; "Global view — Vault"; "Trash — Vault" and "Archived — Vault"; just the app name after Close Vault.
 12. **Quick notes still work** (⌘⇧N into the Scratchpad, named from the first line), and **single-file windows** (⌘⇧O) still have their own header styling.
 
-### The friend, on Windows (the `.exe`)
+### The Windows tester (the `.exe`)
 
 1. There's no menu bar. **Click the vault name** in the sidebar for Settings…, Open another vault… and Close vault. **Ctrl+,** also opens Settings.
 2. **Ctrl+F** opens Search. With a dialog open or on the Welcome screen, check that WebView2's own find bar doesn't appear.
@@ -200,10 +200,10 @@ No Critical issues. Fixed, each with a test that failed first:
   - A `.Archive` folder on a case-insensitive disk takes archived items.
   - A vault at `~` on macOS would list the system `~/.Trash`.
 
-### Rulings to confirm (taken for Jose)
+### Rulings to confirm (taken for the maintainer)
 
 **Layout and menus:**
-1. **Actions button:** bottom right as Jose asked, with Bottom left and Top right in Settings (from his first message). ⌘J toggles it. It's a disclosure button, not an ARIA menu.
+1. **Actions button:** bottom right as the maintainer asked, with Bottom left and Top right in Settings (from his first message). ⌘J toggles it. It's a disclosure button, not an ARIA menu.
 2. **No menu bar on Windows or Linux.** The vault-name menu is the way to Settings, Open another vault and Close vault there, and on macOS too.
 3. **No Open Recent submenu.** Close Vault goes to Welcome, which lists recent vaults.
 4. **Accelerators:** Open Vault… has none (the page answers ⌘O; two dialogs would open), and neither does Toggle Sidebar (the page answers ⌘\\; two toggles would cancel out). Close Vault is **⌥⌘W**.
@@ -271,7 +271,7 @@ No Critical issues. Fixed, each with a test that failed first:
 
 ## 7. Round 2 (evening of 2026-10-15)
 
-Jose tested the M5b build and sent a second batch of feedback. Everything below is on `feat/m5b-feedback` after `d0677c6`: 29 signed commits from `4aae8f3` (the title fix) to the tip. Spec: §17 (round 2 and its review), §18 (Settings with categories), §19 (Favorites).
+The maintainer tested the M5b build and sent a second batch of feedback. Everything below is on `feat/m5b-feedback` after `d0677c6`: 29 signed commits from `4aae8f3` (the title fix) to the tip. Spec: §17 (round 2 and its review), §18 (Settings with categories), §19 (Favorites).
 
 ### 7.1 What changed
 
@@ -353,7 +353,7 @@ A fresh Opus review of `4aae8f3..7c69026` found 4 Important issues and 14 Minor 
 - The Trash's "Earlier this week" means the last 7 days; sizes are 1024-based.
 - Favourites saves go through a queue over the whole-list command, not separate add/remove/move commands.
 
-### 7.6 Real-window checklist (Jose, on the Mac `.app`)
+### 7.6 Real-window checklist (the maintainer, on the Mac `.app`)
 
 1. **Title on covers:** open a page with a top cover. The title and subtitle sit at the top of the cover, the breadcrumb under them. Try Settings → Editor → Default cover height → Small: the band grows a little to fit. Add a cover while typing in the subtitle: the cursor stays.
 2. **Settings:** ⌘, opens on General. Walk the categories with the mouse and with ↑/↓. Search "theme", then "line"; clear it. Tab round the dialog while searching: it stays inside. Check Keyboard shortcuts (it shows ⌘⇧D and ⌘⇧7/8/9/.). Settings → This vault: both text fields are full width. The Auto save hint says ⌘S.

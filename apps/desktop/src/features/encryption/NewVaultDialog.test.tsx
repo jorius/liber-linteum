@@ -178,7 +178,7 @@ describe('New vault dialog', () => {
   });
 
   it('a folder never encrypted in place (§8.10): no offer, it says why; Plain still opens it', async () => {
-    const calls = backend(['/Users/jose/Documents'], { '/Users/jose/Documents': 'refused' });
+    const calls = backend(['/Users/me/Documents'], { '/Users/me/Documents': 'refused' });
     const dialog = await start();
     await userEvent.click(within(dialog).getByRole('radio', { name: 'Encrypted Beta' }));
     const go = within(dialog).getByRole('button', { name: 'Continue' });
@@ -193,7 +193,7 @@ describe('New vault dialog', () => {
     await userEvent.click(within(dialog).getByRole('radio', { name: 'Plain' }));
     await userEvent.click(go);
     await waitFor(() => expect(useVaultStore.getState().status).toBe('open'));
-    expect(sent(calls, 'vault_open')).toEqual([{ path: '/Users/jose/Documents' }]);
+    expect(sent(calls, 'vault_open')).toEqual([{ path: '/Users/me/Documents' }]);
   });
 
   it.each(['plain', 'encrypted'])(

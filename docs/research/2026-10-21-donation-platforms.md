@@ -1,6 +1,6 @@
 # Donation platforms (research, 2026-10-21)
 
-For the "Support the project" button on the showcase site (and `.github/FUNDING.yml` once the repo is public). Nothing is set up yet: Jose has no account on any of these.
+For the "Support the project" button on the showcase site (and `.github/FUNDING.yml` once the repo is public). Nothing is set up yet: the maintainer has no account on any of these.
 
 Fees below come mostly from third-party comparisons; check each platform's own pricing page before signing up.
 

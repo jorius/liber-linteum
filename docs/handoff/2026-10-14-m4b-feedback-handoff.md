@@ -1,4 +1,4 @@
-# M4b — Feedback round (after Jose's real-window check of M2c–M4): Hand-off
+# M4b — Feedback round (after the maintainer's real-window check of M2c–M4): Hand-off
 
 **Specs:**
 - Part 1: `docs/superpowers/specs/2026-10-14-m4b-feedback-design.md` (§10 amendments);
@@ -10,7 +10,7 @@
 **Branch:** `feat/m4b-feedback`, stacked on `feat/m4-block-moves` ← `feat/m3b-relationships` ← `feat/m3a-global-view` ← `feat/m2c-page-extras`. Merge in order: M2c → M3a → M3b → M4 → M4b.
 
 **How this round was made:**
-1. Jose tested M2c–M4 in the real window on 2026-10-14 and sent two lists of feedback.
+1. The maintainer tested M2c–M4 in the real window on 2026-10-14 and sent two lists of feedback.
 2. Each answer was settled with him through questions: the header layout, `[[` search, the attachments override, how relationships are found, page width, text files, the code-block language picker, and the scratchpad.
 3. The work was built in two parts, then went through one review and one fix pass.
 
@@ -95,7 +95,7 @@ After the fix pass:
 | Minors | Word count parsed twice and counted URLs; outline O(n²); `class_` colouring; Copy announcements; excerpts and `$$`; band height 163 px → 132; subtitle ellipsis; text view back arrow; page widths after delete | one commit each, RED → GREEN |
 | M4 bug | Gutter keys pressed while the Split pane lagged were dropped | queued and replayed |
 
-**Found by Jose after the fix pass:**
+**Found by the maintainer after the fix pass:**
 - **Symptom:** `pnpm dev` opened a blank window.
 - **Cause:** Vite's dev server ran the freeze-safe transform a second time on its pre-bundled deps (`node_modules/.vite/deps`), turning the helper's own `Object.assign` into a call to itself, so startup overflowed the stack. Production builds run the transform once, so no e2e saw it.
 - **Fix (`ed0b717`):** the transform is idempotent and skips pre-bundled deps; covered by tests in `tests/freezeSafe.test.ts`.
@@ -106,7 +106,7 @@ After the fix pass:
 - `Object.assign` replacement overhead (~130 ns per call);
 - the gutter's current block id isn't remapped after an external re-parse.
 
-## 5. Added after the round: resizable covers (Jose, 2026-10-14)
+## 5. Added after the round: resizable covers (the maintainer, 2026-10-14)
 
 **The feature:** drag the cover band's bottom edge to resize it, per page.
 - **Storage:** heights live in `.liber/vault.json` `coverHeights`, never in the note. They follow renames and moves, and are forgotten when the page is deleted.

@@ -15,7 +15,7 @@ The previous session ran long and crashed several times (see "Resource rules"). 
 
 | Branch | Where | State | What's left |
 |---|---|---|---|
-| `feat/custom-titlebar` | main checkout (`/home/jorius/Sources/GitHub/Personal/liber-linteum`) | **Done, uncommitted** (Jose still to test the `.deb` built from it) | Commit; merge `origin/main` (`556884e`, vault-name menu items) into it — **merge, never rebase**; add menu items for Find, Go to line, Decrypt, Home when those land |
+| `feat/custom-titlebar` | main checkout (`<repo>`) | **Done, uncommitted** (the maintainer still to test the `.deb` built from it) | Commit; merge `origin/main` (`556884e`, vault-name menu items) into it — **merge, never rebase**; add menu items for Find, Go to line, Decrypt, Home when those land |
 | `feat/find-and-extensions` | `.claude/worktrees/agent-a0f9290c3d8a8255e` | 2 commits: find in page + show file extensions; auto-close brackets and quotes | **Cursor position** (`Ln 12, Col 8 · 15 selected`, a button opening Go to line) and **Go to line** (Ctrl+G on every OS incl. macOS; `42`, `42:7`, `+5`/`-5`; macOS menu Edit → Go to Line… id `liber-goto-line`; shortcuts table). Then the checks |
 | `feat/decrypt-vault` | `.claude/worktrees/agent-ae8a207fa54399ab0` | ~41 files uncommitted work in progress (based on `556884e`) | Review the diff, finish: Decrypt "<vault>" (passphrase **and** recovery key, crash-safe in-place decrypt mirroring encrypt-in-place, keys/header/epochs removed, re-encrypt gets new id) and the "keep a readable backup in a folder you pick" step of Encrypt in place. Design sections go in `docs/superpowers/specs/2026-10-21-encryption-ux-design.md` |
 | `feat/home-page` | `.claude/worktrees/agent-a92400d8f4e7e8d4e` | ~35 files uncommitted work in progress | Finish: per-vault home (a page or the Global View) in `.liber/vault.json`, follows renames, cleared on trash/archive; set from the tree's context menu, the Global View, Settings → vault; house glyph in the tree; open flow goes home unless something explicit was requested |
@@ -32,12 +32,12 @@ Untracked in the main checkout: `examples/` (sample vault, Notion sample), `docs
 
 ## After all branches land
 
-1. Merge everything into one integration branch (merges only), run the full checks once (serially), build the `.deb` (`cd apps/desktop && pnpm tauri build --bundles deb`), hand it to Jose with a test list.
+1. Merge everything into one integration branch (merges only), run the full checks once (serially), build the `.deb` (`cd apps/desktop && pnpm tauri build --bundles deb`), hand it to the maintainer with a test list.
 2. Capture real screenshots/videos of the sample vault for the site.
 3. Release pipeline: fix CI (known Linux issues already fixed on `feat/custom-titlebar`: `tests/menu.rs` macOS-only items; `m1b_every_command…` hanging on a real file dialog. Still failing on Linux: `cover-resize.spec.ts` ×3, `m2c.spec.ts:58`, `m4b3-files.spec.ts:172,193`; flaky `blockMoves` 200 KB perf test). Tagged releases with `.deb`, `.AppImage`, `.exe`, `.msi`, `.dmg`, SHA-256 checksums and VirusTotal links (unsigned is fine), writing the site's `release.json`.
 4. Personal site card in the `jorius.github.io` repo (its own conventions: npm, capitalised-verb commits, **no Co-Authored-By**).
 
-## Decided with Jose (don't re-ask)
+## Decided with the maintainer (don't re-ask)
 
 - Linux/Windows title bar: the app draws its own (option B), menus mirror macOS.
 - Encrypt in place offers a readable backup in a folder the user picks.
@@ -45,6 +45,6 @@ Untracked in the main checkout: `examples/` (sample vault, Notion sample), `docs
 - Ctrl+F finds in the page in the editor; Ctrl+Shift+F is vault search.
 - Home page per vault: a page or the Global View.
 - Showcase site: "open desert by day", approved round-2 mock; roadmap section with version history, slash menu, focus mode; credits "An idea by José Meza, built by Jose Ríos."
-- Donations: GitHub Sponsors + Ko-fi recommended; Jose to create accounts (see `docs/research/2026-10-21-donation-platforms.md`).
+- Donations: GitHub Sponsors + Ko-fi recommended; the maintainer to create accounts (see `docs/research/2026-10-21-donation-platforms.md`).
 - Releases unsigned, with checksums and VirusTotal.
-- Next editor basics after this batch: from the list in the session (zoom shortcuts, print/PDF, quick switcher, multiple cursors, insert date, version history…), Jose picks.
+- Next editor basics after this batch: from the list in the session (zoom shortcuts, print/PDF, quick switcher, multiple cursors, insert date, version history…), the maintainer picks.

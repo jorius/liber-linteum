@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Answer Jose's real-window feedback on M2c–M4. The page text starts about 25% from the top under a compact header band, with the cover as its background. Buttons take the palette. The `[[` list gets a search line, and the ⌘K picker stays on screen. Pasted TIFF, BMP and HEIC images are saved as PNG. Liber Linteum can override Obsidian's attachment folder. Related pages become chips, the Global View gets "Connect cards", and the Dock icon sits inside Apple's grid.
+**Goal:** Answer the maintainer's real-window feedback on M2c–M4. The page text starts about 25% from the top under a compact header band, with the cover as its background. Buttons take the palette. The `[[` list gets a search line, and the ⌘K picker stays on screen. Pasted TIFF, BMP and HEIC images are saved as PNG. Liber Linteum can override Obsidian's attachment folder. Related pages become chips, the Global View gets "Connect cards", and the Dock icon sits inside Apple's grid.
 
 **Architecture:**
 - **Shell and header.** The shell moves the page title and subtitle into the top bar (`PageHeading`), and the sidebar names the vault. `Cover` becomes the header band: a render-prop component that draws the cover as a background, while `PageHeader` places its rows on veiled pills.

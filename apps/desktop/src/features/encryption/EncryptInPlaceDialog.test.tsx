@@ -26,7 +26,7 @@ vi.mock('../editor/unsavedPrompt', () => ({
 
 const CODE = `LIBER-${Array.from({ length: 14 }, (_, i) => `G${String(i + 1).padStart(2, '0')}X`).join('-')}`;
 const PASS = 'correct horse battery';
-const ROOT = '/v/Smartjob';
+const ROOT = '/v/Myproject';
 const report = {
   files: 0,
   pages: 0,
@@ -36,7 +36,7 @@ const report = {
   warnings: [],
   durationMs: 1,
 };
-const plain = { name: 'Smartjob', root: ROOT, report };
+const plain = { name: 'Myproject', root: ROOT, report };
 const encrypted = (pending = false) => ({ ...plain, encrypted: true, originalsPending: pending });
 
 interface Deferred {
@@ -125,7 +125,7 @@ function openPlain(unsaved: string[] = []) {
 async function start(root = ROOT) {
   render(<EncryptInPlaceHost />);
   await act(() => openEncryptInPlace(root));
-  const dialog = await screen.findByRole('dialog', { name: 'Encrypt “Smartjob”' });
+  const dialog = await screen.findByRole('dialog', { name: 'Encrypt “Myproject”' });
   return dialog;
 }
 
@@ -243,7 +243,7 @@ describe('Encrypt in place: intro and preflight', () => {
 });
 
 describe('Encrypt in place: the readable backup (§9)', () => {
-  const COPY = '/backups/Smartjob copy';
+  const COPY = '/backups/Myproject copy';
 
   async function toBackup(dialog: HTMLElement) {
     await within(dialog).findByText(/1,204 files\./);
@@ -261,7 +261,9 @@ describe('Encrypt in place: the readable backup (§9)', () => {
     expect(keep).not.toBeChecked();
     expect(skip).not.toBeChecked();
     expect(keep).toHaveFocus();
-    expect(within(dialog).getByText(/Trash as “Smartjob \(unencrypted originals\)”/)).toBeVisible();
+    expect(
+      within(dialog).getByText(/Trash as “Myproject \(unencrypted originals\)”/),
+    ).toBeVisible();
     const next = within(dialog).getByRole('button', { name: 'Choose a passphrase…' });
     expect(next).toBeDisabled();
     await userEvent.click(keep);
@@ -471,13 +473,13 @@ describe('Encrypt in place: final round', () => {
 
   it('the open vault begin closes under another spelling (preflight says so) is left, and comes back', async () => {
     backend({ closesOpen: true });
-    useVaultStore.setState({ status: 'open', info: { ...plain, root: '/private/v/Smartjob' } });
+    useVaultStore.setState({ status: 'open', info: { ...plain, root: '/private/v/Myproject' } });
     useEditorStore.setState({ saveAll: async () => [] });
     const dialog = await start();
     await toKey(dialog);
     expect(useVaultStore.getState().status).toBe('closed');
     await userEvent.click(within(dialog).getByRole('button', { name: 'Cancel' }));
-    await waitFor(() => expect(sent('vault_open')).toEqual([{ path: '/private/v/Smartjob' }]));
+    await waitFor(() => expect(sent('vault_open')).toEqual([{ path: '/private/v/Myproject' }]));
   });
 
   it('from begin until it ends, no entry point switches vaults: it says to wait', async () => {
@@ -556,7 +558,7 @@ describe('Encrypt in place: encrypting, done and errors', () => {
     await act(async () => runGate!.resolve(encrypted()));
     expect(
       await within(dialog).findByText(
-        "1,204 files encrypted and checked. The unencrypted originals are in the Trash as “Smartjob (unencrypted originals)”: empty it when you're happy.",
+        "1,204 files encrypted and checked. The unencrypted originals are in the Trash as “Myproject (unencrypted originals)”: empty it when you're happy.",
       ),
     ).toBeInTheDocument();
     expect(useVaultStore.getState().status).toBe('open');
@@ -620,7 +622,7 @@ describe('Encrypt in place: encrypting, done and errors', () => {
     await userEvent.click(within(dialog).getByRole('button', { name: 'Move to Trash' }));
     expect(sent('vault_trash_originals')).toHaveLength(1);
     expect(
-      await within(dialog).findByText(/in the Trash as “Smartjob \(unencrypted originals\)”/),
+      await within(dialog).findByText(/in the Trash as “Myproject \(unencrypted originals\)”/),
     ).toBeInTheDocument();
     expect(useVaultStore.getState().info?.originalsPending).toBe(false);
   });
@@ -682,7 +684,7 @@ describe('Encrypt in place: final review', () => {
     expect(await act(() => mayClose())).toBe(false);
     const question = within(dialog).getByRole('alert');
     expect(question).toHaveTextContent(
-      'Encrypting “Smartjob”… Quit anyway? It will finish or undo itself next time you open it.',
+      'Encrypting “Myproject”… Quit anyway? It will finish or undo itself next time you open it.',
     );
     const keep = within(question).getByRole('button', { name: 'Keep encrypting' });
     expect(keep).toHaveFocus();

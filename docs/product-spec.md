@@ -1,7 +1,7 @@
 # Liber Linteum — Product Spec (v0.2)
 
 > **Status:** v0.2 — all open questions closed · **Date:** 2026-10-12
-> **Roles:** Jose — tech lead · PO — product owner (owns the idea and final say on behavior)
+> **Roles:** tech lead: the maintainer · PO — product owner (owns the idea and final say on behavior)
 > **Purpose of this file:** the single source of truth for *what* we build and *why*, written to be handed to Claude Code.
 > **Not in this file:** architecture, stack, libraries, storage engines. Those live in `docs/superpowers/specs/2026-10-12-architecture-design.md`.
 

@@ -171,7 +171,7 @@ impl Harness {
 #[test]
 fn encrypts_a_plain_vault_in_place_end_to_end() {
     let h = harness();
-    let root = h.plain("Smartjob");
+    let root = h.plain("Myproject");
     // Open plain first: its index lands in the cache.
     call(&h.main, "vault_open", json!({ "path": root })).unwrap();
     let index_dir = liber_session::index_db_path(h.cache.path(), &root)
@@ -201,7 +201,7 @@ fn encrypts_a_plain_vault_in_place_end_to_end() {
     let info = call(&h.main, "vault_encrypt_run", json!({})).unwrap();
     assert_eq!(info["encrypted"], true);
     assert_eq!(info["originalsPending"], false);
-    assert_eq!(info["name"], "Smartjob");
+    assert_eq!(info["name"], "Myproject");
     let progress = progress.lock().unwrap().clone();
     assert_eq!(progress.last(), Some(&json!({ "done": 4, "total": 4 })));
     assert!(progress.len() >= 4, "{progress:?}");
@@ -216,7 +216,7 @@ fn encrypts_a_plain_vault_in_place_end_to_end() {
             .unwrap();
     assert_eq!(epochs.as_object().unwrap().len(), 1, "{epochs}");
     // The originals went to the (fake) trash, visibly named.
-    let trashed = h.bin().join("Smartjob (unencrypted originals)");
+    let trashed = h.bin().join("Myproject (unencrypted originals)");
     assert_eq!(std::fs::read(trashed.join("Sub/Deep.md")).unwrap(), b"deep");
     assert!(convert::read_journal(&root).unwrap().is_none());
     // The code shown at begin opens it.
@@ -877,9 +877,9 @@ fn every_backup_and_decrypt_command_is_main_only() {
 #[test]
 fn encrypts_with_a_verified_readable_backup_first() {
     let h = harness();
-    let root = h.plain("Smartjob");
+    let root = h.plain("Myproject");
     let before = files_of(&root);
-    let dest = h.disk.path().join("Smartjob backup");
+    let dest = h.disk.path().join("Myproject backup");
     h.pick_backup(Some(dest.clone()));
     let picked = call(
         &h.main,
@@ -892,7 +892,7 @@ fn encrypts_with_a_verified_readable_backup_first() {
         json!(
             dunce::canonicalize(h.disk.path())
                 .unwrap()
-                .join("Smartjob backup")
+                .join("Myproject backup")
         )
     );
     call(
@@ -994,7 +994,7 @@ fn a_stopped_backup_undoes_the_conversion_and_leaves_no_copy() {
 #[test]
 fn decrypts_in_place_with_both_secrets_and_retires_the_keys() {
     let h = harness();
-    let root = h.plain("Smartjob");
+    let root = h.plain("Myproject");
     let original = snapshot(&root);
     let code = h.encrypted(&root);
     let old_ids: Vec<String> = h.epochs().as_object().unwrap().keys().cloned().collect();
@@ -1021,7 +1021,7 @@ fn decrypts_in_place_with_both_secrets_and_retires_the_keys() {
     let progress = h.events("vault:decrypt-progress");
     let info = call(&h.main, "vault_decrypt_run", json!({})).unwrap();
     assert_eq!(info["encrypted"], false);
-    assert_eq!(info["name"], "Smartjob");
+    assert_eq!(info["name"], "Myproject");
     assert_eq!(
         progress.lock().unwrap().last(),
         Some(&json!({ "done": 4, "total": 4 }))
@@ -1049,7 +1049,7 @@ fn decrypts_in_place_with_both_secrets_and_retires_the_keys() {
         .as_array()
         .unwrap()
         .iter()
-        .find(|r| r["name"] == "Smartjob")
+        .find(|r| r["name"] == "Myproject")
         .unwrap();
     assert_eq!(row["encrypted"], false);
 

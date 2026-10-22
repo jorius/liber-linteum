@@ -1,10 +1,10 @@
 # M3b — Global View: relationships and index notes: Hand-off
 
-**Spec:** `docs/superpowers/specs/2026-10-14-m3b-relationships-design.md` (§9: decisions taken for Jose without review; §10: amendments from planning; §11: amendments from the final review) · **Plan:** `docs/superpowers/plans/2026-10-14-m3b-relationships.md` (replayed end to end on a scratch clone)
+**Spec:** `docs/superpowers/specs/2026-10-14-m3b-relationships-design.md` (§9: decisions taken for the maintainer without review; §10: amendments from planning; §11: amendments from the final review) · **Plan:** `docs/superpowers/plans/2026-10-14-m3b-relationships.md` (replayed end to end on a scratch clone)
 **Branch:** `feat/m3b-relationships`, **stacked on `feat/m3a-global-view`**, which is stacked on `feat/m2c-page-extras`. Merge in order: M2c → M3a → M3b. Previous hand-off: `docs/handoff/2026-10-14-m3a-global-view-handoff.md`.
 
 **How this milestone was made:**
-- It was designed, planned and built after Jose asked to "carry on with everything that's missing" and review in bulk later.
+- It was designed, planned and built after the maintainer asked for the remaining features to be built and reviewed in bulk later.
 - **Grounding:**
   - the product spec GV-02 and GV-22–24 (all DECIDED);
   - architecture §3.3 and §4.4;

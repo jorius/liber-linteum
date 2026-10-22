@@ -14,20 +14,20 @@ afterEach(() => {
   clearMocks();
 });
 
-const info = { name: 'Smartjob', root: '/v/Smartjob', report: {} as never };
+const info = { name: 'Myproject', root: '/v/Myproject', report: {} as never };
 
 describe('Encrypt "<name>"… (UX round §4.1)', () => {
   it('opens the encrypt dialog for a vault folder', async () => {
     mockIPC((cmd) => (cmd === 'folder_kind' ? 'plain' : null));
-    await openEncryptInPlace('/v/Smartjob');
-    expect(useUiStore.getState().dialog).toEqual({ type: 'encryptInPlace', root: '/v/Smartjob' });
+    await openEncryptInPlace('/v/Myproject');
+    expect(useUiStore.getState().dialog).toEqual({ type: 'encryptInPlace', root: '/v/Myproject' });
   });
 
   it.each([
-    ['/Users/jose/Documents', 'Encrypt a vault folder, not Documents.'],
-    ['/Users/jose', 'Encrypt a vault folder, not jose.'],
+    ['/Users/me/Documents', 'Encrypt a vault folder, not Documents.'],
+    ['/Users/me', 'Encrypt a vault folder, not me.'],
     ['/', 'Encrypt a vault folder, not /.'],
-    ['C:\\Users\\jose\\Desktop', 'Encrypt a vault folder, not Desktop.'],
+    ['C:\\Users\\me\\Desktop', 'Encrypt a vault folder, not Desktop.'],
   ])('a refused folder (%s, §8.10) gets no dialog, a toast saying why', async (path, text) => {
     mockIPC((cmd) => (cmd === 'folder_kind' ? 'refused' : null));
     await openEncryptInPlace(path);
@@ -39,7 +39,7 @@ describe('Encrypt "<name>"… (UX round §4.1)', () => {
     mockIPC((cmd) => {
       if (cmd === 'folder_kind') throw { kind: 'convertingElsewhere', message: 'x' };
     });
-    await openEncryptInPlace('/v/Smartjob');
+    await openEncryptInPlace('/v/Myproject');
     expect(useUiStore.getState().dialog).toBeNull();
     expect(useToastStore.getState().toasts.at(-1)?.message).toMatch(/another device/);
   });
@@ -51,15 +51,15 @@ describe('Encrypt "<name>"… (UX round §4.1)', () => {
     });
     act(() => useVaultStore.setState({ status: 'open', info }));
     const hook = renderHook(() => useEncryptMenuItem());
-    expect(sent).toEqual(['Smartjob']);
+    expect(sent).toEqual(['Myproject']);
     act(() => useVaultStore.setState({ info: { ...info, name: 'Other', root: '/v/Other' } }));
-    expect(sent).toEqual(['Smartjob', 'Other']);
+    expect(sent).toEqual(['Myproject', 'Other']);
     act(() => useVaultStore.setState({ info: { ...info, encrypted: true } }));
     expect(sent.at(-1)).toBeNull();
     act(() => useVaultStore.setState({ info: { ...info, scratchpad: true } }));
     expect(sent.at(-1)).toBeNull();
     act(() => useVaultStore.setState({ info }));
-    expect(sent.at(-1)).toBe('Smartjob');
+    expect(sent.at(-1)).toBe('Myproject');
     // The shell going (Welcome, Unlock) turns it off.
     hook.unmount();
     expect(sent.at(-1)).toBeNull();
@@ -72,13 +72,15 @@ describe('an interrupted conversion, recovered on open', () => {
     const hook = renderHook(() => useEncryptRecovered());
     await act(() => new Promise((r) => setTimeout(r)));
     await act(() =>
-      emit('vault:encrypt-recovered', { path: '/v/Smartjob', outcome: 'rolledBack' }),
+      emit('vault:encrypt-recovered', { path: '/v/Myproject', outcome: 'rolledBack' }),
     );
     expect(useToastStore.getState().toasts.at(-1)?.message).toBe(
-      'Encrypting “Smartjob” was interrupted; the vault is back as it was.',
+      'Encrypting “Myproject” was interrupted; the vault is back as it was.',
     );
-    await act(() => emit('vault:encrypt-recovered', { path: '/v/Smartjob', outcome: 'finished' }));
-    expect(useToastStore.getState().toasts.at(-1)?.message).toBe('Finished encrypting “Smartjob”.');
+    await act(() => emit('vault:encrypt-recovered', { path: '/v/Myproject', outcome: 'finished' }));
+    expect(useToastStore.getState().toasts.at(-1)?.message).toBe(
+      'Finished encrypting “Myproject”.',
+    );
     hook.unmount();
   });
 
@@ -87,11 +89,13 @@ describe('an interrupted conversion, recovered on open', () => {
     const hook = renderHook(() => useEncryptRecovered());
     await act(() => new Promise((r) => setTimeout(r)));
     act(() => useVaultStore.setState({ status: 'opening' }));
-    await act(() => emit('vault:encrypt-recovered', { path: '/v/Smartjob', outcome: 'finished' }));
+    await act(() => emit('vault:encrypt-recovered', { path: '/v/Myproject', outcome: 'finished' }));
     useToastStore.getState().clear();
     expect(useToastStore.getState().toasts).toEqual([]);
     act(() => useVaultStore.setState({ status: 'locked' }));
-    expect(useToastStore.getState().toasts.at(-1)?.message).toBe('Finished encrypting “Smartjob”.');
+    expect(useToastStore.getState().toasts.at(-1)?.message).toBe(
+      'Finished encrypting “Myproject”.',
+    );
     hook.unmount();
   });
 });

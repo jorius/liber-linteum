@@ -1,7 +1,7 @@
 # Liber Linteum — Architecture Design (plan doc v1)
 
 > **Status:** Approved in design review · **Date:** 2026-10-12
-> **Roles:** Jose — tech lead (decisions below are DECIDED) · PO — product owner
+> **Roles:** tech lead: the maintainer (decisions below are DECIDED) · PO — product owner
 > **Companion to:** `docs/product-spec.md` v0.2 (the *what*). This file is the *how*.
 > Requirement IDs (e.g. `GV-11`) refer to the product spec.
 > **As built:** this is the approved v1 design. Where the code went another way, §0 says so and the section is marked; the milestone specs in `docs/superpowers/specs/` hold the details. The index and its database are documented as built in `docs/architecture/index-and-database.md`.

@@ -1,9 +1,9 @@
 # M4b part 3 — Second feedback round (Windows test, Obsidian vault): Hand-off
 
 **Where the feedback came from:**
-- Jose's Mac check.
-- A friend's test on Windows with a real Obsidian vault ("Mind_PC").
-- Two later requests from Jose:
+- The maintainer's Mac check.
+- A tester's check on Windows with a real Obsidian vault.
+- Two later requests from the maintainer:
   - wide tables;
   - Escape and a click outside close Settings.
 
@@ -23,7 +23,7 @@
 **Branch:** `feat/m4b3-feedback`, stacked on `feat/m4b-feedback`. Merge order for the whole stack: M2c → M3a → M3b → M4 → M4b → M4b part 3.
 
 **How it was built:**
-1. Six questions answered by Jose: titles, side covers, link formats, picked files, atoms, and the Windows cover.
+1. Six questions answered by the maintainer: titles, side covers, link formats, picked files, atoms, and the Windows cover.
 2. A further question about wide elements.
 3. Four streams built in parallel, each with its own plan, worktree and full gate:
 
@@ -51,8 +51,8 @@
 | Format bar: pick files through the OS dialog | **Attach** (paperclip) opens the system file dialog with multiple selection; "All files" comes first on Windows. It then asks **Copy into the vault** or **Link to where it is**, each time. Files already in the vault are linked directly. |
 | Optional: show attachments' whole local path | **Settings → This vault → Link format for new attachments:** Shortest name / Full path in the vault / Relative to the note / Absolute path on disk (written as `file:///…`, which Obsidian opens). It follows Obsidian's `newLinkFormat` until set. **Settings → Editor → Show where attachments are on disk:** a caption with the full path and Copy under each embed. |
 | Attach with absolute or relative paths (`![[D:\Docs\my-file.pdf]]`) | **Path forms read:** Windows drive paths, UNC, `file:` URLs, `../` above the vault root, and a leading `/` (vault first, then disk). **Serving:** outside files are served only if a saved note links them (an allow-list); only regular, non-hidden files. **Network paths** are never touched until you click **Load from network**. **Open** works for documents and media only; anything else gets **Show in Finder/Explorer**. |
-| Tables use the full width (Jose) | **New width:** a third page width, **Wide elements** (header menu: Readable / Wide elements / Full width / Reset to default; Settings → Editor; Settings → This vault). **What goes wide:** chosen in Settings → Editor (Tables and Diagrams on by default; also Code blocks, Images, Maths). Text keeps the readable width. **Table cells** no longer split words ("Typic al"); a table that doesn't fit scrolls sideways in its own box. |
-| Escape and a click outside save and close Settings (Jose) | **Escape** closes Settings even when nothing in it has focus (WKWebView doesn't focus a clicked checkbox). **A click on the backdrop** also closes it. Before closing, a value typed but not confirmed (a folder or an accent hex) is saved. A press inside released outside doesn't close it. Other dialogs are unchanged. |
+| Tables use the full width (the maintainer) | **New width:** a third page width, **Wide elements** (header menu: Readable / Wide elements / Full width / Reset to default; Settings → Editor; Settings → This vault). **What goes wide:** chosen in Settings → Editor (Tables and Diagrams on by default; also Code blocks, Images, Maths). Text keeps the readable width. **Table cells** no longer split words ("Typic al"); a table that doesn't fit scrolls sideways in its own box. |
+| Escape and a click outside save and close Settings (the maintainer) | **Escape** closes Settings even when nothing in it has focus (WKWebView doesn't focus a clicked checkbox). **A click on the backdrop** also closes it. Before closing, a value typed but not confirmed (a folder or an accent hex) is saved. A press inside released outside doesn't close it. Other dialogs are unchanged. |
 
 ## 2. Totals
 
@@ -69,7 +69,7 @@ Full gate (`check.sh all`) on the final tip, before this doc's commit:
 
 ## 3. Needs the real window
 
-### Jose, on the Mac (`pnpm dev`)
+### The maintainer, on the Mac (`pnpm dev`)
 
 1. **Titles.**
    - A note whose first line is `# Something` shows "Title in the note: Something" if that differs from the file name.
@@ -112,7 +112,7 @@ Full gate (`check.sh all`) on the final tip, before this doc's commit:
     - Open it again and click outside.
     - Type a folder name in This vault → attachments without pressing Enter, then click outside: it's kept.
 
-### The friend, on Windows (the `.exe`)
+### The Windows tester (the `.exe`)
 
 1. Global View cards show the **repositioned** part of each cover, not the top.
 2. "Tipos de comisiones" is titled by its file name everywhere; the "Title in the note" label is gone for it.

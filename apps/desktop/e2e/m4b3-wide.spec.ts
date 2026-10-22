@@ -8,7 +8,7 @@ import { installIpcMock } from './ipcMock';
 
 const AXE = readFileSync(new URL('../node_modules/axe-core/axe.min.js', import.meta.url), 'utf8');
 
-// Jose's "Military Ranks" table (seven columns), squeezed into the measure.
+// A worldbuilding "Military Ranks" table (seven columns), squeezed into the measure.
 const RANKS = [
   '| Category | Rank | Stars | Typical Color | Conceptual Insignia | Command Role | Authorized Ship Classes |',
   '| --- | --- | --- | --- | --- | --- | --- |',

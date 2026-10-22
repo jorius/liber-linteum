@@ -1,7 +1,7 @@
 # Showcase site — design
 
-> **Status:** mocks approved by Jose (2026-10-21) · **Mock:** `docs/design/showcase/mock-v2.html` (open it in a browser; green and blue labels are review notes, not design)
-> **Why:** Liber Linteum gets its own page, linked from Jose's personal site as a project, the way *None Shall Pass* is (`jorius.github.io/none-shall-pass/`). It shows the app, lets people download it and the sample vault, and asks for support. It must practise what the app preaches: private, fast, no third parties.
+> **Status:** mocks approved by the maintainer (2026-10-21) · **Mock:** `docs/design/showcase/mock-v2.html` (open it in a browser; green and blue labels are review notes, not design)
+> **Why:** Liber Linteum gets its own page, linked from the maintainer's personal site as a project, the way *None Shall Pass* is (`jorius.github.io/none-shall-pass/`). It shows the app, lets people download it and the sample vault, and asks for support. It must practise what the app preaches: private, fast, no third parties.
 
 ## 1. Goals, non-goals, anti-goals
 
@@ -12,8 +12,8 @@
 ## 2. Where it lives (Claude's call, not objected to)
 
 - Source in this repo at **`site/`**: plain HTML, CSS and a little vanilla JavaScript. **No build step, no framework, no npm dependencies at runtime.**
-- Published by GitHub Pages at **`https://jorius.github.io/liber-linteum/`** (a project page under Jose's user site), by a workflow that deploys `site/` with `actions/deploy-pages`. Pages from a private repo needs a paid plan, so it goes live when Jose makes the repo public. All URLs inside the site are relative, so the `/liber-linteum/` prefix works.
-- Jose's personal site (`jorius.github.io` repo) gets a project card (`src/content/projects/liber-linteum.json`, `draft: true` until public) linking repo and live page. That repo has its own conventions (`CLAUDE.md` there: npm, capitalised-verb commit subjects, **no Co-Authored-By lines**).
+- Published by GitHub Pages at **`https://jorius.github.io/liber-linteum/`** (a project page under the maintainer's user site), by a workflow that deploys `site/` with `actions/deploy-pages`. Pages from a private repo needs a paid plan, so it goes live when the maintainer makes the repo public. All URLs inside the site are relative, so the `/liber-linteum/` prefix works.
+- The maintainer's personal site (`jorius.github.io` repo) gets a project card (`src/content/projects/liber-linteum.json`, `draft: true` until public) linking repo and live page. That repo has its own conventions (`CLAUDE.md` there: npm, capitalised-verb commit subjects, **no Co-Authored-By lines**).
 
 ## 3. Look (approved: "open desert, by day")
 
@@ -29,7 +29,7 @@ Exactly the approved mock's structure and palette. Sand gradient `#f3e6c9 → #e
 
 ## 4. Sections, top to bottom
 
-Top bar (name, section links, EN/ES switch, GitHub) · Hero · What it is (3 points) · Bring your notes · Feature tour (Global View, Editor, Encryption *Beta*, Search; then 8 small cards: quick notes, voice clips, colours and themes, Trash & Archive, spell check, single files, English/Español, the same menus on every OS) · Privacy (dark band, "What it will never do": no cloud, no accounts, no telemetry; how it's enforced) · Download (three platform cards: files, SHA-256, VirusTotal link; an honest "not code-signed yet" note with how to get past each OS's warning) · Sample vault (*The Moons of Kessari*: what's in it, download) · Roadmap (added 2026-10-21, approved by Jose: kicker "What's next", `#roadmap`; three cards marked *Planned*, no dates: version history, slash menu, focus mode; then an invitation to suggest ideas in GitHub issues) · Support ("Free, and staying that way", donate buttons, credits) · Footer (licence, source, React Flow credit, credits, link back to `jorius.github.io`).
+Top bar (name, section links, EN/ES switch, GitHub) · Hero · What it is (3 points) · Bring your notes · Feature tour (Global View, Editor, Encryption *Beta*, Search; then 8 small cards: quick notes, voice clips, colours and themes, Trash & Archive, spell check, single files, English/Español, the same menus on every OS) · Privacy (dark band, "What it will never do": no cloud, no accounts, no telemetry; how it's enforced) · Download (three platform cards: files, SHA-256, VirusTotal link; an honest "not code-signed yet" note with how to get past each OS's warning) · Sample vault (*The Moons of Kessari*: what's in it, download) · Roadmap (added 2026-10-21, approved by the maintainer: kicker "What's next", `#roadmap`; three cards marked *Planned*, no dates: version history, slash menu, focus mode; then an invitation to suggest ideas in GitHub issues) · Support ("Free, and staying that way", donate buttons, credits) · Footer (licence, source, React Flow credit, credits, link back to `jorius.github.io`).
 
 Copy is the mock's, polished; Spanish translation of all of it (natural Latin-American Spanish).
 
@@ -37,7 +37,7 @@ Copy is the mock's, polished; Spanish translation of all of it (natural Latin-Am
 
 - **Language:** English and Spanish, chosen from `navigator.languages` on first visit, switchable in the top bar, remembered in `localStorage` (a convenience only; the page works without it). Text lives in one dictionary file; the HTML carries keys.
 - **Downloads and checksums** come from a same-origin `release.json` (version, per-file name, size, SHA-256, VirusTotal URL) that the release workflow writes next to the page. Buttons link to GitHub release assets with stable names (`releases/latest/download/…`). Without `release.json` (before the first release), the download section says releases are coming and links to the repo.
-- **Donate:** GitHub Sponsors and Ko-fi buttons, configured in one place; until Jose has the accounts, the URLs are placeholders flagged in the config and the buttons are hidden behind that flag (see `docs/research/2026-10-21-donation-platforms.md`).
+- **Donate:** GitHub Sponsors and Ko-fi buttons, configured in one place; until the maintainer has the accounts, the URLs are placeholders flagged in the config and the buttons are hidden behind that flag (see `docs/research/2026-10-21-donation-platforms.md`).
 - **No JavaScript needed to read the page**; JS only adds the language switch, OS detection, release data, the title animation and video control.
 - **Security headers via `<meta http-equiv="Content-Security-Policy">`:** `default-src 'self'`, no inline script, no third-party origins.
 

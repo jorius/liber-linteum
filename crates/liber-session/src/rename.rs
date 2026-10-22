@@ -790,15 +790,15 @@ mod pair_tests {
         assert_eq!(paired_rename(&vp("B"), &vp("C"), true, |_| None), None);
         assert_eq!(paired_rename(&vp("A/B"), &vp("C"), true, own), None);
         // A case-variant page pairs; matching its name to the folder doesn't.
-        let variant = |f: &VaultPath| f.join("smartjob.md").ok();
+        let variant = |f: &VaultPath| f.join("myproject.md").ok();
         assert_eq!(
-            paired_rename(&vp("SmartJob"), &vp("Work"), true, variant),
-            Some((vp("Work/smartjob.md"), vp("Work/Work.md")))
+            paired_rename(&vp("MyProject"), &vp("Work"), true, variant),
+            Some((vp("Work/myproject.md"), vp("Work/Work.md")))
         );
         assert_eq!(
             paired_rename(
-                &vp("SmartJob/smartjob.md"),
-                &vp("SmartJob/SmartJob.md"),
+                &vp("MyProject/myproject.md"),
+                &vp("MyProject/MyProject.md"),
                 false,
                 variant
             ),

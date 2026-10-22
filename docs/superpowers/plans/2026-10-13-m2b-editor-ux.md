@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Jose's M2a real-window feedback: rename a page from its title, a back arrow for followed internal links, eight palettes plus a custom accent, legible editor fonts with per-mode pickers, and an optional formatting toolbar.
+**Goal:** the maintainer's M2a real-window feedback: rename a page from its title, a back arrow for followed internal links, eight palettes plus a custom accent, legible editor fonts with per-mode pickers, and an optional formatting toolbar.
 
 **Architecture:** Settings (Rust-owned `settings.json`) gain six lenient fields; the UI applies them as a `data-palette` attribute, a generated custom-palette stylesheet and CSS variables on `<html>`. Palettes are data (`theme/palettes.ts`) compiled to `theme/palettes.css` by a script; the custom accent is derived in OKLCH at runtime. Formatting is a set of pure CodeMirror commands shared by the toolbar and the keymap. The link trail is a small store fed by `openPage(path, heading, via)`; the title is an in-place rename through the existing `vaultStore.rename`.
 
@@ -5948,7 +5948,7 @@ git commit -m "test(e2e): toolbar, title rename, link trail and palettes in Chro
 
 ### Task 10: Full verification and the verbose hand-off
 
-Run every check with its own exit code, then write the hand-off (same structure as M2a's). Real-window checks are for Jose (hand-off §9); agents never send keystrokes.
+Run every check with its own exit code, then write the hand-off (same structure as M2a's). Real-window checks are for the maintainer (hand-off §9); agents never send keystrokes.
 
 **Files:**
 - Create: `docs/handoff/2026-10-13-m2b-editor-ux-handoff.md`
@@ -5980,7 +5980,7 @@ Create `docs/handoff/2026-10-13-m2b-editor-ux-handoff.md`:
 **Spec:** `docs/superpowers/specs/2026-10-13-m2b-editor-ux-design.md` · **Plan:** `docs/superpowers/plans/2026-10-13-m2b-editor-ux.md` · **Palette reference:** `docs/design/2026-10-13-m2b-palettes.html`
 **Branch:** `feat/m2b-editor-ux` (from `main` `1c9d0b1`). Previous hand-off: `docs/handoff/2026-10-12-m2a-editor-handoff.md`.
 
-This milestone is Jose's real-window feedback on M2a: rename from the title, a back arrow for followed links, more palettes plus a custom accent, legible fonts with per-mode pickers, and an optional formatting toolbar. The former M2b scope (covers, attachments, `[[` autocomplete) is now **M2c**.
+This milestone is the maintainer's real-window feedback on M2a: rename from the title, a back arrow for followed links, more palettes plus a custom accent, legible fonts with per-mode pickers, and an optional formatting toolbar. The former M2b scope (covers, attachments, `[[` autocomplete) is now **M2c**.
 
 ## 1. Status at a glance
 

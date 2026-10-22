@@ -16,7 +16,7 @@ import { EncryptInPlaceHost } from './EncryptInPlaceDialog';
 
 const PASS = 'correct horse battery';
 const CODE = 'LIBER-AAAA-BBBB';
-const ROOT = '/v/Smartjob';
+const ROOT = '/v/Myproject';
 const report = {
   files: 0,
   pages: 0,
@@ -26,8 +26,8 @@ const report = {
   warnings: [],
   durationMs: 1,
 };
-const encrypted = { name: 'Smartjob', root: ROOT, report, encrypted: true };
-const plain = { name: 'Smartjob', root: ROOT, report, encrypted: false };
+const encrypted = { name: 'Myproject', root: ROOT, report, encrypted: true };
+const plain = { name: 'Myproject', root: ROOT, report, encrypted: false };
 
 interface Deferred {
   resolve: (v: unknown) => void;
@@ -88,7 +88,7 @@ async function start() {
   useEditorStore.setState({ saveAll: async () => [] });
   render(<EncryptInPlaceHost />);
   act(() => openDecryptInPlace());
-  return screen.findByRole('dialog', { name: 'Decrypt “Smartjob”' });
+  return screen.findByRole('dialog', { name: 'Decrypt “Myproject”' });
 }
 
 async function toSecrets(dialog: HTMLElement) {
@@ -252,7 +252,7 @@ describe('Decrypt in place: decrypting and done', () => {
     await act(async () => runGate!.resolve(plain));
     expect(
       await within(dialog).findByText(
-        '1,204 files decrypted and checked. “Smartjob” is no longer encrypted, and its passphrase and recovery key no longer work.',
+        '1,204 files decrypted and checked. “Myproject” is no longer encrypted, and its passphrase and recovery key no longer work.',
       ),
     ).toBeInTheDocument();
     expect(useVaultStore.getState().status).toBe('open');

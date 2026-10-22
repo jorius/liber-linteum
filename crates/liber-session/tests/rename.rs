@@ -685,25 +685,29 @@ fn write_behind(s: &VaultSession, p: &str, body: &[u8]) {
     s.vault().write_cas(&vp(p), body, None).unwrap();
 }
 
-/// Round 3 §9: `SmartJob/Smartjob.md` is its folder's page despite the case.
+/// Round 3 §9: `MyProject/Myproject.md` is its folder's page despite the case.
 #[test]
 fn subpages_case_variant_page_renames_with_its_folder() {
     let (_dir, _c, s) = vault_with(&[
-        ("SmartJob/Smartjob.md", b"# S\n"),
-        ("SmartJob/Teams.md", b""),
+        ("MyProject/Myproject.md", b"# S\n"),
+        ("MyProject/Teams.md", b""),
     ]);
-    s.rename(&vp("SmartJob"), &vp("Work"), true).unwrap();
+    s.rename(&vp("MyProject"), &vp("Work"), true).unwrap();
     assert_eq!(names(&s, "Work"), vec!["Teams.md", "Work.md"]);
 }
 
 #[test]
 fn subpages_renaming_a_case_variant_page_moves_its_folder() {
     let (_dir, _c, s) = vault_with(&[
-        ("SmartJob/Smartjob.md", b"# S\n"),
-        ("SmartJob/Teams.md", b""),
+        ("MyProject/Myproject.md", b"# S\n"),
+        ("MyProject/Teams.md", b""),
     ]);
     let out = s
-        .rename(&vp("SmartJob/Smartjob.md"), &vp("SmartJob/Career.md"), true)
+        .rename(
+            &vp("MyProject/Myproject.md"),
+            &vp("MyProject/Career.md"),
+            true,
+        )
         .unwrap();
     assert_eq!(names(&s, "Career"), vec!["Career.md", "Teams.md"]);
     assert!(out.pair.is_some());
@@ -713,16 +717,16 @@ fn subpages_renaming_a_case_variant_page_moves_its_folder() {
 /// the folder where it is.
 #[test]
 fn subpages_matching_the_page_name_keeps_the_folder() {
-    let (_dir, _c, s) = vault_with(&[("SmartJob/Smartjob.md", b"# S\n")]);
+    let (_dir, _c, s) = vault_with(&[("MyProject/Myproject.md", b"# S\n")]);
     let out = s
         .rename(
-            &vp("SmartJob/Smartjob.md"),
-            &vp("SmartJob/SmartJob.md"),
+            &vp("MyProject/Myproject.md"),
+            &vp("MyProject/MyProject.md"),
             true,
         )
         .unwrap();
-    assert_eq!(names(&s, "."), vec!["SmartJob"]);
-    assert_eq!(names(&s, "SmartJob"), vec!["SmartJob.md"]);
+    assert_eq!(names(&s, "."), vec!["MyProject"]);
+    assert_eq!(names(&s, "MyProject"), vec!["MyProject.md"]);
     assert!(out.pair.is_none());
 }
 

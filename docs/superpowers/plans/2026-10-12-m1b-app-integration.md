@@ -10,7 +10,7 @@
 
 **Spec:** `docs/superpowers/specs/2026-10-12-m1b-app-integration-design.md` (binding; this plan argues from it). Parents: `docs/product-spec.md`, `docs/superpowers/specs/2026-10-12-architecture-design.md`, `docs/superpowers/specs/2026-10-12-m1a-vault-core-design.md`, `docs/handoff/2026-10-12-m1a-vault-core-handoff.md`, `docs/handoff/2026-10-12-m0-scaffold-handoff.md`.
 
-**How this plan was verified:** every code block below is the exact content of a commit in a replay of this plan on a fresh clone of the repository at `869fd32` (`scratchpad/m1b-replay`, commits `062d4ff`…`3ab3a10`, one per task). In that replay every RED step failed for the stated reason and every GREEN step passed; the final commit passes `pnpm check` (124 Vitest + 156 Rust tests, eslint, prettier, tsc, i18n parity, rustfmt, clippy `-D warnings`) and `cargo deny check`. Task 10 (real-window verification + hand-off) is not part of the replay: it needs a GUI and is done by the executor and Jose.
+**How this plan was verified:** every code block below is the exact content of a commit in a replay of this plan on a fresh clone of the repository at `869fd32` (`scratchpad/m1b-replay`, commits `062d4ff`…`3ab3a10`, one per task). In that replay every RED step failed for the stated reason and every GREEN step passed; the final commit passes `pnpm check` (124 Vitest + 156 Rust tests, eslint, prettier, tsc, i18n parity, rustfmt, clippy `-D warnings`) and `cargo deny check`. Task 10 (real-window verification + hand-off) is not part of the replay: it needs a GUI and is done by the executor and the maintainer.
 
 ## Global Constraints
 
@@ -7622,7 +7622,7 @@ pkill -f "Liber Linteum.app/Contents/MacOS"
 ```
 Expected (view the PNG): the welcome card with **enabled** Create / Open buttons, the Notion button disabled with "Notion import arrives in a later milestone.", the version label, and a "Recent" section (empty on a fresh config dir). Opening a vault needs the native folder picker, i.e. a human — Step 4.
 
-- [ ] **Step 4: Human checklist (Jose) in the real window** — copy into the hand-off with results
+- [ ] **Step 4: Human checklist (the maintainer) in the real window** — copy into the hand-off with results
 
 Prepare a disposable vault first: `cp -R fixtures/vaults/obsidian-basic /tmp/m1b-vault`.
 
@@ -7681,6 +7681,6 @@ Each note was forced by something found while building and testing the replay; t
 ## Self-review
 
 - **Spec coverage:** §1 criteria → 1: Tasks 3, 6 (+ VLT-02 via `vault_create` test and M1a); 2: Tasks 3, 5, 7, 9; 3: Tasks 3, 8; 4: Tasks 1, 3, 5; 5: Tasks 2, 3, 5, 6, 9; 6: Tasks 7, 8, 9 (+ Task 10 human checklist); 7: Task 3 (ACL test, `dialog:allow-open` only, cargo deny). §2.1–2.8 → Tasks 1–3; §3.1–3.6 → Tasks 4–9; §4.1–4.4 → Tasks 5, 6, 8, 9; §5.1 → Tasks 1–3; §5.2 → Tasks 4–9; §5.3 → Task 10. §6 respected (no editor, Global View, search, multi-window, undo).
-- **Placeholders:** none — every code step is the exact file or patch from the replay commit; Task 10's hand-off is an outline by design because it records results only the executor and Jose can observe.
+- **Placeholders:** none — every code step is the exact file or patch from the replay commit; Task 10's hand-off is an outline by design because it records results only the executor and the maintainer can observe.
 - **Type consistency:** checked mechanically — each task's code compiled and ran against the previous tasks' real code in the replay.
 - **Review Focus:** five items, each pinned by a named test in its owning task.

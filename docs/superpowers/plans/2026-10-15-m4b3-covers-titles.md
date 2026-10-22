@@ -53,7 +53,7 @@
 
 ## Review Focus
 
-- **A note whose only H1 is a section halfway down** (the friend's "Tipos de comisiones"): the title is the file name everywhere. *Rust unit + e2e.*
+- **A note whose only H1 is a section halfway down** (the tester's "Tipos de comisiones"): the title is the file name everywhere. *Rust unit + e2e.*
 - **Switching placement while focus is on a placement radio:** the group moves between the band and the strip, and focus follows. *Vitest.*
 - **A window narrowed below strip + 520 px:** the cover goes on top without saving anything, and the strip comes back on widening. *Vitest with a fake ResizeObserver, plus e2e.*
 - **⌘Z right after choosing a placement:** it puts the previous one back, and redo restores it. The entry never merges with typing (`isolateHistory`). *Vitest.*
@@ -70,7 +70,7 @@
 - [x] **Step 1: Failing tests** in `title.rs`:
   - `pg_01_first_h1_anywhere_in_the_page` is replaced by `pg_01_an_h1_after_other_blocks_is_not_the_title` (a paragraph, an embed or an HTML comment first gives the stem);
   - `pg_01_an_h1_after_frontmatter_and_blank_lines_is_the_title`;
-  - `pg_01_a_section_heading_halfway_down_is_not_the_title` (the friend's note gives "Tipos de comisiones");
+  - `pg_01_a_section_heading_halfway_down_is_not_the_title` (the tester's note gives "Tipos de comisiones");
   - `pg_01_a_setext_h1_at_the_top_is_the_title`.
 - [x] **Step 2:** `cargo test -p liber-markdown --lib title`. Expected and seen: 3 FAIL (`left: "Real Title"`, `left: "WIP (Work In Progress):"`).
 - [x] **Step 3: Implement.** Skip the metadata block. The first H1 may open; an empty H1 is skipped. Any other block start (`Start(_)`, `Rule`, `Html`) breaks to the stem:
@@ -241,7 +241,7 @@ invertedEffects.of((tr) => tr.effects.filter((e) => e.is(sideChange))
   - 2-axis reposition: ← ↑ give `45% 55%`, and Save writes `cover-y: 55\ncover-x: 45`.
   - An 860 px window drops the strip; 1280 brings it back.
   - **The WebView2 crop path:** `test.use({ userAgent: WINDOWS_UA })`. Assets go to `http://liber-asset.localhost/…`, and the test routes them to a 400 × 1200 SVG. The image box must equal its frame (the band, then the strip), with `object-position: 0% 100%` from `cover-x: 0` / `cover-y: 100`.
-  - §1: no "Title in the note" on the friend's note.
+  - §1: no "Title in the note" on the tester's note.
   - axe light and dark on the strip and the band.
 - [x] **Step 2: Run** (with `pnpm --filter @liber/desktop build` first) on a private port copy of the config, so parallel streams don't collide on 4317.
   - Two fixes:

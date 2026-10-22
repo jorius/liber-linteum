@@ -5,7 +5,7 @@ Supersedes `2026-10-21-session-handoff.md`. Everything is on branch **`feat/cust
 ## Try first
 
 1. Quit Liber Linteum, then install the new build: `sudo apt install "./target/release/bundle/deb/Liber Linteum_0.1.0_amd64.deb"` (built 00:20, everything below is in it).
-2. Open `~/Vaults/The Moons of Kessari` (the sample vault; covers fixed) and the Notion sample: File → Import from Notion → `examples/notion-sample-export.zip`.
+2. Open your copy of the sample vault, *The Moons of Kessari* (covers fixed), and the Notion sample: File → Import from Notion → `examples/notion-sample-export.zip`.
 3. The showcase site is served at **http://127.0.0.1:8765/liber-linteum/** (a detached `python3 -m http.server` in `/tmp/liber-site-preview`; stop it with `pkill -f '[h]ttp.server 8765'`).
 
 ## What's in the branch

@@ -579,7 +579,7 @@ export type LinkFormat = 'shortest' | 'vault' | 'relative' | 'absolute';
 
 /** A file outside the vault that a link names (M4b part 3 §9). */
 export interface ExternalFile {
-  /** Absolute, in its OS's form (`D:\Docs\x.pdf`, `/Users/jose/x.png`). */
+  /** Absolute, in its OS's form (`D:\Docs\x.pdf`, `/Users/me/x.png`). */
   path: string;
   /** A regular, visible file on this computer. */
   exists: boolean;

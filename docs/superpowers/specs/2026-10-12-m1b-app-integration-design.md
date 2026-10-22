@@ -1,7 +1,7 @@
 # M1b — App Integration: Design
 
 > **Status:** Approved in design review · **Date:** 2026-10-12
-> **Roles:** Jose — tech lead (decisions below are DECIDED)
+> **Roles:** tech lead: the maintainer (decisions below are DECIDED)
 > **Parent docs:** product spec `docs/product-spec.md` · architecture `docs/superpowers/specs/2026-10-12-architecture-design.md` · M1a design `docs/superpowers/specs/2026-10-12-m1a-vault-core-design.md` · hand-offs `docs/handoff/2026-10-12-m0-scaffold-handoff.md`, `docs/handoff/2026-10-12-m1a-vault-core-handoff.md`
 > **Scope:** connect the M1a engine (`liber-session`) to the desktop app: Tauri commands/events, a settings store, working welcome actions, the app shell with an explorer, a read-only page view, dialogs and toasts.
 
@@ -189,7 +189,7 @@ Top bar "Close vault" → `vault_close` → Welcome (the closed vault first in R
 
 ### 5.3 Real-window verification
 - Agent: build the app, open a copy of `fixtures/vaults/obsidian-basic`, screenshot welcome → opening → explorer → page view → rename with toast, in light and dark (no synthetic keystrokes; launching and screenshots only).
-- Human (Jose): keyboard checklist in the real window with macOS Keyboard navigation off and on — what Tab reaches, tree arrows, shortcuts, dialogs, dnd keyboard move. Results recorded in the M1b hand-off.
+- Human (the maintainer): keyboard checklist in the real window with macOS Keyboard navigation off and on — what Tab reaches, tree arrows, shortcuts, dialogs, dnd keyboard move. Results recorded in the M1b hand-off.
 
 ---
 
