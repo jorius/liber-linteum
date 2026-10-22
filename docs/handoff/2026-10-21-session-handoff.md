@@ -1,5 +1,7 @@
 # Session hand-off (2026-10-21, late)
 
+> **Superseded by `2026-10-22-overnight-handoff.md`.**
+
 The previous session ran long and crashed several times (see "Resource rules"). Everything below is on disk; nothing is pushed. Start here.
 
 ## Resource rules (why the session crashed)
