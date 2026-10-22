@@ -1,0 +1,54 @@
+{
+  "version": "0.1.0",
+  "published": "2026-11-01",
+  "files": [
+    {
+      "os": "linux",
+      "kind": "deb",
+      "name": "Liber-Linteum_amd64.deb",
+      "size": 9123456,
+      "sha256": "3f9a1c0d5e6b7a8f9e0d1c2b3a4f5e6d7c8b9a0f1e2d3c4b5a69788796a5c21e",
+      "virustotal": "https://www.virustotal.com/gui/file/3f9a1c0d5e6b7a8f9e0d1c2b3a4f5e6d7c8b9a0f1e2d3c4b5a69788796a5c21e"
+    },
+    {
+      "os": "linux",
+      "kind": "appimage",
+      "name": "Liber-Linteum_amd64.AppImage",
+      "size": 84123456,
+      "sha256": "b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2",
+      "virustotal": "https://www.virustotal.com/gui/file/b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2"
+    },
+    {
+      "os": "windows",
+      "kind": "exe",
+      "name": "Liber-Linteum_x64-setup.exe",
+      "size": 6234567,
+      "sha256": "a17b2c3d4e5f60718293a4b5c6d7e8f90a1b2c3d4e5f60718293a4b5c6d709d4",
+      "virustotal": "https://www.virustotal.com/gui/file/a17b2c3d4e5f60718293a4b5c6d7e8f90a1b2c3d4e5f60718293a4b5c6d709d4"
+    },
+    {
+      "os": "windows",
+      "kind": "msi",
+      "name": "Liber-Linteum_x64.msi",
+      "size": 7345678,
+      "sha256": "c4d5e6f708192a3b4c5d6e7f8091a2b3c4d5e6f708192a3b4c5d6e7f8091a2b3",
+      "virustotal": null
+    },
+    {
+      "os": "macos",
+      "kind": "dmg",
+      "name": "Liber-Linteum_universal.dmg",
+      "size": 15456789,
+      "sha256": "77c0d1e2f3a4b5c6d7e8f90a1b2c3d4e5f60718293a4b5c6d7e8f90a1b2ce5f2",
+      "virustotal": "https://www.virustotal.com/gui/file/77c0d1e2f3a4b5c6d7e8f90a1b2c3d4e5f60718293a4b5c6d7e8f90a1b2ce5f2"
+    },
+    {
+      "os": "any",
+      "kind": "sample-vault",
+      "name": "The-Moons-of-Kessari.zip",
+      "size": 2345678,
+      "sha256": "d9e8f7a6b5c4d3e2f1a0b9c8d7e6f5a4b3c2d1e0f9a8b7c6d5e4f3a2b1c0d9e8",
+      "virustotal": null
+    }
+  ]
+}
