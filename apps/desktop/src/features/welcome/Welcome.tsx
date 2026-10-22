@@ -4,7 +4,6 @@ import {
   BrandMark,
   FolderIcon,
   ImportIcon,
-  LockIcon,
   NewPageIcon,
   PlusIcon,
   VaultIcon,
@@ -165,10 +164,6 @@ export function Welcome({ version }: WelcomeProps) {
               </button>
             ))}
           </div>
-          <p className={styles.footer}>
-            <LockIcon />
-            {t('privacy.localOnly')}
-          </p>
         </div>
       </div>
 

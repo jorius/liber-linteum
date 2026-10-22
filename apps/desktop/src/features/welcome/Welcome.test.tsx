@@ -147,6 +147,12 @@ describe('Welcome screen', () => {
     expect(calls.find(([c]) => c === 'vault_open')?.[1]).toEqual({ path: '/v/Notes' });
   });
 
+  it('has no "Local only" line under the language switch', () => {
+    backend({ vaults_recent: () => [] });
+    render(<Welcome version="0.1.0" />);
+    expect(screen.queryByText(/Local only/)).not.toBeInTheDocument();
+  });
+
   it('Q-I18N-1 language toggle switches to Spanish and saves the choice', async () => {
     const calls = backend({
       vaults_recent: () => [],

@@ -49,9 +49,6 @@
     "en": "English",
     "es": "Español"
   },
-  "privacy": {
-    "localOnly": "Local only · zero network requests"
-  },
   "errors": {
     "noVault": "No vault is open.",
     "notFound": "Not found.",

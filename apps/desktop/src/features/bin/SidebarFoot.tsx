@@ -8,9 +8,8 @@ import styles from './Bin.module.css';
 
 const ARCHIVE = '.archive';
 
-/** The sidebar's foot (M5b §5.2–§5.3): Archived above Trash, nothing else
- *  (the privacy line stays on the welcome screen). Archived opens like a
- *  folder, read-only (round 2); Trash opens its view. */
+/** The sidebar's foot (M5b §5.2–§5.3): Archived above Trash, nothing else.
+ *  Archived opens like a folder, read-only (round 2); Trash opens its view. */
 export function SidebarFoot({ onRequestDelete, onRequestMenu }: ExplorerTreeProps) {
   const { t } = useTranslation();
   const screen = useUiStore((s) => s.screen);

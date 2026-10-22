@@ -49,9 +49,6 @@
     "en": "English",
     "es": "Español"
   },
-  "privacy": {
-    "localOnly": "Solo local · cero peticiones de red"
-  },
   "errors": {
     "noVault": "No hay ninguna bóveda abierta.",
     "notFound": "No se encontró.",
