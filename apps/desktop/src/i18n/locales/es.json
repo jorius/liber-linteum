@@ -1231,7 +1231,7 @@
     "keys": "La frase de contraseña y la clave de recuperación de la bóveda dejan de funcionar para siempre. Si vuelves a cifrarla, se crean otras nuevas.",
     "blocked": "Esto impide descifrar la bóveda:",
     "blockedHint": "Cámbiales el nombre, muévelos o quítalos y vuelve a intentarlo.",
-    "reason": "{reason, select, unreadable {su nombre no se pudo descifrar, así que se perdería} vault {se leería como una bóveda cifrada propia} taken {algo legible junto a la bóveda ya tiene este nombre} reserved {un nombre que Liber Linteum reserva para sí} other {no se puede descifrar}}",
+    "reason": "{reason, select, unreadable {su nombre no se pudo descifrar, así que se perdería} vault {se leería como una bóveda cifrada propia} taken {algo legible junto a la bóveda ya tiene este nombre} reserved {un nombre que Liber Linteum reserva para sí} unfinished {una escritura sin terminar: bloquea y desbloquea la bóveda y vuelve a intentarlo} recording {una grabación que aún no se guardó como clip: abre una página y empieza a grabar para guardarla, o sácala} other {no se puede descifrar}}",
     "secretsIntro": "Escribe la frase de contraseña y también la clave de recuperación de esta bóveda.",
     "decrypt": "Descifrar",
     "wrongPassphrase": "La frase de contraseña no abre esta bóveda.",
@@ -1248,6 +1248,8 @@
     "keepDecrypting": "Seguir descifrando",
     "undoTitle": "¿Deshacer el descifrado en este dispositivo?",
     "undoBody": "Hazlo solo si el otro dispositivo no está descifrando esta carpeta ahora mismo. La bóveda sigue cifrada.",
-    "undoConfirm": "Deshacerlo en este dispositivo"
+    "undoConfirm": "Deshacerlo en este dispositivo",
+    "archives": "{names} en la raíz de esta carpeta guarda versiones antiguas de archivos: puede conservar los archivos cifrados y el archivo de claves antiguos. Descifrar no los toca; vacíalos tú si quieres que desaparezcan.",
+    "doneLeft": "{count, plural, one {# archivo descifrado y comprobado.} other {# archivos descifrados y comprobados.}} «{name}» ya no está cifrada, pero la limpieza no terminó: el archivo de claves y los archivos cifrados antiguos siguen en esta carpeta oculta, así que la frase de contraseña y la clave de recuperación aún pueden abrirlos ahí. Al volver a abrir la bóveda se borran."
   }
 }

@@ -614,6 +614,7 @@ export function installIpcMock({
       files: 2,
       bytes: 9,
       blocked: decryptInPlace.blocked ?? [],
+      archives: [],
     }),
     vault_decrypt_begin: (a) => {
       const pass = a.passphrase === encrypted?.passphrase;

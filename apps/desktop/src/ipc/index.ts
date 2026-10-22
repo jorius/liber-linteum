@@ -161,6 +161,9 @@ export interface VaultInfo {
    *  Trash and are still in the vault folder. Show the banner with
    *  `vaultTrashOriginals` and `vaultRevealOriginals`. */
   originalsPending?: boolean;
+  /** Decrypt in place (§10.5): cleaning up didn't finish; the old keys and
+   *  ciphertext are still in this folder (the next open deletes them). */
+  keysLeft?: string;
 }
 
 export type NodeKind = 'page' | 'folder' | 'attachment';
@@ -463,7 +466,11 @@ export type EncryptBlockedReason =
   /** A vault of its own inside the folder (final review I3). */
   | 'vault'
   /** Decrypt in place: a readable entry beside the vault has this name. */
-  | 'taken';
+  | 'taken'
+  /** Decrypt in place: an unfinished write under `d/` (a hidden temp file). */
+  | 'unfinished'
+  /** Decrypt in place: a recording not yet saved as a clip. */
+  | 'recording';
 
 export interface EncryptBlocked {
   /** Vault-relative, `/`-separated. */
@@ -486,6 +493,9 @@ export interface DecryptPreflight {
   files: number;
   bytes: number;
   blocked: EncryptBlocked[];
+  /** Sync archives at the root (`.stversions`, `.sync`): they may keep old
+   *  encrypted files and keys; decrypting never touches them. */
+  archives: string[];
 }
 
 /** `vault:encrypt-progress`. */

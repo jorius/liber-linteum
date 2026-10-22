@@ -1231,7 +1231,7 @@
     "keys": "The vault's passphrase and recovery key stop working for good. Encrypting it again later makes new ones.",
     "blocked": "These stop the vault from being decrypted:",
     "blockedHint": "Rename, move or remove these, then try again.",
-    "reason": "{reason, select, unreadable {its name couldn't be decrypted, so it would be lost} vault {it would read as an encrypted vault of its own} taken {something readable beside the vault already has this name} reserved {a name Liber Linteum keeps for itself} other {it can't be decrypted}}",
+    "reason": "{reason, select, unreadable {its name couldn't be decrypted, so it would be lost} vault {it would read as an encrypted vault of its own} taken {something readable beside the vault already has this name} reserved {a name Liber Linteum keeps for itself} unfinished {an unfinished write: lock and unlock the vault, then try again} recording {a recording not saved as a clip yet: open a page and start recording to save it, or move it out} other {it can't be decrypted}}",
     "secretsIntro": "Enter both the passphrase and the recovery key of this vault.",
     "decrypt": "Decrypt",
     "wrongPassphrase": "The passphrase doesn't open this vault.",
@@ -1248,6 +1248,8 @@
     "keepDecrypting": "Keep decrypting",
     "undoTitle": "Undo decrypting on this device?",
     "undoBody": "Only do this if the other device isn't decrypting this folder right now. The vault stays encrypted.",
-    "undoConfirm": "Undo it on this device"
+    "undoConfirm": "Undo it on this device",
+    "archives": "{names} at the top of this folder keep old versions of files: they may still hold the old encrypted files and key file. Decrypting doesn't touch them; empty them yourself if you want those gone.",
+    "doneLeft": "{count, plural, one {# file decrypted and checked.} other {# files decrypted and checked.}} “{name}” is no longer encrypted, but cleaning up didn't finish: the old key file and encrypted files are still in this hidden folder, so the passphrase and recovery key can still open them there. Opening the vault again deletes them."
   }
 }

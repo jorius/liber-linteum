@@ -660,12 +660,18 @@ export const useVaultStore = create<VaultState>((set, get) => {
       return res;
     },
     decryptRun: async () => {
+      const root = converting;
       const res = await vaultDecryptRun();
       converting = null;
       decrypting = false;
       lockAfterConvert = false; // a plain vault has nothing to lock
       useUiStore.setState({ quitAsked: false });
-      if (!res.ok) return res;
+      if (!res.ok) {
+        // Past `staged` the folder is plain already (review L8): opening it
+        // finishes the decryption; there is nothing to unlock.
+        if (root && res.error.kind === 'decryptFinishFailed') await get().open(root);
+        return res;
+      }
       return opened(res, get().status, { path: res.value.root });
     },
     decryptCancel: async () => {

@@ -39,7 +39,7 @@ let runGate: Deferred | null = null;
 /** The session the backend holds: begin closes it. */
 let sessionOpen = true;
 
-function backend(opts: { blocked?: { path: string; reason: string }[] } = {}) {
+function backend(opts: { blocked?: { path: string; reason: string }[]; archives?: string[] } = {}) {
   calls = [];
   sessionOpen = true;
   mockIPC(
@@ -47,7 +47,16 @@ function backend(opts: { blocked?: { path: string; reason: string }[] } = {}) {
       const a = (args ?? {}) as Record<string, unknown>;
       calls.push([cmd, a]);
       if (cmd === 'vault_decrypt_preflight')
-        return { files: 1204, bytes: 9, blocked: opts.blocked ?? [] };
+        return {
+          files: 1204,
+          bytes: 9,
+          blocked: opts.blocked ?? [],
+          archives: opts.archives ?? [],
+        };
+      if (cmd === 'vault_open') {
+        sessionOpen = true;
+        return plain;
+      }
       if (cmd === 'vault_decrypt_begin') {
         const pass = a.passphrase === PASS;
         const code = a.recovery === CODE;
@@ -289,5 +298,43 @@ describe('Decrypt in place: decrypting and done', () => {
     await act(() => useVaultStore.getState().open('/other'));
     expect(useToastStore.getState().toasts.at(-1)?.message).toBe('Wait until decrypting finishes.');
     expect(sent('vault_open')).toEqual([]);
+  });
+
+  it('Stop and undo turns off once the last file is done (review L9)', async () => {
+    const dialog = await toRun();
+    await act(() => emit('vault:decrypt-progress', { done: 1203, total: 1204 }));
+    expect(within(dialog).getByRole('button', { name: 'Stop and undo' })).toBeEnabled();
+    await act(() => emit('vault:decrypt-progress', { done: 1204, total: 1204 }));
+    expect(within(dialog).getByRole('button', { name: 'Stop and undo' })).toBeDisabled();
+  });
+
+  it('a cleanup that did not finish is said, never "no longer work" (review 6e)', async () => {
+    const dialog = await toRun();
+    const left = `${ROOT}/.liber-encrypted`;
+    await act(async () => runGate!.resolve({ ...plain, keysLeft: left }));
+    expect(await within(dialog).findByText(/cleaning up didn't finish/)).toBeVisible();
+    expect(within(dialog).getByText(left)).toBeVisible();
+    expect(within(dialog).queryByText(/no longer work/)).toBeNull();
+    expect((await axe.run(document.body)).violations).toEqual([]);
+  });
+
+  it('a failure past staged opens the folder as the plain vault it is (review L8)', async () => {
+    const dialog = await toRun();
+    await act(async () => runGate!.reject({ kind: 'decryptFinishFailed', message: ROOT }));
+    expect(await within(dialog).findByRole('alert')).toHaveTextContent(/couldn't finish yet/);
+    expect(sent('vault_open')).toEqual([{ path: ROOT }]);
+    await waitFor(() => expect(useVaultStore.getState().status).toBe('open'));
+    expect(useVaultStore.getState().info?.encrypted).toBe(false);
+  });
+});
+
+describe('Decrypt in place: sync archives (review 6c)', () => {
+  it('are named in the intro', async () => {
+    backend({ archives: ['.stversions'] });
+    const dialog = await start();
+    expect(
+      await within(dialog).findByText(/^\.stversions at the top of this folder/),
+    ).toBeVisible();
+    expect((await axe.run(document.body)).violations).toEqual([]);
   });
 });

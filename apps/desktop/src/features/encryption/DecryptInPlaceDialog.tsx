@@ -41,6 +41,8 @@ export function DecryptInPlaceDialog({ root, onClose }: { root: string; onClose:
   const [progress, setProgress] = useState<EncryptProgressPayload | null>(null);
   const [stopping, setStopping] = useState(false);
   const [announced, setAnnounced] = useState('');
+  /** Where the old keys and ciphertext still are, if cleaning up didn't finish. */
+  const [keysLeft, setKeysLeft] = useState<string | null>(null);
   const lastSaid = useRef({ at: 0, share: -1 });
   const body = useRef<HTMLDivElement>(null);
 
@@ -145,8 +147,10 @@ export function DecryptInPlaceDialog({ root, onClose }: { root: string; onClose:
     const res = await useVaultStore.getState().decryptRun();
     if (stop) quietly(stop);
     useUiStore.getState().hold(false);
-    if (res.ok) setStep('done');
-    else {
+    if (res.ok) {
+      setKeysLeft(res.value.keysLeft ?? null);
+      setStep('done');
+    } else {
       setError(errorMessage(res.error));
       setStep('failed');
     }
@@ -196,6 +200,9 @@ export function DecryptInPlaceDialog({ root, onClose }: { root: string; onClose:
               <p>{t('decryptInPlace.warning')}</p>
               <p>{t('decryptInPlace.sync')}</p>
               <p>{t('decryptInPlace.keys')}</p>
+              {!!pre?.archives.length && (
+                <p>{t('decryptInPlace.archives', { names: pre.archives.join(', ') })}</p>
+              )}
             </div>
             <div className={dialogs.buttons}>
               <button type="button" className="btn btn-secondary" onClick={onClose}>
@@ -315,7 +322,8 @@ export function DecryptInPlaceDialog({ root, onClose }: { root: string; onClose:
                 type="button"
                 className="btn btn-secondary"
                 data-autofocus
-                disabled={stopping || !started}
+                // Past the last file nothing can be stopped any more (review L9).
+                disabled={stopping || !started || (progress?.done ?? 0) >= (progress?.total ?? 1)}
                 onClick={() => {
                   setStopping(true);
                   void vaultDecryptCancel();
@@ -332,8 +340,16 @@ export function DecryptInPlaceDialog({ root, onClose }: { root: string; onClose:
         {step === 'done' && (
           <>
             <p role="status" className={dialogs.text}>
-              {t('decryptInPlace.done', { count, name })}
+              {keysLeft
+                ? t('decryptInPlace.doneLeft', { count, name })
+                : t('decryptInPlace.done', { count, name })}
             </p>
+            {keysLeft && <p className={styles.path}>{keysLeft}</p>}
+            {!!pre?.archives.length && (
+              <p className={dialogs.text}>
+                {t('decryptInPlace.archives', { names: pre.archives.join(', ') })}
+              </p>
+            )}
             <div className={dialogs.buttons}>
               <button type="button" className="btn btn-primary" data-autofocus onClick={onClose}>
                 {t('encryptInPlace.open')}
