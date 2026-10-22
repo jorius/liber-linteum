@@ -84,7 +84,7 @@ A new conversion in `liber-vault` (`storage/encrypted/convert.rs`), driven by a 
 
 ## 6. Out of scope
 
-- Decrypting a vault back to plain (E5's "Export decrypted copy…").
+- Decrypting a vault back to plain (E5's "Export decrypted copy…"). Decrypting in place came later: §10.
 - The keyring / master key, rotation, Touch ID (E5, E7).
 - Converting while the vault is open in another app (sync tools keep running; their history is the warned residual).
 
@@ -111,3 +111,101 @@ A fresh-context builder check raised ten questions, six about crash safety. All 
 11. **Another device's unfinished conversion can be undone here, but only before `staged`** (amends item 2; final whole-branch review). A journal from another install used to strand the vault for good if that device never came back.
     - **Phase `copying`**: every original is still at the root, or back from `.liber-plain/` by an exact-name move. Opening the folder fails with `convertingElsewhere`, and the error offers "Undo it on this device…". Its confirmation says "Only do this if the other device isn't encrypting this folder right now. The vault goes back to unencrypted." On confirm, `vault_encrypt_undo_elsewhere` runs the ordinary rollback, ignoring the install id but keeping every other check: exact names, a staging folder this run created, and never overwriting. The folder then opens as a plain vault.
     - **From `staged` on**: the refusal stays (`convertingElsewhereFinishing`). The error gives the manual steps: finish it by opening the vault on that device. If that device is gone, quit and move everything in the hidden `.liber-plain/` folder into a new folder: those are the notes, unencrypted.
+
+## 9. Encrypt in place: keep a readable backup (2026-10-21, approved feature A)
+
+### 9.1 Flow
+
+intro → preflight (blocked list) → **backup** → passphrase → begin (staging vault) → **backing up** (only with a copy) → recovery key → encrypting → done.
+
+- **The backup step** comes right after preflight, before the passphrase: "Keep a readable copy?" with two radio cards and no default (the user chooses):
+  - **Keep a readable copy**: a folder field with **Choose…** (a Rust-side folder dialog, `vault_encrypt_pick_backup`; tests replace it with `ConvertState::set_backup_picker`). Rust keeps the folder it picked; the page never names it to the backend (as the Notion import does).
+  - **Don't keep a copy**: today's behaviour. The originals go to the Trash as "<name> (unencrypted originals)".
+  - The warning box says it plainly: the copy is **not encrypted**, so anyone who can open that folder (or its sync service) can read it. "Choose a passphrase…" stays off until a choice is made and, with a copy, until a folder passes the checks.
+- **The folder must be** outside the vault (not the vault, not inside it, not around it), not inside another vault (an encrypted or damaged one by `vault_kind`, a folder holding `.liber/`, any recent vault, the Scratchpad), and empty (OS junk aside) or new (its parent must exist). Refused with its own error: `backupInVault`, `backupInOtherVault`, `backupNotEmpty`. The pick checks it; begin and the backup check it again.
+- **When it's written.** After begin, before the recovery key: the vault is closed by then (the open pages were saved first), so nothing edits it while it's copied, and a backup that fails never shows a key that is then thrown away. `vault_encrypt_backup` copies every file the conversion will encrypt (the same walk: notes, attachments, `.liber/`, `.trash/`, `.archive/`, `.obsidian/`, empty folders; sync-tool control files and OS junk are left out, as they are from the encrypted vault) and emits `vault:encrypt-progress`. Stop and undo works during it.
+- **Verified before any encryption.** Each file is streamed into the folder (`create_new`) while its SHA-256 is computed, synced to disk, read back and hashed again: the two must match, and the original's size, mtime and (unix) inode and ctime must be the same before and after the read. Its mtime is set to the original's.
+- **The backup matches what is encrypted.** The backup records each file's stamp. The encrypt copy re-scans and compares with that record first: a file changed or added since (a sync during the key step) aborts with `changedDuringConvert`, and the conversion is undone. The backup stays.
+- **Done** adds: "A readable copy is in <folder>. It isn't encrypted: keep it somewhere safe, and delete it when you no longer need it." with **Show in Finder / Show in file manager** (`vault_reveal_backup`, which reveals only the folder this app backed up to).
+
+### 9.2 Failure modes
+
+| When | What happens |
+|---|---|
+| The pick is refused | an inline alert with the reason; nothing written |
+| Begin re-checks the folder and it no longer passes | begin refuses; nothing changed |
+| A file can't be read or written, or reads back differently | `backupFailed` (the file and why): the entries this backup wrote are removed (only those: the folder was empty), the conversion is undone (`rollback`), the plain vault reopens: "The readable copy couldn't be made (…). Nothing was encrypted." |
+| Stop and undo during the backup | as above, `cancelled` |
+| A crash during the backup | the journal says `copying`: the next open rolls the conversion back as before. The part-written copy stays in the folder (recovery never deletes outside the vault, and the journal doesn't name the folder); it is the user's to delete |
+| The conversion fails or is stopped after the backup | the backup is complete and verified: it stays (it's the user's) |
+
+### 9.3 Not changed
+
+The originals still go to the Trash when a backup is kept: the backup is a second copy, not a replacement. The journal format is unchanged (no secrets, no backup path).
+
+## 10. Decrypt "<vault>" (2026-10-21, approved feature B)
+
+### 10.1 Entry points
+
+- **Vault menu** (macOS): `Decrypt “<name>”…`, id `liber-vault-decrypt`, `menu:vault` payload `"decrypt"`, named and enabled only while an encrypted vault is open (`menu_set_decrypt_item`, as `menu_set_encrypt_item`). The in-app menu bar of Linux and Windows (another branch) can wire the same id and payload.
+- **The sidebar's vault-name menu** (`VaultMenu.tsx`), for an encrypted vault.
+- Refused while another conversion is pending or running, for the Scratchpad, for the folders encrypt in place refuses (home, Desktop, Documents, Downloads, a volume root: consistent with §8.10), and for a vault inside another encrypted vault.
+
+### 10.2 Flow (one dialog, held from begin until done or an error, with the Beta chip)
+
+1. **Intro:** "Decrypting turns every page, folder name and attachment of “<name>” back into ordinary files, where they are. <N> files." The warning box: anyone with access to this disk, its backups or its sync service can read the vault afterwards; the sync service uploads the readable pages and its version history keeps them, even if the vault is encrypted again later; pause syncing while it runs. "The passphrase and recovery key stop working for good: encrypting the vault again later makes new ones." Buttons: Cancel, Continue.
+2. **Preflight** (a blocked list; nothing changed): names that couldn't be decrypted (`unreadable`; they would be lost with the ciphertext), a folder that would read as an encrypted vault of its own once readable (`vault`), a top-level name already used by a readable entry beside the vault (`taken`), or one of the conversions' own names (`reserved`).
+3. **Secrets:** the passphrase and the recovery key, both required. Each is checked on its own against this vault's header (the passphrase slots with Argon2, the recovery slot): a wrong one says which ("The passphrase doesn't open this vault." / "The recovery key doesn't open this vault.", or both), and the header must be the open vault's (same vault id, and not an older epoch than this device has seen).
+4. **Decrypting:** progress, "<done> of <total> files · each one is checked before anything encrypted is removed", and **Stop and undo**. The open pages are saved first and the encrypted session closes (its decrypted attachment copies are wiped then).
+5. **Done:** "<N> files decrypted and checked. “<name>” is no longer encrypted, and its passphrase and recovery key no longer work." **Open** closes the dialog: the vault is already open behind it, as a plain vault (Settings → Security and the Recent chip go, since both read the folder).
+
+### 10.3 Backend: crash-safe in place
+
+The mirror of §4.3 and §8, in `liber_vault::decrypt` (`storage/encrypted/decrypt.rs`), reusing convert's journal, stamp, collision and crash-point patterns.
+
+- **Names:** the journal `.liber-decrypt.json` (plain JSON, no secrets: version, phase, started, `installId`, the old `vaultId`, `stagingCreated`, `retiredCreated`); the readable tree while it fills, `.liber-decrypting/`; the encrypted entries between staging and deletion, `.liber-encrypted/`. Encrypt in place refuses a folder with a decrypt journal (`convertPending`); decrypt refuses one with either journal.
+- **Phases:**
+  1. **Begin** (secrets checked, the session closed): journal `copying`, then `.liber-decrypting/`.
+  2. **Copy and verify** (`copying`): first the stamps of every physical entry under `d/`, of the header and of the root's other entries are recorded. Then each logical folder is made (empty ones too) and each file is streamed out of `EncryptedStorage` into `create_new`, synced, read back, and its SHA-256 compared with the decrypted stream's; its mtime is set to the encrypted file's (which encrypt in place set to the original's). A file that fails to decrypt stops it (`damaged`). Progress per file; cancel between files.
+  3. **Stage the encrypted entries:** re-check the recorded stamps (a changed ciphertext file, a newcomer at the root, a change in `.liber-decrypting/`: `changedDuringDecrypt`, rolled back), then move `d/`, `README.txt` and any header sync-conflict copies into `.liber-encrypted/`, `liber-vault.json` **last**, and re-check them there. Then journal `staged`. From here every readable file is verified and nothing encrypted is at the root: recovery **rolls forward**.
+  4. **Commit** (`committing`): move each top-level entry of `.liber-decrypting/` up to the root, skipping those a crash already moved, never overwriting (a collision stops with `decryptCollision`). `committed` once the staging folder is empty and the root holds no header.
+  5. **Finish:** delete `.liber-encrypted/liber-vault.json` and the header copies (the keys go first, fsynced), then `.liber-encrypted/` (the ciphertext), forget the vault id in `vault-epochs.json` (a failure there is only a warning), remove the empty staging folder, then the journal **last**. The desktop then wipes the decrypted copies again and opens the folder as a plain vault.
+- **Recovery on open** (`vault_open`, `vault_unlock` and `folder_kind` check the decrypt journal as they check the encrypt one): this device's journal at `copying` → **roll back** (the encrypted entries back from `.liber-encrypted/`, the header last, never overwriting; the readable staging folder deleted; the journal last): "Decrypting “<name>” was interrupted; the vault is still encrypted." From `staged` on → **finish**: "Finished decrypting “<name>”." Another install's journal touches nothing: `decryptingElsewhere` while copying (with "Undo it on this device…", the same rollback after a confirm), `decryptingElsewhereFinishing` from `staged` on; committed there, the folder opens as plain and that device finishes.
+- **Stop and undo:** during the copy, the rollback above.
+
+### 10.4 What is deleted, when, and why it's deleted rather than trashed
+
+| What | When | How |
+|---|---|---|
+| The readable staging copy | Stop and undo, a failed run, recovery before `staged` | deleted: the encrypted vault is intact, and a second readable copy is what the user didn't ask for |
+| `liber-vault.json` and its sync-conflict copies | finish, first | **deleted** |
+| `d/` (the ciphertext) and `README.txt` | finish, after the header | **deleted** |
+| The vault id in `vault-epochs.json` | finish | removed |
+| Decrypted attachment copies | begin (the session closes) and after finish | wiped |
+
+The header and the ciphertext are deleted, not trashed:
+
+- **The header is the only place the vault key is kept**, wrapped by the passphrase and by the recovery key. In the Trash, putting it back beside `d/` would make the old passphrase and recovery key open the old data again; the spec says they stop working forever.
+- **Without the header, nobody can read the ciphertext**: the vault key is random and was never stored anywhere else. Trashing it would only fill the Trash with unreadable bytes the size of the vault, which would look like a backup and isn't one.
+- **Deleting loses nothing**: every readable file is written, synced, read back and hash-checked before anything encrypted leaves the root, and is at the root before the finish deletes anything. A crash between the commit and the end of the finish re-runs the finish.
+
+So nothing that can unlock or reveal the old data stays in the vault folder. What the app can't reach is what §4.2 already warns about: copies elsewhere (backups, Time Machine, a sync service's history of the old header and ciphertext).
+
+### 10.5 Failure modes
+
+| When | What happens |
+|---|---|
+| A wrong passphrase or recovery key | `decryptWrongSecret` (`passphrase`, `recovery` or `both`); nothing changed, the vault stays open |
+| Preflight blocks | the list; nothing changed |
+| A file fails to decrypt (damaged) or reads back differently | rolled back; `damaged` / `decryptMismatch` names it; the vault is encrypted as it was (the Unlock screen shows behind the dialog) |
+| Sync changes something mid-run | `changedDuringDecrypt`, rolled back |
+| Stop and undo | `cancelled`, rolled back |
+| A crash before `staged` | rolled back on the next open (the readable staging copy stays hidden in the folder until then) |
+| A crash from `staged` on | finished on the next open |
+| The undo fails | `decryptUndoFailed`: the encrypted entries are safe in `.liber-encrypted/`; opening the folder again retries |
+| A failure past `staged` | `decryptFinishFailed`: the next open finishes it |
+| Forgetting the epoch fails | a warning; the vault is plain anyway, and a record for an id that no header carries any more is harmless |
+
+### 10.6 Re-encrypting later
+
+Encrypt in place always makes a new vault (`EncryptedStorage::create`: a random vault key and vault id, new slots, a new recovery key), so nothing of the old keys comes back. Tested in `liber-vault` (a new id; the old recovery key doesn't open it) and on the desktop (the old id is gone from `vault-epochs.json`, the new one is recorded).

@@ -38,7 +38,7 @@ pub use page_width::{PageWidth, PageWidths};
 pub use path::VaultPath;
 pub use scan::{Entry, EntryKind, Scan};
 pub use scratch::DEFAULT_SCRATCH_FOLDER;
-pub use storage::convert;
+pub use storage::{convert, decrypt};
 pub use storage::plain::TMP_MARKER;
 pub use storage::{
     Child, EncryptedStorage, Follow, HEADER_FILE, Kind, Meta, NewFile, OsUse, PlainStorage,
