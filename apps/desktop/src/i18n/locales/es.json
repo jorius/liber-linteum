@@ -142,7 +142,10 @@
     "showSidebar": "Mostrar la barra lateral",
     "settingsItem": "Ajustes…",
     "openAnother": "Abrir otra bóveda…",
-    "encryptVault": "Cifrar «{name}»…"
+    "encryptVault": "Cifrar «{name}»…",
+    "newVault": "Nueva bóveda…",
+    "newScratchpad": "Crear nueva nota rápida en «{name}»",
+    "lockVault": "Bloquear bóveda"
   },
   "page": {
     "region": "Página",

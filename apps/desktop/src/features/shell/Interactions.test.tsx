@@ -127,6 +127,7 @@ describe('context menu', () => {
     expect(items.map((i) => i.textContent)).toEqual([
       'New page',
       'New folder',
+      'Create new scratchpad for “Vault”',
       'Add sub-page',
       'Rename',
       'Move to…',

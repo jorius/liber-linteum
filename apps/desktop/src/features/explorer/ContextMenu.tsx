@@ -16,6 +16,7 @@ import { entryReveal } from '../../ipc';
 import { errorMessage } from '../../stores/messages';
 import { useToastStore } from '../../stores/toastStore';
 import { revealKey } from './reveal';
+import { newQuickNote } from '../scratchpad/quickNote';
 
 export interface MenuState {
   path: string;
@@ -108,6 +109,7 @@ export function ContextMenu({ menu, onClose }: { menu: MenuState; onClose: () =>
     : [
         [t('menu.newPage'), () => void vault().createPage(dir)],
         [t('menu.newFolder'), () => void vault().createFolder(dir)],
+        [t('shell.newScratchpad', { name: vault().info?.name ?? '' }), () => void newQuickNote()],
         ...(node.kind === 'page'
           ? [
               [t('menu.addSubPage'), () => void vault().addSubPage(node.path)] as [
