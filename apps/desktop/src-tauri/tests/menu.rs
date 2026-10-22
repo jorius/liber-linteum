@@ -166,6 +166,7 @@ fn macos_menu_quit_is_ours_and_the_standard_items_stay() {
             "New Vault…",
             "Open Vault…",
             "Encrypt Vault…",
+            "Decrypt Vault…",
             "Lock Vault",
             "Close Vault"
         ]
@@ -495,14 +496,15 @@ fn quick_note_item_follows_open_and_close() {
 }
 
 /// Encryption UX round §4.1: Vault → Encrypt "<name>"… is off and generic
-/// until the page names an open plain vault, and off again after.
+/// until the page names an open plain vault, and off again after; §10.1:
+/// Decrypt "<name>"… the same for an encrypted vault.
 #[cfg(target_os = "macos")]
 fn encrypt_item_follows_the_page() {
     let got: Arc<std::sync::Mutex<Vec<(String, bool)>>> = Arc::default();
     let log = got.clone();
     build_app("encrypt-item").run_return(move |handle, event| {
         if let RunEvent::Ready = event {
-            let item = |h: &tauri::AppHandle<MockRuntime>| {
+            let item = |h: &tauri::AppHandle<MockRuntime>, id: &str| {
                 let vault = h
                     .menu()
                     .unwrap()
@@ -519,20 +521,24 @@ fn encrypt_item_follows_the_page() {
                     .unwrap()
                     .into_iter()
                     .find_map(|i| match i {
-                        MenuItemKind::MenuItem(m)
-                            if m.id() == liber_desktop::menu::VAULT_ENCRYPT_ID =>
-                        {
+                        MenuItemKind::MenuItem(m) if m.id() == id => {
                             Some((m.text().unwrap(), m.is_enabled().unwrap()))
                         }
                         _ => None,
                     })
                     .unwrap()
             };
-            log.lock().unwrap().push(item(handle));
+            use liber_desktop::menu::{VAULT_DECRYPT_ID, VAULT_ENCRYPT_ID};
+            log.lock().unwrap().push(item(handle, VAULT_ENCRYPT_ID));
             liber_desktop::menu::menu_set_encrypt_item(handle.clone(), Some("Smartjob".into()));
-            log.lock().unwrap().push(item(handle));
+            log.lock().unwrap().push(item(handle, VAULT_ENCRYPT_ID));
             liber_desktop::menu::menu_set_encrypt_item(handle.clone(), None);
-            log.lock().unwrap().push(item(handle));
+            log.lock().unwrap().push(item(handle, VAULT_ENCRYPT_ID));
+            log.lock().unwrap().push(item(handle, VAULT_DECRYPT_ID));
+            liber_desktop::menu::menu_set_decrypt_item(handle.clone(), Some("Smartjob".into()));
+            log.lock().unwrap().push(item(handle, VAULT_DECRYPT_ID));
+            liber_desktop::menu::menu_set_decrypt_item(handle.clone(), None);
+            log.lock().unwrap().push(item(handle, VAULT_DECRYPT_ID));
             for window in handle.webview_windows().into_values() {
                 window.close().unwrap();
             }
@@ -544,6 +550,9 @@ fn encrypt_item_follows_the_page() {
             ("Encrypt Vault…".to_string(), false),
             ("Encrypt “Smartjob”…".to_string(), true),
             ("Encrypt Vault…".to_string(), false),
+            ("Decrypt Vault…".to_string(), false),
+            ("Decrypt “Smartjob”…".to_string(), true),
+            ("Decrypt Vault…".to_string(), false),
         ]
     );
 }
@@ -606,6 +615,7 @@ fn m5b_items_emit_their_events() {
                 liber_desktop::menu::VAULT_CLOSE_ID,
                 liber_desktop::menu::VAULT_NEW_ID,
                 liber_desktop::menu::VAULT_ENCRYPT_ID,
+                liber_desktop::menu::VAULT_DECRYPT_ID,
                 liber_desktop::menu::SAVE_ID,
                 liber_desktop::menu::SIDEBAR_ID,
             ] {
@@ -629,6 +639,7 @@ fn m5b_items_emit_their_events() {
             "main menu:vault \"close\"".into(),
             "main menu:vault \"new\"".into(),
             "main menu:vault \"encrypt\"".into(),
+            "main menu:vault \"decrypt\"".into(),
             "main menu:save null".into(),
             "main menu:sidebar null".into(),
         ]

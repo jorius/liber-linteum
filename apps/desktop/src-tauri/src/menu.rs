@@ -85,6 +85,15 @@ pub fn encrypt_label(vault: Option<&str>) -> String {
     }
 }
 
+/// Vault → Decrypt "<name>"… (encryption UX §10.1): the open encrypted
+/// vault's name, or the generic label while the item is off.
+pub fn decrypt_label(vault: Option<&str>) -> String {
+    match vault {
+        Some(name) => format!("Decrypt “{}”…", menu_name(name)),
+        None => "Decrypt Vault…".into(),
+    }
+}
+
 /// The app menu's item `id`, in any submenu.
 fn find_item<R: Runtime>(app: &AppHandle<R>, id: &str) -> Option<MenuItem<R>> {
     fn find<R: Runtime>(items: Vec<MenuItemKind<R>>, id: &str) -> Option<MenuItem<R>> {
@@ -133,6 +142,11 @@ pub const VAULT_NEW_ID: &str = "liber-vault-new";
 /// Vault → Encrypt "<name>"… (encryption UX round §4.1): enabled and named
 /// only while a plain vault is open (`menu_set_encrypt_item`).
 pub const VAULT_ENCRYPT_ID: &str = "liber-vault-encrypt";
+/// Vault → Decrypt "<name>"… (encryption UX §10.1): enabled and named only
+/// while an encrypted vault is open (`menu_set_decrypt_item`); `menu:vault`
+/// payload `"decrypt"`. The in-app menu bar of Linux and Windows uses the
+/// same id.
+pub const VAULT_DECRYPT_ID: &str = "liber-vault-decrypt";
 
 /// The `menu:vault` payload of a Vault menu item.
 fn vault_action(id: &str) -> Option<&'static str> {
@@ -142,6 +156,7 @@ fn vault_action(id: &str) -> Option<&'static str> {
         VAULT_CLOSE_ID => Some("close"),
         VAULT_LOCK_ID => Some("lock"),
         VAULT_ENCRYPT_ID => Some("encrypt"),
+        VAULT_DECRYPT_ID => Some("decrypt"),
         _ => None,
     }
 }
@@ -161,6 +176,16 @@ pub fn menu_set_lock_enabled<R: Runtime>(app: AppHandle<R>, enabled: bool) {
 pub fn menu_set_encrypt_item<R: Runtime>(app: AppHandle<R>, vault: Option<String>) {
     if let Some(item) = find_item(&app, VAULT_ENCRYPT_ID) {
         let _ = item.set_text(encrypt_label(vault.as_deref()));
+        let _ = item.set_enabled(vault.is_some());
+    }
+}
+
+/// Names and enables Vault → Decrypt "<vault>"…, or turns it off with no
+/// vault (the page calls this as an encrypted vault opens and goes).
+#[tauri::command]
+pub fn menu_set_decrypt_item<R: Runtime>(app: AppHandle<R>, vault: Option<String>) {
+    if let Some(item) = find_item(&app, VAULT_DECRYPT_ID) {
+        let _ = item.set_text(decrypt_label(vault.as_deref()));
         let _ = item.set_enabled(vault.is_some());
     }
 }
@@ -282,6 +307,13 @@ pub fn app_menu<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
         false,
         None::<&str>,
     )?;
+    let vault_decrypt = MenuItem::with_id(
+        app,
+        VAULT_DECRYPT_ID,
+        decrypt_label(None),
+        false,
+        None::<&str>,
+    )?;
     let vault = Submenu::with_items(
         app,
         "Vault",
@@ -291,6 +323,7 @@ pub fn app_menu<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
             &vault_open,
             &PredefinedMenuItem::separator(app)?,
             &vault_encrypt,
+            &vault_decrypt,
             &vault_lock,
             &vault_close,
         ],
@@ -551,6 +584,8 @@ mod lock_tests {
     fn vault_menu_items_emit_their_action() {
         assert_eq!(vault_action(VAULT_NEW_ID), Some("new"));
         assert_eq!(vault_action(VAULT_ENCRYPT_ID), Some("encrypt"));
+        assert_eq!(VAULT_DECRYPT_ID, "liber-vault-decrypt");
+        assert_eq!(vault_action(VAULT_DECRYPT_ID), Some("decrypt"));
         assert_eq!(vault_action(VAULT_LOCK_ID), Some("lock"));
         assert_eq!(vault_action(VAULT_OPEN_ID), Some("open"));
         assert_eq!(vault_action(VAULT_CLOSE_ID), Some("close"));
@@ -567,6 +602,17 @@ mod lock_tests {
         assert_eq!(
             encrypt_label(Some(&"Á".repeat(60))),
             format!("Encrypt “{}…”…", "Á".repeat(39))
+        );
+    }
+
+    #[test]
+    fn decrypt_label_names_the_vault_cut_like_encrypt() {
+        assert_eq!(decrypt_label(None), "Decrypt Vault…");
+        assert_eq!(decrypt_label(Some("Smartjob")), "Decrypt “Smartjob”…");
+        assert_eq!(decrypt_label(Some("R&D")), "Decrypt “R&&D”…");
+        assert_eq!(
+            decrypt_label(Some(&"Á".repeat(60))),
+            format!("Decrypt “{}…”…", "Á".repeat(39))
         );
     }
 }

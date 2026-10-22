@@ -83,6 +83,18 @@ pub fn check_and_record(config_dir: &Path, vault_id: &[u8; 16], epoch: u32) -> C
     save(config_dir, &store)
 }
 
+/// Removes `vault_id` (hex) from the store (decrypt in place, encryption UX
+/// §10.3: no header carries that id any more). Absent is fine.
+pub fn forget(config_dir: &Path, vault_id: &str) -> CmdResult<()> {
+    let _one = hold();
+    let path = config_dir.join(FILE_NAME);
+    let mut store = load(&path)?;
+    if store.remove(vault_id).is_none() {
+        return Ok(());
+    }
+    save(config_dir, &store)
+}
+
 /// Atomic: a temp file unique to this write → fsync → rename → fsync the folder.
 fn save(config_dir: &Path, store: &Store) -> CmdResult<()> {
     let json = serde_json::to_vec_pretty(store).map_err(io)?;
@@ -208,6 +220,22 @@ mod tests {
             b"{ torn",
             "kept aside, unchanged"
         );
+        check_and_record(dir.path(), &a, 1).unwrap();
+    }
+
+    #[test]
+    fn a_forgotten_vault_leaves_the_others() {
+        let dir = tempfile::tempdir().unwrap();
+        let (a, b) = ([1u8; 16], [2u8; 16]);
+        check_and_record(dir.path(), &a, 3).unwrap();
+        check_and_record(dir.path(), &b, 1).unwrap();
+        forget(dir.path(), &hex(&a)).unwrap();
+        forget(dir.path(), &hex(&[9u8; 16])).unwrap();
+        let store: Store =
+            serde_json::from_slice(&std::fs::read(dir.path().join(FILE_NAME)).unwrap()).unwrap();
+        assert_eq!(store.len(), 1);
+        assert_eq!(store[&hex(&b)], 1);
+        // A vault with that id would start from scratch: any epoch opens.
         check_and_record(dir.path(), &a, 1).unwrap();
     }
 

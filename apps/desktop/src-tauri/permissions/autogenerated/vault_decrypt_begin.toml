@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-vault-decrypt-begin"
+description = "Enables the vault_decrypt_begin command without any pre-configured scope."
+commands.allow = ["vault_decrypt_begin"]
+
+[[permission]]
+identifier = "deny-vault-decrypt-begin"
+description = "Denies the vault_decrypt_begin command without any pre-configured scope."
+commands.deny = ["vault_decrypt_begin"]
