@@ -378,7 +378,9 @@ describe('Search dialog (M5 §4)', () => {
     await userEvent.type(field, 'p');
     await userEvent.click(await screen.findByRole('button', { name: 'Show more' }));
     expect(lastQuery().offset).toBe(1);
-    expect(await screen.findByRole('option', { name: /More/ })).toBeInTheDocument();
+    // Queried inside waitFor: the list re-renders as the page arrives, and an
+    // element found before that is detached by the time it's checked (CI).
+    await waitFor(() => expect(screen.getByRole('option', { name: /More/ })).toBeInTheDocument());
     expect(screen.queryByRole('button', { name: 'Show more' })).toBeNull();
   });
 

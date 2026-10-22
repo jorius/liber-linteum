@@ -288,19 +288,29 @@ describe('AppShell', () => {
   });
 
   it('Windows and Linux have no app menu: the vault menu makes a scratchpad note', async () => {
-    const calls = backend({});
     seed();
+    // The whole quick note runs (create, tree, open) and the test waits for
+    // its end: an unanswered vault_tree crashed it after the test (CI).
+    const note = 'Scratchpad/Quick note.md';
+    const disk = fakeDisk(
+      { [note]: '' },
+      {
+        quick_notes_state: () => ({ folder: 'Scratchpad', autoNamed: [] }),
+        quick_note_create: () => note,
+        vault_tree: () => [
+          ...nodes,
+          { path: 'Scratchpad', kind: 'folder' },
+          { path: note, kind: 'page' },
+        ],
+      },
+    );
     render(<AppShell />);
     await userEvent.click(screen.getByRole('button', { name: 'Digital Brain' }));
     await userEvent.click(
       screen.getByRole('menuitem', { name: 'Create new scratchpad for “Digital Brain”' }),
     );
-    await waitFor(() =>
-      expect(
-        calls.some(([c]) => c === 'quick_note_create') ||
-          useUiStore.getState().dialog?.type === 'scratchpadSetup',
-      ).toBe(true),
-    );
+    await waitFor(() => expect(usePageStore.getState().path).toBe(note));
+    expect(disk.calls.some(([c]) => c === 'quick_note_create')).toBe(true);
   });
 
   it('UX round §4.1: Encrypt “<name>”… starts encrypting the open plain vault', async () => {

@@ -2645,7 +2645,12 @@ fn m6_a_take_becomes_an_attachment_of_its_page() {
     )
     .unwrap_err();
     assert_eq!(kind(busy), "alreadyExists");
-    std::thread::sleep(std::time::Duration::from_millis(250));
+    // Until the take has a few level readings (about 20 a second), not a
+    // fixed sleep: a loaded CI runner starts the synthetic device late.
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
+    while levels.lock().unwrap().len() < 5 && std::time::Instant::now() < deadline {
+        std::thread::sleep(std::time::Duration::from_millis(20));
+    }
     let id = started["recordingId"].clone();
     let clip = call(&h.main, "audio_record_stop", json!({ "recordingId": id })).unwrap();
     let path = clip["path"].as_str().unwrap();
