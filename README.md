@@ -125,4 +125,5 @@ credited here and on the welcome screen instead. Other licences are in
 
 ## License
 
-[GPL-3.0-or-later](LICENSE).
+[GPL-3.0-or-later](LICENSE). The name and the icon aren't covered by it: a fork that's
+changed or sold needs its own (see [TRADEMARKS.md](TRADEMARKS.md)).
