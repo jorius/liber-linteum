@@ -215,6 +215,22 @@ fn relations(s: &str) -> Option<Vec<(String, String)>> {
     (!out.is_empty()).then_some(out)
 }
 
+/// `[[…]]` for each relation in a cell: the page it resolves to, else the
+/// name Notion wrote.
+fn relation_links(value: &str, dir: &[String], r: &dyn Resolver) -> Vec<String> {
+    relations(value)
+        .unwrap_or_default()
+        .into_iter()
+        .map(|(name, href)| {
+            let text = match resolve_href(dir, &href).and_then(|p| r.target(&p)) {
+                Some(Target::Page(t) | Target::Asset(t)) => t,
+                None => name,
+            };
+            format!("[[{text}]]")
+        })
+        .collect()
+}
+
 fn infer(values: &[&str]) -> Kind {
     let values: Vec<&str> = values
         .iter()
@@ -310,17 +326,9 @@ impl Table {
                 Kind::Number => value.to_string(),
                 Kind::Date => date_value(value).unwrap_or_else(|| quoted(value)),
                 Kind::Relation => {
-                    let links: Vec<String> = relations(value)
-                        .unwrap_or_default()
-                        .into_iter()
-                        .map(|(name, href)| {
-                            let target = resolve_href(dir, &href).and_then(|p| r.target(&p));
-                            let text = match target {
-                                Some(Target::Page(t) | Target::Asset(t)) => t,
-                                None => name,
-                            };
-                            quoted(&format!("[[{text}]]"))
-                        })
+                    let links: Vec<String> = relation_links(value, dir, r)
+                        .iter()
+                        .map(|l| quoted(l))
                         .collect();
                     format!("[{}]", links.join(", "))
                 }
@@ -343,8 +351,16 @@ impl Table {
     }
 
     /// The database's index page: its title and a table linking every row
-    /// (`targets[i]`: row `i`'s vault path without `.md`).
-    pub fn index_page(&self, title: &str, targets: &[String]) -> String {
+    /// (`targets[i]`: row `i`'s vault path without `.md`). Relations show as
+    /// links and dates as dates, as in each row's frontmatter (resolved
+    /// against `dir`, the CSV's folder).
+    pub fn index_page(
+        &self,
+        title: &str,
+        targets: &[String],
+        dir: &[String],
+        r: &dyn Resolver,
+    ) -> String {
         let cell = |s: &str| {
             s.trim()
                 .replace('|', "\\|")
@@ -357,9 +373,14 @@ impl Table {
         out.push_str(&format!("|{}\n", " --- |".repeat(headers.len().max(1))));
         for (i, row) in self.rows.iter().enumerate() {
             let mut cells = vec![format!("[[{}\\|{}]]", targets[i], cell(self.title(i)))];
-            cells.extend(
-                (1..self.headers.len()).map(|c| cell(row.get(c).map_or("", String::as_str))),
-            );
+            cells.extend((1..self.headers.len()).map(|c| {
+                let value = row.get(c).map_or("", |v| v.trim());
+                match self.kinds[c] {
+                    Kind::Relation if !value.is_empty() => relation_links(value, dir, r).join(", "),
+                    Kind::Date => cell(&iso_date(value).unwrap_or_else(|| value.to_string())),
+                    _ => cell(value),
+                }
+            }));
             out.push_str(&format!("| {} |\n", cells.join(" | ")));
         }
         out
@@ -499,10 +520,32 @@ mod tests {
         );
     }
 
+    /// The index table shows relations as links and dates as dates, as each
+    /// row's frontmatter does (a relation showed `Big (Projects%20abc/…md)`).
+    #[test]
+    fn index_page_links_relations_and_dates_like_the_frontmatter() {
+        let csv = "Name,Project,When\nA,\"Big (Projects%20abc/Big%20def.md), Gone (x.md)\",\"October 18, 2026\"\n";
+        let t = Table::parse(csv).unwrap();
+        let r = Map(HashMap::from([(
+            "Tasks/Projects abc/Big def.md".to_string(),
+            Target::Page("Big".to_string()),
+        )]));
+        let page = t.index_page("Tasks", &["Tasks/A".into()], &["Tasks".to_string()], &r);
+        assert_eq!(
+            page,
+            "# Tasks\n\n| Name | Project | When |\n| --- | --- | --- |\n| [[Tasks/A\\|A]] | [[Big]], [[Gone]] | 2026-10-18 |\n"
+        );
+    }
+
     #[test]
     fn m7_index_page() {
         let t = Table::parse("Name,Status\nA | 1,Done\nB,\"two\nlines\"\n").unwrap();
-        let page = t.index_page("Tasks", &["Tasks/A - 1".into(), "Tasks/B".into()]);
+        let page = t.index_page(
+            "Tasks",
+            &["Tasks/A - 1".into(), "Tasks/B".into()],
+            &[],
+            &Map(HashMap::new()),
+        );
         assert_eq!(
             page,
             "# Tasks\n\n| Name | Status |\n| --- | --- |\n| [[Tasks/A - 1\\|A \\| 1]] | Done |\n| [[Tasks/B\\|B]] | two<br>lines |\n"

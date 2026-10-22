@@ -475,7 +475,10 @@ pub fn plan(export: &Export, cancel: &AtomicBool) -> Result<Plan, ImportError> {
             .collect();
         files.push(Out {
             path: d.index.clone(),
-            body: Body::Text(rows.table.index_page(&d.title, &links)),
+            body: Body::Text(
+                rows.table
+                    .index_page(&d.title, &links, &rows.csv_dir, &targets),
+            ),
         });
     }
 
@@ -858,12 +861,13 @@ mod tests {
             read(&dir, "Home/Tasks/Write intro.md"),
             "---\nStatus: \"Done\"\nDue: 2026-10-01\nRelated: [\"[[Child]]\"]\n---\n# Write intro\n\nThe body.\n"
         );
-        // A row with no page gets one; the index page links both.
+        // A row with no page gets one; the index page links both, with its
+        // relations as links and its dates as dates.
         assert_eq!(read(&dir, "Home/Tasks/Ship it.md"), "# Ship it\n");
         assert!(!dir.path().join("Home/Tasks.md").exists());
         assert_eq!(
             read(&dir, "Home/Tasks/Tasks.md"),
-            "# Tasks\n\n| Name | Status | Due | Related |\n| --- | --- | --- | --- |\n| [[Home/Tasks/Write intro\\|Write intro]] | Done | October 1, 2026 | Child (Child%20ffffffffffffffffffffffffffffffff.md) |\n| [[Home/Tasks/Ship it\\|Ship it]] |  |  |  |\n"
+            "# Tasks\n\n| Name | Status | Due | Related |\n| --- | --- | --- | --- |\n| [[Home/Tasks/Write intro\\|Write intro]] | Done | 2026-10-01 | [[Child]] |\n| [[Home/Tasks/Ship it\\|Ship it]] |  |  |  |\n"
         );
         // Duplicate names numbered; the plain CSV not written.
         assert_eq!(read(&dir, "Notes.md"), "# Notes\n");
