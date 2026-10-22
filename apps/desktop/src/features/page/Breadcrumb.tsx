@@ -1,6 +1,7 @@
 import { useTranslation } from 'react-i18next';
-import { folderPageOf, nameOf, parentOf } from '../../stores/tree';
+import { folderPageOf, nameOf, parentOf, shownName } from '../../stores/tree';
 import { useVaultStore } from '../../stores/vaultStore';
+import { useShowExtensions } from '../explorer/TreeRow';
 import { ItemIcon, useIcons } from '../icons/ItemIcon';
 import styles from './PageView.module.css';
 
@@ -12,13 +13,15 @@ export function Breadcrumb({ path }: { path: string }) {
   const vault = useVaultStore((s) => s.info?.name ?? '');
   const reveal = useVaultStore((s) => s.revealFolder);
   const vaultIcon = useVaultStore((s) => s.info?.icon);
+  const extensions = useShowExtensions();
   const icons = useIcons();
   const folders: string[] = [];
   for (let p = parentOf(path); p; p = parentOf(p)) folders.unshift(p);
   // A folder page (round 3b §6.5) is its folder: `… / X`, not `… / X / X`.
   const folderPage = useVaultStore((s) => folderPageOf(parentOf(path), s.children) === path);
   if (folderPage) folders.pop();
-  const page = nameOf(path).replace(/\.md$/i, '');
+  // The page's file name; a folder page's crumb is its folder's.
+  const page = shownName(path, extensions && !folderPage);
   const icon = icons.get(path) ?? (folderPage ? icons.get(parentOf(path)) : undefined);
   return (
     <nav aria-label={t('page.breadcrumb')} className={styles.breadcrumb}>

@@ -446,7 +446,7 @@
       },
       "files": {
         "title": "Files and quick notes",
-        "description": "Renaming, deleting and where quick notes live."
+        "description": "Names, renaming, deleting and where quick notes live."
       },
       "security": {
         "title": "Security",
@@ -473,7 +473,7 @@
         "forward": "Forward",
         "edit": "Edit",
         "globalView": "Global View",
-        "search": "Search",
+        "search": "Search the vault",
         "files": "Go to the files",
         "newPage": "New page",
         "quickNote": "Create new scratchpad for this vault",
@@ -496,7 +496,11 @@
         "sidebar": "Show or hide the sidebar",
         "actions": "Show the actions",
         "settings": "Settings",
-        "quit": "Quit"
+        "quit": "Quit",
+        "findInPage": "Find in the page (outside the editor: Search)",
+        "findNext": "Next match",
+        "findPrevious": "Previous match",
+        "goToLine": "Go to line"
       }
     },
     "themes": {
@@ -623,7 +627,10 @@
       "exportFailed": "The theme couldn't be saved.",
       "saveFailed": "That change couldn't be saved, so the theme is back to how it was.",
       "limit": "You can keep up to {max} themes. Delete one to add another."
-    }
+    },
+    "showExtensions": "Show file extensions",
+    "showExtensionsHint": "File names show their extension, like Chapter 1.md or notes.txt. Page titles stay as they are.",
+    "autoCloseBrackets": "Auto-close brackets and quotes"
   },
   "toolbar": {
     "label": "Formatting",
@@ -1240,12 +1247,43 @@
       "minimize": "Minimize",
       "maximize": "Maximize",
       "restore": "Restore",
-      "closeWindow": "Close window"
+      "closeWindow": "Close window",
+      "find": "Find…",
+      "gotoLine": "Go to line…"
     },
     "about": {
       "title": "About Liber Linteum",
       "license": "Free software under the GNU GPL, version 3 or later."
     },
     "region": "Title bar"
+  },
+  "cursor": {
+    "position": "Ln {line}, Col {col}",
+    "positionSelected": "Ln {line}, Col {col} · {count} selected",
+    "goTo": "Go to line ({key})"
+  },
+  "findInPage": {
+    "find": "Find in page",
+    "replaceField": "Replace with",
+    "next": "Next",
+    "previous": "Previous",
+    "all": "Select all",
+    "matchCase": "Match case",
+    "regexp": "Regular expression",
+    "byWord": "Whole word",
+    "replace": "Replace",
+    "replaceAll": "Replace all",
+    "close": "Close",
+    "currentMatch": "Current match",
+    "onLine": "on line",
+    "replacedMatches": "Replaced $ matches",
+    "replacedOnLine": "Replaced the match on line $"
+  },
+  "goToLine": {
+    "label": "Go to line",
+    "placeholder": "42, 42:7, +5",
+    "go": "Go",
+    "hint": "Line {line} of {lines}",
+    "invalid": "Type a line, line:column, or +/− lines"
   }
 }

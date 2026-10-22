@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Dialog } from '../dialogs/Dialog';
 import dialogStyles from '../dialogs/Dialogs.module.css';
+import { useShowExtensions } from '../explorer/TreeRow';
 import { binLabel } from './BinView';
 
 /** Something new is where a restored or unarchived item was: keep both
@@ -17,6 +18,7 @@ export function BinClashDialog({
   onClose: () => void;
 }) {
   const { t } = useTranslation();
+  const extensions = useShowExtensions();
   const answered = useRef(false);
   const reply = (keep: boolean) => {
     if (!answered.current) {
@@ -36,7 +38,7 @@ export function BinClashDialog({
   const cancel = () => reply(false);
   return (
     <Dialog
-      title={t('bin.clashTitle', { name: binLabel(path) })}
+      title={t('bin.clashTitle', { name: binLabel(path, extensions) })}
       onClose={cancel}
       onConfirm={keepBoth}
     >

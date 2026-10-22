@@ -454,7 +454,7 @@ describe('AppShell', () => {
     expect(actions).toHaveAttribute('aria-expanded', 'true');
     const search = screen.getByRole('button', { name: /^Search/ });
     expect(search).toHaveFocus();
-    expect(search).toHaveAttribute('aria-keyshortcuts', 'Meta+F Control+F');
+    expect(search).toHaveAttribute('aria-keyshortcuts', 'Meta+Shift+F Control+Shift+F');
     await userEvent.keyboard('{ArrowDown}');
     expect(screen.getByRole('button', { name: /^Global view/ })).toHaveFocus();
     await userEvent.keyboard('{ArrowUp}{ArrowUp}');

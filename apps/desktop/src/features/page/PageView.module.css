@@ -125,6 +125,29 @@
   white-space: nowrap;
 }
 
+/* The cursor position: reads like the word count, and is a button (Go to
+   line). Over a cover it keeps the pill's veil (.bandCover .pill). */
+.cursorPos {
+  margin: 0;
+  border: 0;
+  padding: 2px 4px;
+  border-radius: var(--radius-sm);
+  background: none;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.cursorPos:hover {
+  color: var(--color-text);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.cursorPos:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 2px;
+}
+
 .modes {
   display: inline-flex;
   margin: 0;

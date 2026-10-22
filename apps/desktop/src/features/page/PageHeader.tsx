@@ -16,6 +16,7 @@ import { PageHeading } from './PageHeading';
 import { RelatedChips } from './RelatedChips';
 import { WidthMenu } from './WidthMenu';
 import { isArchived } from '../../stores/tree';
+import { CursorPosition } from './CursorPosition';
 import { WordCount } from './WordCount';
 import styles from './PageView.module.css';
 
@@ -71,6 +72,7 @@ export function PageHeader({
                 </span>
               )}
               {hasDoc && <WordCount />}
+              {hasDoc && <CursorPosition />}
               {hasDoc && (
                 <button
                   type="button"

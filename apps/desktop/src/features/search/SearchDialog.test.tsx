@@ -4,6 +4,7 @@ import axe from 'axe-core';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { SearchHit, SearchPage, SearchQuery } from '../../ipc';
 import { clearMocks, mockIPC } from '../../ipc/testing';
+import { DEFAULT_SETTINGS, useSettingsStore } from '../../stores/settingsStore';
 import { useUiStore } from '../../stores/uiStore';
 import { useVaultStore } from '../../stores/vaultStore';
 import { useGvStore } from '../global-view/gvStore';
@@ -127,6 +128,31 @@ describe('Search dialog (M5 §4)', () => {
     await waitFor(() => expect(box(iconed).querySelector('img')).not.toBeNull());
     const plain = screen.getByRole('option', { name: /Canción/ });
     expect(box(plain).querySelector('svg')).not.toBeNull();
+  });
+
+  it('Show file extensions: a hit’s file name shows its extension either way, its title never', async () => {
+    // The path line already named the file in full before the setting
+    // (`Lore › Smaug.md`, a text file's title is its name): off stays exactly
+    // so, and on has nothing to add; the page title keeps no extension.
+    for (const on of [false, true]) {
+      useSettingsStore.setState({ settings: { ...DEFAULT_SETTINGS, showExtensions: on } });
+      reply = () => ({
+        results: [hit('Lore/Smaug.md'), hit('Lore/notes.txt', { title: 'notes.txt' })],
+        total: 2,
+        facets: FACETS,
+        recent: true,
+        indexing: false,
+      });
+      const { unmount } = render(<DialogHost />);
+      act(() => useUiStore.getState().openDialog({ type: 'search' }));
+      const page = await screen.findByRole('option', { name: /Smaug/ });
+      expect(titleOf(page).textContent).toBe('Smaug');
+      expect(page).toHaveTextContent('Lore › Smaug.md');
+      expect(screen.getByRole('option', { name: /notes/ })).toHaveTextContent('Lore › notes.txt');
+      act(() => useUiStore.getState().closeDialog());
+      unmount();
+    }
+    useSettingsStore.setState({ settings: DEFAULT_SETTINGS });
   });
 
   it('opens with the keyboard in the field and shows Recent', async () => {
@@ -383,7 +409,7 @@ describe('opening Search (M5 §4)', () => {
     expect(key({ metaKey: true, shiftKey: true, key: 'F', code: 'KeyF' })).toBe(true);
     expect(key({ ctrlKey: true, shiftKey: true, key: 'f', code: 'KeyF' })).toBe(true);
     expect(key({ metaKey: true, shiftKey: true, key: 'А', code: 'KeyF' })).toBe(true);
-    // ⌘F too (M5b §7.3): there is no find-in-note to displace.
+    // ⌘F too (M5b §7.3): Search where no editor shows (find in page routes it).
     expect(key({ metaKey: true, key: 'f', code: 'KeyF' })).toBe(true);
     expect(key({ ctrlKey: true, key: 'f', code: 'KeyF' })).toBe(true);
     expect(key({ metaKey: true, key: 'g', code: 'KeyG' })).toBe(false);
@@ -419,7 +445,7 @@ describe('opening Search (M5 §4)', () => {
     mac();
   });
 
-  it('⌘F in the editor opens Search with a short one-line selection as its text (M5b §7.3)', () => {
+  it('⌘⇧F in the editor opens Search with a short one-line selection as its text (M5b §7.3)', () => {
     useVaultStore.setState({ status: 'open' });
     render(
       <>
@@ -439,7 +465,8 @@ describe('opening Search (M5 §4)', () => {
     };
     content.focus();
     select(8, 12);
-    fireEvent.keyDown(content, { metaKey: true, key: 'f', code: 'KeyF' });
+    // ⌘F finds in the page (find in page): Search is ⌘⇧F there.
+    fireEvent.keyDown(content, { metaKey: true, shiftKey: true, key: 'f', code: 'KeyF' });
     expect(useUiStore.getState().dialog).toEqual({ type: 'search' });
     expect(useSearchStore.getState().text).toBe('wyrm');
   });
@@ -461,7 +488,8 @@ describe('opening Search (M5 §4)', () => {
     render(<ActionButton />);
     await userEvent.click(screen.getByRole('button', { name: 'Actions' }));
     const button = screen.getByRole('button', { name: 'Search' });
-    expect(button).toHaveAttribute('aria-keyshortcuts', 'Meta+F Control+F');
+    // ⌘F finds in the page while the editor shows one; ⌘⇧F is always Search.
+    expect(button).toHaveAttribute('aria-keyshortcuts', 'Meta+Shift+F Control+Shift+F');
     await userEvent.click(button);
     expect(useUiStore.getState().dialog).toEqual({ type: 'search' });
   });

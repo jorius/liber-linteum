@@ -43,6 +43,19 @@ pub const ATOMS_ID: &str = "liber-see-atoms";
 /// Id of View → Search… (M5 §4); the page answers `menu:search`.
 pub const SEARCH_ID: &str = "liber-search";
 pub const SEARCH_EVENT: &str = "menu:search";
+/// ⌘⇧F: ⌘F is Edit → Find… (find in page).
+pub const SEARCH_ACCELERATOR: &str = "CmdOrCtrl+Shift+F";
+/// Id of Edit → Find… (find in page): the focused window answers
+/// `menu:find`, finding in its page (the main window opens Search when no
+/// editor shows, as the key does).
+pub const FIND_ID: &str = "liber-find";
+pub const FIND_EVENT: &str = "menu:find";
+pub const FIND_ACCELERATOR: &str = "CmdOrCtrl+F";
+/// Id of Edit → Go to Line…: the focused window answers `menu:goto-line`.
+/// Ctrl+G on every platform, macOS included (⌘G is find next there).
+pub const GOTO_LINE_ID: &str = "liber-goto-line";
+pub const GOTO_LINE_EVENT: &str = "menu:goto-line";
+pub const GOTO_LINE_ACCELERATOR: &str = "Ctrl+G";
 /// Event telling the page which screen to show; payload `"edit"`,
 /// `"global"`, or `"atoms"` (the open page's atoms in the Global View).
 pub const SCREEN_EVENT: &str = "menu:screen";
@@ -176,7 +189,7 @@ pub const SIDEBAR_EVENT: &str = "menu:sidebar";
 /// File (New Quick Note, ⌘⇧N: from any window, so it carries the
 /// accelerator; the page also answers ⌘⇧N where there is no app menu and
 /// ignores a second trigger within a second, M4c §7.10); Edit (Undo, Redo, Cut, Copy, Paste, Select All: macOS routes the text
-/// editing shortcuts through it); View (Editor, Global View — no
+/// editing shortcuts through it; Find… ⌘F, find in page; Go to Line… Ctrl+G); View (Search… ⌘⇧F; Editor, Global View — no
 /// accelerators: the page handles ⌘1 / ⌘2; Back, Forward along the link trail —
 /// no accelerators: the page handles ⌘[ / ⌘] itself, which also works where
 /// there is no app menu; the formatting toolbar, line-number and outline toggles —
@@ -295,6 +308,17 @@ pub fn app_menu<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
             &vault_close,
         ],
     )?;
+    // ⌘F here and on the page: opening find a second time only gives its
+    // field the keyboard again, so either may win.
+    let find = MenuItem::with_id(app, FIND_ID, "Find…", true, Some(FIND_ACCELERATOR))?;
+    // Ctrl+G here and on the page: a second open only selects its field.
+    let goto_line = MenuItem::with_id(
+        app,
+        GOTO_LINE_ID,
+        "Go to Line…",
+        true,
+        Some(GOTO_LINE_ACCELERATOR),
+    )?;
     let edit = Submenu::with_items(
         app,
         "Edit",
@@ -307,6 +331,9 @@ pub fn app_menu<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
             &PredefinedMenuItem::copy(app, None)?,
             &PredefinedMenuItem::paste(app, None)?,
             &PredefinedMenuItem::select_all(app, None)?,
+            &PredefinedMenuItem::separator(app)?,
+            &find,
+            &goto_line,
         ],
     )?;
     let back = MenuItem::with_id(app, BACK_ID, "Back", true, None::<&str>)?;
@@ -314,9 +341,9 @@ pub fn app_menu<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
     // No accelerators: the page handles ⌘1 / ⌘2 itself (as ⌘[ / ⌘]).
     let editor = MenuItem::with_id(app, EDITOR_ID, "Editor", true, None::<&str>)?;
     let global_view = MenuItem::with_id(app, GLOBAL_VIEW_ID, "Global View", true, None::<&str>)?;
-    // ⌘F shows on the item (M5b §7.3); the page answers it too, and opening
-    // Search a second time does nothing, so either may win.
-    let search = MenuItem::with_id(app, SEARCH_ID, "Search…", true, Some("CmdOrCtrl+F"))?;
+    // ⌘⇧F shows on the item (M5b §7.3; ⌘F is Edit → Find…); the page answers
+    // it too, and opening Search a second time does nothing, so either may win.
+    let search = MenuItem::with_id(app, SEARCH_ID, "Search…", true, Some(SEARCH_ACCELERATOR))?;
     let atoms = MenuItem::with_id(app, ATOMS_ID, "See Atoms of This Page", true, None::<&str>)?;
     let toolbar = MenuItem::with_id(
         app,
@@ -415,6 +442,11 @@ fn activate<R: Runtime>(app: &AppHandle<R>, id: &str, target: Option<String>) {
             let _ = main.set_focus();
         }
         let _ = app.emit_to("main", SEARCH_EVENT, ());
+    } else if id == FIND_ID {
+        // Find in the focused window's page: file windows have one too.
+        emit_to(app, &target, FIND_EVENT, ());
+    } else if id == GOTO_LINE_ID {
+        emit_to(app, &target, GOTO_LINE_EVENT, ());
     } else if id == TOOLBAR_ID {
         emit_to(app, &target, TOGGLE_EVENT, "toolbar");
     } else if id == LINE_NUMBERS_ID {

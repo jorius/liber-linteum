@@ -141,6 +141,9 @@ export function buildMenus(t: TFunction, ctx: MenuContext): MenuDef[] {
       item('copy', { action: 'copy', keys: 'Mod+C' }),
       item('paste', { action: 'paste', keys: 'Mod+V' }),
       item('selectAll', { action: 'selectAll', keys: 'Mod+A' }),
+      sep('s2'),
+      item('find', { id: 'liber-find', keys: 'Mod+F' }),
+      item('gotoLine', { id: 'liber-goto-line', keys: 'Ctrl+G' }),
     ],
   };
   const toggleItems: MenuEntry[] = [
@@ -153,7 +156,7 @@ export function buildMenus(t: TFunction, ctx: MenuContext): MenuDef[] {
     label: t('titlebar.menus.view'),
     items: ctx.main
       ? [
-          item('search', { id: 'liber-search', keys: 'Mod+F', disabled: !open }),
+          item('search', { id: 'liber-search', keys: 'Mod+Shift+F', disabled: !open }),
           sep('s1'),
           item('editor', { id: 'liber-screen-edit', keys: 'Mod+1', disabled: !open }),
           item('globalView', { id: 'liber-screen-global', keys: 'Mod+2', disabled: !open }),

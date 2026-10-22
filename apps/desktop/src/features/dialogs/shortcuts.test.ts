@@ -26,9 +26,35 @@ describe('Settings → Keyboard shortcuts (M5b §18)', () => {
 
   it('lists the keys only the page answers (round-2 review M11)', () => {
     // Hand-kept: these live in useGlobalShortcuts' key tests, not in a table a test can read.
-    for (const k of ['Mod+[', 'Mod+]', 'Mod+1', 'Mod+2', 'Mod+F', 'Mod+J', 'Mod+Shift+D']) {
+    for (const k of ['Mod+[', 'Mod+]', 'Mod+1', 'Mod+2', 'Mod+F', 'Mod+J', 'Mod+Shift+D', 'F3']) {
       expect(listed, k).toContain(k);
     }
+  });
+
+  it('find in page: ⌘F is Edit → Find…, ⌘⇧F View → Search…', () => {
+    const menu = readFileSync(new URL('../../../src-tauri/src/menu.rs', import.meta.url), 'utf8');
+    expect(menu).toMatch(/FIND_ACCELERATOR: &str = "CmdOrCtrl\+F"/);
+    expect(menu).toMatch(/SEARCH_ACCELERATOR: &str = "CmdOrCtrl\+Shift\+F"/);
+    const label = (keys: string) =>
+      SHORTCUT_GROUPS.flatMap((g): readonly { keys: string; label: string }[] => g.items).find(
+        (i) => i.keys === keys,
+      )?.label;
+    expect(label('Mod+F')).toBe('findInPage');
+    expect(label('Mod+Shift+F')).toBe('search');
+    expect(keyLabel('Shift+F3', true)).toBe('⇧F3');
+    expect(keyLabel('Shift+F3', false)).toBe('Shift+F3');
+  });
+
+  it('Go to line is Ctrl+G on every platform, in the menu (Ctrl, not ⌘) and the table', () => {
+    const menu = readFileSync(new URL('../../../src-tauri/src/menu.rs', import.meta.url), 'utf8');
+    expect(menu).toMatch(/GOTO_LINE_ID: &str = "liber-goto-line"/);
+    expect(menu).toMatch(/GOTO_LINE_ACCELERATOR: &str = "Ctrl\+G"/);
+    // Every plain-Ctrl accelerator of the menus is listed too.
+    const ctrl = [...menu.matchAll(/"((?:Alt\+|Shift\+)*Ctrl\+[^"]+)"/g)].map((m) => m[1]);
+    expect(ctrl).toContain('Ctrl+G');
+    for (const a of ctrl) expect(listed, a).toContain(a);
+    expect(keyLabel('Ctrl+G', true)).toBe('⌃G');
+    expect(keyLabel('Ctrl+G', false)).toBe('Ctrl+G');
   });
 
   it('writes keys the way each platform does', () => {

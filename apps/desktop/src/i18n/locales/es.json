@@ -446,7 +446,7 @@
       },
       "files": {
         "title": "Archivos y notas rápidas",
-        "description": "Renombrar, borrar y dónde viven las notas rápidas."
+        "description": "Nombres, renombrar, borrar y dónde viven las notas rápidas."
       },
       "security": {
         "title": "Seguridad",
@@ -473,7 +473,7 @@
         "forward": "Adelante",
         "edit": "Editar",
         "globalView": "Vista global",
-        "search": "Buscar",
+        "search": "Buscar en la bóveda",
         "files": "Ir a los archivos",
         "newPage": "Nueva página",
         "quickNote": "Crear una nota rápida nueva para esta bóveda",
@@ -496,7 +496,11 @@
         "sidebar": "Mostrar u ocultar la barra lateral",
         "actions": "Mostrar las acciones",
         "settings": "Ajustes",
-        "quit": "Salir"
+        "quit": "Salir",
+        "findInPage": "Buscar en la página (fuera del editor: Buscar)",
+        "findNext": "Siguiente coincidencia",
+        "findPrevious": "Coincidencia anterior",
+        "goToLine": "Ir a la línea"
       }
     },
     "themes": {
@@ -623,7 +627,10 @@
       "exportFailed": "No se pudo guardar el tema.",
       "saveFailed": "Ese cambio no se pudo guardar, así que el tema vuelve a como estaba.",
       "limit": "Puedes tener hasta {max} temas. Borra uno para añadir otro."
-    }
+    },
+    "showExtensions": "Mostrar las extensiones de los archivos",
+    "showExtensionsHint": "Los nombres de los archivos muestran su extensión, como Capítulo 1.md o notas.txt. Los títulos de las páginas no cambian.",
+    "autoCloseBrackets": "Cerrar automáticamente paréntesis, corchetes y comillas"
   },
   "toolbar": {
     "label": "Formato",
@@ -1240,12 +1247,43 @@
       "minimize": "Minimizar",
       "maximize": "Maximizar",
       "restore": "Restaurar",
-      "closeWindow": "Cerrar ventana"
+      "closeWindow": "Cerrar ventana",
+      "find": "Buscar en la página…",
+      "gotoLine": "Ir a la línea…"
     },
     "about": {
       "title": "Acerca de Liber Linteum",
       "license": "Software libre bajo la GNU GPL, versión 3 o posterior."
     },
     "region": "Barra de título"
+  },
+  "cursor": {
+    "position": "Lín {line}, col {col}",
+    "positionSelected": "Lín {line}, col {col} · {count, plural, one {# seleccionado} other {# seleccionados}}",
+    "goTo": "Ir a la línea ({key})"
+  },
+  "findInPage": {
+    "find": "Buscar en la página",
+    "replaceField": "Reemplazar por",
+    "next": "Siguiente",
+    "previous": "Anterior",
+    "all": "Seleccionar todas",
+    "matchCase": "Distinguir mayúsculas",
+    "regexp": "Expresión regular",
+    "byWord": "Palabra completa",
+    "replace": "Reemplazar",
+    "replaceAll": "Reemplazar todas",
+    "close": "Cerrar",
+    "currentMatch": "Coincidencia actual",
+    "onLine": "en la línea",
+    "replacedMatches": "Se reemplazaron $ coincidencias",
+    "replacedOnLine": "Se reemplazó la coincidencia de la línea $"
+  },
+  "goToLine": {
+    "label": "Ir a la línea",
+    "placeholder": "42, 42:7, +5",
+    "go": "Ir",
+    "hint": "Línea {line} de {lines}",
+    "invalid": "Escribe una línea, línea:columna o +/− líneas"
   }
 }

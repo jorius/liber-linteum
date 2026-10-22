@@ -4,6 +4,8 @@ import { goBack, goForward } from '../../stores/navigate';
 import { dirFor } from '../../stores/tree';
 import { useUiStore } from '../../stores/uiStore';
 import { refuseWhileConverting, useVaultStore } from '../../stores/vaultStore';
+import { findableView, openFindInPage } from '../editor/findInPage';
+import { isGoToLineKey, openGoToLine } from '../editor/goToLine';
 import { useFavoritesStore } from '../favorites/favoritesStore';
 import { openSearch } from '../search/searchMenu';
 import { usePageStore } from '../../stores/pageStore';
@@ -38,17 +40,21 @@ const MAC = /Mac/i.test(navigator.platform);
 
 /** Outside macOS, Ctrl+F never opens the webview's own find bar (WebView2),
  *  also where Search doesn't open (a dialog, the Welcome screen; final review
- *  M12). Returns the uninstall. */
+ *  M12); nor does F3, find in page's next match (find in page). Returns the
+ *  uninstall. */
 export function installNoFindBar(mac = MAC): () => void {
   const onKeyDown = (e: KeyboardEvent) => {
-    if (!mac && e.ctrlKey && !e.altKey && e.key.toLowerCase() === 'f') e.preventDefault();
+    if (mac) return;
+    if ((e.ctrlKey && !e.altKey && e.key.toLowerCase() === 'f') || e.key === 'F3') {
+      e.preventDefault();
+    }
   };
   window.addEventListener('keydown', onKeyDown);
   return () => window.removeEventListener('keydown', onKeyDown);
 }
 
-/** ⌘F or ⌘⇧F (Ctrl+F, Ctrl+Shift+F) Search (M5 §4, M5b §7.3): the F key,
- *  or the physical one on layouts without a Latin F. */
+/** ⌘F or ⌘⇧F (Ctrl+F, Ctrl+Shift+F), find in page or Search (M5 §4, M5b
+ *  §7.3): the F key, or the physical one on layouts without a Latin F. */
 export function isSearchKey(e: KeyboardEvent, mac = MAC): boolean {
   // On macOS only ⌘: Ctrl+F is "forward one character" in text (final review M12).
   if (!(mac ? e.metaKey : e.metaKey || e.ctrlKey) || e.altKey) return false;
@@ -56,7 +62,36 @@ export function isSearchKey(e: KeyboardEvent, mac = MAC): boolean {
   return key === 'f' || (!/^[a-z]$/.test(key) && e.code === 'KeyF');
 }
 
-/** ⌘ (macOS) / Ctrl shortcuts (spec §3.5): F or ⇧F search, ⇧E explorer, O open vault,
+/** Where the F key goes (find in page): `find` in the page while the editor
+ *  shows one, `search` the vault-wide Search (⇧ always, and ⌘F anywhere
+ *  else: the Global View, the Trash, no page open), `null` not the key. */
+export function searchKeyTarget(
+  e: KeyboardEvent,
+  editorShowing: boolean,
+  mac = MAC,
+): 'find' | 'search' | null {
+  if (!isSearchKey(e, mac)) return null;
+  return editorShowing && !e.shiftKey ? 'find' : 'search';
+}
+
+/** ⌘F / Ctrl+F and Ctrl+G in a single-file window (no vault, no Search, no
+ *  global shortcuts): find in the file, go to a line. Returns the uninstall. */
+export function installEditorKeys(mac = MAC): () => void {
+  const onKeyDown = (e: KeyboardEvent) => {
+    if (isGoToLineKey(e)) {
+      if (openGoToLine()) e.preventDefault();
+      return;
+    }
+    if (searchKeyTarget(e, findableView() !== null, mac) !== 'find') return;
+    e.preventDefault();
+    openFindInPage();
+  };
+  window.addEventListener('keydown', onKeyDown);
+  return () => window.removeEventListener('keydown', onKeyDown);
+}
+
+/** ⌘ (macOS) / Ctrl shortcuts (spec §3.5): F find in page (Search outside
+ * the editor) or ⇧F search, Ctrl+G go to line (Ctrl on macOS too), ⇧E explorer, O open vault,
  * J the floating button's actions and \ the sidebar (M5b §2.2, §2.5),
  * ⇧D Favorites (M5b §19), , settings, N new page ( ⇧N is New Quick Note since M4c §7.9, handled by
  * `ScratchpadHost`), [ / ] back and forward along the
@@ -77,10 +112,15 @@ export function useGlobalShortcuts(menuOpen: boolean) {
       const vault = useVaultStore.getState();
       const key = e.key.toLowerCase();
       const screen = screenKey(e);
+      const find = searchKeyTarget(e, findableView() !== null);
       if (screen) {
         useUiStore.getState().setScreen(screen);
-      } else if (isSearchKey(e)) {
-        openSearch();
+      } else if (find) {
+        if (find === 'find') openFindInPage();
+        else openSearch();
+      } else if (isGoToLineKey(e)) {
+        // Ctrl+G everywhere, ⌘G being find next on macOS; nothing without a page.
+        if (!openGoToLine()) return;
       } else if (key === ',') {
         useUiStore.getState().openDialog({ type: 'settings' });
       } else if (key === 'o' && !e.shiftKey) {

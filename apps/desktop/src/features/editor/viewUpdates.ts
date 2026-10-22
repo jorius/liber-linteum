@@ -34,6 +34,9 @@ export function setCurrentView(view: EditorView | null): void {
   watchers.forEach((fn) => fn());
 }
 
+/** The page editor's view, outside React (find in page). */
+export const currentView = (): EditorView | null => current;
+
 export function useCurrentView(): EditorView | null {
   return useSyncExternalStore(
     (fn) => {
