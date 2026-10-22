@@ -162,6 +162,20 @@ const COMMANDS: &[&str] = &[
 ];
 
 fn main() {
+    // The integration tests link Tauri, which needs Windows' Common Controls
+    // v6; tauri-build's manifest only goes into the app, so without this the
+    // test binaries don't start (STATUS_ENTRYPOINT_NOT_FOUND).
+    let target = |key: &str| std::env::var(key).unwrap_or_default();
+    if target("CARGO_CFG_TARGET_OS") == "windows" && target("CARGO_CFG_TARGET_ENV") == "msvc" {
+        let manifest =
+            std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("windows-test-manifest.xml");
+        println!("cargo:rerun-if-changed=windows-test-manifest.xml");
+        println!("cargo:rustc-link-arg-tests=/MANIFEST:EMBED");
+        println!(
+            "cargo:rustc-link-arg-tests=/MANIFESTINPUT:{}",
+            manifest.display()
+        );
+    }
     tauri_build::try_build(
         tauri_build::Attributes::new()
             .app_manifest(tauri_build::AppManifest::new().commands(COMMANDS)),

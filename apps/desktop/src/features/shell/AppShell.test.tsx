@@ -36,12 +36,21 @@ function seed(selected: string | null = null) {
   );
 }
 
+/** A save still in flight when a test ends lands in the next test's mock:
+ *  it gets a written file's answer, as from the real backend, not nothing
+ *  (an unhandled `hash` of undefined, seen on CI). */
+const WRITES: Record<string, (a: Record<string, unknown>) => unknown> = {
+  page_write: () => ({ hash: 'written' }),
+  text_write: () => ({ hash: 'written' }),
+};
+
 function backend(handlers: Record<string, (a: Record<string, unknown>) => unknown>) {
   const calls: [string, Record<string, unknown>][] = [];
+  const all = { ...WRITES, ...handlers };
   mockIPC((cmd, args) => {
     const a = (args ?? {}) as Record<string, unknown>;
     calls.push([cmd, a]);
-    return handlers[cmd]?.(a);
+    return all[cmd]?.(a);
   });
   return calls;
 }
