@@ -25,12 +25,29 @@ const TYPES = {
   '.txt': 'text/plain; charset=utf-8',
 };
 
-async function send(res, file, status = 200) {
+async function send(res, file, status = 200, range = undefined) {
   const body = await readFile(file);
-  res.writeHead(status, {
+  const headers = {
     'Content-Type': TYPES[extname(file)] ?? 'application/octet-stream',
     'Cache-Control': 'no-store',
-  });
+    'Accept-Ranges': 'bytes',
+  };
+  // Byte ranges, as Pages serves them: without them a browser re-downloads a whole clip to
+  // seek or loop it, and the network never goes idle.
+  const m = status === 200 && /^bytes=(\d*)-(\d*)$/.exec(range ?? '');
+  if (m && (m[1] || m[2])) {
+    const size = body.length;
+    const start = m[1] ? Number(m[1]) : Math.max(0, size - Number(m[2]));
+    const end = m[1] && m[2] ? Math.min(Number(m[2]), size - 1) : size - 1;
+    if (start >= size || start > end) {
+      res.writeHead(416, { ...headers, 'Content-Range': `bytes */${size}` }).end();
+      return;
+    }
+    res.writeHead(206, { ...headers, 'Content-Range': `bytes ${start}-${end}/${size}` });
+    res.end(body.subarray(start, end + 1));
+    return;
+  }
+  res.writeHead(status, headers);
   res.end(body);
 }
 
@@ -49,7 +66,7 @@ createServer(async (req, res) => {
       throw new Error('outside');
     }
     if ((await stat(file)).isDirectory()) file = join(file, 'index.html');
-    await send(res, file);
+    await send(res, file, 200, req.headers.range);
   } catch {
     await send(res, join(root, '404.html'), 404).catch(() => res.writeHead(404).end());
   }

@@ -31,24 +31,31 @@ export const dict = {
     'hero.compat': 'Opens Obsidian vaults · Imports from Notion',
     'hero.pledge':
       'No\u00a0cloud · No\u00a0accounts · No\u00a0telemetry · 0\u00a0network\u00a0requests',
-    'menu.file': 'File',
-    'menu.vault': 'Vault',
-    'menu.edit': 'Edit',
-    'menu.view': 'View',
-    'menu.window': 'Window',
 
-    'clip.hero': 'The Global View: the sample vault’s notes as cards with covers, linked by lines.',
-    'clip.obsidian': 'An Obsidian vault opened in Liber Linteum, its folders and notes unchanged.',
+    'clip.hero':
+      'The Global View: a folder expanded in place, a drill-down, a page’s atoms, then a quick edit in Live Preview.',
+    'clip.obsidian':
+      'Choosing Open an Obsidian vault, then the vault as Obsidian left it: callouts, embeds, wikilinks and its attachment setting.',
     'clip.notion': 'A Notion export being imported: pages, nested pages and a database as a table.',
     'clip.globalView': 'Cards in the Global View expanding in place to show a folder’s pages.',
+    'clip.atoms':
+      'A page’s atoms in the Global View: its sections and blocks as a tree of small cards.',
     'clip.editor':
       'A page being written in Live Preview, with a callout and a block dragged into place.',
-    'clip.encryption': 'An encrypted vault being locked, then unlocked with its passphrase.',
-    'clip.search': 'Search results narrowing as filters for a folder and a tag are added.',
+    'clip.maths':
+      'Split view: a page’s LaTeX formula and Mermaid diagram as source on the left, rendered on the right.',
+    'clip.dragDrop':
+      'A block dragged to a new place in a page, then a page dragged into a folder in the sidebar.',
+    'clip.voice': 'A voice clip being recorded into a page, then played inline.',
+    'clip.encryption':
+      'Encrypting a vault from start to end: passphrase, recovery key, confirmation, then lock and unlock.',
+    'clip.search': 'Searching the vault, narrowing by a tag, then opening a result at the match.',
     'clip.sampleVault':
       'The Moons of Kessari in the Global View: factions, places and people as cards.',
     'clip.play': 'Play the clip',
     'clip.pause': 'Pause the clip',
+    'clip.enlarge': 'Enlarge the clip',
+    'clip.close': 'Close',
 
     'what.kicker': 'What it is',
     'what.title': 'A notebook that stays yours',
@@ -89,25 +96,43 @@ export const dict = {
       'Covers, titles and excerpts on every card; lines for links, folders and the relationships you draw by dragging from card to card.',
     'features.gv.li1': 'Drill into a folder, or expand it in place',
     'features.gv.li2': 'The positions you set are remembered',
+    'features.atoms.kicker': 'Atoms',
+    'features.atoms.title': 'Every page, broken into its parts',
+    'features.atoms.body':
+      'Right-click a card and choose See atoms: the page’s sections and blocks laid out as a tree of paragraphs, lists, callouts, code, tables, images, maths and diagrams. Click one to jump to it in the page.',
     'features.editor.kicker': 'Editor',
     'features.editor.title': 'Write in Live Preview',
     'features.editor.body':
-      'Markdown that formats as you type, or the raw source, or both side by side. Drag blocks to reorder them.',
+      'Markdown that formats as you type, or the raw source, or both side by side.',
     'features.editor.li1': 'Code with highlighting, Mermaid diagrams, LaTeX maths',
     'features.editor.li2': 'Callouts, toggles, columns, highlights, coloured text',
     'features.editor.li3': 'Covers, icons and subtitles for every page',
+    'features.maths.kicker': 'Maths & diagrams',
+    'features.maths.title': 'LaTeX and Mermaid, side by side',
+    'features.maths.body':
+      'Write TeX between $…$ or $$…$$, and Mermaid in a code block. Split view shows the source and the rendered page together, updating as you type.',
+    'features.maths.li1': 'KaTeX for maths, offline',
+    'features.maths.li2': 'Mermaid flowcharts, sequences, timelines…',
+    'features.dnd.kicker': 'Drag and drop',
+    'features.dnd.title': 'Move things where they belong',
+    'features.dnd.body':
+      'Drag a block by its handle to reorder a page, drag pages and folders around the sidebar, and drag from card to card in the Global View to draw a relationship.',
+    'features.voice.kicker': 'Voice clips',
+    'features.voice.title': 'Record straight into a note',
+    'features.voice.body':
+      'Record from the microphone into the page you’re on. The clip is saved as an audio file in your vault and plays inline.',
     'features.enc.kicker': 'Encryption',
     'features.enc.title': 'Vaults sealed with a passphrase',
     'features.enc.body':
-      'Create an encrypted vault, or encrypt an existing one where it is. You get a recovery key first, before anything is touched. It locks when idle, on sleep and on quit.',
+      'Choose Encrypt and, if you like, keep a readable copy in a folder you pick. Then choose a passphrase, save the recovery key and confirm two of its groups. From then on the vault locks when idle, on sleep and on quit, and unlocks with your passphrase.',
     'features.search.kicker': 'Search',
     'features.search.title': 'Find anything, instantly',
     'features.search.body':
-      'Full-text search with filters by folder, tag, links and attachments, on your machine, over thousands of notes.',
+      'Full-text search with filters by folder, tag, links and attachments, on your machine, over thousands of notes. Click a result to open the page at the match.',
     'features.mini.quick.title': 'Quick notes',
     'features.mini.quick.body': 'Ctrl+Shift+N from anywhere; a scratchpad in every vault.',
-    'features.mini.voice.title': 'Voice clips',
-    'features.mini.voice.body': 'Record audio straight into a note, and play it inline.',
+    'features.mini.find.title': 'Find in the page',
+    'features.mini.find.body': 'Ctrl+F finds and replaces in the page; Ctrl+G jumps to a line.',
     'features.mini.colours.title': 'Your colours',
     'features.mini.colours.body': 'Palettes, light and dark, or a theme of your own.',
     'features.mini.trash.title': 'Trash & Archive',
@@ -174,7 +199,7 @@ export const dict = {
     'vault.chip.notion': 'a Notion export to import',
     'vault.button': 'Download the sample vault (.zip)',
     'vault.hint': 'Unzip it, then choose Open folder as vault.',
-    'vault.pending': 'It arrives with the first release.',
+    'vault.notion': 'Also: the sample Notion export (.zip)',
 
     'roadmap.kicker': 'What’s next',
     'roadmap.title': 'Roadmap',
@@ -235,30 +260,34 @@ export const dict = {
     'hero.compat': 'Abre bóvedas de Obsidian · Importa desde Notion',
     'hero.pledge':
       'Sin\u00a0nube · Sin\u00a0cuentas · Sin\u00a0telemetría · 0\u00a0conexiones\u00a0a\u00a0internet',
-    'menu.file': 'Archivo',
-    'menu.vault': 'Bóveda',
-    'menu.edit': 'Edición',
-    'menu.view': 'Ver',
-    'menu.window': 'Ventana',
 
     'clip.hero':
-      'La Vista global: las notas de la bóveda de ejemplo como tarjetas con portada, unidas por líneas.',
+      'La Vista global: una carpeta desplegada en el sitio, la entrada a otra, los átomos de una página y luego una edición rápida en Vista en vivo.',
     'clip.obsidian':
-      'Una bóveda de Obsidian abierta en Liber Linteum, con sus carpetas y notas intactas.',
+      'Se elige Abrir una bóveda de Obsidian y aparece la bóveda tal como la dejó Obsidian: avisos, incrustaciones, wikilinks y su configuración de adjuntos.',
     'clip.notion':
       'Una exportación de Notion importándose: páginas, subpáginas y una base de datos como tabla.',
     'clip.globalView':
       'Tarjetas de la Vista global que se expanden en el sitio para mostrar las páginas de una carpeta.',
+    'clip.atoms':
+      'Los átomos de una página en la Vista global: sus secciones y bloques como un árbol de tarjetas pequeñas.',
     'clip.editor':
       'Una página escrita en Vista en vivo, con un aviso y un bloque arrastrado a su lugar.',
+    'clip.maths':
+      'Modo Dividido: la fórmula en LaTeX y el diagrama Mermaid de una página como código fuente a la izquierda y renderizados a la derecha.',
+    'clip.dragDrop':
+      'Un bloque arrastrado a otro lugar de la página y luego una página arrastrada a una carpeta de la barra lateral.',
+    'clip.voice': 'Una nota de voz grabándose en una página y luego reproduciéndose ahí mismo.',
     'clip.encryption':
-      'Una bóveda cifrada que se bloquea y luego se desbloquea con su frase de contraseña.',
+      'Una bóveda cifrándose de principio a fin: frase de contraseña, clave de recuperación, confirmación, y luego bloqueo y desbloqueo.',
     'clip.search':
-      'Resultados de búsqueda que se acotan al añadir filtros por carpeta y por etiqueta.',
+      'Una búsqueda en la bóveda, acotada por una etiqueta, y luego un resultado que se abre justo en la coincidencia.',
     'clip.sampleVault':
       'Las lunas de Kessari en la Vista global: facciones, lugares y personajes como tarjetas.',
     'clip.play': 'Reproducir el clip',
     'clip.pause': 'Pausar el clip',
+    'clip.enlarge': 'Ampliar el clip',
+    'clip.close': 'Cerrar',
 
     'what.kicker': 'Qué es',
     'what.title': 'Una libreta que sigue siendo tuya',
@@ -300,26 +329,44 @@ export const dict = {
       'Portada, título y extracto en cada tarjeta; líneas para los enlaces, las carpetas y las relaciones que dibujas arrastrando de una tarjeta a otra.',
     'features.gv.li1': 'Entra en una carpeta o despliégala en el sitio',
     'features.gv.li2': 'Las posiciones que eliges se recuerdan',
+    'features.atoms.kicker': 'Átomos',
+    'features.atoms.title': 'Cada página, desarmada en sus partes',
+    'features.atoms.body':
+      'Haz clic derecho en una tarjeta y elige Ver átomos: las secciones y los bloques de la página se despliegan como un árbol de párrafos, listas, avisos, código, tablas, imágenes, fórmulas y diagramas. Haz clic en uno para ir a él en la página.',
     'features.editor.kicker': 'Editor',
     'features.editor.title': 'Escribe en Vista en vivo',
     'features.editor.body':
-      'Markdown que toma formato mientras escribes, o el código fuente, o los dos lado a lado. Arrastra los bloques para reordenarlos.',
+      'Markdown que toma formato mientras escribes, o el código fuente, o los dos lado a lado.',
     'features.editor.li1': 'Código con resaltado, diagramas Mermaid, fórmulas en LaTeX',
     'features.editor.li2': 'Avisos, desplegables, columnas, resaltados, texto en color',
     'features.editor.li3': 'Portada, icono y subtítulo para cada página',
+    'features.maths.kicker': 'Fórmulas y diagramas',
+    'features.maths.title': 'LaTeX y Mermaid, lado a lado',
+    'features.maths.body':
+      'Escribe TeX entre $…$ o $$…$$, y Mermaid en un bloque de código. El modo Dividido muestra juntos el código fuente y la página renderizada, y se actualiza mientras escribes.',
+    'features.maths.li1': 'KaTeX para las fórmulas, sin conexión',
+    'features.maths.li2': 'Mermaid: diagramas de flujo, de secuencia, líneas de tiempo…',
+    'features.dnd.kicker': 'Arrastrar y soltar',
+    'features.dnd.title': 'Mueve cada cosa a su lugar',
+    'features.dnd.body':
+      'Arrastra un bloque por su asa para reordenar una página, mueve páginas y carpetas por la barra lateral, y arrastra de una tarjeta a otra en la Vista global para trazar una relación.',
+    'features.voice.kicker': 'Notas de voz',
+    'features.voice.title': 'Graba directamente en una nota',
+    'features.voice.body':
+      'Graba con el micrófono en la página en la que estás. El clip se guarda como un archivo de audio en tu bóveda y se reproduce ahí mismo.',
     'features.enc.kicker': 'Cifrado',
     'features.enc.title': 'Bóvedas selladas con una frase de contraseña',
     'features.enc.body':
-      'Crea una bóveda cifrada, o cifra una que ya tienes ahí mismo. Primero recibes una clave de recuperación, antes de tocar nada. Se bloquea por inactividad, al suspender el equipo y al salir.',
+      'Elige Cifrar y, si quieres, guarda una copia legible en una carpeta que elijas. Luego elige una frase de contraseña, guarda la clave de recuperación y confirma dos de sus grupos. Desde ese momento la bóveda se bloquea por inactividad, al suspender el equipo y al salir, y se desbloquea con tu frase de contraseña.',
     'features.search.kicker': 'Búsqueda',
     'features.search.title': 'Encuentra cualquier cosa, al instante',
     'features.search.body':
-      'Búsqueda de texto completo con filtros por carpeta, etiqueta, enlaces y adjuntos, en tu equipo, entre miles de notas.',
+      'Búsqueda de texto completo con filtros por carpeta, etiqueta, enlaces y adjuntos, en tu equipo, entre miles de notas. Haz clic en un resultado para abrir la página justo en la coincidencia.',
     'features.mini.quick.title': 'Notas rápidas',
     'features.mini.quick.body':
       'Ctrl+Shift+N desde cualquier parte; una carpeta de notas rápidas en cada bóveda.',
-    'features.mini.voice.title': 'Notas de voz',
-    'features.mini.voice.body': 'Graba audio directamente en una nota y escúchalo ahí mismo.',
+    'features.mini.find.title': 'Buscar en la página',
+    'features.mini.find.body': 'Ctrl+F busca y reemplaza en la página; Ctrl+G salta a una línea.',
     'features.mini.colours.title': 'Tus colores',
     'features.mini.colours.body': 'Paletas, modo claro y oscuro, o un tema propio.',
     'features.mini.trash.title': 'Papelera y Archivo',
@@ -386,7 +433,7 @@ export const dict = {
     'vault.chip.notion': 'una exportación de Notion para importar',
     'vault.button': 'Descargar la bóveda de ejemplo (.zip)',
     'vault.hint': 'Descomprímela y elige Abrir carpeta como bóveda.',
-    'vault.pending': 'Llega con la primera versión.',
+    'vault.notion': 'Además: la exportación de Notion de ejemplo (.zip)',
 
     'roadmap.kicker': 'Lo que viene',
     'roadmap.title': 'Hoja de ruta',

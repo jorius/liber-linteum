@@ -77,7 +77,12 @@
             <span aria-hidden="true">ES</span><span class="sr-only">Español</span>
           </button>
         </div>
-        <a class="gh" href="https://github.com/jorius/liber-linteum">
+        <a
+          class="gh"
+          href="https://github.com/jorius/liber-linteum"
+          target="_blank"
+          rel="noopener noreferrer"
+        >
           <svg class="g" aria-hidden="true"><use href="img/icons.svg#gh" /></svg>
           <span>GitHub</span>
         </a>
@@ -246,14 +251,6 @@
         </div>
         <div class="hero-shot">
           <div class="window">
-            <div class="window-bar" aria-hidden="true">
-              <span class="window-name">Liber Linteum</span>
-              <span data-i18n="menu.file">File</span>
-              <span data-i18n="menu.vault">Vault</span>
-              <span data-i18n="menu.edit">Edit</span>
-              <span data-i18n="menu.view">View</span>
-              <span data-i18n="menu.window">Window</span>
-            </div>
             <figure class="clip clip-hero" data-clip="hero">
               <img
                 src="media/hero.poster.webp"
@@ -261,7 +258,7 @@
                 height="900"
                 fetchpriority="high"
                 decoding="async"
-                alt="The Global View: the sample vault's notes as cards with covers, linked by lines."
+                alt="The Global View: a folder expanded in place, a drill-down, a page's atoms, then a quick edit in Live Preview."
                 data-i18n-attr="alt:clip.hero"
               />
             </figure>
@@ -316,7 +313,7 @@
                 height="900"
                 loading="lazy"
                 decoding="async"
-                alt="An Obsidian vault opened in Liber Linteum, its folders and notes unchanged."
+                alt="Choosing Open an Obsidian vault, then the vault as Obsidian left it: callouts, embeds, wikilinks and its attachment setting."
                 data-i18n-attr="alt:clip.obsidian"
               />
             </figure>
@@ -414,7 +411,7 @@
               height="900"
               loading="lazy"
               decoding="async"
-              alt="Cards in the Global View expanding in place to show a folder's pages."
+              alt="Cards in the Global View expanding in place to show a folder’s pages."
               data-i18n-attr="alt:clip.globalView"
             />
           </figure>
@@ -422,11 +419,33 @@
 
         <div class="row flip">
           <div class="row-text">
+            <p class="kicker" data-i18n="features.atoms.kicker">Atoms</p>
+            <h3 data-i18n="features.atoms.title">Every page, broken into its parts</h3>
+            <p data-i18n="features.atoms.body">
+              Right-click a card and choose See atoms: the page’s sections and blocks laid out as a
+              tree of paragraphs, lists, callouts, code, tables, images, maths and diagrams. Click
+              one to jump to it in the page.
+            </p>
+          </div>
+          <figure class="clip clip-card" data-clip="atoms">
+            <img
+              src="media/atoms.poster.webp"
+              width="1440"
+              height="900"
+              loading="lazy"
+              decoding="async"
+              alt="A page’s atoms in the Global View: its sections and blocks as a tree of small cards."
+              data-i18n-attr="alt:clip.atoms"
+            />
+          </figure>
+        </div>
+
+        <div class="row">
+          <div class="row-text">
             <p class="kicker" data-i18n="features.editor.kicker">Editor</p>
             <h3 data-i18n="features.editor.title">Write in Live Preview</h3>
             <p data-i18n="features.editor.body">
-              Markdown that formats as you type, or the raw source, or both side by side. Drag
-              blocks to reorder them.
+              Markdown that formats as you type, or the raw source, or both side by side.
             </p>
             <ul>
               <li data-i18n="features.editor.li1">
@@ -451,38 +470,83 @@
           </figure>
         </div>
 
-        <div class="row">
+        <div class="row flip">
           <div class="row-text">
-            <p class="kicker">
-              <span data-i18n="features.enc.kicker">Encryption</span>
-              <span class="tag">Beta</span>
+            <p class="kicker" data-i18n="features.maths.kicker">Maths &amp; diagrams</p>
+            <h3 data-i18n="features.maths.title">LaTeX and Mermaid, side by side</h3>
+            <p data-i18n="features.maths.body">
+              Write TeX between $…$ or $$…$$, and Mermaid in a code block. Split view shows the
+              source and the rendered page together, updating as you type.
             </p>
-            <h3 data-i18n="features.enc.title">Vaults sealed with a passphrase</h3>
-            <p data-i18n="features.enc.body">
-              Create an encrypted vault, or encrypt an existing one where it is. You get a recovery
-              key first, before anything is touched. It locks when idle, on sleep and on quit.
-            </p>
+            <ul>
+              <li data-i18n="features.maths.li1">KaTeX for maths, offline</li>
+              <li data-i18n="features.maths.li2">Mermaid flowcharts, sequences, timelines…</li>
+            </ul>
           </div>
-          <figure class="clip clip-card" data-clip="encryption">
+          <figure class="clip clip-card" data-clip="maths">
             <img
-              src="media/encryption.poster.webp"
+              src="media/maths.poster.webp"
               width="1440"
               height="900"
               loading="lazy"
               decoding="async"
-              alt="An encrypted vault being locked, then unlocked with its passphrase."
-              data-i18n-attr="alt:clip.encryption"
+              alt="Split view: a page’s LaTeX formula and Mermaid diagram as source on the left, rendered on the right."
+              data-i18n-attr="alt:clip.maths"
+            />
+          </figure>
+        </div>
+
+        <div class="row">
+          <div class="row-text">
+            <p class="kicker" data-i18n="features.dnd.kicker">Drag and drop</p>
+            <h3 data-i18n="features.dnd.title">Move things where they belong</h3>
+            <p data-i18n="features.dnd.body">
+              Drag a block by its handle to reorder a page, drag pages and folders around the
+              sidebar, and drag from card to card in the Global View to draw a relationship.
+            </p>
+          </div>
+          <figure class="clip clip-card" data-clip="drag-drop">
+            <img
+              src="media/drag-drop.poster.webp"
+              width="1440"
+              height="900"
+              loading="lazy"
+              decoding="async"
+              alt="A block dragged to a new place in a page, then a page dragged into a folder in the sidebar."
+              data-i18n-attr="alt:clip.dragDrop"
             />
           </figure>
         </div>
 
         <div class="row flip">
           <div class="row-text">
+            <p class="kicker" data-i18n="features.voice.kicker">Voice clips</p>
+            <h3 data-i18n="features.voice.title">Record straight into a note</h3>
+            <p data-i18n="features.voice.body">
+              Record from the microphone into the page you’re on. The clip is saved as an audio file
+              in your vault and plays inline.
+            </p>
+          </div>
+          <figure class="clip clip-card" data-clip="voice">
+            <img
+              src="media/voice.poster.webp"
+              width="1440"
+              height="900"
+              loading="lazy"
+              decoding="async"
+              alt="A voice clip being recorded into a page, then played inline."
+              data-i18n-attr="alt:clip.voice"
+            />
+          </figure>
+        </div>
+
+        <div class="row">
+          <div class="row-text">
             <p class="kicker" data-i18n="features.search.kicker">Search</p>
             <h3 data-i18n="features.search.title">Find anything, instantly</h3>
             <p data-i18n="features.search.body">
               Full-text search with filters by folder, tag, links and attachments, on your machine,
-              over thousands of notes.
+              over thousands of notes. Click a result to open the page at the match.
             </p>
           </div>
           <figure class="clip clip-card" data-clip="search">
@@ -492,8 +556,34 @@
               height="900"
               loading="lazy"
               decoding="async"
-              alt="Search results narrowing as filters for a folder and a tag are added."
+              alt="Searching the vault, narrowing by a tag, then opening a result at the match."
               data-i18n-attr="alt:clip.search"
+            />
+          </figure>
+        </div>
+
+        <div class="row flip">
+          <div class="row-text">
+            <p class="kicker">
+              <span data-i18n="features.enc.kicker">Encryption</span>
+              <span class="tag">Beta</span>
+            </p>
+            <h3 data-i18n="features.enc.title">Vaults sealed with a passphrase</h3>
+            <p data-i18n="features.enc.body">
+              Choose Encrypt and, if you like, keep a readable copy in a folder you pick. Then
+              choose a passphrase, save the recovery key and confirm two of its groups. From then on
+              the vault locks when idle, on sleep and on quit, and unlocks with your passphrase.
+            </p>
+          </div>
+          <figure class="clip clip-card" data-clip="encryption">
+            <img
+              src="media/encryption.poster.webp"
+              width="1440"
+              height="900"
+              loading="lazy"
+              decoding="async"
+              alt="Encrypting a vault from start to end: passphrase, recovery key, confirmation, then lock and unlock."
+              data-i18n-attr="alt:clip.encryption"
             />
           </figure>
         </div>
@@ -510,11 +600,11 @@
           </li>
           <li class="mini">
             <h3>
-              <svg class="i" aria-hidden="true"><use href="img/icons.svg#i-mic" /></svg>
-              <span data-i18n="features.mini.voice.title">Voice clips</span>
+              <svg class="i" aria-hidden="true"><use href="img/icons.svg#i-find" /></svg>
+              <span data-i18n="features.mini.find.title">Find in the page</span>
             </h3>
-            <p data-i18n="features.mini.voice.body">
-              Record audio straight into a note, and play it inline.
+            <p data-i18n="features.mini.find.body">
+              Ctrl+F finds and replaces in the page; Ctrl+G jumps to a line.
             </p>
           </li>
           <li class="mini">
@@ -626,6 +716,8 @@
             <a
               class="textlink"
               href="https://github.com/jorius/liber-linteum"
+              target="_blank"
+              rel="noopener noreferrer"
               data-i18n="download.pending.link"
               >See the repository</a
             >
@@ -644,6 +736,8 @@
               class="btn dark"
               data-release-primary="linux"
               href="https://github.com/jorius/liber-linteum/releases"
+              target="_blank"
+              rel="noopener noreferrer"
             >
               <svg class="g" aria-hidden="true"><use href="img/icons.svg#tux" /></svg>
               <span data-i18n="download.linux.button">Download .deb</span>
@@ -665,6 +759,8 @@
               class="btn dark"
               data-release-primary="windows"
               href="https://github.com/jorius/liber-linteum/releases"
+              target="_blank"
+              rel="noopener noreferrer"
             >
               <svg class="g" aria-hidden="true"><use href="img/icons.svg#win" /></svg>
               <span data-i18n="download.windows.button">Download .exe</span>
@@ -686,6 +782,8 @@
               class="btn dark"
               data-release-primary="macos"
               href="https://github.com/jorius/liber-linteum/releases"
+              target="_blank"
+              rel="noopener noreferrer"
             >
               <svg class="g" aria-hidden="true"><use href="img/icons.svg#apple" /></svg>
               <span data-i18n="download.macos.button">Download .dmg</span>
@@ -735,16 +833,24 @@
             <a
               class="btn dark"
               data-release-sample
-              href="https://github.com/jorius/liber-linteum/releases"
+              href="https://github.com/jorius/liber-linteum/releases/latest/download/The-Moons-of-Kessari.zip"
+              target="_blank"
+              rel="noopener noreferrer"
             >
               <svg class="i" aria-hidden="true"><use href="img/icons.svg#i-import" /></svg>
               <span data-i18n="vault.button">Download the sample vault (.zip)</span>
             </a>
-            <p class="small" data-release-sample-hint data-i18n="vault.hint">
-              Unzip it, then choose Open folder as vault.
-            </p>
-            <p class="small" data-release-sample-pending hidden data-i18n="vault.pending">
-              It arrives with the first release.
+            <p class="small" data-i18n="vault.hint">Unzip it, then choose Open folder as vault.</p>
+            <p class="small also-notion">
+              <a
+                class="textlink"
+                data-release-notion
+                href="https://github.com/jorius/liber-linteum/releases/latest/download/Notion-Sample-Export.zip"
+                target="_blank"
+                rel="noopener noreferrer"
+                data-i18n="vault.notion"
+                >Also: the sample Notion export (.zip)</a
+              >
             </p>
           </div>
           <figure class="clip clip-card" data-clip="sample-vault">
@@ -809,6 +915,8 @@
             <a
               class="textlink"
               href="https://github.com/jorius/liber-linteum/issues"
+              target="_blank"
+              rel="noopener noreferrer"
               data-i18n="roadmap.ideasLink"
               >Suggest it in the GitHub issues</a
             >
@@ -851,7 +959,11 @@
         <p>
           <span>GPL-3.0-or-later</span>
           <span aria-hidden="true">·</span>
-          <a href="https://github.com/jorius/liber-linteum" data-i18n="footer.source"
+          <a
+            href="https://github.com/jorius/liber-linteum"
+            target="_blank"
+            rel="noopener noreferrer"
+            data-i18n="footer.source"
             >Source on GitHub</a
           >
           <span aria-hidden="true">·</span>
@@ -862,7 +974,9 @@
             >An idea by <b>José Meza</b>, built by <b>Jose Ríos</b>.</span
           >
           <span aria-hidden="true">·</span>
-          <a href="https://jorius.github.io/">jorius.github.io</a>
+          <a href="https://jorius.github.io/" target="_blank" rel="noopener noreferrer"
+            >jorius.github.io</a
+          >
         </p>
       </div>
       <p class="foot-note" data-i18n="footer.note">

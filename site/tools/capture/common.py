@@ -37,6 +37,6 @@ def settings(**over):
     return s
 
 
-def session(**over):
+def session(files=None, env=None, **over):
     fresh_vault()
-    return Session(BINARY, settings(**over))
+    return Session(BINARY, settings(**over), files=files, env=env)

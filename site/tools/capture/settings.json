@@ -28,7 +28,7 @@
   },
   "outline": false,
   "coverHeight": 200,
-  "showAttachmentPaths": true,
+  "showAttachmentPaths": false,
   "scratchpadPath": null,
   "autoSave": true,
   "sidebarCollapsed": false,

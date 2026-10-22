@@ -1,6 +1,6 @@
 // Progressive enhancement only: the page reads fine without this file. It adds the language
-// switch, the download button for the visitor's OS, release data, donate buttons and the
-// looping clips. It never talks to anything but the page's own origin.
+// switch, the download button for the visitor's OS, release data, donate buttons, the
+// looping clips and their lightbox. It never talks to anything but the page's own origin.
 
 import { config } from './config.js';
 import { dict, LANGS } from './i18n.js';
@@ -9,6 +9,8 @@ const LANG_KEY = 'liber-site-lang';
 const OS_NAMES = { linux: 'Linux', windows: 'Windows', macos: 'macOS' };
 const PRIMARY_KIND = { linux: 'deb', windows: 'exe', macos: 'dmg' };
 const SPRITE = 'img/icons.svg';
+const SAMPLE_VAULT = 'The-Moons-of-Kessari.zip';
+const NOTION_SAMPLE = 'Notion-Sample-Export.zip';
 
 const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
 let lang = 'en';
@@ -100,6 +102,18 @@ function assetUrl(name) {
   return config.assetBase + encodeURIComponent(name);
 }
 
+/** Points a link somewhere: off-site addresses open in a new tab, in-page anchors don't. */
+function setHref(link, url) {
+  link.href = url;
+  if (/^https?:/i.test(url)) {
+    link.target = '_blank';
+    link.rel = 'noopener noreferrer';
+  } else {
+    link.removeAttribute('target');
+    link.removeAttribute('rel');
+  }
+}
+
 function filesFor(os) {
   return (release?.files ?? []).filter((f) => f.os === os);
 }
@@ -119,7 +133,7 @@ function renderHeroButtons() {
     const name = OS_NAMES[btn.dataset.os];
     label.textContent = mine ? t('hero.downloadFor', { os: name }) : name;
     const file = mine ? primaryFile(os) : null;
-    btn.href = file ? assetUrl(file.name) : '#download';
+    setHref(btn, file ? assetUrl(file.name) : '#download');
   }
 }
 
@@ -160,6 +174,7 @@ function el(tag, attrs = {}, children = []) {
     if (k === 'text') node.textContent = v;
     else node.setAttribute(k, v);
   }
+  if (tag === 'a' && attrs.href) setHref(node, attrs.href);
   for (const c of children) if (c) node.append(c);
   return node;
 }
@@ -201,16 +216,15 @@ function renderRelease() {
     const primary = primaryFile(os);
     plat.classList.toggle('is-pending', !ok || !primary);
     const btn = plat.querySelector('[data-release-primary]');
-    if (primary) btn.href = assetUrl(primary.name);
+    if (primary) setHref(btn, assetUrl(primary.name));
     plat.querySelector('[data-release-files]').replaceChildren(...files.map(fileRow));
   }
 
+  // The sample vault and the Notion sample have stable names in every release, so their links
+  // are always there; before the first release they lead to GitHub's "not found" page.
   const sample = (release?.files ?? []).find((f) => f.kind === 'sample-vault');
-  const sampleBtn = document.querySelector('[data-release-sample]');
-  sampleBtn.hidden = !sample;
-  if (sample) sampleBtn.href = assetUrl(sample.name);
-  document.querySelector('[data-release-sample-pending]').hidden = Boolean(sample);
-  document.querySelector('[data-release-sample-hint]').hidden = !sample;
+  setHref(document.querySelector('[data-release-sample]'), assetUrl(sample?.name ?? SAMPLE_VAULT));
+  setHref(document.querySelector('[data-release-notion]'), assetUrl(NOTION_SAMPLE));
 }
 
 async function initRelease() {
@@ -240,7 +254,7 @@ function initDonate() {
   for (const link of box.querySelectorAll('[data-donate-link]')) {
     const url = donate[link.dataset.donateLink];
     if (typeof url === 'string' && url.startsWith('https://')) {
-      link.href = url;
+      setHref(link, url);
       shown += 1;
     } else {
       link.hidden = true;
@@ -263,13 +277,54 @@ function icon(id) {
   return svg;
 }
 
+function addSources(video, slug) {
+  for (const [ext, type] of [
+    ['webm', 'video/webm'],
+    ['mp4', 'video/mp4'],
+  ]) {
+    video.append(el('source', { src: `media/${slug}.${ext}`, type }));
+  }
+}
+
 function initClips() {
   const wanted = new Set(config.videos ?? []);
-  const clips = [];
+  const slots = []; // every clip slot: each can be opened large
+  const clips = []; // the ones with a video
+  let lightboxOpen = false;
+
   for (const slot of document.querySelectorAll('[data-clip]')) {
     const slug = slot.dataset.clip;
     const img = slot.querySelector('img');
-    if (!wanted.has(slug) || !img) continue;
+    if (!img) continue;
+    const altKey = (img.dataset.i18nAttr || '').match(/alt:([\w.-]+)/)?.[1];
+    const fallbackAlt = img.alt;
+    const zoom = el('button', {
+      type: 'button',
+      class: 'clip-zoom',
+      'aria-haspopup': 'dialog',
+      'data-i18n-attr': 'aria-label:clip.enlarge',
+      'aria-label': t('clip.enlarge'),
+    });
+    zoom.append(icon('i-expand'));
+    const entry = {
+      slug,
+      slot,
+      zoom,
+      poster: img.getAttribute('src'),
+      altKey,
+      label: () => (altKey ? t(altKey) : fallbackAlt),
+      video: null,
+    };
+    slots.push(entry);
+    slot.addEventListener('click', (e) => {
+      if (e.target.closest('.clip-toggle')) return;
+      openLightbox(entry);
+    });
+
+    if (!wanted.has(slug)) {
+      slot.append(zoom);
+      continue;
+    }
 
     const video = document.createElement('video');
     video.muted = true;
@@ -278,20 +333,25 @@ function initClips() {
     video.preload = 'none';
     video.setAttribute('muted', '');
     video.setAttribute('playsinline', '');
-    video.poster = img.getAttribute('src');
+    video.poster = entry.poster;
     video.width = img.width;
     video.height = img.height;
-    const altKey = (img.dataset.i18nAttr || '').match(/alt:([\w.-]+)/)?.[1];
     if (altKey) video.dataset.i18nAttr = `aria-label:${altKey}`;
     video.setAttribute('aria-label', img.alt);
     img.replaceWith(video);
 
     const button = el('button', { type: 'button', class: 'clip-toggle' });
     const bar = el('span', { class: 'clip-bar', 'aria-hidden': 'true' }, [el('i')]);
-    slot.append(button, bar);
+    slot.append(button, zoom, bar);
 
-    const clip = { slug, slot, video, button, bar: bar.firstChild, loaded: false, visible: false };
-    clip.userPaused = reducedMotion.matches; // reduced motion: poster and a play button
+    const clip = Object.assign(entry, {
+      video,
+      button,
+      bar: bar.firstChild,
+      loaded: false,
+      visible: false,
+      userPaused: reducedMotion.matches, // reduced motion: poster and a play button
+    });
     clips.push(clip);
 
     const sync = () => {
@@ -327,29 +387,113 @@ function initClips() {
       }
     });
   }
-  if (!clips.length) return;
+  if (!slots.length) return;
 
   function load(clip) {
     if (clip.loaded) return;
     clip.loaded = true;
-    for (const [ext, type] of [
-      ['webm', 'video/webm'],
-      ['mp4', 'video/mp4'],
-    ]) {
-      clip.video.append(el('source', { src: `media/${clip.slug}.${ext}`, type }));
-    }
+    addSources(clip.video, clip.slug);
     clip.video.preload = 'auto';
     clip.video.load();
   }
 
   function update(clip) {
-    if (clip.visible && !clip.userPaused) {
+    if (clip.visible && !clip.userPaused && !lightboxOpen) {
       load(clip);
       clip.video.play().catch(() => {});
     } else if (!clip.video.paused) {
       clip.video.pause();
     }
   }
+
+  /* The lightbox: one native modal dialog, filled with whichever clip was opened. It covers the
+     viewport, so a click that lands on the dialog itself (not the clip) is a click on the
+     backdrop. Esc closes it natively. */
+  const dialog = el('dialog', { class: 'lightbox' });
+  const close = el('button', {
+    type: 'button',
+    class: 'lightbox-close',
+    'data-i18n-attr': 'aria-label:clip.close',
+    'aria-label': t('clip.close'),
+  });
+  close.append(icon('i-close'));
+  const frame = el('div', { class: 'lightbox-frame' });
+  dialog.append(close, frame);
+  document.body.append(dialog);
+  let opener = null;
+  let downOnBackdrop = false;
+
+  close.addEventListener('click', () => dialog.close());
+  dialog.addEventListener('pointerdown', (e) => {
+    downOnBackdrop = e.target === dialog;
+  });
+  dialog.addEventListener('click', (e) => {
+    if (e.target === dialog && downOnBackdrop) dialog.close();
+  });
+
+  function openLightbox(entry) {
+    if (dialog.open) return;
+    opener = entry.zoom; // the clip itself can't take focus; its Enlarge button can
+    lightboxOpen = true;
+    for (const clip of clips) update(clip);
+
+    const label = entry.label();
+    dialog.setAttribute('aria-label', label);
+    let media;
+    if (entry.video) {
+      media = el('video', {
+        class: 'lightbox-media',
+        poster: entry.poster,
+        width: '1440',
+        height: '900',
+        'aria-label': label,
+      });
+      media.muted = true;
+      media.loop = true;
+      media.playsInline = true;
+      media.controls = true;
+      media.preload = 'auto';
+      media.setAttribute('muted', '');
+      media.setAttribute('playsinline', '');
+      if (entry.altKey) media.dataset.i18nAttr = `aria-label:${entry.altKey}`;
+      const from = entry.video.currentTime || 0;
+      media.addEventListener(
+        'loadedmetadata',
+        () => {
+          if (from > 0 && from < media.duration) media.currentTime = from;
+          // Reduced motion: it waits on its first frame for the visitor to press play.
+          if (!reducedMotion.matches && dialog.open) media.play().catch(() => {});
+        },
+        { once: true },
+      );
+      addSources(media, entry.slug);
+    } else {
+      media = el('img', {
+        class: 'lightbox-media',
+        src: entry.poster,
+        width: '1440',
+        height: '900',
+        alt: label,
+      });
+      if (entry.altKey) media.dataset.i18nAttr = `alt:${entry.altKey}`;
+    }
+    frame.replaceChildren(media);
+    dialog.showModal();
+  }
+
+  dialog.addEventListener('close', () => {
+    const media = frame.firstElementChild;
+    if (media instanceof HTMLVideoElement) {
+      media.pause();
+      media.replaceChildren(); // drop the sources and stop any download still running
+      media.load();
+    }
+    frame.replaceChildren();
+    lightboxOpen = false;
+    for (const clip of clips) update(clip);
+    opener?.focus();
+    opener = null;
+  });
 
   const io = new IntersectionObserver(
     (entries) => {

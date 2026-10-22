@@ -40,6 +40,9 @@ Rust: fmt, clippy `-D warnings` clean; every test binary passes (the three watch
 
 ## Noticed, not done
 
+- **Voice clips don't play on Linux** (found 2026-10-22 morning): WebKitGTK's media player refuses the app's `liber-asset://` scheme (`MediaPlayerPrivateGStreamer … loadingFailed: FormatError`), so every audio embed shows `0:00 / 0:00`. Recording works. Fix options: serve audio to the player as a `blob:` URL (needs `liber-asset:` in the CSP's `connect-src`, or an IPC command returning the bytes); decide before changing the security policy.
+- Showcase clips: `2026-10-22-macos-clips-handoff.md` has the storyboards for re-recording all 12 on macOS.
+
 - A page opened with the cursor on line 1 shows its frontmatter and `# Title` raw in Live Preview (by design today; worth a look).
 - The Notion import's report/breadcrumb shows an odd glyph after "Dela's Caravan Notes /".
 - Editor basics still open from the list: zoom shortcuts, print/export to PDF, quick switcher, multiple cursors, insert date, version history (roadmap), tabs, command palette.

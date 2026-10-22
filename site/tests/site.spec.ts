@@ -100,7 +100,7 @@ test.describe('privacy', () => {
     // Only the clips the config lists are fetched, from this site.
     for (const u of net.urls.filter((u) => media.test(u))) {
       expect(new URL(u).pathname).toMatch(
-        /\/media\/(hero|obsidian|notion|global-view|editor|encryption|search|sample-vault)\./,
+        /\/media\/(hero|obsidian|notion|global-view|atoms|editor|maths|drag-drop|voice|search|encryption|sample-vault)\./,
       );
     }
     expect(net.console.filter((m) => /Content Security Policy|pageerror|i18n/.test(m))).toEqual([]);
@@ -134,6 +134,47 @@ test.describe('privacy', () => {
       ),
     );
     for (const ref of refs) expect(ref, ref).not.toMatch(/^(\/|https?:)/);
+  });
+
+  test('every outbound link opens in a new tab; in-page anchors stay put', async ({ browser }) => {
+    // With a release, an OS and the donate buttons, so every link main.js makes exists too.
+    const ctx = await browser.newContext({ userAgent: UA.linux, locale: 'en-US' });
+    const page = await ctx.newPage();
+    await withRelease(page, RELEASE);
+    await page.route('**/js/config.js', async (route) => {
+      const res = await route.fetch();
+      const body = (await res.text()).replace('enabled: false', 'enabled: true');
+      await route.fulfill({ response: res, body });
+    });
+    await page.goto('./');
+    await expect(page.locator('html')).toHaveAttribute('data-release', 'ready');
+    await expect(page.locator('[data-donate]')).toBeVisible();
+    const links = () =>
+      page.evaluate(() =>
+        [...document.querySelectorAll('a[href]')].map((a) => ({
+          href: a.getAttribute('href')!,
+          target: a.getAttribute('target'),
+          rel: (a.getAttribute('rel') ?? '').split(/\s+/),
+        })),
+      );
+    const all = await links();
+    const outbound = all.filter((l) => /^https?:/i.test(l.href));
+    // Static ones, the hero's OS button, file rows, VirusTotal, donate, sample vault, Notion.
+    expect(outbound.length).toBeGreaterThan(20);
+    for (const l of outbound) {
+      expect(l.target, l.href).toBe('_blank');
+      expect(l.rel, l.href).toEqual(expect.arrayContaining(['noopener', 'noreferrer']));
+    }
+    for (const l of all.filter((l) => l.href.startsWith('#'))) {
+      expect(l.target, l.href).toBeNull();
+    }
+    // The 404 page has only same-site links, which stay in the tab.
+    await page.goto('./no/such/page');
+    for (const l of await links()) {
+      if (/^https?:/i.test(l.href)) expect(l.target, l.href).toBe('_blank');
+      else expect(l.target, l.href).toBeNull();
+    }
+    await ctx.close();
   });
 });
 
@@ -337,7 +378,22 @@ test.describe('downloads', () => {
     const sample = page.getByRole('link', { name: 'Download the sample vault (.zip)' });
     await expect(sample).toBeVisible();
     await expect(sample).toHaveAttribute('href', `${ASSETS}The-Moons-of-Kessari.zip`);
-    await expect(page.locator('[data-release-sample-pending]')).toBeHidden();
+    await expect(page.getByText('Unzip it, then choose Open folder as vault.')).toBeVisible();
+    await expect(
+      page.getByRole('link', { name: 'Also: the sample Notion export (.zip)' }),
+    ).toHaveAttribute('href', `${ASSETS}Notion-Sample-Export.zip`);
+    await ctx.close();
+  });
+
+  test('the sample vault link takes its name from release.json when it lists one', async ({
+    browser,
+  }) => {
+    const renamed = RELEASE.replace('"The-Moons-of-Kessari.zip"', '"Kessari 2.zip"');
+    const { ctx, page } = await openAs(browser, UA.linux, renamed);
+    await expect(page.locator('html')).toHaveAttribute('data-release', 'ready');
+    await expect(
+      page.getByRole('link', { name: 'Download the sample vault (.zip)' }),
+    ).toHaveAttribute('href', `${ASSETS}Kessari%202.zip`);
     await ctx.close();
   });
 
@@ -361,8 +417,15 @@ test.describe('downloads', () => {
       await expect(page.locator('[data-release-primary]').first()).toBeHidden();
       await expect(page.locator('.plat-pending').first()).toBeVisible();
       await expect(page.locator('.os-buttons a.dark')).toHaveAttribute('href', '#download');
-      await expect(page.locator('[data-release-sample]')).toBeHidden();
-      await expect(page.locator('[data-release-sample-pending]')).toBeVisible();
+      // The sample vault has a stable name, so its link is there even before a release.
+      const sample = page.getByRole('link', { name: 'Download the sample vault (.zip)' });
+      await expect(sample).toBeVisible();
+      await expect(sample).toHaveAttribute('href', `${ASSETS}The-Moons-of-Kessari.zip`);
+      await expect(page.getByText('Unzip it, then choose Open folder as vault.')).toBeVisible();
+      await expect(
+        page.getByRole('link', { name: 'Also: the sample Notion export (.zip)' }),
+      ).toHaveAttribute('href', `${ASSETS}Notion-Sample-Export.zip`);
+      await expect(page.getByText('It arrives with the first release.')).toHaveCount(0);
       await ctx.close();
     });
   }
@@ -532,6 +595,175 @@ test.describe('clips', () => {
     await button.click();
     await expect.poll(() => paused(page, 'global-view')).toBe(false);
     await ctx.close();
+  });
+
+  test('a click on a clip opens it large; Esc closes it and the clip plays on', async ({
+    browser,
+  }) => {
+    const webm = await makeWebm(browser);
+    const ctx = await browser.newContext({ viewport: { width: 1280, height: 800 } });
+    const page = await ctx.newPage();
+    await withVideos(page, webm, ['global-view', 'editor']);
+    await page.goto('./');
+    const gv = page.locator('[data-clip="global-view"]');
+    await gv.evaluate((el) => el.scrollIntoView({ block: 'center' }));
+    await expect.poll(() => paused(page, 'global-view')).toBe(false);
+    await expect(gv).toHaveCSS('cursor', 'zoom-in');
+
+    await gv.click({ position: { x: 150, y: 60 } });
+    const dialog = page.getByRole('dialog');
+    await expect(dialog).toBeVisible();
+    await expect(dialog).toHaveAccessibleName(
+      'Cards in the Global View expanding in place to show a folder’s pages.',
+    );
+    const big = dialog.locator('video');
+    await expect(big).toHaveCount(1);
+    expect(
+      await big.evaluate((v: HTMLVideoElement) => [v.controls, v.muted, v.loop, v.poster]),
+    ).toEqual([true, true, true, expect.stringContaining('media/global-view.poster.webp')]);
+    await expect.poll(() => big.evaluate((v: HTMLVideoElement) => v.paused)).toBe(false);
+    // Inline clips hold still behind it.
+    expect(await paused(page, 'global-view')).toBe(true);
+    // As large as fits, 16:10, inside the viewport.
+    const frame = (await dialog.locator('.lightbox-frame').boundingBox())!;
+    expect(frame.width / frame.height).toBeCloseTo(1.6, 1);
+    expect(frame.x).toBeGreaterThanOrEqual(16);
+    expect(frame.y).toBeGreaterThanOrEqual(16);
+    expect(frame.x + frame.width).toBeLessThanOrEqual(1280 - 16);
+    expect(frame.y + frame.height).toBeLessThanOrEqual(800 - 16);
+    expect(frame.height).toBeGreaterThan(600);
+
+    await page.keyboard.press('Escape');
+    await expect(dialog).toBeHidden();
+    await expect(dialog.locator('video')).toHaveCount(0);
+    await expect(gv.getByRole('button', { name: 'Enlarge the clip' })).toBeFocused();
+    await expect.poll(() => paused(page, 'global-view')).toBe(false);
+    await ctx.close();
+  });
+
+  test('keyboard: Enlarge opens it, Close and the backdrop close it, a paused clip stays paused', async ({
+    browser,
+  }) => {
+    const webm = await makeWebm(browser);
+    const ctx = await browser.newContext({ viewport: { width: 1280, height: 800 } });
+    const page = await ctx.newPage();
+    await withVideos(page, webm, ['editor']);
+    await page.goto('./');
+    const editor = page.locator('[data-clip="editor"]');
+    await editor.evaluate((el) => el.scrollIntoView({ block: 'center' }));
+    await expect.poll(() => paused(page, 'editor')).toBe(false);
+    await editor.locator('.clip-toggle').click();
+    await expect.poll(() => paused(page, 'editor')).toBe(true);
+
+    const zoom = editor.getByRole('button', { name: 'Enlarge the clip' });
+    await zoom.focus();
+    await page.keyboard.press('Enter');
+    const dialog = page.getByRole('dialog');
+    await expect(dialog).toBeVisible();
+    const close = dialog.getByRole('button', { name: 'Close' });
+    await expect(close).toBeFocused();
+    await page.keyboard.press('Enter');
+    await expect(dialog).toBeHidden();
+    await expect(zoom).toBeFocused();
+
+    await page.keyboard.press('Space');
+    await expect(dialog).toBeVisible();
+    await page.mouse.click(8, 400); // the backdrop, beside the frame
+    await expect(dialog).toBeHidden();
+    await expect(zoom).toBeFocused();
+    // The visitor had paused it; it stays paused.
+    await page.waitForTimeout(300);
+    expect(await paused(page, 'editor')).toBe(true);
+    await ctx.close();
+  });
+
+  test('a clip with only a poster opens the poster large, in Spanish too', async ({ browser }) => {
+    const ctx = await browser.newContext({ locale: 'es-CO' });
+    const page = await ctx.newPage();
+    await page.route('**/js/config.js', async (route) => {
+      const res = await route.fetch();
+      const body = (await res.text()).replace(/^ {2}videos: \[[^\]]*\]/m, '  videos: []');
+      await route.fulfill({ response: res, body });
+    });
+    await page.goto('./');
+    const atoms = page.locator('[data-clip="atoms"]');
+    await expect(atoms.locator('img')).toHaveCount(1);
+    await atoms.getByRole('button', { name: 'Ampliar el clip' }).click();
+    const dialog = page.getByRole('dialog');
+    await expect(dialog).toBeVisible();
+    const img = dialog.locator('img');
+    await expect(img).toHaveAttribute('src', 'media/atoms.poster.webp');
+    await expect(img).toHaveAttribute(
+      'alt',
+      'Los átomos de una página en la Vista global: sus secciones y bloques como un árbol de tarjetas pequeñas.',
+    );
+    await expect(dialog.getByRole('button', { name: 'Cerrar' })).toBeVisible();
+    await page.keyboard.press('Escape');
+    await expect(dialog).toBeHidden();
+    await ctx.close();
+  });
+
+  test('with reduced motion the large clip waits for play', async ({ browser }) => {
+    const webm = await makeWebm(browser);
+    const ctx = await browser.newContext({ reducedMotion: 'reduce' });
+    const page = await ctx.newPage();
+    await withVideos(page, webm, ['search']);
+    await page.goto('./');
+    const search = page.locator('[data-clip="search"]');
+    await search.evaluate((el) => el.scrollIntoView({ block: 'center' }));
+    await search.getByRole('button', { name: 'Enlarge the clip' }).click();
+    const big = page.getByRole('dialog').locator('video');
+    await expect
+      .poll(() => big.evaluate((v: HTMLVideoElement) => v.readyState))
+      .toBeGreaterThanOrEqual(1);
+    await page.waitForTimeout(400);
+    expect(await big.evaluate((v: HTMLVideoElement) => v.paused)).toBe(true);
+    await big.evaluate((v: HTMLVideoElement) => v.play());
+    await expect.poll(() => big.evaluate((v: HTMLVideoElement) => v.paused)).toBe(false);
+    await ctx.close();
+  });
+});
+
+test.describe('page content', () => {
+  test('the hero shows the recorded window whole, with no drawn menu bar', async ({ page }) => {
+    await page.goto('./');
+    await expect(page.locator('.window-bar')).toHaveCount(0);
+    await expect(page.locator('.hero-shot')).not.toContainText('File');
+    const box = (await page.locator('.clip-hero').boundingBox())!;
+    expect(box.width / box.height).toBeCloseTo(1.6, 2);
+  });
+
+  test('the feature tour: eight rows, alternating, then the minis', async ({ page }) => {
+    await page.goto('./');
+    const rows = page.locator('#features .row');
+    expect(
+      await rows.evaluateAll((els) =>
+        els.map((e) => e.querySelector('[data-clip]')!.getAttribute('data-clip')),
+      ),
+    ).toEqual([
+      'global-view',
+      'atoms',
+      'editor',
+      'maths',
+      'drag-drop',
+      'voice',
+      'search',
+      'encryption',
+    ]);
+    expect(await rows.evaluateAll((els) => els.map((e) => e.classList.contains('flip')))).toEqual([
+      false,
+      true,
+      false,
+      true,
+      false,
+      true,
+      false,
+      true,
+    ]);
+    await expect(rows.last().locator('.tag')).toHaveText('Beta');
+    const minis = page.locator('.minis h3');
+    await expect(minis).toContainText(['Find in the page']);
+    await expect(minis.filter({ hasText: 'Voice clips' })).toHaveCount(0);
   });
 });
 

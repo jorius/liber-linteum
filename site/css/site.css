@@ -597,42 +597,20 @@ svg.g {
   min-width: 0;
 }
 
+/* The clip is a recording of the app's own window, title bar and all: the frame only rounds
+   it and lifts it off the dunes. */
 .window {
   overflow: hidden;
-  border-radius: 12px 12px 0 0;
+  margin-bottom: clamp(32px, 5vw, 64px);
+  border-radius: 12px;
   background: var(--card);
-  box-shadow: var(--shadow-lg);
-}
-
-.window-bar {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  height: 30px;
-  padding: 0 14px;
-  background: #1f1a14;
-  color: #e9d3a6;
-  font-size: 11.5px;
-  font-weight: 600;
-  white-space: nowrap;
-  overflow: hidden;
-}
-
-.window-bar span:not(.window-name) {
-  font-weight: 400;
-  color: #d8c29b;
+  box-shadow:
+    0 0 0 1px rgb(42 28 16 / 0.14),
+    var(--shadow-lg);
 }
 
 .clip-hero {
-  aspect-ratio: 16 / 9.4;
-}
-
-.clip-hero img,
-.clip-hero video {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  object-position: top left;
+  aspect-ratio: 16 / 10;
 }
 
 /* ---------- clips (poster or looping video) ---------- */
@@ -683,14 +661,64 @@ svg.g {
     transform 0.18s ease;
 }
 
-.clip-toggle:hover {
+.clip-toggle:hover,
+.clip-zoom:hover {
   background: rgb(42 28 16 / 0.92);
   transform: scale(1.05);
 }
 
-.clip-toggle svg {
+.clip-toggle svg,
+.clip-zoom svg {
   width: 16px;
   height: 16px;
+}
+
+/* Any clip opens large: a click anywhere on it, or its Enlarge button from the keyboard. */
+.js [data-clip] {
+  cursor: zoom-in;
+}
+
+.clip-zoom {
+  position: absolute;
+  right: 12px;
+  bottom: 14px;
+  z-index: 2;
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: rgb(42 28 16 / 0.78);
+  color: var(--sand);
+  cursor: zoom-in;
+  transition:
+    background-color 0.18s ease,
+    transform 0.18s ease;
+}
+
+.clip-toggle:focus-visible,
+.clip-zoom:focus-visible {
+  outline-offset: 2px;
+  border-radius: 50%;
+}
+
+/* With a mouse, Enlarge shows on hover (it would sit over the recorded app's own buttons);
+   it is always there for the keyboard (on focus) and on touch screens. */
+@media (hover: hover) {
+  .clip-zoom {
+    opacity: 0;
+    transition:
+      opacity 0.18s ease,
+      background-color 0.18s ease,
+      transform 0.18s ease;
+  }
+
+  [data-clip]:hover .clip-zoom,
+  .clip-zoom:focus-visible {
+    opacity: 1;
+  }
 }
 
 .clip-bar {
@@ -709,6 +737,86 @@ svg.g {
   background: var(--spice);
   transform-origin: left;
   transform: scaleX(0);
+}
+
+/* ---------- lightbox ---------- */
+
+/* The dialog covers the viewport and is see-through; the frame sits in its middle, 16:10, as
+   large as fits with a margin (and room for the close button above). */
+.lightbox {
+  width: 100vw;
+  height: 100vh;
+  height: 100dvh;
+  max-width: none;
+  max-height: none;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--sand);
+  overflow: hidden;
+  cursor: zoom-out;
+}
+
+.lightbox[open] {
+  display: grid;
+  place-items: center;
+}
+
+.lightbox::backdrop {
+  background: rgb(31 26 20 / 0.92);
+}
+
+:root:has(.lightbox[open]) {
+  overflow: hidden;
+}
+
+.lightbox-frame {
+  --m: clamp(16px, 4vw, 48px);
+  width: min(100vw - 2 * var(--m), (100vh - 2 * var(--m) - 56px) * 1.6);
+  width: min(100vw - 2 * var(--m), (100dvh - 2 * var(--m) - 56px) * 1.6);
+  aspect-ratio: 16 / 10;
+  overflow: hidden;
+  border-radius: var(--radius);
+  background: #1f1a14;
+  box-shadow: 0 30px 80px rgb(0 0 0 / 0.45);
+  cursor: auto;
+}
+
+.lightbox-media {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.lightbox-close {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: 1px solid rgb(243 230 201 / 0.35);
+  border-radius: 50%;
+  background: rgb(42 28 16 / 0.6);
+  color: var(--sand);
+  cursor: pointer;
+}
+
+.lightbox-close:hover {
+  background: rgb(42 28 16 / 0.95);
+  border-color: rgb(243 230 201 / 0.6);
+}
+
+.lightbox-close svg {
+  width: 20px;
+  height: 20px;
+}
+
+.lightbox :focus-visible {
+  outline-color: var(--spice-glow);
 }
 
 /* ---------- what it is ---------- */
@@ -1125,6 +1233,18 @@ svg.g {
   margin-bottom: 0;
 }
 
+.vault .also-notion {
+  margin-top: 6px;
+  font-size: 13.5px;
+}
+
+.also-notion .textlink {
+  display: inline-block;
+  min-height: 24px;
+  font-weight: 400;
+  text-underline-offset: 3px;
+}
+
 .chips {
   list-style: none;
   display: flex;
@@ -1379,12 +1499,6 @@ svg.g {
 @media (max-width: 560px) {
   .hero .kicker {
     letter-spacing: 0.14em;
-  }
-
-  .window-bar {
-    gap: 10px;
-    padding: 0 12px;
-    font-size: 10.5px;
   }
 
   .brand {

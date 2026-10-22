@@ -20,3 +20,4 @@ playwright-report/
 
 # Brainstorm companion mocks and plan workspaces (local only)
 .superpowers/
+__pycache__/

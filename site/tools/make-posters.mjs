@@ -3,7 +3,8 @@
 // so it needs no translation. The real capture work overwrites these files (media/README.md).
 //
 // Usage, from the repo root after `pnpm install`:
-//   node site/tools/make-posters.mjs
+//   node site/tools/make-posters.mjs              # every slot (overwrites real posters too)
+//   node site/tools/make-posters.mjs atoms voice  # only these slots
 // It uses the Playwright Chromium that the desktop app's tests already install.
 
 import { writeFileSync } from 'node:fs';
@@ -215,12 +216,134 @@ function notionView() {
   );
 }
 
+function atomsView() {
+  // A page card on the left, its atoms as a tree of small cards to the right.
+  const atom = (x, y, w, kind) => {
+    const inner = {
+      text: `${bar(x + 14, y + 18, w * 0.6, 8)}${bar(x + 14, y + 34, w * 0.42, 8)}`,
+      list: [0, 1, 2]
+        .map(
+          (i) =>
+            `<circle cx="${x + 18}" cy="${y + 16 + i * 14}" r="3" fill="${C.spice}"/>${bar(x + 28, y + 12 + i * 14, w * 0.5, 8)}`,
+        )
+        .join(''),
+      code: `<rect x="${x + 10}" y="${y + 10}" width="${w - 20}" height="34" rx="5" fill="${C.night}"/>${bar(x + 18, y + 18, w * 0.4, 6, '#e9a45f', 3)}${bar(x + 18, y + 30, w * 0.55, 6, '#cdb894', 3)}`,
+      callout: `<rect x="${x + 10}" y="${y + 10}" width="${w - 20}" height="34" rx="5" fill="#fff3dc"/><rect x="${x + 10}" y="${y + 10}" width="4" height="34" fill="${C.spice}"/>${bar(x + 22, y + 22, w * 0.5, 8, C.spice, 4)}`,
+      maths: `<path d="M${x + 16} ${y + 34}l8-20 8 20M${x + 44} ${y + 20}h16M${x + 52} ${y + 12}v16" fill="none" stroke="${C.ink2}" stroke-width="3" stroke-linecap="round"/>${bar(x + 72, y + 20, w * 0.3, 8)}`,
+      image: `${cover(x + 10, y + 8, w - 20, 38)}`,
+    }[kind];
+    return `<rect x="${x}" y="${y}" width="${w}" height="56" rx="8" fill="${C.card}" stroke="${C.rule}" stroke-width="1.5"/>${inner}`;
+  };
+  const kinds = ['text', 'list', 'callout', 'code', 'maths', 'image', 'text', 'list'];
+  const items = [];
+  const links = [];
+  kinds.forEach((kind, i) => {
+    const col = i < 3 ? 0 : 1;
+    const x = 760 + col * 300 + (i % 2) * 20;
+    const y = 120 + (col ? i - 3 : i) * 130 + col * 40;
+    items.push(atom(x, y, 240, kind));
+    links.push(edge(col ? 1000 : 560, col ? 230 + (i % 3) * 40 : 330, x, y + 28));
+  });
+  return chrome(
+    `${links.join('')}${card(330, 220, 230, 214)}
+     <rect x="${730}" y="96" width="${1380 - 730}" height="${H - 160}" rx="14" fill="none" stroke="${C.rule}" stroke-width="1.5" stroke-dasharray="6 6"/>
+     ${items.join('')}`,
+  );
+}
+
+function mathsView() {
+  // Split: source on the left, the rendered page on the right.
+  const src = [];
+  for (let i = 0; i < 14; i++) {
+    const y = 130 + i * 38;
+    const w = 180 + ((i * 67) % 220);
+    const fill = [2, 3, 7, 8, 9, 10].includes(i) ? '#e9a45f' : C.line;
+    src.push(bar(300 + (i % 4 === 3 ? 24 : 0), y, w, 10, fill));
+  }
+  const node = (x, y, w = 130) =>
+    `<rect x="${x}" y="${y}" width="${w}" height="46" rx="8" fill="${C.card}" stroke="${C.spice}" stroke-width="2"/>${bar(x + 20, y + 18, w - 40, 9, C.ink2, 4)}`;
+  const arrow = (x1, y1, x2, y2) =>
+    `<path d="M${x1} ${y1} L${x2} ${y2}" stroke="${C.spice}" stroke-width="2.5" stroke-opacity=".7"/>`;
+  return chrome(
+    `<rect x="270" y="100" width="530" height="${H - 140}" rx="10" fill="${C.card}" stroke="${C.rule}" stroke-width="1.5"/>
+     ${src.join('')}
+     <rect x="830" y="100" width="560" height="${H - 140}" rx="10" fill="${C.card}" stroke="${C.rule}" stroke-width="1.5"/>
+     ${bar(870, 140, 260, 18, C.ink, 9)}${bar(870, 176, 420)}
+     <g fill="none" stroke="${C.ink}" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round">
+       <path d="M940 250h70M975 222v56M1040 268l20-40 20 40M1110 250h40M1110 236v28M1170 236c20 0 20 28 0 28"/>
+       <path d="M920 300h280"/>
+       <path d="M1000 320l22 24 22-24M1070 330h50"/>
+     </g>
+     ${node(990, 400)}${arrow(1055, 446, 960, 500)}${arrow(1055, 446, 1150, 500)}
+     ${node(895, 500)}${node(1085, 500)}${arrow(960, 546, 1055, 600)}${arrow(1150, 546, 1055, 600)}
+     ${node(990, 600)}
+     ${bar(870, 700, 440)}${bar(870, 720, 300)}`,
+  );
+}
+
+function dragDropView() {
+  // The sidebar's own tree (from chrome) with one folder lit up as the drop target.
+  const tree = [
+    `<rect x="16" y="398" width="216" height="32" rx="6" fill="#fff3dc" stroke="${C.spice}" stroke-width="2"/>${bar(32, 410, 140, 10, C.spice)}`,
+  ];
+  const x = 380;
+  const lines = [];
+  let y = 140;
+  for (let i = 0; i < 12; i++) {
+    if (i === 5) {
+      lines.push(`<rect x="${x}" y="${y + 6}" width="700" height="3" rx="1.5" fill="${C.spice}"/>`);
+      y += 22;
+      continue;
+    }
+    lines.push(bar(x, (y += 34), 640 - ((i * 53) % 200)));
+  }
+  const handle = (hx, hy) =>
+    [0, 1, 2]
+      .map((r) =>
+        [0, 1]
+          .map((c) => `<circle cx="${hx + c * 8}" cy="${hy + r * 8}" r="2.5" fill="${C.ink2}"/>`)
+          .join(''),
+      )
+      .join('');
+  const dragged = `<g><rect x="${x + 60}" y="420" width="640" height="46" rx="8" fill="${C.card}" stroke="${C.spice}" stroke-width="2"/>
+    ${handle(x + 76, 435)}${bar(x + 104, 438, 420)}</g>`;
+  const page = `<g opacity=".95"><rect x="120" y="360" width="190" height="34" rx="6" fill="${C.card}" stroke="${C.spice}" stroke-width="2"/>${bar(140, 372, 120, 10, C.ink2)}</g>`;
+  return chrome(`<g>${tree.join('')}</g>${lines.join('')}${dragged}${page}`, { sidebar: true });
+}
+
+function voiceView() {
+  const x = 380;
+  const lines = [];
+  let y = 120;
+  for (let i = 0; i < 5; i++) lines.push(bar(x, (y += 30), 640 - ((i * 53) % 160)));
+  const wave = [];
+  for (let i = 0; i < 60; i++) {
+    const h = 8 + Math.abs(Math.sin(i * 0.55) * 34 + Math.sin(i * 1.7) * 12);
+    wave.push(
+      `<rect x="${x + 90 + i * 9}" y="${370 - h / 2}" width="5" height="${h}" rx="2.5" fill="${i < 34 ? C.spice : C.line}"/>`,
+    );
+  }
+  const player = `<rect x="${x}" y="320" width="700" height="100" rx="12" fill="${C.card}" stroke="${C.rule}" stroke-width="1.5"/>
+    <circle cx="${x + 48}" cy="370" r="26" fill="${C.ink}"/><path d="M${x + 40} 356v28l22-14z" fill="${C.sand}"/>${wave.join('')}`;
+  const rec = `<rect x="${x}" y="460" width="700" height="80" rx="12" fill="#fff3dc" stroke="${C.tag ?? '#ecd2a8'}" stroke-width="1.5"/>
+    <circle cx="${x + 44}" cy="500" r="14" fill="#c0392b"/>${bar(x + 76, 494, 90, 12, C.ink2, 6)}
+    ${[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11].map((i) => `<rect x="${x + 200 + i * 12}" y="${500 - (6 + ((i * 7) % 18))}" width="6" height="${2 * (6 + ((i * 7) % 18))}" rx="3" fill="${C.spice}" opacity=".7"/>`).join('')}
+    <rect x="${x + 560}" y="480" width="120" height="40" rx="8" fill="${C.ink}"/>${bar(x + 590, 496, 60, 8, C.sand, 4)}`;
+  y = 570;
+  for (let i = 0; i < 4; i++) lines.push(bar(x, (y += 30), 600 - ((i * 47) % 180)));
+  return chrome(`${bar(x, 110, 380, 24, C.ink, 10)}${lines.join('')}${player}${rec}`);
+}
+
 const POSTERS = {
   hero: () => canvasView(0),
   obsidian: obsidianView,
   notion: notionView,
   'global-view': () => canvasView(2),
+  atoms: atomsView,
   editor: editorView,
+  maths: mathsView,
+  'drag-drop': dragDropView,
+  voice: voiceView,
   encryption: encryptionView,
   search: searchView,
   'sample-vault': () => canvasView(5),
@@ -229,7 +352,10 @@ const POSTERS = {
 const browser = await chromium.launch();
 const page = await browser.newPage();
 await page.setContent('<canvas width="1440" height="900"></canvas>');
+const only = process.argv.slice(2);
+for (const slug of only) if (!POSTERS[slug]) throw new Error(`no poster for "${slug}"`);
 for (const [slug, draw] of Object.entries(POSTERS)) {
+  if (only.length && !only.includes(slug)) continue;
   const svg = draw();
   const dataUrl = await page.evaluate(async (markup) => {
     const img = new Image();

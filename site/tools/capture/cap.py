@@ -23,10 +23,12 @@ WORK = os.environ.get("CAPTURE_WORK", "/tmp/liber-capture")
 
 
 class Session:
-    def __init__(self, binary, settings, home=None):
+    def __init__(self, binary, settings, home=None, files=None, env=None):
         self.binary = binary
         self.home = home or os.path.join(WORK, "home")
         self.settings = settings
+        self.files = files or {}  # extra files in the app's home: {relative path: text}
+        self.env = env or {}
         self.procs = []
         self.rec = None
 
@@ -38,6 +40,10 @@ class Session:
         os.makedirs(cfg)
         with open(os.path.join(cfg, "settings.json"), "w") as f:
             json.dump(self.settings, f)
+        for rel, text in self.files.items():
+            os.makedirs(os.path.dirname(os.path.join(self.home, rel)), exist_ok=True)
+            with open(os.path.join(self.home, rel), "w") as f:
+                f.write(text)
         xv = subprocess.Popen(
             ["Xvfb", DISPLAY, "-screen", "0", f"{W}x{H}x24", "-nolisten", "tcp", "-dpi", "192"],
             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
@@ -56,6 +62,7 @@ class Session:
             "WEBKIT_DISABLE_DMABUF_RENDERER": "1",
             "LANG": "en_US.UTF-8",
             "NO_AT_BRIDGE": "1",
+            **self.env,
         }
         app = subprocess.Popen(
             ["dbus-run-session", "--", self.binary],
@@ -183,7 +190,9 @@ class Session:
             ",": "comma", ":": "colon", "[": "bracketleft", "]": "bracketright", "#": "numbersign",
             "!": "exclam", "?": "question", "'": "apostrophe", '"': "quotedbl", "(": "parenleft",
             ")": "parenright", "=": "equal", "*": "asterisk", "_": "underscore", ">": "greater",
-            "~": "asciitilde", "`": "grave",
+            "~": "asciitilde", "`": "grave", "$": "dollar", "{": "braceleft", "}": "braceright",
+            "|": "bar", "<": "less", "^": "asciicircum", "&": "ampersand", "%": "percent",
+            "@": "at", "+": "plus", ";": "semicolon", "\\": "backslash",
         }
         sym = XK.string_to_keysym(names.get(ch, ch))
         code = self.d.keysym_to_keycode(sym)
