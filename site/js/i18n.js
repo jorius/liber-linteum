@@ -217,6 +217,9 @@ export const dict = {
     'roadmap.transcribe.title': 'Offline transcription',
     'roadmap.transcribe.body':
       'Turn a voice clip into text with a speech model that runs on your machine: the audio never leaves it.',
+    'roadmap.handwriting.title': 'Handwritten notes',
+    'roadmap.handwriting.body':
+      'Write by hand with a pen or a tablet and keep both: the handwriting stays in your vault, and its text becomes Markdown beside it, recognised offline.',
     'roadmap.ideas': 'Have an idea for what comes next?',
     'roadmap.ideasLink': 'Suggest it in the GitHub issues',
 
@@ -450,6 +453,9 @@ export const dict = {
     'roadmap.transcribe.title': 'Transcripción sin conexión',
     'roadmap.transcribe.body':
       'Convierte un clip de voz en texto con un modelo de voz que corre en tu equipo: el audio nunca sale de él.',
+    'roadmap.handwriting.title': 'Notas a mano',
+    'roadmap.handwriting.body':
+      'Escribe a mano con un lápiz o una tableta y conserva ambas cosas: el trazo se queda en tu bóveda y su texto se vuelve Markdown a su lado, reconocido sin conexión.',
     'roadmap.ideas': '¿Tienes una idea para lo que sigue?',
     'roadmap.ideasLink': 'Cuéntala en los issues de GitHub',
 

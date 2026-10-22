@@ -816,7 +816,13 @@ test.describe('roadmap', () => {
       nav: 'Roadmap',
       kicker: 'What’s next',
       planned: 'Planned',
-      titles: ['Version history', 'Slash menu', 'Focus mode', 'Offline transcription'],
+      titles: [
+        'Version history',
+        'Slash menu',
+        'Focus mode',
+        'Offline transcription',
+        'Handwritten notes',
+      ],
     },
     es: {
       nav: 'Hoja de ruta',
@@ -827,12 +833,13 @@ test.describe('roadmap', () => {
         'Menú de barra (/)',
         'Modo concentración',
         'Transcripción sin conexión',
+        'Notas a mano',
       ],
     },
   };
 
   for (const lang of ['en', 'es'] as const) {
-    test(`${lang}: four planned features, and the nav link scrolls to them`, async ({
+    test(`${lang}: five planned features, and the nav link scrolls to them`, async ({
       browser,
     }) => {
       const ctx = await browser.newContext({ locale: lang === 'es' ? 'es-CO' : 'en-US' });
@@ -846,7 +853,7 @@ test.describe('roadmap', () => {
       await expect(section.getByRole('heading', { level: 2 })).toBeInViewport();
       await expect(section.locator('.kicker').first()).toHaveText(c.kicker);
       await expect(section.getByRole('heading', { level: 3 })).toHaveText(c.titles);
-      await expect(section.locator('.plan .tag')).toHaveText(Array(4).fill(c.planned));
+      await expect(section.locator('.plan .tag')).toHaveText(Array(5).fill(c.planned));
       await expect(section.getByRole('link')).toHaveAttribute(
         'href',
         'https://github.com/jorius/liber-linteum/issues',
