@@ -11,6 +11,7 @@ import {
   type DragStartEvent,
 } from '@dnd-kit/core';
 import { useEffect, useMemo, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { nameOf } from '../../stores/tree';
 import { useVaultStore } from '../../stores/vaultStore';
 import { announcements, createSpringLoad, dropFeedback, type DropFeedback } from './dragFeedback';
@@ -102,18 +103,25 @@ export function ExplorerDnd(props: ExplorerTreeProps) {
       >
         <ExplorerTree {...props} dragging={active !== null} dropTarget={over} />
       </div>
-      <DragOverlay dropAnimation={null}>
-        {dragged ? (
-          <div
-            className={
-              feedback === 'forbidden' ? `${styles.ghost} ${styles.ghostForbidden}` : styles.ghost
-            }
-          >
-            <Icon node={dragged} expanded={false} />
-            <span>{displayName(dragged)}</span>
-          </div>
-        ) : null}
-      </DragOverlay>
+      {/* In <body>: the sidebar slides in with a transform, and a fixed
+          overlay under a transformed ancestor is placed (and measured for
+          drops) against it, not the window; with the title bar above it a
+          drag started during the slide aimed the bar's height off. */}
+      {createPortal(
+        <DragOverlay dropAnimation={null}>
+          {dragged ? (
+            <div
+              className={
+                feedback === 'forbidden' ? `${styles.ghost} ${styles.ghostForbidden}` : styles.ghost
+              }
+            >
+              <Icon node={dragged} expanded={false} />
+              <span>{displayName(dragged)}</span>
+            </div>
+          ) : null}
+        </DragOverlay>,
+        document.body,
+      )}
     </DndContext>
   );
 }
