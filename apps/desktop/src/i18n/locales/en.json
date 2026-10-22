@@ -664,7 +664,24 @@
     "short": "Format",
     "show": "Show the formatting toolbar",
     "hide": "Hide the formatting toolbar",
-    "attach": "Attach a file or image…"
+    "attach": "Attach a file or image…",
+    "table": "Table",
+    "tableActions": {
+      "insert": "Insert a table",
+      "cell": "{cols} by {rows} table",
+      "size": "{cols} × {rows}",
+      "menu": "Table",
+      "rowAbove": "Add row above",
+      "rowBelow": "Add row below",
+      "colLeft": "Add column left",
+      "colRight": "Add column right",
+      "alignLeft": "Align column left",
+      "alignCenter": "Center column",
+      "alignRight": "Align column right",
+      "deleteRow": "Delete row",
+      "deleteCol": "Delete column",
+      "deleteTable": "Delete table"
+    }
   },
   "trail": {
     "back": "Back to {name}"

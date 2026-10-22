@@ -8,6 +8,7 @@ import { openLanguagePicker } from './languagePickerOpen';
 import { createRoot, type Root } from 'react-dom/client';
 import { toggleTask } from '../../markdown/tasks';
 import { Preview } from '../preview/Preview';
+import { cellEnd } from './tableEdit';
 
 /** Toggles the task whose list item starts at `at` in the editor's text (a
  *  rendered checkbox was clicked); a stale offset does nothing. */
@@ -46,7 +47,19 @@ export class PreviewWidget extends WidgetType {
       // scrollbar: the box scrolls and the table stays (final review I3).
       if (target.matches('[data-table-scroll]')) return;
       e.preventDefault();
-      view.dispatch({ selection: { anchor: view.posAtDOM(dom) } });
+      // A table's cell puts the cursor at the end of that cell's text, so a
+      // click and typing edit it; anywhere else, the block's start.
+      const start = view.posAtDOM(dom);
+      const cell = target.closest('td, th') as HTMLTableCellElement | null;
+      const row = cell?.parentElement as HTMLTableRowElement | null;
+      const table = row?.closest('table');
+      // Only the Markdown table itself: not one nested in it as HTML.
+      const own = this.kind === 'tables' && table && !table.parentElement?.closest('table');
+      const at =
+        own && cell && row
+          ? cellEnd(this.text, [...table.rows].indexOf(row), cell.cellIndex)
+          : null;
+      view.dispatch({ selection: { anchor: start + (at ?? 0) } });
       view.focus();
     });
     this.root = createRoot(dom);

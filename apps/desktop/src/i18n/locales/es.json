@@ -664,7 +664,24 @@
     "short": "Formato",
     "show": "Mostrar la barra de formato",
     "hide": "Ocultar la barra de formato",
-    "attach": "Adjuntar un archivo o imagen…"
+    "attach": "Adjuntar un archivo o imagen…",
+    "table": "Tabla",
+    "tableActions": {
+      "insert": "Insertar una tabla",
+      "cell": "Tabla de {cols} por {rows}",
+      "size": "{cols} × {rows}",
+      "menu": "Tabla",
+      "rowAbove": "Agregar fila arriba",
+      "rowBelow": "Agregar fila abajo",
+      "colLeft": "Agregar columna a la izquierda",
+      "colRight": "Agregar columna a la derecha",
+      "alignLeft": "Alinear columna a la izquierda",
+      "alignCenter": "Centrar columna",
+      "alignRight": "Alinear columna a la derecha",
+      "deleteRow": "Eliminar fila",
+      "deleteCol": "Eliminar columna",
+      "deleteTable": "Eliminar tabla"
+    }
   },
   "trail": {
     "back": "Volver a {name}"

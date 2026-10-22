@@ -8,7 +8,7 @@ import {
   syntaxHighlighting,
   syntaxTree,
 } from '@codemirror/language';
-import { Compartment, EditorState, Transaction, type Extension } from '@codemirror/state';
+import { Compartment, EditorState, Prec, Transaction, type Extension } from '@codemirror/state';
 import { drawSelection, EditorView, keymap, lineNumbers } from '@codemirror/view';
 import { tagHighlighter, tags } from '@lezer/highlight';
 import { diffIndices } from 'node-diff3';
@@ -33,6 +33,7 @@ import { BlockGutter, type Shown } from './BlockGutter';
 import { SplitHint } from './SplitHint';
 import { activeFormats, editorKeymap, type ActiveFormat } from './format';
 import { coverSideHistory } from './coverSideHistory';
+import { tableKeymap } from './tableEdit';
 import { linkCompletion } from './linkComplete';
 import { LanguagePicker } from './LanguagePicker';
 import { setLanguagePickerOpener } from './languagePickerOpen';
@@ -327,6 +328,9 @@ function createState(d: PageDoc, mode: EditorMode, label: string, numbers: boole
       history(),
       drawSelection(),
       EditorView.lineWrapping,
+      // In a table, Tab / Enter move between cells; before Markdown's own
+      // Enter (list continuation), which runs at the same precedence.
+      Prec.high(keymap.of(tableKeymap)),
       // GFM syntax tree: Source highlighting and the toolbar's pressed state.
       // Picker ids (`mssql`, `angulartemplate`) resolve as in the rendered pane.
       markdown({ base: markdownLanguage, codeLanguages: languageFor }),
