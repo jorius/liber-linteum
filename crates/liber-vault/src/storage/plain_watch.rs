@@ -42,6 +42,9 @@ impl Translate {
             Ok(event) if !event.need_rescan() => event,
             _ => return sink(RawEvent::Overflow),
         };
+        if crate::storage::only_read(&event.kind) {
+            return;
+        }
         for p in &event.paths {
             if self.is_root(p) {
                 sink(RawEvent::Overflow);
@@ -116,6 +119,35 @@ mod tests {
         let f = filter(dir.path());
         let root_ev = Event::new(EventKind::Create(CreateKind::Any)).add_path(f.root.clone());
         assert_eq!(f.batch(vec![Ok(root_ev)]), vec![WatchEvent::Overflow]);
+    }
+
+    /// Linux's backend reports a file or folder being opened (`IN_OPEN`),
+    /// which FSEvents never did: a read isn't a change, or every read of a
+    /// note (the app's own included) would be indexed again. A file closed
+    /// after writing is a change.
+    #[test]
+    fn opening_or_reading_is_not_a_change_closing_after_a_write_is() {
+        use notify::event::{AccessKind, AccessMode};
+        let dir = tempfile::tempdir().unwrap();
+        let f = filter(dir.path());
+        std::fs::write(f.root.join("a.md"), "x").unwrap();
+        std::fs::create_dir(f.root.join("Folder")).unwrap();
+        let access =
+            |kind, p: &str| Ok(Event::new(EventKind::Access(kind)).add_path(f.root.join(p)));
+        assert_eq!(
+            f.batch(vec![
+                access(AccessKind::Open(AccessMode::Any), "a.md"),
+                access(AccessKind::Open(AccessMode::Any), "Folder"),
+                access(AccessKind::Read, "a.md"),
+                access(AccessKind::Close(AccessMode::Read), "a.md"),
+                access(AccessKind::Any, "Folder"),
+            ]),
+            vec![]
+        );
+        assert_eq!(
+            f.batch(vec![access(AccessKind::Close(AccessMode::Write), "a.md")]),
+            vec![WatchEvent::Changed(VaultPath::new("a.md").unwrap())]
+        );
     }
 
     #[test]

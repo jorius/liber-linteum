@@ -56,6 +56,9 @@ impl Translate {
             Ok(event) if !event.need_rescan() => event,
             _ => return vec![RawEvent::Overflow],
         };
+        if crate::storage::only_read(&event.kind) {
+            return Vec::new();
+        }
         // A clone: no lock is held while paths are resolved and listings read.
         let Some(keys) = read(&self.keys).clone() else {
             return vec![RawEvent::Overflow];

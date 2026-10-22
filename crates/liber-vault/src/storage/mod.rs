@@ -348,6 +348,16 @@ impl Storage for PassThrough {
     }
 }
 
+/// Whether a backend event only says something was read: opened, read, or
+/// closed without writing. Linux's backend reports opens (`IN_OPEN`), which
+/// FSEvents never did; treating them as changes indexed a note again every
+/// time anything (the app included) read it. A file closed after writing is
+/// a change.
+pub(crate) fn only_read(kind: &notify::EventKind) -> bool {
+    use notify::event::{AccessKind, AccessMode};
+    matches!(kind, notify::EventKind::Access(a) if !matches!(a, AccessKind::Close(AccessMode::Write)))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
