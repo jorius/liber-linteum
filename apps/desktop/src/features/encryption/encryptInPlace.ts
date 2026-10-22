@@ -1,10 +1,15 @@
 import i18next from 'i18next';
 import { useEffect } from 'react';
-import { folderKind, menuSetEncryptItem, onEncryptRecovered } from '../../ipc';
+import {
+  folderKind,
+  menuSetEncryptItem,
+  onEncryptRecovered,
+  type EncryptRecoveredPayload,
+} from '../../ipc';
 import { errorMessage } from '../../stores/messages';
 import { useToastStore } from '../../stores/toastStore';
 import { useUiStore } from '../../stores/uiStore';
-import { undoElsewhereAction, useVaultStore } from '../../stores/vaultStore';
+import { elsewhereAction, useVaultStore } from '../../stores/vaultStore';
 import { quietly } from '../scratchpad/ScratchpadHost';
 
 /** A folder's own name (either separator); a volume root is its path. */
@@ -25,7 +30,7 @@ export async function openEncryptInPlace(path: string): Promise<void> {
   const kind = await folderKind(path);
   const toast = useToastStore.getState();
   if (!kind.ok) {
-    const undo = kind.error.kind === 'convertingElsewhere' ? undoElsewhereAction(path) : undefined;
+    const undo = elsewhereAction(kind.error.kind, path);
     toast.push({ message: errorMessage(kind.error), tone: 'error', action: undo });
   } else if (kind.value === 'refused') toast.push({ message: refusedText(path), tone: 'error' });
   else useUiStore.getState().openDialog({ type: 'encryptInPlace', root: path });
@@ -45,6 +50,15 @@ export function useEncryptMenuItem(): void {
  *  while a vault opens, it waits for the open to end: leaving the vault on
  *  screen clears toasts. */
 export function useEncryptRecovered(): void {
+  useRecoveredToasts(onEncryptRecovered, 'encryptInPlace');
+}
+
+/** [`useEncryptRecovered`] for either direction: `ns.finished` or
+ *  `ns.interrupted`, heard through `subscribe`. */
+export function useRecoveredToasts(
+  subscribe: (cb: (p: EncryptRecoveredPayload) => void) => Promise<() => void>,
+  ns: 'encryptInPlace' | 'decryptInPlace',
+): void {
   useEffect(() => {
     let waiting: string[] = [];
     const flush = () => {
@@ -54,9 +68,9 @@ export function useEncryptRecovered(): void {
     const unsubscribe = useVaultStore.subscribe((s) => s.status !== 'opening' && flush());
     let stopped = false;
     let stop: (() => void) | null = null;
-    onEncryptRecovered(({ path, outcome }) => {
+    subscribe(({ path, outcome }) => {
       const key = outcome === 'finished' ? 'finished' : 'interrupted';
-      waiting.push(i18next.t(`encryptInPlace.${key}`, { name: folderName(path) }));
+      waiting.push(i18next.t(`${ns}.${key}`, { name: folderName(path) }));
       if (useVaultStore.getState().status !== 'opening') flush();
     })
       .then((s) => (stopped ? quietly(s) : (stop = s)))
@@ -66,5 +80,5 @@ export function useEncryptRecovered(): void {
       if (stop) quietly(stop);
       unsubscribe();
     };
-  }, []);
+  }, [subscribe, ns]);
 }

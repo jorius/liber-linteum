@@ -48,6 +48,7 @@ let calls: [string, Record<string, unknown>][] = [];
 let order: string[] = [];
 let runGate: Deferred | null = null;
 let beginGate: Deferred | null = null;
+let backupGate: Deferred | null = null;
 
 function backend(
   opts: {
@@ -58,6 +59,9 @@ function backend(
     holdBegin?: boolean;
     kind?: string;
     pending?: boolean;
+    /** §9: what the backup folder dialog picks (after the checks). */
+    pick?: string | null;
+    pickError?: object;
   } = {},
 ) {
   calls = [];
@@ -89,6 +93,14 @@ function backend(
         return new Promise((resolve, reject) => {
           runGate = { resolve, reject };
         });
+      if (cmd === 'vault_encrypt_pick_backup') {
+        if (opts.pickError) throw opts.pickError;
+        return opts.pick ?? null;
+      }
+      if (cmd === 'vault_encrypt_backup')
+        return new Promise((resolve, reject) => {
+          backupGate = { resolve, reject };
+        });
       if (cmd === 'vault_open') return plain;
       if (cmd === 'vault_tree') return [];
       return null;
@@ -119,6 +131,9 @@ async function start(root = ROOT) {
 
 async function toPassphrase(dialog: HTMLElement) {
   await within(dialog).findByText(/1,204 files\./);
+  await userEvent.click(within(dialog).getByRole('button', { name: 'Continue' }));
+  // §9: no readable copy (the backup step has its own tests).
+  await userEvent.click(within(dialog).getByRole('radio', { name: "Don't keep a copy" }));
   await userEvent.click(within(dialog).getByRole('button', { name: 'Choose a passphrase…' }));
   expect(within(dialog).getByLabelText('Passphrase')).toHaveFocus();
   await userEvent.type(within(dialog).getByLabelText('Passphrase'), PASS);
@@ -153,6 +168,7 @@ beforeEach(() => {
   prompt.asked = 0;
   runGate = null;
   beginGate = null;
+  backupGate = null;
 });
 
 afterEach(async () => {
@@ -179,7 +195,7 @@ describe('Encrypt in place: intro and preflight', () => {
       ),
     ).toBeInTheDocument();
     expect(within(dialog).getByText(/Syncthing, its \.stversions folder keeps/)).toBeVisible();
-    expect(within(dialog).getByRole('button', { name: 'Choose a passphrase…' })).toHaveFocus();
+    expect(within(dialog).getByRole('button', { name: 'Continue' })).toHaveFocus();
     expect((await axe.run(document.body)).violations).toEqual([]);
     // Cancel: nothing changes.
     await userEvent.click(within(dialog).getByRole('button', { name: 'Cancel' }));
@@ -226,6 +242,135 @@ describe('Encrypt in place: intro and preflight', () => {
   });
 });
 
+describe('Encrypt in place: the readable backup (§9)', () => {
+  const COPY = '/backups/Smartjob copy';
+
+  async function toBackup(dialog: HTMLElement) {
+    await within(dialog).findByText(/1,204 files\./);
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Continue' }));
+    return within(dialog).getByRole('group', { name: 'Keep a readable copy?' });
+  }
+
+  it('asks, with no default; keeping one needs a folder, and says plainly it is not encrypted', async () => {
+    backend({ pick: COPY });
+    openPlain();
+    const dialog = await start();
+    const group = await toBackup(dialog);
+    const keep = within(group).getByRole('radio', { name: 'Keep a readable copy' });
+    const skip = within(group).getByRole('radio', { name: "Don't keep a copy" });
+    expect(keep).not.toBeChecked();
+    expect(skip).not.toBeChecked();
+    expect(keep).toHaveFocus();
+    expect(within(dialog).getByText(/Trash as “Smartjob \(unencrypted originals\)”/)).toBeVisible();
+    const next = within(dialog).getByRole('button', { name: 'Choose a passphrase…' });
+    expect(next).toBeDisabled();
+    await userEvent.click(keep);
+    expect(within(dialog).getByText(/The copy is not encrypted/)).toBeVisible();
+    expect(within(dialog).getByText(/before anything is encrypted/)).toBeVisible();
+    expect(next).toBeDisabled();
+    expect((await axe.run(document.body)).violations).toEqual([]);
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Choose…' }));
+    expect(sent('vault_encrypt_pick_backup')).toEqual([{ path: ROOT }]);
+    expect(await within(dialog).findByText(COPY)).toBeInTheDocument();
+    expect(next).toBeEnabled();
+    expect((await axe.run(document.body)).violations).toEqual([]);
+    // Don't keep one: no folder needed.
+    await userEvent.click(skip);
+    expect(within(dialog).queryByText(/The copy is not encrypted/)).toBeNull();
+    expect(next).toBeEnabled();
+  });
+
+  it('a refused folder says why, and Choose a passphrase stays off', async () => {
+    backend({ pickError: { kind: 'backupNotEmpty', message: '/backups/full' } });
+    openPlain();
+    const dialog = await start();
+    const group = await toBackup(dialog);
+    await userEvent.click(within(group).getByRole('radio', { name: 'Keep a readable copy' }));
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Choose…' }));
+    expect(await within(dialog).findByRole('alert')).toHaveTextContent(
+      "/backups/full isn't empty. Pick an empty or new folder for the copy.",
+    );
+    expect(within(dialog).getByRole('button', { name: 'Choose a passphrase…' })).toBeDisabled();
+    expect((await axe.run(document.body)).violations).toEqual([]);
+  });
+
+  async function toCopying() {
+    backend({ pick: COPY });
+    openPlain();
+    const dialog = await start();
+    const group = await toBackup(dialog);
+    await userEvent.click(within(group).getByRole('radio', { name: 'Keep a readable copy' }));
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Choose…' }));
+    await within(dialog).findByText(COPY);
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Choose a passphrase…' }));
+    await userEvent.type(within(dialog).getByLabelText('Passphrase'), PASS);
+    await userEvent.type(within(dialog).getByLabelText('Confirm passphrase'), PASS);
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Continue' }));
+    await waitFor(() => expect(backupGate).not.toBeNull());
+    return dialog;
+  }
+
+  it('copies and checks it after begin and before the key; done says where it is', async () => {
+    const dialog = await toCopying();
+    expect(sent('vault_encrypt_begin')).toEqual([{ path: ROOT, passphrase: PASS, backup: true }]);
+    // The key waits for the copy (nothing is encrypted before it is made).
+    expect(within(dialog).queryByTestId('recovery-code')).toBeNull();
+    await act(() => emit('vault:encrypt-progress', { done: 2, total: 1204 }));
+    expect(
+      within(dialog).getByText(
+        '2 of 1,204 files copied · each copy is checked before anything is encrypted',
+      ),
+    ).toBeInTheDocument();
+    expect(within(dialog).getByRole('progressbar', { name: 'Copying' })).toHaveAttribute(
+      'value',
+      '2',
+    );
+    expect(within(dialog).getByRole('status')).toHaveTextContent('2 of 1,204 files copied');
+    expect(within(dialog).getByRole('button', { name: 'Stop and undo' })).toHaveFocus();
+    expect(useUiStore.getState().held).toBe(true);
+    expect((await axe.run(document.body)).violations).toEqual([]);
+    expect(sent('vault_encrypt_run')).toEqual([]);
+    await act(async () => backupGate!.resolve(null));
+    expect(await within(dialog).findByTestId('recovery-code')).toHaveTextContent(CODE);
+    await confirmKey(dialog);
+    await waitFor(() => expect(runGate).not.toBeNull());
+    await act(async () => runGate!.resolve(encrypted()));
+    expect(await within(dialog).findByText(/A readable copy is in this folder/)).toBeVisible();
+    expect(within(dialog).getByText(COPY)).toBeVisible();
+    expect((await axe.run(document.body)).violations).toEqual([]);
+    await userEvent.click(within(dialog).getByRole('button', { name: /^Show in / }));
+    expect(sent('vault_reveal_backup')).toHaveLength(1);
+  });
+
+  it('a copy that fails encrypts nothing: said why, and the plain vault is back', async () => {
+    const dialog = await toCopying();
+    await act(async () =>
+      backupGate!.reject({ kind: 'backupFailed', message: 'Notes.md: disk full' }),
+    );
+    expect(await within(dialog).findByRole('alert')).toHaveTextContent(
+      "The readable copy couldn't be made (Notes.md: disk full). Nothing was encrypted.",
+    );
+    expect(within(dialog).queryByTestId('recovery-code')).toBeNull();
+    expect(sent('vault_encrypt_run')).toEqual([]);
+    expect(sent('vault_open')).toEqual([{ path: ROOT }]);
+    await waitFor(() => expect(useVaultStore.getState().status).toBe('open'));
+    expect(useUiStore.getState().held).toBe(false);
+    expect(secretsKept()).not.toContain(CODE);
+  });
+
+  it('Stop and undo during the copy undoes the begin', async () => {
+    const dialog = await toCopying();
+    await act(() => emit('vault:encrypt-progress', { done: 1, total: 1204 }));
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Stop and undo' }));
+    expect(sent('vault_encrypt_cancel')).toHaveLength(1);
+    await act(async () => backupGate!.reject({ kind: 'cancelled', message: 'stopped' }));
+    expect(await within(dialog).findByRole('alert')).toHaveTextContent(
+      'Stopped. The vault is back as it was.',
+    );
+    await waitFor(() => expect(useVaultStore.getState().status).toBe('open'));
+  });
+});
+
 describe('Encrypt in place: passphrase and recovery key', () => {
   it('saves every page without asking, leaves the vault, begins, then shows the key before any copy', async () => {
     backend();
@@ -237,7 +382,7 @@ describe('Encrypt in place: passphrase and recovery key', () => {
     expect(await within(dialog).findByTestId('recovery-code')).toHaveTextContent(CODE);
     expect(prompt.asked).toBe(0);
     expect(order.indexOf('saveAll')).toBeLessThan(order.indexOf('vault_encrypt_begin'));
-    expect(sent('vault_encrypt_begin')).toEqual([{ path: ROOT, passphrase: PASS }]);
+    expect(sent('vault_encrypt_begin')).toEqual([{ path: ROOT, passphrase: PASS, backup: false }]);
     // Begin closed the plain session: the shell went with it.
     expect(useVaultStore.getState().status).toBe('closed');
     // Not yet: the key is confirmed first (§8.1).

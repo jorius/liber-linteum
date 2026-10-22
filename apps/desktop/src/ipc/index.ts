@@ -69,6 +69,27 @@ export type ErrorKind =
   | 'convertMismatch'
   | 'convertUndoFailed'
   | 'convertFinishFailed'
+  /** The readable backup (encryption UX §9): the folder (the message) is in
+   *  the vault, in another vault (the message: that vault), or not empty;
+   *  `backupFailed`: writing or checking it failed (the message: the file and
+   *  why), nothing was encrypted. */
+  | 'backupInVault'
+  | 'backupInOtherVault'
+  | 'backupNotEmpty'
+  | 'backupFailed'
+  /** Decrypt in place (§10): the message says which secret opens no slot:
+   *  `passphrase`, `recovery` or `both`. */
+  | 'decryptWrongSecret'
+  /** Decrypt in place: the backend's own reasons, as the convert ones. */
+  | 'decryptingElsewhere'
+  | 'decryptingElsewhereFinishing'
+  | 'changedDuringDecrypt'
+  | 'decryptActive'
+  | 'decryptPending'
+  | 'decryptMismatch'
+  | 'decryptCollision'
+  | 'decryptUndoFailed'
+  | 'decryptFinishFailed'
   | 'io';
 
 export interface CommandError {
@@ -406,6 +427,27 @@ export interface VaultLockRequestPayload {
 // vault_open / vault_unlock first finish or undo this device's interrupted
 //   conversion and emit `vault:encrypt-recovered` (EncryptRecoveredPayload);
 //   another device's makes them fail with `convertingElsewhere`.
+//
+// The readable backup (§9): vault_encrypt_pick_backup { path } → string |
+//   null (the folder dialog; the folder, checked, or `null` when cancelled;
+//   `backupInVault` / `backupInOtherVault` / `backupNotEmpty`). Rust keeps
+//   it: vault_encrypt_begin { path, passphrase, backup: true } uses it, then
+//   vault_encrypt_backup {} writes and verifies the copy (progress on
+//   `vault:encrypt-progress`; `backupFailed`, `cancelled`: undone, nothing
+//   encrypted) BEFORE the recovery key shows. vault_reveal_backup {} shows it.
+//
+// Decrypt in place (§10), the open encrypted vault:
+// vault_decrypt_preflight {} → DecryptPreflight (changes nothing).
+// vault_decrypt_begin { passphrase, recovery } → void: each checked on its
+//   own (`decryptWrongSecret`, message `passphrase` | `recovery` | `both`);
+//   then the session closes (save open pages first).
+// vault_decrypt_run {} → VaultInfo (the folder open as a plain vault). Emits
+//   `vault:decrypt-progress` after each file. `cancelled` (rolled back: the
+//   vault is encrypted and closed), `changedDuringDecrypt`, `damaged`.
+// vault_decrypt_cancel {} → void: Stop and undo, or undoes a begin not run.
+// Opens recover an interrupted decryption first (`vault:decrypt-recovered`);
+//   another device's fails with `decryptingElsewhere` (undo it with
+//   vault_encrypt_undo_elsewhere) or `decryptingElsewhereFinishing`.
 
 export type EncryptBlockedReason =
   | 'badChar'
@@ -419,7 +461,9 @@ export type EncryptBlockedReason =
   | 'longName'
   | 'notUtf8'
   /** A vault of its own inside the folder (final review I3). */
-  | 'vault';
+  | 'vault'
+  /** Decrypt in place: a readable entry beside the vault has this name. */
+  | 'taken';
 
 export interface EncryptBlocked {
   /** Vault-relative, `/`-separated. */
@@ -435,6 +479,13 @@ export interface EncryptPreflight {
   /** Begin will close the open vault (this folder under any spelling,
    *  inside it or around it): the UI leaves it first. */
   closesOpen: boolean;
+}
+
+/** Decrypt in place (§10.2): what blocks it, read from the open vault. */
+export interface DecryptPreflight {
+  files: number;
+  bytes: number;
+  blocked: EncryptBlocked[];
 }
 
 /** `vault:encrypt-progress`. */
@@ -778,6 +829,10 @@ export const menuSetLockEnabled = (enabled: boolean) =>
  *  vault, off with `null`. */
 export const menuSetEncryptItem = (vault: string | null) =>
   call<void>('menu_set_encrypt_item', { vault });
+/** Vault → Decrypt "<vault>"… (§10.1): named and on for an open encrypted
+ *  vault, off with `null`. */
+export const menuSetDecryptItem = (vault: string | null) =>
+  call<void>('menu_set_decrypt_item', { vault });
 /** What a folder chosen for a new vault holds (UX round §2): `empty` (OS
  *  files aside) or `missing` can be created in; `plain` has files;
  *  `refused`: never encrypted in place (Scratchpad, home, Desktop,
@@ -798,8 +853,19 @@ export const attachmentOpenDecrypted = (path: string) =>
 // ---- Encrypt in place (encryption UX §4.3, §8) ----
 export const vaultEncryptPreflight = (path: string) =>
   call<EncryptPreflight>('vault_encrypt_preflight', { path });
-export const vaultEncryptBegin = (path: string, passphrase: string) =>
-  call<{ recovery: string }>('vault_encrypt_begin', { path, passphrase });
+export const vaultEncryptBegin = (path: string, passphrase: string, backup = false) =>
+  call<{ recovery: string }>('vault_encrypt_begin', { path, passphrase, backup });
+/** The readable backup's folder (§9.1): the native dialog, then the checks. */
+export const vaultEncryptPickBackup = (path: string) =>
+  call<string | null>('vault_encrypt_pick_backup', { path });
+export const vaultEncryptBackup = () => call<void>('vault_encrypt_backup');
+export const vaultRevealBackup = () => call<void>('vault_reveal_backup');
+// ---- Decrypt in place (encryption UX §10) ----
+export const vaultDecryptPreflight = () => call<DecryptPreflight>('vault_decrypt_preflight');
+export const vaultDecryptBegin = (passphrase: string, recovery: string) =>
+  call<void>('vault_decrypt_begin', { passphrase, recovery });
+export const vaultDecryptRun = () => call<VaultInfo>('vault_decrypt_run');
+export const vaultDecryptCancel = () => call<void>('vault_decrypt_cancel');
 export const vaultEncryptRun = () => call<VaultInfo>('vault_encrypt_run');
 export const vaultEncryptCancel = () => call<void>('vault_encrypt_cancel');
 /** Another device's conversion still copying, undone here (spec §8.11). */
@@ -1296,6 +1362,12 @@ export const onEncryptProgress = (cb: (p: EncryptProgressPayload) => void): Prom
 /** Encrypt in place: an open finished or undid an interrupted conversion. */
 export const onEncryptRecovered = (cb: (p: EncryptRecoveredPayload) => void): Promise<UnlistenFn> =>
   listen<EncryptRecoveredPayload>('vault:encrypt-recovered', (e) => cb(e.payload), mine());
+/** Decrypt in place: after each file written and checked. */
+export const onDecryptProgress = (cb: (p: EncryptProgressPayload) => void): Promise<UnlistenFn> =>
+  listen<EncryptProgressPayload>('vault:decrypt-progress', (e) => cb(e.payload), mine());
+/** Decrypt in place: an open finished or undid an interrupted decryption. */
+export const onDecryptRecovered = (cb: (p: EncryptRecoveredPayload) => void): Promise<UnlistenFn> =>
+  listen<EncryptRecoveredPayload>('vault:decrypt-recovered', (e) => cb(e.payload), mine());
 export const onVaultWarning = (cb: (p: WarningPayload) => void): Promise<UnlistenFn> =>
   listen<WarningPayload>('vault:warning', (e) => cb(e.payload));
 
