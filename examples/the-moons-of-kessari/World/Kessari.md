@@ -30,14 +30,21 @@ Kessari is a dry world circling a hot yellow sun. Most of its surface is sand: l
 Ilu goes once round Kessari in $T_{\text{Ilu}} = 27$ days. Thane, much closer in, goes round in $T_{\text{Thane}} = 9$, exactly three times as fast. Because both move the same way round the sky, Thane keeps overtaking Ilu, and the time between one overtaking and the next, when the two moons rise together, is the **synodic period** $S$:
 
 $$
-\frac{1}{S} \;=\; \frac{1}{T_{\text{Thane}}} - \frac{1}{T_{\text{Ilu}}} \;=\; \frac{1}{9} - \frac{1}{27} \;=\; \frac{2}{27}
-\qquad\Longrightarrow\qquad
-S = \frac{27}{2} = 13.5 \ \text{days}
+\begin{aligned}
+\frac{1}{S} &= \frac{1}{T_{\text{Thane}}} - \frac{1}{T_{\text{Ilu}}} = \frac{1}{9} - \frac{1}{27} = \frac{2}{27} \\[6pt]
+S &= \frac{27}{2} = 13.5 \ \text{days}
+\end{aligned}
 $$
 
 So the moons meet twice in every turn of Ilu. That is a **Closing**.
 
 Because $S$ is thirteen days *and a half*, each Closing falls half a day later in the daily round than the one before: one comes at dusk, the next at dawn, the next at dusk again. The **Dusk Closing**, every $2S = 27$ days, is the long one: the moons rise together at nightfall, the deep water rises through the dark, and the dunes sing for most of the night. The **Dawn Closing** is short and quiet, and happens mostly in daylight.
+
+```mermaid
+flowchart LR
+    Dusk(["Dusk Closing: long, the dunes sing"]) -->|"13.5 days"| Dawn(["Dawn Closing: short and quiet"])
+    Dawn -->|"13.5 days"| Dusk
+```
 
 The year works out evenly too. Thirteen turns of Ilu make $Y = 13 \times 27 = 351$ days, which holds exactly $Y / S = 26$ Closings and $Y / T_{\text{Thane}} = 39$ turns of Thane. The Keepers number the Closings of each year from 1 to 26, and the odd ones are always the Dusk Closings.
 
