@@ -73,7 +73,8 @@ fn forget_or_warn<R: Runtime>(app: &AppHandle<R>, id: &str) -> std::io::Result<(
 /// plain folder: deleted, so the folder opens (review 6f).
 fn drop_retired_header<R: Runtime>(app: &AppHandle<R>, root: &Path) -> CmdResult<()> {
     let header = root.join(liber_vault::HEADER_FILE);
-    if !header.symlink_metadata().is_ok_and(|m| m.is_file()) {
+    let present = header.symlink_metadata().is_ok_and(|m| m.is_file()); // seam: outside (only a check: the folder is not open as a vault yet)
+    if !present {
         return Ok(());
     }
     let dir = app.state::<AppState>().settings.dir().to_path_buf();
