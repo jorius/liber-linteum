@@ -3,6 +3,7 @@
 //! encrypted name.
 
 pub mod convert;
+pub mod decrypt;
 mod header;
 mod names;
 mod watch;

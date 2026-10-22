@@ -255,7 +255,7 @@ describe('AppShell', () => {
     expect(calls.map(([c]) => c)).toContain('vault_close');
   });
 
-  it('UX round §4.1: the vault menu offers Encrypt only for a plain vault', async () => {
+  it('UX round §4.1, §10.1: the vault menu offers Encrypt for a plain vault, Decrypt for an encrypted one', async () => {
     backend({});
     seed();
     act(() => useVaultStore.setState((s) => ({ info: s.info && { ...s.info, encrypted: true } })));
@@ -270,6 +270,7 @@ describe('AppShell', () => {
       'New vault…',
       'Open another vault…',
       'Create new scratchpad for “Digital Brain”',
+      'Decrypt “Digital Brain”…',
       'Lock vault',
       'Settings…',
       'Close vault',
@@ -278,6 +279,12 @@ describe('AppShell', () => {
     await userEvent.click(within(menu).getByRole('menuitem', { name: 'Lock vault' }));
     expect(lock).toHaveBeenCalledWith('menu');
     lock.mockRestore();
+    await userEvent.click(screen.getByRole('button', { name: 'Digital Brain' }));
+    await userEvent.click(screen.getByRole('menuitem', { name: 'Decrypt “Digital Brain”…' }));
+    expect(useUiStore.getState().dialog).toEqual({
+      type: 'decryptInPlace',
+      root: useVaultStore.getState().info!.root,
+    });
   });
 
   it('Windows and Linux have no app menu: the vault menu makes a scratchpad note', async () => {

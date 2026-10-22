@@ -64,6 +64,8 @@ describe('the drawn menu bar (custom title bar §3)', () => {
     const locked = ctx({ vault: { name: 'Kessari', encrypted: true, scratchpad: false } });
     expect(find(locked, 'encrypt')).toMatchObject({ label: 'Encrypt vault…', disabled: true });
     expect(find(locked, 'lock').disabled).toBe(false);
+    expect(find(locked, 'decrypt')).toMatchObject({ label: 'Decrypt “Kessari”…', disabled: false });
+    expect(find(ctx(), 'decrypt')).toMatchObject({ label: 'Decrypt vault…', disabled: true });
     const welcome = ctx({ vault: null });
     expect(find(welcome, 'closeVault').disabled).toBe(true);
     expect(find(welcome, 'globalView').disabled).toBe(true);

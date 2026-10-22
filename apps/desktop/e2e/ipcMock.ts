@@ -14,6 +14,7 @@ export function installIpcMock({
   encrypted,
   folderKinds = {},
   encryptInPlace = {},
+  decryptInPlace = {},
 }: {
   pages: Record<string, string>;
   editorMode: string;
@@ -60,6 +61,18 @@ export function installIpcMock({
     originalsPending?: boolean;
     /** The run stops after its first file until `__liberFinishEncrypt()`
      *  (or Stop and undo), so its progress step can be checked. */
+    holdRun?: boolean;
+    /** §9: the folder the backup dialog picks (default `/e2e/backup`), or
+     *  the refusal of the pick. */
+    backupPick?: string;
+    backupRefusal?: { kind: string; message: string };
+    /** The backup stops after its first file until `__liberFinishBackup()`. */
+    holdBackup?: boolean;
+  };
+  /** Decrypt in place (§10) of the encrypted vault at `/enc`. */
+  decryptInPlace?: {
+    blocked?: { path: string; reason: string }[];
+    /** The run stops after its first file until `__liberFinishDecrypt()`. */
     holdRun?: boolean;
   };
 }) {
@@ -192,6 +205,11 @@ export function installIpcMock({
   let encUnlocked = false;
   /** Encrypt in place: the conversion between `vault_encrypt_begin` and `_run`. */
   let convertJob: { path: string; cancelled: boolean } | null = null;
+  /** Decrypt in place: between `vault_decrypt_begin` and its run's end. */
+  let decryptJob: { cancelled: boolean } | null = null;
+  /** `/enc` was decrypted: a plain vault from then on. */
+  let encDecrypted = false;
+  const plainEnc = () => ({ ...encInfo('enc', '/enc'), encrypted: false });
   const NEW_RECOVERY = `LIBER-${Array.from({ length: 14 }, (_, i) => `K${String(i + 1).padStart(2, '0')}${'ABCDEFGHJKMNPQ'[i]}`).join('-')}`;
   const encInfo = (name: string, root: string) => ({
     name,
@@ -452,7 +470,15 @@ export function installIpcMock({
     vaults_recent: () => [
       { path: '/vault', name: 'vault', openedAt: '', missing: false, encrypted: false },
       ...(encrypted
-        ? [{ path: '/enc', name: 'enc', openedAt: '', missing: false, encrypted: true }]
+        ? [
+            {
+              path: '/enc',
+              name: 'enc',
+              openedAt: '',
+              missing: false,
+              encrypted: !encDecrypted,
+            },
+          ]
         : []),
     ],
     // The folder picker of Welcome and the Vault menu.
@@ -486,6 +512,10 @@ export function installIpcMock({
     folder_kind: (a) => folderKinds[a.path as string] ?? 'empty',
     menu_set_encrypt_item: (a) => {
       w.__liberEncryptItem = a.vault ?? null;
+      return null;
+    },
+    menu_set_decrypt_item: (a) => {
+      w.__liberDecryptItem = a.vault ?? null;
       return null;
     },
     vault_create: (a) => ({
@@ -575,6 +605,66 @@ export function installIpcMock({
       if (convertJob) convertJob.cancelled = true;
       convertJob = null; // a running run keeps its own `job`
       (w.__liberFinishEncrypt as (() => void) | undefined)?.();
+      (w.__liberFinishBackup as (() => void) | undefined)?.();
+      return null;
+    },
+    // The readable backup (encryption UX §9).
+    vault_encrypt_pick_backup: () => {
+      if (encryptInPlace.backupRefusal) throw encryptInPlace.backupRefusal;
+      return encryptInPlace.backupPick ?? '/e2e/backup';
+    },
+    vault_encrypt_backup: async () => {
+      const job = convertJob;
+      if (!job) throw { kind: 'notPermitted', message: 'nothing to back up: begin first' };
+      const total = Object.keys(pages).length + files.size;
+      const emit = w.__liberEmit as (e: string, p: unknown) => void;
+      emit('vault:encrypt-progress', { done: 1, total });
+      if (encryptInPlace.holdBackup) {
+        await new Promise((resolve) => (w.__liberFinishBackup = resolve));
+      }
+      if (job.cancelled) throw { kind: 'cancelled', message: 'encrypting was stopped' };
+      emit('vault:encrypt-progress', { done: total, total });
+      return null;
+    },
+    vault_reveal_backup: () => {
+      ((w.__liberReveals ??= []) as unknown[]).push('backup');
+      return null;
+    },
+    // Decrypt in place (encryption UX §10).
+    vault_decrypt_preflight: () => ({
+      files: 2,
+      bytes: 9,
+      blocked: decryptInPlace.blocked ?? [],
+      archives: [],
+    }),
+    vault_decrypt_begin: (a) => {
+      const pass = a.passphrase === encrypted?.passphrase;
+      const code = String(a.recovery).replace(/\s/g, '').toUpperCase() === encrypted?.recovery;
+      if (!pass || !code) {
+        const which = !pass && !code ? 'both' : !pass ? 'passphrase' : 'recovery';
+        throw { kind: 'decryptWrongSecret', message: which };
+      }
+      encUnlocked = false; // the session closed
+      decryptJob = { cancelled: false };
+      return null;
+    },
+    vault_decrypt_run: async () => {
+      const job = decryptJob;
+      if (!job) throw { kind: 'notPermitted', message: 'nothing to decrypt: begin first' };
+      const emit = w.__liberEmit as (e: string, p: unknown) => void;
+      emit('vault:decrypt-progress', { done: 1, total: 2 });
+      if (decryptInPlace.holdRun) {
+        await new Promise((resolve) => (w.__liberFinishDecrypt = resolve));
+      }
+      decryptJob = null;
+      if (job.cancelled) throw { kind: 'cancelled', message: 'decrypting was stopped' };
+      emit('vault:decrypt-progress', { done: 2, total: 2 });
+      encDecrypted = true;
+      return plainEnc();
+    },
+    vault_decrypt_cancel: () => {
+      if (decryptJob) decryptJob.cancelled = true;
+      (w.__liberFinishDecrypt as (() => void) | undefined)?.();
       return null;
     },
     vault_trash_originals: () => {
@@ -583,6 +673,7 @@ export function installIpcMock({
     },
     vault_reveal_originals: () => null,
     vault_open: (a) => {
+      if (encrypted && a.path === '/enc' && encDecrypted) return plainEnc();
       if (encrypted && a.path === '/enc' && !encUnlocked) {
         throw { kind: 'locked', message: 'locked' };
       }

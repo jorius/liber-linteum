@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-vault-decrypt-run"
+description = "Enables the vault_decrypt_run command without any pre-configured scope."
+commands.allow = ["vault_decrypt_run"]
+
+[[permission]]
+identifier = "deny-vault-decrypt-run"
+description = "Denies the vault_decrypt_run command without any pre-configured scope."
+commands.deny = ["vault_decrypt_run"]

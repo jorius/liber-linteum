@@ -36,9 +36,13 @@ export type DialogState =
   /** Encrypt the plain vault at `root` in place (encryption UX §4.2, §8);
    *  `EncryptInPlaceHost`. Held from its begin until it is done. */
   | { type: 'encryptInPlace'; root: string }
+  /** Decrypt the encrypted vault at `root` in place (encryption UX §10);
+   *  `EncryptInPlaceHost`. Held from its begin until it is done. */
+  | { type: 'decryptInPlace'; root: string }
   /** Undo another device's conversion of `path` that is still copying
-   *  (spec §8.11), confirmed first; `EncryptInPlaceHost`. */
-  | { type: 'undoElsewhere'; path: string }
+   *  (spec §8.11; `decrypt`: a decryption, §10.3), confirmed first;
+   *  `EncryptInPlaceHost`. */
+  | { type: 'undoElsewhere'; path: string; decrypt?: boolean }
   /** Save / Don't Save / Cancel before unsaved text is left (M5b §6, auto
    *  save off). `id` tells two questions apart. */
   | { type: 'unsaved'; id: number; paths: string[]; answer: (c: UnsavedChoice) => void }
@@ -87,7 +91,7 @@ function isSticky(d: DialogState, held: boolean): boolean {
 }
 
 /** The dialogs that can hold the screen (`hold`). */
-export const HOLDERS = new Set(['newVault', 'newRecovery', 'encryptInPlace']);
+export const HOLDERS = new Set(['newVault', 'newRecovery', 'encryptInPlace', 'decryptInPlace']);
 
 export const useUiStore = create<UiState>((set, get) => ({
   dialog: null,

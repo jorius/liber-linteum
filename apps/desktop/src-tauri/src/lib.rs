@@ -4,6 +4,7 @@ pub mod audio_commands;
 pub mod bin_commands;
 pub mod commands;
 pub mod convert_commands;
+pub mod decrypt_commands;
 pub mod decrypted_copies;
 pub mod drops;
 pub mod dto;
@@ -292,6 +293,16 @@ pub fn configure<R: tauri::Runtime>(
         convert_commands::vault_encrypt_undo_elsewhere,
         convert_commands::vault_trash_originals,
         convert_commands::vault_reveal_originals,
+        // Encrypt in place: the readable backup (encryption UX §9).
+        convert_commands::vault_encrypt_pick_backup,
+        convert_commands::vault_encrypt_backup,
+        convert_commands::vault_reveal_backup,
+        // Decrypt in place (encryption UX §10).
+        menu::menu_set_decrypt_item,
+        decrypt_commands::vault_decrypt_preflight,
+        decrypt_commands::vault_decrypt_begin,
+        decrypt_commands::vault_decrypt_run,
+        decrypt_commands::vault_decrypt_cancel,
     ])
 }
 

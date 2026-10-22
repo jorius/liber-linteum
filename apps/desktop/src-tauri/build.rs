@@ -149,6 +149,16 @@ const COMMANDS: &[&str] = &[
     "vault_encrypt_undo_elsewhere",
     "vault_trash_originals",
     "vault_reveal_originals",
+    // Encrypt in place: the readable backup (encryption UX §9; main window only).
+    "vault_encrypt_pick_backup",
+    "vault_encrypt_backup",
+    "vault_reveal_backup",
+    // Decrypt in place (encryption UX §10; main window only).
+    "menu_set_decrypt_item",
+    "vault_decrypt_preflight",
+    "vault_decrypt_begin",
+    "vault_decrypt_run",
+    "vault_decrypt_cancel",
 ];
 
 fn main() {

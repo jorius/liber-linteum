@@ -11,11 +11,11 @@ use crate::error::Result;
 use crate::path::VaultPath;
 use std::path::{Path, PathBuf};
 
-pub use encrypted::convert;
 pub use encrypted::{
     EncryptedStorage, HEADER_FILE, RECORDING_DIR, UnlockReport, VaultKind, is_empty_for_create,
     is_encrypted_vault, remove_new_vault, trash_header_copy, vault_kind,
 };
+pub use encrypted::{convert, decrypt};
 pub use plain::PlainStorage;
 
 pub trait ReadSeek: std::io::Read + std::io::Seek + Send {}

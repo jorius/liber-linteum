@@ -126,6 +126,15 @@ export function buildMenus(t: TFunction, ctx: MenuContext): MenuDef[] {
         id: 'liber-vault-encrypt',
         disabled: !plain,
       },
+      {
+        kind: 'item',
+        key: 'decrypt',
+        label: vault?.encrypted
+          ? t('titlebar.items.decryptNamed', { name: menuName(vault.name) })
+          : t('titlebar.items.decrypt'),
+        id: 'liber-vault-decrypt',
+        disabled: !vault?.encrypted,
+      },
       item('lock', { id: 'liber-vault-lock', keys: 'Alt+Mod+L', disabled: !vault?.encrypted }),
       item('closeVault', { id: 'liber-vault-close', keys: 'Alt+Mod+W', disabled: !open }),
     ],

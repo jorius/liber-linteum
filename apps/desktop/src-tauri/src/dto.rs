@@ -55,6 +55,11 @@ pub struct VaultInfo {
     /// What the vault opens to (`.liber/vault.json`): a page or the Global
     /// View; `None` is nothing chosen.
     pub home: Option<liber_vault::Home>,
+    /// Decrypt in place (encryption UX §10.5): the finish didn't complete,
+    /// so the old keys and ciphertext are still in this folder; the next
+    /// open deletes them.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub keys_left: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize)]

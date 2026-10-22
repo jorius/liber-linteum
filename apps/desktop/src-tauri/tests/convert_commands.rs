@@ -807,3 +807,493 @@ fn another_devices_unfinished_copy_can_be_undone_here() {
     assert_eq!(kind(err), "convertingElsewhereFinishing");
     assert_eq!(snapshot(&root), late, "untouched");
 }
+
+// ---- The readable backup (encryption UX §9) and decrypt in place (§10) ----
+
+use liber_desktop::convert_commands::ConvertState;
+use liber_vault::decrypt;
+
+impl Harness {
+    /// The backup folder dialog answers `folder` (`None`: cancelled).
+    fn pick_backup(&self, folder: Option<PathBuf>) {
+        self.app
+            .state::<ConvertState>()
+            .set_backup_picker(Some(Arc::new(move || folder.clone())));
+    }
+
+    /// `root` encrypted in place through the commands, open and unlocked; its
+    /// recovery code.
+    fn encrypted(&self, root: &Path) -> String {
+        let begun = begin(self, root).unwrap();
+        call(&self.main, "vault_encrypt_run", json!({})).unwrap();
+        begun["recovery"].as_str().unwrap().to_string()
+    }
+
+    fn epochs(&self) -> Value {
+        std::fs::read(self.config.path().join("vault-epochs.json"))
+            .map(|b| serde_json::from_slice(&b).unwrap())
+            .unwrap_or(json!({}))
+    }
+
+    fn decrypt_begin(&self, passphrase: &str, recovery: &str) -> Result<Value, Value> {
+        call(
+            &self.main,
+            "vault_decrypt_begin",
+            json!({ "passphrase": passphrase, "recovery": recovery }),
+        )
+    }
+}
+
+/// Every file under `root`, without the conversions' leftovers.
+fn files_of(root: &Path) -> BTreeMap<String, Option<Vec<u8>>> {
+    snapshot(root)
+}
+
+#[test]
+fn every_backup_and_decrypt_command_is_main_only() {
+    let h = harness();
+    h.pick_backup(None);
+    let other = WebviewWindowBuilder::new(&h.app, "other", Default::default())
+        .build()
+        .unwrap();
+    for cmd in [
+        "vault_encrypt_pick_backup",
+        "vault_encrypt_backup",
+        "vault_reveal_backup",
+        "menu_set_decrypt_item",
+        "vault_decrypt_preflight",
+        "vault_decrypt_begin",
+        "vault_decrypt_run",
+        "vault_decrypt_cancel",
+    ] {
+        if let Err(e) = call(&h.main, cmd, json!({})) {
+            assert!(!e.to_string().contains("not allowed"), "{cmd}: {e}");
+        }
+        let err = call(&other, cmd, json!({})).expect_err(cmd);
+        assert!(err.to_string().contains("not allowed"), "{cmd}: {err}");
+    }
+}
+
+#[test]
+fn encrypts_with_a_verified_readable_backup_first() {
+    let h = harness();
+    let root = h.plain("Smartjob");
+    let before = files_of(&root);
+    let dest = h.disk.path().join("Smartjob backup");
+    h.pick_backup(Some(dest.clone()));
+    let picked = call(
+        &h.main,
+        "vault_encrypt_pick_backup",
+        json!({ "path": root }),
+    )
+    .unwrap();
+    assert_eq!(
+        picked,
+        json!(
+            dunce::canonicalize(h.disk.path())
+                .unwrap()
+                .join("Smartjob backup")
+        )
+    );
+    call(
+        &h.main,
+        "vault_encrypt_begin",
+        json!({ "path": root, "passphrase": PASS, "backup": true }),
+    )
+    .unwrap();
+    // Nothing is encrypted before the copy is made.
+    let err = call(&h.main, "vault_encrypt_run", json!({})).unwrap_err();
+    assert_eq!(kind(err), "notPermitted");
+    let progress = h.events("vault:encrypt-progress");
+    call(&h.main, "vault_encrypt_backup", json!({})).unwrap();
+    assert_eq!(
+        progress.lock().unwrap().last(),
+        Some(&json!({ "done": 4, "total": 4 }))
+    );
+    assert_eq!(files_of(&dest), before, "a full readable copy");
+    let info = call(&h.main, "vault_encrypt_run", json!({})).unwrap();
+    assert_eq!(info["encrypted"], true);
+    assert_eq!(files_of(&dest), before, "it stays");
+}
+
+#[test]
+fn a_backup_folder_is_refused_with_its_reason() {
+    let h = harness();
+    let root = h.plain("V");
+    let pick = |folder: PathBuf| {
+        h.pick_backup(Some(folder));
+        call(
+            &h.main,
+            "vault_encrypt_pick_backup",
+            json!({ "path": root }),
+        )
+    };
+    assert_eq!(kind(pick(root.join("in")).unwrap_err()), "backupInVault");
+    let full = h.disk.path().join("Full");
+    std::fs::create_dir(&full).unwrap();
+    std::fs::write(full.join("x.md"), "x").unwrap();
+    assert_eq!(kind(pick(full).unwrap_err()), "backupNotEmpty");
+    // Inside a vault this app knows.
+    let other = h.plain("Other");
+    call(&h.main, "vault_open", json!({ "path": other })).unwrap();
+    call(&h.main, "vault_close", json!({})).unwrap();
+    let err = pick(other.join("Backup")).unwrap_err();
+    assert_eq!(kind(err.clone()), "backupInOtherVault", "{err}");
+    // Cancelled: nothing picked, and begin asks for a folder.
+    h.pick_backup(None);
+    let none = call(
+        &h.main,
+        "vault_encrypt_pick_backup",
+        json!({ "path": root }),
+    )
+    .unwrap();
+    assert_eq!(none, Value::Null);
+    let err = call(
+        &h.main,
+        "vault_encrypt_begin",
+        json!({ "path": root, "passphrase": PASS, "backup": true }),
+    )
+    .unwrap_err();
+    assert_eq!(kind(err), "notPermitted");
+}
+
+#[test]
+fn a_stopped_backup_undoes_the_conversion_and_leaves_no_copy() {
+    let h = harness();
+    let root = h.plain("V");
+    let before = snapshot(&root);
+    let dest = h.disk.path().join("Copy");
+    h.pick_backup(Some(dest.clone()));
+    call(
+        &h.main,
+        "vault_encrypt_pick_backup",
+        json!({ "path": root }),
+    )
+    .unwrap();
+    call(
+        &h.main,
+        "vault_encrypt_begin",
+        json!({ "path": root, "passphrase": PASS, "backup": true }),
+    )
+    .unwrap();
+    let handle = h.app.handle().clone();
+    h.app.listen_any("vault:encrypt-progress", move |e| {
+        let p: Value = serde_json::from_str(e.payload()).unwrap();
+        if p["done"] == 1 {
+            liber_desktop::convert_commands::vault_encrypt_cancel_impl(&handle).unwrap();
+        }
+    });
+    let err = call(&h.main, "vault_encrypt_backup", json!({})).unwrap_err();
+    assert_eq!(kind(err), "cancelled");
+    assert!(!dest.exists(), "the copy it started is gone");
+    assert_eq!(snapshot(&root), before, "nothing encrypted");
+    let err = call(&h.main, "vault_encrypt_run", json!({})).unwrap_err();
+    assert_eq!(kind(err), "notPermitted");
+}
+
+#[test]
+fn decrypts_in_place_with_both_secrets_and_retires_the_keys() {
+    let h = harness();
+    let root = h.plain("Smartjob");
+    let original = snapshot(&root);
+    let code = h.encrypted(&root);
+    let old_ids: Vec<String> = h.epochs().as_object().unwrap().keys().cloned().collect();
+    assert_eq!(old_ids.len(), 1);
+
+    let pre = call(&h.main, "vault_decrypt_preflight", json!({})).unwrap();
+    assert_eq!(pre["files"], 4);
+    assert_eq!(pre["blocked"], json!([]));
+    // Each secret is checked on its own; nothing changes.
+    for (pass, rec, which) in [
+        ("wrong passphrase!", code.as_str(), "passphrase"),
+        (PASS, "LIBER-AAAA-BBBB", "recovery"),
+        ("wrong passphrase!", "not a code", "both"),
+    ] {
+        let err = h.decrypt_begin(pass, rec).unwrap_err();
+        assert_eq!(kind(err.clone()), "decryptWrongSecret");
+        assert_eq!(err["message"], which);
+    }
+    call(&h.main, "vault_tree", json!({})).expect("still open");
+
+    h.decrypt_begin(PASS, &code).unwrap();
+    let err = call(&h.main, "vault_tree", json!({})).unwrap_err();
+    assert_eq!(kind(err), "noVault", "the encrypted session closed");
+    let progress = h.events("vault:decrypt-progress");
+    let info = call(&h.main, "vault_decrypt_run", json!({})).unwrap();
+    assert_eq!(info["encrypted"], false);
+    assert_eq!(info["name"], "Smartjob");
+    assert_eq!(
+        progress.lock().unwrap().last(),
+        Some(&json!({ "done": 4, "total": 4 }))
+    );
+    let page = call(&h.main, "page_read", json!({ "path": "Notes.md" })).unwrap();
+    assert_eq!(page["text"], "# Notes\n\nhello");
+    // The tree as it was, nothing of the keys left, the id forgotten.
+    let now = snapshot(&root);
+    for (rel, body) in &original {
+        assert_eq!(now.get(rel), Some(body), "{rel}");
+    }
+    for name in [
+        "liber-vault.json",
+        "d",
+        "README.txt",
+        decrypt::JOURNAL,
+        decrypt::STAGING,
+        decrypt::RETIRED,
+    ] {
+        assert!(!root.join(name).exists(), "{name} left behind");
+    }
+    assert_eq!(h.epochs(), json!({}), "the rollback memory forgot it");
+    let recent = call(&h.main, "vaults_recent", json!({})).unwrap();
+    let row = recent
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|r| r["name"] == "Smartjob")
+        .unwrap();
+    assert_eq!(row["encrypted"], false);
+
+    // Encrypting again: a new vault id, and the old key opens nothing.
+    let code2 = h.encrypted(&root);
+    let new_ids: Vec<String> = h.epochs().as_object().unwrap().keys().cloned().collect();
+    assert_eq!(new_ids.len(), 1);
+    assert_ne!(new_ids, old_ids, "a new vault id");
+    assert_ne!(code2, code);
+    call(&h.main, "vault_lock", json!({})).unwrap();
+    let err = h.unlock(&root, "recovery", &code).unwrap_err();
+    assert_eq!(kind(err), "wrongSecret");
+    h.unlock(&root, "recovery", &code2).unwrap();
+}
+
+#[test]
+fn decrypt_stop_and_undo_keeps_the_vault_encrypted() {
+    let h = harness();
+    let root = h.plain("V");
+    let code = h.encrypted(&root);
+    let encrypted = snapshot(&root);
+    // Cancelled between begin and run.
+    h.decrypt_begin(PASS, &code).unwrap();
+    call(&h.main, "vault_decrypt_cancel", json!({})).unwrap();
+    assert_eq!(snapshot(&root), encrypted);
+    let err = call(&h.main, "vault_decrypt_run", json!({})).unwrap_err();
+    assert_eq!(kind(err), "notPermitted");
+    // Stopped mid-run.
+    h.unlock(&root, "passphrase", PASS).unwrap();
+    h.decrypt_begin(PASS, &code).unwrap();
+    let handle = h.app.handle().clone();
+    h.app.listen_any("vault:decrypt-progress", move |e| {
+        let p: Value = serde_json::from_str(e.payload()).unwrap();
+        if p["done"] == 1 {
+            liber_desktop::decrypt_commands::vault_decrypt_cancel_impl(&handle).unwrap();
+        }
+    });
+    let err = call(&h.main, "vault_decrypt_run", json!({})).unwrap_err();
+    assert_eq!(kind(err), "cancelled");
+    assert_eq!(
+        snapshot(&root),
+        encrypted,
+        "back as it was, still encrypted"
+    );
+    h.unlock(&root, "passphrase", PASS).unwrap();
+}
+
+#[test]
+fn an_interrupted_decrypt_recovers_on_open() {
+    let h = harness();
+    let me = h.install_id();
+    let recovered = h.events("vault:decrypt-recovered");
+    let crash = |root: &Path, code: &str, install: &str, at: decrypt::CrashPoint| {
+        let code = liber_crypto::RecoveryCode::parse(code).unwrap();
+        decrypt::crash_at(Some(at));
+        let run = (|| -> convert::Result<()> {
+            let s = decrypt::open_with_both(root, PASS, Some(&code))?;
+            let mut d = decrypt::begin(s, &[], install)?;
+            decrypt::copy(&mut d, |_, _| {}, &AtomicBool::new(false))?;
+            decrypt::stage_and_commit(d)?;
+            decrypt::finish(root, &|_| Ok(()))
+        })();
+        decrypt::crash_at(None);
+        assert!(run.is_err());
+    };
+    // Before `staged`: back to encrypted; it unlocks.
+    let a = h.plain("A");
+    let code = h.encrypted(&a);
+    call(&h.main, "vault_close", json!({})).unwrap();
+    crash(&a, &code, &me, decrypt::CrashPoint::Copied(2));
+    let err = call(&h.main, "vault_open", json!({ "path": a })).unwrap_err();
+    assert_eq!(kind(err), "locked");
+    assert!(
+        !a.join(decrypt::STAGING).exists(),
+        "the readable copy is gone"
+    );
+    h.unlock(&a, "passphrase", PASS).unwrap();
+    // From `staged` on: finished, it opens as plain.
+    let b = h.plain("B");
+    let code = h.encrypted(&b);
+    call(&h.main, "vault_close", json!({})).unwrap();
+    crash(&b, &code, &me, decrypt::CrashPoint::AfterStaged);
+    let info = call(&h.main, "vault_open", json!({ "path": b })).unwrap();
+    assert_eq!(info["encrypted"], false);
+    assert!(!b.join("liber-vault.json").exists());
+    let path = |p: &Path| p.to_string_lossy().into_owned();
+    assert_eq!(
+        *recovered.lock().unwrap(),
+        vec![
+            json!({ "path": path(&a), "outcome": "rolledBack" }),
+            json!({ "path": path(&b), "outcome": "finished" }),
+        ]
+    );
+    // Another device's, still copying: refused, then undone here on request.
+    let c = h.plain("C");
+    let code = h.encrypted(&c);
+    call(&h.main, "vault_close", json!({})).unwrap();
+    let encrypted = snapshot(&c);
+    crash(&c, &code, "another-install", decrypt::CrashPoint::Copied(1));
+    let err = call(&h.main, "vault_open", json!({ "path": c })).unwrap_err();
+    assert_eq!(kind(err), "decryptingElsewhere");
+    call(
+        &h.main,
+        "vault_encrypt_undo_elsewhere",
+        json!({ "path": c }),
+    )
+    .unwrap();
+    assert_eq!(snapshot(&c), encrypted);
+}
+
+#[test]
+fn decrypt_refusals() {
+    let h = harness();
+    let root = h.plain("P");
+    call(&h.main, "vault_open", json!({ "path": root })).unwrap();
+    let err = call(&h.main, "vault_decrypt_preflight", json!({})).unwrap_err();
+    assert_eq!(kind(err), "notPermitted", "a plain vault");
+    let err = h.decrypt_begin(PASS, "x").unwrap_err();
+    assert_eq!(kind(err), "notPermitted");
+    // Encrypt refuses a folder part-way through decrypting.
+    let enc = h.plain("E");
+    let code = h.encrypted(&enc);
+    h.decrypt_begin(PASS, &code).unwrap();
+    let err = begin(&h, &h.plain("Other")).unwrap_err();
+    assert_eq!(kind(err), "convertBusy", "one conversion at a time");
+    call(&h.main, "vault_decrypt_cancel", json!({})).unwrap();
+}
+
+// ---- Decrypt in place: review fixes ----
+
+/// A decryption of `root` (open with `code`) by `install` stopped at `at`.
+fn crash_decrypt(root: &Path, code: &str, install: &str, at: decrypt::CrashPoint) {
+    let code = liber_crypto::RecoveryCode::parse(code).unwrap();
+    decrypt::crash_at(Some(at));
+    let run = (|| -> convert::Result<()> {
+        let s = decrypt::open_with_both(root, PASS, Some(&code))?;
+        let mut d = decrypt::begin(s, &[], install)?;
+        decrypt::copy(&mut d, |_, _| {}, &AtomicBool::new(false))?;
+        decrypt::stage_and_commit(d)?;
+        decrypt::finish(root, &|_| Ok(()))
+    })();
+    decrypt::crash_at(None);
+    assert!(run.is_err(), "{at:?}");
+}
+
+/// Review M4: a take in progress at begin is saved as a clip next to its
+/// page before the session closes, so it is in the decrypted vault.
+#[test]
+fn a_take_in_progress_at_decrypt_is_saved_as_a_clip() {
+    let h = harness();
+    let root = h.plain("Rec");
+    let code = h.encrypted(&root);
+    call(
+        &h.main,
+        "audio_record_start",
+        json!({ "page": "Notes.md", "device": null, "name": "clip-20261021-130000" }),
+    )
+    .unwrap();
+    std::thread::sleep(std::time::Duration::from_millis(250));
+    h.decrypt_begin(PASS, &code).unwrap();
+    call(&h.main, "vault_decrypt_run", json!({})).unwrap();
+    let wavs: Vec<String> = snapshot(&root)
+        .into_keys()
+        .filter(|k| k.ends_with(".wav"))
+        .collect();
+    assert_eq!(
+        wavs,
+        ["attachments/clip-20261021-130000.wav"],
+        "saved as a clip of its page, readable"
+    );
+}
+
+/// Review L7: a begin refused because the folder is part-way through
+/// another device's decryption never undoes that one.
+#[test]
+fn a_refused_decrypt_begin_never_undoes_another_journal() {
+    let h = harness();
+    let root = h.plain("Other");
+    let code = h.encrypted(&root);
+    crash_decrypt(
+        &root,
+        &code,
+        "another-install",
+        decrypt::CrashPoint::Copied(1),
+    );
+    let before = snapshot(&root);
+    let err = h.decrypt_begin(PASS, &code).unwrap_err();
+    assert_eq!(kind(err), "decryptPending");
+    assert_eq!(snapshot(&root), before, "untouched");
+}
+
+/// Review L8: a decryption past `staged`, finished by the recovery at
+/// unlock, opens the folder as the plain vault it now is.
+#[test]
+fn unlock_opens_a_folder_its_recovery_just_decrypted() {
+    let h = harness();
+    let me = h.install_id();
+    let root = h.plain("Late");
+    let code = h.encrypted(&root);
+    call(&h.main, "vault_close", json!({})).unwrap();
+    crash_decrypt(&root, &code, &me, decrypt::CrashPoint::AfterStaged);
+    let info = h.unlock(&root, "passphrase", PASS).unwrap();
+    assert_eq!(info["encrypted"], false);
+    assert!(!root.join(decrypt::RETIRED).exists());
+}
+
+/// Review 6e: when the finish fails, the vault still opens and says where
+/// the old keys and ciphertext still are; the next open deletes them.
+#[test]
+fn a_failed_finish_says_the_keys_are_still_there() {
+    let h = harness();
+    let root = h.plain("Left");
+    let code = h.encrypted(&root);
+    h.decrypt_begin(PASS, &code).unwrap();
+    decrypt::crash_when(Some(Box::new(|p| {
+        matches!(p, decrypt::CrashPoint::AfterKeys)
+    })));
+    let run = liber_desktop::decrypt_commands::vault_decrypt_run_impl(h.app.handle());
+    decrypt::crash_when(None);
+    let info = run.expect("the vault opens");
+    assert!(!info.encrypted);
+    let left = info.keys_left.expect("says what is left");
+    assert!(left.ends_with(decrypt::RETIRED), "{left}");
+    call(&h.main, "vault_close", json!({})).unwrap();
+    call(&h.main, "vault_open", json!({ "path": root })).unwrap();
+    assert!(
+        !root.join(decrypt::RETIRED).exists(),
+        "finished on the next open"
+    );
+}
+
+/// Review 6f: a retired vault's header a sync puts back is deleted at open,
+/// and the folder opens as plain.
+#[test]
+fn a_retired_header_put_back_is_dropped_at_open() {
+    let h = harness();
+    let root = h.plain("Back");
+    let code = h.encrypted(&root);
+    let header = std::fs::read(root.join("liber-vault.json")).unwrap();
+    h.decrypt_begin(PASS, &code).unwrap();
+    call(&h.main, "vault_decrypt_run", json!({})).unwrap();
+    call(&h.main, "vault_close", json!({})).unwrap();
+    std::fs::write(root.join("liber-vault.json"), header).unwrap();
+    let info = call(&h.main, "vault_open", json!({ "path": root })).unwrap();
+    assert_eq!(info["encrypted"], false);
+    assert!(!root.join("liber-vault.json").exists());
+}

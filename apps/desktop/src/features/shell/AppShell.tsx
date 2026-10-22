@@ -8,6 +8,7 @@ import { BinView } from '../bin/BinView';
 import { DialogHost } from '../dialogs/DialogHost';
 import { useAutoLock } from '../encryption/autoLock';
 import { OriginalsBanner } from '../encryption/EncryptInPlaceDialog';
+import { useDecryptMenuItem } from '../encryption/decryptInPlace';
 import { useEncryptMenuItem } from '../encryption/encryptInPlace';
 import { ContextMenu, type MenuState } from '../explorer/ContextMenu';
 import { requestTrash } from '../explorer/trashAction';
@@ -37,6 +38,7 @@ export function AppShell() {
   useWindowTitle();
   useAutoLock();
   useEncryptMenuItem();
+  useDecryptMenuItem();
   const current = useUiStore((s) => s.screen);
   const collapsed = useSettingsStore((s) => s.settings.sidebarCollapsed);
   // Keys typed while the lock runs would be dropped with the vault: none are taken.

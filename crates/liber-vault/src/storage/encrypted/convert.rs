@@ -18,6 +18,10 @@
 //! from `staged` on it rolls forward. The engine never cleans up after its own
 //! errors: the caller calls [`recover`] (or [`rollback`]), which is exactly
 //! what an open after a crash does. Only this device's journal is acted on.
+//!
+//! A readable backup (§9) may be written between [`begin`] and [`copy`]:
+//! [`backup`] copies and verifies every file into an empty folder outside the
+//! vault, and [`copy`] then refuses a tree that changed since.
 
 use super::names::fold;
 use super::{
@@ -47,12 +51,12 @@ pub const STAGING: &str = ".liber-converting";
 pub const ORIGINALS: &str = ".liber-plain";
 /// The journal's temp name while it is rewritten.
 const JOURNAL_TMP: &str = ".liber-convert.json.tmp";
-const RESERVED: [&str; 4] = [JOURNAL, JOURNAL_TMP, STAGING, ORIGINALS];
+pub(super) const RESERVED: [&str; 4] = [JOURNAL, JOURNAL_TMP, STAGING, ORIGINALS];
 /// Top-level entries that stay plaintext at the root, neither copied nor
 /// staged (§8.5): sync-tool control files only. The root's `.DS_Store` and
 /// `Thumbs.db` hold plaintext names and thumbnails: they go to the trash with
 /// the originals (review judgment change).
-const KEPT: [&str; 8] = [
+pub(super) const KEPT: [&str; 8] = [
     ".stfolder",
     ".stignore",
     ".stversions",
@@ -63,10 +67,10 @@ const KEPT: [&str; 8] = [
     "desktop.ini",
 ];
 /// OS junk, never copied at any depth (below the root it goes with its folder).
-const JUNK: [&str; 4] = [".DS_Store", "Thumbs.db", "desktop.ini", "Icon\r"];
+pub(super) const JUNK: [&str; 4] = [".DS_Store", "Thumbs.db", "desktop.ini", "Icon\r"];
 const JOURNAL_VERSION: u32 = 1;
 /// Longest name the encrypted format takes, in bytes of its NFC form.
-const MAX_NAME_BYTES: usize = 255;
+pub(super) const MAX_NAME_BYTES: usize = 255;
 
 #[derive(Debug, thiserror::Error)]
 pub enum ConvertError {
@@ -99,6 +103,29 @@ pub enum ConvertError {
     Collision(String),
     #[error("{0} didn't read back as written")]
     Mismatch(String),
+    /// The backup folder (§9.1) is the vault, inside it or around it.
+    #[error("{0} is inside the vault being encrypted")]
+    BackupInVault(String),
+    /// The backup folder is inside another vault (the one named).
+    #[error("{0} is a vault, or inside one")]
+    BackupInOtherVault(String),
+    /// The backup folder has something in it already.
+    #[error("{0} isn't empty")]
+    BackupNotEmpty(String),
+    /// Writing or checking the backup failed (the file and why): nothing was encrypted.
+    #[error("the readable copy couldn't be made: {0}")]
+    BackupFailed(String),
+    /// Decrypt in place (§10.2): which of the two secrets opens no slot.
+    #[error("{}", wrong_secrets(*.passphrase, *.recovery))]
+    WrongSecrets { passphrase: bool, recovery: bool },
+}
+
+fn wrong_secrets(passphrase: bool, recovery: bool) -> &'static str {
+    match (passphrase, recovery) {
+        (true, true) => "both",
+        (true, false) => "passphrase",
+        _ => "recovery",
+    }
 }
 
 pub type Result<T> = std::result::Result<T, ConvertError>;
@@ -126,6 +153,13 @@ pub enum Reason {
     NotUtf8,
     /// A vault of its own (encrypted or damaged): move it out first (final review I3).
     Vault,
+    /// Decrypt in place (§10.2): a readable entry beside the vault already has this name.
+    Taken,
+    /// Decrypt in place: an unfinished write (a hidden temp file under `d/`,
+    /// a salvage stream): open the vault and let it finish first.
+    Unfinished,
+    /// Decrypt in place: a recording that hasn't been saved as a clip yet.
+    Recording,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
@@ -140,6 +174,9 @@ pub struct Preflight {
     pub files: u64,
     pub bytes: u64,
     pub blocked: Vec<Blocked>,
+    /// Decrypt in place (§10.2): sync archives at the root (`.stversions`,
+    /// `.sync`) that may hold old encrypted files and keys; never touched.
+    pub archives: Vec<String>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -272,8 +309,8 @@ pub type DropIndex<'a> = &'a dyn Fn() -> std::io::Result<()>;
 /// M2: a rewrite that keeps size and mtime still changes those). Windows has
 /// no stable file id in std: size and mtime only there.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-struct Stamp {
-    len: u64,
+pub(super) struct Stamp {
+    pub(super) len: u64,
     mtime: Option<SystemTime>,
     ino: u64,
     ctime_ns: i128,
@@ -281,7 +318,7 @@ struct Stamp {
 
 impl Stamp {
     /// What a rename keeps (it may change the ctime).
-    fn moved(self) -> (u64, Option<SystemTime>, u64) {
+    pub(super) fn moved(self) -> (u64, Option<SystemTime>, u64) {
         (self.len, self.mtime, self.ino)
     }
 }
@@ -293,6 +330,8 @@ pub struct Converting {
     journal: Journal,
     /// What [`copy`] copied, as it was (no `blocked`).
     record: Tree,
+    /// What [`backup`] copied, as it was: [`copy`] refuses anything else.
+    backup: Option<Tree>,
 }
 
 impl Converting {
@@ -306,30 +345,34 @@ impl Converting {
     }
 }
 
-fn hex(id: &[u8]) -> String {
+pub(super) fn hex(id: &[u8]) -> String {
     id.iter().map(|b| format!("{b:02x}")).collect()
 }
 
-fn exists(p: &Path) -> bool {
+pub(super) fn exists(p: &Path) -> bool {
     p.symlink_metadata().is_ok()
 }
 
 /// Whether `dir` lists exactly `name`: on a case-insensitive disk `exists`
 /// also finds `.Liber-Plain` for `.liber-plain` (review C1).
-fn listed(dir: &Path, name: &str) -> bool {
+pub(super) fn listed(dir: &Path, name: &str) -> bool {
     std::fs::read_dir(dir).is_ok_and(|items| items.flatten().any(|i| i.file_name() == name))
 }
 
-/// A user's name that a reserved one matches by case or Unicode form only.
-fn reserved_like(name: &str) -> bool {
-    RESERVED.iter().any(|r| fold(r) == fold(name))
+/// A user's name that a reserved one (this conversion's or decrypt's) matches
+/// by case or Unicode form only.
+pub(super) fn reserved_like(name: &str) -> bool {
+    RESERVED
+        .iter()
+        .chain(super::decrypt::RESERVED.iter())
+        .any(|r| fold(r) == fold(name))
 }
 
-fn io(what: impl std::fmt::Display) -> impl Fn(std::io::Error) -> ConvertError {
+pub(super) fn io(what: impl std::fmt::Display) -> impl Fn(std::io::Error) -> ConvertError {
     move |e| io_err(what.to_string(), e).into()
 }
 
-fn now_secs() -> u64 {
+pub(super) fn now_secs() -> u64 {
     SystemTime::now()
         .duration_since(SystemTime::UNIX_EPOCH)
         .map(|d| d.as_secs())
@@ -357,32 +400,37 @@ pub fn read_journal(root: &Path) -> Result<Option<Journal>> {
 
 /// Atomic: temp file, fsync, rename, fsync the folder.
 fn write_journal(root: &Path, j: &Journal) -> Result<()> {
-    let tmp = root.join(JOURNAL_TMP);
-    let bytes = serde_json::to_vec_pretty(j).expect("a journal serializes");
+    write_json(root, JOURNAL, JOURNAL_TMP, j)
+}
+
+/// Writes `value` as `root/name` through `root/tmp` (decrypt's journal too).
+pub(super) fn write_json(root: &Path, name: &str, tmp: &str, value: &impl Serialize) -> Result<()> {
+    let tmp = root.join(tmp);
+    let bytes = serde_json::to_vec_pretty(value).expect("a journal serializes");
     let r = (|| {
         let mut f = File::create(&tmp)?;
         f.write_all(&bytes)?;
         f.sync_all()?;
-        std::fs::rename(&tmp, root.join(JOURNAL))
+        std::fs::rename(&tmp, root.join(name))
     })();
     if r.is_err() {
         let _ = std::fs::remove_file(&tmp);
     }
-    r.map_err(io(JOURNAL))?;
+    r.map_err(io(name))?;
     sync_dir(root);
     Ok(())
 }
 
 /// What a walk found: files with their stamps, folders, and what blocks.
 #[derive(Default)]
-struct Tree {
-    files: BTreeMap<String, Stamp>,
+pub(super) struct Tree {
+    pub(super) files: BTreeMap<String, Stamp>,
     /// Sorted, so a parent comes before its children.
-    dirs: BTreeSet<String>,
-    blocked: Vec<Blocked>,
+    pub(super) dirs: BTreeSet<String>,
+    pub(super) blocked: Vec<Blocked>,
 }
 
-fn join(rel: &str, name: &str) -> String {
+pub(super) fn join(rel: &str, name: &str) -> String {
     if rel.is_empty() {
         name.to_string()
     } else {
@@ -390,7 +438,7 @@ fn join(rel: &str, name: &str) -> String {
     }
 }
 
-fn stamp(m: &Metadata) -> Stamp {
+pub(super) fn stamp(m: &Metadata) -> Stamp {
     #[cfg(unix)]
     let (ino, ctime_ns) = {
         use std::os::unix::fs::MetadataExt;
@@ -525,7 +573,7 @@ fn in_cloud(name: &str, meta: &Metadata) -> bool {
 }
 
 /// A volume root, or a folder the caller refuses (home, Desktop, …): §8.10.
-fn refuse_folder(root: &Path, refused: &[PathBuf]) -> Result<()> {
+pub(super) fn refuse_folder(root: &Path, refused: &[PathBuf]) -> Result<()> {
     let listed = refused
         .iter()
         .any(|r| dunce::canonicalize(r).is_ok_and(|r| r == root));
@@ -564,7 +612,8 @@ pub fn preflight(root: &Path, refused: &[PathBuf]) -> Result<Preflight> {
     {
         return Err(ConvertError::InsideVault(vault.display().to_string()));
     }
-    if read_journal(&root)?.is_some() {
+    // A decrypt part-way through (§10.3) is that run's to finish or undo.
+    if read_journal(&root)?.is_some() || super::decrypt::read_journal(&root)?.is_some() {
         return Err(ConvertError::Pending);
     }
     match vault_kind(&root) {
@@ -583,6 +632,7 @@ pub fn preflight(root: &Path, refused: &[PathBuf]) -> Result<Preflight> {
         files: tree.files.len() as u64,
         bytes: tree.files.values().map(|s| s.len).sum(),
         blocked: tree.blocked,
+        archives: Vec::new(),
     })
 }
 
@@ -628,6 +678,7 @@ pub fn begin(
             storage,
             journal,
             record: Tree::default(),
+            backup: None,
         },
         code,
     ))
@@ -646,6 +697,11 @@ pub fn copy(
     if !tree.blocked.is_empty() {
         return Err(ConvertError::Blocked(tree.blocked));
     }
+    // The backup is of exactly what is encrypted (§9.1): a sync since it
+    // (during the recovery-key step) stops the conversion.
+    if let Some(backup) = &c.backup {
+        check_same(&tree, backup, false)?;
+    }
     for dir in &tree.dirs {
         c.storage.make_dir(&VaultPath::new(dir)?)?;
     }
@@ -662,7 +718,7 @@ pub fn copy(
     Ok(())
 }
 
-fn sha256(
+pub(super) fn sha256(
     mut r: impl Read,
     mut also: impl FnMut(&[u8]) -> std::io::Result<()>,
 ) -> std::io::Result<[u8; 32]> {
@@ -713,7 +769,7 @@ fn copy_file(s: &EncryptedStorage, root: &Path, rel: &str, recorded: &Stamp) -> 
 
 /// `Changed` unless `now` is exactly what was recorded (`moved`: what a
 /// rename keeps of each file).
-fn check_same(now: &Tree, rec: &Tree, moved: bool) -> Result<()> {
+pub(super) fn check_same(now: &Tree, rec: &Tree, moved: bool) -> Result<()> {
     if let Some(b) = now.blocked.first() {
         return Err(ConvertError::Changed(b.path.clone()));
     }
@@ -755,7 +811,7 @@ fn movable(root: &Path) -> Result<Vec<OsString>> {
 }
 
 /// Renames `from` onto `to`, which must not exist (never overwrites).
-fn move_new(from: &Path, to: &Path) -> Result<()> {
+pub(super) fn move_new(from: &Path, to: &Path) -> Result<()> {
     if exists(to) {
         return Err(ConvertError::Collision(to.display().to_string()));
     }
@@ -771,6 +827,7 @@ pub fn stage_and_commit(c: Converting) -> Result<()> {
         storage,
         mut journal,
         record,
+        backup: _,
     } = c;
     drop(storage);
     check_same(&scan(&root, true), &record, false)?;
@@ -1089,4 +1146,188 @@ pub fn recover(
     }
     finish(&root, trash, drop_index)?;
     Ok(RecoverOutcome::Finished)
+}
+
+// ---- the readable backup (encryption UX §9) ----
+
+/// `dest`, canonical: itself if it exists, else its (existing) parent's
+/// canonical path joined with its name.
+fn backup_target(dest: &Path) -> Result<PathBuf> {
+    match dunce::canonicalize(dest) {
+        Ok(p) => Ok(p),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
+            let (Some(parent), Some(name)) = (dest.parent(), dest.file_name()) else {
+                return Err(VaultError::NotFound(dest.display().to_string()).into());
+            };
+            let parent = dunce::canonicalize(parent).map_err(io(parent.display()))?;
+            Ok(parent.join(name))
+        }
+        Err(e) => Err(io(dest.display())(e)),
+    }
+}
+
+/// Whether `dir` is a vault: an encrypted or damaged one, or a plain one the
+/// app has opened (it holds the settings folder).
+fn is_a_vault(dir: &Path) -> bool {
+    !matches!(vault_kind(dir), VaultKind::Plain)
+        || dir
+            .join(crate::META_DIR)
+            .symlink_metadata()
+            .is_ok_and(|m| m.is_dir())
+}
+
+/// Checks the folder picked for the readable backup of `root` (§9.1): outside
+/// the vault, not in another vault, and empty (OS junk aside) or new with an
+/// existing parent. Changes nothing; the folder, canonical.
+pub fn check_backup(root: &Path, dest: &Path) -> Result<PathBuf> {
+    let root = canonical_root(root)?;
+    let dest = backup_target(dest)?;
+    let shown = || dest.display().to_string();
+    if dest.starts_with(&root) || root.starts_with(&dest) {
+        return Err(ConvertError::BackupInVault(shown()));
+    }
+    if let Some(vault) = dest
+        .ancestors()
+        .filter(|a| exists(a))
+        .find(|a| is_a_vault(a))
+    {
+        return Err(ConvertError::BackupInOtherVault(
+            vault.display().to_string(),
+        ));
+    }
+    match dest.symlink_metadata() {
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(dest),
+        Err(e) => Err(io(shown())(e)),
+        Ok(m) if !m.is_dir() => Err(ConvertError::BackupNotEmpty(shown())),
+        Ok(_) => {
+            let items = std::fs::read_dir(&dest).map_err(io(shown()))?;
+            let junk =
+                |i: &std::fs::DirEntry| i.file_name().to_str().is_some_and(|n| JUNK.contains(&n));
+            for item in items {
+                if !junk(&item.map_err(io(shown()))?) {
+                    return Err(ConvertError::BackupNotEmpty(shown()));
+                }
+            }
+            Ok(dest)
+        }
+    }
+}
+
+/// Writes a readable copy of every file and folder [`copy`] will encrypt into
+/// `dest` (checked again by [`check_backup`]), each file read back and its
+/// SHA-256 compared, its mtime kept (§9.1). Call between [`begin`] and
+/// [`copy`]: `copy` then refuses a tree that changed since. On any error the
+/// entries this backup wrote are removed again (the folder was empty) and
+/// nothing of the vault was changed; the caller undoes the conversion.
+pub fn backup(
+    c: &mut Converting,
+    dest: &Path,
+    mut progress: impl FnMut(u64, u64),
+    cancel: &AtomicBool,
+) -> Result<()> {
+    let dest = check_backup(&c.root, dest)?;
+    let tree = scan(&c.root, true);
+    if !tree.blocked.is_empty() {
+        return Err(ConvertError::Blocked(tree.blocked));
+    }
+    let failed = |what: &str| {
+        let what = what.to_string();
+        move |e: std::io::Error| ConvertError::BackupFailed(format!("{what}: {e}"))
+    };
+    let made = !exists(&dest);
+    if made {
+        std::fs::create_dir(&dest).map_err(failed(&dest.display().to_string()))?;
+    }
+    // Exactly what this backup created, in order, each only once its
+    // creation succeeded: on failure only those go (review: never anything a
+    // sync put in the folder meanwhile).
+    let mut created: Vec<Created> = Vec::new();
+    let run = (|| {
+        for dir in &tree.dirs {
+            std::fs::create_dir(dest.join(dir)).map_err(failed(dir))?;
+            created.push(Created::Dir(dest.join(dir)));
+        }
+        let total = tree.files.len() as u64;
+        progress(0, total);
+        for (done, (rel, recorded)) in tree.files.iter().enumerate() {
+            if cancel.load(Ordering::Relaxed) {
+                return Err(ConvertError::Cancelled);
+            }
+            backup_file(&c.root, &dest, rel, recorded, &mut created)?;
+            progress(done as u64 + 1, total);
+        }
+        sync_dir(&dest);
+        Ok(())
+    })();
+    if let Err(e) = run {
+        // Newest first: a folder is empty of ours by the time it is reached,
+        // and one still holding something else stays.
+        for item in created.iter().rev() {
+            let _ = match item {
+                Created::File(p) => std::fs::remove_file(p),
+                Created::Dir(p) => std::fs::remove_dir(p),
+            };
+        }
+        if made {
+            let _ = std::fs::remove_dir(&dest);
+        }
+        return Err(e);
+    }
+    c.backup = Some(tree);
+    Ok(())
+}
+
+/// An entry the backup made (removed again if the backup fails).
+enum Created {
+    File(PathBuf),
+    Dir(PathBuf),
+}
+
+fn backup_file(
+    root: &Path,
+    dest: &Path,
+    rel: &str,
+    recorded: &Stamp,
+    created: &mut Vec<Created>,
+) -> Result<()> {
+    let (src, to) = (root.join(rel), dest.join(rel));
+    let failed = |e: std::io::Error| ConvertError::BackupFailed(format!("{rel}: {e}"));
+    let changed = || ConvertError::Changed(rel.to_string());
+    let from = File::open(&src).map_err(io(rel))?;
+    if stamp(&from.metadata().map_err(io(rel))?) != *recorded {
+        return Err(changed());
+    }
+    let mut out = File::options()
+        .write(true)
+        .create_new(true)
+        .open(&to)
+        .map_err(failed)?;
+    created.push(Created::File(to.clone()));
+    let mut write_err = None;
+    let wrote = sha256(from, |b| {
+        out.write_all(b).inspect_err(|e| {
+            write_err = Some(std::io::Error::new(e.kind(), e.to_string()));
+        })
+    });
+    let wrote = match (wrote, write_err) {
+        (_, Some(e)) => return Err(failed(e)),
+        (Err(e), None) => return Err(io(rel)(e)),
+        (Ok(h), None) => h,
+    };
+    if let Some(t) = recorded.mtime {
+        out.set_modified(t).map_err(failed)?;
+    }
+    out.sync_all().map_err(failed)?;
+    drop(out);
+    // Changed while it was read: the copy may be torn.
+    if src.symlink_metadata().map(|m| stamp(&m)).ok().as_ref() != Some(recorded) {
+        return Err(changed());
+    }
+    let read = sha256(File::open(&to).map_err(failed)?, |_| Ok(())).map_err(failed)?;
+    if read != wrote {
+        return Err(ConvertError::BackupFailed(format!(
+            "{rel} didn't read back as written"
+        )));
+    }
+    Ok(())
 }

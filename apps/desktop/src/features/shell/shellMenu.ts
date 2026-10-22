@@ -9,6 +9,7 @@ import {
   pickFolder,
 } from '../../ipc';
 import { openNewVault } from '../encryption/CreateEncryptedHost';
+import { openDecryptInPlace } from '../encryption/decryptInPlace';
 import { openEncryptInPlace } from '../encryption/encryptInPlace';
 import { useEditorStore } from '../../stores/editorStore';
 import { useSettingsStore } from '../../stores/settingsStore';
@@ -39,6 +40,10 @@ export const encryptThisVault = () => {
   if (status === 'open' && info && !info.encrypted && !info.scratchpad)
     void openEncryptInPlace(info.root);
 };
+
+/** Vault → Decrypt "<name>"… (and the sidebar's vault menu): the open
+ *  encrypted vault, where it is (encryption UX §10.1). */
+export const decryptThisVault = () => openDecryptInPlace();
 
 export const closeVault = () => void useVaultStore.getState().close();
 
@@ -75,6 +80,7 @@ export async function installShellMenu({ main }: { main: boolean }): Promise<() 
             else if (what === 'close') closeVault();
             else if (what === 'new') void openNewVault();
             else if (what === 'encrypt') encryptThisVault();
+            else if (what === 'decrypt') decryptThisVault();
             else if (what === 'lock') void useVaultStore.getState().lock('menu');
           }),
           onMenuSidebar(toggleSidebar),
