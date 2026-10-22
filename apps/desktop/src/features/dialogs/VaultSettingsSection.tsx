@@ -13,6 +13,7 @@ import { UnreadableList } from '../encryption/UnreadableList';
 import { usePageWidthStore } from '../../stores/pageWidthStore';
 import { validateName } from '../explorer/nameRules';
 import { ScratchFolderSetting } from '../scratchpad/ScratchFolderSetting';
+import { HomeSetting } from '../home/HomeSetting';
 import styles from './Dialogs.module.css';
 import { VaultSpelling } from './SpellingSettings';
 
@@ -163,6 +164,7 @@ export function VaultSettingsSection() {
       <h3 id={id} className={styles.sectionTitle}>
         {t('settings.sections.vault')}
       </h3>
+      <HomeSetting />
       <label className={styles.field}>
         <span>{t('vault.attachmentsLabel')}</span>
         <select

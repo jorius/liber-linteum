@@ -1018,6 +1018,57 @@ mod tests {
     }
 
     #[test]
+    fn the_home_page_follows_renames_and_moves_and_goes_with_the_trash_and_archive() {
+        use liber_vault::Home;
+        let page = |p: &str| Some(Home::Page { path: p.into() });
+        let f = fx(&[("a.md", "a"), ("F/G/b.md", "b"), ("c.md", "c")]);
+        let v = f.s.vault();
+        v.set_home(page("F/G/b.md").as_ref()).unwrap();
+        // Its own rename, then its folder's and a parent folder's move.
+        f.s.rename(&vp("F/G/b.md"), &vp("F/G/home.md"), true)
+            .unwrap();
+        assert_eq!(v.home(), page("F/G/home.md"));
+        f.s.rename(&vp("F/G"), &vp("F/H"), true).unwrap();
+        assert_eq!(v.home(), page("F/H/home.md"));
+        f.s.vault().create_dir_all(&vp("Top")).unwrap();
+        f.s.rename(&vp("F"), &vp("Top/F"), true).unwrap();
+        assert_eq!(v.home(), page("Top/F/H/home.md"));
+        // Trashing its folder clears it, and Restore doesn't bring it back.
+        let inner = f.s.trash(&vp("Top/F")).unwrap();
+        assert_eq!(v.home(), None);
+        f.s.trash_restore(&inner, false).unwrap();
+        assert_eq!(v.home(), None);
+        // Archived: cleared too.
+        v.set_home(page("a.md").as_ref()).unwrap();
+        f.s.archive(&vp("a.md"), true).unwrap();
+        assert_eq!(v.home(), None);
+        // The Global View stays whatever moves.
+        v.set_home(Some(&Home::GlobalView)).unwrap();
+        let inner = f.s.trash(&vp("c.md")).unwrap();
+        f.s.trash_delete_via(std::slice::from_ref(&inner), &remove(&f.root))
+            .unwrap();
+        assert_eq!(v.home(), Some(Home::GlobalView));
+    }
+
+    #[test]
+    fn the_home_page_is_forgotten_when_deleted_outside_the_app() {
+        if liber_testkit::plain_disk_only() {
+            return;
+        }
+        use liber_vault::Home;
+        let f = fx(&[("a.md", "a"), ("F/b.md", "b")]);
+        let v = f.s.vault();
+        v.set_home(Some(&Home::Page {
+            path: "F/b.md".into(),
+        }))
+        .unwrap();
+        std::fs::remove_dir_all(f.root.join("F")).unwrap();
+        f.s.apply(vec![liber_vault::WatchEvent::Removed(vp("F"))])
+            .unwrap();
+        assert_eq!(v.home(), None);
+    }
+
+    #[test]
     fn m5b_review_m8_a_folder_name_keeps_its_dots() {
         assert_eq!(super::numbered_entry("v1.2", 1, true), "v1.2 1");
         assert_eq!(super::numbered_entry("a.tar.gz", 1, false), "a.tar 1.gz");

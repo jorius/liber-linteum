@@ -1,0 +1,29 @@
+/* Settings → This vault → Home. */
+.setting {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.pageRow {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px 12px;
+  font: 600 13px var(--font-body);
+  color: var(--color-text-body);
+}
+
+.pageName {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  font-weight: 500;
+  color: var(--color-text-strong);
+  overflow-wrap: anywhere;
+}
+
+.pageName[data-empty] {
+  color: var(--color-text-muted);
+}

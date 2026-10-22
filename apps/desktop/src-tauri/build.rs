@@ -96,6 +96,9 @@ const COMMANDS: &[&str] = &[
     // M5b §19: Favorites.
     "favorites_get",
     "favorites_set",
+    // A vault's home page (or the Global View).
+    "home_get",
+    "home_set",
     // M6: audio clips (main window only).
     "audio_devices",
     "audio_record_start",

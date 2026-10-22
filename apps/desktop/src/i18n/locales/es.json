@@ -1083,6 +1083,31 @@
     "movedTo": "{name} pasó a la posición {position} de {count} en Favoritos",
     "scratchTree": "Notas rápidas"
   },
+  "home": {
+    "setPage": "Usar como página de inicio",
+    "removePage": "Quitar como página de inicio",
+    "glyph": "Página de inicio",
+    "setPageDone": "{name} es ahora la página de inicio",
+    "removedPage": "{name} ya no es la página de inicio",
+    "globalViewToggle": "Usar como inicio",
+    "globalViewSetHint": "Abrir esta bóveda en la Vista global",
+    "globalViewRemoveHint": "Esta bóveda se abre en la Vista global. Haz clic para dejar de hacerlo",
+    "globalViewSet": "Ahora esta bóveda se abre en la Vista global",
+    "globalViewRemoved": "Esta bóveda ya no se abre en la Vista global",
+    "setting": "Inicio",
+    "settingHint": "Lo que se muestra al abrir esta bóveda.",
+    "choices": {
+      "none": "Nada (elegir una página)",
+      "globalView": "Vista global",
+      "page": "Una página…"
+    },
+    "page": "Página de inicio",
+    "noPage": "Todavía no hay una página elegida",
+    "choose": "Elegir…",
+    "change": "Cambiar…",
+    "pickerLabel": "Buscar la página de inicio",
+    "pickerPlaceholder": "Escribe el nombre de una página"
+  },
   "notion": {
     "title": "Importar desde Notion",
     "intro": "Convierte una exportación de Notion «Markdown y CSV» en una bóveda nueva. No se escribe nada hasta que pulses Importar.",

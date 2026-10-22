@@ -1083,6 +1083,31 @@
     "movedTo": "{name} moved to {position} of {count} in Favorites",
     "scratchTree": "Quick notes"
   },
+  "home": {
+    "setPage": "Set as home page",
+    "removePage": "Remove as home page",
+    "glyph": "Home page",
+    "setPageDone": "{name} is now the home page",
+    "removedPage": "{name} is no longer the home page",
+    "globalViewToggle": "Use as home",
+    "globalViewSetHint": "Open this vault on the Global View",
+    "globalViewRemoveHint": "This vault opens on the Global View. Click to stop",
+    "globalViewSet": "This vault now opens on the Global View",
+    "globalViewRemoved": "This vault no longer opens on the Global View",
+    "setting": "Home",
+    "settingHint": "What shows when this vault opens.",
+    "choices": {
+      "none": "Nothing (pick a page)",
+      "globalView": "Global View",
+      "page": "A page…"
+    },
+    "page": "Home page",
+    "noPage": "No page chosen yet",
+    "choose": "Choose…",
+    "change": "Change…",
+    "pickerLabel": "Find the home page",
+    "pickerPlaceholder": "Type a page name"
+  },
   "notion": {
     "title": "Import from Notion",
     "intro": "Turns a Notion “Markdown & CSV” export into a new vault. Nothing is written until you press Import.",

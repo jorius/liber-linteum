@@ -149,6 +149,13 @@
   opacity: 0.85;
 }
 
+.homeGlyph {
+  display: inline-flex;
+  flex: none;
+  margin-left: -2px;
+  opacity: 0.8;
+}
+
 .count {
   margin-left: auto;
   flex: none;

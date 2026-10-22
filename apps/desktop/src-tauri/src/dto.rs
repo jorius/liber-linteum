@@ -52,6 +52,9 @@ pub struct VaultInfo {
     /// couldn't go to the Trash and are still in the vault folder. The UI
     /// offers `vault_trash_originals` and `vault_reveal_originals`.
     pub originals_pending: bool,
+    /// What the vault opens to (`.liber/vault.json`): a page or the Global
+    /// View; `None` is nothing chosen.
+    pub home: Option<liber_vault::Home>,
 }
 
 #[derive(Debug, Clone, Serialize)]

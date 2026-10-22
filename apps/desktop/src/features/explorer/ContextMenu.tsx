@@ -17,6 +17,8 @@ import { errorMessage } from '../../stores/messages';
 import { useToastStore } from '../../stores/toastStore';
 import { revealKey } from './reveal';
 import { newQuickNote } from '../scratchpad/quickNote';
+import { homeOffered, homePageOf, toggleHomePage, useHomeStore } from '../home/homeStore';
+import { isTextPath } from '../../stores/textFiles';
 
 export interface MenuState {
   path: string;
@@ -32,6 +34,8 @@ export function ContextMenu({ menu, onClose }: { menu: MenuState; onClose: () =>
     s.children.get(parentOf(menu.path))?.find((n) => n.path === menu.path),
   );
   const favorites = useFavoritesStore((s) => s.paths);
+  const homePage = useHomeStore((s) => homePageOf(s.home));
+  const offersHome = useVaultStore((s) => homeOffered(s.info));
   const [active, setActive] = useState(0);
   // Icon… swaps the menu for the emoji picker at the same place (M5b §4).
   const [picking, setPicking] = useState(false);
@@ -129,6 +133,16 @@ export function ContextMenu({ menu, onClose }: { menu: MenuState; onClose: () =>
         [t('menu.sortBy'), () => setSorting(true)],
         [t('menu.archive'), () => void archiveItem(node.path)],
         [t('menu.delete'), () => requestTrash(node.path)],
+        // The vault's home: a page (a folder's own page) or a text file.
+        ...(offersHome &&
+        (page || node.kind === 'page' || (node.kind === 'attachment' && isTextPath(node.path)))
+          ? [
+              [
+                t(homePage === target ? 'home.removePage' : 'home.setPage'),
+                () => void toggleHomePage(target),
+              ] as [string, () => void],
+            ]
+          : []),
         // Favorites (M5b §19): pages and folders; a favorite also moves in the list.
         ...favoriteActions(target, page ? 'page' : node.kind, favorites, t),
       ];

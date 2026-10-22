@@ -171,6 +171,23 @@ export function installIpcMock({
       relation,
     };
   };
+  /** The vault's home (`.liber/vault.json`'s `home`), kept in sessionStorage
+   *  like favorites so a reload still has it. It follows renames and is
+   *  cleared by the Trash and the Archive, as Rust does. */
+  type Home = { kind: 'page'; path: string } | { kind: 'globalView' };
+  const home = (): Home | null =>
+    JSON.parse(sessionStorage.getItem('liberMockHome') ?? 'null') as Home | null;
+  const setHome = (next: Home | null) =>
+    sessionStorage.setItem('liberMockHome', JSON.stringify(next));
+  const within = (path: string, dir: string) => path === dir || path.startsWith(`${dir}/`);
+  /** `from` moved to `to`: a page home inside it follows (or, into a bin, goes). */
+  const homeMoved = (from: string, to: string | null) => {
+    const h = home();
+    if (h?.kind !== 'page' || !within(h.path, from)) return;
+    const next = to === null ? null : to + h.path.slice(from.length);
+    const binned = !next || /^\.(trash|archive)(\/|$)/.test(next);
+    setHome(binned ? null : { kind: 'page', path: next });
+  };
   /** E4: the encrypted vault is unlocked; `vault_lock` locks it again. */
   let encUnlocked = false;
   /** Encrypt in place: the conversion between `vault_encrypt_begin` and `_run`. */
@@ -181,6 +198,7 @@ export function installIpcMock({
     root,
     encrypted: true,
     recoveryVoid: encrypted?.recoveryVoid ?? false,
+    home: home(),
     report: {
       files: 2,
       pages: 2,
@@ -315,6 +333,7 @@ export function installIpcMock({
       const to = a.to as string;
       pages[to] = pages[from];
       delete pages[from];
+      homeMoved(from, to);
       ((w.__liberRenames ??= []) as unknown[]).push({ from, to });
       return { moved: [[from, to]], updatedFiles: [], updatedLinks: 0, failed: [] };
     },
@@ -381,6 +400,7 @@ export function installIpcMock({
       const inner = `.trash/${from.split('/').pop()}`;
       trashed[inner] = { text: pages[from], from, at: Date.now() };
       delete pages[from];
+      homeMoved(from, null);
       return inner;
     },
     trash_restore: (a) => {
@@ -402,6 +422,7 @@ export function installIpcMock({
       const to = `.archive/${from}`;
       pages[to] = pages[from];
       delete pages[from];
+      homeMoved(from, null);
       return { moved: [[from, to]], updatedFiles: [], updatedLinks: 0, failed: [] };
     },
     archive_restore: (a) => {
@@ -569,6 +590,7 @@ export function installIpcMock({
       return {
         name: 'vault',
         root: '/vault',
+        home: home(),
         report: {
           files: 2,
           pages: 2,
@@ -613,6 +635,21 @@ export function installIpcMock({
     favorites_set: (a) => {
       const next = (a.paths as string[]).filter((p, i, all) => all.indexOf(p) === i);
       sessionStorage.setItem('liberMockFavorites', JSON.stringify(next));
+      return next;
+    },
+    // The window's title (M5b §2.3), kept so tests can read it.
+    window_title_set: (a) => {
+      w.__liberWindowTitle = a.title;
+      return null;
+    },
+    // The vault's home: a page of the vault (not a bin's) or the Global View.
+    home_get: () => home(),
+    home_set: (a) => {
+      const next = (a.home as Home | null) ?? null;
+      if (next?.kind === 'page' && (!(next.path in pages) || /^\./.test(next.path))) {
+        throw { kind: 'notFound', message: `not in the vault: ${next.path}` };
+      }
+      setHome(next);
       return next;
     },
     // ---- spell checking: a tiny dictionary that knows one misspelling ----

@@ -67,6 +67,9 @@ interface OpenOpts {
   path?: string;
   /** An unlock: its failure is shown by the Unlock screen, not toasted. */
   quiet?: boolean;
+  /** `false`: the caller shows a page of its own right after (a file opened
+   *  from outside, a Notion import's report), so the vault's home isn't. */
+  home?: boolean;
 }
 
 export type VaultStatus = 'closed' | 'opening' | 'open' | 'locked';
@@ -94,7 +97,8 @@ interface VaultState {
   /** Breadcrumb (M2a §5): a folder is expanded with its ancestors and focused;
    *  `''` (the vault) collapses the tree and focuses its first row. */
   revealFolder: (path: string) => void;
-  open: (path: string) => Promise<IpcResult<VaultInfo>>;
+  /** `home: false`: the caller opens a page of its own next (see `OpenOpts`). */
+  open: (path: string, opts?: { home?: boolean }) => Promise<IpcResult<VaultInfo>>;
   /** Opens the global Scratchpad (M4c §2): Rust knows its folder. */
   openScratchpad: () => Promise<IpcResult<VaultInfo>>;
   /** Imports a Notion export into a new vault `name` (M7) and opens it. The
@@ -180,6 +184,17 @@ const beforeSwitch = new Set<() => Promise<unknown>>();
 export function onBeforeVaultSwitch(run: () => Promise<unknown>): () => void {
   beforeSwitch.add(run);
   return () => beforeSwitch.delete(run);
+}
+
+/** What runs once a vault is open and on screen (plain, or unlocked):
+ *  `home` is false when the open's caller shows a page of its own next. The
+ *  vault's home registers here, so this store doesn't depend on it. */
+type OpenedHook = (info: VaultInfo, opts: { home: boolean }) => Promise<unknown> | void;
+const afterOpen = new Set<OpenedHook>();
+
+export function onVaultOpened(run: OpenedHook): () => void {
+  afterOpen.add(run);
+  return () => afterOpen.delete(run);
 }
 
 const toast = () => useToastStore.getState();
@@ -455,6 +470,14 @@ export const useVaultStore = create<VaultState>((set, get) => {
         detail: warnings.map(warningText),
       });
     }
+    const home = opts?.home !== false;
+    for (const run of [...afterOpen]) {
+      try {
+        await run(info, { home });
+      } catch {
+        // A feature's own failure never fails the open.
+      }
+    }
     return res;
   }
 
@@ -494,7 +517,7 @@ export const useVaultStore = create<VaultState>((set, get) => {
   return {
     ...EMPTY,
     locking: false,
-    open: (path) => withProgress(() => vaultOpen(path), { path }),
+    open: (path, o) => withProgress(() => vaultOpen(path), { path, home: o?.home }),
     openScratchpad: () => withProgress(() => scratchpadOpen()),
     importNotion: async (name) => {
       const before = get().status;
@@ -503,10 +526,12 @@ export const useVaultStore = create<VaultState>((set, get) => {
       if (before === 'open' && !(await savedEverything())) return { ok: false, error: BUSY };
       const res = await notionImport(name);
       // A failed import isn't opened: the dialog offers to open it anyway.
-      if (res.ok && res.value.vault) await opened({ ok: true, value: res.value.vault }, before);
+      // Its report page opens next (the dialog), not the vault's home.
+      if (res.ok && res.value.vault)
+        await opened({ ok: true, value: res.value.vault }, before, { home: false });
       return res;
     },
-    openPartialImport: () => withProgress(() => notionOpenPartial()),
+    openPartialImport: () => withProgress(() => notionOpenPartial(), { home: false }),
     create: (path) => withProgress(() => vaultCreate(path)),
     unlock: async (secret) => {
       const path = get().lockedPath;

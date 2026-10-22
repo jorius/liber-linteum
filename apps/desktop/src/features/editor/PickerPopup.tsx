@@ -30,6 +30,8 @@ export interface PickerPopupProps {
   label: string;
   placeholder: string;
   onPick: (option: PickerOption) => void;
+  /** Pages it may offer (default: every page). */
+  filter?: (page: LinkSuggestion) => boolean;
   /** `refocus`: give the keyboard back to where the picker was opened. */
   onClose: (refocus: boolean) => void;
 }
@@ -44,6 +46,7 @@ export function PickerPopup({
   label,
   placeholder,
   onPick,
+  filter,
   onClose,
 }: PickerPopupProps) {
   const { t } = useTranslation();
@@ -59,13 +62,15 @@ export function PickerPopup({
     let live = true;
     void linkSuggest(source, query.trim(), false).then((res) => {
       if (!live || !res.ok) return;
-      setPages(res.value.filter((s) => s.kind === 'page').slice(0, MAX_PAGES));
+      setPages(
+        res.value.filter((s) => s.kind === 'page' && (!filter || filter(s))).slice(0, MAX_PAGES),
+      );
       setActive(0);
     });
     return () => {
       live = false;
     };
-  }, [query, source]);
+  }, [query, source, filter]);
 
   const reposition = useCallback(() => {
     const at = anchor();
