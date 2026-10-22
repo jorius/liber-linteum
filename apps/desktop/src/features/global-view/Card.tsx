@@ -239,7 +239,8 @@ export function Card({
               <AtomIcon />
             </button>
           )}
-          {/* M4b part 3 §4: a page is edited; a folder's pages are seen. */}
+          {/* M4b part 3 §4: a page is edited; a folder's pages are seen, a
+              folder page's too (its page opens on a double click). */}
           <button
             type="button"
             className={styles.seeAll}
@@ -249,7 +250,7 @@ export function Card({
                 ? t('gv.editLabel', { title: card.title })
                 : t('gv.seeAllLabel', { title: card.title })
             }
-            onClick={onOpenEditor}
+            onClick={page ? onOpenEditor : onOpen}
           >
             {page ? <EditIcon /> : <StackIcon />}
             {t(page ? 'gv.edit' : 'gv.seeAll')}

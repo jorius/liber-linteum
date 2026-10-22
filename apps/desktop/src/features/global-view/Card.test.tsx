@@ -128,6 +128,23 @@ describe('Global View card (M3a §4)', () => {
     expect(screen.getByRole('group', { name: 'Generator Rex, folder' })).toBeInTheDocument();
   });
 
+  it("M4b part 3 §4: a folder page's See all shows its pages; the page itself opens on a double click", async () => {
+    const user = userEvent.setup();
+    const { onOpen, onOpenEditor } = show(
+      card({
+        path: 'World',
+        kind: 'folder',
+        title: 'World',
+        indexPage: 'World/World.md',
+      }),
+    );
+    await user.click(screen.getByRole('button', { name: 'See all: World' }));
+    expect(onOpen).toHaveBeenCalledTimes(1);
+    expect(onOpenEditor).not.toHaveBeenCalled();
+    fireEvent.doubleClick(screen.getByRole('button', { name: 'World' }));
+    expect(onOpenEditor).toHaveBeenCalledTimes(1);
+  });
+
   it('M4b part 3 §3: a side cover is a strip on that side, focused in both axes', () => {
     const { unmount } = show(card({ coverSide: 'left', coverX: 20, coverY: 70 }));
     expect(document.querySelector('[data-cover-side]')).toHaveAttribute('data-cover-side', 'left');
