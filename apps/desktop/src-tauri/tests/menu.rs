@@ -11,7 +11,9 @@ use std::rc::Rc;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Duration;
-use tauri::menu::{Menu, MenuEvent, MenuId, MenuItemKind};
+#[cfg(target_os = "macos")]
+use tauri::menu::{Menu, MenuItemKind};
+use tauri::menu::{MenuEvent, MenuId};
 use tauri::test::{MockRuntime, mock_builder};
 use tauri::{App, Manager, RunEvent, WindowEvent};
 
@@ -33,9 +35,12 @@ fn main_window(handle: &tauri::AppHandle<MockRuntime>) -> tauri::WebviewWindow<M
     handle.get_webview_window("main").expect("the main window")
 }
 
+// Only the macOS menu test reads the outline (Linux and Windows have no app menu).
+#[cfg(target_os = "macos")]
 type Entry = (&'static str, String, String);
 
 /// (submenu text, [(item kind, id, text)]) for every top-level submenu.
+#[cfg(target_os = "macos")]
 fn outline(menu: &Menu<MockRuntime>) -> Vec<(String, Vec<Entry>)> {
     menu.items()
         .unwrap()
@@ -111,10 +116,19 @@ fn macos_menu_quit_is_ours_and_the_standard_items_stay() {
             .filter(|t| !t.is_empty())
             .collect()
     };
-    // Text editing shortcuts (⌘Z, ⌘C, ⌘V, …) come from the Edit menu on macOS.
+    // Text editing shortcuts (⌘Z, ⌘C, ⌘V, …) come from the Edit menu on
+    // macOS; Find… (⌘F) finds in the page, View → Search… is ⌘⇧F.
     assert_eq!(
         texts("Edit"),
-        ["Undo", "Redo", "Cut", "Copy", "Paste", "Select All"]
+        [
+            "Undo",
+            "Redo",
+            "Cut",
+            "Copy",
+            "Paste",
+            "Select All",
+            "Find…"
+        ]
     );
     // M2b §3: Back / Forward along the link trail (⌘[ / ⌘] are handled by the
     // page itself, so the items carry no accelerator).
@@ -186,7 +200,7 @@ fn menu_events_reach_one_window_only() {
                 .build()
                 .unwrap();
             for (window, name) in [(main_window(handle), "main"), (file, "file-1")] {
-                for event in ["menu:open-file", "menu:toggle"] {
+                for event in ["menu:open-file", "menu:toggle", "menu:find"] {
                     let log = log.clone();
                     window.listen(event, move |e| {
                         log.lock()
@@ -198,6 +212,7 @@ fn menu_events_reach_one_window_only() {
             for id in [
                 liber_desktop::menu::OPEN_FILE_ID,
                 liber_desktop::menu::TOOLBAR_ID,
+                liber_desktop::menu::FIND_ID,
             ] {
                 liber_desktop::menu::on_menu_event(
                     handle,
@@ -215,7 +230,8 @@ fn menu_events_reach_one_window_only() {
         *got.lock().unwrap(),
         [
             "main menu:open-file null".to_string(),
-            "main menu:toggle \"toolbar\"".into()
+            "main menu:toggle \"toolbar\"".into(),
+            "main menu:find null".into()
         ]
     );
 }

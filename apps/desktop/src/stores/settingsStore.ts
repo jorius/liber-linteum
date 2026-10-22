@@ -34,6 +34,7 @@ export const DEFAULT_SETTINGS: Settings = {
   outline: false,
   coverHeight: 200,
   showAttachmentPaths: false,
+  showExtensions: false,
   scratchpadPath: null,
   autoSave: true,
   sidebarCollapsed: false,

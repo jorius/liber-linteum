@@ -25,6 +25,7 @@ import { Preview } from '../preview/Preview';
 import styles from './Editor.module.css';
 import { followLinkAtCursor, livePreview, pagePath } from './livePreview';
 import { attachmentHandlers } from './attachments';
+import { findInPage, findPhrases, phrasesSlot } from './findInPage';
 import { flash, jumpTo } from './flash';
 import { BlockGutter, type Shown } from './BlockGutter';
 import { SplitHint } from './SplitHint';
@@ -300,6 +301,8 @@ function createTextState(d: PageDoc, label: string): EditorState {
       languageSlot.of([]),
       syntaxHighlighting(codeHighlighter),
       keymap.of([...defaultKeymap, ...historyKeymap]),
+      // ⌘F / Ctrl+F: find (and replace) in the file.
+      findInPage(),
       theme,
       labelSlot.of(labelled(label)),
       modeSlot.of(modeExtensions('source')),
@@ -327,6 +330,8 @@ function createState(d: PageDoc, mode: EditorMode, label: string, numbers: boole
       // Syntax colours inside fenced code (M4b part 2 §2), in every mode.
       syntaxHighlighting(codeHighlighter),
       keymap.of([{ key: 'Mod-Enter', run: followLinkAtCursor }, ...editorKeymap, ...historyKeymap]),
+      // ⌘F / Ctrl+F: find (and replace) in the page.
+      findInPage(),
       pagePath.of(() => d.path),
       theme,
       labelSlot.of(labelled(label)),
@@ -362,7 +367,7 @@ export function Editor({ doc, mode, label }: EditorProps) {
   const width = usePageWidth(doc.path);
   const wideKinds = useWideElements();
   const textFile = isTextPath(doc.path);
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const host = useRef<HTMLDivElement>(null);
   const pane = useRef<HTMLDivElement>(null);
   const view = useRef<EditorView | null>(null);
@@ -448,6 +453,8 @@ export function Editor({ doc, mode, label }: EditorProps) {
         modeSlot.reconfigure(modeExtensions(mode)),
         labelSlot.reconfigure(labelled(label)),
         gutterSlot.reconfigure(gutter(showNumbers || isTextPath(doc.path))),
+        // Its find panel's words, in case the language changed since.
+        phrasesSlot.reconfigure(findPhrases()),
         // A page's stored state may predate a change to the setting.
         ...(isTextPath(doc.path) ? [] : [spellSlot.reconfigure(spellOn() ? spellcheck() : [])]),
       ],
@@ -461,6 +468,12 @@ export function Editor({ doc, mode, label }: EditorProps) {
       effects: [modeSlot.reconfigure(modeExtensions(mode)), labelSlot.reconfigure(labelled(label))],
     });
   }, [mode, label]);
+
+  // The find panel speaks the app's language (it shows the new words when
+  // it next opens).
+  useLayoutEffect(() => {
+    view.current?.dispatch({ effects: phrasesSlot.reconfigure(findPhrases()) });
+  }, [i18n.language]);
 
   // Unarchived (or archived) while open: the same doc, a new place.
   useLayoutEffect(() => {

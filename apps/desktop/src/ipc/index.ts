@@ -251,6 +251,9 @@ export interface Settings {
   coverHeight: number;
   /** A caption with each attachment's place on disk (M4b part 3 §8). */
   showAttachmentPaths: boolean;
+  /** File names show their extension (`Chapter 1.md`, `notes.txt`) where
+   *  the UI names a file; off: pages without `.md`. Never a page's title. */
+  showExtensions: boolean;
   /** The global Scratchpad's folder (M4c §2); `null` until the first quick
    *  note. Changed only through `scratchpadSet`, never a settings patch. */
   scratchpadPath?: string | null;
@@ -323,6 +326,7 @@ export interface SettingsPatch {
   outline?: boolean;
   coverHeight?: number;
   showAttachmentPaths?: boolean;
+  showExtensions?: boolean;
   autoSave?: boolean;
   sidebarCollapsed?: boolean;
   sidebarWidth?: number;
@@ -1272,6 +1276,9 @@ export const onNotionProgress = (
 /** View → Search… in the app menu (M5 §4). */
 export const onMenuSearch = (cb: () => void): Promise<UnlistenFn> =>
   listen<null>('menu:search', () => cb(), mine());
+/** Edit → Find… in the app menu: find in the page (find in page). */
+export const onMenuFind = (cb: () => void): Promise<UnlistenFn> =>
+  listen<null>('menu:find', () => cb(), mine());
 /** Liber Linteum → Settings… (M5b §2.1). */
 export const onMenuSettings = (cb: () => void): Promise<UnlistenFn> =>
   listen<null>('menu:settings', () => cb(), mine());

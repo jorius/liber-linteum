@@ -26,9 +26,23 @@ describe('Settings → Keyboard shortcuts (M5b §18)', () => {
 
   it('lists the keys only the page answers (round-2 review M11)', () => {
     // Hand-kept: these live in useGlobalShortcuts' key tests, not in a table a test can read.
-    for (const k of ['Mod+[', 'Mod+]', 'Mod+1', 'Mod+2', 'Mod+F', 'Mod+J', 'Mod+Shift+D']) {
+    for (const k of ['Mod+[', 'Mod+]', 'Mod+1', 'Mod+2', 'Mod+F', 'Mod+J', 'Mod+Shift+D', 'F3']) {
       expect(listed, k).toContain(k);
     }
+  });
+
+  it('find in page: ⌘F is Edit → Find…, ⌘⇧F View → Search…', () => {
+    const menu = readFileSync(new URL('../../../src-tauri/src/menu.rs', import.meta.url), 'utf8');
+    expect(menu).toMatch(/FIND_ACCELERATOR: &str = "CmdOrCtrl\+F"/);
+    expect(menu).toMatch(/SEARCH_ACCELERATOR: &str = "CmdOrCtrl\+Shift\+F"/);
+    const label = (keys: string) =>
+      SHORTCUT_GROUPS.flatMap((g): readonly { keys: string; label: string }[] => g.items).find(
+        (i) => i.keys === keys,
+      )?.label;
+    expect(label('Mod+F')).toBe('findInPage');
+    expect(label('Mod+Shift+F')).toBe('search');
+    expect(keyLabel('Shift+F3', true)).toBe('⇧F3');
+    expect(keyLabel('Shift+F3', false)).toBe('Shift+F3');
   });
 
   it('writes keys the way each platform does', () => {

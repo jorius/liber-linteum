@@ -103,6 +103,7 @@ export function SettingsDialog({ onClose }: { onClose: () => void }) {
   const ids = {
     wideHint: useId(),
     autoSaveHint: useId(),
+    extensionsHint: useId(),
   };
   const vault = useVaultStore((s) => s.info);
   const vaultOpen = vault !== null;
@@ -465,6 +466,18 @@ export function SettingsDialog({ onClose }: { onClose: () => void }) {
                 />
                 {t('settings.confirmDelete')}
               </label>
+              <label className={styles.check}>
+                <input
+                  type="checkbox"
+                  checked={settings.showExtensions === true}
+                  onChange={(e) => void update({ showExtensions: e.target.checked })}
+                  aria-describedby={ids.extensionsHint}
+                />
+                {t('settings.showExtensions')}
+              </label>
+              <p id={ids.extensionsHint} className={styles.hint}>
+                {t('settings.showExtensionsHint')}
+              </p>
               <ScratchpadLocation />
             </>,
           )}

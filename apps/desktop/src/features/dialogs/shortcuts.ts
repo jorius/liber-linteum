@@ -9,7 +9,10 @@ export const SHORTCUT_GROUPS = [
       { keys: 'Mod+]', label: 'forward' },
       { keys: 'Mod+1', label: 'edit' },
       { keys: 'Mod+2', label: 'globalView' },
-      { keys: 'Mod+F', label: 'search' },
+      // ⌘F finds in the open page; outside the editor it is Search too.
+      { keys: 'Mod+F', label: 'findInPage' },
+      { keys: 'F3', label: 'findNext' },
+      { keys: 'Shift+F3', label: 'findPrevious' },
       { keys: 'Mod+Shift+F', label: 'search' },
       { keys: 'Mod+Shift+E', label: 'files' },
     ],

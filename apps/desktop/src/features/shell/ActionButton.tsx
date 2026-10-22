@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { ActionsIcon, GraphIcon, PencilIcon, SearchIcon } from '../../app/icons';
 import { useSettingsStore } from '../../stores/settingsStore';
 import { useUiStore } from '../../stores/uiStore';
+import { keyLabel } from '../dialogs/shortcuts';
 import styles from './Shell.module.css';
 
 const MAC = /Mac/i.test(navigator.platform);
@@ -77,13 +78,14 @@ export function ActionButton() {
           <button
             type="button"
             className={styles.fabItem}
-            aria-keyshortcuts="Meta+F Control+F"
+            aria-keyshortcuts="Meta+Shift+F Control+Shift+F"
             onClick={() => run(() => openDialog({ type: 'search' }))}
           >
             <SearchIcon />
             {t('search.button')}
             <kbd className={styles.kbd} aria-hidden="true">
-              {keys('F')}
+              {/* ⌘F finds in the page while the editor shows one (find in page). */}
+              {keyLabel('Mod+Shift+F', MAC)}
             </kbd>
           </button>
           <button

@@ -6,6 +6,12 @@ export const parentOf = (path: string): string =>
 
 export const nameOf = (path: string): string => path.slice(path.lastIndexOf('/') + 1);
 
+/** A file's name as the UI shows it (not a page's title): without `.md`
+ *  unless `extensions` (Settings → Files → Show file extensions); other
+ *  extensions always show. */
+export const shownName = (path: string, extensions: boolean): string =>
+  extensions ? nameOf(path) : nameOf(path).replace(/\.md$/i, '');
+
 export const joinPath = (dir: string, name: string): string => (dir ? `${dir}/${name}` : name);
 
 /** Children per parent path (`''` = vault root), in backend order. */

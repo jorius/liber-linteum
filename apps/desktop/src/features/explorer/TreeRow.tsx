@@ -2,7 +2,8 @@ import { useDraggable, useDroppable } from '@dnd-kit/core';
 import { forwardRef, useEffect, useId, useRef, useState, type KeyboardEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { TreeNode } from '../../ipc';
-import { isArchived } from '../../stores/tree';
+import { useSettingsStore } from '../../stores/settingsStore';
+import { isArchived, nameOf } from '../../stores/tree';
 import { StarIcon } from '../favorites/FavoritesSection';
 import { useFavoritesStore } from '../favorites/favoritesStore';
 import { IconButton, ItemIcon } from '../icons/ItemIcon';
@@ -11,11 +12,15 @@ import styles from './Explorer.module.css';
 import { validateName } from './nameRules';
 import { requestTrash } from './trashAction';
 
-/** Name shown in the tree: pages without their `.md`. */
-export function displayName(node: TreeNode): string {
-  const name = node.path.slice(node.path.lastIndexOf('/') + 1);
-  return node.kind === 'page' ? name.replace(/\.md$/i, '') : name;
+/** Name shown in the tree: pages without their `.md`, unless `extensions`
+ *  (Settings → Files → Show file extensions); other files as they are named. */
+export function displayName(node: TreeNode, extensions: boolean): string {
+  const name = nameOf(node.path);
+  return node.kind === 'page' && !extensions ? name.replace(/\.md$/i, '') : name;
 }
+
+/** Settings → Files → Show file extensions, for the names a component shows. */
+export const useShowExtensions = () => useSettingsStore((s) => s.settings.showExtensions === true);
 
 /** The extension kept when renaming (`.md` as written, or '' for folders). */
 export function keptExtension(node: TreeNode): string {
@@ -154,7 +159,10 @@ function RenameInput({
   onCancel: () => void;
 }) {
   const { t } = useTranslation();
-  const [value, setValue] = useState(displayName(node));
+  // The field edits the name; a page's `.md` stays outside it, shown after
+  // it when extensions show, and is put back on commit (`keptExtension`).
+  const [value, setValue] = useState(displayName(node, false));
+  const suffix = useShowExtensions() ? keptExtension(node) : '';
   const input = useRef<HTMLInputElement>(null);
   // Set once Enter/Escape decided; the blur that follows unmounting is ignored.
   const finished = useRef(false);
@@ -183,23 +191,30 @@ function RenameInput({
 
   return (
     <span className={styles.renameBox}>
-      <input
-        ref={input}
-        className={styles.renameInput}
-        aria-label={t('explorer.rename')}
-        aria-invalid={error ? true : undefined}
-        aria-describedby={error ? errorId : undefined}
-        value={value}
-        onChange={(e) => setValue(e.target.value)}
-        onKeyDown={onKeyDown}
-        onClick={(e) => e.stopPropagation()}
-        onBlur={() => {
-          if (finished.current) return;
-          finished.current = true;
-          if (error) onCancel();
-          else onCommit(value.trim());
-        }}
-      />
+      <span className={styles.renameLine}>
+        <input
+          ref={input}
+          className={styles.renameInput}
+          aria-label={t('explorer.rename')}
+          aria-invalid={error ? true : undefined}
+          aria-describedby={error ? errorId : undefined}
+          value={value}
+          onChange={(e) => setValue(e.target.value)}
+          onKeyDown={onKeyDown}
+          onClick={(e) => e.stopPropagation()}
+          onBlur={() => {
+            if (finished.current) return;
+            finished.current = true;
+            if (error) onCancel();
+            else onCommit(value.trim());
+          }}
+        />
+        {suffix && (
+          <span className={styles.renameExt} data-rename-ext>
+            {suffix}
+          </span>
+        )}
+      </span>
       {error && (
         <span id={errorId} className={styles.renameError}>
           {t(
@@ -234,7 +249,7 @@ export const TreeRow = forwardRef<HTMLLIElement, TreeRowProps>(function TreeRow(
   ref,
 ) {
   const { t } = useTranslation();
-  const name = displayName(node);
+  const name = displayName(node, useShowExtensions());
   // The Archive is read-only (M5b round 2): no new page inside, no icon.
   const archived = isArchived(node.path);
   // A folder page's ★ and ☺ act on its page (round 3b §6.2).

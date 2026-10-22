@@ -11,13 +11,14 @@ import { detectLanguage, initI18n } from './i18n';
 import { isFileWindowLabel } from './ipc';
 import { installRecorderEvents } from './features/audio/recorderStore';
 import { installFileDropIfTauri } from './features/editor/attachments';
+import { installFindMenuIfTauri } from './features/editor/findInPage';
 import { installSeeAtomsMenuIfTauri } from './features/global-view/seeAtomsMenu';
 import { installOpenFile, installOpenInVault } from './features/singleFile/openFile';
 import { SingleFileApp } from './features/singleFile/SingleFileApp';
 import { installFileWatch } from './features/singleFile/singleFileStore';
 import { installSearchMenuIfTauri } from './features/search/searchMenu';
 import { installSaveKey, installShellMenuIfTauri } from './features/shell/shellMenu';
-import { installNoFindBar } from './features/shell/useGlobalShortcuts';
+import { installFindKey, installNoFindBar } from './features/shell/useGlobalShortcuts';
 import { installQuitGuardIfTauri } from './stores/editorStore';
 import { installMenuTogglesIfTauri } from './stores/menuToggles';
 import { installMenuNavigationIfTauri } from './stores/navigate';
@@ -38,10 +39,13 @@ void initI18n(detectLanguage(navigator.languages))
     installShellMenuIfTauri(!singleFile);
     installSaveKey();
     installNoFindBar();
+    installFindMenuIfTauri(!singleFile);
     installSettingsSync();
     installOpenFile();
     if (singleFile) {
       void installFileWatch().catch(() => undefined);
+      // The main window's ⌘F is in its global shortcuts.
+      installFindKey();
     } else {
       installMenuNavigationIfTauri();
       installSeeAtomsMenuIfTauri();

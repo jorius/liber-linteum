@@ -1,7 +1,8 @@
 import { useEffect, useId, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { UnsavedChoice } from '../../stores/uiStore';
-import { nameOf } from '../../stores/tree';
+import { shownName } from '../../stores/tree';
+import { useShowExtensions } from '../explorer/TreeRow';
 import { Dialog } from './Dialog';
 import styles from './Dialogs.module.css';
 
@@ -17,6 +18,7 @@ export function UnsavedDialog({
   onClose: () => void;
 }) {
   const { t } = useTranslation();
+  const extensions = useShowExtensions();
   const bodyId = useId();
   const answered = useRef(false);
   const reply = (c: UnsavedChoice) => {
@@ -39,7 +41,7 @@ export function UnsavedDialog({
   };
   const title =
     paths.length === 1
-      ? t('dialogs.unsaved.titleOne', { name: nameOf(paths[0]).replace(/\.md$/i, '') })
+      ? t('dialogs.unsaved.titleOne', { name: shownName(paths[0], extensions) })
       : t('dialogs.unsaved.titleMany', { count: paths.length });
   return (
     <Dialog
@@ -55,7 +57,7 @@ export function UnsavedDialog({
       {paths.length > 1 && (
         <ul className={styles.text} aria-label={t('dialogs.unsaved.list')}>
           {paths.map((p) => (
-            <li key={p}>{nameOf(p).replace(/\.md$/i, '')}</li>
+            <li key={p}>{shownName(p, extensions)}</li>
           ))}
         </ul>
       )}

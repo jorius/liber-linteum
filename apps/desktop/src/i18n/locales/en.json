@@ -355,6 +355,8 @@
     "themeDark": "Dark",
     "rewriteLinks": "Update links when renaming or moving",
     "confirmDelete": "Ask before moving to Trash",
+    "showExtensions": "Show file extensions",
+    "showExtensionsHint": "File names show their extension, like Chapter 1.md or notes.txt. Page titles stay as they are.",
     "sections": {
       "vault": "This vault"
     },
@@ -443,7 +445,7 @@
       },
       "files": {
         "title": "Files and quick notes",
-        "description": "Renaming, deleting and where quick notes live."
+        "description": "Names, renaming, deleting and where quick notes live."
       },
       "security": {
         "title": "Security",
@@ -470,7 +472,10 @@
         "forward": "Forward",
         "edit": "Edit",
         "globalView": "Global View",
-        "search": "Search",
+        "findInPage": "Find in the page (outside the editor: Search)",
+        "findNext": "Next match",
+        "findPrevious": "Previous match",
+        "search": "Search the vault",
         "files": "Go to the files",
         "newPage": "New page",
         "quickNote": "Create new scratchpad for this vault",
@@ -1192,5 +1197,22 @@
     "quitWhile": "Encrypting “{name}”… Quit anyway? It will finish or undo itself next time you open it.",
     "quitAnyway": "Quit anyway",
     "keepEncrypting": "Keep encrypting"
+  },
+  "findInPage": {
+    "find": "Find in page",
+    "replaceField": "Replace with",
+    "next": "Next",
+    "previous": "Previous",
+    "all": "Select all",
+    "matchCase": "Match case",
+    "regexp": "Regular expression",
+    "byWord": "Whole word",
+    "replace": "Replace",
+    "replaceAll": "Replace all",
+    "close": "Close find",
+    "currentMatch": "Current match",
+    "onLine": "on line",
+    "replacedMatches": "Replaced $ matches",
+    "replacedOnLine": "Replaced the match on line $"
   }
 }

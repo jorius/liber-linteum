@@ -2,10 +2,10 @@ import { useEffect, useId, useRef, useState, type CSSProperties, type KeyboardEv
 import { useTranslation } from 'react-i18next';
 import { FolderIcon } from '../../app/icons';
 import type { TreeNode } from '../../ipc';
-import { childrenByParent, folderPageOf, nameOf, parentOf } from '../../stores/tree';
+import { childrenByParent, folderPageOf, parentOf, shownName } from '../../stores/tree';
 import { useVaultStore } from '../../stores/vaultStore';
 import { dropEntry, planDrop } from '../explorer/drop';
-import { displayName, Icon } from '../explorer/TreeRow';
+import { displayName, Icon, useShowExtensions } from '../explorer/TreeRow';
 import { ItemIcon } from '../icons/ItemIcon';
 import { Dialog } from './Dialog';
 import styles from './Dialogs.module.css';
@@ -32,6 +32,7 @@ function ancestors(path: string): string[] {
  *  folders as a tree to pick from, filtered by typing (round 3 §3.2). */
 export function MoveToDialog({ path, onClose }: { path: string; onClose: () => void }) {
   const { t } = useTranslation();
+  const extensions = useShowExtensions();
   const nodes = useVaultStore((s) => s.nodes);
   const node = nodes.find((n) => n.path === path);
   const current = parentOf(path);
@@ -63,7 +64,7 @@ export function MoveToDialog({ path, onClose }: { path: string; onClose: () => v
         !n.path.startsWith(`${path}/`),
     ),
   );
-  const label = (p: string) => nameOf(p).replace(/\.md$/i, '');
+  const label = (p: string) => shownName(p, extensions);
   const q = query.trim().toLowerCase();
   const keep = new Set<string>();
   if (q) {
@@ -152,7 +153,10 @@ export function MoveToDialog({ path, onClose }: { path: string; onClose: () => v
   };
 
   return (
-    <Dialog title={t('dialogs.move.title', { name: displayName(node) })} onClose={onClose}>
+    <Dialog
+      title={t('dialogs.move.title', { name: displayName(node, extensions) })}
+      onClose={onClose}
+    >
       <span className={styles.field} id={labelId}>
         {t('dialogs.move.to')}
       </span>

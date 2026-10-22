@@ -512,6 +512,51 @@ fn m4b3_show_attachment_paths_default_persist_and_reset() {
     assert!(warning.unwrap().contains("showAttachmentPaths"));
 }
 
+/// Show file extensions: off by default, also for a settings file written
+/// before the setting existed; on persists; a wrong value falls back to off
+/// with a warning and leaves the other fields alone.
+#[test]
+fn show_extensions_default_persist_and_reset() {
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::write(
+        dir.path().join("settings.json"),
+        r#"{"version":1,"theme":"dark","confirmDelete":false}"#,
+    )
+    .unwrap();
+    let (old, warning) = store(dir.path()).get();
+    assert!(
+        !old.show_extensions,
+        "an older file loads with the setting off"
+    );
+    assert_eq!(old.theme, Theme::Dark);
+    assert!(!old.confirm_delete);
+    assert!(warning.is_none());
+
+    let s = store(dir.path());
+    s.update(SettingsPatch {
+        show_extensions: Some(true),
+        ..Default::default()
+    })
+    .unwrap();
+    let saved: serde_json::Value =
+        serde_json::from_str(&std::fs::read_to_string(dir.path().join("settings.json")).unwrap())
+            .unwrap();
+    assert_eq!(saved["showExtensions"], true);
+    let (back, _) = store(dir.path()).get();
+    assert!(back.show_extensions);
+    assert_eq!(back.theme, Theme::Dark, "the patch kept the other fields");
+
+    std::fs::write(
+        dir.path().join("settings.json"),
+        r#"{"showExtensions":"yes","theme":"dark"}"#,
+    )
+    .unwrap();
+    let (s, warning) = store(dir.path()).get();
+    assert!(!s.show_extensions);
+    assert_eq!(s.theme, Theme::Dark);
+    assert!(warning.unwrap().contains("showExtensions"));
+}
+
 /// M5b §2.2, §2.5, §6: auto save (on), the sidebar's collapsed state (off)
 /// and the floating button's place (bottom right) persist, and a wrong value
 /// resets only its own field.

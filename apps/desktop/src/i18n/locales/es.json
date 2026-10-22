@@ -355,6 +355,8 @@
     "themeDark": "Oscuro",
     "rewriteLinks": "Actualizar enlaces al renombrar o mover",
     "confirmDelete": "Preguntar antes de mover a la papelera",
+    "showExtensions": "Mostrar las extensiones de los archivos",
+    "showExtensionsHint": "Los nombres de los archivos muestran su extensión, como Capítulo 1.md o notas.txt. Los títulos de las páginas no cambian.",
     "sections": {
       "vault": "Esta bóveda"
     },
@@ -443,7 +445,7 @@
       },
       "files": {
         "title": "Archivos y notas rápidas",
-        "description": "Renombrar, borrar y dónde viven las notas rápidas."
+        "description": "Nombres, renombrar, borrar y dónde viven las notas rápidas."
       },
       "security": {
         "title": "Seguridad",
@@ -470,7 +472,10 @@
         "forward": "Adelante",
         "edit": "Editar",
         "globalView": "Vista global",
-        "search": "Buscar",
+        "findInPage": "Buscar en la página (fuera del editor: Buscar)",
+        "findNext": "Siguiente coincidencia",
+        "findPrevious": "Coincidencia anterior",
+        "search": "Buscar en la bóveda",
         "files": "Ir a los archivos",
         "newPage": "Nueva página",
         "quickNote": "Crear una nota rápida nueva para esta bóveda",
@@ -1192,5 +1197,22 @@
     "quitWhile": "Cifrando «{name}»… ¿Salir de todos modos? Terminará o se deshará sola la próxima vez que la abras.",
     "quitAnyway": "Salir de todos modos",
     "keepEncrypting": "Seguir cifrando"
+  },
+  "findInPage": {
+    "find": "Buscar en la página",
+    "replaceField": "Reemplazar por",
+    "next": "Siguiente",
+    "previous": "Anterior",
+    "all": "Seleccionar todas",
+    "matchCase": "Distinguir mayúsculas",
+    "regexp": "Expresión regular",
+    "byWord": "Palabra completa",
+    "replace": "Reemplazar",
+    "replaceAll": "Reemplazar todas",
+    "close": "Cerrar la búsqueda",
+    "currentMatch": "Coincidencia actual",
+    "onLine": "en la línea",
+    "replacedMatches": "Se reemplazaron $ coincidencias",
+    "replacedOnLine": "Se reemplazó la coincidencia de la línea $"
   }
 }

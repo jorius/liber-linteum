@@ -11,7 +11,7 @@ import { openPage } from '../../stores/navigate';
 import { SortMenu } from './SortMenu';
 import { requestTrash } from './trashAction';
 import { nudgeFavorite, shownFavorites, useFavoritesStore } from '../favorites/favoritesStore';
-import { displayName } from './TreeRow';
+import { displayName, useShowExtensions } from './TreeRow';
 import { entryReveal } from '../../ipc';
 import { errorMessage } from '../../stores/messages';
 import { useToastStore } from '../../stores/toastStore';
@@ -25,6 +25,7 @@ export interface MenuState {
 /** Explorer actions for one item (right-click, "…" or Shift+F10). */
 export function ContextMenu({ menu, onClose }: { menu: MenuState; onClose: () => void }) {
   const { t } = useTranslation();
+  const extensions = useShowExtensions();
   // From its folder's rows, which also hold the Archive's (M5b round 2).
   const node = useVaultStore((s) =>
     s.children.get(parentOf(menu.path))?.find((n) => n.path === menu.path),
@@ -138,7 +139,7 @@ export function ContextMenu({ menu, onClose }: { menu: MenuState; onClose: () =>
       dir === '.archive'
         ? t('bin.archived')
         : folder && dir
-          ? displayName(folder)
+          ? displayName(folder, extensions)
           : (vault.info?.name ?? '');
     return (
       <SortMenu
@@ -160,7 +161,7 @@ export function ContextMenu({ menu, onClose }: { menu: MenuState; onClose: () =>
     return (
       <EmojiPicker
         anchor={() => ({ top: menu.anchor.y, bottom: menu.anchor.y, left: menu.anchor.x })}
-        label={t('icons.pickFor', { name: displayName(node) })}
+        label={t('icons.pickFor', { name: displayName(node, extensions) })}
         hasIcon={!!iconOf}
         onClose={onClose}
         onPick={(emoji) => {
@@ -189,7 +190,7 @@ export function ContextMenu({ menu, onClose }: { menu: MenuState; onClose: () =>
     <div
       ref={box}
       role="menu"
-      aria-label={t('menu.label', { name: displayName(node) })}
+      aria-label={t('menu.label', { name: displayName(node, extensions) })}
       className="liber-menu"
       style={{ position: 'fixed', left: menu.anchor.x, top: menu.anchor.y }}
       onKeyDown={onKeyDown}
