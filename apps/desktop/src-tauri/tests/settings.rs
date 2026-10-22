@@ -557,6 +557,49 @@ fn show_extensions_default_persist_and_reset() {
     assert!(warning.unwrap().contains("showExtensions"));
 }
 
+/// Auto-close brackets and quotes: on by default, also for a settings file
+/// written before the setting existed; off persists; a wrong value falls
+/// back to on with a warning.
+#[test]
+fn auto_close_brackets_default_persist_and_reset() {
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::write(
+        dir.path().join("settings.json"),
+        r#"{"version":1,"theme":"dark"}"#,
+    )
+    .unwrap();
+    let (old, warning) = store(dir.path()).get();
+    assert!(
+        old.auto_close_brackets,
+        "an older file loads with the setting on"
+    );
+    assert!(warning.is_none());
+
+    store(dir.path())
+        .update(SettingsPatch {
+            auto_close_brackets: Some(false),
+            ..Default::default()
+        })
+        .unwrap();
+    let saved: serde_json::Value =
+        serde_json::from_str(&std::fs::read_to_string(dir.path().join("settings.json")).unwrap())
+            .unwrap();
+    assert_eq!(saved["autoCloseBrackets"], false);
+    let (back, _) = store(dir.path()).get();
+    assert!(!back.auto_close_brackets);
+    assert_eq!(back.theme, Theme::Dark);
+
+    std::fs::write(
+        dir.path().join("settings.json"),
+        r#"{"autoCloseBrackets":"no","theme":"dark"}"#,
+    )
+    .unwrap();
+    let (s, warning) = store(dir.path()).get();
+    assert!(s.auto_close_brackets);
+    assert_eq!(s.theme, Theme::Dark);
+    assert!(warning.unwrap().contains("autoCloseBrackets"));
+}
+
 /// M5b §2.2, §2.5, §6: auto save (on), the sidebar's collapsed state (off)
 /// and the floating button's place (bottom right) persist, and a wrong value
 /// resets only its own field.

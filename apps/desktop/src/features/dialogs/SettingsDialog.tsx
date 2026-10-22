@@ -440,6 +440,14 @@ export function SettingsDialog({ onClose }: { onClose: () => void }) {
               <label className={styles.check}>
                 <input
                   type="checkbox"
+                  checked={settings.autoCloseBrackets !== false}
+                  onChange={(e) => void update({ autoCloseBrackets: e.target.checked })}
+                />
+                {t('settings.autoCloseBrackets')}
+              </label>
+              <label className={styles.check}>
+                <input
+                  type="checkbox"
                   checked={settings.showAttachmentPaths === true}
                   onChange={(e) => void update({ showAttachmentPaths: e.target.checked })}
                 />

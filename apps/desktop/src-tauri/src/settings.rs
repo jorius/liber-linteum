@@ -572,6 +572,9 @@ pub struct Settings {
     /// File names show their extension everywhere the UI names a file (the
     /// sidebar, Move to…, Trash); off: pages without `.md`, as before.
     pub show_extensions: bool,
+    /// Typing `(`, `[`, `{`, `"` or a backtick closes it; a selection is
+    /// wrapped instead (editor; on by default).
+    pub auto_close_brackets: bool,
     /// The global Scratchpad's folder (M4c §2), canonical; `None` until the
     /// first quick note. Set only through `scratchpad_set` (a folder the user
     /// picked, or the default), never through a settings patch (§4).
@@ -626,6 +629,7 @@ impl Default for Settings {
             cover_height: CoverHeight::default(),
             show_attachment_paths: false,
             show_extensions: false,
+            auto_close_brackets: true,
             scratchpad_path: None,
             auto_save: true,
             sidebar_collapsed: false,
@@ -668,6 +672,7 @@ pub struct SettingsPatch {
     pub cover_height: Option<CoverHeight>,
     pub show_attachment_paths: Option<bool>,
     pub show_extensions: Option<bool>,
+    pub auto_close_brackets: Option<bool>,
     pub auto_save: Option<bool>,
     pub sidebar_collapsed: Option<bool>,
     pub sidebar_width: Option<SidebarWidth>,
@@ -759,6 +764,7 @@ fn parse_lenient(text: &str) -> Result<(Settings, Vec<String>), serde_json::Erro
     field!("coverHeight", cover_height);
     field!("showAttachmentPaths", show_attachment_paths);
     field!("showExtensions", show_extensions);
+    field!("autoCloseBrackets", auto_close_brackets);
     field!("scratchpadPath", scratchpad_path);
     field!("autoSave", auto_save);
     field!("sidebarCollapsed", sidebar_collapsed);
@@ -940,6 +946,9 @@ impl SettingsStore {
         }
         if let Some(v) = patch.show_extensions {
             next.show_extensions = v;
+        }
+        if let Some(v) = patch.auto_close_brackets {
+            next.auto_close_brackets = v;
         }
         if let Some(v) = patch.auto_save {
             next.auto_save = v;

@@ -35,6 +35,7 @@ export const DEFAULT_SETTINGS: Settings = {
   coverHeight: 200,
   showAttachmentPaths: false,
   showExtensions: false,
+  autoCloseBrackets: true,
   scratchpadPath: null,
   autoSave: true,
   sidebarCollapsed: false,

@@ -380,6 +380,7 @@
     "fontSizePx": "{px} px",
     "toolbar": "Show the formatting toolbar",
     "lineNumbers": "Show line numbers",
+    "autoCloseBrackets": "Auto-close brackets and quotes",
     "pageWidth": "Page width",
     "pageWidthReadable": "Readable",
     "pageWidthWide": "Wide elements",

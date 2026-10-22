@@ -380,6 +380,7 @@
     "fontSizePx": "{px} px",
     "toolbar": "Mostrar la barra de formato",
     "lineNumbers": "Mostrar los números de línea",
+    "autoCloseBrackets": "Cerrar automáticamente paréntesis, corchetes y comillas",
     "pageWidth": "Ancho de página",
     "pageWidthReadable": "De lectura",
     "pageWidthWide": "Elementos anchos",

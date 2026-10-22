@@ -254,6 +254,9 @@ export interface Settings {
   /** File names show their extension (`Chapter 1.md`, `notes.txt`) where
    *  the UI names a file; off: pages without `.md`. Never a page's title. */
   showExtensions: boolean;
+  /** `(`, `[`, `{`, `"` and backticks close themselves; a selection is
+   *  wrapped (editor). */
+  autoCloseBrackets: boolean;
   /** The global Scratchpad's folder (M4c §2); `null` until the first quick
    *  note. Changed only through `scratchpadSet`, never a settings patch. */
   scratchpadPath?: string | null;
@@ -327,6 +330,7 @@ export interface SettingsPatch {
   coverHeight?: number;
   showAttachmentPaths?: boolean;
   showExtensions?: boolean;
+  autoCloseBrackets?: boolean;
   autoSave?: boolean;
   sidebarCollapsed?: boolean;
   sidebarWidth?: number;
