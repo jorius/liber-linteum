@@ -1,5 +1,6 @@
-// Go to line (Ctrl+G on every platform) in the built UI, in Chromium and
-// WebKit (≈ WKWebView). LIBER_SHOTS=<dir> saves a screenshot for review.
+// Go to line (Ctrl+G on every platform) and the cursor position beside the
+// word count, in the built UI, in Chromium and WebKit (≈ WKWebView).
+// LIBER_SHOTS=<dir> saves screenshots for review.
 import { join } from 'node:path';
 import { expect, test, type Page } from '@playwright/test';
 import { installIpcMock } from './ipcMock';
@@ -97,5 +98,44 @@ test('Ctrl+G in Live Preview, from the sidebar too', async ({ page }) => {
   await field(page).fill('40');
   await page.keyboard.press('Enter');
   await expect(page.locator('.cm-line', { hasText: 'Line number 40 of' })).toBeInViewport();
+  expect(errors).toEqual([]);
+});
+
+const position = (page: Page) => page.locator('[data-cursor-position]');
+
+test('the cursor position beside the word count: hidden, then Ln/Col and the selection; a click opens Go to line', async ({
+  page,
+}) => {
+  const errors = await open(page);
+  // Nobody has placed a cursor yet.
+  await expect(position(page)).toHaveCount(0);
+  await page.locator('.cm-line', { hasText: 'Line number 8 of' }).click();
+  await page.keyboard.press('Home');
+  await expect(position(page)).toHaveText('Ln 8, Col 1');
+  await page.keyboard.press('ArrowRight');
+  await page.keyboard.press('ArrowRight');
+  await expect(position(page)).toHaveText('Ln 8, Col 3');
+  // "Line number 8 of the page." less its first two characters.
+  await page.keyboard.press('Shift+End');
+  await expect(position(page)).toHaveText('Ln 8, Col 27 · 24 selected');
+  // Not a live region: it would talk on every keystroke.
+  await expect(position(page)).not.toHaveAttribute('aria-live');
+  expect(await position(page).evaluate((el) => el.closest('[aria-live]'))).toBeNull();
+
+  await position(page).click();
+  await expect(field(page)).toBeFocused();
+  await expect(field(page)).toHaveValue('8');
+  await field(page).fill('20:5');
+  await page.keyboard.press('Enter');
+  await expect(position(page)).toHaveText('Ln 20, Col 5');
+  if (SHOTS) await page.screenshot({ path: join(SHOTS, 'cursor-position.png') });
+  expect(errors).toEqual([]);
+});
+
+test('the cursor position follows Split too', async ({ page }) => {
+  const errors = await open(page, 'split');
+  await page.locator('.cm-line', { hasText: 'Line number 7 of' }).click();
+  await page.keyboard.press('End');
+  await expect(position(page)).toHaveText('Ln 7, Col 27');
   expect(errors).toEqual([]);
 });

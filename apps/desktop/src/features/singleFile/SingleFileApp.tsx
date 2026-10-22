@@ -14,6 +14,7 @@ import { Editor } from '../editor/Editor';
 import { ModeToggle } from '../page/ModeToggle';
 import { PageSubtitle } from '../page/PageSubtitle';
 import { PageTitle } from '../page/PageTitle';
+import { CursorPosition } from '../page/CursorPosition';
 import { TextStats } from '../page/TextView';
 import { WidthMenu } from '../page/WidthMenu';
 import { WordCount } from '../page/WordCount';
@@ -189,6 +190,7 @@ function FileView({ info }: { info: FileInfo }) {
                     {t(`editor.${status}`)}
                   </span>
                   {text ? <TextStats /> : <WordCount />}
+                  <CursorPosition />
                   {!text && (
                     <button
                       type="button"

@@ -11,6 +11,7 @@ import { Breadcrumb } from './Breadcrumb';
 import styles from './PageView.module.css';
 import { PageTitle } from './PageTitle';
 import { UnwritableNotice } from './UnwritableNotice';
+import { CursorPosition } from './CursorPosition';
 import { COUNT_DEBOUNCE_MS } from './WordCount';
 
 /** Lines and characters of the file in the editor (in place of words). */
@@ -78,6 +79,7 @@ export function TextView({ path }: { path: string }) {
                   {t(`editor.${status}`)}
                 </span>
                 <TextStats />
+                <CursorPosition />
               </div>
             )}
           </div>

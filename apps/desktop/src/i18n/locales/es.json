@@ -896,6 +896,11 @@
     "chars": "{chars, plural, one {# carácter} other {# caracteres}} · {bare, number} sin espacios",
     "lines": "{lines, plural, one {# línea} other {# líneas}} · {chars, plural, one {# carácter} other {# caracteres}}"
   },
+  "cursor": {
+    "position": "Lín {line}, col {col}",
+    "positionSelected": "Lín {line}, col {col} · {count, plural, one {# seleccionado} other {# seleccionados}}",
+    "goTo": "Ir a la línea ({key})"
+  },
   "scratchpad": {
     "title": "Notas rápidas",
     "noteName": "Nota rápida {stamp}",
