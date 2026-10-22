@@ -198,6 +198,7 @@ These live in files, not SQLite:
 | 3 | M5 | `page_text` and `fts` (search) |
 | 4 | M5b | `pages.icon` |
 | 5 | Batch 6 | Text and code files get a `page_text` row (name, title = file name, folders, body), so search finds them; no tags or links |
+| 6 | 2026-10-22 | Excerpts leave out callout markers (`[!quote] Title` reads "Title"); no table changes, a bump re-parses every page |
 
 (Source: the comment at `schema.rs:1-7`.)
 

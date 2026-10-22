@@ -385,7 +385,13 @@ fn tags_in(text: &str, out: &mut Vec<Tag>) {
 fn excerpt(src: &str, regions: &[Range<usize>]) -> String {
     let mut words = String::new();
     for region in regions {
-        let rendered = render_wikilinks(&src[region.clone()]);
+        let text = &src[region.clone()];
+        let text = if in_blockquote(src, region.start) {
+            without_callout_marker(text)
+        } else {
+            text
+        };
+        let rendered = render_wikilinks(text);
         words.push(' ');
         words.push_str(&rendered.replace('\\', ""));
     }
@@ -395,6 +401,33 @@ fn excerpt(src: &str, regions: &[Range<usize>]) -> String {
     } else {
         let cut: String = collapsed.chars().take(EXCERPT_CHARS).collect();
         format!("{}…", cut.trim_end())
+    }
+}
+
+/// Whether the line holding `at` is a blockquote line (`>` before it).
+fn in_blockquote(src: &str, at: usize) -> bool {
+    let line_start = src[..at].rfind('\n').map_or(0, |i| i + 1);
+    src[line_start..at].trim_start().starts_with('>')
+}
+
+/// `text` without a leading callout marker (`[!type]`, `[!type]-`,
+/// `[!type]+`, as the app's callouts read them), so the title stays.
+fn without_callout_marker(text: &str) -> &str {
+    let Some(rest) = text.strip_prefix("[!") else {
+        return text;
+    };
+    let name = rest
+        .find(|c: char| !(c.is_alphanumeric() || c == '_' || c == '-'))
+        .unwrap_or(rest.len());
+    if name == 0 || !rest.starts_with(|c: char| c.is_ascii_alphabetic()) {
+        return text;
+    }
+    match rest[name..].strip_prefix(']') {
+        Some(after) => after
+            .strip_prefix(['+', '-'])
+            .unwrap_or(after)
+            .trim_start_matches([' ', '\t']),
+        None => text,
     }
 }
 
@@ -596,6 +629,22 @@ mod tests {
         let e = extract(&long, 0).excerpt;
         assert!(e.ends_with('…') && e.chars().count() <= 201);
         assert_eq!(extract("Intro\n\n# Title\n\nAfter", 0).excerpt, "After");
+    }
+
+    /// A callout's marker (`[!quote]`, `[!note]-`) isn't text: the excerpt
+    /// keeps its title and body, not the marker (a card showed "[quote] …").
+    #[test]
+    fn excerpt_leaves_out_callout_markers() {
+        let b = extract(
+            "# T\n\n> [!quote] The first thing\n> Paper cracks.\n\nAfter.",
+            0,
+        );
+        assert_eq!(b.excerpt, "The first thing Paper cracks. After.");
+        let b = extract("# T\n\n> [!note]- Folded\n> Hidden body", 0);
+        assert_eq!(b.excerpt, "Folded Hidden body");
+        // Not a callout: brackets in ordinary text stay.
+        let b = extract("# T\n\n[!] is a footnote-ish thing, [!x] too.", 0);
+        assert_eq!(b.excerpt, "[!] is a footnote-ish thing, [!x] too.");
     }
 
     /// M4b part 2 §3: display maths (`$$ … $$`) is left out of the excerpt.

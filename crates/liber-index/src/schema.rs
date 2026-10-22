@@ -6,7 +6,9 @@
 /// 4 (M5b §4): pages gain `icon`, the frontmatter emoji.
 /// 5 (batch 6): text and code files get `page_text` rows too, so search finds
 /// them (they stay attachments everywhere else).
-pub const SCHEMA_VERSION: i64 = 5;
+/// 6: excerpts leave out callout markers (`[!quote]`); no table changes, the
+/// bump re-parses every page so cached excerpts lose them too.
+pub const SCHEMA_VERSION: i64 = 6;
 
 pub(crate) const SCHEMA: &str = r#"
 CREATE TABLE meta (key TEXT PRIMARY KEY, value TEXT NOT NULL);
