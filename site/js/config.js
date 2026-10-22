@@ -19,5 +19,14 @@ export const config = {
   // Looping clips present in media/ (see media/README.md). A slot not listed here shows its
   // poster only, so the page never asks for a video that isn't there yet. Example:
   //   videos: ['hero', 'obsidian', 'notion', 'global-view', 'editor', 'encryption', 'search', 'sample-vault'],
-  videos: ['hero', 'obsidian', 'notion', 'global-view', 'editor', 'encryption', 'search', 'sample-vault'],
+  videos: [
+    'hero',
+    'obsidian',
+    'notion',
+    'global-view',
+    'editor',
+    'encryption',
+    'search',
+    'sample-vault',
+  ],
 };

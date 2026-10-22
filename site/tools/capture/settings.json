@@ -36,11 +36,7 @@
   "autoLockMinutes": 15,
   "actionButton": "bottomRight",
   "spellcheck": false,
-  "spellDictionaries": [
-    "en_US",
-    "es",
-    "es_CO"
-  ],
+  "spellDictionaries": ["en_US", "es", "es_CO"],
   "customThemes": [],
   "customTheme": null,
   "importedDictionaries": [],
