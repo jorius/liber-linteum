@@ -5,6 +5,8 @@ import type { TreeNode } from '../../ipc';
 import { isArchived } from '../../stores/tree';
 import { StarIcon } from '../favorites/FavoritesSection';
 import { useFavoritesStore } from '../favorites/favoritesStore';
+import { homePageOf, useHomeStore } from '../home/homeStore';
+import { HomeIcon } from '../../app/icons';
 import { IconButton, ItemIcon } from '../icons/ItemIcon';
 import { QuickNoteIcon } from '../scratchpad/QuickNoteIcon';
 import styles from './Explorer.module.css';
@@ -239,6 +241,9 @@ export const TreeRow = forwardRef<HTMLLIElement, TreeRowProps>(function TreeRow(
   const archived = isArchived(node.path);
   // A folder page's ★ and ☺ act on its page (round 3b §6.2).
   const target = page ?? node;
+  // The vault's home page: a quiet house after its name.
+  const home = useHomeStore((s) => homePageOf(s.home) === target.path);
+  const homeId = useId();
   // Drag source (any item) and drop target (folders, and pages: round 3 §9.3).
   // Only the listeners are spread: dnd-kit's attributes would replace the
   // treeitem role and tabindex.
@@ -274,6 +279,7 @@ export const TreeRow = forwardRef<HTMLLIElement, TreeRowProps>(function TreeRow(
       aria-selected={selected}
       aria-expanded={node.kind === 'folder' ? expanded : undefined}
       aria-current={current ? 'page' : undefined}
+      aria-describedby={home ? homeId : undefined}
       tabIndex={focused ? 0 : -1}
       data-path={node.path}
       data-name={name}
@@ -319,6 +325,18 @@ export const TreeRow = forwardRef<HTMLLIElement, TreeRowProps>(function TreeRow(
           className={node.kind === 'folder' ? `${styles.label} ${styles.folder}` : styles.label}
         >
           {name}
+        </span>
+      )}
+      {home && !renaming && (
+        <span
+          id={homeId}
+          className={styles.homeGlyph}
+          role="img"
+          aria-label={t('home.glyph')}
+          title={t('home.glyph')}
+          data-home-glyph
+        >
+          <HomeIcon size={13} />
         </span>
       )}
       {pinnedCount !== undefined && !renaming && (

@@ -46,7 +46,8 @@ export function installOpenFile(): void {
 export async function openInVault(root: string, page: string | null): Promise<void> {
   const vault = useVaultStore.getState();
   if (vault.info?.root !== root) {
-    const res = await vault.open(root);
+    // A page asked for wins over the vault's home.
+    const res = await vault.open(root, { home: !page });
     if (!res.ok) return;
   }
   if (page) await openPage(page);

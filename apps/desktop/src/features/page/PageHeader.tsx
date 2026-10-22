@@ -5,6 +5,7 @@ import { fileWindowName, type EditorMode, type Page } from '../../ipc';
 import { useEditorStore } from '../../stores/editorStore';
 import { useSettingsStore } from '../../stores/settingsStore';
 import { FavoriteToggle } from '../favorites/FavoriteToggle';
+import { HomeToggle } from '../home/HomeToggle';
 import { useRecorderStore } from '../audio/recorderStore';
 import { viewOf } from '../editor/views';
 import { BackArrow } from './BackArrow';
@@ -114,6 +115,7 @@ export function PageHeader({
                   <OutlineIcon />
                 </button>
               )}
+              {!archived && <HomeToggle path={page.path} />}
               {!archived && <FavoriteToggle path={page.path} />}
               <ModeToggle mode={mode} />
             </div>

@@ -140,7 +140,13 @@ export interface VaultInfo {
    *  Trash and are still in the vault folder. Show the banner with
    *  `vaultTrashOriginals` and `vaultRevealOriginals`. */
   originalsPending?: boolean;
+  /** What the vault opens to (`.liber/vault.json`); none: nothing chosen. */
+  home?: Home | null;
 }
+
+/** A vault's home: a page (or text file) opened in the editor, or the
+ *  Global View. */
+export type Home = { kind: 'page'; path: string } | { kind: 'globalView' };
 
 export type NodeKind = 'page' | 'folder' | 'attachment';
 
@@ -1026,6 +1032,13 @@ export const favoritesGet = () => call<string[]>('favorites_get');
 /** Replaces the favorites; Rust drops missing entries and repeats and
  *  returns what it stored. */
 export const favoritesSet = (paths: string[]) => call<string[]>('favorites_set', { paths });
+
+/** The vault's home, as `.liber/vault.json` holds it now (renames move it). */
+export const homeGet = () => call<Home | null>('home_get');
+/** Sets the home (`null`: nothing chosen); Rust refuses what the vault can't
+ *  open to (a folder, an image, the Trash or the Archive) and returns what it
+ *  stored. */
+export const homeSet = (home: Home | null) => call<Home | null>('home_set', { home });
 
 // ---- quick notes (M4c §2, §7) ----
 

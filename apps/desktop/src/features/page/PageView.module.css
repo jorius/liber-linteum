@@ -27,6 +27,8 @@
   align-items: center;
   justify-content: space-between;
   gap: 8px 16px;
+  /* The home toggle gives its room back in a narrow page (below). */
+  container: page-bar / inline-size;
 }
 
 .controls {
@@ -683,6 +685,15 @@
 .toolbarToggle[data-active] {
   background: var(--color-surface);
   color: var(--color-text-strong);
+}
+
+/* The house (set as home page) is the first control to go when the bar is
+   narrow: it would wrap the controls onto another row and make the band
+   taller (final review M9). The tree's row menu and Settings still offer it. */
+@container page-bar (max-width: 600px) {
+  .homeToggle {
+    display: none;
+  }
 }
 
 /* The page width menu (M4b part 3 wide elements §2): a tick column. */

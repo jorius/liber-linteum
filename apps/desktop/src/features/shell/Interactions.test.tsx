@@ -135,6 +135,7 @@ describe('context menu', () => {
       'Sort by',
       'Archive',
       'Delete',
+      'Set as home page',
       'Add to Favorites',
     ]);
     expect(items[0]).toHaveFocus();
