@@ -402,7 +402,8 @@ describe('Search dialog (M5 §4)', () => {
     // Queried inside waitFor: the list re-renders as the page arrives, and an
     // element found before that is detached by the time it's checked (CI).
     await waitFor(() => expect(screen.getByRole('option', { name: /More/ })).toBeInTheDocument());
-    expect(screen.queryByRole('button', { name: 'Show more' })).toBeNull();
+    // The button can go a render after the page shows (seen on CI).
+    await waitFor(() => expect(screen.queryByRole('button', { name: 'Show more' })).toBeNull());
   });
 
   it('has no axe violations, light or dark', async () => {

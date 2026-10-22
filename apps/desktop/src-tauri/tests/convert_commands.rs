@@ -290,8 +290,8 @@ fn recovery_on_open_rolls_back_or_finishes_this_devices_conversion() {
     assert_eq!(
         got,
         vec![
-            json!({ "path": path(&h.disk.path().join("A").canonicalize().unwrap()), "outcome": "rolledBack" }),
-            json!({ "path": path(&h.disk.path().join("B").canonicalize().unwrap()), "outcome": "finished" }),
+            json!({ "path": path(&dunce::canonicalize(h.disk.path().join("A")).unwrap()), "outcome": "rolledBack" }),
+            json!({ "path": path(&dunce::canonicalize(h.disk.path().join("B")).unwrap()), "outcome": "finished" }),
         ]
     );
 }
@@ -436,7 +436,7 @@ fn folder_kind_recovers_an_interrupted_conversion_and_names_refused_folders() {
     // An empty one can still get a new encrypted vault (a USB stick, M2).
     let empty = h.disk.path().join("EmptyScratch");
     std::fs::create_dir(&empty).unwrap();
-    let empty = empty.canonicalize().unwrap();
+    let empty = dunce::canonicalize(&empty).unwrap();
     h.state()
         .settings
         .set_scratchpad_path(Some(empty.to_string_lossy().into_owned()))
@@ -540,7 +540,7 @@ fn an_open_vault_inside_or_around_the_folder_is_closed() {
     );
     call(&h.main, "vault_encrypt_cancel", json!({})).unwrap();
 
-    let parent = h.disk.path().canonicalize().unwrap();
+    let parent = dunce::canonicalize(h.disk.path()).unwrap();
     call(&h.main, "vault_open", json!({ "path": parent })).unwrap();
     begin(&h, &root).unwrap();
     assert_eq!(
@@ -634,7 +634,7 @@ fn plaintext_indexes_are_swept_at_begin_and_at_unlock() {
             .to_path_buf()
     };
     let inner = root.join("Sub");
-    let parent = h.disk.path().canonicalize().unwrap();
+    let parent = dunce::canonicalize(h.disk.path()).unwrap();
     let elsewhere = h.plain("Elsewhere");
     for v in [&inner, &parent, &elsewhere] {
         call(&h.main, "vault_open", json!({ "path": v })).unwrap();
@@ -657,7 +657,7 @@ fn plaintext_indexes_are_swept_at_begin_and_at_unlock() {
         json!({ "path": enc, "passphrase": PASS }),
     )
     .unwrap();
-    let enc = enc.canonicalize().unwrap();
+    let enc = dunce::canonicalize(&enc).unwrap();
     call(&h.main, "vault_lock", json!({})).unwrap();
     std::fs::create_dir_all(index(&enc)).unwrap();
     std::fs::write(index(&enc).join("index.sqlite"), b"plain text").unwrap();

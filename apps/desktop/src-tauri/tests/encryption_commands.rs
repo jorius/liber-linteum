@@ -166,7 +166,7 @@ fn create_unlock_lock_cycle() {
     h.lock();
     let got = locked.lock().unwrap().clone();
     assert_eq!(got.len(), 1, "{got:?}");
-    let canonical = std::fs::canonicalize(&root).unwrap();
+    let canonical = dunce::canonicalize(&root).unwrap();
     assert_eq!(got[0]["path"], canonical.to_string_lossy().as_ref());
     let err = call(&h.main, "page_get", json!({ "path": "Diary.md" })).unwrap_err();
     assert_eq!(kind(err), "noVault");
@@ -689,7 +689,7 @@ fn recent_list_marks_encrypted() {
     call(&h.main, "vault_create", json!({ "path": plain })).unwrap();
     let recent = call(&h.main, "vaults_recent", json!({})).unwrap();
     let find = |p: &Path| {
-        let p = std::fs::canonicalize(p).unwrap();
+        let p = dunce::canonicalize(p).unwrap();
         recent
             .as_array()
             .unwrap()
