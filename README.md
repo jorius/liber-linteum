@@ -1,84 +1,128 @@
+<div align="center">
+
+<img src="apps/desktop/src-tauri/icons/app-icon.svg" width="96" height="96" alt="" />
+
 # Liber Linteum
 
-> Renamed from Notes In My Way on 2026-10-20. Existing vaults keep working: their `.nimw/` folder becomes `.liber/` the first time they open, and the app copies its settings from `app.notesinmyway.desktop`, which it never changes.
->
-> Once Liber Linteum has opened a vault, stop using the old app on it. The old app would recreate its old settings folder, and Liber Linteum then keeps using its own and ignores whatever the old app wrote there (it warns when a vault has both).
+**Private notes that stay on your machine.**
 
-Private, local-only notes. Plain Markdown files in folders you own, compatible
-with Obsidian vaults, with a visual **Global View** of your projects, folders
-and pages as cards. No cloud, no accounts, no telemetry; the app makes no
-network requests.
+Your notes are plain Markdown files in a folder you own. A canvas of cards shows how they
+connect. Nothing leaves your computer: no cloud, no accounts, no telemetry.
 
-> Status: **M0–M5b merged on `main`** (2026-10-18): vault, editor, covers and
-> attachments, Global View, block moves, Scratchpad and single-file windows,
-> search, Trash and Archive, Favorites. Batch 6 (`feat/batch6`, unmerged):
-> text files in search, M6 audio clips (WAV), M7 Notion import. Next: M8
-> packaging. Start at `docs/README.md`; `docs/product-spec.md` is the *what*,
-> `docs/superpowers/specs/2026-10-12-architecture-design.md` the *how*.
+[Website](https://jorius.github.io/liber-linteum/) ·
+[Download](https://github.com/jorius/liber-linteum/releases/latest) ·
+[Sample vault](https://github.com/jorius/liber-linteum/releases/latest/download/The-Moons-of-Kessari.zip) ·
+[Sponsor](https://github.com/sponsors/jorius)
 
-## Prerequisites
+<a href="https://jorius.github.io/liber-linteum/"><img src="site/media/hero.poster.webp" alt="The Global View of the sample vault: projects, folders and pages as cards with covers, linked by what they reference" width="880" /></a>
 
-- Node 24 (`.nvmrc`; `engines` allows ≥ 22.18, but the project is built and tested on 24) and pnpm 12 (`npm i -g pnpm@12.11.2`)
-- Rust 1.99 (rustup picks it up from `rust-toolchain.toml`)
-- Platform deps for Tauri 2:
-  - macOS: Xcode Command Line Tools
-  - Windows: Microsoft C++ Build Tools and WebView2 (preinstalled on Windows 11)
-  - Linux: `libwebkit2gtk-4.1-dev build-essential curl wget file libxdo-dev libssl-dev libayatana-appindicator3-dev librsvg2-dev`
+<sub>Free and open source (GPL-3.0) · Linux, Windows and macOS · English and Spanish</sub>
 
-## Commands
+</div>
 
-| Command | What it does |
-|---------|--------------|
-| `pnpm install` | Install JS dependencies |
-| `pnpm dev` | Run the desktop app with hot reload |
-| `pnpm build` | Build installers for the current OS |
-| `pnpm check` | Everything CI runs: lint, types, unit tests, i18n parity, UI build, e2e, rustfmt, clippy, cargo test. It also builds the UI (`build:ui`) because the Tauri crate embeds `apps/desktop/dist` |
-| `pnpm test:e2e` | Playwright against the built UI with a mocked backend, in Chromium and WebKit (≈ WKWebView). First run: `pnpm --filter @liber/desktop exec playwright install chromium webkit`. `LIBER_E2E_PORT` (default 4317) lets several checkouts run it side by side |
-| `cargo deny check` | License and banned-crate checks. Needs cargo-deny installed (`brew install cargo-deny` or `cargo install cargo-deny --locked`) |
-| `cargo test --release -p liber-session --test search -- --ignored --nocapture` | The NFR-03 performance tests on a generated 10k-note vault (also `--test global_view`) |
-| `LIBER_XCHECK_PY=<venv>/bin/python cargo test -p liber-vault --test encrypted_xcheck -- --nocapture` | An encrypted vault the app wrote, decrypted by the independent Python reader (`xcheck.py vault`). Needs a Python with `cryptography>=44` (`python3 -m venv <venv> && <venv>/bin/pip install 'cryptography>=44'`); without the variable it prints SKIP |
-| `LIBER_PERF=1 cargo test --release -p liber-session --test encrypted_perf -- --nocapture` | Encrypted vaults: unlock to searchable on a sealed 10k-note vault, budget 3 s |
+## A notebook that stays yours
 
-### Windows installer from macOS
+|                                                                                                                         |                                                                                                                                                                                    |                                                                                                        |
+| ----------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
+| **Plain Markdown, your folders**<br>Every note is a `.md` file you can open anywhere: wikilinks, frontmatter and folders, exactly as you left them. | **See it as a map**<br>The Global View shows projects, folders and pages as cards with covers, linked by what they reference. Drill in, or expand in place.                                  | **Sealed when you want**<br>Encrypt a vault with a passphrase, and keep a recovery key in case you forget it. |
+| **No cloud**<br>Your notes live in a folder on your disk. Sync them with whatever you already trust, or don't.          | **No accounts**<br>Nothing to sign up for, nothing to log into, nothing to lose access to.                                                                                         | **No telemetry**<br>No analytics, no crash reports. Zero network requests, checked by tests.           |
 
-The Windows test builds are cross-compiled with [cargo-xwin](https://github.com/rust-cross/cargo-xwin), using a toolchain kept apart in `~/.liber-cross`. A machine set up before the rename to Liber Linteum has it in `~/.nimw-cross` (rename note): rename that folder, or use that path in the exports below. The same exports run `cargo xwin check -p liber-desktop --tests --target x86_64-pc-windows-msvc`, the Windows compile check.
+These aren't settings. The app is built so it can't reach the network: blocked by its content
+security policy, refused by its permissions, banned in its code and kept out of its
+dependencies.
+
+## Bring your notes
+
+- **Obsidian:** open your vault as it is. Wikilinks, embeds, callouts, tags and frontmatter
+  work; your attachment-folder and link-format settings are respected; `.obsidian/` is left
+  untouched.
+- **Notion:** import a Markdown & CSV export. Pages keep their structure and links, databases
+  become a page with a table plus one note per row, callouts and toggles become their
+  Markdown equivalents. Everything is read on your machine.
+
+## A tour
+
+<table>
+<tr>
+<td width="50%"><a href="https://jorius.github.io/liber-linteum/#features"><img src="site/media/global-view.poster.webp" alt="Global View" /></a><br><b>Global View</b>: your notes as a canvas of cards. Drill into a folder or expand it in place; draw relationships by dragging from card to card.</td>
+<td width="50%"><a href="https://jorius.github.io/liber-linteum/#features"><img src="site/media/atoms.poster.webp" alt="Atoms" /></a><br><b>Atoms</b>: every page broken into its parts (sections, paragraphs, formulas, diagrams, links); click one to open the page right there.</td>
+</tr>
+<tr>
+<td><a href="https://jorius.github.io/liber-linteum/#features"><img src="site/media/editor.poster.webp" alt="Live Preview editor" /></a><br><b>Live Preview</b>: write Markdown and see it rendered as you go. Code with highlighting, callouts, toggles, columns, highlights, covers and icons, tables you edit like a grid.</td>
+<td><a href="https://jorius.github.io/liber-linteum/#features"><img src="site/media/maths.poster.webp" alt="LaTeX and Mermaid in Split view" /></a><br><b>LaTeX and Mermaid</b>: KaTeX maths and Mermaid diagrams, offline, side by side in Split view.</td>
+</tr>
+<tr>
+<td><a href="https://jorius.github.io/liber-linteum/#features"><img src="site/media/drag-drop.poster.webp" alt="Drag and drop" /></a><br><b>Drag and drop</b>: move a list item by its handle, a page into a folder, or link two pages on the canvas.</td>
+<td><a href="https://jorius.github.io/liber-linteum/#features"><img src="site/media/voice.poster.webp" alt="Voice clips" /></a><br><b>Voice clips</b>: record straight into a note; the clip is a WAV file next to it.</td>
+</tr>
+<tr>
+<td><a href="https://jorius.github.io/liber-linteum/#features"><img src="site/media/search.poster.webp" alt="Search" /></a><br><b>Search</b>: every note, filtered by tag, folder or link; a result opens with the match highlighted.</td>
+<td><a href="https://jorius.github.io/liber-linteum/#features"><img src="site/media/encryption.poster.webp" alt="Encryption" /></a><br><b>Encrypted vaults</b> <sup>beta</sup>: a passphrase and a recovery key; every file's contents and its name are encrypted on disk.</td>
+</tr>
+</table>
+
+Also: quick notes from anywhere (Ctrl+Shift+N) · find and replace in the page, go to line ·
+palettes, light and dark · Trash and Archive · spell check in English and Spanish, offline ·
+single `.md`/`.txt` files in a window of their own · a home page per vault.
+
+The clips play on the [website](https://jorius.github.io/liber-linteum/#features).
+
+## Download
+
+| System                         | Files                                                                                                                                                                                                                                       |
+| ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Linux** (Ubuntu 22.04+)      | [`.deb`](https://github.com/jorius/liber-linteum/releases/latest/download/Liber-Linteum_amd64.deb) · [`.AppImage`](https://github.com/jorius/liber-linteum/releases/latest/download/Liber-Linteum_amd64.AppImage)                         |
+| **Windows** 10 and 11          | [`.exe` installer](https://github.com/jorius/liber-linteum/releases/latest/download/Liber-Linteum_x64-setup.exe) · [`.msi`](https://github.com/jorius/liber-linteum/releases/latest/download/Liber-Linteum_x64.msi)                        |
+| **macOS** 12+ (Apple silicon and Intel) | [`.dmg`](https://github.com/jorius/liber-linteum/releases/latest/download/Liber-Linteum_universal.dmg)                                                                                                                           |
+
+Every release lists a SHA-256 checksum for each file (`SHA256SUMS`) and, when available, a
+VirusTotal report. The installers aren't code-signed yet: on Windows choose **More info → Run
+anyway**; on macOS right-click the app and choose **Open** the first time.
+
+## Try the sample vault
+
+[**The Moons of Kessari**](https://github.com/jorius/liber-linteum/releases/latest/download/The-Moons-of-Kessari.zip)
+is a short science-fiction novel with the world behind it and the notes in its margins: covers
+and icons, wikilinks, relationships, maths and diagrams, callouts, a voice clip, and a
+[Notion export](https://github.com/jorius/liber-linteum/releases/latest/download/Notion-Sample-Export.zip)
+to import. Unzip it and choose **Open folder as vault**. It's also in
+[`examples/`](examples/).
+
+## Roadmap
+
+Planned after the first release (no dates, no promises): version history, a slash menu, focus
+mode, offline transcription of voice clips, and handwritten notes (write with a pen or tablet,
+keep the handwriting and get its text as Markdown, recognised offline). Ideas are welcome in
+the [issues](https://github.com/jorius/liber-linteum/issues).
+
+## Build it yourself
+
+Node 24, pnpm 12, Rust 1.99 and Tauri's system packages, then:
 
 ```sh
-cd apps/desktop
-export CARGO_HOME=$HOME/.liber-cross/cargo RUSTUP_HOME=$HOME/.liber-cross/rustup RUSTUP_TOOLCHAIN=1.99.0 XWIN_ACCEPT_LICENSE=1
-export PATH="/opt/homebrew/opt/rustup/bin:$CARGO_HOME/bin:/opt/homebrew/opt/llvm/bin:/opt/homebrew/opt/lld/bin:$PATH"
-pnpm tauri build --runner cargo-xwin --target x86_64-pc-windows-msvc --bundles nsis
+pnpm install
+pnpm dev      # the app with hot reload
+pnpm build    # installers for this system
 ```
 
-The installer lands in `target/x86_64-pc-windows-msvc/release/bundle/nsis/` and is unsigned until M8.
+Everything else (prerequisites per system, tests, the architecture, the release pipeline and
+the website) is in **[docs/DEVELOPMENT.md](docs/DEVELOPMENT.md)**.
 
-## Layout
+## Support
 
-- `apps/desktop/src`: React UI (`features/*`, `ipc/` is the only backend gateway)
-- `apps/desktop/src-tauri`: thin Tauri shell (commands, CSP, capabilities: `main.json` for the vault window, `file.json` for single-file windows)
-- `crates/*`: Rust core, no Tauri dependency:
-  - `liber-vault`: the file system (scan, watch, CAS writes, `.liber/`, Trash and Archive)
-  - `liber-markdown`: parsing a page (title, frontmatter, tags, links, body text)
-  - `liber-index`: the SQLite index and search (see `docs/architecture/index-and-database.md`)
-  - `liber-session`: one open vault, composing the three above
-  - `liber-audio`: microphone capture (`cpal`), WAV writing (`hound`), level meter (M6). On Linux, `cpal` needs ALSA headers: `sudo apt install libasound2-dev`
-  - `liber-import`: the Notion Markdown & CSV importer: safe zip reading, names, links, databases (M7)
-  - `liber-testkit`: fixtures and the generated test vaults
-- `design/prototype`: clickable design reference (not shipped)
+Liber Linteum is free and staying that way. If it earns a place on your disk, you can
+[sponsor it on GitHub](https://github.com/sponsors/jorius), star the repository, or tell a
+friend.
 
-## Privacy guarantees
+## Credits
 
-Network access is blocked by a strict CSP, a Tauri capability allowlist, an
-ESLint ban on network APIs, and a cargo-deny ban on HTTP client crates.
+An idea by **José Meza**, built by **Jose Ríos**.
 
-## Third-party software
-
-The Global View's canvas is built with [React Flow](https://reactflow.dev)
-(`@xyflow/react` and `@xyflow/system`, MIT, © 2019-2025 webkid GmbH). The app
-hides React Flow's on-canvas attribution badge, which the MIT licence allows,
-and credits it here and on the welcome screen instead. Its licence text is in
-`THIRD-PARTY-NOTICES.md`.
+The Global View's canvas is built with [React Flow](https://reactflow.dev) (`@xyflow/react`,
+MIT, © webkid GmbH); its on-canvas badge is hidden, as the MIT licence allows, and it is
+credited here and on the welcome screen instead. Other licences are in
+[`THIRD-PARTY-NOTICES.md`](THIRD-PARTY-NOTICES.md).
 
 ## License
 
-GPL-3.0-or-later. See `LICENSE`.
+[GPL-3.0-or-later](LICENSE).

@@ -1,8 +1,8 @@
 # Showcase media
 
 The page refers to these files by name. Replacing a file here updates the site with no HTML
-change. The `*.poster.webp` files in the repo now are placeholders, drawn by
-`site/tools/make-posters.mjs`.
+change. Every clip and poster here is recorded from the app by `site/tools/capture/`
+(`site/tools/make-posters.mjs` draws placeholder posters for a slot with no recording yet).
 
 ## Slots
 
