@@ -348,6 +348,51 @@ pub async fn attachment_paste<R: Runtime>(
     .await
 }
 
+/// The clipboard's image as PNG bytes, for a paste the page saw empty (v0.1.1):
+/// WebKitGTK pastes an image with no `clipboardData` at all, so on Linux GTK
+/// reads it, on the main thread. Empty when the clipboard holds no image; it is
+/// then saved through `attachment_paste` like any paste. Elsewhere the page
+/// reads the paste itself, so this answers `notPermitted`.
+#[tauri::command]
+pub async fn clipboard_image<R: Runtime>(app: AppHandle<R>) -> CmdResult<tauri::ipc::Response> {
+    #[cfg(target_os = "linux")]
+    {
+        blocking(app, |app| {
+            let (tx, rx) = std::sync::mpsc::channel();
+            app.run_on_main_thread(move || {
+                use gtk::{Clipboard, gdk};
+                Clipboard::get(&gdk::SELECTION_CLIPBOARD).request_image(move |_, image| {
+                    let _ = tx.send(image.map(|p| p.save_to_bufferv("png", &[])));
+                });
+            })
+            .map_err(|e| CommandError::new(ErrorKind::Io, e.to_string()))?;
+            let png = match rx.recv_timeout(std::time::Duration::from_secs(10)) {
+                Ok(Some(png)) => {
+                    png.map_err(|e| CommandError::new(ErrorKind::Io, e.to_string()))?
+                }
+                // No image, or no answer from the clipboard's owner.
+                Ok(None) | Err(_) => Vec::new(),
+            };
+            if png.len() > MAX_PASTE_BYTES {
+                return Err(invalid(format!(
+                    "pasted images are limited to {} MiB",
+                    MAX_PASTE_BYTES >> 20
+                )));
+            }
+            Ok(tauri::ipc::Response::new(png))
+        })
+        .await
+    }
+    #[cfg(not(target_os = "linux"))]
+    {
+        let _ = app;
+        Err(CommandError::new(
+            ErrorKind::NotPermitted,
+            "clipboard image",
+        ))
+    }
+}
+
 #[tauri::command]
 pub async fn attachment_import<R: Runtime>(
     app: AppHandle<R>,

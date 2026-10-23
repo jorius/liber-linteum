@@ -14,6 +14,7 @@ import i18next from 'i18next';
 import {
   attachmentImport,
   attachmentPaste,
+  clipboardImage,
   fileWindowName,
   isTauri,
   onDragDrop,
@@ -273,12 +274,25 @@ async function pasteImages(view: EditorView, files: File[]) {
   void useVaultStore.getState().refreshTree();
 }
 
+/** A paste that came with no data at all (v0.1.1): WebKitGTK hands an image
+ *  over that way, so Rust reads it from the system clipboard. */
+async function pasteSystemImage(view: EditorView) {
+  const res = await clipboardImage();
+  if (!res.ok || !res.value.byteLength) return;
+  await pasteImages(view, [new File([res.value], 'clipboard.png', { type: 'image/png' })]);
+}
+
 const pasteHandler = EditorView.domEventHandlers({
   paste(e, view) {
     // No vault to save the image in (a single-file window, M4c §3), or the
     // page can't change (archived, round-2 review M5).
     if (fileWindowName() !== null || view.state.readOnly) return false;
     const data = e.clipboardData;
+    if (data && !data.types.length && !data.files.length) {
+      e.preventDefault();
+      void pasteSystemImage(view);
+      return true;
+    }
     if (!data || data.types.includes('text/plain')) return false;
     const files = [...data.files].filter((f) => PASTE_TYPES[f.type] || convertible(f.type));
     if (!files.length) return false;

@@ -45,6 +45,8 @@ tauri-plugin-single-instance.workspace = true
 # version wry uses).
 [target.'cfg(target_os = "linux")'.dependencies]
 webkit2gtk = "=2.0.2"
+# v0.1.1: a pasted image is read from the GTK clipboard (`clipboard_image`).
+gtk = "=0.18.2"
 
 # E3 T7: lock detection polls the input desktop (a locked session has none).
 [target.'cfg(windows)'.dependencies]

@@ -196,6 +196,7 @@ pub fn configure<R: tauri::Runtime>(
         attachment_commands::vault_settings_get,
         attachment_commands::vault_settings_set,
         attachment_commands::attachment_paste,
+        attachment_commands::clipboard_image,
         attachment_commands::attachment_import,
         attachment_commands::cover_pick,
         attachment_commands::link_suggest,

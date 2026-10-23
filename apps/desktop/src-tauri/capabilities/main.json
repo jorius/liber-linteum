@@ -43,6 +43,7 @@
     "allow-vault-settings-get",
     "allow-vault-settings-set",
     "allow-attachment-paste",
+    "allow-clipboard-image",
     "allow-attachment-import",
     "allow-cover-pick",
     "allow-link-suggest",

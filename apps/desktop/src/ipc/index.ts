@@ -1007,6 +1007,9 @@ export const attachmentPaste = (page: string, name: string, bytes: Uint8Array) =
       },
     }),
   );
+/** The system clipboard's image as PNG bytes, empty when it holds none: for a
+ *  paste WebKitGTK hands over empty (Linux; elsewhere `notPermitted`). */
+export const clipboardImage = () => call<ArrayBuffer>('clipboard_image');
 /** Imports files from the latest native drop (other paths are refused). */
 export const attachmentImport = (page: string, paths: string[]) =>
   call<ImportResult[]>('attachment_import', { page, paths });
