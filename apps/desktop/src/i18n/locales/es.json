@@ -423,7 +423,10 @@
       "example": "Los adjuntos nuevos se escriben como",
       "obsidian": "Sigue la configuración de Obsidian ({format}). Elige un formato para usar el tuyo.",
       "useObsidian": "Usar la configuración de Obsidian",
-      "showPaths": "Mostrar dónde están los adjuntos en el disco"
+      "showPaths": "Mostrar dónde están los adjuntos en el disco",
+      "existing": "{count, plural, one {# enlace a un adjunto de la bóveda usa otro formato.} other {# enlaces a adjuntos de la bóveda usan otro formato.}}",
+      "update": "Actualizarlos",
+      "relinkFailed": "{count, plural, one {No se pudo actualizar # página} other {No se pudieron actualizar # páginas}}"
     },
     "autoSave": "Guardado automático",
     "autoSaveHint": "Si está desactivado, {save} guarda. Cambiar el título, el subtítulo, la portada o las relaciones, y mover una página a la Papelera, también guardan su texto.",

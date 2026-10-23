@@ -41,6 +41,8 @@ const COMMANDS: &[&str] = &[
     "vault_settings_get",
     "vault_settings_set",
     "attachment_paste",
+    "clipboard_image",
+    "attachment_relink",
     "attachment_import",
     "cover_pick",
     "link_suggest",

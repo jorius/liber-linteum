@@ -85,6 +85,24 @@ test('the sidebar collapses and comes back (button and ⌘\\)', async ({ page })
   expect(errors).toEqual([]);
 });
 
+test('v0.1.1: the vault menu opened with the mouse takes the arrow keys', async ({ page }) => {
+  await open(page, 'A');
+  await page.locator('[data-vault-menu]').click();
+  const items = page.getByRole('menu').getByRole('menuitem');
+  await expect(items.first()).toBeFocused();
+  await page.keyboard.press('ArrowDown');
+  await expect(items.nth(1)).toBeFocused();
+  // Shown, not just focused: WebKitGTK never matches :focus-visible here.
+  expect(await items.nth(1).evaluate((el) => getComputedStyle(el).backgroundColor)).not.toBe(
+    'rgba(0, 0, 0, 0)',
+  );
+  await page.keyboard.press('End');
+  await page.keyboard.press('ArrowUp');
+  await expect(page.getByRole('menuitem', { name: 'Settings…' })).toBeFocused();
+  await page.keyboard.press('Enter');
+  await expect(page.getByRole('dialog', { name: 'Settings' })).toBeVisible();
+});
+
 test('the vault menu opens Settings', async ({ page }) => {
   await open(page, 'A');
   await page.locator('[data-vault-menu]').click();

@@ -153,6 +153,8 @@ export function fakeDisk(initial: Record<string, string>, extra: Extra = {}): Fa
           files.set(args.to, text);
           return { moved: [[args.from, args.to]], updatedFiles: [], updatedLinks: 0, failed: [] };
         }
+        case 'attachment_relink':
+          return { updatedFiles: [], updatedLinks: 0, failed: [] };
         case 'vault_tree':
           return [...files.keys()].map((path) => {
             const page = /\.md$/i.test(path);

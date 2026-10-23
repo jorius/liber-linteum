@@ -96,6 +96,9 @@ pub struct LinkRef {
     pub alias: Option<String>,
     /// Byte range of the target text in the source, as written.
     pub range: Range<usize>,
+    /// Byte range of the whole link (`![[…]]`, `[text](…)`); the target's for
+    /// frontmatter links.
+    pub span: Range<usize>,
     /// The target was %-encoded in the source (Markdown links).
     pub encoded: bool,
     /// Markdown destination written as `<…>`.
@@ -112,6 +115,7 @@ impl LinkRef {
             target: target.to_string(),
             heading: None,
             alias: None,
+            span: range.clone(),
             range,
             encoded: false,
             angle: false,

@@ -4,8 +4,8 @@
 //! dialog Rust opens itself (spec §8).
 
 use crate::dto::{
-    AttachedDto, AttachmentsDto, CoverDto, ImportResultDto, LinkSuggestionDto, VaultSettingsDto,
-    VaultSettingsPatch,
+    AttachedDto, AttachmentsDto, CoverDto, ImportResultDto, LinkSuggestionDto, RelinkOutcomeDto,
+    VaultSettingsDto, VaultSettingsPatch,
 };
 use crate::error::{CmdResult, CommandError, ErrorKind};
 use crate::state::AppState;
@@ -336,6 +336,23 @@ pub(crate) fn vault_settings_set_impl(
     vault_settings_get_impl(state)
 }
 
+/// v0.1.1: every attachment link in the vault in its link format, as a new
+/// one's would be written; with `apply` false, only what would change.
+pub(crate) fn attachment_relink_impl(state: &AppState, apply: bool) -> CmdResult<RelinkOutcomeDto> {
+    Ok(state.session()?.relink_attachments(apply)?.into())
+}
+
+#[tauri::command]
+pub async fn attachment_relink<R: Runtime>(
+    app: AppHandle<R>,
+    apply: bool,
+) -> CmdResult<RelinkOutcomeDto> {
+    blocking(app, move |app| {
+        attachment_relink_impl(&app.state::<AppState>(), apply)
+    })
+    .await
+}
+
 #[tauri::command]
 pub async fn attachment_paste<R: Runtime>(
     app: AppHandle<R>,
@@ -346,6 +363,51 @@ pub async fn attachment_paste<R: Runtime>(
         attachment_paste_impl(&app.state::<AppState>(), page, name, bytes)
     })
     .await
+}
+
+/// The clipboard's image as PNG bytes, for a paste the page saw empty (v0.1.1):
+/// WebKitGTK pastes an image with no `clipboardData` at all, so on Linux GTK
+/// reads it, on the main thread. Empty when the clipboard holds no image; it is
+/// then saved through `attachment_paste` like any paste. Elsewhere the page
+/// reads the paste itself, so this answers `notPermitted`.
+#[tauri::command]
+pub async fn clipboard_image<R: Runtime>(app: AppHandle<R>) -> CmdResult<tauri::ipc::Response> {
+    #[cfg(target_os = "linux")]
+    {
+        blocking(app, |app| {
+            let (tx, rx) = std::sync::mpsc::channel();
+            app.run_on_main_thread(move || {
+                use gtk::{Clipboard, gdk};
+                Clipboard::get(&gdk::SELECTION_CLIPBOARD).request_image(move |_, image| {
+                    let _ = tx.send(image.map(|p| p.save_to_bufferv("png", &[])));
+                });
+            })
+            .map_err(|e| CommandError::new(ErrorKind::Io, e.to_string()))?;
+            let png = match rx.recv_timeout(std::time::Duration::from_secs(10)) {
+                Ok(Some(png)) => {
+                    png.map_err(|e| CommandError::new(ErrorKind::Io, e.to_string()))?
+                }
+                // No image, or no answer from the clipboard's owner.
+                Ok(None) | Err(_) => Vec::new(),
+            };
+            if png.len() > MAX_PASTE_BYTES {
+                return Err(invalid(format!(
+                    "pasted images are limited to {} MiB",
+                    MAX_PASTE_BYTES >> 20
+                )));
+            }
+            Ok(tauri::ipc::Response::new(png))
+        })
+        .await
+    }
+    #[cfg(not(target_os = "linux"))]
+    {
+        let _ = app;
+        Err(CommandError::new(
+            ErrorKind::NotPermitted,
+            "clipboard image",
+        ))
+    }
 }
 
 #[tauri::command]

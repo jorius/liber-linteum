@@ -180,3 +180,59 @@ describe('the absolute link format (M4b part 3 §8)', () => {
     );
   });
 });
+
+describe('a paste WebKitGTK hands over empty (v0.1.1)', () => {
+  /** A paste event whose clipboardData has nothing in it, as on Ubuntu. */
+  const emptyPaste = () => {
+    const e = new Event('paste', { bubbles: true, cancelable: true });
+    Object.defineProperty(e, 'clipboardData', {
+      value: { files: [], types: [], items: [], getData: () => '' },
+    });
+    viewOf().contentDOM.dispatchEvent(e);
+    return e;
+  };
+
+  it("saves the system clipboard's image, read by Rust", async () => {
+    const disk = fakeDisk(
+      { 'P.md': 'x\n' },
+      {
+        clipboard_image: () => new Uint8Array([0x89, 0x50, 0x4e, 0x47]).buffer,
+        attachment_paste: () => ({
+          path: 'attachments/Pasted image 1.png',
+          link: 'Pasted image 1.png',
+          url: null,
+          copied: true,
+        }),
+      },
+    );
+    await mount('P.md');
+    act(() => viewOf().dispatch({ selection: { anchor: 0 } }));
+    expect(emptyPaste().defaultPrevented).toBe(true);
+    await vi.waitFor(() =>
+      expect(viewOf().state.doc.toString()).toBe('![[Pasted image 1.png]]x\n'),
+    );
+    const saved = disk.calls.find(([c]) => c === 'attachment_paste');
+    expect(saved).toBeDefined();
+  });
+
+  it('a paste with only HTML asks Rust too (Copy image in a browser)', async () => {
+    const disk = fakeDisk({ 'P.md': 'x\n' }, { clipboard_image: () => new ArrayBuffer(0) });
+    await mount('P.md');
+    const e = new Event('paste', { bubbles: true, cancelable: true });
+    Object.defineProperty(e, 'clipboardData', {
+      value: { files: [], types: ['text/html'], items: [], getData: () => '<img src="x">' },
+    });
+    viewOf().contentDOM.dispatchEvent(e);
+    await vi.waitFor(() => expect(disk.calls.some(([c]) => c === 'clipboard_image')).toBe(true));
+  });
+
+  it('with no image on the clipboard, nothing changes', async () => {
+    const disk = fakeDisk({ 'P.md': 'x\n' }, { clipboard_image: () => new ArrayBuffer(0) });
+    await mount('P.md');
+    emptyPaste();
+    await vi.waitFor(() => expect(disk.calls.some(([c]) => c === 'clipboard_image')).toBe(true));
+    await new Promise((r) => setTimeout(r, 20));
+    expect(disk.calls.some(([c]) => c === 'attachment_paste')).toBe(false);
+    expect(viewOf().state.doc.toString()).toBe('x\n');
+  });
+});

@@ -192,6 +192,7 @@ fn extract_unmasked(src: &str, body_start: usize) -> Body {
                 LinkKind::Wiki
             };
             let mut link = LinkRef::new(kind, parts.target, start..start + parts.target.len());
+            link.span = region.start + occ.whole.start..region.start + occ.whole.end;
             link.heading = parts.heading.map(str::to_string);
             link.alias = parts.alias.map(str::to_string);
             body.links.push(link);
@@ -345,6 +346,7 @@ fn markdown_link(
         .to_string();
     let abs = range.start + dest_start;
     let mut link = LinkRef::new(kind, &target, abs..abs + path_part.len());
+    link.span = range.clone();
     link.heading = heading.filter(|h| !h.is_empty()).map(str::to_string);
     link.encoded = path_part.contains('%');
     link.angle = angle;

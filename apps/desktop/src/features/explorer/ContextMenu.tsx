@@ -233,6 +233,7 @@ export function ContextMenu({ menu, onClose }: { menu: MenuState; onClose: () =>
           type="button"
           role="menuitem"
           tabIndex={i === active ? 0 : -1}
+          onMouseMove={() => setActive(i)}
           aria-haspopup={i === sortIndex ? 'menu' : undefined}
           onClick={() => {
             if (label !== t('menu.icon') && i !== sortIndex) onClose();

@@ -428,3 +428,88 @@ fn m2c_cover_reference_is_relative_inside_the_page_folder_else_rooted() {
     assert_eq!(r("Chars/Rex.md", "Images/x.png"), "/Images/x.png");
     assert_eq!(r("Chars/Rex.md", "Characters/x.png"), "/Characters/x.png");
 }
+
+/// v0.1.1: changing the link format can rewrite the attachment links already
+/// in the vault, as new ones would be written. Wiki links and `file:` URLs to
+/// attachments change; page links, other Markdown links and links that find
+/// nothing stay. Sizes, aliases and `#…` survive, in both directions.
+#[test]
+fn v011_existing_attachment_links_follow_a_new_link_format() {
+    use liber_vault::LinkFormat;
+    // Reads the page's bytes on disk, and an encrypted vault has no file: URLs.
+    if liber_testkit::plain_disk_only() {
+        return;
+    }
+    let vault = tempfile::tempdir().unwrap();
+    let root = dunce::canonicalize(vault.path()).unwrap();
+    std::fs::create_dir_all(root.join("Notes")).unwrap();
+    std::fs::create_dir_all(root.join("attachments")).unwrap();
+    for f in ["a b.png", "c.png", "doc.pdf"] {
+        std::fs::write(root.join("attachments").join(f), b"x").unwrap();
+    }
+    std::fs::write(root.join("Notes/Other.md"), "# Other\n").unwrap();
+    let url = |f: &str| liber_session::file_url(root.join("attachments").join(f).to_str().unwrap());
+    let original = format!(
+        "# Page\n- one\n![[a b.png]]\n![[../attachments/c.png|300]]\n\
+         See [[doc.pdf#page=2|Spec]] and [[Other]].\n![x](attachments/a%20b.png)\n\
+         ![]({})\n![[missing.png]]\n",
+        url("c.png")
+    );
+    std::fs::write(root.join("Notes/Page.md"), &original).unwrap();
+    std::fs::create_dir(root.join(".archive")).unwrap();
+    std::fs::write(root.join(".archive/Old.md"), "![[../attachments/c.png]]\n").unwrap();
+    let (_c, s) = open(&root);
+    let page = || std::fs::read_to_string(root.join("Notes/Page.md")).unwrap();
+
+    // Shortest: the relative embed and the file: URL become short names.
+    s.vault()
+        .set_link_format(Some(LinkFormat::Shortest))
+        .unwrap();
+    let counted = s.relink_attachments(false).unwrap();
+    assert_eq!(counted.updated_files, ["Notes/Page.md"]);
+    assert_eq!(counted.updated_links, 2);
+    assert_eq!(page(), original, "counting writes nothing");
+    let done = s.relink_attachments(true).unwrap();
+    assert_eq!(done, counted);
+    let shortest = page();
+    assert!(shortest.contains("![[c.png|300]]\n"), "{shortest}");
+    assert!(shortest.contains("See [[doc.pdf#page=2|Spec]] and [[Other]].\n"));
+    assert!(
+        shortest.contains("![x](attachments/a%20b.png)\n"),
+        "other Markdown stays"
+    );
+    assert!(shortest.contains("![[missing.png]]\n"), "unresolved stays");
+    assert_eq!(s.relink_attachments(false).unwrap().updated_links, 0);
+    assert!(
+        shortest.contains("\n![[c.png]]\n![[missing.png]]"),
+        "{shortest}"
+    );
+
+    // Absolute: every attachment link is its file: URL, size and alias kept.
+    s.vault()
+        .set_link_format(Some(LinkFormat::Absolute))
+        .unwrap();
+    assert_eq!(s.relink_attachments(true).unwrap().updated_links, 4);
+    assert_eq!(
+        page(),
+        format!(
+            "# Page\n- one\n![]({a})\n![300]({c})\nSee [Spec]({d}#page=2) and [[Other]].\n\
+             ![x](attachments/a%20b.png)\n![]({c})\n![[missing.png]]\n",
+            a = url("a b.png"),
+            c = url("c.png"),
+            d = url("doc.pdf"),
+        )
+    );
+
+    // And back: the same text as the shortest pass wrote.
+    s.vault()
+        .set_link_format(Some(LinkFormat::Shortest))
+        .unwrap();
+    assert_eq!(s.relink_attachments(true).unwrap().updated_links, 4);
+    assert_eq!(page(), shortest);
+    assert_eq!(
+        std::fs::read_to_string(root.join(".archive/Old.md")).unwrap(),
+        "![[../attachments/c.png]]\n",
+        "archived pages are read-only"
+    );
+}

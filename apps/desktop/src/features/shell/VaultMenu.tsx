@@ -135,6 +135,7 @@ function Menu({
           type="button"
           role="menuitem"
           tabIndex={i === active ? 0 : -1}
+          onMouseMove={() => setActive(i)}
           onClick={() => {
             onClose(false);
             run();

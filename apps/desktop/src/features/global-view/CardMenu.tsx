@@ -91,6 +91,7 @@ export function CardMenu({
           type="button"
           role="menuitem"
           tabIndex={i === active ? 0 : -1}
+          onMouseMove={() => setActive(i)}
           onClick={() => {
             onClose(true);
             item.run();

@@ -330,7 +330,11 @@ impl VaultSession {
     /// The link to `path` from `page` in the vault's link format (M4b part 3
     /// §8), and the `file:` URL for the absolute format. A full or relative
     /// path that wouldn't find `path` again falls back to the shortest name.
-    fn link_to(&self, page: &VaultPath, path: &VaultPath) -> Result<(String, Option<String>)> {
+    pub(crate) fn link_to(
+        &self,
+        page: &VaultPath,
+        path: &VaultPath,
+    ) -> Result<(String, Option<String>)> {
         let files = self.index()?.file_set()?;
         let shortest =
             shortest_unique_target(path.as_str(), page.as_str(), &files, LinkKind::Embed, false);

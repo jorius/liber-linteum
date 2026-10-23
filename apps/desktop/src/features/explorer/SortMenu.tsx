@@ -87,6 +87,7 @@ export function SortMenu({
           role="menuitemradio"
           aria-checked={sort === current}
           tabIndex={i === active ? 0 : -1}
+          onMouseMove={() => setActive(i)}
           onClick={() => choose(sort)}
         >
           {t(`sort.${sort}`)}

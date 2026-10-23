@@ -79,6 +79,8 @@ Every release lists a SHA-256 checksum for each file (`SHA256SUMS`) and, when av
 VirusTotal report. The installers aren't code-signed yet: on Windows choose **More info → Run
 anyway**; on macOS right-click the app and choose **Open** the first time.
 
+What changed in each release is in [CHANGELOG.md](CHANGELOG.md).
+
 ## Try the sample vault
 
 [**The Moons of Kessari**](https://github.com/jorius/liber-linteum/releases/latest/download/The-Moons-of-Kessari.zip)

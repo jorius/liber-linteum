@@ -271,6 +271,7 @@ function TableMenu({
             aria-checked={checked}
             aria-disabled={disabled || undefined}
             tabIndex={i === active ? 0 : -1}
+            onMouseMove={() => setActive(i)}
             onClick={() => {
               if (!disabled) onRun(tableAction(entry.action));
             }}

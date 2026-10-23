@@ -68,18 +68,13 @@ body {
   cursor: pointer;
 }
 
-/* Separate rules: WebKit before 15.4 drops a whole selector list that holds
-   :focus-visible, hover included. */
+/* The focused item is the menu's current one, as in a native menu: arrow
+   keys and the pointer move it (v0.1.1). Not :focus-visible, which WebKitGTK
+   never matches when a menu opened with the mouse moves its focus. */
 .liber-menu [role='menuitem']:hover,
-.liber-menu [role='menuitemradio']:hover {
-  background: var(--color-accent-soft);
-}
-
-.liber-menu [role='menuitem']:focus-visible {
-  background: var(--color-accent-soft);
-}
-
-.liber-menu [role='menuitemradio']:focus-visible {
+.liber-menu [role='menuitemradio']:hover,
+.liber-menu [role='menuitem']:focus,
+.liber-menu [role='menuitemradio']:focus {
   background: var(--color-accent-soft);
 }
 

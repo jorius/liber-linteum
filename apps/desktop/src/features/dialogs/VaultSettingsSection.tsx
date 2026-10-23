@@ -2,12 +2,15 @@ import type { TFunction } from 'i18next';
 import { useEffect, useId, useRef, useState, type KeyboardEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
+  attachmentRelink,
   vaultSettingsGet,
   vaultSettingsSet,
   type AttachmentMode,
   type LinkFormat,
 } from '../../ipc';
+import { useEditorStore } from '../../stores/editorStore';
 import { errorMessage } from '../../stores/messages';
+import { useToastStore } from '../../stores/toastStore';
 import { useVaultStore } from '../../stores/vaultStore';
 import { UnreadableList } from '../encryption/UnreadableList';
 import { usePageWidthStore } from '../../stores/pageWidthStore';
@@ -59,6 +62,9 @@ export function VaultSettingsSection() {
   const [linkFormat, setLinkFormat] = useState<LinkFormat | null>(null);
   const [obsidianFormat, setObsidianFormat] = useState<LinkFormat | null>(null);
   const [loaded, setLoaded] = useState(false);
+  /** Attachment links already in the vault in another format (v0.1.1). */
+  const [others, setOthers] = useState(0);
+  const [relinking, setRelinking] = useState(false);
   const [error, setError] = useState<string | null>(null);
   // What `.liber/vault.json` holds (as loaded, then as last saved): saving the
   // same again would create `.liber/` for nothing (final review M5).
@@ -76,6 +82,9 @@ export function VaultSettingsSection() {
       setLinkFormat(res.value.attachmentLinkFormat ?? null);
       setObsidianFormat(res.value.obsidianLinkFormat ?? null);
       setLoaded(true);
+      void attachmentRelink(false).then((count) => {
+        if (live && count.ok) setOthers(count.value.updatedLinks);
+      });
     });
     return () => {
       live = false;
@@ -154,6 +163,38 @@ export function VaultSettingsSection() {
     }
     setLinkFormat(res.value.attachmentLinkFormat ?? null);
     setError(null);
+    const count = await attachmentRelink(false);
+    setOthers(count.ok ? count.value.updatedLinks : 0);
+  };
+  /** Rewrites the links counted in `others`, after open pages are saved so
+   *  none is written over; open pages then show the new text. */
+  const relink = async () => {
+    setRelinking(true);
+    try {
+      await useEditorStore.getState().saveAll();
+      const res = await attachmentRelink(true);
+      if (!res.ok) {
+        setError(errorMessage(res.error));
+        return;
+      }
+      await useEditorStore.getState().syncPaths(res.value.updatedFiles);
+      const { failed, updatedFiles } = res.value;
+      if (failed.length) {
+        useToastStore.getState().push({
+          message: t('settings.links.relinkFailed', { count: failed.length }),
+          detail: failed.map(([p, why]) => `${p} — ${why}`),
+          tone: 'error',
+        });
+      } else if (updatedFiles.length) {
+        useToastStore
+          .getState()
+          .push({ message: t('toasts.linksUpdated', { count: updatedFiles.length }) });
+      }
+      const count = await attachmentRelink(false);
+      setOthers(count.ok ? count.value.updatedLinks : 0);
+    } finally {
+      setRelinking(false);
+    }
   };
   const followsObsidian = linkFormat === null && obsidianFormat !== null;
   const effectiveFormat = linkFormat ?? obsidianFormat ?? 'shortest';
@@ -250,6 +291,19 @@ export function VaultSettingsSection() {
         )}{' '}
         {t('settings.links.example')} <code>{EXAMPLES[effectiveFormat]}</code>
       </p>
+      {others > 0 && (
+        <p className={styles.hint}>
+          {t('settings.links.existing', { count: others })}{' '}
+          <button
+            type="button"
+            className="btn btn-secondary"
+            disabled={relinking}
+            onClick={() => void relink()}
+          >
+            {t('settings.links.update')}
+          </button>
+        </p>
+      )}
       <label className={styles.field} htmlFor={widthId}>
         <span>{t('vault.pageWidth')}</span>
         <select
