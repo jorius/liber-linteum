@@ -274,8 +274,9 @@ async function pasteImages(view: EditorView, files: File[]) {
   void useVaultStore.getState().refreshTree();
 }
 
-/** A paste that came with no data at all (v0.1.1): WebKitGTK hands an image
- *  over that way, so Rust reads it from the system clipboard. */
+/** A paste that came with neither text nor an image file (v0.1.1): WebKitGTK
+ *  hands an image over that way, so Rust reads it from the system clipboard;
+ *  with no image there, nothing happens. */
 async function pasteSystemImage(view: EditorView) {
   const res = await clipboardImage();
   if (!res.ok || !res.value.byteLength) return;
@@ -288,16 +289,12 @@ const pasteHandler = EditorView.domEventHandlers({
     // page can't change (archived, round-2 review M5).
     if (fileWindowName() !== null || view.state.readOnly) return false;
     const data = e.clipboardData;
-    if (data && !data.types.length && !data.files.length) {
-      e.preventDefault();
-      void pasteSystemImage(view);
-      return true;
-    }
     if (!data || data.types.includes('text/plain')) return false;
     const files = [...data.files].filter((f) => PASTE_TYPES[f.type] || convertible(f.type));
-    if (!files.length) return false;
     e.preventDefault();
-    void pasteImages(view, files);
+    // No image file and no text: the system clipboard may still hold an image
+    // (v0.1.1) that WebKitGTK left out, with nothing at all or only HTML.
+    void (files.length ? pasteImages(view, files) : pasteSystemImage(view));
     return true;
   },
 });

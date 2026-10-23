@@ -215,6 +215,17 @@ describe('a paste WebKitGTK hands over empty (v0.1.1)', () => {
     expect(saved).toBeDefined();
   });
 
+  it('a paste with only HTML asks Rust too (Copy image in a browser)', async () => {
+    const disk = fakeDisk({ 'P.md': 'x\n' }, { clipboard_image: () => new ArrayBuffer(0) });
+    await mount('P.md');
+    const e = new Event('paste', { bubbles: true, cancelable: true });
+    Object.defineProperty(e, 'clipboardData', {
+      value: { files: [], types: ['text/html'], items: [], getData: () => '<img src="x">' },
+    });
+    viewOf().contentDOM.dispatchEvent(e);
+    await vi.waitFor(() => expect(disk.calls.some(([c]) => c === 'clipboard_image')).toBe(true));
+  });
+
   it('with no image on the clipboard, nothing changes', async () => {
     const disk = fakeDisk({ 'P.md': 'x\n' }, { clipboard_image: () => new ArrayBuffer(0) });
     await mount('P.md');
