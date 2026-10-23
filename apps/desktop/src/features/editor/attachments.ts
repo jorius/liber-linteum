@@ -279,7 +279,7 @@ async function pasteImages(view: EditorView, files: File[]) {
  *  with no image there, nothing happens. */
 async function pasteSystemImage(view: EditorView) {
   const res = await clipboardImage();
-  if (!res.ok || !res.value.byteLength) return;
+  if (!res.ok || !res.value?.byteLength) return;
   await pasteImages(view, [new File([res.value], 'clipboard.png', { type: 'image/png' })]);
 }
 
@@ -290,11 +290,17 @@ const pasteHandler = EditorView.domEventHandlers({
     if (fileWindowName() !== null || view.state.readOnly) return false;
     const data = e.clipboardData;
     if (!data || data.types.includes('text/plain')) return false;
-    const files = [...data.files].filter((f) => PASTE_TYPES[f.type] || convertible(f.type));
-    e.preventDefault();
-    // No image file and no text: the system clipboard may still hold an image
+    // No file and no text: the system clipboard may still hold an image
     // (v0.1.1) that WebKitGTK left out, with nothing at all or only HTML.
-    void (files.length ? pasteImages(view, files) : pasteSystemImage(view));
+    if (!data.files.length) {
+      e.preventDefault();
+      void pasteSystemImage(view);
+      return true;
+    }
+    const files = [...data.files].filter((f) => PASTE_TYPES[f.type] || convertible(f.type));
+    if (!files.length) return false;
+    e.preventDefault();
+    void pasteImages(view, files);
     return true;
   },
 });
