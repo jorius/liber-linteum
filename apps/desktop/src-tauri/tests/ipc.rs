@@ -53,7 +53,7 @@ fn app_info_is_callable_from_the_main_window() {
 
     assert_eq!(
         value,
-        serde_json::json!({ "name": "Liber Linteum", "version": "0.1.0" })
+        serde_json::json!({ "name": "Liber Linteum", "version": "0.1.1" })
     );
 }
 

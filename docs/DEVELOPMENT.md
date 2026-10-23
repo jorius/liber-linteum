@@ -73,7 +73,7 @@ Output goes to `target/release/bundle/<type>/` at the repository root
 `pnpm tauri …` from `apps/desktop`: from the root, pnpm can't find the `tauri` command.
 
 On Linux, install the result with
-`sudo apt install "./target/release/bundle/deb/Liber Linteum_0.1.0_amd64.deb"`. Quit the app
+`sudo apt install "./target/release/bundle/deb/Liber Linteum_0.1.1_amd64.deb"`. Quit the app
 first: a running copy keeps the old version until it restarts.
 
 ### A Windows installer from macOS
