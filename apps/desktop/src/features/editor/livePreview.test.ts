@@ -326,6 +326,48 @@ describe('raw HTML blocks (M2c §7.7)', () => {
     expect(v.contentDOM.querySelector('.cm-liber-widget')).toBeNull();
     expect(line(v, 3)).toBe('a <b>bold</b> c');
   });
+
+  it('a <span data-color|data-bg> label renders in its colour; the cursor line shows its tags (v0.1.1)', async () => {
+    const v = editor(
+      'x\n\n- <span data-bg="red">bug</span> - and <span data-color=\'blue\' data-bg="yellow">two</span>\n',
+      0,
+    );
+    expect(line(v, 3)).toBe('• bug - and two');
+    const bug = v.contentDOM.querySelector('.cm-liber-label[data-bg="red"]');
+    expect(bug).toHaveTextContent('bug');
+    const two = v.contentDOM.querySelector('.cm-liber-label[data-color="blue"]');
+    expect(two).toHaveAttribute('data-bg', 'yellow');
+    expect(two).toHaveTextContent('two');
+    await moveTo(v, v.state.doc.line(3).from);
+    expect(line(v, 3)).toContain('<span data-bg="red">bug</span>');
+    expect(v.contentDOM.querySelector('.cm-liber-label[data-bg="red"]')).toHaveTextContent('bug');
+  });
+
+  it('a span outside the palette, or one left open, stays text', () => {
+    const v = editor('x\n\n<span data-color="pink">a</span> and <span data-bg="red">open\n', 0);
+    expect(v.contentDOM.querySelector('.cm-liber-label')).toBeNull();
+    expect(line(v, 3)).toBe('<span data-color="pink">a</span> and <span data-bg="red">open');
+  });
+});
+
+describe('Live Preview images inside a paragraph (v0.1.1)', () => {
+  it("an image on a list item's next line renders until the cursor enters its line", async () => {
+    const v = editor('x\n\n- A card\n![[pic.png]]\n- Next\n', 0);
+    expect(v.contentDOM.textContent).not.toContain('![[pic.png]]');
+    expect(v.contentDOM.querySelectorAll('.cm-liber-widget')).toHaveLength(1);
+    // The item's own line stays an editable line of text.
+    expect(line(v, 3)).toContain('A card');
+    await moveTo(v, v.state.doc.line(4).from);
+    expect(v.contentDOM.querySelector('.cm-liber-widget')).toBeNull();
+    expect(line(v, 4)).toBe('![[pic.png]]');
+  });
+
+  it('a Markdown image after text renders too; the text stays', () => {
+    const v = editor('x\n\n- see here: ![](file:///home/me/Vault/a%20b.png)\n', 0);
+    expect(v.contentDOM.querySelectorAll('.cm-liber-widget')).toHaveLength(1);
+    expect(v.contentDOM.textContent).toContain('see here:');
+    expect(v.contentDOM.textContent).not.toContain('file:///');
+  });
 });
 
 describe('Live Preview maths (M4b part 2 §3)', () => {

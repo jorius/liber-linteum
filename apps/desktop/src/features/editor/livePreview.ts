@@ -21,7 +21,7 @@ import { linksExternal, linksResolve, type LinkKind, type WideElements } from '.
 import { isFileTarget, looksExternal } from '../../markdown/externalPath';
 import { reparse } from '../../markdown/incremental';
 import { parsePage } from '../../markdown/parse';
-import { toSafeHast, vaultJoin } from '../../markdown/sanitize';
+import { PALETTE, toSafeHast, vaultJoin } from '../../markdown/sanitize';
 import type { Embed, ParsedPage, WikiLink } from '../../markdown/types';
 import { rangeOf } from '../../markdown/walk';
 import { onLeaveVault } from '../../stores/leaveVault';
@@ -87,6 +87,24 @@ const quoteMarks = (depth: number) =>
 /** The wide-elements choice (M4b part 3) a block widget follows. */
 const WIDE_KIND: Record<string, keyof WideElements> = { table: 'tables', math: 'maths' };
 const IMAGE_FILE = /\.(?:png|jpe?g|gif|webp|svg|avif|bmp)$/i;
+/** A label's opening tag: `<span>` with only `data-color` / `data-bg`
+ *  (M2a §4), quoted either way; the closing tag is a bare `</span>`. */
+const LABEL_OPEN = /^<span((?:\s+data-(?:color|bg)\s*=\s*(?:"[a-z]+"|'[a-z]+'))+)\s*>$/i;
+const LABEL_ATTR = /data-(color|bg)\s*=\s*["']([a-z]+)["']/gi;
+const SPAN_OPEN = /^<span[\s>]/i;
+const SPAN_CLOSE = /^<\/span\s*>$/i;
+
+/** The label's attributes when every colour is in the palette, else `null`. */
+function labelAttrs(tag: string): Record<string, string> | null {
+  const m = LABEL_OPEN.exec(tag);
+  if (!m) return null;
+  const attrs: Record<string, string> = {};
+  for (const [, key, value] of m[1].matchAll(LABEL_ATTR)) {
+    if (!(PALETTE as readonly string[]).includes(value)) return null;
+    attrs[`data-${key.toLowerCase()}`] = value;
+  }
+  return attrs;
+}
 
 /** Whether an HTML block renders nothing once sanitized (comments, scripts):
  *  such blocks keep their source, muted, so nothing silently disappears
@@ -196,6 +214,36 @@ function build(state: EditorState, page: ParsedPage, active: Set<number>): Decor
       : null;
   };
 
+  /** Labels among `node`'s children (v0.1.1): the text between a palette
+   *  `<span>` and its `</span>` takes the colour, and off the cursor the tags
+   *  hide. Other inline HTML stays text, and so does a span left open. */
+  const labels = (node: Parent) => {
+    const open: ({ attrs: Record<string, string>; from: number; to: number } | null)[] = [];
+    for (const kid of node.children as Node[]) {
+      if (kid.type !== 'html' || !kid.position) continue;
+      const [from, to] = rangeOf(kid);
+      const tag = text(from, to);
+      if (SPAN_CLOSE.test(tag)) {
+        const start = open.pop();
+        if (!start) continue;
+        if (start.to < from) {
+          out.push(
+            Decoration.mark({ class: 'cm-liber-label', attributes: start.attrs }).range(
+              start.to,
+              from,
+            ),
+          );
+        }
+        if (!touched(start.from, to)) {
+          conceal(start.from, start.to);
+          conceal(from, to);
+        }
+      } else if (SPAN_OPEN.test(tag)) {
+        const attrs = labelAttrs(tag);
+        open.push(attrs && { attrs, from, to });
+      }
+    }
+  };
   /** Inside a blockquote: its outermost one hides every level's markers. */
   let quoteDepth = 0;
   /** Each line's quote nesting under `node` (a blockquote at `level`). */
@@ -269,6 +317,16 @@ function build(state: EditorState, page: ParsedPage, active: Set<number>): Decor
       }
       case 'tag':
         if (!reduced && from < to) out.push(MARKS.tag.range(from, to));
+        return;
+      case 'embed':
+      case 'image':
+        // v0.1.1: one that shares its paragraph (a list item's next line, a
+        // sentence) renders where it is, until the cursor enters its line.
+        if (!reduced && !touched(from, to)) {
+          out.push(
+            Decoration.replace({ widget: new PreviewWidget(text(from, to), path) }).range(from, to),
+          );
+        }
         return;
       case 'inlineMath': {
         // M4b part 2 §3: maths renders unless the cursor is on its line.
@@ -368,7 +426,10 @@ function build(state: EditorState, page: ParsedPage, active: Set<number>): Decor
       }
     }
     const kids = (node as Parent).children as Node[] | undefined;
-    if (kids) kids.forEach(visit);
+    if (kids) {
+      labels(node as Parent);
+      kids.forEach(visit);
+    }
   };
   /** Flow HTML (a root-level `html` node) renders like a table; inline HTML
    *  inside a paragraph stays text. */
@@ -589,6 +650,13 @@ const theme = EditorView.baseTheme({
   },
   '.cm-liber-link': { color: 'var(--color-accent)', textDecoration: 'underline' },
   '.cm-liber-tag': { color: 'var(--color-secondary)', fontWeight: '600' },
+  // The palette's `--tone` comes from the shared `[data-color='…']` rules.
+  '.cm-liber-label[data-color]': { color: 'var(--tone)' },
+  '.cm-liber-label[data-bg]': {
+    background: 'var(--tone-bg)',
+    borderRadius: '3px',
+    padding: '0 2px',
+  },
   '.cm-liber-codeblock': {
     fontFamily: 'var(--font-source)',
     fontSize: '0.9em',
