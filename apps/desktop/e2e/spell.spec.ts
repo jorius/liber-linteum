@@ -43,6 +43,28 @@ test('right-click → a suggestion replaces it', async ({ page }) => {
   await expect(underlined(page)).toHaveCount(0);
 });
 
+test('v0.1.1: the menu opened with the mouse takes the arrow keys', async ({ page }) => {
+  await open(page);
+  await underlined(page).click({ button: 'right' });
+  const menu = page.getByRole('menu', { name: 'Spelling: recieve' });
+  await expect(menu.getByRole('menuitem', { name: 'receive' })).toBeFocused();
+  await page.keyboard.press('ArrowDown');
+  await expect(menu.getByRole('menuitem').nth(1)).toBeFocused();
+  // Shown, not just focused: WebKitGTK never matches :focus-visible here.
+  expect(
+    await menu
+      .getByRole('menuitem')
+      .nth(1)
+      .evaluate((el) => getComputedStyle(el).backgroundColor),
+  ).not.toBe('rgba(0, 0, 0, 0)');
+  await page.keyboard.press('ArrowUp');
+  await page.keyboard.press('ArrowUp');
+  await expect(menu.getByRole('menuitem', { name: 'Ignore' })).toBeFocused();
+  await page.keyboard.press('Enter');
+  await expect(underlined(page)).toHaveCount(0);
+  await expect(page.locator('.cm-content')).toContainText('I recieve mail.');
+});
+
 test('Add to dictionary removes the underline and survives a reload', async ({ page }) => {
   await open(page);
   await underlined(page).click({ button: 'right' });

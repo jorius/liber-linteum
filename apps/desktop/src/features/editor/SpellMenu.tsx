@@ -92,6 +92,7 @@ export function SpellMenu({
       type="button"
       role="menuitem"
       tabIndex={i === active ? 0 : -1}
+      onMouseMove={() => setActive(i)}
       onClick={run}
     >
       {label}

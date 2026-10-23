@@ -137,6 +137,7 @@ function Menu({
           role="menuitemradio"
           aria-checked={w === width}
           tabIndex={i === active ? 0 : -1}
+          onMouseMove={() => setActive(i)}
           onClick={() => onChoose(w)}
         >
           <span className={styles.widthCheck}>{w === width && <CheckIcon />}</span>
@@ -152,6 +153,7 @@ function Menu({
         role="menuitem"
         aria-disabled={!own}
         tabIndex={own && active === WIDTHS.length ? 0 : -1}
+        onMouseMove={() => setActive(WIDTHS.length)}
         onClick={() => {
           if (own) onChoose(null);
         }}
