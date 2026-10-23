@@ -628,6 +628,8 @@ fn the_window_hears_when_its_file_changes_and_only_its_file() {
         sink.lock().unwrap().push(e.payload().to_string())
     });
     std::thread::sleep(Duration::from_millis(300)); // let the backend arm
+    // macOS FSEvents can deliver the note's own creation after arming.
+    seen.lock().unwrap().clear();
     std::fs::write(dir.path().join("other.md"), "changed").unwrap();
     std::thread::sleep(Duration::from_millis(600));
     assert!(
