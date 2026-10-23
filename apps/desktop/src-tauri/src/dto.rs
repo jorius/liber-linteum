@@ -1,6 +1,6 @@
 //! Serializable shapes returned to the UI (M1b spec §2.4), all camelCase.
 
-use liber_session::{IndexReport, RenameOutcome};
+use liber_session::{IndexReport, RelinkOutcome, RenameOutcome};
 use serde::Serialize;
 
 #[derive(Debug, Clone, Serialize)]
@@ -361,6 +361,25 @@ impl From<liber_session::GvEdge> for GvEdgeDto {
             aggregated: e.aggregated,
             directed: e.directed,
             label: e.label,
+        }
+    }
+}
+
+/// v0.1.1: attachment links rewritten (or that would be) to the link format.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RelinkOutcomeDto {
+    pub updated_files: Vec<String>,
+    pub updated_links: usize,
+    pub failed: Vec<(String, String)>,
+}
+
+impl From<RelinkOutcome> for RelinkOutcomeDto {
+    fn from(o: RelinkOutcome) -> RelinkOutcomeDto {
+        RelinkOutcomeDto {
+            updated_files: o.updated_files,
+            updated_links: o.updated_links,
+            failed: o.failed,
         }
     }
 }

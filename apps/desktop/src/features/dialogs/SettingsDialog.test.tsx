@@ -275,6 +275,8 @@ describe('Settings dialog (M2b §4, §5, §7)', () => {
 
 describe('Settings → This vault (M2c §5.4)', () => {
   let vaultPatches: unknown[];
+  let elsewhere: number;
+  let relinks: boolean[];
   let obsidian: string | null;
   let overrideObsidian: boolean;
   let stored: { mode: string; path: string };
@@ -287,6 +289,8 @@ describe('Settings → This vault (M2c §5.4)', () => {
     linkFormat = null;
     obsidianLinkFormat = null;
     vaultPatches = [];
+    elsewhere = 0;
+    relinks = [];
     obsidian = null;
     overrideObsidian = false;
     stored = { mode: 'subfolder', path: 'attachments' };
@@ -320,6 +324,16 @@ describe('Settings → This vault (M2c §5.4)', () => {
         return reply();
       }
       if (cmd === 'fonts_list') return [];
+      if (cmd === 'attachment_relink') {
+        relinks.push(args.apply as boolean);
+        const out = {
+          updatedFiles: args.apply ? ['A.md'] : [],
+          updatedLinks: elsewhere,
+          failed: [],
+        };
+        if (args.apply) elsewhere = 0;
+        return out;
+      }
       return null;
     });
   });
@@ -387,6 +401,27 @@ describe('Settings → This vault (M2c §5.4)', () => {
     await waitFor(() => expect(vaultPatches).toEqual([{ attachmentLinkFormat: 'absolute' }]));
     expect(format).toHaveValue('absolute');
     expect(screen.getByText('![](file:///…/Assets/x.png)')).toBeInTheDocument();
+  });
+
+  it('v0.1.1: links already in another format can be updated from here', async () => {
+    open();
+    await show('This vault');
+    const format = await screen.findByRole('combobox', {
+      name: 'Link format for new attachments',
+    });
+    await waitFor(() => expect(format).toHaveValue('shortest'));
+    expect(screen.queryByRole('button', { name: 'Update them' })).not.toBeInTheDocument();
+    elsewhere = 3;
+    await userEvent.selectOptions(format, 'absolute');
+    expect(
+      await screen.findByText(/3 attachment links already in the vault use another format\./),
+    ).toBeInTheDocument();
+    expect(relinks).toEqual([false, false]);
+    await userEvent.click(screen.getByRole('button', { name: 'Update them' }));
+    await waitFor(() => expect(relinks).toEqual([false, false, true, false]));
+    await waitFor(() =>
+      expect(screen.queryByRole('button', { name: 'Update them' })).not.toBeInTheDocument(),
+    );
   });
 
   it("M4b part 3 §8: Obsidian's newLinkFormat is followed until Liber Linteum has its own", async () => {

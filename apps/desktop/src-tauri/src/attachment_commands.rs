@@ -4,8 +4,8 @@
 //! dialog Rust opens itself (spec §8).
 
 use crate::dto::{
-    AttachedDto, AttachmentsDto, CoverDto, ImportResultDto, LinkSuggestionDto, VaultSettingsDto,
-    VaultSettingsPatch,
+    AttachedDto, AttachmentsDto, CoverDto, ImportResultDto, LinkSuggestionDto, RelinkOutcomeDto,
+    VaultSettingsDto, VaultSettingsPatch,
 };
 use crate::error::{CmdResult, CommandError, ErrorKind};
 use crate::state::AppState;
@@ -334,6 +334,23 @@ pub(crate) fn vault_settings_set_impl(
         }
     }
     vault_settings_get_impl(state)
+}
+
+/// v0.1.1: every attachment link in the vault in its link format, as a new
+/// one's would be written; with `apply` false, only what would change.
+pub(crate) fn attachment_relink_impl(state: &AppState, apply: bool) -> CmdResult<RelinkOutcomeDto> {
+    Ok(state.session()?.relink_attachments(apply)?.into())
+}
+
+#[tauri::command]
+pub async fn attachment_relink<R: Runtime>(
+    app: AppHandle<R>,
+    apply: bool,
+) -> CmdResult<RelinkOutcomeDto> {
+    blocking(app, move |app| {
+        attachment_relink_impl(&app.state::<AppState>(), apply)
+    })
+    .await
 }
 
 #[tauri::command]

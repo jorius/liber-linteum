@@ -423,7 +423,10 @@
       "example": "New attachments are written as",
       "obsidian": "Following Obsidian’s setting ({format}). Choose a format to use your own.",
       "useObsidian": "Use Obsidian’s setting",
-      "showPaths": "Show where attachments are on disk"
+      "showPaths": "Show where attachments are on disk",
+      "existing": "{count, plural, one {# attachment link already in the vault uses another format.} other {# attachment links already in the vault use another format.}}",
+      "update": "Update them",
+      "relinkFailed": "{count, plural, one {# page couldn't be updated} other {# pages couldn't be updated}}"
     },
     "autoSave": "Auto save",
     "autoSaveHint": "When off, {save} saves. Changing the title, subtitle, cover or relationships, and moving a page to the Trash, also save its text.",
