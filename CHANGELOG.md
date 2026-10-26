@@ -46,6 +46,13 @@ What changed in each release of Liber Linteum. The format follows
   image showed full size. It now writes `![|300](file:///…/x.png)`, and links
   converted by 0.1.1 turn back into `![[x.png|300]]`.
 
+### Security
+
+- **A timing fix under the encryption.** `ctutils`, which the AES-GCM and
+  hashing libraries use, is updated to 0.4.6 for
+  [RUSTSEC-2026-0385](https://rustsec.org/advisories/RUSTSEC-2026-0385)
+  (masks and comparisons that weren't constant-time).
+
 ## [0.1.1] - 2026-10-23
 
 ### Added
