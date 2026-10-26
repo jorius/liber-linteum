@@ -80,7 +80,7 @@ async function rowsPinned(page: Page) {
   const crumbs = (await band(page).getByRole('navigation', { name: 'Breadcrumb' }).boundingBox())!;
   // The last row: the facts, or the controls when they wrap below them (0.1.2).
   const facts = (await band(page).getByText('0 links · 0 backlinks').boundingBox())!;
-  const modes = (await band(page).getByRole('radio', { name: 'Source' }).boundingBox())!;
+  const modes = (await band(page).getByRole('group', { name: 'Editor mode' }).boundingBox())!;
   const bottom = Math.max(facts.y + facts.height, modes.y + modes.height);
   expect(top.y - b.y).toBeGreaterThanOrEqual(0);
   expect(top.y - b.y).toBeLessThan(24);
