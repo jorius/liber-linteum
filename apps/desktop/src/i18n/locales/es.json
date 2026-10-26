@@ -1390,5 +1390,12 @@
     "menu": "Menú de la imagen",
     "size": "{width} × {height} px",
     "broken": "No se pudo mostrar esta imagen."
+  },
+  "open": {
+    "title": "Abiertos",
+    "closeAll": "Cerrar todo",
+    "close": "Cerrar",
+    "closeNamed": "Cerrar {name}",
+    "unsaved": "Cambios sin guardar"
   }
 }

@@ -247,6 +247,8 @@ pub fn configure<R: tauri::Runtime>(
         icon_commands::vault_icon_set,
         favorite_commands::favorites_get,
         favorite_commands::favorites_set,
+        favorite_commands::open_get,
+        favorite_commands::open_set,
         home_commands::home_get,
         home_commands::home_set,
         audio_commands::audio_devices,

@@ -84,6 +84,8 @@ const COMMANDS: &[&str] = &[
     // M5b §19: Favorites.
     "favorites_get",
     "favorites_set",
+    "open_get",
+    "open_set",
     // A vault's home.
     "home_get",
     "home_set",
@@ -2434,6 +2436,45 @@ fn m5b_trash_and_archive_over_ipc() {
     assert_eq!(out["moved"][0][1], "Welcome.md");
     // Refused: the bins themselves.
     assert!(call(&h.main, "entry_trash", json!({ "path": ".liber" })).is_err());
+}
+
+/// 0.1.2: the sidebar's Open list is kept in the vault like favorites: hidden
+/// paths refused, missing ones and repeats dropped, renames followed and
+/// deleted pages forgotten.
+#[test]
+fn v012_open_list_over_ipc() {
+    let h = harness();
+    let vault = copy_fixture("obsidian-basic");
+    call(&h.main, "vault_open", json!({ "path": vault.path() })).unwrap();
+    assert_eq!(call(&h.main, "open_get", json!({})).unwrap(), json!([]));
+    let stored = call(
+        &h.main,
+        "open_set",
+        json!({ "paths": ["Welcome.md", "Missing.md", "Game Design/Game 1.md", "Welcome.md"] }),
+    )
+    .unwrap();
+    assert_eq!(stored, json!(["Welcome.md", "Game Design/Game 1.md"]));
+    for bad in ["../x.md", ".liber/vault.json", "/abs.md"] {
+        assert!(
+            call(&h.main, "open_set", json!({ "paths": [bad] })).is_err(),
+            "{bad}"
+        );
+    }
+    call(
+        &h.main,
+        "entry_rename",
+        json!({ "from": "Game Design", "to": "Design" }),
+    )
+    .unwrap();
+    assert_eq!(
+        call(&h.main, "open_get", json!({})).unwrap(),
+        json!(["Welcome.md", "Design/Game 1.md"])
+    );
+    assert_eq!(
+        call(&h.main, "favorites_get", json!({})).unwrap(),
+        json!([]),
+        "the two lists stay apart"
+    );
 }
 
 /// M5b §19: Favorites are one ordered list; escaping or hidden paths are

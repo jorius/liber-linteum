@@ -1390,5 +1390,12 @@
     "menu": "Image menu",
     "size": "{width} × {height} px",
     "broken": "This image couldn’t be shown."
+  },
+  "open": {
+    "title": "Open",
+    "closeAll": "Close all",
+    "close": "Close",
+    "closeNamed": "Close {name}",
+    "unsaved": "Unsaved changes"
   }
 }

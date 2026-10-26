@@ -119,6 +119,8 @@ const VAULT_COMMANDS: &[&str] = &[
     "vault_icon_set",
     "favorites_get",
     "favorites_set",
+    "open_get",
+    "open_set",
     // M6: recording is the main window's.
     "audio_devices",
     "audio_record_start",

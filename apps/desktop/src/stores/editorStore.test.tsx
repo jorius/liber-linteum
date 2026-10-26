@@ -7,7 +7,7 @@ import { Editor } from '../features/editor/Editor';
 import { Toaster } from '../features/toasts/Toaster';
 import { clearMocks, emit, mockIPC, mockWindows } from '../ipc/testing';
 import { fakeDisk } from '../test/fakeDisk';
-import { installQuitGuard, resetEditorStore, useEditorStore } from './editorStore';
+import { installQuitGuard, resetEditorStore, setKeepLoaded, useEditorStore } from './editorStore';
 import { usePageStore } from './pageStore';
 import { DEFAULT_SETTINGS, useSettingsStore } from './settingsStore';
 import { useToastStore } from './toastStore';
@@ -53,6 +53,27 @@ describe('editorStore (M2a §3.3)', () => {
     // Coming back finds the saved text.
     await editor().open('A.md');
     expect(editor().doc!.text).toBe('a2\n');
+  });
+
+  it('0.1.2: a page kept loaded (the Open list) is the same document on return, until released', async () => {
+    fakeDisk({ 'A.md': 'a\n', 'B.md': 'b\n' });
+    let kept = true;
+    setKeepLoaded((path) => kept && path === 'A.md');
+    try {
+      await editor().open('A.md');
+      const a = editor().doc;
+      await editor().open('B.md');
+      await editor().release('A.md'); // still kept: stays
+      await editor().open('A.md');
+      expect(editor().doc).toBe(a);
+      await editor().open('B.md');
+      kept = false; // closed in the list
+      await editor().release('A.md');
+      await editor().open('A.md');
+      expect(editor().doc).not.toBe(a);
+    } finally {
+      setKeepLoaded(() => false);
+    }
   });
 
   it('follows renames (own or external) keeping unsaved text', async () => {

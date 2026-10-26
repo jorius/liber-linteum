@@ -53,6 +53,9 @@ interface EditorState {
   flushBefore: (under?: string) => Promise<void>;
   onExternalChange: (c: ChangedPayload, exists?: (path: string) => boolean) => Promise<void>;
   follow: (from: string, to: string) => void;
+  /** Saves a page kept loaded in the background and lets it go (0.1.2: closed
+   *  from the Open list). */
+  release: (path: string) => Promise<void>;
   /** Re-reads pages rewritten by our own link updates (rename/move). */
   syncPaths: (paths: string[]) => Promise<void>;
   /** Writes an orphaned page (deleted outside while dirty) to a new page. */
@@ -161,12 +164,19 @@ async function applyEdit(doc: PageDoc, edit: (text: string) => FrontmatterEdit):
   return doc.status === 'saved' && !doc.orphaned ? 'saved' : 'pending';
 }
 
+/** Whether a page left behind stays loaded (0.1.2: those in the sidebar's
+ *  Open list keep their selection, scroll and undo history). */
+let keepLoaded: (path: string) => boolean = () => false;
+export const setKeepLoaded = (keep: (path: string) => boolean) => {
+  keepLoaded = keep;
+};
+
 /** A background page is dropped once it's saved. An orphaned one (deleted
  *  outside with unsaved text) is kept: its text must not be dropped silently,
  *  so it still blocks closing the vault or the window (M2a §3.3). */
 function dropIfDone(doc: PageDoc) {
   if (doc === useEditorStore.getState().doc) return;
-  if (doc.status === 'saved') {
+  if (doc.status === 'saved' && !keepLoaded(doc.path)) {
     doc.dispose();
     if (docs.get(doc.path) === doc) docs.delete(doc.path);
   }
@@ -262,6 +272,12 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       docs.set(next, doc);
       doc.moveTo(next);
     }
+  },
+  release: async (path) => {
+    const doc = docs.get(path);
+    if (!doc) return;
+    await doc.flush();
+    dropIfDone(doc);
   },
   syncPaths: async (paths) => {
     await Promise.all(paths.flatMap((p) => docs.get(p)?.sync() ?? []));

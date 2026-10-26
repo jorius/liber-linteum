@@ -16,6 +16,7 @@ import { useVaultStore } from '../../stores/vaultStore';
 import { useUiStore } from '../../stores/uiStore';
 import { useScratchpadStore } from '../scratchpad/scratchpadStore';
 import { FavoritesSection } from '../favorites/FavoritesSection';
+import { OpenSection } from '../open/OpenSection';
 import { shownFavorites, useFavoritesStore } from '../favorites/favoritesStore';
 import styles from './Explorer.module.css';
 import { displayName, keptExtension, TreeRow } from './TreeRow';
@@ -326,6 +327,7 @@ export function ExplorerTree({
   }
   return (
     <>
+      <OpenSection />
       {split > 0 && (
         <ul {...tree} aria-label={t('favorites.scratchTree')}>
           {rows.slice(0, split).map(renderRow)}
