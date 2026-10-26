@@ -19,7 +19,7 @@ import { FavoritesSection } from '../favorites/FavoritesSection';
 import { shownFavorites, useFavoritesStore } from '../favorites/favoritesStore';
 import styles from './Explorer.module.css';
 import { displayName, keptExtension, TreeRow } from './TreeRow';
-import { isTextPath } from '../../stores/textFiles';
+import { isImagePath, isTextPath } from '../../stores/textFiles';
 
 export interface Row {
   node: TreeNode;
@@ -156,7 +156,7 @@ export function ExplorerTree({
   const activate = (node: TreeNode, clicks = 1) => {
     const vault = useVaultStore.getState();
     const open = node.kind === 'folder' ? pageOf(node)?.path : node.path;
-    const opens = !!open && (node.kind !== 'attachment' || isTextPath(open));
+    const opens = !!open && (node.kind !== 'attachment' || isTextPath(open) || isImagePath(open));
     if (opens && clicks >= 2) {
       const ui = useUiStore.getState();
       if (wasEditing.current) {
@@ -174,7 +174,8 @@ export function ExplorerTree({
     setFocused(node.path);
     if (node.kind === 'folder' && !open) vault.toggle(node.path);
     else if (opens) {
-      // Pages, and text and code files in the text view (M4b part 2 §6).
+      // Pages, text and code files in the text view (M4b part 2 §6), and
+      // images in the image view (0.1.2).
       // Opening from the explorer starts a fresh link trail (M2b §3).
       useTrailStore.getState().reset();
       // The Trash view takes the editor's place (M5b §5).

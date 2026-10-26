@@ -125,9 +125,13 @@ describe('ExplorerTree (EXP-01, NFR-10)', () => {
     expect(useVaultStore.getState().selected).toBe('Games');
   });
 
-  it('M4b part 2 §6: a text or code file opens in the app; other files only select', async () => {
+  it('M4b part 2 §6, 0.1.2: text, code and image files open in the app; other files only select', async () => {
     const calls = backend({ text_read: () => ({ text: '{}', hash: 'h' }) });
-    const list: TreeNode[] = [...nodes, { path: 'app.json', kind: 'attachment' }];
+    const list: TreeNode[] = [
+      ...nodes,
+      { path: 'app.json', kind: 'attachment' },
+      { path: 'manual.pdf', kind: 'attachment' },
+    ];
     seed(list, { expanded: new Set(['Art']) });
     render(<ExplorerTree />);
     await userEvent.click(screen.getByRole('treeitem', { name: 'app.json' }));
@@ -135,7 +139,11 @@ describe('ExplorerTree (EXP-01, NFR-10)', () => {
     expect(calls).toContainEqual(['text_read', { path: 'app.json' }]);
     await userEvent.click(screen.getByRole('treeitem', { name: 'cover.png' }));
     expect(useVaultStore.getState().selected).toBe('Art/cover.png');
-    expect(usePageStore.getState().path).toBe('app.json');
+    await waitFor(() => expect(usePageStore.getState().path).toBe('Art/cover.png'));
+    expect(calls).not.toContainEqual(['text_read', { path: 'Art/cover.png' }]);
+    await userEvent.click(screen.getByRole('treeitem', { name: 'manual.pdf' }));
+    expect(useVaultStore.getState().selected).toBe('manual.pdf');
+    expect(usePageStore.getState().path).toBe('Art/cover.png');
   });
 
   it('EXP-02 F2 renames inline, validating the name as you type', async () => {

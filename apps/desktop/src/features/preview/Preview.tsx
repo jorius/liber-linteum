@@ -111,7 +111,7 @@ function PreviewBody({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tree, resolve, external, path, depth, chainKey, t, onToggleTask]);
   return (
-    <div ref={box} className={depth || embedded ? styles.nested : styles.content}>
+    <div ref={box} className={depth || embedded ? styles.nested : styles.content} data-preview="">
       {body}
     </div>
   );

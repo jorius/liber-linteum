@@ -6,9 +6,10 @@ import { useSettingsStore } from '../../stores/settingsStore';
 import { nameOf } from '../../stores/tree';
 import { ArchivedBanner } from '../bin/ArchivedBanner';
 import { Editor } from '../editor/Editor';
-import { isTextPath } from '../../stores/textFiles';
+import { isImagePath, isTextPath } from '../../stores/textFiles';
 import { PageHeader } from './PageHeader';
 import { RecorderBar } from '../audio/RecorderBar';
+import { ImageView } from './ImageView';
 import { TextView } from './TextView';
 import { UnwritableNotice } from './UnwritableNotice';
 import styles from './PageView.module.css';
@@ -44,6 +45,7 @@ export function PageView() {
     );
   }
   if (state === 'ready' && path && isTextPath(path)) return <TextView path={path} />;
+  if (state === 'ready' && path && isImagePath(path)) return <ImageView key={path} path={path} />;
   // Deleted outside while it had unsaved edits: the text is kept (M2a §3.3).
   const orphanBanner = orphaned && doc && (
     <div className={styles.orphan}>

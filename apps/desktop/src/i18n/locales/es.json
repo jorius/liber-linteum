@@ -1385,5 +1385,10 @@
     "undoConfirm": "Deshacerlo en este dispositivo",
     "archives": "{names} en la raíz de esta carpeta guarda versiones antiguas de archivos: puede conservar los archivos cifrados y el archivo de claves antiguos. Descifrar no los toca; vacíalos tú si quieres que desaparezcan.",
     "doneLeft": "{count, plural, one {# archivo descifrado y comprobado.} other {# archivos descifrados y comprobados.}} «{name}» ya no está cifrada, pero la limpieza no terminó: el archivo de claves y los archivos cifrados antiguos siguen en esta carpeta oculta, así que la frase de contraseña y la clave de recuperación aún pueden abrirlos ahí. Al volver a abrir la bóveda se borran."
+  },
+  "image": {
+    "menu": "Menú de la imagen",
+    "size": "{width} × {height} px",
+    "broken": "No se pudo mostrar esta imagen."
   }
 }

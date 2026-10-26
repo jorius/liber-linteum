@@ -20,6 +20,7 @@ import { Sidebar } from './Sidebar';
 import { useGlobalShortcuts } from './useGlobalShortcuts';
 import { useWindowTitle } from './useWindowTitle';
 import styles from './Shell.module.css';
+import { ImageMenuHost } from '../preview/ImageMenu';
 
 /** The open-vault layout (spec §3.4; M5b §2): the sidebar explorer (it
  *  collapses), the page view or the Global View, the floating Edit / Global
@@ -79,6 +80,7 @@ export function AppShell() {
       </div>
       {menu && <ContextMenu menu={menu} onClose={closeMenu} />}
       <DialogHost />
+      <ImageMenuHost />
     </div>
   );
 }
