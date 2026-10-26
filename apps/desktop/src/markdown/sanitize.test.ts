@@ -286,3 +286,16 @@ describe('highlighted code (M4b part 2 §2)', () => {
     ).toEqual([['hljs-x', 'x_']]);
   });
 });
+
+describe("0.1.2: Obsidian's sized Markdown image", () => {
+  it('`![alt|300](x.png)` and `|300x200` size the image; the alt keeps the rest', () => {
+    const imgs = elements(render('![moon|300](a.png) ![|120x80](b.png) ![a|b](c.png)\n')).filter(
+      (e) => e.tagName === 'img',
+    );
+    expect(imgs.map((e) => [e.properties.alt, e.properties.width, e.properties.height])).toEqual([
+      ['moon', 300, undefined],
+      ['', 120, 80],
+      ['a|b', undefined, undefined],
+    ]);
+  });
+});

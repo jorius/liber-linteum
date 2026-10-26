@@ -493,7 +493,7 @@ fn v011_existing_attachment_links_follow_a_new_link_format() {
     assert_eq!(
         page(),
         format!(
-            "# Page\n- one\n![]({a})\n![300]({c})\nSee [Spec]({d}#page=2) and [[Other]].\n\
+            "# Page\n- one\n![]({a})\n![|300]({c})\nSee [Spec]({d}#page=2) and [[Other]].\n\
              ![x](attachments/a%20b.png)\n![]({c})\n![[missing.png]]\n",
             a = url("a b.png"),
             c = url("c.png"),
@@ -507,6 +507,28 @@ fn v011_existing_attachment_links_follow_a_new_link_format() {
         .unwrap();
     assert_eq!(s.relink_attachments(true).unwrap().updated_links, 4);
     assert_eq!(page(), shortest);
+
+    // 0.1.2: a size written after a Markdown image's alt (the image resize
+    // handle writes it there) comes back as the embed's size, and 0.1.1's
+    // `![300](url)` still does.
+    s.vault()
+        .set_link_format(Some(LinkFormat::Absolute))
+        .unwrap();
+    s.relink_attachments(true).unwrap();
+    let sized = page().replace(
+        &format!("![]({})\n![|300]", url("a b.png")),
+        &format!("![moon|420]({})\n![300]", url("a b.png")),
+    );
+    std::fs::write(root.join("Notes/Page.md"), &sized).unwrap();
+    s.vault()
+        .set_link_format(Some(LinkFormat::Shortest))
+        .unwrap();
+    s.relink_attachments(true).unwrap();
+    let back = page();
+    assert!(
+        back.contains("![[a b.png|420]]\n![[c.png|300]]\n"),
+        "{back}"
+    );
     assert_eq!(
         std::fs::read_to_string(root.join(".archive/Old.md")).unwrap(),
         "![[../attachments/c.png]]\n",
