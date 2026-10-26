@@ -17,7 +17,11 @@ export function ModeToggle({ mode }: { mode: EditorMode }) {
       {MODES.map((m) => {
         const Icon = ICONS[m];
         return (
-          <label key={m} className={m === mode ? styles.modeOn : styles.mode}>
+          <label
+            key={m}
+            className={m === mode ? styles.modeOn : styles.mode}
+            title={t(`editor.modes.${m}`)}
+          >
             <input
               type="radio"
               name="editor-mode"
@@ -26,7 +30,7 @@ export function ModeToggle({ mode }: { mode: EditorMode }) {
               onChange={() => void useSettingsStore.getState().update({ editorMode: m })}
             />
             <Icon />
-            {t(`editor.modes.${m}`)}
+            <span className={styles.modeName}>{t(`editor.modes.${m}`)}</span>
           </label>
         );
       })}

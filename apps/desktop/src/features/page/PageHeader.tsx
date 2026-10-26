@@ -105,7 +105,9 @@ export function PageHeader({
                   onClick={() => void useSettingsStore.getState().update({ toolbar: !toolbar })}
                 >
                   <FormatIcon />
-                  <span aria-hidden="true">{t('toolbar.short')}</span>
+                  <span className={styles.formatName} aria-hidden="true">
+                    {t('toolbar.short')}
+                  </span>
                 </button>
               )}
               {/* M6 §10.2: Record clip; never on read-only pages or in a file window. */}

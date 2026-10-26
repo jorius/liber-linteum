@@ -31,14 +31,21 @@
 .controls {
   display: flex;
   flex: none;
-  /* Room for 8 rem of breadcrumb, whatever its length. */
-  max-width: calc(100% - 9rem);
+  max-width: 100%;
+  /* At the right, on the tags' row or (short of room) the row below. */
+  margin-left: auto;
   align-items: center;
   /* Saved, the word count and the toggles wrap in a narrow window rather
      than widen the page (M4b part 2 §5). */
   flex-wrap: wrap;
   justify-content: flex-end;
   gap: 8px 12px;
+}
+
+/* Beside a breadcrumb (text files, images) they leave it 8 rem, whatever
+   its length. */
+.bar .controls {
+  max-width: calc(100% - 9rem);
 }
 
 .breadcrumb {
@@ -127,6 +134,7 @@
 /* The cursor position: reads like the word count, and is a button (Go to
    line). Over a cover it keeps the pill's veil (.bandCover .pill). */
 .cursorPos {
+  min-width: 13ch;
   margin: 0;
   border: 0;
   padding: 2px 4px;
@@ -134,6 +142,13 @@
   background: none;
   font-family: inherit;
   cursor: pointer;
+}
+
+/* Its room until the editor has the keyboard: "Ln 99, Col 99". */
+.cursorSlot {
+  display: inline-block;
+  min-width: 13ch;
+  padding: 2px 4px;
 }
 
 .cursorPos:hover {
@@ -747,10 +762,36 @@
 
 /* The house (set as home page) is the first control to go when the bar is
    narrow: it would wrap the controls onto another row and make the band
-   taller (final review M9). The tree's row menu and Settings still offer it. */
+   taller (final review M9). The tree's row menu and Settings still offer it.
+   The cursor position's kept room goes with it. */
 @container page-bar (max-width: 600px) {
-  .homeToggle {
+  .homeToggle,
+  .cursorSlot {
     display: none;
+  }
+}
+
+/* 0.1.2: the controls share the tags' row only while they fit beside them;
+   short of a wide window, Format and the modes show just their icons (the
+   names stay for screen readers and as tooltips), so the band keeps the
+   cover's height instead of growing a row. */
+@container page-bar (max-width: 1240px) {
+  .formatName {
+    display: none;
+  }
+
+  .modeName {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  .mode,
+  .modeOn {
+    padding: 4px 8px;
   }
 }
 
