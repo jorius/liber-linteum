@@ -21,9 +21,10 @@ import { CursorPosition } from './CursorPosition';
 import { WordCount } from './WordCount';
 import styles from './PageView.module.css';
 
-/** The header band (M4b §1): first row, the back arrow and breadcrumb, then
- *  the save status, Format and the mode switch; second row, tags, link
- *  counts and the note's own title, with the cover's controls at the right.
+/** The header band (M4b §1): first row, the back arrow and breadcrumb, with
+ *  the cover's controls at the right; second row, tags, link counts and the
+ *  note's own title, then the save status, Format and the mode switch at the
+ *  right (0.1.2: lined up with the tags).
  *  With a cover the rows sit on it in veiled pills. The title and subtitle
  *  head the band, above the breadcrumb (on the cover when there is one). */
 export function PageHeader({
@@ -59,6 +60,26 @@ export function PageHeader({
             <div className={`${styles.where} ${styles.pill}`}>
               <BackArrow />
               <Breadcrumb path={page.path} />
+            </div>
+            {controls}
+          </div>
+          <div className={styles.bandFoot}>
+            <div className={`${styles.facts} ${styles.pill}`}>
+              {page.tags.length > 0 && (
+                <ul className={styles.tags} aria-label={t('page.tags')}>
+                  {page.tags.map((tag) => (
+                    <li key={tag} className={styles.tag}>
+                      #{tag}
+                    </li>
+                  ))}
+                </ul>
+              )}
+              <p className={styles.meta}>
+                <span>{t('page.meta', { links: page.links, backlinks: page.backlinks })}</span>
+                {large && mode === 'livePreview' && <span>{t('editor.largeNote')}</span>}
+              </p>
+              <RelatedChips page={page} editable={editable} />
+              <NoteTitle page={page} />
             </div>
             <div className={styles.controls}>
               {addCover}
@@ -121,26 +142,6 @@ export function PageHeader({
               {!archived && <FavoriteToggle path={page.path} />}
               <ModeToggle mode={mode} />
             </div>
-          </div>
-          <div className={styles.bandFoot}>
-            <div className={`${styles.facts} ${styles.pill}`}>
-              {page.tags.length > 0 && (
-                <ul className={styles.tags} aria-label={t('page.tags')}>
-                  {page.tags.map((tag) => (
-                    <li key={tag} className={styles.tag}>
-                      #{tag}
-                    </li>
-                  ))}
-                </ul>
-              )}
-              <p className={styles.meta}>
-                <span>{t('page.meta', { links: page.links, backlinks: page.backlinks })}</span>
-                {large && mode === 'livePreview' && <span>{t('editor.largeNote')}</span>}
-              </p>
-              <RelatedChips page={page} editable={editable} />
-              <NoteTitle page={page} />
-            </div>
-            {controls}
           </div>
         </>
       )}

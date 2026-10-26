@@ -38,6 +38,7 @@
   --color-edge-tree: #6b5f80;
   --color-edge-manual: #a2540d;
   --color-surface-veil: rgba(255, 255, 255, 0.88);
+  --color-surface-glass: rgba(255, 255, 255, 0.38);
   --color-danger: #b42318;
   --color-danger-contrast: #ffffff;
   --color-success: #157123;
@@ -90,6 +91,7 @@
     --color-edge-tree: #a59cb5;
     --color-edge-manual: #e0843e;
     --color-surface-veil: rgba(31, 29, 38, 0.88);
+    --color-surface-glass: rgba(31, 29, 38, 0.38);
     --color-danger: #ff9d92;
     --color-danger-contrast: #1b1426;
     --color-success: #7acf7e;
@@ -143,6 +145,7 @@
   --color-edge-tree: #a59cb5;
   --color-edge-manual: #e0843e;
   --color-surface-veil: rgba(31, 29, 38, 0.88);
+  --color-surface-glass: rgba(31, 29, 38, 0.38);
   --color-danger: #ff9d92;
   --color-danger-contrast: #1b1426;
   --color-success: #7acf7e;
@@ -196,6 +199,7 @@
   --color-edge-tree: #606676;
   --color-edge-manual: #187478;
   --color-surface-veil: rgba(255, 255, 255, 0.88);
+  --color-surface-glass: rgba(255, 255, 255, 0.38);
   --color-danger: #b42318;
   --color-danger-contrast: #ffffff;
   --color-success: #157123;
@@ -248,6 +252,7 @@
     --color-edge-tree: #949aa8;
     --color-edge-manual: #2bb3b9;
     --color-surface-veil: rgba(24, 25, 30, 0.88);
+    --color-surface-glass: rgba(24, 25, 30, 0.38);
     --color-danger: #ff9d92;
     --color-danger-contrast: #1b1426;
     --color-success: #7acf7e;
@@ -301,6 +306,7 @@
   --color-edge-tree: #949aa8;
   --color-edge-manual: #2bb3b9;
   --color-surface-veil: rgba(24, 25, 30, 0.88);
+  --color-surface-glass: rgba(24, 25, 30, 0.38);
   --color-danger: #ff9d92;
   --color-danger-contrast: #1b1426;
   --color-success: #7acf7e;
@@ -354,6 +360,7 @@
   --color-edge-tree: #76616a;
   --color-edge-manual: #1c7758;
   --color-surface-veil: rgba(255, 255, 255, 0.88);
+  --color-surface-glass: rgba(255, 255, 255, 0.38);
   --color-danger: #b42318;
   --color-danger-contrast: #ffffff;
   --color-success: #157123;
@@ -406,6 +413,7 @@
     --color-edge-tree: #ab97a0;
     --color-edge-manual: #46b68c;
     --color-surface-veil: rgba(33, 26, 29, 0.88);
+    --color-surface-glass: rgba(33, 26, 29, 0.38);
     --color-danger: #ff9d92;
     --color-danger-contrast: #1b1426;
     --color-success: #7acf7e;
@@ -459,6 +467,7 @@
   --color-edge-tree: #ab97a0;
   --color-edge-manual: #46b68c;
   --color-surface-veil: rgba(33, 26, 29, 0.88);
+  --color-surface-glass: rgba(33, 26, 29, 0.38);
   --color-danger: #ff9d92;
   --color-danger-contrast: #1b1426;
   --color-success: #7acf7e;
@@ -512,6 +521,7 @@
   --color-edge-tree: #6e6552;
   --color-edge-manual: #2769b7;
   --color-surface-veil: rgba(255, 254, 251, 0.88);
+  --color-surface-glass: rgba(255, 254, 251, 0.38);
   --color-danger: #b42318;
   --color-danger-contrast: #ffffff;
   --color-success: #157123;
@@ -564,6 +574,7 @@
     --color-edge-tree: #a99f88;
     --color-edge-manual: #5fa1f3;
     --color-surface-veil: rgba(30, 27, 20, 0.88);
+    --color-surface-glass: rgba(30, 27, 20, 0.38);
     --color-danger: #ff9d92;
     --color-danger-contrast: #1b1426;
     --color-success: #7acf7e;
@@ -617,6 +628,7 @@
   --color-edge-tree: #a99f88;
   --color-edge-manual: #5fa1f3;
   --color-surface-veil: rgba(30, 27, 20, 0.88);
+  --color-surface-glass: rgba(30, 27, 20, 0.38);
   --color-danger: #ff9d92;
   --color-danger-contrast: #1b1426;
   --color-success: #7acf7e;
@@ -670,6 +682,7 @@
   --color-edge-tree: #6a6163;
   --color-edge-manual: #187193;
   --color-surface-veil: rgba(255, 255, 255, 0.88);
+  --color-surface-glass: rgba(255, 255, 255, 0.38);
   --color-danger: #b42318;
   --color-danger-contrast: #ffffff;
   --color-success: #157123;
@@ -722,6 +735,7 @@
     --color-edge-tree: #a8999a;
     --color-edge-manual: #28acdf;
     --color-surface-veil: rgba(29, 25, 26, 0.88);
+    --color-surface-glass: rgba(29, 25, 26, 0.38);
     --color-danger: #ff9d92;
     --color-danger-contrast: #1b1426;
     --color-success: #7acf7e;
@@ -775,6 +789,7 @@
   --color-edge-tree: #a8999a;
   --color-edge-manual: #28acdf;
   --color-surface-veil: rgba(29, 25, 26, 0.88);
+  --color-surface-glass: rgba(29, 25, 26, 0.38);
   --color-danger: #ff9d92;
   --color-danger-contrast: #1b1426;
   --color-success: #7acf7e;
@@ -828,6 +843,7 @@
   --color-edge-tree: #5d6384;
   --color-edge-manual: #965a0c;
   --color-surface-veil: rgba(255, 255, 255, 0.88);
+  --color-surface-glass: rgba(255, 255, 255, 0.38);
   --color-danger: #b42318;
   --color-danger-contrast: #ffffff;
   --color-success: #157123;
@@ -880,6 +896,7 @@
     --color-edge-tree: #8d92b8;
     --color-edge-manual: #d98a2e;
     --color-surface-veil: rgba(20, 23, 49, 0.88);
+    --color-surface-glass: rgba(20, 23, 49, 0.38);
     --color-danger: #ff9d92;
     --color-danger-contrast: #1b1426;
     --color-success: #7acf7e;
@@ -933,6 +950,7 @@
   --color-edge-tree: #8d92b8;
   --color-edge-manual: #d98a2e;
   --color-surface-veil: rgba(20, 23, 49, 0.88);
+  --color-surface-glass: rgba(20, 23, 49, 0.38);
   --color-danger: #ff9d92;
   --color-danger-contrast: #1b1426;
   --color-success: #7acf7e;
@@ -986,6 +1004,7 @@
   --color-edge-tree: #75634c;
   --color-edge-manual: #116f6a;
   --color-surface-veil: rgba(251, 245, 233, 0.88);
+  --color-surface-glass: rgba(251, 245, 233, 0.38);
   --color-danger: #b42318;
   --color-danger-contrast: #ffffff;
   --color-success: #0a6b1d;
@@ -1038,6 +1057,7 @@
     --color-edge-tree: #a8987f;
     --color-edge-manual: #30b4ad;
     --color-surface-veil: rgba(36, 31, 25, 0.88);
+    --color-surface-glass: rgba(36, 31, 25, 0.38);
     --color-danger: #ff9d92;
     --color-danger-contrast: #1b1426;
     --color-success: #7acf7e;
@@ -1091,6 +1111,7 @@
   --color-edge-tree: #a8987f;
   --color-edge-manual: #30b4ad;
   --color-surface-veil: rgba(36, 31, 25, 0.88);
+  --color-surface-glass: rgba(36, 31, 25, 0.38);
   --color-danger: #ff9d92;
   --color-danger-contrast: #1b1426;
   --color-success: #7acf7e;
@@ -1144,6 +1165,7 @@
   --color-edge-tree: #4d4d4d;
   --color-edge-manual: #000000;
   --color-surface-veil: rgba(255, 255, 255, 0.88);
+  --color-surface-glass: rgba(255, 255, 255, 0.38);
   --color-danger: #b42318;
   --color-danger-contrast: #ffffff;
   --color-success: #157123;
@@ -1196,6 +1218,7 @@
     --color-edge-tree: #b3b3b3;
     --color-edge-manual: #ffffff;
     --color-surface-veil: rgba(10, 10, 10, 0.88);
+    --color-surface-glass: rgba(10, 10, 10, 0.38);
     --color-danger: #ff9d92;
     --color-danger-contrast: #1b1426;
     --color-success: #7acf7e;
@@ -1249,6 +1272,7 @@
   --color-edge-tree: #b3b3b3;
   --color-edge-manual: #ffffff;
   --color-surface-veil: rgba(10, 10, 10, 0.88);
+  --color-surface-glass: rgba(10, 10, 10, 0.38);
   --color-danger: #ff9d92;
   --color-danger-contrast: #1b1426;
   --color-success: #7acf7e;
