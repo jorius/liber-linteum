@@ -17,3 +17,12 @@ export function isTextPath(path: string): boolean {
   const dot = name.lastIndexOf('.');
   return dot > 0 && EXTENSIONS.has(name.slice(dot + 1).toLowerCase());
 }
+
+const IMAGES = new Set('png jpg jpeg gif webp svg avif bmp'.split(' '));
+
+/** Images the app shows in its image view (0.1.2), as `Embed` renders them. */
+export function isImagePath(path: string): boolean {
+  const name = path.slice(path.lastIndexOf('/') + 1);
+  const dot = name.lastIndexOf('.');
+  return dot > 0 && IMAGES.has(name.slice(dot + 1).toLowerCase());
+}

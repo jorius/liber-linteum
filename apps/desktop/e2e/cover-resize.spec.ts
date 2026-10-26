@@ -78,12 +78,15 @@ async function rowsPinned(page: Page) {
   const b = (await band(page).boundingBox())!;
   const top = (await band(page).getByRole('textbox', { name: 'Page title' }).boundingBox())!;
   const crumbs = (await band(page).getByRole('navigation', { name: 'Breadcrumb' }).boundingBox())!;
-  const foot = (await band(page).getByText('0 links · 0 backlinks').boundingBox())!;
+  // The last row: the facts, or the controls when they wrap below them (0.1.2).
+  const facts = (await band(page).getByText('0 links · 0 backlinks').boundingBox())!;
+  const modes = (await band(page).getByRole('group', { name: 'Editor mode' }).boundingBox())!;
+  const bottom = Math.max(facts.y + facts.height, modes.y + modes.height);
   expect(top.y - b.y).toBeGreaterThanOrEqual(0);
   expect(top.y - b.y).toBeLessThan(24);
   expect(crumbs.y).toBeGreaterThan(top.y + top.height);
-  expect(b.y + b.height - (foot.y + foot.height)).toBeGreaterThanOrEqual(0);
-  expect(b.y + b.height - (foot.y + foot.height)).toBeLessThan(24);
+  expect(b.y + b.height - bottom).toBeGreaterThanOrEqual(0);
+  expect(b.y + b.height - bottom).toBeLessThan(24);
 }
 
 test.use({ viewport: { width: 1280, height: 900 } });

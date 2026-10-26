@@ -1,0 +1,43 @@
+/* The Open list (0.1.2): Favorites' heading and rows, with Close all at the
+   heading's end and a dot for unsaved changes. */
+.head {
+  display: flex;
+  align-items: center;
+}
+
+.head > h2 {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.closeAll {
+  flex: none;
+  padding: 4px 8px;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: none;
+  color: var(--color-sidebar-text);
+  font: 600 11px var(--font-body);
+  opacity: 0.75;
+  cursor: pointer;
+}
+
+.closeAll:hover {
+  background: var(--color-sidebar-active);
+  opacity: 1;
+}
+
+.closeAll:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: -2px;
+  opacity: 1;
+}
+
+.dot {
+  flex: none;
+  width: 7px;
+  height: 7px;
+  margin: 0 4px;
+  border-radius: 50%;
+  background: var(--color-sidebar-secondary);
+}

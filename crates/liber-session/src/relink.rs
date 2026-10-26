@@ -36,6 +36,13 @@ fn label(text: &str) -> String {
     text.replace(['[', ']', '\r', '\n'], " ").trim().to_string()
 }
 
+/// Obsidian's image size, `300` or `300x200`.
+fn is_size(text: &str) -> bool {
+    let digits = |s: &str| !s.is_empty() && s.bytes().all(|b| b.is_ascii_digit());
+    let mut parts = text.splitn(2, 'x');
+    parts.next().is_some_and(digits) && parts.next().is_none_or(digits)
+}
+
 /// A Markdown link's text: between `[` (or `![`) and the `](` before its
 /// destination.
 fn markdown_text<'a>(text: &'a str, link: &LinkRef) -> &'a str {
@@ -159,6 +166,11 @@ impl VaultSession {
                 (false, Some(url)) => (link.range.clone(), url),
                 (true, Some(url)) => {
                     let text = match (&link.alias, embed) {
+                        // An embed's size goes after the alt, Obsidian's
+                        // `![|300](url)`, which sizes the image (0.1.2).
+                        (Some(alias), true) if is_size(alias.trim()) => {
+                            format!("|{}", alias.trim())
+                        }
                         (Some(alias), _) => label(alias),
                         (None, true) => String::new(),
                         (None, false) => label(target.file_name()),
@@ -167,6 +179,12 @@ impl VaultSession {
                 }
                 (false, None) => {
                     let text = label(markdown_text(text, &link));
+                    // `![alt|300](url)` keeps its size: a wiki embed holds one
+                    // alias, and for an image that is the size (0.1.2).
+                    let text = match text.rsplit_once('|') {
+                        Some((_, size)) if embed && is_size(size.trim()) => size.trim().to_string(),
+                        _ => text,
+                    };
                     let alias = if text.is_empty() || (!embed && text == target.file_name()) {
                         String::new()
                     } else {

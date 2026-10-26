@@ -88,6 +88,8 @@
     "allow-archive-restore",
     "allow-favorites-get",
     "allow-favorites-set",
+    "allow-open-get",
+    "allow-open-set",
     "allow-home-get",
     "allow-home-set",
     "allow-audio-devices",

@@ -57,6 +57,9 @@ export function paletteVars(p: Palette, mode: 'light' | 'dark'): Record<string, 
     // no color-mix()), and the danger button, fixed per mode like the manual
     // edge so it reads as "danger" in every palette.
     '--color-surface-veil': alpha(t.surface, 0.88),
+    // 0.1.2: the band's rows as glass over a cover; the veil above returns
+    // when the OS asks for more contrast or less transparency.
+    '--color-surface-glass': alpha(t.surface, 0.38),
     '--color-danger': DANGER[mode].bg,
     '--color-danger-contrast': DANGER[mode].text,
     // M5b §6: "Saved" in green, readable on this palette's header and on its

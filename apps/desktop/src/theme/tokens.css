@@ -50,6 +50,7 @@
   --color-edge-manual: #a2540d;
   /* M4b §1, §3: header pills over a cover; danger buttons. */
   --color-surface-veil: rgba(255, 255, 255, 0.88);
+  --color-surface-glass: rgba(255, 255, 255, 0.38);
   --color-danger: #b42318;
   --color-danger-contrast: #ffffff;
   --color-success: #157123;
@@ -137,6 +138,7 @@
     --color-edge-tree: #a59cb5;
     --color-edge-manual: #e0843e;
     --color-surface-veil: rgba(31, 29, 38, 0.88);
+    --color-surface-glass: rgba(31, 29, 38, 0.38);
     --color-danger: #ff9d92;
     --color-danger-contrast: #1b1426;
     --color-success: #7acf7e;
@@ -207,6 +209,7 @@
   --color-edge-tree: #a59cb5;
   --color-edge-manual: #e0843e;
   --color-surface-veil: rgba(31, 29, 38, 0.88);
+  --color-surface-glass: rgba(31, 29, 38, 0.38);
   --color-danger: #ff9d92;
   --color-danger-contrast: #1b1426;
   --color-success: #7acf7e;

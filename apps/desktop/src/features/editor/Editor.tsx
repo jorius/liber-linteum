@@ -46,7 +46,15 @@ import { Outline } from './Outline';
 import { blockForOffset, offsetAtTop, topIn } from './scrollSync';
 import { notifyViewReset, notifyViewUpdate, setCurrentView } from './viewUpdates';
 import { Toolbar } from './Toolbar';
-import { hideView, pageDocOf, showView, storedState, storeState } from './views';
+import {
+  hideView,
+  pageDocOf,
+  restoreTop,
+  showView,
+  storedState,
+  storeState,
+  storeTop,
+} from './views';
 import { LIVE_PADDING, wideAttrs, wideExtents } from './wideBox';
 import { setSpellMenuOpener, spellcheck, type WordRange } from './spell';
 import { SpellMenu } from './SpellMenu';
@@ -425,9 +433,11 @@ export function Editor({ doc, mode, label }: EditorProps) {
     showFormats(v.state);
     setCurrentView(v);
     showLanguage(v, current.current);
+    restoreTop(current.current, v);
     return () => {
       setCurrentView(null);
       hideView(current.current, v);
+      storeTop(current.current, v);
       storeState(current.current, v.state);
       current.current.sink = null;
       paneOf.delete(v);
@@ -445,12 +455,14 @@ export function Editor({ doc, mode, label }: EditorProps) {
   useLayoutEffect(() => {
     const v = view.current!;
     if (current.current !== doc) {
+      storeTop(current.current, v);
       storeState(current.current, v.state);
       current.current.sink = null;
       hideView(current.current, v);
       current.current = doc;
       showView(doc, v);
       v.setState(stateFor(doc));
+      restoreTop(doc, v);
       showFormats(v.state);
       notifyViewReset(v);
       showLanguage(v, doc);

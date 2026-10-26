@@ -176,7 +176,7 @@ mod tests {
     fn app_info_reports_name_and_crate_version() {
         let info = build_app_info();
         assert_eq!(info.name, "Liber Linteum");
-        assert_eq!(info.version, "0.1.1");
+        assert_eq!(info.version, "0.1.2");
     }
 
     #[test]
@@ -184,7 +184,7 @@ mod tests {
         let json = serde_json::to_value(build_app_info()).unwrap();
         assert_eq!(
             json,
-            serde_json::json!({ "name": "Liber Linteum", "version": "0.1.1" })
+            serde_json::json!({ "name": "Liber Linteum", "version": "0.1.2" })
         );
     }
 }

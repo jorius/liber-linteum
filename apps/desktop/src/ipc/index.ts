@@ -1148,6 +1148,12 @@ export const favoritesGet = () => call<string[]>('favorites_get');
  *  returns what it stored. */
 export const favoritesSet = (paths: string[]) => call<string[]>('favorites_set', { paths });
 
+/** The sidebar's Open list (0.1.2), in the order the pages were opened. */
+export const openGet = () => call<string[]>('open_get');
+/** Replaces the Open list; Rust drops missing entries and repeats and
+ *  returns what it stored. */
+export const openSet = (paths: string[]) => call<string[]>('open_set', { paths });
+
 /** The vault's home, as `.liber/vault.json` holds it now (renames move it). */
 export const homeGet = () => call<Home | null>('home_get');
 /** Sets the home (`null`: nothing chosen); Rust refuses what the vault can't

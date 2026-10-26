@@ -4,7 +4,10 @@ import { pageGet, type ChangedPayload, type Page } from '../ipc';
 import { useEditorStore } from './editorStore';
 import { errorMessage } from './messages';
 import { useToastStore } from './toastStore';
-import { isTextPath } from './textFiles';
+import { isImagePath, isTextPath } from './textFiles';
+
+/** Text and code files, and images, have no page data (M4b part 2 §6, 0.1.2). */
+const noPageData = (path: string) => isTextPath(path) || isImagePath(path);
 import { remap } from './tree';
 
 export type PageViewState = 'empty' | 'loading' | 'ready' | 'deleted';
@@ -107,12 +110,18 @@ export const usePageStore = create<PageState>((set, get) => ({
     const same = get().path === path;
     // The same document again (reloaded, renamed): it stays shown. A text
     // file has no page data to wait for (final review I4).
-    const shown = same && (get().page !== null || isTextPath(path));
+    const shown = same && (get().page !== null || noPageData(path));
     set({
       path,
       state: shown ? get().state : 'loading',
       anchor: same ? get().anchor : null,
     });
+    // An image (0.1.2) shows in the image view: nothing to edit.
+    if (isImagePath(path)) {
+      await useEditorStore.getState().close();
+      if (mine === seq) set({ page: null, state: 'ready' });
+      return;
+    }
     const editing = useEditorStore.getState().open(path);
     // Text and code files (M4b part 2 §6) have no page data: the text view
     // shows them, or why it can't.
@@ -135,7 +144,7 @@ export const usePageStore = create<PageState>((set, get) => ({
   },
   refresh: async () => {
     const path = get().path;
-    if (!path || get().state !== 'ready' || isTextPath(path)) return;
+    if (!path || get().state !== 'ready' || noPageData(path)) return;
     const mine = seq;
     const res = await pageGet(path);
     if (mine === seq && res.ok) set({ page: res.value });
@@ -156,7 +165,7 @@ export const usePageStore = create<PageState>((set, get) => ({
     // stays the same way (final review I4).
     const page = get().page;
     if (page && get().state === 'ready') set({ path: next, page: { ...page, path: next } });
-    else if (get().state === 'ready' && path && isTextPath(path) && isTextPath(next)) {
+    else if (get().state === 'ready' && path && noPageData(path) && noPageData(next)) {
       set({ path: next });
     }
     await get().load(next);

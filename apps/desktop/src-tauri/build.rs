@@ -98,6 +98,8 @@ const COMMANDS: &[&str] = &[
     // M5b §19: Favorites.
     "favorites_get",
     "favorites_set",
+    "open_get",
+    "open_set",
     // A vault's home page (or the Global View).
     "home_get",
     "home_set",

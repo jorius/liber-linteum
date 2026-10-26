@@ -728,6 +728,13 @@ export function installIpcMock({
       sessionStorage.setItem('liberMockFavorites', JSON.stringify(next));
       return next;
     },
+    // 0.1.2: the sidebar's Open list, kept the same way.
+    open_get: () => JSON.parse(sessionStorage.getItem('liberMockOpen') ?? '[]') as string[],
+    open_set: (a) => {
+      const next = (a.paths as string[]).filter((p, i, all) => all.indexOf(p) === i);
+      sessionStorage.setItem('liberMockOpen', JSON.stringify(next));
+      return next;
+    },
     // The window's title (M5b §2.3), kept so tests can read it.
     window_title_set: (a) => {
       w.__liberWindowTitle = a.title;
@@ -884,6 +891,10 @@ export function installIpcMock({
     },
     file_pick: () => filePicks,
     external_open: (a) => {
+      ((w.__liberExternalOpens ??= []) as unknown[]).push(a.path);
+      return null;
+    },
+    file_open_external: (a) => {
       ((w.__liberExternalOpens ??= []) as unknown[]).push(a.path);
       return null;
     },

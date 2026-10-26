@@ -37,6 +37,7 @@ import { widestLine } from './wideBox';
 
 import { LARGE_NOTE_CHARS } from './limits';
 import { safeDecode } from '../../markdown/decode';
+import { imageResize } from './imageResize';
 
 export { LARGE_NOTE_CHARS };
 /** Re-parse delay after typing; positions are mapped until then. */
@@ -702,8 +703,24 @@ const theme = EditorView.baseTheme({
     cursor: 'pointer',
   },
   '.cm-liber-checkbox': { margin: '0 4px 0 0', verticalAlign: 'middle', cursor: 'pointer' },
+  // 0.1.2: the image resize handle and the image it sizes.
+  '.cm-liber-resize': {
+    position: 'absolute',
+    zIndex: '5',
+    width: '14px',
+    height: '14px',
+    boxSizing: 'border-box',
+    borderRadius: '4px',
+    border: '2px solid var(--color-surface)',
+    background: 'var(--color-accent)',
+    boxShadow: '0 1px 3px rgb(0 0 0 / 0.3)',
+    cursor: 'nwse-resize',
+    touchAction: 'none',
+  },
+  '.cm-liber-resize[hidden]': { display: 'none' },
+  'img.cm-liber-sizable': { outline: '2px solid var(--color-accent)', outlineOffset: '2px' },
 });
 
 export function livePreview(): Extension {
-  return [model, reparser, linkClick, theme];
+  return [model, reparser, linkClick, theme, imageResize];
 }

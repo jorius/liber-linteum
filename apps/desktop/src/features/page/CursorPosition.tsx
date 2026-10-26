@@ -86,7 +86,10 @@ export function CursorPosition() {
     };
   }, [view]);
 
-  if (!view || !pos) return null;
+  if (!view) return null;
+  // Its room is kept meanwhile: appearing must not re-wrap the header's row
+  // and move the text under the pointer (0.1.2).
+  if (!pos) return <span className={`${styles.count} ${styles.cursorSlot}`} aria-hidden="true" />;
   const key = keyLabel('Ctrl+G', MAC);
   return (
     <button

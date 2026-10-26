@@ -297,6 +297,7 @@ describe('custom accent → palette (M2b §4, derive.ts)', () => {
 /** Buttons and the header band (M4b §1, §3). */
 const BUTTON_TOKENS = [
   '--color-surface-veil',
+  '--color-surface-glass',
   '--color-danger',
   '--color-danger-contrast',
 ] as const;
@@ -325,6 +326,7 @@ describe('buttons and the header veil (M4b §1, §3)', () => {
         'danger: text on danger',
       ).toBeGreaterThanOrEqual(4.5);
       expect(vars['--color-surface-veil']).toMatch(/^rgba\(\d+, \d+, \d+, 0\.88\)$/);
+      expect(vars['--color-surface-glass']).toMatch(/^rgba\(\d+, \d+, \d+, 0\.38\)$/);
     },
   );
 
@@ -382,6 +384,19 @@ describe('review focus: text on the veil over any cover (M4b §1)', () => {
   it('muted text in a pill is drawn in the body colour (muted alone falls to ~4.0:1)', () => {
     const rule = /\.bandCover \.pill \{([^}]*)\}/.exec(pageCss)?.[1] ?? '';
     expect(rule).toContain('--color-text-muted: var(--color-text-body);');
+  });
+
+  it('0.1.2: the rows are glass over a cover; more contrast or less transparency brings the veil back', () => {
+    expect(pageCss).toMatch(
+      /\.bandCover \.modes \{\s*background: var\(--color-surface-glass\);\s*backdrop-filter: blur/,
+    );
+    const fallback =
+      /@media \(prefers-contrast: more\), \(prefers-reduced-transparency: reduce\) \{([\s\S]*?)\n\}/.exec(
+        pageCss,
+      )?.[1] ?? '';
+    expect(fallback).toContain('.bandCover .pill,');
+    expect(fallback).toContain('background: var(--color-surface-veil);');
+    expect(fallback).toContain('backdrop-filter: none;');
   });
 });
 

@@ -9,6 +9,7 @@ import dialogStyles from '../dialogs/Dialogs.module.css';
 import { deleteItems, emptyTrash, restoreItem } from './binActions';
 import { useBinStore } from './binStore';
 import styles from './Bin.module.css';
+import { isImagePath } from '../../stores/textFiles';
 
 type Ask = { type: 'delete'; items: BinItem[] } | { type: 'empty' };
 type Sort = 'newest' | 'oldest' | 'name' | 'folder';
@@ -18,13 +19,12 @@ type Sort = 'newest' | 'oldest' | 'name' | 'folder';
 export const binLabel = (path: string, extensions = false) => shownName(path, extensions);
 const label = (item: BinItem, extensions: boolean) =>
   item.folder ? nameOf(item.path) : binLabel(item.path, extensions);
-const isImage = (path: string) => /\.(png|jpe?g|gif|webp|avif|bmp|svg)$/i.test(path);
 const kindOf = (item: BinItem) =>
   item.folder
     ? 'folder'
     : /\.md$/i.test(item.path)
       ? 'page'
-      : isImage(item.path)
+      : isImagePath(item.path)
         ? 'image'
         : 'file';
 const DAY = 86_400_000;

@@ -3,7 +3,7 @@
 // go through them and join the page's undo history: header edits (M2c §4), and
 // pastes and drops that finish after a page switch (§5, final review I1).
 import { Facet, type EditorState } from '@codemirror/state';
-import type { EditorView } from '@codemirror/view';
+import { EditorView } from '@codemirror/view';
 import type { PageDoc } from './pageDoc';
 
 /** The page a state belongs to: a cached state is reused by whichever editor
@@ -33,4 +33,19 @@ export const storedState = (doc: PageDoc): EditorState | null => states.get(doc)
 
 export function storeState(doc: PageDoc, state: EditorState): void {
   states.set(doc, state);
+}
+
+/** The first line each page showed when it was left (0.1.2: going back to it
+ *  from the Open list finds it scrolled as it was). */
+const tops = new WeakMap<PageDoc, number>();
+
+export function storeTop(doc: PageDoc, view: EditorView): void {
+  tops.set(doc, view.lineBlockAtHeight(view.scrollDOM.scrollTop).from);
+}
+
+/** Scrolls `view` back to where `doc` was left, if it was. */
+export function restoreTop(doc: PageDoc, view: EditorView): void {
+  const top = tops.get(doc);
+  if (top === undefined || top > view.state.doc.length) return;
+  view.dispatch({ effects: EditorView.scrollIntoView(top, { y: 'start' }) });
 }

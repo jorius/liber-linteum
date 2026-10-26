@@ -6,6 +6,53 @@ What changed in each release of Liber Linteum. The format follows
 
 ## [Unreleased]
 
+## [0.1.2] - 2026-10-26
+
+### Added
+
+- **Resize an image by dragging its corner.** In Live Preview, hover an image
+  and drag the handle at its bottom-right corner. The width is written into the
+  link as Obsidian does (`![[x.png|300]]`, `![alt|300](x.png)`), so it shows at
+  that size in Preview and in other apps.
+- **A right-click menu on images.** Right-click an image in a page to open it
+  in your system's image viewer ("Open in default app") or show it in its
+  folder (Finder, File Explorer or your file manager).
+- **Images open in the app.** Clicking an image in the sidebar, an attachments
+  folder included, shows it full size with its dimensions, instead of only
+  selecting it.
+- **An Open list at the top of the sidebar.** Every page and file you open for
+  editing is listed above Favorites until you close it with ×, a middle click,
+  Delete or Close all. Going back to one finds it as you left it: cursor,
+  scroll and undo history. The list is kept per vault across restarts and
+  follows renames.
+
+### Changed
+
+- **The page header's controls sit on the tags row.** Saved, the word count,
+  Format and the other buttons line up with the tags, backlinks and related
+  pages, on the right, instead of floating halfway down the header. Short of a
+  wide window, Format and Live Preview · Source · Split show just their icons
+  (their names show on hover), and the buttons move to the row below the tags
+  when they don't fit beside them.
+- **The header is lighter over a cover.** The title, breadcrumbs, tags,
+  backlinks and buttons sit on a light frosted glass, so more of the cover
+  shows through. With "Increase contrast" or "Reduce transparency" turned on in
+  the system, they keep the solid backing.
+
+### Fixed
+
+- **Image sizes survive "Update existing attachment links".** Switching a sized
+  `![[x.png|300]]` to a `file://` link kept the size as the alt text, so the
+  image showed full size. It now writes `![|300](file:///…/x.png)`, and links
+  converted by 0.1.1 turn back into `![[x.png|300]]`.
+
+### Security
+
+- **A timing fix under the encryption.** `ctutils`, which the AES-GCM and
+  hashing libraries use, is updated to 0.4.6 for
+  [RUSTSEC-2026-0385](https://rustsec.org/advisories/RUSTSEC-2026-0385)
+  (masks and comparisons that weren't constant-time).
+
 ## [0.1.1] - 2026-10-23
 
 ### Added
@@ -53,6 +100,7 @@ network requests at all.
   and Archive, offline spell check in English and Spanish, a home page per
   vault.
 
-[Unreleased]: https://github.com/jorius/liber-linteum/compare/v0.1.1...HEAD
+[Unreleased]: https://github.com/jorius/liber-linteum/compare/v0.1.2...HEAD
+[0.1.2]: https://github.com/jorius/liber-linteum/compare/v0.1.1...v0.1.2
 [0.1.1]: https://github.com/jorius/liber-linteum/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/jorius/liber-linteum/releases/tag/v0.1.0

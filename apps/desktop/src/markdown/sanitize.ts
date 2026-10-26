@@ -7,8 +7,8 @@ import GithubSlugger from 'github-slugger';
 import type { Element, ElementContent, Nodes, Properties, Root } from 'hast';
 import { raw } from 'hast-util-raw';
 import { sanitize, type Schema } from 'hast-util-sanitize';
-import type { Nodes as MdastNodes } from 'mdast';
-import { toHast, type Handler, type State } from 'mdast-util-to-hast';
+import type { Image as MdImage, Nodes as MdastNodes } from 'mdast';
+import { defaultHandlers, toHast, type Handler, type State } from 'mdast-util-to-hast';
 import type {
   Callout,
   CalloutTitle,
@@ -67,6 +67,18 @@ const handlers: Record<string, Handler> = {
       [{ type: 'text', value: label }],
     );
     state.patch(node, out);
+    return out;
+  },
+  // 0.1.2: Obsidian's `![alt|300](x.png)` sizes a Markdown image as `|300`
+  // sizes an embed; the alt keeps the rest.
+  image(state: State, node: MdImage) {
+    const out = defaultHandlers.image(state, node);
+    const m = /^(.*?)\|\s*(\d+)(?:\s*x\s*(\d+))?\s*$/.exec(node.alt ?? '');
+    if (m) {
+      out.properties.alt = m[1];
+      out.properties.width = Number(m[2]);
+      if (m[3]) out.properties.height = Number(m[3]);
+    }
     return out;
   },
   embed(state: State, node: Embed) {

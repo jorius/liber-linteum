@@ -3,6 +3,10 @@
 //! renames and moves (into the Trash and the Archive too, so Restore and
 //! Unarchive bring them back) and are forgotten when deleted from the vault.
 //! Paths are stored as given; callers validate them.
+//!
+//! The sidebar's Open list (0.1.2) lives beside them as `open`: the pages and
+//! files open for editing, in the order they were opened. It follows renames
+//! and forgets deletions the same way.
 
 use crate::Result;
 use crate::layout::remap;
@@ -11,6 +15,7 @@ use serde_json::Value;
 use std::collections::HashMap;
 
 const KEY: &str = "favorites";
+const OPEN: &str = "open";
 
 fn list(value: Option<&Value>) -> Vec<String> {
     value
@@ -34,11 +39,23 @@ impl Vault {
 
     /// Replaces the list, keeping every other key; an empty list removes it.
     pub fn set_favorites(&self, paths: &[String]) -> Result<()> {
-        self.edit_favorites(!paths.is_empty(), |list| *list = paths.to_vec())
+        self.edit_lists(&[KEY], !paths.is_empty(), |list| *list = paths.to_vec())
     }
 
-    /// Entries follow a batch of renames (whole components only), keeping
-    /// their place; one write, none when nothing moved.
+    /// The Open list, re-read on every call.
+    pub fn open_pages(&self) -> Vec<String> {
+        let value: Value = read_json(self.storage(), LIBER_JSON, &mut Vec::new());
+        list(value.get(OPEN))
+    }
+
+    /// Replaces the Open list, keeping every other key; empty removes it.
+    pub fn set_open_pages(&self, paths: &[String]) -> Result<()> {
+        self.edit_lists(&[OPEN], !paths.is_empty(), |list| *list = paths.to_vec())
+    }
+
+    /// Entries (favorites and the Open list) follow a batch of renames (whole
+    /// components only), keeping their place; one write, none when nothing
+    /// moved.
     pub fn remap_favorites_many(&self, renames: &[(String, String)]) -> Result<()> {
         if renames.is_empty() {
             return Ok(());
@@ -47,7 +64,7 @@ impl Vault {
             .iter()
             .map(|(from, to)| (from.as_str(), to.as_str()))
             .collect();
-        self.edit_favorites(false, |list| {
+        self.edit_lists(&[KEY, OPEN], false, |list| {
             for path in list.iter_mut() {
                 if let Some(to) = remap(path, &moves) {
                     *path = to;
@@ -56,12 +73,13 @@ impl Vault {
         })
     }
 
-    /// Forgets deleted entries and everything inside deleted folders.
+    /// Forgets deleted entries (favorites and the Open list) and everything
+    /// inside deleted folders.
     pub fn forget_favorites(&self, removed: &[String]) -> Result<()> {
         if removed.is_empty() {
             return Ok(());
         }
-        self.edit_favorites(false, |list| {
+        self.edit_lists(&[KEY, OPEN], false, |list| {
             list.retain(|path| {
                 !removed.iter().any(|gone| {
                     path == gone
@@ -73,17 +91,24 @@ impl Vault {
         })
     }
 
-    fn edit_favorites(&self, create: bool, edit: impl Fn(&mut Vec<String>)) -> Result<()> {
+    fn edit_lists(
+        &self,
+        keys: &[&str],
+        create: bool,
+        edit: impl Fn(&mut Vec<String>),
+    ) -> Result<()> {
         self.update_json_object(LIBER_JSON, create, |map| {
-            let mut items = list(map.get(KEY));
-            edit(&mut items);
-            if items.is_empty() {
-                map.remove(KEY);
-            } else {
-                map.insert(
-                    KEY.to_string(),
-                    Value::Array(items.into_iter().map(Value::from).collect()),
-                );
+            for key in keys {
+                let mut items = list(map.get(*key));
+                edit(&mut items);
+                if items.is_empty() {
+                    map.remove(*key);
+                } else {
+                    map.insert(
+                        key.to_string(),
+                        Value::Array(items.into_iter().map(Value::from).collect()),
+                    );
+                }
             }
         })
     }

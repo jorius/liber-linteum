@@ -19,29 +19,33 @@
   flex-direction: column;
 }
 
-/* The band's first row: the breadcrumb and the controls share one line, so
-   the band keeps its height (final review M9); a long path is shortened
-   with an ellipsis rather than taking lines of its own. */
+/* The band's first row: the back arrow and the breadcrumb; a long path is
+   shortened with an ellipsis rather than taking lines of its own. */
 .bar {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 8px 16px;
-  /* The home toggle gives its room back in a narrow page (below). */
-  container: page-bar / inline-size;
 }
 
 .controls {
   display: flex;
   flex: none;
-  /* Room for 8 rem of breadcrumb, whatever its length. */
-  max-width: calc(100% - 9rem);
+  max-width: 100%;
+  /* At the right, on the tags' row or (short of room) the row below. */
+  margin-left: auto;
   align-items: center;
   /* Saved, the word count and the toggles wrap in a narrow window rather
      than widen the page (M4b part 2 §5). */
   flex-wrap: wrap;
   justify-content: flex-end;
   gap: 8px 12px;
+}
+
+/* Beside a breadcrumb (text files, images) they leave it 8 rem, whatever
+   its length. */
+.bar .controls {
+  max-width: calc(100% - 9rem);
 }
 
 .breadcrumb {
@@ -130,6 +134,7 @@
 /* The cursor position: reads like the word count, and is a button (Go to
    line). Over a cover it keeps the pill's veil (.bandCover .pill). */
 .cursorPos {
+  min-width: 13ch;
   margin: 0;
   border: 0;
   padding: 2px 4px;
@@ -137,6 +142,13 @@
   background: none;
   font-family: inherit;
   cursor: pointer;
+}
+
+/* Its room until the editor has the keyboard: "Ln 99, Col 99". */
+.cursorSlot {
+  display: inline-block;
+  min-width: 13ch;
+  padding: 2px 4px;
 }
 
 .cursorPos:hover {
@@ -243,18 +255,44 @@
    cover: it takes the body colour (M4b review focus). */
 .bandCover .pill {
   --color-text-muted: var(--color-text-body);
-  background: var(--color-surface-veil);
   border-radius: var(--radius-md);
   padding: 4px 10px;
   box-shadow: 0 1px 3px rgb(0 0 0 / 0.08);
 }
 
+/* 0.1.2: over a cover the rows and the controls are glass, so the image
+   shows through; the blur keeps a busy cover from fighting the text. */
+.bandCover .pill,
+.bandCover .toolbarToggle,
+.bandCover .modes {
+  background: var(--color-surface-glass);
+  backdrop-filter: blur(14px) saturate(1.3);
+  -webkit-backdrop-filter: blur(14px) saturate(1.3);
+}
+
+/* Asking the OS for more contrast or less transparency brings back the
+   solid veil, which keeps every text colour at AA over any cover. */
+@media (prefers-contrast: more), (prefers-reduced-transparency: reduce) {
+  .bandCover .pill,
+  .bandCover .toolbarToggle,
+  .bandCover .modes {
+    background: var(--color-surface-veil);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+}
+
+/* The band's last row: the tags and link counts, and at the right the save
+   status, the counts and the toggles (0.1.2: they moved down from the
+   breadcrumb's row, so they line up with the tags). */
 .bandFoot {
   display: flex;
   align-items: flex-end;
   justify-content: space-between;
   flex-wrap: wrap;
   gap: 8px 16px;
+  /* The home toggle gives its room back in a narrow page (below). */
+  container: page-bar / inline-size;
 }
 
 .facts {
@@ -319,6 +357,17 @@
 
 .band:hover .coverControls {
   opacity: 1;
+}
+
+/* 0.1.2: in the band they sit at the end of the breadcrumb's row, which the
+   page's controls left for the tags row; they stay visible while the rest of
+   that row hides for repositioning. */
+.bar .coverControls {
+  position: static;
+}
+
+.repositioning .bar .coverControls {
+  visibility: visible;
 }
 
 .coverControls:focus-within {
@@ -549,7 +598,8 @@
   visibility: hidden;
 }
 
-.repositioning .facts {
+.repositioning .facts,
+.repositioning .controls {
   visibility: hidden;
 }
 
@@ -712,10 +762,36 @@
 
 /* The house (set as home page) is the first control to go when the bar is
    narrow: it would wrap the controls onto another row and make the band
-   taller (final review M9). The tree's row menu and Settings still offer it. */
+   taller (final review M9). The tree's row menu and Settings still offer it.
+   The cursor position's kept room goes with it. */
 @container page-bar (max-width: 600px) {
-  .homeToggle {
+  .homeToggle,
+  .cursorSlot {
     display: none;
+  }
+}
+
+/* 0.1.2: the controls share the tags' row only while they fit beside them;
+   short of a wide window, Format and the modes show just their icons (the
+   names stay for screen readers and as tooltips), so the band keeps the
+   cover's height instead of growing a row. */
+@container page-bar (max-width: 1240px) {
+  .formatName {
+    display: none;
+  }
+
+  .modeName {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  .mode,
+  .modeOn {
+    padding: 4px 8px;
   }
 }
 
@@ -928,3 +1004,23 @@ span.relatedOpen {
 }
 
 /* At the top of the page the icon matches the title's size (M5b §2.3, §4). */
+
+/* The image view (0.1.2): the image fitted to the space under the band, never
+   larger than it is. */
+.imageStage {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px 40px;
+  overflow: auto;
+}
+
+.imageStage img {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  border-radius: var(--radius-md);
+  box-shadow: 0 1px 3px rgb(0 0 0 / 0.12);
+}
