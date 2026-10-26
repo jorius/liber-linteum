@@ -23,9 +23,9 @@ const nodes: TreeNode[] = [
 
 const info = { name: 'v', root: '/v' } as VaultInfo;
 
-/** Opens a vault whose Rust side keeps `open` as its Open list; the page
- *  store's load just shows the page. */
-async function vault(open: string[]) {
+/** Opens a vault whose Rust side keeps `open` as its Open list (and
+ *  `favorites`); the page store's load just shows the page. */
+async function vault(open: string[], favorites: string[] = []) {
   let stored = open;
   const sets: string[][] = [];
   mockIPC((cmd, args) => {
@@ -35,7 +35,7 @@ async function vault(open: string[]) {
       sets.push(stored);
       return stored;
     }
-    if (cmd === 'favorites_get') return ['Zed.md'];
+    if (cmd === 'favorites_get') return favorites;
     return null;
   });
   const load = vi.spyOn(usePageStore.getState(), 'load').mockImplementation(async (path) => {
@@ -77,7 +77,7 @@ describe('the Open list (0.1.2)', () => {
   });
 
   it('sits at the top, above the Scratchpad and Favorites; binned and missing entries hide', async () => {
-    await vault(['Zed.md', '.trash/Old.md', 'Gone.md', 'Art', 'Art/rex.md']);
+    await vault(['Zed.md', '.trash/Old.md', 'Gone.md', 'Art', 'Art/rex.md'], ['Zed.md']);
     const { container } = render(<ExplorerTree />);
     await screen.findByRole('region', { name: 'Favorites' });
     const [quick] = screen.getAllByRole('tree');

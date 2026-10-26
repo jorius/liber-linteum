@@ -320,9 +320,12 @@ export function ExplorerTree({
 
   if (!favorites) {
     return (
-      <ul {...tree} aria-label={archive ? t('bin.archived') : t('explorer.tree')}>
-        {rows.map(renderRow)}
-      </ul>
+      <>
+        {!archive && <OpenSection />}
+        <ul {...tree} aria-label={archive ? t('bin.archived') : t('explorer.tree')}>
+          {rows.map(renderRow)}
+        </ul>
+      </>
     );
   }
   return (

@@ -43,7 +43,9 @@ async function globalView(
   await expect(page.getByRole('region', { name: 'Global View' })).toBeVisible();
 }
 
-const card = (page: Page, name: string) => page.getByRole('button', { name, exact: true });
+// In the canvas: the sidebar's Open list (0.1.2) has buttons named after pages too.
+const card = (page: Page, name: string) =>
+  page.getByRole('main').getByRole('button', { name, exact: true });
 const crumbs = (page: Page) => page.getByRole('navigation', { name: 'Global View path' });
 
 test('level 0 shows projects and root pages; a click drills in; the breadcrumb goes back', async ({
