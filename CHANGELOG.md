@@ -6,7 +6,7 @@ What changed in each release of Liber Linteum. The format follows
 
 ## [Unreleased]
 
-## [0.1.2] - 2026-10-25
+## [0.1.2] - 2026-10-26
 
 ### Added
 
