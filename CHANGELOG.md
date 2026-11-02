@@ -6,6 +6,25 @@ What changed in each release of Liber Linteum. The format follows
 
 ## [Unreleased]
 
+## [0.1.3] - 2026-11-02
+
+### Fixed
+
+- **Searching Settings no longer freezes the app.** The first letter typed in
+  the search showed every category at once, and the Live Preview and Source
+  font menus drew each installed font in its own typeface, so the app loaded
+  every font on the computer before it answered (seconds on Linux). Installed
+  fonts are now listed in the app's own font; the bundled ones still show in
+  theirs.
+- **Drag to the top of the vault.** Dropping a page or folder on the empty
+  space below the files moves it out of its folder, to the vault's top level;
+  the space lights up while you drag over it. The drop used to be ignored. The
+  space stays at the end of the list even when the files fill the sidebar.
+- **New pages and folders at the top of the vault.** Clicking the empty space
+  below the files, or pressing Esc in them, clears the selection, so New page
+  and New folder create at the vault's top level instead of in the last folder
+  you clicked.
+
 ## [0.1.2] - 2026-10-26
 
 ### Added
@@ -100,7 +119,8 @@ network requests at all.
   and Archive, offline spell check in English and Spanish, a home page per
   vault.
 
-[Unreleased]: https://github.com/jorius/liber-linteum/compare/v0.1.2...HEAD
+[Unreleased]: https://github.com/jorius/liber-linteum/compare/v0.1.3...HEAD
+[0.1.3]: https://github.com/jorius/liber-linteum/compare/v0.1.2...v0.1.3
 [0.1.2]: https://github.com/jorius/liber-linteum/compare/v0.1.1...v0.1.2
 [0.1.1]: https://github.com/jorius/liber-linteum/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/jorius/liber-linteum/releases/tag/v0.1.0
