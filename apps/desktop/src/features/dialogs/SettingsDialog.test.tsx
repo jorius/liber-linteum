@@ -153,7 +153,9 @@ describe('Settings dialog (M2b §4, §5, §7)', () => {
     const live = screen.getByRole('combobox', { name: 'Live Preview font' });
     const source = screen.getByRole('combobox', { name: 'Source font' });
     expect(within(live).getByRole('option', { name: 'Atkinson Hyperlegible' })).toBeInTheDocument();
-    expect(await within(source).findByRole('option', { name: 'Menlo' })).toBeInTheDocument();
+    const menlo = await within(source).findByRole('option', { name: 'Menlo' });
+    // Not drawn in its own font: hundreds of those froze the settings search (0.1.3).
+    expect(menlo.style.fontFamily).toBe('');
     await userEvent.selectOptions(live, 'literata');
     await userEvent.selectOptions(source, 'system:Menlo');
     await userEvent.selectOptions(screen.getByRole('combobox', { name: 'Text size' }), '18');

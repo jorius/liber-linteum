@@ -138,6 +138,9 @@
 
 .rootDrop {
   min-height: 100%;
+  /* Room below the last row, however long the tree: the vault root's drop
+     and click target (0.1.3); taller than a dragged row's ghost. */
+  padding-bottom: 56px;
   border-radius: var(--radius-sm);
 }
 

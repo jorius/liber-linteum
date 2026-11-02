@@ -592,12 +592,10 @@ function FontSelect({
             {!known.has(value) && value.startsWith('system:') && (
               <option value={value}>{value.slice('system:'.length)}</option>
             )}
+            {/* Unstyled: one font per option made WebKitGTK load every
+                installed font to lay the select out (seconds, 0.1.3). */}
             {installed.map((family) => (
-              <option
-                key={family}
-                value={systemChoice(family)}
-                style={{ fontFamily: `"${family}"` }}
-              >
+              <option key={family} value={systemChoice(family)}>
                 {family}
               </option>
             ))}

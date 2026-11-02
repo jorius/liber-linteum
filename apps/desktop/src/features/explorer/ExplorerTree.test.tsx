@@ -6,11 +6,12 @@ import type { TreeNode } from '../../ipc';
 import { clearMocks, mockIPC } from '../../ipc/testing';
 import { usePageStore } from '../../stores/pageStore';
 import { useUiStore } from '../../stores/uiStore';
-import { childrenByParent } from '../../stores/tree';
+import { childrenByParent, dirFor } from '../../stores/tree';
 import { resetVaultStore, useVaultStore } from '../../stores/vaultStore';
 import { useFavoritesStore } from '../favorites/favoritesStore';
 import { useScratchpadStore } from '../scratchpad/scratchpadStore';
 import { ContextMenu } from './ContextMenu';
+import { ExplorerDnd } from './ExplorerDnd';
 import { ExplorerTree, visibleRows } from './ExplorerTree';
 
 const nodes: TreeNode[] = [
@@ -213,6 +214,20 @@ describe('ExplorerTree (EXP-01, NFR-10)', () => {
     screen.getByRole('treeitem', { name: 'Games' }).focus();
     await userEvent.keyboard('{Delete}');
     expect(onRequestDelete).toHaveBeenCalledWith('Games');
+  });
+
+  it('0.1.3: Esc in the tree or a click below the rows clears the selection (new items go to the root)', async () => {
+    seed(nodes, { selected: 'Games' });
+    const { container } = render(<ExplorerDnd />);
+    await userEvent.click(screen.getByRole('treeitem', { name: 'Welcome' }));
+    expect(useVaultStore.getState().selected).toBe('Welcome.md');
+    await userEvent.keyboard('{Escape}');
+    expect(useVaultStore.getState().selected).toBeNull();
+    await userEvent.click(screen.getByRole('treeitem', { name: 'Games' }));
+    expect(useVaultStore.getState().selected).toBe('Games');
+    await userEvent.click(container.querySelector<HTMLElement>('[data-vault-root]')!);
+    expect(useVaultStore.getState().selected).toBeNull();
+    expect(dirFor(nodes, useVaultStore.getState().selected)).toBe('');
   });
 
   /** Review Focus: a vault with thousands of files in a collapsed folder renders
