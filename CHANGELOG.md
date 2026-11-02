@@ -25,6 +25,15 @@ What changed in each release of Liber Linteum. The format follows
   and New folder create at the vault's top level instead of in the last folder
   you clicked.
 
+### Security
+
+- **Wikilinks can't stall the Markdown parser.** `pulldown-cmark`, which reads
+  every page, is updated to 0.13.6 for
+  [RUSTSEC-2026-0414](https://rustsec.org/advisories/RUSTSEC-2026-0414) and
+  [RUSTSEC-2026-0433](https://rustsec.org/advisories/RUSTSEC-2026-0433): a
+  crafted `[[link|…]]` or nested image wikilinks could make parsing a page
+  take exponential or quadratic time.
+
 ## [0.1.2] - 2026-10-26
 
 ### Added
