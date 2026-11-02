@@ -239,6 +239,11 @@ export function ExplorerTree({
       case 'F2':
         if (!archive) vault.startRename(row.node.path);
         break;
+      case 'Escape':
+        // Nothing selected: New page and New folder go to the vault root (0.1.3).
+        if (!vault.selected) return;
+        vault.select(null);
+        break;
       case 'Delete':
       case 'Backspace':
         onRequestDelete?.(row.node.path);

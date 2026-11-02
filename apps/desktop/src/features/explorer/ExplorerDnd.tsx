@@ -10,7 +10,7 @@ import {
   type DragOverEvent,
   type DragStartEvent,
 } from '@dnd-kit/core';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { nameOf } from '../../stores/tree';
 import { useVaultStore } from '../../stores/vaultStore';
@@ -22,6 +22,27 @@ import { displayName, Icon, useShowExtensions } from './TreeRow';
 
 const targetOf = (id: string | number | undefined) =>
   id === undefined ? null : id === ROOT_DROP_ID ? '' : String(id);
+
+/** The tree's wrapper, the vault root: a drop on its empty space below the
+ *  rows moves to the root, a click there clears the selection so New page and
+ *  New folder go to the root (0.1.3; Esc in the tree does the same). Its own
+ *  component so the droppable registers inside the DndContext: called in
+ *  ExplorerDnd it sat above it and the root never took a drop. */
+function RootDrop({ highlighted, children }: { highlighted: boolean; children: ReactNode }) {
+  const { setNodeRef } = useDroppable({ id: ROOT_DROP_ID });
+  return (
+    <div
+      ref={setNodeRef}
+      data-vault-root
+      className={highlighted ? `${styles.rootDrop} ${styles.drop}` : styles.rootDrop}
+      onClick={(e) => {
+        if (e.target === e.currentTarget) useVaultStore.getState().select(null);
+      }}
+    >
+      {children}
+    </div>
+  );
+}
 
 /** Drag-and-drop moves in the explorer (pointer and keyboard sensors). Keyboard
  * drag: Space to pick up, arrows to move, Space to drop, Escape to cancel.
@@ -41,7 +62,6 @@ export function ExplorerDnd(props: ExplorerTreeProps) {
       keyboardCodes: { start: ['Space'], cancel: ['Escape'], end: ['Space'] },
     }),
   );
-  const root = useDroppable({ id: ROOT_DROP_ID });
   const spring = useMemo(
     () => createSpringLoad((path) => useVaultStore.getState().expand(path)),
     [],
@@ -98,12 +118,9 @@ export function ExplorerDnd(props: ExplorerTreeProps) {
       onDragEnd={onDragEnd}
       onDragCancel={reset}
     >
-      <div
-        ref={root.setNodeRef}
-        className={over === '' ? `${styles.rootDrop} ${styles.drop}` : styles.rootDrop}
-      >
+      <RootDrop highlighted={over === ''}>
         <ExplorerTree {...props} dragging={active !== null} dropTarget={over} />
-      </div>
+      </RootDrop>
       {/* In <body>: the sidebar slides in with a transform, and a fixed
           overlay under a transformed ancestor is placed (and measured for
           drops) against it, not the window; with the title bar above it a
