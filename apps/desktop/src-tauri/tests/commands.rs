@@ -113,6 +113,7 @@ const COMMANDS: &[&str] = &[
     // Encryption UX round: the New vault dialog and Vault → Encrypt.
     "folder_kind",
     "menu_set_encrypt_item",
+    "menu_set_vaults",
 ];
 
 struct Harness {

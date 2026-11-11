@@ -289,6 +289,7 @@ pub fn configure<R: tauri::Runtime>(
         encryption_commands::security_reset_rollback_memory,
         vault_commands::folder_kind,
         menu::menu_set_encrypt_item,
+        menu::menu_set_vaults,
         // Encrypt in place (encryption UX §4.3, §8).
         convert_commands::vault_encrypt_preflight,
         convert_commands::vault_encrypt_begin,

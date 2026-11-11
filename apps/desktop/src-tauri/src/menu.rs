@@ -15,7 +15,8 @@
 //! already granted (`core:window:allow-destroy`).
 
 use tauri::menu::{
-    AboutMetadata, Menu, MenuEvent, MenuItem, MenuItemKind, PredefinedMenuItem, Submenu,
+    AboutMetadata, CheckMenuItem, Menu, MenuEvent, MenuItem, MenuItemKind, PredefinedMenuItem,
+    Submenu,
 };
 use tauri::{AppHandle, Emitter, Manager, Runtime};
 
@@ -160,6 +161,58 @@ pub const VAULT_ENCRYPT_ID: &str = "liber-vault-encrypt";
 /// payload `"decrypt"`. The in-app menu bar of Linux and Windows uses the
 /// same id.
 pub const VAULT_DECRYPT_ID: &str = "liber-vault-decrypt";
+
+/// Vault → Switch Vault: a submenu of the recent vaults (`menu_set_vaults`),
+/// each item `liber-vault-switch:<path>`; `menu:vault` payload `switch:<path>`.
+pub const VAULT_SWITCH_ID: &str = "liber-vault-switch";
+pub const VAULT_SWITCH_PREFIX: &str = "liber-vault-switch:";
+
+/// A vault of Vault → Switch Vault.
+#[derive(serde::Deserialize)]
+pub struct VaultChoice {
+    pub path: String,
+    pub name: String,
+}
+
+/// Lists the vaults in Vault → Switch Vault, a check on the open one `current`
+/// (the page calls this as a vault opens or closes). No menu (Linux, Windows
+/// draw their own from the page) does nothing.
+#[tauri::command]
+pub fn menu_set_vaults<R: Runtime>(
+    app: AppHandle<R>,
+    vaults: Vec<VaultChoice>,
+    current: Option<String>,
+) {
+    let Some(menu) = app.menu() else { return };
+    let Some(sub) = menu.items().ok().and_then(|items| {
+        items.into_iter().find_map(|i| match i {
+            MenuItemKind::Submenu(s) if s.id() == "liber-vault-menu" => Some(s),
+            _ => None,
+        })
+    }) else {
+        return;
+    };
+    let Some(switch) = sub.items().ok().and_then(|items| {
+        items.into_iter().find_map(|i| match i {
+            MenuItemKind::Submenu(s) if s.id() == VAULT_SWITCH_ID => Some(s),
+            _ => None,
+        })
+    }) else {
+        return;
+    };
+    for old in switch.items().unwrap_or_default() {
+        let _ = switch.remove(&old);
+    }
+    for v in vaults {
+        let id = format!("{VAULT_SWITCH_PREFIX}{}", v.path);
+        let on = current.as_deref() == Some(v.path.as_str());
+        if let Ok(item) =
+            CheckMenuItem::with_id(&app, id, menu_name(&v.name), true, on, None::<&str>)
+        {
+            let _ = switch.append(&item);
+        }
+    }
+}
 
 /// The `menu:vault` payload of a Vault menu item.
 fn vault_action(id: &str) -> Option<&'static str> {
@@ -327,13 +380,16 @@ pub fn app_menu<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
         false,
         None::<&str>,
     )?;
-    let vault = Submenu::with_items(
+    let vault_switch = Submenu::with_id(app, VAULT_SWITCH_ID, "Switch Vault", true)?;
+    let vault = Submenu::with_id_and_items(
         app,
+        "liber-vault-menu",
         "Vault",
         true,
         &[
             &vault_new,
             &vault_open,
+            &vault_switch,
             &PredefinedMenuItem::separator(app)?,
             &vault_encrypt,
             &vault_decrypt,
@@ -510,6 +566,8 @@ fn activate<R: Runtime>(app: &AppHandle<R>, id: &str, target: Option<String>) {
         emit_to(app, &target, SAVE_EVENT, ());
     } else if let Some(what) = vault_action(id) {
         emit_main(app, VAULT_EVENT, what);
+    } else if let Some(path) = id.strip_prefix(VAULT_SWITCH_PREFIX) {
+        emit_main(app, VAULT_EVENT, format!("switch:{path}"));
     } else if id == SIDEBAR_ID {
         emit_main(app, SIDEBAR_EVENT, ());
     }

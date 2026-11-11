@@ -15,6 +15,7 @@ import {
 import { useSettingsStore } from '../../stores/settingsStore';
 import { useVaultStore } from '../../stores/vaultStore';
 import { Dialog } from '../dialogs/Dialog';
+import { vaultChoices } from '../shell/shellMenu';
 import { keyLabel } from '../dialogs/shortcuts';
 import { runEdit, type EditAction } from './editActions';
 import { buildMenus, type LocalAction, type MenuDef, type MenuItemEntry } from './menus';
@@ -76,6 +77,7 @@ export function TitleBar({ main }: { main: boolean }) {
   const status = useVaultStore((s) => s.status);
   const info = useVaultStore((s) => s.info);
   const settings = useSettingsStore((s) => s.settings);
+  const [vaults, setVaults] = useState<{ path: string; name: string }[]>([]);
   const [open, setOpen] = useState<number | null>(null);
   const [active, setActive] = useState(-1);
   const [about, setAbout] = useState(false);
@@ -89,12 +91,24 @@ export function TitleBar({ main }: { main: boolean }) {
   const before = useRef<Element | null>(null);
   const windows = onWindows();
 
+  // The recent vaults, again as one opens (it moves to the top of the list).
+  const root = info?.root;
+  useEffect(() => {
+    if (main) void vaultChoices().then(setVaults);
+  }, [main, status, root]);
+
   const menus = buildMenus(t, {
     main,
     vault:
       main && status === 'open' && info
-        ? { name: info.name, encrypted: !!info.encrypted, scratchpad: !!info.scratchpad }
+        ? {
+            name: info.name,
+            root: info.root,
+            encrypted: !!info.encrypted,
+            scratchpad: !!info.scratchpad,
+          }
         : null,
+    vaults,
     toggles: {
       sidebar: !settings.sidebarCollapsed,
       toolbar: settings.toolbar,

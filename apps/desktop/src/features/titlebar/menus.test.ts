@@ -7,7 +7,8 @@ import { buildMenus, menuName, type MenuContext, type MenuItemEntry } from './me
 
 const ctx = (over: Partial<MenuContext> = {}): MenuContext => ({
   main: true,
-  vault: { name: 'Kessari', encrypted: false, scratchpad: false },
+  vaults: [],
+  vault: { name: 'Kessari', root: '/v/kessari', encrypted: false, scratchpad: false },
   toggles: { sidebar: true, toolbar: false, lineNumbers: true, outline: false },
   maximized: false,
   windows: false,
@@ -57,11 +58,27 @@ describe('the drawn menu bar (custom title bar §3)', () => {
     for (const i of own) expect(listed, `${i.key}: ${i.keys}`).toContain(i.keys);
   });
 
+  it('lists the recent vaults under Open Vault, a check on the open one', () => {
+    const vaults = [
+      { path: '/v/kessari', name: 'Kessari' },
+      { path: '/v/cybersec', name: 'Cybersec' },
+    ];
+    const c = ctx({ vaults });
+    expect(find(c, 'switch:/v/kessari')).toMatchObject({
+      checked: true,
+      id: 'liber-vault-switch:/v/kessari',
+    });
+    expect(find(c, 'switch:/v/cybersec')).toMatchObject({ label: 'Cybersec', checked: false });
+    expect(itemsOf(ctx()).some((i) => i.key.startsWith('switch:'))).toBe(false);
+  });
+
   it('names the vault in Encrypt and the scratchpad item, and enables what applies', () => {
     expect(find(ctx(), 'encrypt')).toMatchObject({ label: 'Encrypt “Kessari”…', disabled: false });
     expect(find(ctx(), 'quickNote').label).toBe('Create new scratchpad for Kessari');
     expect(find(ctx(), 'lock').disabled).toBe(true);
-    const locked = ctx({ vault: { name: 'Kessari', encrypted: true, scratchpad: false } });
+    const locked = ctx({
+      vault: { name: 'Kessari', root: '/v/kessari', encrypted: true, scratchpad: false },
+    });
     expect(find(locked, 'encrypt')).toMatchObject({ label: 'Encrypt vault…', disabled: true });
     expect(find(locked, 'lock').disabled).toBe(false);
     expect(find(locked, 'decrypt')).toMatchObject({ label: 'Decrypt “Kessari”…', disabled: false });

@@ -48,7 +48,9 @@ export interface MenuContext {
   /** The vault window (single-file windows have no Vault menu). */
   main: boolean;
   /** The open vault, if any (not while locked or on Welcome). */
-  vault: { name: string; encrypted: boolean; scratchpad: boolean } | null;
+  vault: { name: string; root: string; encrypted: boolean; scratchpad: boolean } | null;
+  /** The vaults Vault → Switch Vault lists (the recent ones). */
+  vaults: { path: string; name: string }[];
   toggles: { sidebar: boolean; toolbar: boolean; lineNumbers: boolean; outline: boolean };
   maximized: boolean;
   /** Windows writes redo as Ctrl+Y; Linux as Ctrl+Shift+Z. */
@@ -116,6 +118,18 @@ export function buildMenus(t: TFunction, ctx: MenuContext): MenuDef[] {
     items: [
       item('newVault', { id: 'liber-vault-new' }),
       item('openVault', { id: 'liber-vault-open', keys: 'Mod+O' }),
+      ...(ctx.vaults.length
+        ? [
+            sep('sv'),
+            ...ctx.vaults.map((v): MenuEntry => ({
+              kind: 'item',
+              key: `switch:${v.path}`,
+              label: menuName(v.name),
+              id: `liber-vault-switch:${v.path}`,
+              checked: v.path === vault?.root,
+            })),
+          ]
+        : []),
       sep('s1'),
       {
         kind: 'item',

@@ -129,6 +129,7 @@
     "allow-security-reset-rollback-memory",
     "allow-folder-kind",
     "allow-menu-set-encrypt-item",
+    "allow-menu-set-vaults",
     "allow-vault-encrypt-preflight",
     "allow-vault-encrypt-begin",
     "allow-vault-encrypt-run",
