@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** A Zen-style Focus mode: full screen, only the page's text in Live Preview, a quiet bottom strip (← · words · read time · saved status), left with Escape twice, the shortcut or the menu.
+**Goal:** (A) A Zen-style Focus mode: full screen, only the page's text in Live Preview, a quiet bottom strip (← · words · read time · saved status), left with Escape twice, the shortcut or the menu. (B) A right-click Preview for Mermaid diagrams and block maths, in a dialog with zoom and pan.
 
 **Architecture:** One session-only flag `focus` in `uiStore`. A small `features/focus/` module owns entering/leaving (full screen, announce, restore), the shortcut, the double-Escape rule, the menu event and the "something else turned it off" watchers. Views read the flag and hide their chrome with `hidden`/conditional rendering of *siblings* only — the tree around `Editor` never changes, so the editor is never remounted.
 
@@ -227,7 +227,66 @@ Copy:
 
 ---
 
-### Task 8: Full verification
+## Part B — Diagram preview (added 2026-11-11, agreed in chat)
+
+Requirement (maintainer): a normal click on a rendered Mermaid diagram or block maths edits it, as now. A **right click** opens a context menu with **Preview** and **Edit source**. Preview opens a dialog to zoom in, zoom out and move across the diagram. No hover button. Not included: inline maths, tables, images, Global View atom cards, export.
+
+Decided (Claude's calls): no new dependency (CSS transform); zoom 25 %–800 %; wheel/pinch zooms around the pointer, + / − / 0 keys and buttons zoom around the centre / fit; drag or arrow keys pan; the dialog shows the already-rendered markup (cloned `innerHTML`, which is already sanitised: `inertSvg` for Mermaid, KaTeX with `trust: false`), never re-rendering. In Split mode's rendered pane (`[data-preview]`) the menu offers Preview only (no source position to go to). Separate commits from Focus mode, `feat(preview): …`.
+
+### Task 8: Shared popup menu, diagram context menu
+
+**Files:**
+- Create: `apps/desktop/src/features/preview/PopupMenu.tsx` (the list, placement, outside-click and keyboard logic moved out of `ImageMenu`)
+- Modify: `apps/desktop/src/features/preview/ImageMenu.tsx` (uses `PopupMenu`; behaviour unchanged)
+- Create: `apps/desktop/src/features/preview/DiagramMenu.tsx`
+- Modify: `apps/desktop/src/features/preview/MermaidView.tsx:~151` (add `data-liber="diagram"` on the diagram's div)
+- Modify: `apps/desktop/src/features/shell/AppShell.tsx` (render `<DiagramMenuHost />` next to `<ImageMenuHost />`)
+- Modify: `src/i18n/locales/en.json`, `es.json`
+- Test: `apps/desktop/src/features/preview/DiagramMenu.test.tsx`; existing ImageMenu tests unchanged
+
+**Interfaces:**
+- Produces: `PopupMenu({ label, items, anchor, onClose }: { label: string; items: { label: string; run: () => void }[]; anchor: { x: number; y: number }; onClose: () => void })` — `role="menu"`, `liber-menu` class, arrows / Escape / Tab exactly as `ImageMenu` does today.
+- Produces: `diagramAt(target: EventTarget | null): HTMLElement | null` — `closest('[data-liber="diagram"], div[data-liber="math"]')` inside `.cm-editor` or `[data-preview]`; `null` otherwise (inline maths is a `span`, so it's excluded).
+- Produces: `DiagramMenuHost()` — capture-phase `contextmenu` listener on `document` (like `ImageMenuHost`); on a diagram: `preventDefault`, `stopPropagation`, open the menu. Items: `diagram.preview` → `openDiagramPreview(el)` (Task 9); `diagram.editSource` (only inside `.cm-editor`) → find the `EditorView` (`EditorView.findFromDOM`), `pos = view.posAtDOM(el)`, dispatch `selection: { anchor: pos }`, `view.focus()`.
+
+Strings (en / es): `diagram.menu` "Diagram menu" / "Menú del diagrama"; `diagram.preview` "Preview" / "Vista previa"; `diagram.editSource` "Edit source" / "Editar código".
+
+- [ ] **Step 1: Failing tests:** `right-click on a mermaid diagram opens Preview and Edit source`; `right-click on block maths opens the menu`; `right-click on inline maths does nothing`; `in the rendered pane only Preview is offered`; `Edit source puts the cursor in the diagram's source` (Live Preview editor with a ```mermaid block; after Edit source, `view.state.selection.main.head` is inside the fence's range); `a left click is not intercepted` (no menu on `mousedown`).
+- [ ] **Step 2:** `npx vitest run src/features/preview` — FAIL.
+- [ ] **Step 3:** Implement; move `ImageMenu`'s list into `PopupMenu`.
+- [ ] **Step 4:** `npm test` — new and existing ImageMenu tests PASS.
+- [ ] **Step 5:** Commit `feat(preview): right-click menu on diagrams and maths`.
+
+### Task 9: Diagram preview dialog with zoom and pan
+
+**Files:**
+- Create: `apps/desktop/src/features/preview/DiagramPreview.tsx`, `DiagramPreview.module.css`
+- Create: `apps/desktop/src/features/preview/panZoom.ts` (pure maths)
+- Modify: `stores/uiStore.ts` (`DialogState` gets `| { type: 'diagramPreview'; html: string; kind: 'diagram' | 'math'; returnTo: HTMLElement | null }`)
+- Modify: `features/dialogs/DialogHost.tsx` (renders `DiagramPreview`)
+- Modify: `src/i18n/locales/en.json`, `es.json`
+- Test: `apps/desktop/src/features/preview/panZoom.test.ts`, `DiagramPreview.test.tsx`, `apps/desktop/e2e/diagram-preview.spec.ts`
+
+**Interfaces:**
+- Consumes: `Dialog` (`title`, `onClose`, `returnFocus`, `wide`), `PopupMenu` caller from Task 8.
+- Produces: `openDiagramPreview(el: HTMLElement): void` — `openDialog({ type: 'diagramPreview', html: el.innerHTML, kind, returnTo: document.activeElement })`.
+- Produces (`panZoom.ts`): `type View = { scale: number; x: number; y: number }`; `MIN_SCALE = 0.25`, `MAX_SCALE = 8`, `STEP = 1.25`; `zoomAt(v: View, factor: number, px: number, py: number): View` (keeps the point under (px,py) fixed, clamps scale); `panBy(v: View, dx: number, dy: number): View`; `fit(content: {w,h}, box: {w,h}): View` (scale `min(box/content, 1)` — never upscales on fit — centred).
+
+Behaviour: content in a `transform: translate(x,y) scale(s)` layer, `transform-origin: 0 0`. Wheel: `preventDefault`; factor `exp(-deltaY * 0.002)` (pinch arrives as ctrl+wheel in Chromium/WebKit — same handler). Pointer drag pans (pointer capture). Keys: `+`/`=` zoom in, `-` zoom out, `0` fit, arrows pan 40 px. Toolbar: −, percentage (`Math.round(scale*100)%`), +, Fit — buttons with `aria-label`s. Opens at `fit`. The layer gets `role="img"` and `aria-label` = `diagram.previewLabel`; for maths, the KaTeX MathML inside stays readable. Escape is the `Dialog`'s own (it sets `role="dialog"`, so Task 2's overlay check covers Focus mode).
+
+Strings (en / es): `diagram.previewTitle` "Diagram preview" / "Vista previa del diagrama"; `diagram.previewLabel` "Diagram" / "Diagrama"; `diagram.zoomIn` "Zoom in" / "Acercar"; `diagram.zoomOut` "Zoom out" / "Alejar"; `diagram.fit` "Fit" / "Ajustar".
+
+- [ ] **Step 1: Failing unit tests** (`panZoom.test.ts`): `zoomAt keeps the point under the pointer` (zoom 2× at (100,50) from identity → (100,50) maps to the same screen point); `zoomAt clamps to 0.25 and 8`; `panBy adds`; `fit centres and never upscales` (content 200×100 in 800×600 → scale 1, x 300, y 250; content 1600×600 in 800×600 → scale 0.5).
+- [ ] **Step 2: Failing component tests** (`DiagramPreview.test.tsx`): `shows the cloned markup`; `+ and − change the percentage` (100% → 125% → 100%); `0 fits`; `Escape closes and gives the keyboard back to returnTo`.
+- [ ] **Step 3: Failing e2e** (`e2e/diagram-preview.spec.ts`, chromium + webkit): page with a ```mermaid graph and a `$$` block; click the diagram → source shows (unchanged behaviour); right-click → Preview → dialog with an `svg`; wheel up → percentage > 100%; drag → transform's translate changes; Escape → closed; in Focus mode, right-click → Preview → Escape closes the dialog and Focus mode stays on.
+- [ ] **Step 4:** `npx vitest run src/features/preview` and `npx playwright test e2e/diagram-preview.spec.ts` — FAIL.
+- [ ] **Step 5:** Implement.
+- [ ] **Step 6:** Re-run both — PASS.
+- [ ] **Step 7:** Commit `feat(preview): zoom and pan diagram preview`.
+
+---
+
+### Task 10: Full verification
 
 - [ ] **Step 1:** From `apps/desktop`: `npm run typecheck && npm run lint && npm test && npm run check:i18n && npm run test:e2e`; from `src-tauri`: `cargo test`. All green.
-- [ ] **Step 2:** Manual check on macOS via `npm run tauri dev`: ⌥⌘Z enters (animated full screen, no immediate exit), Escape twice leaves, green button while focused leaves Focus mode, View → Toggle Focus Mode works.
+- [ ] **Step 2:** Manual check on macOS via `npm run tauri dev`: ⌥⌘Z enters (animated full screen, no immediate exit), Escape twice leaves, green button while focused leaves Focus mode, View → Toggle Focus Mode works; right-click a Mermaid diagram → Preview, pinch-zoom on the trackpad and drag work.
