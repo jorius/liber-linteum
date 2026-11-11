@@ -398,9 +398,10 @@ export function Editor({ doc, mode, label }: EditorProps) {
     setText(next);
     setRenderNow(now);
   }, []);
-  const showToolbar = useSettingsStore((s) => s.settings.toolbar);
-  const showNumbers = useSettingsStore((s) => s.settings.lineNumbers);
-  const showOutline = useSettingsStore((s) => s.settings.outline);
+  const focus = useUiStore((s) => s.focus);
+  const showToolbar = useSettingsStore((s) => s.settings.toolbar) && !focus;
+  const showNumbers = useSettingsStore((s) => s.settings.lineNumbers) && !focus;
+  const showOutline = useSettingsStore((s) => s.settings.outline) && !focus;
   const [toolbarView, setToolbarView] = useState<EditorView | null>(null);
   const [picker, setPicker] = useState(false);
   const [attach, setAttach] = useState<PickedFile[] | null>(null);

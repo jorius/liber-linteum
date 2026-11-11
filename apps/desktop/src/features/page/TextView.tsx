@@ -50,6 +50,7 @@ export function TextStats() {
  *  app. */
 export function TextView({ path }: { path: string }) {
   const { t } = useTranslation();
+  const focus = useUiStore((s) => s.focus);
   const doc = useEditorStore((s) => s.doc);
   const error = useEditorStore((s) => s.error);
   // Rewritten outside as something it can't edit, with nothing unsaved to
@@ -58,7 +59,7 @@ export function TextView({ path }: { path: string }) {
   const notText = gone || error?.kind === 'notAText';
   return (
     <section className={styles.page} aria-label={t('page.region')}>
-      <div data-band="plain" className={styles.band}>
+      <div data-band="plain" className={styles.band} hidden={focus}>
         <div className={styles.bandRows}>
           <div className={styles.heading}>
             <PageTitle path={path} />

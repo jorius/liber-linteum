@@ -13,6 +13,7 @@ import {
   windowToggleMaximize,
 } from '../../ipc';
 import { useSettingsStore } from '../../stores/settingsStore';
+import { useUiStore } from '../../stores/uiStore';
 import { useVaultStore } from '../../stores/vaultStore';
 import { Dialog } from '../dialogs/Dialog';
 import { vaultChoices } from '../shell/shellMenu';
@@ -77,6 +78,7 @@ export function TitleBar({ main }: { main: boolean }) {
   const status = useVaultStore((s) => s.status);
   const info = useVaultStore((s) => s.info);
   const settings = useSettingsStore((s) => s.settings);
+  const focus = useUiStore((s) => s.focus);
   const [vaults, setVaults] = useState<{ path: string; name: string }[]>([]);
   const [open, setOpen] = useState<number | null>(null);
   const [active, setActive] = useState(-1);
@@ -217,6 +219,8 @@ export function TitleBar({ main }: { main: boolean }) {
     else void windowStartDrag();
   };
 
+  // Focus mode hides the bar; its keys above still work.
+  if (main && focus) return null;
   let index = -1;
   return (
     <>

@@ -25,6 +25,7 @@ import { installQuitGuardIfTauri } from './stores/editorStore';
 import { installMenuTogglesIfTauri } from './stores/menuToggles';
 import { installMenuNavigationIfTauri } from './stores/navigate';
 import { installSettingsSync, useSettingsStore } from './stores/settingsStore';
+import { installFocusMode } from './features/focus/focusMode';
 import { applyTheme } from './theme/theme';
 
 applyTheme('system');
@@ -60,6 +61,7 @@ void initI18n(detectLanguage(navigator.languages))
       installFileDropIfTauri();
       installRecorderEvents();
       installOpenInVault();
+      installFocusMode();
     }
     createRoot(document.getElementById('root')!).render(
       <StrictMode>

@@ -13,6 +13,7 @@ import { useEncryptMenuItem } from '../encryption/encryptInPlace';
 import { ContextMenu, type MenuState } from '../explorer/ContextMenu';
 import { requestTrash } from '../explorer/trashAction';
 import { GlobalView } from '../global-view/GlobalView';
+import { FocusStrip } from '../focus/FocusStrip';
 import { PageView } from '../page/PageView';
 import { ActionButton } from './ActionButton';
 import { toggleSidebar } from './shellMenu';
@@ -44,16 +45,21 @@ export function AppShell() {
   const collapsed = useSettingsStore((s) => s.settings.sidebarCollapsed);
   // Keys typed while the lock runs would be dropped with the vault: none are taken.
   const locking = useVaultStore((s) => s.locking);
+  const focus = useUiStore((s) => s.focus);
   return (
-    <div className={styles.shell} inert={locking}>
-      {!collapsed && (
+    <div className={styles.shell} inert={locking} data-focus={focus || undefined}>
+      {!collapsed && !focus && (
         <Sidebar
           onRequestDelete={requestTrash}
           onRequestMenu={(path, anchor) => setMenu({ path, anchor })}
         />
       )}
-      <div className={styles.main} data-screen={current} data-collapsed={collapsed || undefined}>
-        {collapsed && (
+      <div
+        className={styles.main}
+        data-screen={current}
+        data-collapsed={(collapsed && !focus) || undefined}
+      >
+        {collapsed && !focus && (
           <button
             type="button"
             className={`${styles.iconButtonLight} ${styles.reopen}`}
@@ -66,7 +72,7 @@ export function AppShell() {
             <SidebarIcon />
           </button>
         )}
-        <OriginalsBanner />
+        {!focus && <OriginalsBanner />}
         <main className={styles.content}>
           {/* The editor stays mounted while the Global View shows, so text,
               selection and undo survive switching (M3a §2). */}
@@ -76,7 +82,8 @@ export function AppShell() {
           {current === 'global' && <GlobalView />}
           {current === 'trash' && <BinView />}
         </main>
-        <ActionButton />
+        {!focus && <ActionButton />}
+        <FocusStrip />
       </div>
       {menu && <ContextMenu menu={menu} onClose={closeMenu} />}
       <DialogHost />

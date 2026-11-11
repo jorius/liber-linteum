@@ -1,0 +1,36 @@
+/* Focus mode (spec §3, §4): the strip, and room for it under the text. */
+:global([data-focus]) {
+  --focus-strip-h: 44px;
+}
+
+:global([data-focus]) :global(.cm-scroller) {
+  padding-bottom: var(--focus-strip-h);
+}
+
+.strip {
+  position: fixed;
+  bottom: 0;
+  left: 50%;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  height: var(--focus-strip-h);
+  padding: 0 16px;
+  transform: translateX(-50%);
+  color: var(--color-text-muted);
+  opacity: 0.35;
+  transition: opacity 150ms ease;
+}
+
+.strip:hover,
+.strip:focus-within,
+.strip[data-near] {
+  opacity: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .strip {
+    transition: none;
+  }
+}
