@@ -1242,6 +1242,12 @@ export function installIpcMock({
     window_maximized: () => false,
     window_toggle_maximize: () => true,
     window_toggle_fullscreen: () => null,
+    window_fullscreen: () => (w.__liberFullscreen as boolean | undefined) ?? false,
+    window_set_fullscreen: (a) => {
+      w.__liberFullscreen = a.full as boolean;
+      window.dispatchEvent(new Event('resize'));
+      return null;
+    },
     window_start_drag: () => null,
     window_close_request: () => null,
     window_paste: () => null,

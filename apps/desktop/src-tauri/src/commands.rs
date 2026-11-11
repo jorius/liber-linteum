@@ -109,6 +109,23 @@ pub async fn window_toggle_fullscreen<R: tauri::Runtime>(
     window.set_fullscreen(!full).map_err(window_error)
 }
 
+/// Whether the calling window is full screen.
+#[tauri::command]
+pub async fn window_fullscreen<R: tauri::Runtime>(
+    window: tauri::WebviewWindow<R>,
+) -> crate::error::CmdResult<bool> {
+    window.is_fullscreen().map_err(window_error)
+}
+
+/// Enters or leaves full screen (Focus mode).
+#[tauri::command]
+pub async fn window_set_fullscreen<R: tauri::Runtime>(
+    window: tauri::WebviewWindow<R>,
+    full: bool,
+) -> crate::error::CmdResult<()> {
+    window.set_fullscreen(full).map_err(window_error)
+}
+
 /// Moves the calling window with the pointer (a press on the title bar).
 #[tauri::command]
 pub async fn window_start_drag<R: tauri::Runtime>(

@@ -9,6 +9,8 @@ const COMMANDS: &[&str] = &[
     "window_toggle_maximize",
     "window_maximized",
     "window_toggle_fullscreen",
+    "window_fullscreen",
+    "window_set_fullscreen",
     "window_start_drag",
     "window_close_request",
     "window_paste",

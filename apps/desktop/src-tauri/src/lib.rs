@@ -159,6 +159,8 @@ pub fn configure<R: tauri::Runtime>(
         commands::window_toggle_maximize,
         commands::window_maximized,
         commands::window_toggle_fullscreen,
+        commands::window_fullscreen,
+        commands::window_set_fullscreen,
         commands::window_start_drag,
         commands::window_close_request,
         commands::window_paste,
