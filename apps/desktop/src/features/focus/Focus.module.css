@@ -19,18 +19,24 @@
   padding: 0 16px;
   transform: translateX(-50%);
   color: var(--color-text-muted);
+  /* Opaque, so text scrolling under it never mixes with the status; only
+     the content is faint. */
+  background: var(--color-bg);
+}
+
+.strip > * {
   opacity: 0.35;
   transition: opacity 150ms ease;
 }
 
-.strip:hover,
-.strip:focus-within,
-.strip[data-near] {
+.strip:hover > *,
+.strip:focus-within > *,
+.strip[data-near] > * {
   opacity: 1;
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .strip {
+  .strip > * {
     transition: none;
   }
 }

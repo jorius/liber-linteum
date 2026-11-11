@@ -1,4 +1,5 @@
 import { autocompletion, startCompletion } from '@codemirror/autocomplete';
+import i18next from 'i18next';
 import { EditorView } from '@codemirror/view';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { onWindowResized, settingsSet, windowFullscreen, windowSetFullscreen } from '../../ipc';
@@ -220,11 +221,29 @@ describe('watchers', () => {
     expect(focused()).toBe(false);
   });
 
-  it('closing the vault turns Focus mode off without touching full screen', async () => {
+  it('locking the vault ends Focus mode and the full screen it entered', async () => {
     await enterFocus();
     useVaultStore.setState({ status: 'locked' });
+    await flush();
     expect(focused()).toBe(false);
-    expect(setFullscreen).toHaveBeenCalledTimes(1);
+    expect(setFullscreen).toHaveBeenLastCalledWith(false);
+  });
+
+  it("locking the vault leaves the user's own full screen alone", async () => {
+    fullscreen.mockResolvedValue({ ok: true, value: true });
+    await enterFocus();
+    useVaultStore.setState({ status: 'locked' });
+    await flush();
+    expect(focused()).toBe(false);
+    expect(setFullscreen).not.toHaveBeenCalled();
+  });
+
+  it('announces focus.on and focus.off', async () => {
+    const live = () => document.querySelector('[data-liber-status]')?.textContent;
+    await enterFocus();
+    expect(live()).toBe(i18next.t('focus.on'));
+    await leaveFocus();
+    expect(live()).toBe(i18next.t('focus.off'));
   });
 });
 

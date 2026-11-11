@@ -1,4 +1,5 @@
 import { act, render, screen } from '@testing-library/react';
+import { cleanup } from '@testing-library/react';
 import { afterEach, describe, expect, it } from 'vitest';
 import { clearMocks } from '../../ipc/testing';
 import { useEditorStore } from '../../stores/editorStore';
@@ -12,7 +13,12 @@ import { FocusStrip } from './FocusStrip';
 
 const hooks = { onChange: () => undefined, onConflictCopy: () => undefined };
 
-afterEach(() => {
+afterEach(async () => {
+  // Unmount the editor and let its pending IPC settle before the mocks go.
+  cleanup();
+  await act(async () => {
+    await new Promise((r) => setTimeout(r, 0));
+  });
   act(() => {
     useUiStore.setState({ focus: false });
     useEditorStore.setState({ doc: null, path: null });

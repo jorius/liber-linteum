@@ -227,3 +227,17 @@ test('plain Escape, an overlay-closing Escape, then a plain Escape stays focused
   await page.waitForTimeout(100);
   await expect(strip(page)).toBeVisible();
 });
+
+test('Tab from the editor reaches the strip controls', async ({ page }) => {
+  await open(page, 'A');
+  await enter(page);
+  await page.locator('.cm-liber-link', { hasText: 'B' }).click();
+  await expect(page.locator('.cm-content').first()).toContainText('More.');
+  await page.locator('.cm-content').first().click();
+  // Outside a list, Tab moves focus rather than indenting.
+  // WebKit skips buttons on plain Tab (its default, as in Safari); Alt+Tab reaches them.
+  await page.keyboard.press(test.info().project.name === 'webkit' ? 'Alt+Tab' : 'Tab');
+  await expect(
+    page.locator('[data-focus-strip]').getByRole('button', { name: 'Back to A' }),
+  ).toBeFocused();
+});

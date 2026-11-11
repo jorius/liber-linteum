@@ -4,7 +4,13 @@
 // toolbar/outline/line-number toggle, the vault closing).
 import { completionStatus } from '@codemirror/autocomplete';
 import i18next from 'i18next';
-import { isTauri, onMenuFocus, onWindowResized, windowFullscreen, windowSetFullscreen } from '../../ipc';
+import {
+  isTauri,
+  onMenuFocus,
+  onWindowResized,
+  windowFullscreen,
+  windowSetFullscreen,
+} from '../../ipc';
 import { usePageStore } from '../../stores/pageStore';
 import { useSettingsStore } from '../../stores/settingsStore';
 import { useUiStore } from '../../stores/uiStore';
@@ -159,11 +165,8 @@ export function installFocusMode(): () => void {
     }
   });
   const unVault = useVaultStore.subscribe((s) => {
-    // Closing or locking: Focus mode ends, the window stays as it is.
-    if (s.status !== 'open' && useUiStore.getState().focus) {
-      enteredFullscreen = false;
-      useUiStore.getState().setFocus(false);
-    }
+    // Closing or locking ends Focus mode; full screen goes only if it put it there.
+    if (s.status !== 'open' && useUiStore.getState().focus) void leaveFocus();
   });
 
   return () => {
