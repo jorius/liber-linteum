@@ -1,7 +1,7 @@
 // Focus mode in the built UI, in Chromium and WebKit (≈ WKWebView): the
 // chrome goes, the editor stays (the same one, in Live Preview), the strip
 // shows ←, words and Saved; double Escape brings everything back.
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type Locator, type Page } from '@playwright/test';
 import { installIpcMock } from './ipcMock';
 
 type W = Window & {
@@ -11,11 +11,16 @@ type W = Window & {
   __TAURI_INTERNALS__: { invoke: (cmd: string, args: unknown) => Promise<unknown> };
 };
 
-async function open(page: Page, name: string, settings: Record<string, unknown> = {}) {
+async function open(
+  page: Page,
+  name: string,
+  settings: Record<string, unknown> = {},
+  extra: Record<string, string> = {},
+) {
   const errors: string[] = [];
   page.on('pageerror', (e) => errors.push(e.message));
   await page.addInitScript(installIpcMock, {
-    pages: { 'A.md': '# A\n\nSee [[B]] here.\n', 'B.md': '# B\n\nMore.\n' },
+    pages: { 'A.md': '# A\n\nSee [[B]] here.\n', 'B.md': '# B\n\nMore.\n', ...extra },
     editorMode: 'split',
     remoteCover: false,
     settings: { editorMode: 'split', outline: true, toolbar: true, ...settings },
@@ -147,4 +152,78 @@ test('no title bar space while focused', async ({ page }) => {
   expect(await top()).toBe('0px');
   await leave(page);
   expect(await top()).toBe('38px');
+});
+
+// One Escape that closes an overlay is never half of a double Escape.
+const strip = (page: Page) => page.locator('[data-focus-strip]');
+const FIXTURES = {
+  'Spell.md': '# Spell\n\nI recieve mail.\n',
+  'Code.md': '# Code\n\n```js\nconst a = 1;\n```\n',
+};
+const overlays: [string, string, (page: Page) => Promise<unknown>, (page: Page) => Locator][] = [
+  [
+    '[[ link list',
+    'A',
+    async (page) => page.keyboard.type('[['),
+    (page) => page.locator('.cm-tooltip-autocomplete'),
+  ],
+  [
+    'find in page',
+    'A',
+    async (page) => page.keyboard.press('ControlOrMeta+F'),
+    (page) => page.locator('.cm-search'),
+  ],
+  [
+    'go to line',
+    'A',
+    async (page) => page.keyboard.press('Control+G'),
+    (page) => page.locator('.cm-liber-goto'),
+  ],
+  [
+    'Search dialog',
+    'A',
+    async (page) => page.keyboard.press('ControlOrMeta+Shift+F'),
+    (page) => page.getByRole('dialog', { name: 'Search' }),
+  ],
+  [
+    'language picker',
+    'Code',
+    async (page) => page.getByRole('button', { name: 'Language: JavaScript' }).click(),
+    (page) => page.getByRole('combobox', { name: 'Code language' }),
+  ],
+  [
+    'spell menu',
+    'Spell',
+    async (page) => page.locator('.cm-liber-misspelled').click({ button: 'right' }),
+    (page) => page.getByRole('menu', { name: 'Spelling: recieve' }),
+  ],
+];
+// The table tool lives in the toolbar, which Focus mode hides: nothing to open.
+for (const [name, pageName, openIt, overlay] of overlays) {
+  test(`one Escape in the ${name} stays focused`, async ({ page }) => {
+    await open(page, pageName, {}, FIXTURES);
+    await enter(page);
+    await openIt(page);
+    await expect(overlay(page)).toBeVisible();
+    await page.keyboard.press('Escape');
+    await expect(overlay(page)).toHaveCount(0);
+    await expect(strip(page)).toBeVisible();
+    await page.keyboard.press('Escape');
+    await page.waitForTimeout(100);
+    await expect(strip(page)).toBeVisible();
+    await leave(page);
+  });
+}
+
+test('plain Escape, an overlay-closing Escape, then a plain Escape stays focused', async ({
+  page,
+}) => {
+  await open(page, 'A');
+  await enter(page);
+  await page.keyboard.press('Escape');
+  await page.keyboard.press('Control+G');
+  await page.keyboard.press('Escape');
+  await page.keyboard.press('Escape');
+  await page.waitForTimeout(100);
+  await expect(strip(page)).toBeVisible();
 });
