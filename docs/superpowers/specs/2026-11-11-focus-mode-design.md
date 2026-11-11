@@ -88,9 +88,9 @@ A single row fixed at the bottom of the screen, centred under the text column:
 
 **Enter** from any of:
 - **View → Focus mode** (custom title bar menu in `features/titlebar/menus.ts`, and the native
-  macOS menu in `src-tauri/src/menu.rs`), placed next to Full screen, as a checked item. On macOS
-  that is a new `CheckMenuItem` beside the `PredefinedMenuItem::fullscreen`, emitting a menu event
-  and with its check synced the way the existing toggle items (sidebar, outline) are.
+  macOS menu in `src-tauri/src/menu.rs`), placed next to Full screen. In the custom title bar it
+  is a checked item. On macOS it is a plain "Toggle Focus Mode" `MenuItem`, like the other View
+  toggles there, which carry no checkmark (corrected while planning).
 - A shortcut: **Alt+Mod+Z** (Z for Zen). VS Code's Mod+K Z cannot be used: Mod+K is already
   "insert link" in the editor. Add it to the shortcuts list (`features/dialogs/shortcuts.ts`).
 - Available only in the main window with a vault open. Entering from the Global View or the Bin
@@ -129,9 +129,10 @@ fires resizes mid-way).
   and stay in Focus mode. The new page is text only, in Live Preview.
 - Search (Mod+Shift+F) and the quick switcher open their existing overlays above the focused page;
   they do not leave Focus mode.
-- Commands that need hidden UI (Mod+\ sidebar, Mod+2 Global View, the toolbar/outline toggles)
-  leave Focus mode first, then do their job. Builder's call; the alternative of ignoring them was
-  judged more confusing.
+- Commands that need hidden UI (Mod+2 Global View, the toolbar/outline/line-number toggles)
+  leave Focus mode and do their job. Mod+\ only leaves Focus mode: the sidebar comes back as it
+  was (toggling it as well would hide a sidebar the user just asked to see; corrected while
+  planning).
 
 ## 7. Wording to update
 
@@ -171,6 +172,7 @@ fires resizes mid-way).
 - If full screen fails, Focus mode still works inside the window.
 - Existing overlays may be changed so their Escape never counts toward leaving.
 - Leaving always lands on the editor, never back on the Global View or the Bin.
-- Mod+\, Mod+2 and the toolbar/outline toggles leave Focus mode and then do their job.
+- Mod+2 and the toolbar/outline toggles leave Focus mode and do their job; Mod+\ only leaves.
+- macOS menu item is a plain toggle (no checkmark), matching the other View toggles there.
 - Page width follows the page's own setting; no special Focus width.
 - No Focus mode in the single-file window this round.
