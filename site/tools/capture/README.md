@@ -13,7 +13,7 @@ bare); those scenes are recorded in parts.
 
 ## Needs
 
-- `Xvfb`, `ffmpeg` (libx264, libvpx-vp9, libwebp), `dbus-run-session`
+- `Xvfb`, `ffmpeg` (libx264, libvpx-vp9), `cwebp` (posters), `dbus-run-session`
 - Python 3 with `python-xlib` and `Pillow` (a throwaway venv is fine)
 - For the voice scene: PipeWire (`pw-cli`, `pw-loopback`, `pw-cat`, `pw-link`) and its ALSA
   plugin. `fakemic.py` adds a virtual microphone fed with a synthetic, speech-like signal and a
