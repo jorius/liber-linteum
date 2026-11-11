@@ -17,6 +17,7 @@ import { PageHeading } from './PageHeading';
 import { RelatedChips } from './RelatedChips';
 import { WidthMenu } from './WidthMenu';
 import { isArchived } from '../../stores/tree';
+import { SaveStatus } from './SaveStatus';
 import { CursorPosition } from './CursorPosition';
 import { WordCount } from './WordCount';
 import styles from './PageView.module.css';
@@ -38,8 +39,6 @@ export function PageHeader({
   children?: ReactNode;
 }) {
   const { t } = useTranslation();
-  const status = useEditorStore((s) => s.status);
-  const copying = useEditorStore((s) => s.copying > 0);
   const hasDoc = useEditorStore((s) => s.doc !== null);
   const large = useEditorStore((s) => s.large);
   const toolbar = useSettingsStore((s) => s.settings.toolbar);
@@ -83,16 +82,7 @@ export function PageHeader({
             </div>
             <div className={styles.controls}>
               {addCover}
-              {hasDoc && (
-                <span
-                  role="status"
-                  aria-label={t('editor.saveStatus')}
-                  data-status={status}
-                  className={`${styles.status} ${styles.pill}`}
-                >
-                  {copying ? t('editor.copying') : t(`editor.${status}`)}
-                </span>
-              )}
+              {hasDoc && <SaveStatus />}
               {hasDoc && <WordCount />}
               {hasDoc && <CursorPosition />}
               {hasDoc && (
