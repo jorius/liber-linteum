@@ -6,6 +6,8 @@ What changed in each release of Liber Linteum. The format follows
 
 ## [Unreleased]
 
+## [0.1.4] - 2026-11-11
+
 ### Added
 
 - **Switch vaults from the Vault menu.** Vault → Switch Vault lists your recent
@@ -16,6 +18,12 @@ What changed in each release of Liber Linteum. The format follows
 
 - **Search opens over find in page.** With the find bar open, ⌘⇧F showed Search
   underneath it, so the bar covered the search field and its filters.
+
+### Security
+
+- **SQLite 3.54 for RUSTSEC-2026-0459.** Older SQLite could return
+  uninitialized memory when opening a database next to a write-ahead log that
+  someone else wrote. `rusqlite` 0.42 bundles the fixed version.
 
 ## [0.1.3] - 2026-11-02
 
