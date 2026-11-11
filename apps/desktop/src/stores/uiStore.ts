@@ -81,6 +81,9 @@ interface UiState {
   /** A quit came while a folder is being encrypted: the encrypt dialog asks
    *  "Quit anyway?" inside itself (a toast would sit under its backdrop). */
   quitAsked: boolean;
+  /** Focus mode (session only; `features/focus/focusMode.ts`). */
+  focus: boolean;
+  setFocus: (on: boolean) => void;
 }
 
 /** The voided-key prompt (or the new key made in its place), and a dialog
@@ -109,4 +112,6 @@ export const useUiStore = create<UiState>((set, get) => ({
   held: false,
   hold: (held) => set({ held }),
   quitAsked: false,
+  focus: false,
+  setFocus: (focus) => set({ focus }),
 }));

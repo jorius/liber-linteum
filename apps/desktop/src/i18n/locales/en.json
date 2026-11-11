@@ -1397,5 +1397,9 @@
     "close": "Close",
     "closeNamed": "Close {name}",
     "unsaved": "Unsaved changes"
+  },
+  "focus": {
+    "on": "Focus mode on. Press Escape twice to leave.",
+    "off": "Focus mode off."
   }
 }

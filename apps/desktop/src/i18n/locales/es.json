@@ -1397,5 +1397,9 @@
     "close": "Cerrar",
     "closeNamed": "Cerrar {name}",
     "unsaved": "Cambios sin guardar"
+  },
+  "focus": {
+    "on": "Modo concentración activado. Pulsa Escape dos veces para salir.",
+    "off": "Modo concentración desactivado."
   }
 }
