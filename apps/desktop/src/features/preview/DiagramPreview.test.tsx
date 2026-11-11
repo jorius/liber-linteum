@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { act, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it } from 'vitest';
 import { useUiStore } from '../../stores/uiStore';
@@ -51,6 +51,29 @@ describe('Part B: the diagram preview', () => {
     expect(percent()).not.toBe('100%');
     await userEvent.keyboard('0');
     expect(percent()).toBe('100%');
+  });
+
+  it("a WebKit pinch (gesture events) zooms and doesn't zoom the page", () => {
+    open();
+    const box = screen.getByRole('img', { name: 'Diagram' }).parentElement!;
+    const gesture = (type: string, scale: number) => {
+      const e = Object.assign(new Event(type, { cancelable: true }), {
+        scale,
+        clientX: 0,
+        clientY: 0,
+      });
+      act(() => void box.dispatchEvent(e));
+      return e;
+    };
+    expect(gesture('gesturestart', 1).defaultPrevented).toBe(true);
+    gesture('gesturechange', 2);
+    expect(percent()).toBe('200%');
+    gesture('gesturechange', 1.5);
+    expect(percent()).toBe('150%');
+    // A new pinch starts from the current zoom.
+    gesture('gesturestart', 1);
+    gesture('gesturechange', 2);
+    expect(percent()).toBe('300%');
   });
 
   it('Escape closes and gives the keyboard back to returnTo', async () => {

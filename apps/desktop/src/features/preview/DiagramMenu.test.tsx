@@ -74,7 +74,7 @@ describe('Part B: the right-click menu on diagrams and maths', () => {
     expect(screen.queryByRole('menu')).not.toBeInTheDocument();
   });
 
-  it('a right press on a diagram in the editor never reaches it (the drawing stays)', () => {
+  it('a right press on a diagram leaves the cursor (the drawing stays); a left press edits', () => {
     render(<DiagramMenuHost />);
     act(() => {
       view = new EditorView({
@@ -86,12 +86,11 @@ describe('Part B: the right-click menu on diagrams and maths', () => {
         }),
       });
     });
-    const seen: number[] = [];
-    view!.contentDOM.addEventListener('mousedown', (e) => seen.push(e.button));
     const diagram = view!.contentDOM.querySelector('[data-liber="diagram"]')!;
     fireEvent.mouseDown(diagram, { button: 2 });
+    expect(view!.state.selection.main.head).toBe(0);
     fireEvent.mouseDown(diagram, { button: 0 });
-    expect(seen).toEqual([0]);
+    expect(view!.state.selection.main.head).toBe(3); // the fence's start
   });
 
   it('right-click on block maths opens the menu', () => {

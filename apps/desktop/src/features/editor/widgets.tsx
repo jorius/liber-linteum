@@ -10,6 +10,8 @@ import { toggleTask } from '../../markdown/tasks';
 import { Preview } from '../preview/Preview';
 import { cellEnd } from './tableEdit';
 
+const MAC = /Mac/i.test(navigator.platform);
+
 /** Toggles the task whose list item starts at `at` in the editor's text (a
  *  rendered checkbox was clicked); a stale offset does nothing. */
 export function toggleTaskIn(view: EditorView, at: number): void {
@@ -41,6 +43,9 @@ export class PreviewWidget extends WidgetType {
     dom.className = 'cm-liber-widget';
     if (this.kind) dom.dataset.wideKind = this.kind;
     dom.addEventListener('mousedown', (e) => {
+      // Only a primary press edits: a right press (and Ctrl+click on macOS)
+      // opens a context menu over the drawing (Part B).
+      if (e.button !== 0 || (MAC && e.ctrlKey)) return;
       const target = e.target as HTMLElement;
       if (target.closest('a, button, input, audio, video, summary')) return;
       // A press on a table's scroll box itself, not a cell, is on its

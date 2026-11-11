@@ -61,8 +61,27 @@ export function DiagramPreview({
       const factor = Math.exp(-e.deltaY * 0.002);
       setView((v) => zoomAt(v, factor, e.clientX - r.left, e.clientY - r.top));
     };
+    // WebKit (WKWebView) may send a trackpad pinch as gesture events with a
+    // running scale instead; stopping them also keeps the webview from zooming.
+    type Gesture = Event & { scale: number; clientX: number; clientY: number };
+    let last = 1;
+    const onGesture = (e: Event) => {
+      const g = e as Gesture;
+      e.preventDefault();
+      if (e.type === 'gesturestart') last = 1;
+      const factor = g.scale / last;
+      last = g.scale;
+      const r = el.getBoundingClientRect();
+      setView((v) => zoomAt(v, factor, g.clientX - r.left, g.clientY - r.top));
+    };
     el.addEventListener('wheel', onWheel, { passive: false });
-    return () => el.removeEventListener('wheel', onWheel);
+    el.addEventListener('gesturestart', onGesture);
+    el.addEventListener('gesturechange', onGesture);
+    return () => {
+      el.removeEventListener('wheel', onWheel);
+      el.removeEventListener('gesturestart', onGesture);
+      el.removeEventListener('gesturechange', onGesture);
+    };
   }, []);
 
   const onKeyDown = (e: KeyboardEvent) => {
