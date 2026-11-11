@@ -919,7 +919,12 @@
     "newerMacos": "Este diagrama necesita una versión más reciente de macOS.",
     "menu": "Menú del diagrama",
     "preview": "Vista previa",
-    "editSource": "Editar código"
+    "editSource": "Editar código",
+    "previewTitle": "Vista previa del diagrama",
+    "previewLabel": "Diagrama",
+    "zoomIn": "Acercar",
+    "zoomOut": "Alejar",
+    "fit": "Ajustar"
   },
   "outline": {
     "title": "Esquema",

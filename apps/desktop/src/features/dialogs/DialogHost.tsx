@@ -2,6 +2,7 @@ import { useUiStore } from '../../stores/uiStore';
 import { BinClashDialog } from '../bin/BinClashDialog';
 import { IndexPickDialog } from '../global-view/IndexPickDialog';
 import { RelationsDialog } from '../global-view/RelationsDialog';
+import { DiagramPreview } from '../preview/DiagramPreview';
 import { SearchDialog } from '../search/SearchDialog';
 import { ConfirmDeleteDialog } from './ConfirmDeleteDialog';
 import { CreatePageDialog, OpenExternalDialog, OpenFileDialog } from './LinkDialogs';
@@ -62,6 +63,15 @@ export function DialogHost() {
           key={dialog.path}
           path={dialog.path}
           answer={dialog.answer}
+          onClose={close}
+        />
+      );
+    case 'diagramPreview':
+      return (
+        <DiagramPreview
+          html={dialog.html}
+          kind={dialog.kind}
+          returnTo={dialog.returnTo}
           onClose={close}
         />
       );

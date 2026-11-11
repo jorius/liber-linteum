@@ -1,7 +1,7 @@
 import { EditorView } from '@codemirror/view';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { openDiagramPreview } from './diagramPreview';
+import { openDiagramPreview } from './openDiagramPreview';
 import { PopupMenu } from './PopupMenu';
 
 /** The rendered diagram or block maths under `target`, in the editor or the
@@ -39,8 +39,17 @@ export function DiagramMenuHost() {
       e.stopPropagation();
       setMenu({ el, anchor: { x: e.clientX, y: e.clientY }, before: document.activeElement });
     };
+    // A right press would move the editor's cursor into the block, which then
+    // shows its source in place of the drawing before the menu event arrives.
+    const onDown = (e: MouseEvent) => {
+      if (e.button === 2 && diagramAt(e.target)?.closest('.cm-editor')) e.stopPropagation();
+    };
     document.addEventListener('contextmenu', onMenu, true);
-    return () => document.removeEventListener('contextmenu', onMenu, true);
+    document.addEventListener('mousedown', onDown, true);
+    return () => {
+      document.removeEventListener('contextmenu', onMenu, true);
+      document.removeEventListener('mousedown', onDown, true);
+    };
   }, []);
   const close = useRef(() => setMenu(null)).current;
   if (!menu) return null;

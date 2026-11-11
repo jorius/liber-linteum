@@ -74,6 +74,26 @@ describe('Part B: the right-click menu on diagrams and maths', () => {
     expect(screen.queryByRole('menu')).not.toBeInTheDocument();
   });
 
+  it('a right press on a diagram in the editor never reaches it (the drawing stays)', () => {
+    render(<DiagramMenuHost />);
+    act(() => {
+      view = new EditorView({
+        parent: document.body.appendChild(document.createElement('div')),
+        state: EditorState.create({
+          doc: 'x\n\n```mermaid\ngraph TD; A-->B\n```\n\nend\n',
+          selection: EditorSelection.cursor(0),
+          extensions: [livePreview(), pagePath.of(() => 'Notes/Page.md')],
+        }),
+      });
+    });
+    const seen: number[] = [];
+    view!.contentDOM.addEventListener('mousedown', (e) => seen.push(e.button));
+    const diagram = view!.contentDOM.querySelector('[data-liber="diagram"]')!;
+    fireEvent.mouseDown(diagram, { button: 2 });
+    fireEvent.mouseDown(diagram, { button: 0 });
+    expect(seen).toEqual([0]);
+  });
+
   it('right-click on block maths opens the menu', () => {
     render(inPreview(<div data-liber="math">x²</div>));
     fireEvent.contextMenu(screen.getByText('x²'));
