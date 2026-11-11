@@ -55,6 +55,9 @@ export type DialogState =
       /** Called once: keep both (true) or cancel (false). */
       answer: (keepBoth: boolean) => void;
     }
+  /** Zoom / pan a rendered diagram or block maths (`features/preview/diagramPreview.ts`);
+   *  `html`: its already-sanitised markup; `returnTo`: focus on close. */
+  | { type: 'diagramPreview'; html: string; kind: 'diagram' | 'math'; returnTo: HTMLElement | null }
   | null;
 
 export type UnsavedChoice = 'save' | 'discard' | 'cancel';

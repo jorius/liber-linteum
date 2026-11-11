@@ -916,7 +916,10 @@
   "diagram": {
     "label": "Diagram: {first}",
     "failed": "Diagram that couldn't be drawn",
-    "newerMacos": "This diagram needs a newer macOS."
+    "newerMacos": "This diagram needs a newer macOS.",
+    "menu": "Diagram menu",
+    "preview": "Preview",
+    "editSource": "Edit source"
   },
   "outline": {
     "title": "Outline",

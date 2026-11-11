@@ -21,6 +21,7 @@ import { Sidebar } from './Sidebar';
 import { useGlobalShortcuts } from './useGlobalShortcuts';
 import { useWindowTitle } from './useWindowTitle';
 import styles from './Shell.module.css';
+import { DiagramMenuHost } from '../preview/DiagramMenu';
 import { ImageMenuHost } from '../preview/ImageMenu';
 
 /** The open-vault layout (spec §3.4; M5b §2): the sidebar explorer (it
@@ -88,6 +89,7 @@ export function AppShell() {
       {menu && <ContextMenu menu={menu} onClose={closeMenu} />}
       <DialogHost />
       <ImageMenuHost />
+      <DiagramMenuHost />
     </div>
   );
 }

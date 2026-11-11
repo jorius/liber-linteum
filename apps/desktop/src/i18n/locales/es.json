@@ -916,7 +916,10 @@
   "diagram": {
     "label": "Diagrama: {first}",
     "failed": "Diagrama que no se pudo dibujar",
-    "newerMacos": "Este diagrama necesita una versión más reciente de macOS."
+    "newerMacos": "Este diagrama necesita una versión más reciente de macOS.",
+    "menu": "Menú del diagrama",
+    "preview": "Vista previa",
+    "editSource": "Editar código"
   },
   "outline": {
     "title": "Esquema",
