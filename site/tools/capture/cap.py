@@ -13,8 +13,11 @@ import signal
 import subprocess
 import time
 
-from Xlib import X, XK, display as xdisplay
-from Xlib.ext import xtest
+import sys
+
+if sys.platform != "darwin":  # mac.py drives the app there; this file still gives WORK and encode()
+    from Xlib import X, XK, display as xdisplay
+    from Xlib.ext import xtest
 
 DISPLAY = ":99"
 W, H, SCALE = 2304, 1440, 2
@@ -292,5 +295,13 @@ def encode(src, slug, out_dir, start=0.0, length=None):
         "-crf", "50", "-row-mt", "1", "-deadline", "good", "-cpu-used", "2", base + ".webm")
     run(*trim, "-i", src, "-an", "-vf", "scale=2304:-2,format=yuv420p", "-c:v", "libx264",
         "-crf", "26", "-preset", "slow", "-movflags", "+faststart", base + ".mp4")
-    run("-ss", str(start), "-i", src, "-frames:v", "1", "-vf", "scale=2304:-2", "-c:v", "libwebp",
-        "-quality", "78", base + ".poster.webp")
+    poster(src, start, 78, base + ".poster.webp")
+
+
+def poster(src, at, quality, dst):
+    """A WebP still at `at` seconds, by cwebp (Homebrew's ffmpeg has no libwebp)."""
+    png = dst + ".png"
+    subprocess.run(["ffmpeg", "-loglevel", "error", "-y", "-ss", str(at), "-i", src, "-frames:v", "1",
+                    "-vf", "scale=2304:-2", png], check=True)
+    subprocess.run(["cwebp", "-quiet", "-q", str(quality), png, "-o", dst], check=True)
+    os.remove(png)

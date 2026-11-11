@@ -7,7 +7,12 @@ import shutil
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from cap import WORK, Session  # noqa: E402
+from cap import WORK  # noqa: E402
+
+if sys.platform == "darwin":
+    from mac import Session  # noqa: E402
+else:
+    from cap import Session  # noqa: E402
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.normpath(os.path.join(HERE, "..", "..", ".."))
@@ -31,7 +36,8 @@ def settings(**over):
     with open(os.path.join(HERE, "settings.json")) as f:
         s = json.load(f)  # light, English, saffron, spell check off
     s["recentVaults"] = [
-        {"path": KESSARI, "name": "The Moons of Kessari", "openedAt": "2026-10-21T22:00:00Z"}
+        # realpath: on macOS /tmp is /private/tmp, and the app lists both otherwise
+        {"path": os.path.realpath(KESSARI), "name": "The Moons of Kessari", "openedAt": "2026-10-21T22:00:00Z"}
     ]
     s.update(over)
     return s
