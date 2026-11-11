@@ -2,6 +2,7 @@
 // `uiStore.focus`; this module enters and leaves it, and watches for the
 // things that end it (double Escape, leaving full screen, Global View, a
 // toolbar/outline/line-number toggle, the vault closing).
+import { completionStatus } from '@codemirror/autocomplete';
 import i18next from 'i18next';
 import { onWindowResized, windowFullscreen, windowSetFullscreen } from '../../ipc';
 import { usePageStore } from '../../stores/pageStore';
@@ -9,6 +10,7 @@ import { useSettingsStore } from '../../stores/settingsStore';
 import { useUiStore } from '../../stores/uiStore';
 import { useVaultStore } from '../../stores/vaultStore';
 import { announce } from '../editor/announce';
+import { currentView } from '../editor/viewUpdates';
 
 /** Two Escapes this close together leave Focus mode. */
 export const FOCUS_ESCAPE_MS = 500;
@@ -88,12 +90,17 @@ export function isFocusKey(e: KeyboardEvent, mac = MAC): boolean {
 export function installFocusMode(): () => void {
   let lastEscape = 0;
   let overlayOpen = false;
+  /** A completion query was still running (nothing shown yet): CodeMirror
+   *  takes the Escape that cancels it, but for the user it's a plain Escape. */
+  let pendingCompletion = false;
 
   // Captured first: by the bubble phase React has already removed the
   // overlay this Escape closed.
   const onCapture = (e: KeyboardEvent) => {
     if (e.key === 'Escape') {
       overlayOpen = !!document.querySelector(OVERLAYS) || useUiStore.getState().dialog !== null;
+      const view = currentView();
+      pendingCompletion = !!view?.hasFocus && completionStatus(view.state) === 'pending';
     } else if (isFocusKey(e) && !e.repeat) {
       e.preventDefault();
       void toggleFocus();
@@ -105,7 +112,7 @@ export function installFocusMode(): () => void {
       return;
     }
     if (!useUiStore.getState().focus) return;
-    if (overlayOpen || e.defaultPrevented) {
+    if (overlayOpen || (e.defaultPrevented && !pendingCompletion)) {
       lastEscape = 0;
       return;
     }
@@ -135,6 +142,8 @@ export function installFocusMode(): () => void {
     .catch(() => undefined);
 
   const unUi = useUiStore.subscribe((s) => {
+    // Custom title bar: `base.css` drops its height while focused.
+    document.documentElement.toggleAttribute('data-focus', s.focus);
     if (s.focus && s.screen !== 'edit') void leaveFocus();
   });
   const unSettings = useSettingsStore.subscribe(({ settings: a }, { settings: b }) => {
@@ -156,6 +165,7 @@ export function installFocusMode(): () => void {
     window.removeEventListener('keydown', onCapture, true);
     window.removeEventListener('keydown', onBubble);
     unUi();
+    document.documentElement.removeAttribute('data-focus');
     unSettings();
     unVault();
   };

@@ -24,6 +24,11 @@ html[data-titlebar] {
   --titlebar-height: 38px;
 }
 
+/* Focus mode hides the bar (its own space and popups' offset go with it). */
+html[data-titlebar][data-focus] {
+  --titlebar-height: 0px;
+}
+
 /* On #root, not body: dnd-kit measures drops against the body's box, and a
    padded body put every drop target the bar's height off. */
 html[data-titlebar] #root {

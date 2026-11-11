@@ -32,14 +32,11 @@ const enter = async (page: Page) => {
   await page.keyboard.press('ControlOrMeta+Alt+KeyZ');
   await expect(page.locator('[data-focus-strip]')).toBeVisible();
 };
-// Retried: right after typing, autocomplete's pending query takes the first
-// Escape (it closes the completion, so Focus mode doesn't count it).
-const leave = (page: Page) =>
-  expect(async () => {
-    await page.keyboard.press('Escape');
-    await page.keyboard.press('Escape');
-    await expect(page.locator('[data-focus-strip]')).toHaveCount(0, { timeout: 200 });
-  }).toPass();
+const leave = async (page: Page) => {
+  await page.keyboard.press('Escape');
+  await page.keyboard.press('Escape');
+  await expect(page.locator('[data-focus-strip]')).toHaveCount(0);
+};
 const title = (page: Page) => page.getByRole('textbox', { name: 'Page title' });
 const outline = (page: Page) => page.getByRole('complementary', { name: 'Outline' });
 
@@ -130,4 +127,24 @@ test('full screen', async ({ page }) => {
   await enter(page);
   await leave(page);
   expect(await full()).toBe(true);
+});
+
+test('double Escape right after typing leaves', async ({ page }) => {
+  await open(page, 'A');
+  await enter(page);
+  await page.keyboard.type('abc');
+  await leave(page);
+});
+
+test('no title bar space while focused', async ({ page }) => {
+  await open(page, 'A');
+  // The custom title bar's layout (Windows/Linux), forced on any platform.
+  await page.evaluate(() => document.documentElement.setAttribute('data-titlebar', ''));
+  const top = () =>
+    page.evaluate(() => getComputedStyle(document.getElementById('root')!).paddingTop);
+  expect(await top()).toBe('38px');
+  await enter(page);
+  expect(await top()).toBe('0px');
+  await leave(page);
+  expect(await top()).toBe('38px');
 });

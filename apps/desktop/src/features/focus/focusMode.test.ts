@@ -1,9 +1,12 @@
+import { autocompletion, startCompletion } from '@codemirror/autocomplete';
+import { EditorView } from '@codemirror/view';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { onWindowResized, settingsSet, windowFullscreen, windowSetFullscreen } from '../../ipc';
 import { usePageStore } from '../../stores/pageStore';
 import { DEFAULT_SETTINGS, useSettingsStore } from '../../stores/settingsStore';
 import { useUiStore } from '../../stores/uiStore';
 import { useVaultStore } from '../../stores/vaultStore';
+import { setCurrentView } from '../editor/viewUpdates';
 import { enterFocus, FOCUS_SETTLE_MS, installFocusMode, isFocusKey, leaveFocus } from './focusMode';
 
 vi.mock('../../ipc', async (importOriginal) => ({
@@ -137,6 +140,35 @@ describe('double Escape', () => {
     document.body.removeEventListener('keydown', close);
     key('Escape');
     expect(focused()).toBe(true);
+  });
+
+  it('an Escape that cancels a pending completion still counts', async () => {
+    // A query still running: nothing shown, but CodeMirror takes the Escape.
+    const view = new EditorView({
+      parent: document.body,
+      extensions: autocompletion({ override: [() => new Promise(() => undefined)] }),
+    });
+    setCurrentView(view);
+    view.focus();
+    startCompletion(view);
+    try {
+      key('Escape', view.contentDOM);
+      key('Escape', view.contentDOM);
+      await flush();
+      expect(focused()).toBe(false);
+    } finally {
+      setCurrentView(null);
+      view.destroy();
+    }
+  });
+});
+
+describe('the html attribute', () => {
+  it('marks <html> while focused, for the title bar height', async () => {
+    await enterFocus();
+    expect(document.documentElement).toHaveAttribute('data-focus');
+    await leaveFocus();
+    expect(document.documentElement).not.toHaveAttribute('data-focus');
   });
 });
 
