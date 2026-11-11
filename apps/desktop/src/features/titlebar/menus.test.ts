@@ -9,7 +9,7 @@ const ctx = (over: Partial<MenuContext> = {}): MenuContext => ({
   main: true,
   vaults: [],
   vault: { name: 'Kessari', root: '/v/kessari', encrypted: false, scratchpad: false },
-  toggles: { sidebar: true, toolbar: false, lineNumbers: true, outline: false },
+  toggles: { focus: false, sidebar: true, toolbar: false, lineNumbers: true, outline: false },
   maximized: false,
   windows: false,
   ...over,
@@ -98,6 +98,18 @@ describe('the drawn menu bar (custom title bar §3)', () => {
     expect(find(ctx({ maximized: true }), 'maximize').label).toBe('Restore');
     expect(find(ctx(), 'redo').keys).toBe('Mod+Shift+Z');
     expect(find(ctx({ windows: true }), 'redo').keys).toBe('Mod+Y');
+  });
+
+  it('View lists Focus mode before Full screen, checked when focused', () => {
+    const view = buildMenus(t, ctx({ toggles: { ...ctx().toggles, focus: true } })).find(
+      (m) => m.key === 'view',
+    )!;
+    const keys = view.items.map((i) => i.key);
+    expect(keys.indexOf('focus')).toBeGreaterThan(-1);
+    expect(keys.indexOf('focus')).toBeLessThan(keys.indexOf('fullscreen'));
+    const focus = view.items.find((i) => i.key === 'focus') as MenuItemEntry;
+    expect(focus).toMatchObject({ id: 'liber-toggle-focus', keys: 'Alt+Mod+Z', checked: true });
+    expect(find(ctx({ vault: null }), 'focus').disabled).toBe(true);
   });
 
   it('cuts long vault names as the macOS menu does', () => {

@@ -1430,6 +1430,9 @@ export const onMenuSave = (cb: () => void): Promise<UnlistenFn> =>
 /** View → Toggle Sidebar (M5b §2.5). */
 export const onMenuSidebar = (cb: () => void): Promise<UnlistenFn> =>
   listen<null>('menu:sidebar', () => cb(), mine());
+/** View → Toggle Focus Mode. */
+export const onMenuFocus = (cb: () => void): Promise<UnlistenFn> =>
+  listen<null>('menu:focus', () => cb(), mine());
 export const onVaultLocked = (cb: (path: string) => void): Promise<UnlistenFn> =>
   listen<VaultLockedPayload>('vault:locked', (e) => cb(e.payload.path), mine());
 export const onLockRequest = (

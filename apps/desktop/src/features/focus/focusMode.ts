@@ -4,7 +4,7 @@
 // toolbar/outline/line-number toggle, the vault closing).
 import { completionStatus } from '@codemirror/autocomplete';
 import i18next from 'i18next';
-import { onWindowResized, windowFullscreen, windowSetFullscreen } from '../../ipc';
+import { isTauri, onMenuFocus, onWindowResized, windowFullscreen, windowSetFullscreen } from '../../ipc';
 import { usePageStore } from '../../stores/pageStore';
 import { useSettingsStore } from '../../stores/settingsStore';
 import { useUiStore } from '../../stores/uiStore';
@@ -141,6 +141,13 @@ export function installFocusMode(): () => void {
     .then((un) => (gone ? un() : (unlistenResize = un)))
     .catch(() => undefined);
 
+  let unlistenMenu: (() => void) | null = null;
+  if (isTauri()) {
+    void onMenuFocus(() => void toggleFocus())
+      .then((un) => (gone ? un() : (unlistenMenu = un)))
+      .catch(() => undefined);
+  }
+
   const unUi = useUiStore.subscribe((s) => {
     // Custom title bar: `base.css` drops its height while focused.
     document.documentElement.toggleAttribute('data-focus', s.focus);
@@ -162,6 +169,7 @@ export function installFocusMode(): () => void {
   return () => {
     gone = true;
     unlistenResize?.();
+    unlistenMenu?.();
     window.removeEventListener('keydown', onCapture, true);
     window.removeEventListener('keydown', onBubble);
     unUi();

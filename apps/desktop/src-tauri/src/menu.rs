@@ -261,6 +261,9 @@ pub const SAVE_EVENT: &str = "menu:save";
 /// View → Toggle Sidebar (M5b §2.5): the main window's sidebar.
 pub const SIDEBAR_ID: &str = "liber-toggle-sidebar";
 pub const SIDEBAR_EVENT: &str = "menu:sidebar";
+/// View → Toggle Focus Mode: the page handles ⌥⌘Z, as with the sidebar.
+pub const FOCUS_ID: &str = "liber-toggle-focus";
+pub const FOCUS_EVENT: &str = "menu:focus";
 
 /// The app menu: About, Settings… (M5b §2.1), Services, Hide, Hide Others,
 /// Show All, Quit (ours); Vault (Open Vault…, Close Vault ⌥⌘W, M5b §2.1);
@@ -451,6 +454,7 @@ pub fn app_menu<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
     let outline = MenuItem::with_id(app, OUTLINE_ID, "Toggle Outline", true, None::<&str>)?;
     // No accelerator: the page handles ⌘\, and a toggle fired twice undoes itself.
     let sidebar = MenuItem::with_id(app, SIDEBAR_ID, "Toggle Sidebar", true, None::<&str>)?;
+    let focus = MenuItem::with_id(app, FOCUS_ID, "Toggle Focus Mode", true, None::<&str>)?;
     let view = Submenu::with_items(
         app,
         "View",
@@ -470,6 +474,7 @@ pub fn app_menu<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
             &line_numbers,
             &outline,
             &PredefinedMenuItem::separator(app)?,
+            &focus,
             &PredefinedMenuItem::fullscreen(app, None)?,
         ],
     )?;
@@ -570,6 +575,8 @@ fn activate<R: Runtime>(app: &AppHandle<R>, id: &str, target: Option<String>) {
         emit_main(app, VAULT_EVENT, format!("switch:{path}"));
     } else if id == SIDEBAR_ID {
         emit_main(app, SIDEBAR_EVENT, ());
+    } else if id == FOCUS_ID {
+        emit_main(app, FOCUS_EVENT, ());
     }
 }
 

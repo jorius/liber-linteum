@@ -112,6 +112,7 @@ export function TitleBar({ main }: { main: boolean }) {
         : null,
     vaults,
     toggles: {
+      focus,
       sidebar: !settings.sidebarCollapsed,
       toolbar: settings.toolbar,
       lineNumbers: settings.lineNumbers,

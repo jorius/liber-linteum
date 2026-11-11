@@ -51,7 +51,7 @@ export interface MenuContext {
   vault: { name: string; root: string; encrypted: boolean; scratchpad: boolean } | null;
   /** The vaults Vault → Switch Vault lists (the recent ones). */
   vaults: { path: string; name: string }[];
-  toggles: { sidebar: boolean; toolbar: boolean; lineNumbers: boolean; outline: boolean };
+  toggles: { focus: boolean; sidebar: boolean; toolbar: boolean; lineNumbers: boolean; outline: boolean };
   maximized: boolean;
   /** Windows writes redo as Ctrl+Y; Linux as Ctrl+Shift+Z. */
   windows: boolean;
@@ -196,6 +196,12 @@ export function buildMenus(t: TFunction, ctx: MenuContext): MenuDef[] {
           }),
           ...toggleItems,
           sep('s4'),
+          item('focus', {
+            id: 'liber-toggle-focus',
+            keys: 'Alt+Mod+Z',
+            checked: toggles.focus,
+            disabled: !open,
+          }),
           item('fullscreen', { action: 'fullscreen', keys: 'F11' }),
         ]
       : [...toggleItems, sep('s1'), item('fullscreen', { action: 'fullscreen', keys: 'F11' })],
