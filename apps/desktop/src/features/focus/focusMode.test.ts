@@ -24,8 +24,11 @@ const flush = () => vi.advanceTimersByTimeAsync(0);
 const key = (k: string, target: EventTarget = document.body) =>
   target.dispatchEvent(new KeyboardEvent('keydown', { key: k, bubbles: true, cancelable: true }));
 
+// Settling is module state: each test starts past the last one's settling.
+let clock = 1_000_000;
+
 beforeEach(() => {
-  vi.useFakeTimers();
+  vi.useFakeTimers({ now: clock });
   fullscreen.mockResolvedValue({ ok: true, value: false });
   setFullscreen.mockResolvedValue({ ok: true, value: undefined });
   vi.mocked(onWindowResized).mockImplementation(async (cb) => {
@@ -47,6 +50,7 @@ afterEach(async () => {
   await leaveFocus();
   uninstall();
   vi.clearAllMocks();
+  clock = Date.now() + FOCUS_SETTLE_MS;
   vi.useRealTimers();
 });
 
@@ -146,6 +150,19 @@ describe('watchers', () => {
     resized();
     await flush();
     expect(focused()).toBe(false);
+  });
+
+  it("a re-enter during its leave's settling isn't ended by that leave's resize", async () => {
+    await enterFocus();
+    await vi.advanceTimersByTimeAsync(FOCUS_SETTLE_MS);
+    await leaveFocus();
+    await vi.advanceTimersByTimeAsync(300);
+    fullscreen.mockResolvedValue({ ok: true, value: true }); // still animating out
+    await enterFocus();
+    fullscreen.mockResolvedValue({ ok: true, value: false });
+    resized();
+    await flush();
+    expect(focused()).toBe(true);
   });
 
   it('leaving full screen yourself leaves Focus mode', async () => {

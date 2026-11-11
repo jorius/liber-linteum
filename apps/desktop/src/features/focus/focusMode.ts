@@ -46,7 +46,6 @@ export async function enterFocus(): Promise<void> {
     if (ui.screen !== 'edit') ui.setScreen('edit');
     const full = await windowFullscreen();
     enteredFullscreen = false;
-    settleUntil = 0;
     watchFullscreen = full.ok && full.value;
     // An unreadable state is left alone: Focus mode still works in the window.
     if (full.ok && !full.value) {
