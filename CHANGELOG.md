@@ -6,6 +6,17 @@ What changed in each release of Liber Linteum. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- **Switch vaults from the Vault menu.** Vault → Switch Vault lists your recent
+  vaults with a check on the open one; choosing another opens it in the window.
+  On Linux and Windows the vaults are listed under Open Vault… in the same menu.
+
+### Fixed
+
+- **Search opens over find in page.** With the find bar open, ⌘⇧F showed Search
+  underneath it, so the bar covered the search field and its filters.
+
 ## [0.1.3] - 2026-11-02
 
 ### Fixed

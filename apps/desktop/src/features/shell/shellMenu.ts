@@ -2,11 +2,13 @@
 // same actions for the vault menu and the shortcuts.
 import {
   isTauri,
+  menuSetVaults,
   onMenuSave,
   onMenuSettings,
   onMenuSidebar,
   onMenuVault,
   pickFolder,
+  vaultsRecent,
 } from '../../ipc';
 import { openNewVault } from '../encryption/CreateEncryptedHost';
 import { openDecryptInPlace } from '../encryption/decryptInPlace';
@@ -45,6 +47,29 @@ export const encryptThisVault = () => {
  *  encrypted vault, where it is (encryption UX §10.1). */
 export const decryptThisVault = () => openDecryptInPlace();
 
+/** The vaults Vault → Switch Vault offers: the recent ones that can open. */
+export async function vaultChoices(): Promise<{ path: string; name: string }[]> {
+  const res = await vaultsRecent();
+  return (res.ok ? res.value : [])?.filter((v) => !v.scratchpad && !v.missing) ?? [];
+}
+
+/** Vault → Switch Vault → a vault: opens it in this window (not the open one). */
+export const switchVault = (path: string) => {
+  if (refuseWhileConverting() || useVaultStore.getState().info?.root === path) return;
+  void useVaultStore.getState().open(path);
+};
+
+/** Keeps the macOS Switch Vault submenu at the recent vaults, as vaults open. */
+function syncVaultChoices(): () => void {
+  let last: string | null | undefined;
+  return useVaultStore.subscribe((s) => {
+    const root = s.status === 'open' ? (s.info?.root ?? null) : null;
+    if (root === last) return;
+    last = root;
+    void vaultChoices().then((v) => menuSetVaults(v, root));
+  });
+}
+
 export const closeVault = () => void useVaultStore.getState().close();
 
 export const toggleSidebar = () => {
@@ -82,12 +107,17 @@ export async function installShellMenu({ main }: { main: boolean }): Promise<() 
             else if (what === 'encrypt') encryptThisVault();
             else if (what === 'decrypt') decryptThisVault();
             else if (what === 'lock') void useVaultStore.getState().lock('menu');
+            else if (what.startsWith('switch:')) switchVault(what.slice('switch:'.length));
           }),
           onMenuSidebar(toggleSidebar),
         ]
       : []),
   ]);
-  return () => stops.forEach((stop) => stop());
+  const unsync = main ? syncVaultChoices() : () => undefined;
+  return () => {
+    unsync();
+    stops.forEach((stop) => stop());
+  };
 }
 
 export function installShellMenuIfTauri(main: boolean): void {

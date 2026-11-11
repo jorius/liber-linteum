@@ -142,6 +142,8 @@ const findTheme = EditorView.theme({
     backgroundColor: 'var(--color-surface)',
     color: 'var(--color-text)',
     fontFamily: 'var(--font-body)',
+    // CodeMirror's 300 sat over the dialogs' backdrop (40), Search's included.
+    zIndex: '30',
   },
   // Inset by the editor's focus ring (Editor.module.css), which it would cover.
   '.cm-panels.cm-panels-top': {

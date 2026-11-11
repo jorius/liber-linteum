@@ -145,6 +145,7 @@ const COMMANDS: &[&str] = &[
     // Encryption UX round: the New vault dialog and Vault → Encrypt (main window only).
     "folder_kind",
     "menu_set_encrypt_item",
+    "menu_set_vaults",
     // Encrypt in place (encryption UX §4.3, §8; main window only).
     "vault_encrypt_preflight",
     "vault_encrypt_begin",

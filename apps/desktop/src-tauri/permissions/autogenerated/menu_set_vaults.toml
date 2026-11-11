@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-menu-set-vaults"
+description = "Enables the menu_set_vaults command without any pre-configured scope."
+commands.allow = ["menu_set_vaults"]
+
+[[permission]]
+identifier = "deny-menu-set-vaults"
+description = "Denies the menu_set_vaults command without any pre-configured scope."
+commands.deny = ["menu_set_vaults"]

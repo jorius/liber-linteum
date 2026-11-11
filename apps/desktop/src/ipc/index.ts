@@ -869,6 +869,9 @@ export const menuSetLockEnabled = (enabled: boolean) =>
   call<void>('menu_set_lock_enabled', { enabled });
 /** Vault → Encrypt "<vault>"… (UX round §4.1): named and on for an open plain
  *  vault, off with `null`. */
+/** Vault → Switch Vault (macOS): the vaults listed, a check on `current`. */
+export const menuSetVaults = (vaults: { path: string; name: string }[], current: string | null) =>
+  call<void>('menu_set_vaults', { vaults, current });
 export const menuSetEncryptItem = (vault: string | null) =>
   call<void>('menu_set_encrypt_item', { vault });
 /** Vault → Decrypt "<vault>"… (§10.1): named and on for an open encrypted
