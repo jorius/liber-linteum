@@ -843,8 +843,7 @@ export const windowToggleMaximize = () => call<boolean>('window_toggle_maximize'
 export const windowMaximized = () => call<boolean>('window_maximized');
 export const windowToggleFullscreen = () => call<void>('window_toggle_fullscreen');
 export const windowFullscreen = () => call<boolean>('window_fullscreen');
-export const windowSetFullscreen = (full: boolean) =>
-  call<void>('window_set_fullscreen', { full });
+export const windowSetFullscreen = (full: boolean) => call<void>('window_set_fullscreen', { full });
 /** Moves the window with the pointer (a press on the title bar). */
 export const windowStartDrag = () => call<void>('window_start_drag');
 /** A close request, as the system's close button sends: the page saves first. */
