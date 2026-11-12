@@ -61,9 +61,11 @@ dependencies.
 </tr>
 </table>
 
-Also: quick notes from anywhere (Ctrl+Shift+N) · find and replace in the page, go to line ·
-palettes, light and dark · Trash and Archive · spell check in English and Spanish, offline ·
-single `.md`/`.txt` files in a window of their own · a home page per vault.
+Also: Focus mode, just the words in full screen (Ctrl+Alt+Z) · quick notes from anywhere
+(Ctrl+Shift+N) · find and replace in the page, go to line · palettes, light and dark
+(Ctrl+Alt+N swaps them) · a zoomable preview of diagrams and maths · Trash and Archive · spell
+check in English and Spanish, offline · single `.md`/`.txt` files in a window of their own · a
+home page per vault.
 
 The clips play on the [website](https://jorius.github.io/liber-linteum/#features).
 
@@ -92,9 +94,9 @@ to import. Unzip it and choose **Open folder as vault**. It's also in
 
 ## Roadmap
 
-Planned after the first release (no dates, no promises): version history, a slash menu, focus
-mode, offline transcription of voice clips, and handwritten notes (write with a pen or tablet,
-keep the handwriting and get its text as Markdown, recognised offline). Ideas are welcome in
+Planned after the first release (no dates, no promises): version history, a slash menu,
+offline transcription of voice clips, and handwritten notes (write with a pen or tablet, keep
+the handwriting and get its text as Markdown, recognised offline). Ideas are welcome in
 the [issues](https://github.com/jorius/liber-linteum/issues).
 
 ## Build it yourself
