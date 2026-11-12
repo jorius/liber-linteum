@@ -106,10 +106,9 @@ export function DiagramPreview({
       onClose={onClose}
       returnFocus={() => returnTo}
       dismissible
-      wide
-    >
-      <div className={styles.body} onKeyDown={onKeyDown}>
-        <div className={styles.toolbar}>
+      fill
+      badge={
+        <div className={styles.toolbar} onKeyDown={onKeyDown}>
           <button
             type="button"
             className="btn btn-secondary"
@@ -131,11 +130,18 @@ export function DiagramPreview({
             {t('diagram.fit')}
           </button>
         </div>
+      }
+    >
+      <div className={styles.body} onKeyDown={onKeyDown}>
         <div
           ref={box}
           className={styles.viewport}
           tabIndex={0}
           data-autofocus
+          // WebKit rings the focus the dialog gives it on open, even after a
+          // click: show the ring only once the keyboard is used here.
+          onKeyUp={(e) => (e.currentTarget.dataset.keys = '')}
+          onBlur={(e) => delete e.currentTarget.dataset.keys}
           onPointerDown={(e) => {
             if (e.button !== 0) return;
             e.currentTarget.setPointerCapture(e.pointerId);

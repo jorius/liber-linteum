@@ -136,6 +136,13 @@
   box-shadow: inset 0 0 0 2px var(--color-focus);
 }
 
+/* Focus mode: the editor is the whole screen and the caret shows where the
+   keyboard is; the ring would only frame the screen's edges. */
+:global(html[data-focus]) .live:focus-within,
+:global(html[data-focus]) .source:focus-within {
+  box-shadow: none;
+}
+
 .pane {
   /* The block gutter (M4 §4) is placed in the pane's scroll coordinates. */
   position: relative;

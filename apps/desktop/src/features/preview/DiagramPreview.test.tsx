@@ -32,6 +32,17 @@ describe('Part B: the diagram preview', () => {
     expect(layer).toHaveTextContent('Start');
   });
 
+  it('rings the drawing only once the keyboard is used there', async () => {
+    open();
+    const viewport = screen.getByRole('img', { name: 'Diagram' }).parentElement!;
+    expect(viewport).toHaveFocus();
+    expect(viewport.dataset.keys).toBeUndefined();
+    await userEvent.keyboard('+');
+    expect(viewport.dataset.keys).toBe('');
+    act(() => viewport.blur());
+    expect(viewport.dataset.keys).toBeUndefined();
+  });
+
   it('+ and − change the percentage', async () => {
     open();
     expect(percent()).toBe('100%');

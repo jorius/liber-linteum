@@ -63,6 +63,18 @@ test('Preview zooms with the wheel, pans with a drag, closes on Escape', async (
   const box = (await layer(page).boundingBox())!;
   // Opens fitted: the whole drawing, at its natural size, inside the viewport.
   const frame = (await layer(page).locator('..').boundingBox())!;
+  // The dialog takes nearly the whole window (1280 × 900), not a fixed box.
+  const shell = (await dialog(page).boundingBox())!;
+  expect(shell.width).toBeGreaterThan(1150);
+  expect(shell.height).toBeGreaterThan(780);
+  expect(frame.height).toBeGreaterThan(600);
+  // Opened with the mouse: the drawing has the keyboard but no focus ring.
+  const ring = () =>
+    layer(page)
+      .locator('..')
+      .evaluate((el) => getComputedStyle(el).outlineStyle);
+  await expect(layer(page).locator('..')).toBeFocused();
+  expect(await ring()).toBe('none');
   expect(box.width).toBeGreaterThan(50);
   expect(box.x).toBeGreaterThanOrEqual(frame.x);
   expect(box.y).toBeGreaterThanOrEqual(frame.y);

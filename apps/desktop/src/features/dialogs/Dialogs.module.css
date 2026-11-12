@@ -28,6 +28,13 @@
   width: min(780px, calc(100% - 32px));
 }
 
+/* The diagram preview: as much room as the window gives. */
+.fill {
+  width: calc(100% - 64px);
+  height: calc(100% - 64px);
+  overflow: hidden;
+}
+
 /* Search lays out its own regions, which scroll (M5b §7.1): the box never
    does, so no engine can shrink the filters under the results. */
 .bare {

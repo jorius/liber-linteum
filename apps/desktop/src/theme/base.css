@@ -129,6 +129,9 @@ body {
 /* Text for screen readers only (live regions made outside React). */
 .liber-sr-only {
   position: absolute;
+  /* Left where it falls, it sits under the full-height app and scrolls the window. */
+  top: 0;
+  left: 0;
   width: 1px;
   height: 1px;
   overflow: hidden;
