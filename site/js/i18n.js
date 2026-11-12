@@ -137,7 +137,8 @@ export const dict = {
     'features.mini.find.title': 'Find in the page',
     'features.mini.find.body': 'Ctrl+F finds and replaces in the page; Ctrl+G jumps to a line.',
     'features.mini.colours.title': 'Your colours',
-    'features.mini.colours.body': 'Palettes, light and dark, or a theme of your own.',
+    'features.mini.colours.body':
+      'Palettes, light and dark (Ctrl+Alt+N swaps them), or a theme of your own.',
     'features.mini.trash.title': 'Trash & Archive',
     'features.mini.trash.body': 'Nothing is lost by a slip; archive what’s done.',
     'features.mini.spell.title': 'Spell check',
@@ -146,6 +147,9 @@ export const dict = {
     'features.mini.single.body': 'Open any .md or .txt file in a window of its own.',
     'features.mini.lang.title': 'English · Español',
     'features.mini.lang.body': 'The whole app, in both languages.',
+    'features.mini.focus.title': 'Focus mode',
+    'features.mini.focus.body':
+      'Ctrl+Alt+Z: full screen, just the words, the word count and whether it’s saved.',
 
     'privacy.lead':
       'No cloud, no accounts, no telemetry, and they aren’t settings. The app is built so it can’t: network access is blocked by its security policy, refused by its permissions, banned in its code and kept out of its dependencies.',
@@ -211,9 +215,6 @@ export const dict = {
     'roadmap.slash.title': 'Slash menu',
     'roadmap.slash.body':
       'Type / at the start of a line to insert a heading, list, table, callout, code block, diagram or image without leaving the keyboard.',
-    'roadmap.focus.title': 'Focus mode',
-    'roadmap.focus.body':
-      'Hide everything but the text: no sidebar, no toolbar, just the words, the word count and whether it’s saved.',
     'roadmap.transcribe.title': 'Offline transcription',
     'roadmap.transcribe.body':
       'Turn a voice clip into text with a speech model that runs on your machine: the audio never leaves it.',
@@ -373,7 +374,8 @@ export const dict = {
     'features.mini.find.title': 'Buscar en la página',
     'features.mini.find.body': 'Ctrl+F busca y reemplaza en la página; Ctrl+G salta a una línea.',
     'features.mini.colours.title': 'Tus colores',
-    'features.mini.colours.body': 'Paletas, modo claro y oscuro, o un tema propio.',
+    'features.mini.colours.body':
+      'Paletas, modo claro y oscuro (Ctrl+Alt+N los alterna), o un tema propio.',
     'features.mini.trash.title': 'Papelera y Archivo',
     'features.mini.trash.body': 'Nada se pierde por un descuido; archiva lo que ya terminaste.',
     'features.mini.spell.title': 'Corrector ortográfico',
@@ -382,6 +384,9 @@ export const dict = {
     'features.mini.single.body': 'Abre cualquier .md o .txt en su propia ventana.',
     'features.mini.lang.title': 'English · Español',
     'features.mini.lang.body': 'Toda la app, en los dos idiomas.',
+    'features.mini.focus.title': 'Modo concentración',
+    'features.mini.focus.body':
+      'Ctrl+Alt+Z: pantalla completa, solo las palabras, cuántas son y si está guardado.',
 
     'privacy.lead':
       'Sin nube, sin cuentas, sin telemetría, y no son ajustes. La app está hecha para que no pueda: su política de seguridad bloquea la red, sus permisos la niegan, su código la prohíbe y sus dependencias no la incluyen.',
@@ -447,9 +452,6 @@ export const dict = {
     'roadmap.slash.title': 'Menú de barra (/)',
     'roadmap.slash.body':
       'Escribe / al inicio de una línea para insertar un título, una lista, una tabla, un aviso, un bloque de código, un diagrama o una imagen sin soltar el teclado.',
-    'roadmap.focus.title': 'Modo concentración',
-    'roadmap.focus.body':
-      'Oculta todo menos el texto: sin barra lateral ni barra de herramientas, solo tus palabras, el recuento y si está guardado.',
     'roadmap.transcribe.title': 'Transcripción sin conexión',
     'roadmap.transcribe.body':
       'Convierte un clip de voz en texto con un modelo de voz que corre en tu equipo: el audio nunca sale de él.',

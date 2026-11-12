@@ -6,6 +6,29 @@ What changed in each release of Liber Linteum. The format follows
 
 ## [Unreleased]
 
+## [0.1.5] - 2026-11-12
+
+### Added
+
+- **Focus mode.** View → Focus mode, or ⌥⌘Z (Alt+Ctrl+Z on Linux and Windows),
+  turns the window into just the page's text: full screen, in Live Preview, with
+  the sidebar, header, toolbar and outline out of the way. A quiet strip at the
+  bottom shows the word count and reading time, whether the page is saved, a way
+  back along the links you followed, and a light / dark switch. Links, search
+  and the quick switcher keep you in it; press Escape twice, or the shortcut
+  again, to come back to everything as it was.
+- **Diagram preview.** Right-click a Mermaid diagram or a block of maths and
+  choose Preview to see it as large as the window allows: zoom with the buttons,
+  the + and − keys, ⌘ + scroll or a trackpad pinch, and drag to move around. A
+  normal click still edits the source.
+- **Night mode.** ⌥⌘N (Alt+Ctrl+N), View → Toggle Dark Mode, or the button in
+  the Focus mode strip swaps between the light and dark theme, and remembers it.
+
+### Fixed
+
+- **No second scroll bar.** After the first screen-reader announcement, the
+  window could grow a scroll bar of its own beside the page's.
+
 ## [0.1.4] - 2026-11-11
 
 ### Added
@@ -147,7 +170,9 @@ network requests at all.
   and Archive, offline spell check in English and Spanish, a home page per
   vault.
 
-[Unreleased]: https://github.com/jorius/liber-linteum/compare/v0.1.3...HEAD
+[Unreleased]: https://github.com/jorius/liber-linteum/compare/v0.1.5...HEAD
+[0.1.5]: https://github.com/jorius/liber-linteum/compare/v0.1.4...v0.1.5
+[0.1.4]: https://github.com/jorius/liber-linteum/compare/v0.1.3...v0.1.4
 [0.1.3]: https://github.com/jorius/liber-linteum/compare/v0.1.2...v0.1.3
 [0.1.2]: https://github.com/jorius/liber-linteum/compare/v0.1.1...v0.1.2
 [0.1.1]: https://github.com/jorius/liber-linteum/compare/v0.1.0...v0.1.1
