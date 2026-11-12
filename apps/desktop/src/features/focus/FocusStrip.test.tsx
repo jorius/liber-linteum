@@ -1,7 +1,9 @@
 import { act, render, screen } from '@testing-library/react';
 import { cleanup } from '@testing-library/react';
 import { afterEach, describe, expect, it } from 'vitest';
-import { clearMocks } from '../../ipc/testing';
+import userEvent from '@testing-library/user-event';
+import { clearMocks, mockIPC } from '../../ipc/testing';
+import { DEFAULT_SETTINGS, useSettingsStore } from '../../stores/settingsStore';
 import { useEditorStore } from '../../stores/editorStore';
 import { usePageStore } from '../../stores/pageStore';
 import { useTrailStore } from '../../stores/trailStore';
@@ -53,14 +55,30 @@ describe('FocusStrip', () => {
     expect(screen.getByRole('status')).toHaveTextContent('Saved');
   });
 
-  it('shows only the back arrow for an image', () => {
+  it('shows only the back arrow and light / dark for an image', () => {
     usePageStore.setState({ state: 'ready', path: 'pic.png' });
     useTrailStore.setState({ back: [{ path: 'B.md' }] as never });
     useUiStore.setState({ focus: true });
     render(<FocusStrip />);
     const strip = document.querySelector('[data-focus-strip]')!;
-    expect(strip.querySelectorAll('button')).toHaveLength(1);
+    expect(strip.querySelectorAll('button')).toHaveLength(2);
     expect(screen.getByRole('button', { name: /B/ })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Switch to dark mode' })).toBeInTheDocument();
     expect(screen.queryByRole('status')).toBeNull();
+  });
+
+  it('the night button swaps light and dark and says what it will do', async () => {
+    mockIPC((cmd, raw) =>
+      cmd === 'settings_set'
+        ? { ...useSettingsStore.getState().settings, ...(raw as { patch: object }).patch }
+        : null,
+    );
+    useSettingsStore.setState({ settings: { ...DEFAULT_SETTINGS, theme: 'light' } });
+    usePageStore.setState({ state: 'ready', path: 'pic.png' });
+    useUiStore.setState({ focus: true });
+    render(<FocusStrip />);
+    await userEvent.click(screen.getByRole('button', { name: 'Switch to dark mode' }));
+    expect(await screen.findByRole('button', { name: 'Switch to light mode' })).toBeInTheDocument();
+    expect(useSettingsStore.getState().settings.theme).toBe('dark');
   });
 });

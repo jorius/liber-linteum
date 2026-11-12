@@ -60,6 +60,12 @@ test('hides everything but the text', async ({ page }) => {
   await expect(strip).toContainText('words');
   await expect(strip).toContainText('Saved');
   await expect(page.getByRole('region', { name: 'Preview' })).toHaveCount(0);
+  // Only the editor scrolls: the announcer's live region once pushed the
+  // window 1 px taller and gave it a second scroll bar.
+  await expect(page.locator('[data-liber-status]')).toHaveCount(1);
+  expect(
+    await page.evaluate(() => document.documentElement.scrollHeight <= window.innerHeight),
+  ).toBe(true);
   expect(errors).toEqual([]);
 });
 
@@ -240,4 +246,47 @@ test('Tab from the editor reaches the strip controls', async ({ page }) => {
   await expect(
     page.locator('[data-focus-strip]').getByRole('button', { name: 'Back to A' }),
   ).toBeFocused();
+});
+
+test('⌥⌘N swaps light and dark outside Focus mode, and saves it', async ({ page }) => {
+  const errors = await open(page, 'A', { theme: 'light' });
+  const theme = () => page.evaluate(() => document.documentElement.dataset.theme);
+  expect(await theme()).toBe('light');
+  await page.locator('.cm-content').first().click();
+  await page.keyboard.press('ControlOrMeta+Alt+KeyN');
+  await expect.poll(theme).toBe('dark');
+  await page.keyboard.press('ControlOrMeta+Alt+KeyN');
+  await expect.poll(theme).toBe('light');
+  const patches = await page.evaluate(
+    () => (window as unknown as { __liberSettingsPatches: object[] }).__liberSettingsPatches,
+  );
+  expect(patches).toContainEqual({ theme: 'dark' });
+  expect(errors).toEqual([]);
+});
+
+test('the strip swaps light and dark without leaving Focus mode', async ({ page }) => {
+  const errors = await open(page, 'A', { theme: 'light' });
+  const theme = () => page.evaluate(() => document.documentElement.dataset.theme);
+  await enter(page);
+  await page.getByRole('button', { name: 'Switch to dark mode' }).click();
+  await expect.poll(theme).toBe('dark');
+  await expect(page.locator('[data-focus-strip]')).toBeVisible();
+  await page.getByRole('button', { name: 'Switch to light mode' }).click();
+  await expect.poll(theme).toBe('light');
+  expect(errors).toEqual([]);
+});
+
+test('no focus ring frames the screen while typing in Focus mode', async ({ page }) => {
+  await open(page, 'A', { theme: 'dark' });
+  const ring = () =>
+    page.evaluate(() => {
+      const pane = document.querySelector('.cm-editor.cm-focused')!.parentElement!;
+      return getComputedStyle(pane).boxShadow;
+    });
+  await page.locator('.cm-content').first().click();
+  // Outside Focus mode the pane with the keyboard is ringed.
+  expect(await ring()).not.toBe('none');
+  await enter(page);
+  await expect(page.locator('.cm-editor.cm-focused')).toHaveCount(1);
+  expect(await ring()).toBe('none');
 });

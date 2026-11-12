@@ -510,6 +510,7 @@
         "openFile": "Open a file",
         "sidebar": "Show or hide the sidebar",
         "focus": "Focus mode",
+        "night": "Switch between light and dark",
         "actions": "Show the actions",
         "settings": "Settings",
         "quit": "Quit",
@@ -1322,6 +1323,7 @@
       "lineNumbers": "Line numbers",
       "outline": "Outline",
       "focus": "Focus mode",
+      "night": "Dark mode",
       "fullscreen": "Full screen",
       "minimize": "Minimize",
       "maximize": "Maximize",
@@ -1410,6 +1412,8 @@
   },
   "focus": {
     "on": "Focus mode on. Press Escape twice to leave.",
-    "off": "Focus mode off."
+    "off": "Focus mode off.",
+    "toDark": "Switch to dark mode",
+    "toLight": "Switch to light mode"
   }
 }

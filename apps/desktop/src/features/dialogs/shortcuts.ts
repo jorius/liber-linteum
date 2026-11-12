@@ -53,6 +53,7 @@ export const SHORTCUT_GROUPS = [
     items: [
       { keys: 'Mod+\\', label: 'sidebar' },
       { keys: 'Alt+Mod+Z', label: 'focus' },
+      { keys: 'Alt+Mod+N', label: 'night' },
       { keys: 'Mod+J', label: 'actions' },
       { keys: 'Mod+,', label: 'settings' },
       { keys: 'Mod+Q', label: 'quit' },

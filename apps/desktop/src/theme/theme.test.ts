@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { applyTheme } from './theme';
+import { applyTheme, nextTheme } from './theme';
 
 describe('Q-UI-1 theme preference', () => {
   it('system removes the override so CSS follows the OS', () => {
@@ -20,5 +20,17 @@ describe('Q-UI-1 theme preference', () => {
     expect(document.documentElement.dataset.theme).toBe('dark');
     applyTheme('system');
     expect(document.documentElement.hasAttribute('data-theme')).toBe(false);
+  });
+});
+
+describe('night mode swap', () => {
+  it('flips an explicit theme', () => {
+    expect(nextTheme('light', true)).toBe('dark');
+    expect(nextTheme('dark', false)).toBe('light');
+  });
+
+  it('from system, picks the opposite of what the system shows', () => {
+    expect(nextTheme('system', true)).toBe('light');
+    expect(nextTheme('system', false)).toBe('dark');
   });
 });

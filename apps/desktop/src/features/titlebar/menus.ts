@@ -51,7 +51,15 @@ export interface MenuContext {
   vault: { name: string; root: string; encrypted: boolean; scratchpad: boolean } | null;
   /** The vaults Vault → Switch Vault lists (the recent ones). */
   vaults: { path: string; name: string }[];
-  toggles: { focus: boolean; sidebar: boolean; toolbar: boolean; lineNumbers: boolean; outline: boolean };
+  toggles: {
+    focus: boolean;
+    sidebar: boolean;
+    toolbar: boolean;
+    lineNumbers: boolean;
+    outline: boolean;
+    /** Dark is showing (the night item's check). */
+    night: boolean;
+  };
   maximized: boolean;
   /** Windows writes redo as Ctrl+Y; Linux as Ctrl+Shift+Z. */
   windows: boolean;
@@ -174,6 +182,11 @@ export function buildMenus(t: TFunction, ctx: MenuContext): MenuDef[] {
     item('lineNumbers', { id: 'liber-toggle-line-numbers', checked: toggles.lineNumbers }),
     item('outline', { id: 'liber-toggle-outline', checked: toggles.outline }),
   ];
+  const night = item('night', {
+    id: 'liber-toggle-theme',
+    keys: 'Alt+Mod+N',
+    checked: toggles.night,
+  });
   const view: MenuDef = {
     key: 'view',
     label: t('titlebar.menus.view'),
@@ -202,9 +215,15 @@ export function buildMenus(t: TFunction, ctx: MenuContext): MenuDef[] {
             checked: toggles.focus,
             disabled: !open,
           }),
+          night,
           item('fullscreen', { action: 'fullscreen', keys: 'F11' }),
         ]
-      : [...toggleItems, sep('s1'), item('fullscreen', { action: 'fullscreen', keys: 'F11' })],
+      : [
+          ...toggleItems,
+          sep('s1'),
+          night,
+          item('fullscreen', { action: 'fullscreen', keys: 'F11' }),
+        ],
   };
   const windowMenu: MenuDef = {
     key: 'window',

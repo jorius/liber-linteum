@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type MouseEvent, type ReactNode } from 're
 import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import { useAppVersion } from '../../app/useAppVersion';
+import { useMediaQuery } from '../../app/useMediaQuery';
 import {
   menuActivate,
   onWindowResized,
@@ -79,6 +80,7 @@ export function TitleBar({ main }: { main: boolean }) {
   const info = useVaultStore((s) => s.info);
   const settings = useSettingsStore((s) => s.settings);
   const focus = useUiStore((s) => s.focus);
+  const systemDark = useMediaQuery('(prefers-color-scheme: dark)');
   const [vaults, setVaults] = useState<{ path: string; name: string }[]>([]);
   const [open, setOpen] = useState<number | null>(null);
   const [active, setActive] = useState(-1);
@@ -117,6 +119,7 @@ export function TitleBar({ main }: { main: boolean }) {
       toolbar: settings.toolbar,
       lineNumbers: settings.lineNumbers,
       outline: settings.outline,
+      night: settings.theme === 'dark' || (settings.theme === 'system' && systemDark),
     },
     maximized,
     windows,

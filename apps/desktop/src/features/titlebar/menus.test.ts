@@ -9,7 +9,7 @@ const ctx = (over: Partial<MenuContext> = {}): MenuContext => ({
   main: true,
   vaults: [],
   vault: { name: 'Kessari', root: '/v/kessari', encrypted: false, scratchpad: false },
-  toggles: { focus: false, sidebar: true, toolbar: false, lineNumbers: true, outline: false },
+  toggles: { focus: false, sidebar: true, toolbar: false, lineNumbers: true, outline: false, night: false },
   maximized: false,
   windows: false,
   ...over,
