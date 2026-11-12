@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { assetUrl } from '../../ipc';
 import { nameOf } from '../../stores/tree';
+import { useUiStore } from '../../stores/uiStore';
 import { revealKey } from '../explorer/reveal';
 import { openImage, revealImage, useCanReveal } from '../preview/ImageMenu';
 import { BackArrow } from './BackArrow';
@@ -14,13 +15,14 @@ import styles from './PageView.module.css';
  *  window. Keyed by path, so another image starts unmeasured. */
 export function ImageView({ path }: { path: string }) {
   const { t } = useTranslation();
+  const focus = useUiStore((s) => s.focus);
   const image = { path, external: false };
   const canReveal = useCanReveal(image);
   const [size, setSize] = useState<{ width: number; height: number } | null>(null);
   const [broken, setBroken] = useState(false);
   return (
     <section className={styles.page} aria-label={t('page.region')}>
-      <div data-band="plain" className={styles.band}>
+      <div data-band="plain" className={styles.band} hidden={focus}>
         <div className={styles.bandRows}>
           <div className={styles.heading}>
             <PageTitle path={path} />

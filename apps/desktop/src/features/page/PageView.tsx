@@ -3,6 +3,7 @@ import { useEditorStore } from '../../stores/editorStore';
 import { errorMessage } from '../../stores/messages';
 import { usePageStore } from '../../stores/pageStore';
 import { useSettingsStore } from '../../stores/settingsStore';
+import { useUiStore } from '../../stores/uiStore';
 import { nameOf } from '../../stores/tree';
 import { ArchivedBanner } from '../bin/ArchivedBanner';
 import { Editor } from '../editor/Editor';
@@ -26,7 +27,9 @@ export function PageView() {
   // Unsaved text its file can no longer take (final review I3): shown with
   // its notice, even though the file now reads as binary.
   const kept = useEditorStore((s) => s.unwritable !== null && s.dirty);
-  const mode = useSettingsStore((s) => s.settings.editorMode);
+  const setting = useSettingsStore((s) => s.settings.editorMode);
+  // Focus mode shows Live Preview without touching the setting.
+  const mode = useUiStore((s) => s.focus) ? 'livePreview' : setting;
 
   if (state === 'empty') {
     return (

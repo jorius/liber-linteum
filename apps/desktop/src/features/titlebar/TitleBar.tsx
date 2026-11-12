@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type MouseEvent, type ReactNode } from 're
 import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import { useAppVersion } from '../../app/useAppVersion';
+import { useMediaQuery } from '../../app/useMediaQuery';
 import {
   menuActivate,
   onWindowResized,
@@ -13,6 +14,7 @@ import {
   windowToggleMaximize,
 } from '../../ipc';
 import { useSettingsStore } from '../../stores/settingsStore';
+import { useUiStore } from '../../stores/uiStore';
 import { useVaultStore } from '../../stores/vaultStore';
 import { Dialog } from '../dialogs/Dialog';
 import { vaultChoices } from '../shell/shellMenu';
@@ -77,6 +79,8 @@ export function TitleBar({ main }: { main: boolean }) {
   const status = useVaultStore((s) => s.status);
   const info = useVaultStore((s) => s.info);
   const settings = useSettingsStore((s) => s.settings);
+  const focus = useUiStore((s) => s.focus);
+  const systemDark = useMediaQuery('(prefers-color-scheme: dark)');
   const [vaults, setVaults] = useState<{ path: string; name: string }[]>([]);
   const [open, setOpen] = useState<number | null>(null);
   const [active, setActive] = useState(-1);
@@ -110,10 +114,12 @@ export function TitleBar({ main }: { main: boolean }) {
         : null,
     vaults,
     toggles: {
+      focus,
       sidebar: !settings.sidebarCollapsed,
       toolbar: settings.toolbar,
       lineNumbers: settings.lineNumbers,
       outline: settings.outline,
+      night: settings.theme === 'dark' || (settings.theme === 'system' && systemDark),
     },
     maximized,
     windows,
@@ -217,6 +223,8 @@ export function TitleBar({ main }: { main: boolean }) {
     else void windowStartDrag();
   };
 
+  // Focus mode hides the bar; its keys above still work.
+  if (main && focus) return null;
   let index = -1;
   return (
     <>

@@ -8,6 +8,7 @@ import { Editor } from '../editor/Editor';
 import { onViewUpdate, useCurrentView } from '../editor/viewUpdates';
 import { BackArrow } from './BackArrow';
 import { Breadcrumb } from './Breadcrumb';
+import { SaveStatus } from './SaveStatus';
 import styles from './PageView.module.css';
 import { PageTitle } from './PageTitle';
 import { UnwritableNotice } from './UnwritableNotice';
@@ -49,16 +50,16 @@ export function TextStats() {
  *  app. */
 export function TextView({ path }: { path: string }) {
   const { t } = useTranslation();
+  const focus = useUiStore((s) => s.focus);
   const doc = useEditorStore((s) => s.doc);
   const error = useEditorStore((s) => s.error);
-  const status = useEditorStore((s) => s.status);
   // Rewritten outside as something it can't edit, with nothing unsaved to
   // keep: as if opened now (final review I3), never the stale text.
   const gone = useEditorStore((s) => s.unwritable === 'disk' && !s.dirty);
   const notText = gone || error?.kind === 'notAText';
   return (
     <section className={styles.page} aria-label={t('page.region')}>
-      <div data-band="plain" className={styles.band}>
+      <div data-band="plain" className={styles.band} hidden={focus}>
         <div className={styles.bandRows}>
           <div className={styles.heading}>
             <PageTitle path={path} />
@@ -70,14 +71,7 @@ export function TextView({ path }: { path: string }) {
             </div>
             {doc && !notText && (
               <div className={styles.controls}>
-                <span
-                  role="status"
-                  aria-label={t('editor.saveStatus')}
-                  data-status={status}
-                  className={`${styles.status} ${styles.pill}`}
-                >
-                  {t(`editor.${status}`)}
-                </span>
+                <SaveStatus />
                 <TextStats />
                 <CursorPosition />
               </div>

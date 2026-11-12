@@ -509,6 +509,8 @@
         "lockVault": "Lock the vault",
         "openFile": "Open a file",
         "sidebar": "Show or hide the sidebar",
+        "focus": "Focus mode",
+        "night": "Switch between light and dark",
         "actions": "Show the actions",
         "settings": "Settings",
         "quit": "Quit",
@@ -915,7 +917,15 @@
   "diagram": {
     "label": "Diagram: {first}",
     "failed": "Diagram that couldn't be drawn",
-    "newerMacos": "This diagram needs a newer macOS."
+    "newerMacos": "This diagram needs a newer macOS.",
+    "menu": "Diagram menu",
+    "preview": "Preview",
+    "editSource": "Edit source",
+    "previewTitle": "Diagram preview",
+    "previewLabel": "Diagram",
+    "zoomIn": "Zoom in",
+    "zoomOut": "Zoom out",
+    "fit": "Fit"
   },
   "outline": {
     "title": "Outline",
@@ -1312,6 +1322,8 @@
       "toolbar": "Formatting toolbar",
       "lineNumbers": "Line numbers",
       "outline": "Outline",
+      "focus": "Focus mode",
+      "night": "Dark mode",
       "fullscreen": "Full screen",
       "minimize": "Minimize",
       "maximize": "Maximize",
@@ -1397,5 +1409,11 @@
     "close": "Close",
     "closeNamed": "Close {name}",
     "unsaved": "Unsaved changes"
+  },
+  "focus": {
+    "on": "Focus mode on. Press Escape twice to leave.",
+    "off": "Focus mode off.",
+    "toDark": "Switch to dark mode",
+    "toLight": "Switch to light mode"
   }
 }

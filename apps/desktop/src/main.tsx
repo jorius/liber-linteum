@@ -22,9 +22,10 @@ import { installSearchMenuIfTauri } from './features/search/searchMenu';
 import { installSaveKey, installShellMenuIfTauri } from './features/shell/shellMenu';
 import { installEditorKeys, installNoFindBar } from './features/shell/useGlobalShortcuts';
 import { installQuitGuardIfTauri } from './stores/editorStore';
-import { installMenuTogglesIfTauri } from './stores/menuToggles';
+import { installMenuTogglesIfTauri, installNightKey } from './stores/menuToggles';
 import { installMenuNavigationIfTauri } from './stores/navigate';
 import { installSettingsSync, useSettingsStore } from './stores/settingsStore';
+import { installFocusMode } from './features/focus/focusMode';
 import { applyTheme } from './theme/theme';
 
 applyTheme('system');
@@ -42,6 +43,7 @@ void initI18n(detectLanguage(navigator.languages))
   .then(() => {
     installQuitGuardIfTauri();
     installMenuTogglesIfTauri();
+    installNightKey();
     installShellMenuIfTauri(!singleFile);
     installSaveKey();
     installNoFindBar();
@@ -60,6 +62,7 @@ void initI18n(detectLanguage(navigator.languages))
       installFileDropIfTauri();
       installRecorderEvents();
       installOpenInVault();
+      installFocusMode();
     }
     createRoot(document.getElementById('root')!).render(
       <StrictMode>

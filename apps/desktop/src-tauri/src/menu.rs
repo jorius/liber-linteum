@@ -33,8 +33,10 @@ pub const TOOLBAR_ID: &str = "liber-toggle-toolbar";
 pub const LINE_NUMBERS_ID: &str = "liber-toggle-line-numbers";
 /// Id of View → Toggle Outline (M4b part 2 §5).
 pub const OUTLINE_ID: &str = "liber-toggle-outline";
+/// Id of View → Toggle Dark Mode: light and dark swap (the page handles ⌥⌘N).
+pub const THEME_ID: &str = "liber-toggle-theme";
 /// Event telling the page to flip a setting; payload `"toolbar"`,
-/// `"lineNumbers"` or `"outline"` (the settings key).
+/// `"lineNumbers"`, `"outline"` (the settings key) or `"theme"`.
 pub const TOGGLE_EVENT: &str = "menu:toggle";
 /// Ids of View → Editor / Global View (M3a §2).
 pub const EDITOR_ID: &str = "liber-screen-edit";
@@ -261,6 +263,9 @@ pub const SAVE_EVENT: &str = "menu:save";
 /// View → Toggle Sidebar (M5b §2.5): the main window's sidebar.
 pub const SIDEBAR_ID: &str = "liber-toggle-sidebar";
 pub const SIDEBAR_EVENT: &str = "menu:sidebar";
+/// View → Toggle Focus Mode: the page handles ⌥⌘Z, as with the sidebar.
+pub const FOCUS_ID: &str = "liber-toggle-focus";
+pub const FOCUS_EVENT: &str = "menu:focus";
 
 /// The app menu: About, Settings… (M5b §2.1), Services, Hide, Hide Others,
 /// Show All, Quit (ours); Vault (Open Vault…, Close Vault ⌥⌘W, M5b §2.1);
@@ -451,6 +456,8 @@ pub fn app_menu<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
     let outline = MenuItem::with_id(app, OUTLINE_ID, "Toggle Outline", true, None::<&str>)?;
     // No accelerator: the page handles ⌘\, and a toggle fired twice undoes itself.
     let sidebar = MenuItem::with_id(app, SIDEBAR_ID, "Toggle Sidebar", true, None::<&str>)?;
+    let focus = MenuItem::with_id(app, FOCUS_ID, "Toggle Focus Mode", true, None::<&str>)?;
+    let theme = MenuItem::with_id(app, THEME_ID, "Toggle Dark Mode", true, None::<&str>)?;
     let view = Submenu::with_items(
         app,
         "View",
@@ -470,6 +477,8 @@ pub fn app_menu<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
             &line_numbers,
             &outline,
             &PredefinedMenuItem::separator(app)?,
+            &focus,
+            &theme,
             &PredefinedMenuItem::fullscreen(app, None)?,
         ],
     )?;
@@ -542,6 +551,8 @@ fn activate<R: Runtime>(app: &AppHandle<R>, id: &str, target: Option<String>) {
         emit_to(app, &target, TOGGLE_EVENT, "lineNumbers");
     } else if id == OUTLINE_ID {
         emit_to(app, &target, TOGGLE_EVENT, "outline");
+    } else if id == THEME_ID {
+        emit_to(app, &target, TOGGLE_EVENT, "theme");
     } else if id == QUICK_NOTE_ID {
         // Quick notes are taken in the main window, wherever ⌘⇧N was pressed.
         if let Some(main) = app.get_webview_window("main") {
@@ -570,6 +581,8 @@ fn activate<R: Runtime>(app: &AppHandle<R>, id: &str, target: Option<String>) {
         emit_main(app, VAULT_EVENT, format!("switch:{path}"));
     } else if id == SIDEBAR_ID {
         emit_main(app, SIDEBAR_EVENT, ());
+    } else if id == FOCUS_ID {
+        emit_main(app, FOCUS_EVENT, ());
     }
 }
 

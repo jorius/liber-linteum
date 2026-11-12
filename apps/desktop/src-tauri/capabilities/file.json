@@ -10,6 +10,8 @@
     "allow-window-toggle-maximize",
     "allow-window-maximized",
     "allow-window-toggle-fullscreen",
+    "allow-window-fullscreen",
+    "allow-window-set-fullscreen",
     "allow-window-start-drag",
     "allow-window-close-request",
     "allow-window-paste",

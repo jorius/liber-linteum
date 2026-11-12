@@ -5,7 +5,7 @@ import { useUiStore } from '../../stores/uiStore';
 import { useVaultStore } from '../../stores/vaultStore';
 import { openNewVault } from '../encryption/CreateEncryptedHost';
 import { openEncryptInPlace } from '../encryption/encryptInPlace';
-import { installSaveKey, installShellMenu, openSettings } from './shellMenu';
+import { installSaveKey, installShellMenu, openSettings, toggleSidebar } from './shellMenu';
 import { useEditorStore } from '../../stores/editorStore';
 
 const prompt = vi.hoisted(() => ({ needs: false, answer: true, order: [] as string[] }));
@@ -126,6 +126,13 @@ describe('M5b §2.1, §2.5: the app menu items the page answers', () => {
       expect(useSettingsStore.getState().settings.sidebarCollapsed).toBe(true),
     );
     stop();
+  });
+
+  it('toggleSidebar while focused leaves Focus mode and keeps the sidebar setting', async () => {
+    useUiStore.setState({ focus: true });
+    toggleSidebar();
+    await vi.waitFor(() => expect(useUiStore.getState().focus).toBe(false));
+    expect(useSettingsStore.getState().settings.sidebarCollapsed).toBe(false);
   });
 
   it('a file window answers Settings, never the vault or sidebar items', async () => {

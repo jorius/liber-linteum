@@ -26,6 +26,7 @@ import { useCoverLayoutStore, useCoverSide } from '../../stores/coverLayoutStore
 import { useEditorStore } from '../../stores/editorStore';
 import { errorMessage } from '../../stores/messages';
 import { useToastStore } from '../../stores/toastStore';
+import { useUiStore } from '../../stores/uiStore';
 import { useVaultStore } from '../../stores/vaultStore';
 import { recordCoverSide } from '../editor/coverSideHistory';
 import { useCoverResize } from './CoverResize';
@@ -131,6 +132,8 @@ export function Cover({
 }) {
   const { t } = useTranslation();
   const cover = useCover(page);
+  // Focus mode hides the band and the strip in place: the editor in `body` stays.
+  const focused = useUiStore((s) => s.focus);
   const resize = useCoverResize(page.path);
   const chosen = useCoverSide(page.path);
   const stripSide = chosen !== 'top' && cover.kind !== 'none' ? chosen : null;
@@ -483,6 +486,7 @@ export function Cover({
     <div
       ref={band}
       data-band={plain ? 'plain' : 'cover'}
+      hidden={focused}
       role={plain ? undefined : 'group'}
       aria-label={plain ? undefined : t('cover.label')}
       className={
@@ -502,6 +506,7 @@ export function Cover({
     <div
       ref={stripEl}
       data-cover-strip={side}
+      hidden={focused}
       role="group"
       aria-label={t('cover.label')}
       className={`${styles.strip} ${repositioning ? styles.repositioning : ''}`}

@@ -149,6 +149,7 @@ export function MermaidView({ source }: { source: string }) {
   return (
     <div
       className={styles.diagram}
+      data-liber="diagram"
       role="img"
       aria-label={t('diagram.label', { first })}
       // Mermaid's own output, sanitized by its strict security level; links

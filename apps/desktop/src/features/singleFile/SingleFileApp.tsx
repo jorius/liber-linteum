@@ -18,6 +18,7 @@ import { CursorPosition } from '../page/CursorPosition';
 import { TextStats } from '../page/TextView';
 import { WidthMenu } from '../page/WidthMenu';
 import { WordCount } from '../page/WordCount';
+import { SaveStatus } from '../page/SaveStatus';
 import page from '../page/PageView.module.css';
 import shell from '../shell/Shell.module.css';
 import { Toaster } from '../toasts/Toaster';
@@ -162,7 +163,6 @@ function FileView({ info }: { info: FileInfo }) {
   const { t } = useTranslation();
   const doc = useEditorStore((s) => s.doc);
   const error = useEditorStore((s) => s.error);
-  const status = useEditorStore((s) => s.status);
   const mode = useSettingsStore((s) => s.settings.editorMode);
   const toolbar = useSettingsStore((s) => s.settings.toolbar);
   const outline = useSettingsStore((s) => s.settings.outline);
@@ -185,14 +185,7 @@ function FileView({ info }: { info: FileInfo }) {
               </div>
               {doc && (
                 <div className={page.controls}>
-                  <span
-                    role="status"
-                    aria-label={t('editor.saveStatus')}
-                    data-status={status}
-                    className={`${page.status} ${page.pill}`}
-                  >
-                    {t(`editor.${status}`)}
-                  </span>
+                  <SaveStatus />
                   {text ? <TextStats /> : <WordCount />}
                   <CursorPosition />
                   {!text && (

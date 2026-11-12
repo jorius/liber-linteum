@@ -842,6 +842,8 @@ export const windowMinimize = () => call<void>('window_minimize');
 export const windowToggleMaximize = () => call<boolean>('window_toggle_maximize');
 export const windowMaximized = () => call<boolean>('window_maximized');
 export const windowToggleFullscreen = () => call<void>('window_toggle_fullscreen');
+export const windowFullscreen = () => call<boolean>('window_fullscreen');
+export const windowSetFullscreen = (full: boolean) => call<void>('window_set_fullscreen', { full });
 /** Moves the window with the pointer (a press on the title bar). */
 export const windowStartDrag = () => call<void>('window_start_drag');
 /** A close request, as the system's close button sends: the page saves first. */
@@ -1427,6 +1429,9 @@ export const onMenuSave = (cb: () => void): Promise<UnlistenFn> =>
 /** View → Toggle Sidebar (M5b §2.5). */
 export const onMenuSidebar = (cb: () => void): Promise<UnlistenFn> =>
   listen<null>('menu:sidebar', () => cb(), mine());
+/** View → Toggle Focus Mode. */
+export const onMenuFocus = (cb: () => void): Promise<UnlistenFn> =>
+  listen<null>('menu:focus', () => cb(), mine());
 export const onVaultLocked = (cb: (path: string) => void): Promise<UnlistenFn> =>
   listen<VaultLockedPayload>('vault:locked', (e) => cb(e.payload.path), mine());
 export const onLockRequest = (

@@ -53,6 +53,8 @@ describe('Settings → Keyboard shortcuts (M5b §18)', () => {
     const ctrl = [...menu.matchAll(/"((?:Alt\+|Shift\+)*Ctrl\+[^"]+)"/g)].map((m) => m[1]);
     expect(ctrl).toContain('Ctrl+G');
     for (const a of ctrl) expect(listed, a).toContain(a);
+    expect(keyLabel('Alt+Mod+Z', true)).toBe('⌥⌘Z');
+    expect(listed).toContain('Alt+Mod+Z');
     expect(keyLabel('Ctrl+G', true)).toBe('⌃G');
     expect(keyLabel('Ctrl+G', false)).toBe('Ctrl+G');
   });

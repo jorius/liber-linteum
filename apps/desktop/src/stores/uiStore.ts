@@ -55,6 +55,9 @@ export type DialogState =
       /** Called once: keep both (true) or cancel (false). */
       answer: (keepBoth: boolean) => void;
     }
+  /** Zoom / pan a rendered diagram or block maths (`features/preview/openDiagramPreview.ts`);
+   *  `html`: its already-sanitised markup; `returnTo`: focus on close. */
+  | { type: 'diagramPreview'; html: string; kind: 'diagram' | 'math'; returnTo: HTMLElement | null }
   | null;
 
 export type UnsavedChoice = 'save' | 'discard' | 'cancel';
@@ -81,6 +84,9 @@ interface UiState {
   /** A quit came while a folder is being encrypted: the encrypt dialog asks
    *  "Quit anyway?" inside itself (a toast would sit under its backdrop). */
   quitAsked: boolean;
+  /** Focus mode (session only; `features/focus/focusMode.ts`). */
+  focus: boolean;
+  setFocus: (on: boolean) => void;
 }
 
 /** The voided-key prompt (or the new key made in its place), and a dialog
@@ -109,4 +115,6 @@ export const useUiStore = create<UiState>((set, get) => ({
   held: false,
   hold: (held) => set({ held }),
   quitAsked: false,
+  focus: false,
+  setFocus: (focus) => set({ focus }),
 }));

@@ -1,0 +1,65 @@
+.body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.toolbar {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.percent {
+  min-width: 4ch;
+  text-align: center;
+  font: 600 13px var(--font-body);
+  font-variant-numeric: tabular-nums;
+  color: var(--color-text-body);
+}
+
+.viewport {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+}
+
+/* WebKit counts the focus given on open as :focus-visible, even after a
+   click: no ring until the keyboard is used here (data-keys). An engine
+   without :focus-visible drops this whole rule and keeps its own ring. */
+.viewport:not([data-keys]):focus:not(:focus-visible),
+.viewport:not([data-keys]):focus-visible {
+  outline: none;
+}
+
+.viewport[data-keys]:focus {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 2px;
+}
+
+.viewport:active {
+  cursor: grabbing;
+}
+
+/* Laid out at its natural size; the transform does the rest. */
+.layer {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: max-content;
+  transform-origin: 0 0;
+}
+
+.layer svg {
+  display: block;
+}

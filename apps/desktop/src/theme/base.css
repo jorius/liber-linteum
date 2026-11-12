@@ -24,6 +24,11 @@ html[data-titlebar] {
   --titlebar-height: 38px;
 }
 
+/* Focus mode hides the bar (its own space and popups' offset go with it). */
+html[data-titlebar][data-focus] {
+  --titlebar-height: 0px;
+}
+
 /* On #root, not body: dnd-kit measures drops against the body's box, and a
    padded body put every drop target the bar's height off. */
 html[data-titlebar] #root {
@@ -124,6 +129,9 @@ body {
 /* Text for screen readers only (live regions made outside React). */
 .liber-sr-only {
   position: absolute;
+  /* Left where it falls, it sits under the full-height app and scrolls the window. */
+  top: 0;
+  left: 0;
   width: 1px;
   height: 1px;
   overflow: hidden;

@@ -32,6 +32,7 @@ export function Dialog({
   returnFocus,
   dismissible = false,
   wide = false,
+  fill = false,
   bare = false,
   panes = false,
   hideTitle = false,
@@ -46,6 +47,8 @@ export function Dialog({
   returnFocus?: () => HTMLElement | null | undefined;
   dismissible?: boolean;
   wide?: boolean;
+  /** Nearly the whole window (the diagram preview). */
+  fill?: boolean;
   bare?: boolean;
   panes?: boolean;
   hideTitle?: boolean;
@@ -160,7 +163,7 @@ export function Dialog({
         aria-modal="true"
         aria-labelledby={titleId}
         aria-describedby={describedBy}
-        className={`${styles.dialog} ${wide ? styles.wide : ''} ${bare ? styles.bare : ''} ${panes ? styles.panes : ''}`}
+        className={`${styles.dialog} ${wide ? styles.wide : ''} ${fill ? styles.fill : ''} ${bare ? styles.bare : ''} ${panes ? styles.panes : ''}`}
         onKeyDown={onKeyDown}
       >
         {badge ? (

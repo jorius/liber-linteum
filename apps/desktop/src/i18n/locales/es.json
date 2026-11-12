@@ -509,6 +509,8 @@
         "lockVault": "Bloquear la bóveda",
         "openFile": "Abrir un archivo",
         "sidebar": "Mostrar u ocultar la barra lateral",
+        "focus": "Modo concentración",
+        "night": "Alternar entre claro y oscuro",
         "actions": "Mostrar las acciones",
         "settings": "Ajustes",
         "quit": "Salir",
@@ -915,7 +917,15 @@
   "diagram": {
     "label": "Diagrama: {first}",
     "failed": "Diagrama que no se pudo dibujar",
-    "newerMacos": "Este diagrama necesita una versión más reciente de macOS."
+    "newerMacos": "Este diagrama necesita una versión más reciente de macOS.",
+    "menu": "Menú del diagrama",
+    "preview": "Vista previa",
+    "editSource": "Editar código",
+    "previewTitle": "Vista previa del diagrama",
+    "previewLabel": "Diagrama",
+    "zoomIn": "Acercar",
+    "zoomOut": "Alejar",
+    "fit": "Ajustar"
   },
   "outline": {
     "title": "Esquema",
@@ -1312,6 +1322,8 @@
       "toolbar": "Barra de formato",
       "lineNumbers": "Números de línea",
       "outline": "Esquema",
+      "focus": "Modo concentración",
+      "night": "Modo oscuro",
       "fullscreen": "Pantalla completa",
       "minimize": "Minimizar",
       "maximize": "Maximizar",
@@ -1397,5 +1409,11 @@
     "close": "Cerrar",
     "closeNamed": "Cerrar {name}",
     "unsaved": "Cambios sin guardar"
+  },
+  "focus": {
+    "on": "Modo concentración activado. Pulsa Escape dos veces para salir.",
+    "off": "Modo concentración desactivado.",
+    "toDark": "Cambiar a modo oscuro",
+    "toLight": "Cambiar a modo claro"
   }
 }

@@ -10,6 +10,7 @@ import {
   pickFolder,
   vaultsRecent,
 } from '../../ipc';
+import { leaveFocus } from '../focus/focusMode';
 import { openNewVault } from '../encryption/CreateEncryptedHost';
 import { openDecryptInPlace } from '../encryption/decryptInPlace';
 import { openEncryptInPlace } from '../encryption/encryptInPlace';
@@ -73,6 +74,8 @@ function syncVaultChoices(): () => void {
 export const closeVault = () => void useVaultStore.getState().close();
 
 export const toggleSidebar = () => {
+  // Mod+\ while focused just leaves; the sidebar comes back as it was.
+  if (useUiStore.getState().focus) return void leaveFocus();
   const { settings, update } = useSettingsStore.getState();
   const collapsing = !settings.sidebarCollapsed;
   const active = document.activeElement;

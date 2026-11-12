@@ -313,6 +313,7 @@ export function installIpcMock({
     settings_get: () => ({ settings }),
     settings_set: (a) => {
       const patch = a.patch as Record<string, unknown>;
+      ((w.__liberSettingsPatches ??= []) as unknown[]).push(patch);
       // Refuses what Rust refuses (custom themes review I3): a bad colour
       // (rgba only for sideSel), a name over 80 characters, over 100 themes.
       const themes = patch.customThemes as
@@ -1242,6 +1243,12 @@ export function installIpcMock({
     window_maximized: () => false,
     window_toggle_maximize: () => true,
     window_toggle_fullscreen: () => null,
+    window_fullscreen: () => (w.__liberFullscreen as boolean | undefined) ?? false,
+    window_set_fullscreen: (a) => {
+      w.__liberFullscreen = a.full as boolean;
+      window.dispatchEvent(new Event('resize'));
+      return null;
+    },
     window_start_drag: () => null,
     window_close_request: () => null,
     window_paste: () => null,

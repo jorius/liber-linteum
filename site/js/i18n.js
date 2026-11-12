@@ -213,7 +213,7 @@ export const dict = {
       'Type / at the start of a line to insert a heading, list, table, callout, code block, diagram or image without leaving the keyboard.',
     'roadmap.focus.title': 'Focus mode',
     'roadmap.focus.body':
-      'Hide everything but the text: no sidebar, no toolbar, and the paragraph you’re on in focus.',
+      'Hide everything but the text: no sidebar, no toolbar, just the words, the word count and whether it’s saved.',
     'roadmap.transcribe.title': 'Offline transcription',
     'roadmap.transcribe.body':
       'Turn a voice clip into text with a speech model that runs on your machine: the audio never leaves it.',
@@ -449,7 +449,7 @@ export const dict = {
       'Escribe / al inicio de una línea para insertar un título, una lista, una tabla, un aviso, un bloque de código, un diagrama o una imagen sin soltar el teclado.',
     'roadmap.focus.title': 'Modo concentración',
     'roadmap.focus.body':
-      'Oculta todo menos el texto: sin barra lateral, sin barra de herramientas, y el párrafo en el que estás en primer plano.',
+      'Oculta todo menos el texto: sin barra lateral ni barra de herramientas, solo tus palabras, el recuento y si está guardado.',
     'roadmap.transcribe.title': 'Transcripción sin conexión',
     'roadmap.transcribe.body':
       'Convierte un clip de voz en texto con un modelo de voz que corre en tu equipo: el audio nunca sale de él.',

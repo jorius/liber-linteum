@@ -1,12 +1,12 @@
-import { useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { entryReveal, externalReveal } from '../../ipc';
 import { errorMessage } from '../../stores/messages';
 import { useToastStore } from '../../stores/toastStore';
 import { useUiStore } from '../../stores/uiStore';
 import { useVaultStore } from '../../stores/vaultStore';
-import { placePopup, windowViewport } from '../editor/placePopup';
 import { revealKey } from '../explorer/reveal';
+import { PopupMenu } from './PopupMenu';
 
 /** An image the app shows: a vault path, or a file outside the vault. */
 export interface ShownImage {
@@ -59,69 +59,11 @@ export function ImageMenu({
 }) {
   const { t } = useTranslation();
   const canReveal = useCanReveal(image);
-  const items: [string, () => void][] = [
-    [t('page.openDefault'), () => openImage(image)],
-    ...(canReveal ? [[t(revealKey()), () => revealImage(image)] as [string, () => void]] : []),
+  const items = [
+    { label: t('page.openDefault'), run: () => openImage(image) },
+    ...(canReveal ? [{ label: t(revealKey()), run: () => revealImage(image) }] : []),
   ];
-  const [active, setActive] = useState(0);
-  const buttons = useRef<(HTMLButtonElement | null)[]>([]);
-  const box = useRef<HTMLDivElement>(null);
-  const [place, setPlace] = useState({ top: anchor.y, left: anchor.x });
-  useLayoutEffect(() => {
-    const el = box.current;
-    const size = { width: el?.offsetWidth ?? 0, height: el?.offsetHeight ?? 0 };
-    const { top, left } = placePopup(
-      { top: anchor.y, bottom: anchor.y, left: anchor.x },
-      size,
-      windowViewport(),
-    );
-    setPlace({ top, left });
-  }, [anchor.x, anchor.y]);
-  useEffect(() => buttons.current[active]?.focus(), [active]);
-  useEffect(() => {
-    const onDown = (e: MouseEvent) => {
-      if (box.current && !box.current.contains(e.target as Node)) onClose();
-    };
-    document.addEventListener('mousedown', onDown);
-    return () => document.removeEventListener('mousedown', onDown);
-  }, [onClose]);
-  const onKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
-    if (e.key === 'ArrowDown') setActive((a) => (a + 1) % items.length);
-    else if (e.key === 'ArrowUp') setActive((a) => (a - 1 + items.length) % items.length);
-    else if (e.key === 'Escape' || e.key === 'Tab') onClose();
-    else return;
-    e.preventDefault();
-    e.stopPropagation();
-  };
-  return (
-    <div
-      ref={box}
-      role="menu"
-      aria-label={t('image.menu')}
-      className="liber-menu"
-      style={{ position: 'fixed', left: place.left, top: place.top }}
-      onKeyDown={onKeyDown}
-    >
-      {items.map(([label, run], i) => (
-        <button
-          key={label}
-          ref={(el) => {
-            buttons.current[i] = el;
-          }}
-          type="button"
-          role="menuitem"
-          tabIndex={i === active ? 0 : -1}
-          onMouseMove={() => setActive(i)}
-          onClick={() => {
-            onClose();
-            run();
-          }}
-        >
-          {label}
-        </button>
-      ))}
-    </div>
-  );
+  return <PopupMenu label={t('image.menu')} items={items} anchor={anchor} onClose={onClose} />;
 }
 
 /** Opens the image menu on a right-click on an image in the editor, the
